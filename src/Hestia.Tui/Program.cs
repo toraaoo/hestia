@@ -32,6 +32,8 @@ services.AddSingleton<IJreManager>(sp =>
     new global::Hestia.Core.Jre.Manager(appDataDir, sp.GetRequiredService<HttpClient>(),
         sp.GetRequiredService<IEventBus>()));
 services.AddSingleton<IServerProvider, global::Hestia.Core.Server.Providers.Vanilla>();
+services.AddSingleton<IServerProvider, global::Hestia.Core.Server.Providers.Paper>();
+services.AddSingleton<IServerProvider, global::Hestia.Core.Server.Providers.Fabric>();
 services.AddSingleton<IServerManager>(sp =>
     new global::Hestia.Core.Server.Manager(appDataDir, sp.GetRequiredService<IJreManager>(),
         sp.GetServices<IServerProvider>(), sp.GetRequiredService<IEventBus>()));

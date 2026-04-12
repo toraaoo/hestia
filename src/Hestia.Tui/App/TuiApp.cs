@@ -139,8 +139,10 @@ internal sealed class TuiApp
 
         try
         {
-            var versions = await _service.GetAvailableVersionsAsync(ServerType.Vanilla, _appCts.Token);
+            var initialType = ServerType.Vanilla;
+            var versions = await _service.GetAvailableVersionsAsync(initialType, _appCts.Token);
             var form = new ServerCreateForm(_appInfo.AppDataDirectory, versions);
+            form.SetType(initialType);
             var mode = CreateMode.Normal;
 
             var editBuffer = string.Empty;
@@ -380,6 +382,9 @@ internal sealed class TuiApp
                         continue;
                     }
 
+                    if (key.Key == ConsoleKey.Oem2 || key.Key == ConsoleKey.Divide)
+                        continue;
+
                     if (IsPrintable(key))
                     {
                         versionQuery += key.KeyChar;
@@ -410,7 +415,14 @@ internal sealed class TuiApp
                     if (key.Key == ConsoleKey.Enter || key.Key == ConsoleKey.Tab)
                     {
                         if (types.Length > 0)
-                            form.SetType(types[typeCursor]);
+                        {
+                            var nextType = types[typeCursor];
+                            form.SetType(nextType);
+                            versions = await _service.GetAvailableVersionsAsync(nextType, _appCts.Token);
+                            versionQuery = string.Empty;
+                            versionCursor = FindIndex(versions, form.Version);
+                            if (versionCursor < 0) versionCursor = 0;
+                        }
 
                         mode = CreateMode.Normal;
                         createError = string.Empty;
