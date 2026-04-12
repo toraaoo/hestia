@@ -16,14 +16,14 @@ internal sealed class TuiApp
         Servers,
         JRE,
         Logs,
-        Stats,
+        Info,
         Command
     }
 
     private enum Tab
     {
         Logs,
-        Stats
+        Info
     }
 
     private enum PendingAction
@@ -143,6 +143,12 @@ internal sealed class TuiApp
             var versions = await _service.GetAvailableVersionsAsync(initialType, _appCts.Token);
             var form = new ServerCreateForm(_appInfo.AppDataDirectory, versions);
             form.SetType(initialType);
+
+            var existing = await _service.GetServersAsync(_appCts.Token);
+            var used = new HashSet<int>(existing.SelectMany(s => new[] { s.Options.Port, s.RconOptions.Port }));
+            form.SetServerPort(FindNextFreePort(25565, used));
+            used.Add(form.ServerPort);
+            form.SetRconPort(FindNextFreePort(25575, used));
             var mode = CreateMode.Normal;
 
             var editBuffer = string.Empty;
@@ -235,11 +241,35 @@ internal sealed class TuiApp
                         continue;
                     }
 
-                    if (key.Key == ConsoleKey.Spacebar && form.SelectedField == ServerCreateForm.Field.Eula)
+                    if (key.Key == ConsoleKey.Spacebar)
                     {
-                        form.ToggleEula();
-                        createError = string.Empty;
-                        continue;
+                        if (form.SelectedField == ServerCreateForm.Field.Eula)
+                        {
+                            form.ToggleEula();
+                            createError = string.Empty;
+                            continue;
+                        }
+
+                        if (form.SelectedField == ServerCreateForm.Field.OnlineMode)
+                        {
+                            form.ToggleOnlineMode();
+                            createError = string.Empty;
+                            continue;
+                        }
+
+                        if (form.SelectedField == ServerCreateForm.Field.Whitelist)
+                        {
+                            form.ToggleWhitelist();
+                            createError = string.Empty;
+                            continue;
+                        }
+
+                        if (form.SelectedField == ServerCreateForm.Field.RconEnabled)
+                        {
+                            form.ToggleRconEnabled();
+                            createError = string.Empty;
+                            continue;
+                        }
                     }
 
                     if (key.KeyChar == '/' || key.Key == ConsoleKey.Oem2 || key.Key == ConsoleKey.Divide)
@@ -266,9 +296,39 @@ internal sealed class TuiApp
                             continue;
                         }
 
-                        if (form.SelectedField is ServerCreateForm.Field.Name or ServerCreateForm.Field.Directory)
+                        if (form.SelectedField is ServerCreateForm.Field.Name
+                            or ServerCreateForm.Field.Directory
+                            or ServerCreateForm.Field.ServerPort
+                            or ServerCreateForm.Field.MaxPlayers
+                            or ServerCreateForm.Field.MotD
+                            or ServerCreateForm.Field.ViewDistance
+                            or ServerCreateForm.Field.LevelName
+                            or ServerCreateForm.Field.Difficulty
+                            or ServerCreateForm.Field.RconPort
+                            or ServerCreateForm.Field.RconPassword
+                            or ServerCreateForm.Field.RconTimeoutSeconds
+                            or ServerCreateForm.Field.JvmMinMemory
+                            or ServerCreateForm.Field.JvmMaxMemory
+                            or ServerCreateForm.Field.JvmAdditionalFlags)
                         {
-                            editOriginal = form.SelectedField == ServerCreateForm.Field.Name ? form.Name : form.Directory;
+                            editOriginal = form.SelectedField switch
+                            {
+                                ServerCreateForm.Field.Name => form.Name,
+                                ServerCreateForm.Field.Directory => form.Directory,
+                                ServerCreateForm.Field.ServerPort => form.ServerPort.ToString(),
+                                ServerCreateForm.Field.MaxPlayers => form.MaxPlayers.ToString(),
+                                ServerCreateForm.Field.MotD => form.MotD,
+                                ServerCreateForm.Field.ViewDistance => form.ViewDistance.ToString(),
+                                ServerCreateForm.Field.LevelName => form.LevelName,
+                                ServerCreateForm.Field.Difficulty => form.Difficulty,
+                                ServerCreateForm.Field.RconPort => form.RconPort.ToString(),
+                                ServerCreateForm.Field.RconPassword => form.RconPassword,
+                                ServerCreateForm.Field.RconTimeoutSeconds => form.RconTimeoutSeconds.ToString(),
+                                ServerCreateForm.Field.JvmMinMemory => form.JvmMinMemory,
+                                ServerCreateForm.Field.JvmMaxMemory => form.JvmMaxMemory,
+                                ServerCreateForm.Field.JvmAdditionalFlags => form.JvmAdditionalFlags,
+                                _ => string.Empty
+                            };
                             editBuffer = editOriginal;
                             mode = CreateMode.EditText;
                             createError = string.Empty;
@@ -282,6 +342,63 @@ internal sealed class TuiApp
                         {
                             createError = "Server name required";
                             continue;
+                        }
+
+                        if (!IsValidPort(form.ServerPort))
+                        {
+                            createError = "Server port must be 1-65535";
+                            continue;
+                        }
+
+                        if (form.MaxPlayers is < 1 or > 10_000)
+                        {
+                            createError = "Max players must be 1-10000";
+                            continue;
+                        }
+
+                        if (form.ViewDistance is < 2 or > 32)
+                        {
+                            createError = "View distance must be 2-32";
+                            continue;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(form.LevelName))
+                        {
+                            createError = "Level name required";
+                            continue;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(form.Difficulty))
+                        {
+                            createError = "Difficulty required";
+                            continue;
+                        }
+
+                        if (!IsValidPort(form.RconPort))
+                        {
+                            createError = "RCON port must be 1-65535";
+                            continue;
+                        }
+
+                        if (form.ServerPort == form.RconPort)
+                        {
+                            createError = "Server port and RCON port must differ";
+                            continue;
+                        }
+
+                        if (form.RconEnabled)
+                        {
+                            if (string.IsNullOrWhiteSpace(form.RconPassword))
+                            {
+                                createError = "RCON password required";
+                                continue;
+                            }
+
+                            if (form.RconTimeoutSeconds is < 1 or > 120)
+                            {
+                                createError = "RCON timeout must be 1-120";
+                                continue;
+                            }
                         }
 
                         if (!form.AcceptEula)
@@ -307,8 +424,92 @@ internal sealed class TuiApp
 
                     if (key.Key == ConsoleKey.Enter || key.Key == ConsoleKey.Tab)
                     {
-                        if (form.SelectedField == ServerCreateForm.Field.Name) form.SetName(editBuffer);
-                        else if (form.SelectedField == ServerCreateForm.Field.Directory) form.SetDirectory(editBuffer);
+                        if (form.SelectedField == ServerCreateForm.Field.Name)
+                        {
+                            form.SetName(editBuffer);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.Directory)
+                        {
+                            form.SetDirectory(editBuffer);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.ServerPort)
+                        {
+                            if (!TryParsePort(editBuffer, out var p))
+                            {
+                                createError = "Server port must be 1-65535";
+                                continue;
+                            }
+
+                            form.SetServerPort(p);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.MaxPlayers)
+                        {
+                            if (!int.TryParse(editBuffer.Trim(), out var mp) || mp is < 1 or > 10_000)
+                            {
+                                createError = "Max players must be 1-10000";
+                                continue;
+                            }
+
+                            form.SetMaxPlayers(mp);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.MotD)
+                        {
+                            form.SetMotD(editBuffer);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.ViewDistance)
+                        {
+                            if (!int.TryParse(editBuffer.Trim(), out var vd) || vd is < 2 or > 32)
+                            {
+                                createError = "View distance must be 2-32";
+                                continue;
+                            }
+
+                            form.SetViewDistance(vd);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.LevelName)
+                        {
+                            form.SetLevelName(editBuffer);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.Difficulty)
+                        {
+                            form.SetDifficulty(editBuffer);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.RconPort)
+                        {
+                            if (!TryParsePort(editBuffer, out var p))
+                            {
+                                createError = "RCON port must be 1-65535";
+                                continue;
+                            }
+
+                            form.SetRconPort(p);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.RconPassword)
+                        {
+                            form.SetRconPassword(editBuffer);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.RconTimeoutSeconds)
+                        {
+                            if (!int.TryParse(editBuffer.Trim(), out var t) || t is < 1 or > 120)
+                            {
+                                createError = "RCON timeout must be 1-120";
+                                continue;
+                            }
+
+                            form.SetRconTimeoutSeconds(t);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.JvmMinMemory)
+                        {
+                            form.SetJvmMinMemory(editBuffer);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.JvmMaxMemory)
+                        {
+                            form.SetJvmMaxMemory(editBuffer);
+                        }
+                        else if (form.SelectedField == ServerCreateForm.Field.JvmAdditionalFlags)
+                        {
+                            form.SetJvmAdditionalFlags(editBuffer);
+                        }
 
                         editBuffer = string.Empty;
                         mode = CreateMode.Normal;
@@ -440,13 +641,50 @@ internal sealed class TuiApp
                 }
             }
 
-            await CreateServerAsync(form.Name, form.Version, form.Directory, form.Type, form.AcceptEula);
+            await CreateServerAsync(
+                form.Name,
+                form.Version,
+                form.Directory,
+                form.Type,
+                form.ServerPort,
+                form.MaxPlayers,
+                form.MotD,
+                form.ViewDistance,
+                form.OnlineMode,
+                form.Whitelist,
+                form.LevelName,
+                form.Difficulty,
+                form.RconEnabled,
+                form.RconPort,
+                form.RconPassword,
+                form.RconTimeoutSeconds,
+                form.JvmMinMemory,
+                form.JvmMaxMemory,
+                form.JvmAdditionalFlags,
+                form.AcceptEula);
         }
         finally
         {
             Console.CursorVisible = false;
             AnsiConsole.Clear();
         }
+    }
+
+    private static bool IsValidPort(int port) => port is >= 1 and <= 65535;
+
+    private static bool TryParsePort(string value, out int port)
+    {
+        port = 0;
+        return int.TryParse(value.Trim(), out port) && IsValidPort(port);
+    }
+
+    private static int FindNextFreePort(int start, HashSet<int> used)
+    {
+        for (var p = Math.Max(1, start); p <= 65535; p++)
+            if (!used.Contains(p))
+                return p;
+
+        return start;
     }
 
     private Table RenderCreateFormTable(
@@ -475,6 +713,21 @@ internal sealed class TuiApp
                 ServerCreateForm.Field.Type => Markup.Escape(form.Type.ToString()),
                 ServerCreateForm.Field.Version => Markup.Escape(form.Version),
                 ServerCreateForm.Field.Directory => Markup.Escape(form.Directory),
+                ServerCreateForm.Field.ServerPort => form.ServerPort.ToString(),
+                ServerCreateForm.Field.MaxPlayers => form.MaxPlayers.ToString(),
+                ServerCreateForm.Field.MotD => Markup.Escape(form.MotD),
+                ServerCreateForm.Field.ViewDistance => form.ViewDistance.ToString(),
+                ServerCreateForm.Field.OnlineMode => form.OnlineMode ? "[green]ON[/]" : "[red]OFF[/]",
+                ServerCreateForm.Field.Whitelist => form.Whitelist ? "[green]ON[/]" : "[red]OFF[/]",
+                ServerCreateForm.Field.LevelName => Markup.Escape(form.LevelName),
+                ServerCreateForm.Field.Difficulty => Markup.Escape(form.Difficulty),
+                ServerCreateForm.Field.RconEnabled => form.RconEnabled ? "[green]ON[/]" : "[red]OFF[/]",
+                ServerCreateForm.Field.RconPort => form.RconPort.ToString(),
+                ServerCreateForm.Field.RconPassword => Markup.Escape(form.RconPassword),
+                ServerCreateForm.Field.RconTimeoutSeconds => form.RconTimeoutSeconds.ToString(),
+                ServerCreateForm.Field.JvmMinMemory => Markup.Escape(form.JvmMinMemory),
+                ServerCreateForm.Field.JvmMaxMemory => Markup.Escape(form.JvmMaxMemory),
+                ServerCreateForm.Field.JvmAdditionalFlags => Markup.Escape(form.JvmAdditionalFlags),
                 ServerCreateForm.Field.Eula => form.AcceptEula ? "[green]ON[/]" : "[red]OFF[/]",
                 _ => string.Empty
             };
@@ -486,6 +739,21 @@ internal sealed class TuiApp
             ("Type", Value(ServerCreateForm.Field.Type), ServerCreateForm.Field.Type),
             ("Version", Value(ServerCreateForm.Field.Version), ServerCreateForm.Field.Version),
             ("Directory", Value(ServerCreateForm.Field.Directory), ServerCreateForm.Field.Directory),
+            ("Server Port", Value(ServerCreateForm.Field.ServerPort), ServerCreateForm.Field.ServerPort),
+            ("Max Players", Value(ServerCreateForm.Field.MaxPlayers), ServerCreateForm.Field.MaxPlayers),
+            ("MotD", Value(ServerCreateForm.Field.MotD), ServerCreateForm.Field.MotD),
+            ("View Dist", Value(ServerCreateForm.Field.ViewDistance), ServerCreateForm.Field.ViewDistance),
+            ("Online", Value(ServerCreateForm.Field.OnlineMode), ServerCreateForm.Field.OnlineMode),
+            ("Whitelist", Value(ServerCreateForm.Field.Whitelist), ServerCreateForm.Field.Whitelist),
+            ("Level", Value(ServerCreateForm.Field.LevelName), ServerCreateForm.Field.LevelName),
+            ("Difficulty", Value(ServerCreateForm.Field.Difficulty), ServerCreateForm.Field.Difficulty),
+            ("RCON", Value(ServerCreateForm.Field.RconEnabled), ServerCreateForm.Field.RconEnabled),
+            ("RCON Port", Value(ServerCreateForm.Field.RconPort), ServerCreateForm.Field.RconPort),
+            ("RCON Pass", Value(ServerCreateForm.Field.RconPassword), ServerCreateForm.Field.RconPassword),
+            ("RCON T/O", Value(ServerCreateForm.Field.RconTimeoutSeconds), ServerCreateForm.Field.RconTimeoutSeconds),
+            ("Xms", Value(ServerCreateForm.Field.JvmMinMemory), ServerCreateForm.Field.JvmMinMemory),
+            ("Xmx", Value(ServerCreateForm.Field.JvmMaxMemory), ServerCreateForm.Field.JvmMaxMemory),
+            ("JVM Flags", Value(ServerCreateForm.Field.JvmAdditionalFlags), ServerCreateForm.Field.JvmAdditionalFlags),
             ("Accept EULA", Value(ServerCreateForm.Field.Eula), ServerCreateForm.Field.Eula)
         };
 
@@ -620,9 +888,9 @@ internal sealed class TuiApp
             return;
         }
 
-        if (_activeTab == Tab.Stats)
+        if (_activeTab == Tab.Info)
         {
-            right.Update(RenderStatsPanel());
+            right.Update(RenderInfoPanel());
             return;
         }
 
@@ -742,8 +1010,8 @@ internal sealed class TuiApp
         }
 
         var tabBar = _activeTab == Tab.Logs
-            ? "[bold underline]Logs[/]  [dim]Stats[/]"
-            : "[dim]Logs[/]  [bold underline]Stats[/]";
+            ? "[bold underline]Logs[/]  [dim]Info[/]"
+            : "[dim]Logs[/]  [bold underline]Info[/]";
 
         var headerSuffix = "[dim]←→:tab  f:follow  PgUp/PgDn:scroll[/]";
 
@@ -771,10 +1039,11 @@ internal sealed class TuiApp
         };
     }
 
-    private IRenderable RenderStatsPanel()
+    private IRenderable RenderInfoPanel()
     {
         var s = _session?.LatestStatus;
-        var focused = _activePane == Pane.Stats;
+        var focused = _activePane == Pane.Info;
+        var server = _selectedServerId is { } id ? _serverListVm.Servers.FirstOrDefault(x => x.Id == id) : null;
 
         var grid = new Grid()
             .AddColumn(new GridColumn().NoWrap().Width(12))
@@ -782,6 +1051,19 @@ internal sealed class TuiApp
 
         void Row(string label, string val)
             => grid.AddRow(new Markup($"[dim]{label}[/]"), new Markup(val));
+
+        if (server is not null)
+        {
+            Row("Name", Markup.Escape(server.Name));
+            Row("Type", Markup.Escape(server.Type.ToString()));
+            Row("Version", Markup.Escape(server.MinecraftVersion));
+            Row("Dir", $"[dim]{Markup.Escape(server.Options.ServerDirectory)}[/]");
+            Row("Port", server.Options.Port.ToString());
+            Row("RCON", server.RconOptions.Enabled
+                ? $"[green]ON[/] [dim]{server.RconOptions.Port}[/]"
+                : "[red]OFF[/]");
+            grid.AddEmptyRow();
+        }
 
         if (s is null)
         {
@@ -825,7 +1107,7 @@ internal sealed class TuiApp
             }
         }
 
-        var tabBar = "[dim]Logs[/]  [bold underline]Stats[/]";
+        var tabBar = "[dim]Logs[/]  [bold underline]Info[/]";
         return new Panel(grid)
         {
             Header = new PanelHeader(tabBar),
@@ -883,13 +1165,13 @@ internal sealed class TuiApp
             case ConsoleKey.Tab:
                 CycleFocus(k.Modifiers.HasFlag(ConsoleModifiers.Shift) ? -1 : 1);
                 return;
-            case ConsoleKey.LeftArrow when _activePane is Pane.Logs or Pane.Stats:
+            case ConsoleKey.LeftArrow when _activePane is Pane.Logs or Pane.Info:
                 _activeTab = Tab.Logs;
                 _activePane = Pane.Logs;
                 return;
-            case ConsoleKey.RightArrow when _activePane is Pane.Logs or Pane.Stats:
-                _activeTab = Tab.Stats;
-                _activePane = Pane.Stats;
+            case ConsoleKey.RightArrow when _activePane is Pane.Logs or Pane.Info:
+                _activeTab = Tab.Info;
+                _activePane = Pane.Info;
                 return;
         }
 
@@ -1011,7 +1293,7 @@ internal sealed class TuiApp
     private void CycleFocus(int dir)
     {
         Pane[] panes = _selectedServerId.HasValue
-            ? [Pane.Servers, Pane.JRE, Pane.Logs, Pane.Stats]
+            ? [Pane.Servers, Pane.JRE, Pane.Logs, Pane.Info]
             : [Pane.Servers, Pane.JRE];
 
         var idx = Array.IndexOf(panes, _activePane);
@@ -1019,7 +1301,7 @@ internal sealed class TuiApp
         _activePane = panes[idx];
 
         if (_activePane == Pane.Logs) _activeTab = Tab.Logs;
-        if (_activePane == Pane.Stats) _activeTab = Tab.Stats;
+        if (_activePane == Pane.Info) _activeTab = Tab.Info;
     }
 
 
@@ -1200,14 +1482,60 @@ internal sealed class TuiApp
     }
 
     private async Task CreateServerAsync(
-        string name, string version, string dir, ServerType type, bool acceptEula)
+        string name,
+        string version,
+        string dir,
+        ServerType type,
+        int serverPort,
+        int maxPlayers,
+        string motd,
+        int viewDistance,
+        bool onlineMode,
+        bool whitelist,
+        string levelName,
+        string difficulty,
+        bool rconEnabled,
+        int rconPort,
+        string rconPassword,
+        int rconTimeoutSeconds,
+        string jvmMinMemory,
+        string jvmMaxMemory,
+        string jvmAdditionalFlags,
+        bool acceptEula)
     {
         SetStatus($"Creating {name}…");
         try
         {
+            var serverOpts = new ServerOptions(
+                ServerDirectory: dir,
+                Port: serverPort,
+                MaxPlayers: maxPlayers,
+                MotD: motd,
+                ViewDistance: viewDistance,
+                OnlineMode: onlineMode,
+                Whitelist: whitelist,
+                LevelName: levelName,
+                Difficulty: difficulty);
+
+            var rconOpts = new RconOptions(
+                Port: rconPort,
+                Password: rconPassword,
+                Enabled: rconEnabled,
+                ConnectTimeoutSeconds: rconTimeoutSeconds);
+
+            var flags = SplitJvmFlags(jvmAdditionalFlags);
+            var jvmOpts = new JvmOptions(
+                MinMemory: jvmMinMemory,
+                MaxMemory: jvmMaxMemory,
+                AdditionalFlags: flags.Count == 0 ? null : flags);
+
             var opts = new CreateServerOptions(
                 Name: name, MinecraftVersion: version, ServerDirectory: dir,
-                Type: type, AcceptEula: acceptEula);
+                Type: type,
+                Options: serverOpts,
+                RconOptions: rconOpts,
+                JvmOptions: jvmOpts,
+                AcceptEula: acceptEula);
 
             var server = await _service.CreateServerAsync(opts, ct: _appCts.Token);
             if (acceptEula) await _service.AcceptEulaAsync(server.Id, _appCts.Token);
@@ -1218,6 +1546,13 @@ internal sealed class TuiApp
         {
             _ui.Post(() => SetStatus($"Create failed: {ex.Message}", true));
         }
+    }
+
+    private static List<string> SplitJvmFlags(string raw)
+    {
+        var s = raw?.Trim();
+        if (string.IsNullOrWhiteSpace(s)) return [];
+        return s.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
     }
 
     private void SetStatus(string msg, bool isError = false)
