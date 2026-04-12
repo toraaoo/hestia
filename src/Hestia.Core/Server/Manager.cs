@@ -195,10 +195,12 @@ public sealed class Manager : IServerManager, IAsyncDisposable
 
         _running[serverId] = ctx;
 
+        var logFile = PrepareLogFile(server.Options.ServerDirectory);
+
         var readTask = Task.Run(async () =>
         {
             await ReadConsoleLoopAsync(
-                process, serverId, consoleChannel.Writer, startedTcs, lifetime.Token)
+                process, serverId, consoleChannel.Writer, startedTcs, logFile, lifetime.Token)
                 .ConfigureAwait(false);
         }, CancellationToken.None);
 
@@ -304,6 +306,7 @@ public sealed class Manager : IServerManager, IAsyncDisposable
         Guid serverId,
         ChannelWriter<string> writer,
         TaskCompletionSource startedTcs,
+        string logFile,
         CancellationToken ct)
     {
         try
@@ -314,6 +317,7 @@ public sealed class Manager : IServerManager, IAsyncDisposable
                 if (line is null) break;
 
                 writer.TryWrite(line);
+                await File.AppendAllTextAsync(logFile, line + Environment.NewLine, ct).ConfigureAwait(false);
 
                 if (!startedTcs.Task.IsCompleted &&
                     line.Contains("]: Done", StringComparison.Ordinal))
@@ -421,6 +425,13 @@ public sealed class Manager : IServerManager, IAsyncDisposable
         {
             _persistLock.Release();
         }
+    }
+
+    private static string PrepareLogFile(string serverDirectory)
+    {
+        var logsDir = Path.Combine(serverDirectory, "logs");
+        Directory.CreateDirectory(logsDir);
+        return Path.Combine(logsDir, $"{DateTime.UtcNow:yyyyMMdd-HHmmss}.log");
     }
 
     private sealed record RunningServerContext(

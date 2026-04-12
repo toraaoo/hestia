@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 var appInfo = new AppInfoService(
     Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly()).GetAppInfo();
 
-// Include an easy-to-spot stamp so it's obvious which binary is running.
 var entry = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
 var stamp = "unknown";
 try
@@ -39,7 +38,6 @@ services.AddSingleton<IServerManager>(sp =>
 services.AddSingleton<IRconService, global::Hestia.Core.Rcon.Service>();
 services.AddSingleton<IServerMonitor>(sp =>
     new global::Hestia.Core.Monitoring.Monitor(sp.GetRequiredService<IServerManager>(),
-        sp.GetRequiredService<IRconService>(),
         sp.GetRequiredService<IEventBus>()));
 services.AddSingleton<IHestiaService>(sp => new HestiaService(
     sp.GetRequiredService<IJreManager>(),
@@ -51,4 +49,9 @@ services.AddSingleton<IHestiaService>(sp => new HestiaService(
 
 await using var provider = services.BuildServiceProvider();
 
+var tuiApp = new Hestia.Tui.App.TuiApp(
+    provider.GetRequiredService<IHestiaService>(),
+    appInfo,
+    stamp);
 
+await tuiApp.RunAsync();

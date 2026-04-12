@@ -23,7 +23,7 @@ public sealed class Vanilla : IServerProvider
     {
         var manifest = await FetchManifestAsync(ct).ConfigureAwait(false);
         return manifest.Versions
-            .Where(v => v.Type == "release")
+            .Where(v => v.Type is "release" or "snapshot")
             .Select(v => v.Id)
             .ToList()
             .AsReadOnly();

@@ -1,13 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-  <ItemGroup>
-    <ProjectReference Include="..\Hestia.Core\Hestia.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="Spectre.Console" Version="0.55.0" />
-  </ItemGroup>
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -15,5 +6,20 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Hestia.Tui.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Spectre.Console" Version="0.49.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hestia.Core\Hestia.Core.csproj" />
+  </ItemGroup>
 
 </Project>

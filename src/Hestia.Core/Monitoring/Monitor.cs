@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Hestia.Core.Abstractions;
-using Hestia.Core.Rcon;
 using Hestia.Core.Server;
 
 namespace Hestia.Core.Monitoring;
@@ -9,16 +8,13 @@ namespace Hestia.Core.Monitoring;
 public sealed class Monitor : IServerMonitor
 {
     private readonly IServerManager _serverManager;
-    private readonly IRconService _rconService;
     private readonly IEventBus _eventBus;
 
     public Monitor(
         IServerManager serverManager,
-        IRconService rconService,
         IEventBus eventBus)
     {
         _serverManager = serverManager;
-        _rconService = rconService;
         _eventBus = eventBus;
     }
 
@@ -77,13 +73,13 @@ public sealed class Monitor : IServerMonitor
         }
     }
 
-    private async Task<ServerStatus> SampleStatusAsync(
+    private Task<ServerStatus> SampleStatusAsync(
         Server.MinecraftServer server,
         CancellationToken ct)
     {
         if (server.State != ServerState.Running)
         {
-            return new ServerStatus(
+            return Task.FromResult(new ServerStatus(
                 ServerId: server.Id,
                 State: server.State,
                 PlayerCount: 0,
@@ -91,21 +87,22 @@ public sealed class Monitor : IServerMonitor
                 OnlinePlayers: [],
                 Tps: null,
                 Resources: null,
-                Uptime: null);
+                Uptime: null));
         }
 
         var resources = SampleProcessResources(server);
-        var (players, tps, uptime) = await SampleRconDataAsync(server, ct).ConfigureAwait(false);
 
-        return new ServerStatus(
+        // Intentionally avoid RCON polling here. It causes the Minecraft server to spam
+        // "RCON Client ... started/shutting down" logs due to frequent connect/disconnect.
+        return Task.FromResult(new ServerStatus(
             ServerId: server.Id,
             State: server.State,
-            PlayerCount: players.Count,
+            PlayerCount: 0,
             MaxPlayers: server.Options.MaxPlayers,
-            OnlinePlayers: players,
-            Tps: tps,
+            OnlinePlayers: [],
+            Tps: null,
             Resources: resources,
-            Uptime: uptime);
+            Uptime: null));
     }
 
     private static ResourceUsage? SampleProcessResources(Server.MinecraftServer server)
@@ -130,72 +127,6 @@ public sealed class Monitor : IServerMonitor
         }
         catch { }
         return null;
-    }
-
-    private async Task<(IReadOnlyList<PlayerInfo> Players, double? Tps, TimeSpan? Uptime)>
-        SampleRconDataAsync(Server.MinecraftServer server, CancellationToken ct)
-    {
-        if (!server.RconOptions.Enabled)
-            return ([], null, null);
-
-        var credentials = new RconCredentials(
-            "127.0.0.1",
-            server.RconOptions.Port,
-            server.RconOptions.Password);
-
-        RconConnection? conn = null;
-        try
-        {
-            conn = await _rconService.ConnectAsync(server.Id, credentials, ct).ConfigureAwait(false);
-
-            var listResponse = await _rconService.SendCommandAsync(conn.Id, "list", ct)
-                .ConfigureAwait(false);
-            var players = ParsePlayerList(listResponse.Payload);
-
-            double? tps = null;
-            if (server.Type != ServerType.Vanilla)
-            {
-                var tpsResponse = await _rconService.SendCommandAsync(conn.Id, "tps", ct)
-                    .ConfigureAwait(false);
-                tps = ParseTps(tpsResponse.Payload);
-            }
-
-            return (players, tps, null);
-        }
-        catch
-        {
-            return ([], null, null);
-        }
-        finally
-        {
-            if (conn is not null)
-                await _rconService.DisconnectAsync(conn.Id, CancellationToken.None)
-                    .ConfigureAwait(false);
-        }
-    }
-
-    private static IReadOnlyList<PlayerInfo> ParsePlayerList(string response)
-    {
-        var colonIdx = response.LastIndexOf(':');
-        if (colonIdx < 0) return [];
-
-        var names = response[(colonIdx + 1)..]
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        return names
-            .Select(n => new PlayerInfo(n, Guid.Empty))
-            .ToList()
-            .AsReadOnly();
-    }
-
-    private static double? ParseTps(string response)
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(
-            response, @"[\*]?(\d+\.?\d*)");
-        if (!match.Success) return null;
-        return double.TryParse(match.Groups[1].Value,
-            System.Globalization.CultureInfo.InvariantCulture, out var v)
-            ? v : null;
     }
 
     private sealed class MonitorHandle(CancellationTokenSource cts, Task task) : IAsyncDisposable
