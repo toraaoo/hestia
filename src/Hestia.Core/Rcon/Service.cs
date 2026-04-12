@@ -20,7 +20,6 @@ public sealed class Service : IRconService
         CancellationToken ct = default)
     {
         var tcp = new TcpClient();
-        var timeout = TimeSpan.FromSeconds(5);
 
         await tcp.ConnectAsync(credentials.Host, credentials.Port, ct).ConfigureAwait(false);
         var stream = tcp.GetStream();

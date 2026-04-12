@@ -100,7 +100,12 @@ public sealed class HestiaService : IHestiaService
             throw new InvalidOperationException($"RCON is not enabled for server '{server.Name}'.");
 
         var credentials = new RconCredentials("127.0.0.1", server.RconOptions.Port, server.RconOptions.Password);
-        var conn = await _rcon.ConnectAsync(serverId, credentials, ct);
+
+        using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        if (server.RconOptions.ConnectTimeoutSeconds > 0)
+            connectCts.CancelAfter(TimeSpan.FromSeconds(server.RconOptions.ConnectTimeoutSeconds));
+
+        var conn = await _rcon.ConnectAsync(serverId, credentials, connectCts.Token);
         try
         {
             return await _rcon.SendCommandAsync(conn.Id, command, ct);
