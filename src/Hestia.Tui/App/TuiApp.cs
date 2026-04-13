@@ -7,6 +7,8 @@ using Hestia.Tui.Services;
 using Hestia.Tui.ViewModels;
 using Spectre.Console;
 using Spectre.Console.Rendering;
+using static Hestia.Tui.Utilities.ServerUtils;
+using static Hestia.Tui.Utilities.TerminalUtils;
 
 namespace Hestia.Tui.App;
 
@@ -51,14 +53,6 @@ internal sealed class TuiApp
         Network,
         Java,
     }
-
-    private const int HeaderH = 7;
-    private const int JreH = 7;
-    private const int LeftMinW = 44;
-    private const int LeftMaxW = 64;
-    private const int RightMinW = 60;
-    private const int MinWidth = 100;
-    private const int MinHeight = 24;
 
     private readonly IHestiaService _service;
     private readonly AppInfo _appInfo;
@@ -186,9 +180,6 @@ internal sealed class TuiApp
             /* render crash: outer RunAsync loop re-enters RunLiveAsync */
         }
     }
-
-    private static bool TooSmall() =>
-        Console.WindowWidth < MinWidth || Console.WindowHeight < MinHeight;
 
     private async Task RunCreateFlowAsync()
     {
@@ -779,23 +770,6 @@ internal sealed class TuiApp
         }
     }
 
-    private static bool IsValidPort(int port) => port is >= 1 and <= 65535;
-
-    private static bool TryParsePort(string value, out int port)
-    {
-        port = 0;
-        return int.TryParse(value.Trim(), out port) && IsValidPort(port);
-    }
-
-    private static int FindNextFreePort(int start, HashSet<int> used)
-    {
-        for (var p = Math.Max(1, start); p <= 65535; p++)
-            if (!used.Contains(p))
-                return p;
-
-        return start;
-    }
-
     private Table RenderCreateFormTable(
         ServerCreateForm form,
         CreatePage page,
@@ -1184,31 +1158,6 @@ internal sealed class TuiApp
         CreatePage.Java => CreatePage.Network,
         _ => CreatePage.Basic,
     };
-
-    private static int FindIndex(IReadOnlyList<string> list, string value)
-    {
-        for (var i = 0; i < list.Count; i++)
-            if (list[i] == value)
-                return i;
-        return -1;
-    }
-
-    private static List<string> FilterVersions(IReadOnlyList<string> all, string query)
-    {
-        if (string.IsNullOrWhiteSpace(query))
-            return [.. all];
-
-        var q = query.Trim();
-        var res = new List<string>(all.Count);
-        for (var i = 0; i < all.Count; i++)
-        {
-            var v = all[i];
-            if (v.Contains(q, StringComparison.OrdinalIgnoreCase))
-                res.Add(v);
-        }
-
-        return res;
-    }
 
     private Layout BuildLayout()
     {
@@ -2179,24 +2128,6 @@ internal sealed class TuiApp
         return layout;
     }
 
-    private static List<string> SplitJvmFlags(string raw)
-    {
-        var s = raw?.Trim();
-        if (string.IsNullOrWhiteSpace(s)) return [];
-        return s.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-    }
-
-    private static int ComputeLeftWidth(int totalW)
-    {
-        var target = (int)Math.Round(totalW * 0.45);
-        target = Math.Clamp(target, LeftMinW, LeftMaxW);
-
-        var maxLeft = totalW - RightMinW;
-        if (maxLeft >= LeftMinW)
-            return Math.Min(target, maxLeft);
-
-        return Math.Max(20, totalW / 2);
-    }
 
     private void SetStatus(string msg, bool isError = false)
     {
