@@ -73,7 +73,7 @@ internal static class DeleteConfirmModal
                 });
 
             return result ?? new DeleteModalResult(false);
-            }
+        }
         finally
         {
             Console.CursorVisible = false;

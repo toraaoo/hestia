@@ -23,43 +23,75 @@ internal static class ServerMenuModal
 
         var cursor = 0;
 
-        while (!ct.IsCancellationRequested)
+        while (!ct.IsCancellationRequested && TooSmall())
         {
-            if (TooSmall())
-            {
-                AnsiConsole.Clear();
-                Console.WriteLine($"Terminal too small. Resize to at least {MinWidth}×{MinHeight}.");
-                await Task.Delay(300, ct);
-                continue;
-            }
-
             AnsiConsole.Clear();
-            try
-            {
-                AnsiConsole.Write(BuildLayout(server, items, cursor));
-            }
-            catch
-            {
-                await Task.Delay(300, ct);
-                continue;
-            }
-
-            if (!Console.KeyAvailable)
-            {
-                await Task.Delay(50, ct);
-                continue;
-            }
-
-            var key = Console.ReadKey(true);
-            var action = keyMap.Translate(key);
-
-            if (action == InputAction.Escape) return new ServerMenuModalResult(null);
-            if (action == InputAction.CursorUp && cursor > 0) cursor--;
-            else if (action == InputAction.CursorDown && cursor < items.Length - 1) cursor++;
-            else if (action == InputAction.Confirm) return new ServerMenuModalResult(items[cursor].Action);
+            Console.WriteLine($"Terminal too small. Resize to at least {MinWidth}×{MinHeight}.");
+            await Task.Delay(300, ct);
         }
 
-        return new ServerMenuModalResult(null);
+        if (ct.IsCancellationRequested)
+            return new ServerMenuModalResult(null);
+
+        ServerMenuModalResult? result = null;
+        var dirty = true;
+
+        await AnsiConsole.Live(BuildLayout(server, items, cursor))
+            .AutoClear(false)
+            .Overflow(VerticalOverflow.Ellipsis)
+            .Cropping(VerticalOverflowCropping.Bottom)
+            .StartAsync(async ctx =>
+            {
+                while (!ct.IsCancellationRequested && result is null)
+                {
+                    if (TooSmall())
+                        return;
+
+                    if (dirty)
+                    {
+                        ctx.UpdateTarget(BuildLayout(server, items, cursor));
+                        ctx.Refresh();
+                        dirty = false;
+                    }
+
+                    if (!Console.KeyAvailable)
+                    {
+                        await Task.Delay(50, ct);
+                        continue;
+                    }
+
+                    var key = Console.ReadKey(true);
+                    var action = keyMap.Translate(key);
+
+                    if (action == InputAction.Escape)
+                    {
+                        result = new ServerMenuModalResult(null);
+                        return;
+                    }
+
+                    if (action == InputAction.CursorUp && cursor > 0)
+                    {
+                        cursor--;
+                        dirty = true;
+                        continue;
+                    }
+
+                    if (action == InputAction.CursorDown && cursor < items.Length - 1)
+                    {
+                        cursor++;
+                        dirty = true;
+                        continue;
+                    }
+
+                    if (action == InputAction.Confirm)
+                    {
+                        result = new ServerMenuModalResult(items[cursor].Action);
+                        return;
+                    }
+                }
+            });
+
+        return result ?? new ServerMenuModalResult(null);
     }
 
     private static IRenderable BuildLayout(
