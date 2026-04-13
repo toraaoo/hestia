@@ -2,6 +2,7 @@ using Hestia.Core;
 using Hestia.Core.Abstractions;
 using Hestia.Core.Server;
 using Hestia.Tui.Formatting;
+using Hestia.Tui.Input;
 using Hestia.Tui.Services;
 using Hestia.Tui.ViewModels;
 using Spectre.Console;
@@ -43,11 +44,15 @@ internal sealed class TuiApp
 
     private const int HeaderH = 7;
     private const int JreH = 7;
+    private const int LeftMinW = 44;
+    private const int LeftMaxW = 64;
+    private const int RightMinW = 60;
 
     private readonly IHestiaService _service;
     private readonly AppInfo _appInfo;
     private readonly string _stamp;
     private readonly UiDispatcher _ui = new();
+    private readonly KeyMap _keyMap = KeyMap.Default();
 
     private ServerListVm _serverListVm = null!;
     private JreListVm _jreListVm = null!;
@@ -65,6 +70,7 @@ internal sealed class TuiApp
     private string _statusMsg = string.Empty;
     private bool _statusIsError;
     private bool _logFollow = true;
+    private bool _showRconPassword;
     private bool _quit;
     private PendingAction _pendingAction = PendingAction.None;
     private Guid? _pendingDeleteId;
@@ -196,8 +202,9 @@ internal sealed class TuiApp
 
                 if (!Console.KeyAvailable) { await Task.Delay(50); continue; }
                 var key = Console.ReadKey(true);
+                var createAction = _keyMap.Translate(key);
 
-                if (key.Key == ConsoleKey.Escape)
+                if (createAction == InputAction.Escape)
                 {
                     if (mode == CreateMode.EditText)
                     {
@@ -231,11 +238,11 @@ internal sealed class TuiApp
 
                 if (mode == CreateMode.Normal)
                 {
-                    if (key.Key == ConsoleKey.UpArrow) { form.MoveUp(); continue; }
-                    if (key.Key == ConsoleKey.DownArrow) { form.MoveDown(); continue; }
-                    if (key.Key == ConsoleKey.Tab)
+                    if (createAction == InputAction.CursorUp) { form.MoveUp(); continue; }
+                    if (createAction == InputAction.CursorDown) { form.MoveDown(); continue; }
+                    if (createAction is InputAction.CycleFocusNext or InputAction.CycleFocusPrev)
                     {
-                        if (key.Modifiers.HasFlag(ConsoleModifiers.Shift)) form.MoveUp();
+                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp();
                         else form.MoveDown();
                         createError = string.Empty;
                         continue;
@@ -272,7 +279,7 @@ internal sealed class TuiApp
                         }
                     }
 
-                    if (key.KeyChar == '/' || key.Key == ConsoleKey.Oem2 || key.Key == ConsoleKey.Divide)
+                    if (createAction == InputAction.OpenCommand)
                     {
                         if (form.SelectedField == ServerCreateForm.Field.Version)
                         {
@@ -336,7 +343,7 @@ internal sealed class TuiApp
                         }
                     }
 
-                    if (key.Key == ConsoleKey.Enter)
+                    if (createAction == InputAction.Confirm)
                     {
                         if (string.IsNullOrWhiteSpace(form.Name))
                         {
@@ -416,13 +423,13 @@ internal sealed class TuiApp
 
                 if (mode == CreateMode.EditText)
                 {
-                    if (key.Key == ConsoleKey.Backspace)
+                    if (createAction == InputAction.TextBackspace)
                     {
                         if (editBuffer.Length > 0) editBuffer = editBuffer[..^1];
                         continue;
                     }
 
-                    if (key.Key == ConsoleKey.Enter || key.Key == ConsoleKey.Tab)
+                    if (createAction is InputAction.Confirm or InputAction.CycleFocusNext or InputAction.CycleFocusPrev)
                     {
                         if (form.SelectedField == ServerCreateForm.Field.Name)
                         {
@@ -515,16 +522,13 @@ internal sealed class TuiApp
                         mode = CreateMode.Normal;
                         createError = string.Empty;
 
-                        if (key.Key == ConsoleKey.Tab)
-                        {
-                            if (key.Modifiers.HasFlag(ConsoleModifiers.Shift)) form.MoveUp();
-                            else form.MoveDown();
-                        }
+                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp();
+                        else if (createAction == InputAction.CycleFocusNext) form.MoveDown();
 
                         continue;
                     }
 
-                    if (IsPrintable(key))
+                    if (createAction == InputAction.TextInput)
                     {
                         editBuffer += key.KeyChar;
                         continue;
@@ -545,26 +549,26 @@ internal sealed class TuiApp
                         versionCursor = Math.Clamp(versionCursor, 0, filtered.Count - 1);
                     }
 
-                    if (key.Key == ConsoleKey.UpArrow)
+                    if (createAction == InputAction.CursorUp)
                     {
                         if (versionCursor > 0) versionCursor--;
                         continue;
                     }
 
-                    if (key.Key == ConsoleKey.DownArrow)
+                    if (createAction == InputAction.CursorDown)
                     {
                         if (filtered.Count > 0 && versionCursor < filtered.Count - 1) versionCursor++;
                         continue;
                     }
 
-                    if (key.Key == ConsoleKey.Backspace)
+                    if (createAction == InputAction.TextBackspace)
                     {
                         if (versionQuery.Length > 0) versionQuery = versionQuery[..^1];
                         versionCursor = 0;
                         continue;
                     }
 
-                    if (key.Key == ConsoleKey.Enter || key.Key == ConsoleKey.Tab)
+                    if (createAction is InputAction.Confirm or InputAction.CycleFocusNext or InputAction.CycleFocusPrev)
                     {
                         if (filtered.Count > 0)
                             form.SetVersion(filtered[versionCursor]);
@@ -574,19 +578,16 @@ internal sealed class TuiApp
                         mode = CreateMode.Normal;
                         createError = string.Empty;
 
-                        if (key.Key == ConsoleKey.Tab)
-                        {
-                            if (key.Modifiers.HasFlag(ConsoleModifiers.Shift)) form.MoveUp();
-                            else form.MoveDown();
-                        }
+                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp();
+                        else if (createAction == InputAction.CycleFocusNext) form.MoveDown();
 
                         continue;
                     }
 
-                    if (key.Key == ConsoleKey.Oem2 || key.Key == ConsoleKey.Divide)
+                    if (createAction == InputAction.OpenCommand)
                         continue;
 
-                    if (IsPrintable(key))
+                    if (createAction == InputAction.TextInput)
                     {
                         versionQuery += key.KeyChar;
                         versionCursor = 0;
@@ -601,19 +602,19 @@ internal sealed class TuiApp
                     var types = form.GetTypes();
                     typeCursor = Math.Clamp(typeCursor, 0, Math.Max(0, types.Length - 1));
 
-                    if (key.Key == ConsoleKey.UpArrow)
+                    if (createAction == InputAction.CursorUp)
                     {
                         if (typeCursor > 0) typeCursor--;
                         continue;
                     }
 
-                    if (key.Key == ConsoleKey.DownArrow)
+                    if (createAction == InputAction.CursorDown)
                     {
                         if (types.Length > 0 && typeCursor < types.Length - 1) typeCursor++;
                         continue;
                     }
 
-                    if (key.Key == ConsoleKey.Enter || key.Key == ConsoleKey.Tab)
+                    if (createAction is InputAction.Confirm or InputAction.CycleFocusNext or InputAction.CycleFocusPrev)
                     {
                         if (types.Length > 0)
                         {
@@ -628,11 +629,8 @@ internal sealed class TuiApp
                         mode = CreateMode.Normal;
                         createError = string.Empty;
 
-                        if (key.Key == ConsoleKey.Tab)
-                        {
-                            if (key.Modifiers.HasFlag(ConsoleModifiers.Shift)) form.MoveUp();
-                            else form.MoveDown();
-                        }
+                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp();
+                        else if (createAction == InputAction.CycleFocusNext) form.MoveDown();
 
                         continue;
                     }
@@ -822,8 +820,6 @@ internal sealed class TuiApp
         return -1;
     }
 
-    private static bool IsPrintable(ConsoleKeyInfo k) => !char.IsControl(k.KeyChar);
-
     private static List<string> FilterVersions(IReadOnlyList<string> all, string query)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -849,8 +845,8 @@ internal sealed class TuiApp
                 new Layout("Status").Size(1));
 
         root["Content"].SplitColumns(
-            new Layout("Left").Ratio(1),
-            new Layout("Right").Ratio(2));
+            new Layout("Left").Size(ComputeLeftWidth(Console.WindowWidth)),
+            new Layout("Right"));
 
         root["Left"].SplitRows(
             new Layout("Header").Size(HeaderH),
@@ -868,6 +864,7 @@ internal sealed class TuiApp
 
     private void UpdateLayout(Layout layout)
     {
+        layout["Left"].Size(ComputeLeftWidth(Console.WindowWidth));
         layout["Header"].Update(RenderHeader());
         layout["Servers"].Update(RenderServerList());
         layout["JRE"].Update(RenderJreList());
@@ -1054,14 +1051,26 @@ internal sealed class TuiApp
 
         if (server is not null)
         {
+            var host = "127.0.0.1";
             Row("Name", Markup.Escape(server.Name));
             Row("Type", Markup.Escape(server.Type.ToString()));
             Row("Version", Markup.Escape(server.MinecraftVersion));
             Row("Dir", $"[dim]{Markup.Escape(server.Options.ServerDirectory)}[/]");
             Row("Port", server.Options.Port.ToString());
-            Row("RCON", server.RconOptions.Enabled
-                ? $"[green]ON[/] [dim]{server.RconOptions.Port}[/]"
-                : "[red]OFF[/]");
+            Row("Join", $"{host}:{server.Options.Port}");
+
+            if (server.RconOptions.Enabled)
+            {
+                var pw = _showRconPassword
+                    ? server.RconOptions.Password
+                    : new string('*', Math.Clamp(server.RconOptions.Password.Length, 8, 24));
+                Row("RCON", "[green]ON[/]");
+                Row("RCON cmd", Markup.Escape($"mcrcon -H {host} -P {server.RconOptions.Port} -p {pw}"));
+            }
+            else
+            {
+                Row("RCON", "[red]OFF[/]");
+            }
             grid.AddEmptyRow();
         }
 
@@ -1120,7 +1129,7 @@ internal sealed class TuiApp
     {
         var hints = _activePane == Pane.Command
             ? "[dim]Esc:cancel  Enter:send  ↑↓:history[/]"
-            : "[dim]q:quit  s:start  t:stop  r:restart  d:delete  c:create  Tab:focus  /:command  ←→:tab  Esc:back[/]";
+            : "[dim]q:quit  s:start  t:stop  r:restart  d:delete  c:create  p:pw  Tab:focus  /:command  ←→:tab  Esc:back[/]";
 
         if (!string.IsNullOrEmpty(_statusMsg))
         {
@@ -1142,83 +1151,88 @@ internal sealed class TuiApp
 
     private void ProcessKey(ConsoleKeyInfo k)
     {
+        var action = _keyMap.Translate(k);
+
         if (_activePane == Pane.Command)
         {
-            HandleCommandKey(k);
+            HandleCommandKey(k, action);
             return;
         }
 
-        if ((k.KeyChar == '/' || k.Key is ConsoleKey.Oem2 or ConsoleKey.Divide) && _selectedServerId.HasValue)
+        switch (action)
         {
-            _activePane = Pane.Command;
-            return;
-        }
-
-        switch (k.Key)
-        {
-            case ConsoleKey.Q:
+            case InputAction.OpenCommand when _selectedServerId.HasValue:
+                _activePane = Pane.Command;
+                return;
+            case InputAction.Quit:
                 _quit = true;
                 return;
-            case ConsoleKey.Escape:
-                if (_selectedServerId.HasValue) _ = DeselectAsync();
+            case InputAction.TogglePassword when _selectedServerId.HasValue:
+                _showRconPassword = !_showRconPassword;
                 return;
-            case ConsoleKey.Tab:
-                CycleFocus(k.Modifiers.HasFlag(ConsoleModifiers.Shift) ? -1 : 1);
+            case InputAction.Escape when _selectedServerId.HasValue:
+                _ = DeselectAsync();
                 return;
-            case ConsoleKey.LeftArrow when _activePane is Pane.Logs or Pane.Info:
+            case InputAction.CycleFocusNext:
+                CycleFocus(1);
+                return;
+            case InputAction.CycleFocusPrev:
+                CycleFocus(-1);
+                return;
+            case InputAction.TabLeft when _activePane is Pane.Logs or Pane.Info:
                 _activeTab = Tab.Logs;
                 _activePane = Pane.Logs;
                 return;
-            case ConsoleKey.RightArrow when _activePane is Pane.Logs or Pane.Info:
+            case InputAction.TabRight when _activePane is Pane.Logs or Pane.Info:
                 _activeTab = Tab.Info;
                 _activePane = Pane.Info;
                 return;
         }
 
         if (_activePane == Pane.Servers)
-            HandleServersKey(k);
+            HandleServersKey(action);
 
         if (_activePane == Pane.Logs)
         {
-            if (k.Key == ConsoleKey.PageUp) { ScrollLogs(+5); return; }
-            if (k.Key == ConsoleKey.PageDown) { ScrollLogs(-5); return; }
+            if (action == InputAction.PageUp) { ScrollLogs(+5); return; }
+            if (action == InputAction.PageDown) { ScrollLogs(-5); return; }
         }
     }
 
-    private void HandleServersKey(ConsoleKeyInfo k)
+    private void HandleServersKey(InputAction? action)
     {
-        switch (k.Key)
+        switch (action)
         {
-            case ConsoleKey.UpArrow:
+            case InputAction.CursorUp:
                 _serverCursor = Math.Max(0, _serverCursor - 1);
                 break;
-            case ConsoleKey.DownArrow:
+            case InputAction.CursorDown:
                 _serverCursor = Math.Min(_serverListVm.Servers.Count - 1, _serverCursor + 1);
                 break;
-            case ConsoleKey.Enter:
+            case InputAction.Confirm:
             {
                 var s = _serverListVm.GetAt(_serverCursor);
                 if (s is not null) _ = SelectServerAsync(s.Id);
                 break;
             }
-            case ConsoleKey.S: RunServerAction('s'); break;
-            case ConsoleKey.T: RunServerAction('t'); break;
-            case ConsoleKey.R: RunServerAction('r'); break;
-            case ConsoleKey.D: DeleteServer(); break;
-            case ConsoleKey.C:
+            case InputAction.ServerStart:   RunServerAction('s'); break;
+            case InputAction.ServerStop:    RunServerAction('t'); break;
+            case InputAction.ServerRestart: RunServerAction('r'); break;
+            case InputAction.ServerDelete:  DeleteServer(); break;
+            case InputAction.ServerCreate:
                 _pendingAction = PendingAction.Create;
                 break;
-            case ConsoleKey.F:
+            case InputAction.ToggleFollow:
                 _logFollow = !_logFollow;
                 break;
         }
     }
 
-    private void HandleCommandKey(ConsoleKeyInfo k)
+    private void HandleCommandKey(ConsoleKeyInfo k, InputAction? action)
     {
-        switch (k.Key)
+        switch (action)
         {
-            case ConsoleKey.Enter:
+            case InputAction.Confirm:
             {
                 var cmd = _inputBuffer;
                 _inputBuffer = string.Empty;
@@ -1230,37 +1244,36 @@ internal sealed class TuiApp
                 }
                 break;
             }
-            case ConsoleKey.Escape:
+            case InputAction.Escape:
                 _inputBuffer = string.Empty;
                 _activePane = Pane.Logs;
                 break;
-            case ConsoleKey.PageUp:
+            case InputAction.PageUp:
                 ScrollLogs(+5);
                 break;
-            case ConsoleKey.PageDown:
+            case InputAction.PageDown:
                 ScrollLogs(-5);
                 break;
-            case ConsoleKey.Backspace:
+            case InputAction.TextBackspace:
                 if (_inputBuffer.Length > 0)
                     _inputBuffer = _inputBuffer[..^1];
                 break;
-            case ConsoleKey.UpArrow:
+            case InputAction.CursorUp:
             {
                 var cur = _inputBuffer;
                 _commandVm.HistoryUp(ref cur);
                 _inputBuffer = cur;
                 break;
             }
-            case ConsoleKey.DownArrow:
+            case InputAction.CursorDown:
             {
                 var cur = _inputBuffer;
                 _commandVm.HistoryDown(ref cur);
                 _inputBuffer = cur;
                 break;
             }
-            default:
-                if (!char.IsControl(k.KeyChar))
-                    _inputBuffer += k.KeyChar;
+            case InputAction.TextInput:
+                _inputBuffer += k.KeyChar;
                 break;
         }
     }
@@ -1553,6 +1566,18 @@ internal sealed class TuiApp
         var s = raw?.Trim();
         if (string.IsNullOrWhiteSpace(s)) return [];
         return s.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    }
+
+    private static int ComputeLeftWidth(int totalW)
+    {
+        var target = (int)Math.Round(totalW * 0.45);
+        target = Math.Clamp(target, LeftMinW, LeftMaxW);
+
+        var maxLeft = totalW - RightMinW;
+        if (maxLeft >= LeftMinW)
+            return Math.Min(target, maxLeft);
+
+        return Math.Max(20, totalW / 2);
     }
 
     private void SetStatus(string msg, bool isError = false)
