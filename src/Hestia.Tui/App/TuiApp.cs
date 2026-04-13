@@ -41,6 +41,15 @@ internal sealed class TuiApp
         EditText,
         SelectVersion,
         SelectType,
+        ConfirmEula,
+    }
+
+    private enum CreatePage
+    {
+        Basic,
+        Gameplay,
+        Network,
+        Java,
     }
 
     private const int HeaderH = 7;
@@ -199,6 +208,10 @@ internal sealed class TuiApp
             used.Add(form.ServerPort);
             form.RconPort = FindNextFreePort(25575, used);
             var mode = CreateMode.Normal;
+            var page = CreatePage.Basic;
+            var advanced = false;
+
+            var eulaCursorYes = true;
 
             var editBuffer = string.Empty;
             var editOriginal = string.Empty;
@@ -214,23 +227,44 @@ internal sealed class TuiApp
 
             while (true)
             {
+                var visibleFields = GetCreateVisibleFields(page, advanced, form.RconEnabled);
+                if (visibleFields.IndexOf(form.SelectedField) < 0)
+                    form.SelectedField = visibleFields.Count > 0 ? visibleFields[0] : ServerCreateForm.Field.Submit;
+
                 var table = RenderCreateFormTable(
                     form,
+                    page,
+                    advanced,
                     mode,
                     editBuffer,
                     versionQuery,
                     versionCursor,
                     typeCursor,
-                    versions);
+                    versions,
+                    eulaCursorYes);
+
+                var pageTitle = advanced
+                    ? page switch
+                    {
+                        CreatePage.Basic => "Basic",
+                        CreatePage.Gameplay => "Gameplay",
+                        CreatePage.Network => "Network",
+                        CreatePage.Java => "Java",
+                        _ => "",
+                    }
+                    : "Basic";
 
                 var help = mode switch
                 {
-                    CreateMode.Normal => "[dim]↑↓/Tab:nav  Enter:activate  Space:toggle  Esc:cancel[/]",
+                    CreateMode.Normal => advanced
+                        ? $"[dim]{Markup.Escape(pageTitle)}  ↑↓/Tab:nav  ←→:page  A:advanced  Enter:activate  Space:toggle  Esc:cancel[/]"
+                        : "[dim]Basic  ↑↓/Tab:nav  A:advanced  Enter:activate  Space:toggle  Esc:cancel[/]",
                     CreateMode.EditText =>
                         "[dim]Type to edit  Enter:confirm  Esc:cancel  Tab:confirm+next  Backspace:delete[/]",
                     CreateMode.SelectVersion =>
                         "[dim]↑↓:select  Type:search  Enter:confirm  Esc:cancel  Tab:confirm+next  Backspace:delete[/]",
                     CreateMode.SelectType => "[dim]↑↓:select  Enter:confirm  Esc:cancel  Tab:confirm+next[/]",
+                    CreateMode.ConfirmEula => "[dim]←→:choose  Enter:confirm  Esc:back[/]",
                     _ => "[dim][/]"
                 };
 
@@ -276,6 +310,20 @@ internal sealed class TuiApp
                 var key = Console.ReadKey(true);
                 var createAction = _keyMap.Translate(key);
 
+                if (mode == CreateMode.Normal)
+                {
+                    // Advanced toggle hotkey.
+                    // Only in normal mode so it doesn't steal input while typing/searching.
+                    if (key.Key == ConsoleKey.A)
+                    {
+                        advanced = !advanced;
+                        if (!advanced)
+                            page = CreatePage.Basic;
+                        createError = string.Empty;
+                        continue;
+                    }
+                }
+
                 if (createAction == InputAction.Escape)
                 {
                     if (mode == CreateMode.EditText)
@@ -305,27 +353,44 @@ internal sealed class TuiApp
                         continue;
                     }
 
+                    if (mode == CreateMode.ConfirmEula)
+                    {
+                        mode = CreateMode.Normal;
+                        createError = string.Empty;
+                        continue;
+                    }
+
                     return;
                 }
 
                 if (mode == CreateMode.Normal)
                 {
+                    // Page switching: only when advanced is enabled.
+                    if (advanced && createAction is InputAction.TabLeft or InputAction.TabRight)
+                    {
+                        page = createAction == InputAction.TabLeft
+                            ? PrevCreatePage(page)
+                            : NextCreatePage(page);
+                        createError = string.Empty;
+                        continue;
+                    }
+
                     if (createAction == InputAction.CursorUp)
                     {
-                        form.MoveUp();
+                        form.MoveUp(visibleFields);
                         continue;
                     }
 
                     if (createAction == InputAction.CursorDown)
                     {
-                        form.MoveDown();
+                        form.MoveDown(visibleFields);
                         continue;
                     }
 
                     if (createAction is InputAction.CycleFocusNext or InputAction.CycleFocusPrev)
                     {
-                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp();
-                        else form.MoveDown();
+                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp(visibleFields);
+                        else form.MoveDown(visibleFields);
                         createError = string.Empty;
                         continue;
                     }
@@ -334,10 +399,13 @@ internal sealed class TuiApp
                     {
                         switch (form.SelectedField)
                         {
-                            case ServerCreateForm.Field.Eula: form.ToggleEula(); break;
                             case ServerCreateForm.Field.OnlineMode: form.ToggleOnlineMode(); break;
                             case ServerCreateForm.Field.Whitelist: form.ToggleWhitelist(); break;
                             case ServerCreateForm.Field.RconEnabled: form.ToggleRconEnabled(); break;
+                            case ServerCreateForm.Field.Advanced:
+                                advanced = !advanced;
+                                if (!advanced) page = CreatePage.Basic;
+                                break;
                             default: continue;
                         }
 
@@ -385,20 +453,20 @@ internal sealed class TuiApp
                                 continue;
                             }
 
-                            if (!IsValidPort(form.RconPort))
-                            {
-                                createError = "RCON port must be 1-65535";
-                                continue;
-                            }
-
-                            if (form.ServerPort == form.RconPort)
-                            {
-                                createError = "Server port and RCON port must differ";
-                                continue;
-                            }
-
                             if (form.RconEnabled)
                             {
+                                if (!IsValidPort(form.RconPort))
+                                {
+                                    createError = "RCON port must be 1-65535";
+                                    continue;
+                                }
+
+                                if (form.ServerPort == form.RconPort)
+                                {
+                                    createError = "Server port and RCON port must differ";
+                                    continue;
+                                }
+
                                 if (string.IsNullOrWhiteSpace(form.RconPassword))
                                 {
                                     createError = "RCON password required";
@@ -412,14 +480,10 @@ internal sealed class TuiApp
                                 }
                             }
 
-                            if (!form.AcceptEula)
-                            {
-                                createError = "You must accept the EULA to create";
-                                continue;
-                            }
-
                             createError = string.Empty;
-                            break;
+                            eulaCursorYes = true;
+                            mode = CreateMode.ConfirmEula;
+                            continue;
                         }
 
                         if (form.SelectedField == ServerCreateForm.Field.Version)
@@ -454,10 +518,13 @@ internal sealed class TuiApp
 
                         switch (form.SelectedField)
                         {
-                            case ServerCreateForm.Field.Eula: form.ToggleEula(); break;
                             case ServerCreateForm.Field.OnlineMode: form.ToggleOnlineMode(); break;
                             case ServerCreateForm.Field.Whitelist: form.ToggleWhitelist(); break;
                             case ServerCreateForm.Field.RconEnabled: form.ToggleRconEnabled(); break;
+                            case ServerCreateForm.Field.Advanced:
+                                advanced = !advanced;
+                                if (!advanced) page = CreatePage.Basic;
+                                break;
                         }
 
                         createError = string.Empty;
@@ -557,8 +624,8 @@ internal sealed class TuiApp
                         mode = CreateMode.Normal;
                         createError = string.Empty;
 
-                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp();
-                        else if (createAction == InputAction.CycleFocusNext) form.MoveDown();
+                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp(visibleFields);
+                        else if (createAction == InputAction.CycleFocusNext) form.MoveDown(visibleFields);
 
                         continue;
                     }
@@ -613,8 +680,8 @@ internal sealed class TuiApp
                         mode = CreateMode.Normal;
                         createError = string.Empty;
 
-                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp();
-                        else if (createAction == InputAction.CycleFocusNext) form.MoveDown();
+                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp(visibleFields);
+                        else if (createAction == InputAction.CycleFocusNext) form.MoveDown(visibleFields);
 
                         continue;
                     }
@@ -663,10 +730,40 @@ internal sealed class TuiApp
                         mode = CreateMode.Normal;
                         createError = string.Empty;
 
-                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp();
-                        else if (createAction == InputAction.CycleFocusNext) form.MoveDown();
+                        if (createAction == InputAction.CycleFocusPrev) form.MoveUp(visibleFields);
+                        else if (createAction == InputAction.CycleFocusNext) form.MoveDown(visibleFields);
 
                         continue;
+                    }
+
+                    continue;
+                }
+                if (mode == CreateMode.ConfirmEula)
+                {
+                    if (createAction is InputAction.TabLeft or InputAction.TabRight)
+                    {
+                        eulaCursorYes = !eulaCursorYes;
+                        continue;
+                    }
+
+                    if (createAction == InputAction.CursorUp || createAction == InputAction.CursorDown)
+                    {
+                        eulaCursorYes = !eulaCursorYes;
+                        continue;
+                    }
+
+                    if (createAction == InputAction.Confirm)
+                    {
+                        form.AcceptEula = eulaCursorYes;
+                        if (!form.AcceptEula)
+                        {
+                            createError = "You must accept the EULA to create";
+                            mode = CreateMode.Normal;
+                            continue;
+                        }
+
+                        createError = string.Empty;
+                        break;
                     }
 
                     continue;
@@ -701,12 +798,15 @@ internal sealed class TuiApp
 
     private Table RenderCreateFormTable(
         ServerCreateForm form,
+        CreatePage page,
+        bool advanced,
         CreateMode mode,
         string editBuffer,
         string versionQuery,
         int versionCursor,
         int typeCursor,
-        IReadOnlyList<string> allVersions)
+        IReadOnlyList<string> allVersions,
+        bool eulaCursorYes)
     {
         const int FormPadding = 4;
 
@@ -735,7 +835,7 @@ internal sealed class TuiApp
                 ServerCreateForm.Field.JvmMinMemory => Markup.Escape(form.JvmMinMemory),
                 ServerCreateForm.Field.JvmMaxMemory => Markup.Escape(form.JvmMaxMemory),
                 ServerCreateForm.Field.JvmAdditionalFlags => Markup.Escape(form.JvmAdditionalFlags),
-                ServerCreateForm.Field.Eula => form.AcceptEula ? "[green]ON[/]" : "[red]OFF[/]",
+                ServerCreateForm.Field.Advanced => advanced ? "[green]ON[/]" : "[red]OFF[/]",
                 _ => string.Empty
             };
         }
@@ -766,36 +866,48 @@ internal sealed class TuiApp
                 ServerCreateForm.Field.JvmMinMemory => form.JvmMinMemory ?? string.Empty,
                 ServerCreateForm.Field.JvmMaxMemory => form.JvmMaxMemory ?? string.Empty,
                 ServerCreateForm.Field.JvmAdditionalFlags => form.JvmAdditionalFlags ?? string.Empty,
-                ServerCreateForm.Field.Eula => form.AcceptEula ? "ON" : "OFF",
+                ServerCreateForm.Field.Advanced => advanced ? "ON" : "OFF",
                 _ => string.Empty
             };
         }
 
         var muted = mode is CreateMode.SelectVersion or CreateMode.SelectType;
 
-        (string Label, string Value, ServerCreateForm.Field Field)[] fields =
-        [
-            ("Name", Value(ServerCreateForm.Field.Name), ServerCreateForm.Field.Name),
-            ("Type", Value(ServerCreateForm.Field.Type), ServerCreateForm.Field.Type),
-            ("Version", Value(ServerCreateForm.Field.Version), ServerCreateForm.Field.Version),
-            ("Directory", Value(ServerCreateForm.Field.Directory), ServerCreateForm.Field.Directory),
-            ("Server Port", Value(ServerCreateForm.Field.ServerPort), ServerCreateForm.Field.ServerPort),
-            ("Max Players", Value(ServerCreateForm.Field.MaxPlayers), ServerCreateForm.Field.MaxPlayers),
-            ("MotD", Value(ServerCreateForm.Field.MotD), ServerCreateForm.Field.MotD),
-            ("View Dist", Value(ServerCreateForm.Field.ViewDistance), ServerCreateForm.Field.ViewDistance),
-            ("Online", Value(ServerCreateForm.Field.OnlineMode), ServerCreateForm.Field.OnlineMode),
-            ("Whitelist", Value(ServerCreateForm.Field.Whitelist), ServerCreateForm.Field.Whitelist),
-            ("Level", Value(ServerCreateForm.Field.LevelName), ServerCreateForm.Field.LevelName),
-            ("Difficulty", Value(ServerCreateForm.Field.Difficulty), ServerCreateForm.Field.Difficulty),
-            ("RCON", Value(ServerCreateForm.Field.RconEnabled), ServerCreateForm.Field.RconEnabled),
-            ("RCON Port", Value(ServerCreateForm.Field.RconPort), ServerCreateForm.Field.RconPort),
-            ("RCON Pass", Value(ServerCreateForm.Field.RconPassword), ServerCreateForm.Field.RconPassword),
-            ("RCON T/O", Value(ServerCreateForm.Field.RconTimeoutSeconds), ServerCreateForm.Field.RconTimeoutSeconds),
-            ("Xms", Value(ServerCreateForm.Field.JvmMinMemory), ServerCreateForm.Field.JvmMinMemory),
-            ("Xmx", Value(ServerCreateForm.Field.JvmMaxMemory), ServerCreateForm.Field.JvmMaxMemory),
-            ("JVM Flags", Value(ServerCreateForm.Field.JvmAdditionalFlags), ServerCreateForm.Field.JvmAdditionalFlags),
-            ("Accept EULA", Value(ServerCreateForm.Field.Eula), ServerCreateForm.Field.Eula),
-        ];
+        var fieldLabels = new Dictionary<ServerCreateForm.Field, string>
+        {
+            [ServerCreateForm.Field.Name] = "Name",
+            [ServerCreateForm.Field.Type] = "Type",
+            [ServerCreateForm.Field.Version] = "Version",
+            [ServerCreateForm.Field.ServerPort] = "Server Port",
+            [ServerCreateForm.Field.MaxPlayers] = "Max Players",
+            [ServerCreateForm.Field.Advanced] = "Advanced",
+
+            [ServerCreateForm.Field.MotD] = "MotD",
+            [ServerCreateForm.Field.ViewDistance] = "View Dist",
+            [ServerCreateForm.Field.OnlineMode] = "Online",
+            [ServerCreateForm.Field.Whitelist] = "Whitelist",
+            [ServerCreateForm.Field.LevelName] = "Level",
+            [ServerCreateForm.Field.Difficulty] = "Difficulty",
+
+            [ServerCreateForm.Field.Directory] = "Directory",
+            [ServerCreateForm.Field.RconEnabled] = "RCON",
+            [ServerCreateForm.Field.RconPort] = "RCON Port",
+            [ServerCreateForm.Field.RconPassword] = "RCON Pass",
+            [ServerCreateForm.Field.RconTimeoutSeconds] = "RCON T/O",
+
+            [ServerCreateForm.Field.JvmMinMemory] = "Xms",
+            [ServerCreateForm.Field.JvmMaxMemory] = "Xmx",
+            [ServerCreateForm.Field.JvmAdditionalFlags] = "JVM Flags",
+        };
+
+        var navFields = GetCreateVisibleFields(page, advanced, form.RconEnabled);
+        var fields = new List<(string Label, string Value, ServerCreateForm.Field Field)>(navFields.Count);
+        for (var i = 0; i < navFields.Count; i++)
+        {
+            var f = navFields[i];
+            if (f == ServerCreateForm.Field.Submit) continue;
+            fields.Add((fieldLabels[f], Value(f), f));
+        }
 
         var availableW = Math.Max(1, Console.WindowWidth - FormPadding);
         var seamTextW = 0;
@@ -815,6 +927,13 @@ internal sealed class TuiApp
 
         var buttonText = "[ Create Server ]";
         if (buttonText.Length > valueTextW) valueTextW = buttonText.Length;
+
+        if (mode == CreateMode.ConfirmEula)
+        {
+            if ("Accept Minecraft EULA?".Length > valueTextW) valueTextW = "Accept Minecraft EULA?".Length;
+            if ("https://aka.ms/MinecraftEULA".Length > valueTextW) valueTextW = "https://aka.ms/MinecraftEULA".Length;
+            if ("  YES     NO  ".Length > valueTextW) valueTextW = "  YES     NO  ".Length;
+        }
 
         if (mode == CreateMode.SelectVersion)
         {
@@ -846,20 +965,28 @@ internal sealed class TuiApp
             }
         }
 
-        var desiredW = Math.Max(16, 2 * Math.Max(seamTextW, valueTextW));
+        var desiredW = Math.Max(17, (2 * Math.Max(seamTextW, valueTextW)) + 1);
         var totalW = Math.Min(availableW, desiredW);
-        var leftW = totalW / 2;
-        var rightW = totalW - leftW;
+        if (totalW % 2 == 0)
+        {
+            totalW = totalW < availableW ? totalW + 1 : totalW - 1;
+        }
+
+        var sideW = Math.Max(1, (totalW - 1) / 2);
+        var leftW = sideW;
+        var rightW = totalW - 1 - leftW;
 
         var formTable = new Table()
             .HideHeaders()
             .NoBorder()
             .Collapse()
             .AddColumn(new TableColumn(string.Empty).NoWrap().RightAligned())
+            .AddColumn(new TableColumn(string.Empty).NoWrap().Centered())
             .AddColumn(new TableColumn(string.Empty).NoWrap().LeftAligned());
 
         formTable.Columns[0].Width(leftW);
-        formTable.Columns[1].Width(rightW);
+        formTable.Columns[1].Width(1);
+        formTable.Columns[2].Width(rightW);
 
         foreach (var (label, value, fieldEnum) in fields)
         {
@@ -870,6 +997,7 @@ internal sealed class TuiApp
             var prefix = isSelected ? "→ " : "  ";
             formTable.AddRow(
                 new Markup($"[{labelStyle}]{Markup.Escape(prefix + label)}[/]"),
+                new Markup("[dim]:v[/]"),
                 new Markup($"[{valueStyle}]{value}[/]"));
         }
 
@@ -952,8 +1080,110 @@ internal sealed class TuiApp
                 HorizontalAlignment.Center));
         }
 
+        if (mode == CreateMode.ConfirmEula)
+        {
+            var hr = new string('─', totalW);
+            content.AddRow(new Markup(string.Empty));
+            content.AddRow(new Align(new Markup($"[dim]{hr}[/]"), HorizontalAlignment.Center));
+
+            var yesStyle = eulaCursorYes ? "bold green reverse" : "green";
+            var noStyle = !eulaCursorYes ? "bold red reverse" : "red";
+            var prompt = new Table()
+                .HideHeaders()
+                .NoBorder()
+                .Collapse()
+                .AddColumn(new TableColumn(string.Empty).NoWrap().Centered().Width(totalW));
+            prompt.AddRow(new Markup("[bold]Accept Minecraft EULA?[/]"));
+            prompt.AddRow(new Markup("[dim]https://aka.ms/MinecraftEULA[/]"));
+            prompt.AddRow(new Markup(string.Empty));
+            prompt.AddRow(new Markup($"[{yesStyle}]  YES  [/]   [{noStyle}]  NO  [/]"));
+
+            content.AddRow(new Align(prompt, HorizontalAlignment.Center));
+        }
+
         return content;
     }
+
+    private static IReadOnlyList<ServerCreateForm.Field> GetCreateVisibleFields(CreatePage page, bool advanced,
+        bool rconEnabled)
+    {
+        var fields = new List<ServerCreateForm.Field>(16);
+
+        // Always show these core fields.
+        if (page == CreatePage.Basic)
+        {
+            fields.Add(ServerCreateForm.Field.Name);
+            fields.Add(ServerCreateForm.Field.Type);
+            fields.Add(ServerCreateForm.Field.Version);
+            fields.Add(ServerCreateForm.Field.ServerPort);
+            fields.Add(ServerCreateForm.Field.MaxPlayers);
+            fields.Add(ServerCreateForm.Field.Advanced);
+        }
+        else if (page == CreatePage.Gameplay)
+        {
+            fields.Add(ServerCreateForm.Field.MotD);
+            fields.Add(ServerCreateForm.Field.ViewDistance);
+            fields.Add(ServerCreateForm.Field.OnlineMode);
+            fields.Add(ServerCreateForm.Field.Whitelist);
+            fields.Add(ServerCreateForm.Field.LevelName);
+            fields.Add(ServerCreateForm.Field.Difficulty);
+        }
+        else if (page == CreatePage.Network)
+        {
+            fields.Add(ServerCreateForm.Field.Directory);
+            fields.Add(ServerCreateForm.Field.RconEnabled);
+            if (rconEnabled)
+            {
+                fields.Add(ServerCreateForm.Field.RconPort);
+                fields.Add(ServerCreateForm.Field.RconPassword);
+                fields.Add(ServerCreateForm.Field.RconTimeoutSeconds);
+            }
+        }
+        else if (page == CreatePage.Java)
+        {
+            fields.Add(ServerCreateForm.Field.JvmMinMemory);
+            fields.Add(ServerCreateForm.Field.JvmMaxMemory);
+            fields.Add(ServerCreateForm.Field.JvmAdditionalFlags);
+        }
+
+        // If advanced is off, only allow the basic page fields.
+        if (!advanced)
+        {
+            var basic = new List<ServerCreateForm.Field>
+            {
+                ServerCreateForm.Field.Name,
+                ServerCreateForm.Field.Type,
+                ServerCreateForm.Field.Version,
+                ServerCreateForm.Field.ServerPort,
+                ServerCreateForm.Field.MaxPlayers,
+                ServerCreateForm.Field.Advanced,
+                ServerCreateForm.Field.Submit,
+            };
+            return basic;
+        }
+
+        // Advanced on: show current page fields plus submit.
+        fields.Add(ServerCreateForm.Field.Submit);
+        return fields;
+    }
+
+    private static CreatePage NextCreatePage(CreatePage page) => page switch
+    {
+        CreatePage.Basic => CreatePage.Gameplay,
+        CreatePage.Gameplay => CreatePage.Network,
+        CreatePage.Network => CreatePage.Java,
+        CreatePage.Java => CreatePage.Basic,
+        _ => CreatePage.Basic,
+    };
+
+    private static CreatePage PrevCreatePage(CreatePage page) => page switch
+    {
+        CreatePage.Basic => CreatePage.Java,
+        CreatePage.Gameplay => CreatePage.Basic,
+        CreatePage.Network => CreatePage.Gameplay,
+        CreatePage.Java => CreatePage.Network,
+        _ => CreatePage.Basic,
+    };
 
     private static int FindIndex(IReadOnlyList<string> list, string value)
     {

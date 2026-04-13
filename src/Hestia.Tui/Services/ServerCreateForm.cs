@@ -27,7 +27,7 @@ internal sealed class ServerCreateForm
         JvmMinMemory,
         JvmMaxMemory,
         JvmAdditionalFlags,
-        Eula,
+        Advanced,
         Submit
     }
 
@@ -64,11 +64,23 @@ internal sealed class ServerCreateForm
         Directory = Path.Combine(appDataDir, "servers", "new-server");
     }
 
-    public void MoveUp() =>
-        SelectedField = SelectedField == Field.Name ? Field.Submit : (Field)(SelectedField - 1);
+    public void MoveUp(IReadOnlyList<Field> visibleFields)
+    {
+        if (visibleFields.Count == 0) return;
+        var i = visibleFields.IndexOf(SelectedField);
+        if (i < 0) i = 0;
+        i = i == 0 ? visibleFields.Count - 1 : i - 1;
+        SelectedField = visibleFields[i];
+    }
 
-    public void MoveDown() =>
-        SelectedField = SelectedField == Field.Submit ? Field.Name : (Field)(SelectedField + 1);
+    public void MoveDown(IReadOnlyList<Field> visibleFields)
+    {
+        if (visibleFields.Count == 0) return;
+        var i = visibleFields.IndexOf(SelectedField);
+        if (i < 0) i = 0;
+        i = i == visibleFields.Count - 1 ? 0 : i + 1;
+        SelectedField = visibleFields[i];
+    }
 
     public void SetName(string value)
     {
@@ -120,8 +132,6 @@ internal sealed class ServerCreateForm
         if (!string.IsNullOrWhiteSpace(value)) JvmMaxMemory = value;
     }
 
-    public void ToggleEula() => AcceptEula = !AcceptEula;
-
     public bool IsTextEditable(Field field) => field is
         Field.Name or Field.Directory or Field.ServerPort or
         Field.MaxPlayers or Field.MotD or Field.ViewDistance or
@@ -152,5 +162,16 @@ internal sealed class ServerCreateForm
     {
         if (!string.IsNullOrWhiteSpace(Name))
             Directory = Path.Combine(_appDataDir, "servers", Name.ToLower().Replace(' ', '-'));
+    }
+}
+
+internal static class ServerCreateFormFieldListExtensions
+{
+    public static int IndexOf(this IReadOnlyList<ServerCreateForm.Field> list, ServerCreateForm.Field value)
+    {
+        for (var i = 0; i < list.Count; i++)
+            if (list[i] == value)
+                return i;
+        return -1;
     }
 }
