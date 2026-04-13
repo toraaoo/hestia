@@ -25,9 +25,15 @@ internal sealed class CommandVm
     {
         if (_historyIndex < 0) return;
         _historyIndex++;
-        current = _historyIndex >= _history.Count
-            ? (current = string.Empty, _historyIndex = -1, string.Empty).Item3
-            : _history[_historyIndex];
+        if (_historyIndex >= _history.Count)
+        {
+            _historyIndex = -1;
+            current = string.Empty;
+        }
+        else
+        {
+            current = _history[_historyIndex];
+        }
     }
 
     public async Task SendAsync(Guid serverId, string command, CancellationToken ct = default)

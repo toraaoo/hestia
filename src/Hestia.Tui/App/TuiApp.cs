@@ -31,7 +31,8 @@ internal sealed class TuiApp
     {
         None,
         Create,
-        DeleteServer
+        DeleteServer,
+        ServerMenu
     }
 
     private enum CreateMode
@@ -47,6 +48,8 @@ internal sealed class TuiApp
     private const int LeftMinW = 44;
     private const int LeftMaxW = 64;
     private const int RightMinW = 60;
+    private const int MinWidth = 100;
+    private const int MinHeight = 24;
 
     private readonly IHestiaService _service;
     private readonly AppInfo _appInfo;
@@ -74,6 +77,7 @@ internal sealed class TuiApp
     private bool _quit;
     private PendingAction _pendingAction = PendingAction.None;
     private Guid? _pendingDeleteId;
+    private Guid? _pendingMenuServerId;
 
     private Layout? _rightLogsCmdLayout;
 
@@ -107,6 +111,19 @@ internal sealed class TuiApp
                 await RunCreateFlowAsync();
             else if (_pendingAction == PendingAction.DeleteServer && _pendingDeleteId.HasValue)
                 await RunDeleteFlowAsync(_pendingDeleteId.Value);
+            else if (_pendingAction == PendingAction.ServerMenu && _pendingMenuServerId.HasValue)
+            {
+                var chosen = await RunServerMenuAsync(_pendingMenuServerId.Value);
+                if (chosen == InputAction.ServerDelete)
+                {
+                    _pendingDeleteId = _pendingMenuServerId;
+                    await RunDeleteFlowAsync(_pendingMenuServerId.Value);
+                }
+                else if (chosen.HasValue)
+                {
+                    RunServerAction(chosen.Value, _pendingMenuServerId.Value);
+                }
+            }
         }
 
         Console.CursorVisible = true;
@@ -116,6 +133,16 @@ internal sealed class TuiApp
 
     private async Task RunLiveAsync()
     {
+        while (!_quit && _pendingAction == PendingAction.None && TooSmall())
+        {
+            AnsiConsole.Clear();
+            Console.WriteLine(
+                $"Terminal too small. Resize to at least {MinWidth}×{MinHeight} (now {Console.WindowWidth}×{Console.WindowHeight}).");
+            await Task.Delay(300);
+        }
+
+        if (_quit || _pendingAction != PendingAction.None) return;
+
         var layout = BuildLayout();
         try
         {
@@ -127,16 +154,32 @@ internal sealed class TuiApp
                 {
                     while (!_quit && _pendingAction == PendingAction.None)
                     {
+                        if (TooSmall()) return;
                         _ui.Drain();
                         HandleInput();
-                        UpdateLayout(layout);
-                        ctx.Refresh();
+                        try
+                        {
+                            UpdateLayout(layout);
+                            ctx.Refresh();
+                        }
+                        catch
+                        {
+                            return;
+                        }
+
                         await Task.Delay(50);
                     }
                 });
         }
         catch (OperationCanceledException) { }
+        catch
+        {
+            /* render crash: outer RunAsync loop re-enters RunLiveAsync */
+        }
     }
+
+    private static bool TooSmall() =>
+        Console.WindowWidth < MinWidth || Console.WindowHeight < MinHeight;
 
     private async Task RunCreateFlowAsync()
     {
@@ -148,13 +191,13 @@ internal sealed class TuiApp
             var initialType = ServerType.Vanilla;
             var versions = await _service.GetAvailableVersionsAsync(initialType, _appCts.Token);
             var form = new ServerCreateForm(_appInfo.AppDataDirectory, versions);
-            form.SetType(initialType);
+            form.Type = initialType;
 
             var existing = await _service.GetServersAsync(_appCts.Token);
             var used = new HashSet<int>(existing.SelectMany(s => new[] { s.Options.Port, s.RconOptions.Port }));
-            form.SetServerPort(FindNextFreePort(25565, used));
+            form.ServerPort = FindNextFreePort(25565, used);
             used.Add(form.ServerPort);
-            form.SetRconPort(FindNextFreePort(25575, used));
+            form.RconPort = FindNextFreePort(25575, used);
             var mode = CreateMode.Normal;
 
             var editBuffer = string.Empty;
@@ -182,9 +225,11 @@ internal sealed class TuiApp
 
                 var help = mode switch
                 {
-                    CreateMode.Normal => "[dim]↑↓:nav  Tab:next  /:edit  Space:toggle  Enter:create  Esc:cancel[/]",
-                    CreateMode.EditText => "[dim]Type to edit  Enter:confirm  Esc:cancel  Tab:confirm+next  Backspace:delete[/]",
-                    CreateMode.SelectVersion => "[dim]↑↓:select  Type:search  Enter:confirm  Esc:cancel  Tab:confirm+next  Backspace:delete[/]",
+                    CreateMode.Normal => "[dim]↑↓/Tab:nav  Enter:activate  Space:toggle  Esc:cancel[/]",
+                    CreateMode.EditText =>
+                        "[dim]Type to edit  Enter:confirm  Esc:cancel  Tab:confirm+next  Backspace:delete[/]",
+                    CreateMode.SelectVersion =>
+                        "[dim]↑↓:select  Type:search  Enter:confirm  Esc:cancel  Tab:confirm+next  Backspace:delete[/]",
                     CreateMode.SelectType => "[dim]↑↓:select  Enter:confirm  Esc:cancel  Tab:confirm+next[/]",
                     _ => "[dim][/]"
                 };
@@ -194,13 +239,34 @@ internal sealed class TuiApp
                     : $"[bold red]{Markup.Escape(createError)}[/]\n{help}";
 
                 var layout = new Layout()
-                    .SplitRows(new Layout("Form"), new Layout("Help").Size(string.IsNullOrWhiteSpace(createError) ? 2 : 3));
+                    .SplitRows(new Layout("Form"),
+                        new Layout("Help").Size(string.IsNullOrWhiteSpace(createError) ? 2 : 3));
                 layout["Form"].Update(new Align(table, HorizontalAlignment.Center, VerticalAlignment.Middle));
                 layout["Help"].Update(new Align(new Markup(helpMarkup), HorizontalAlignment.Center));
                 AnsiConsole.Clear();
-                AnsiConsole.Write(layout);
+                if (TooSmall())
+                {
+                    Console.WriteLine($"Terminal too small. Resize to at least {MinWidth}×{MinHeight}.");
+                    await Task.Delay(300);
+                    continue;
+                }
 
-                if (!Console.KeyAvailable) { await Task.Delay(50); continue; }
+                try
+                {
+                    AnsiConsole.Write(layout);
+                }
+                catch
+                {
+                    await Task.Delay(300);
+                    continue;
+                }
+
+                if (!Console.KeyAvailable)
+                {
+                    await Task.Delay(50);
+                    continue;
+                }
+
                 var key = Console.ReadKey(true);
                 var createAction = _keyMap.Translate(key);
 
@@ -216,7 +282,7 @@ internal sealed class TuiApp
 
                     if (mode == CreateMode.SelectVersion)
                     {
-                        form.SetVersion(versionOriginal);
+                        form.Version = versionOriginal;
                         versionQuery = string.Empty;
                         versionCursor = 0;
                         mode = CreateMode.Normal;
@@ -226,7 +292,7 @@ internal sealed class TuiApp
 
                     if (mode == CreateMode.SelectType)
                     {
-                        form.SetType(typeOriginal);
+                        form.Type = typeOriginal;
                         typeCursor = 0;
                         mode = CreateMode.Normal;
                         createError = string.Empty;
@@ -238,8 +304,18 @@ internal sealed class TuiApp
 
                 if (mode == CreateMode.Normal)
                 {
-                    if (createAction == InputAction.CursorUp) { form.MoveUp(); continue; }
-                    if (createAction == InputAction.CursorDown) { form.MoveDown(); continue; }
+                    if (createAction == InputAction.CursorUp)
+                    {
+                        form.MoveUp();
+                        continue;
+                    }
+
+                    if (createAction == InputAction.CursorDown)
+                    {
+                        form.MoveDown();
+                        continue;
+                    }
+
                     if (createAction is InputAction.CycleFocusNext or InputAction.CycleFocusPrev)
                     {
                         if (createAction == InputAction.CycleFocusPrev) form.MoveUp();
@@ -250,37 +326,96 @@ internal sealed class TuiApp
 
                     if (key.Key == ConsoleKey.Spacebar)
                     {
-                        if (form.SelectedField == ServerCreateForm.Field.Eula)
+                        switch (form.SelectedField)
                         {
-                            form.ToggleEula();
-                            createError = string.Empty;
-                            continue;
+                            case ServerCreateForm.Field.Eula: form.ToggleEula(); break;
+                            case ServerCreateForm.Field.OnlineMode: form.ToggleOnlineMode(); break;
+                            case ServerCreateForm.Field.Whitelist: form.ToggleWhitelist(); break;
+                            case ServerCreateForm.Field.RconEnabled: form.ToggleRconEnabled(); break;
+                            default: continue;
                         }
 
-                        if (form.SelectedField == ServerCreateForm.Field.OnlineMode)
-                        {
-                            form.ToggleOnlineMode();
-                            createError = string.Empty;
-                            continue;
-                        }
-
-                        if (form.SelectedField == ServerCreateForm.Field.Whitelist)
-                        {
-                            form.ToggleWhitelist();
-                            createError = string.Empty;
-                            continue;
-                        }
-
-                        if (form.SelectedField == ServerCreateForm.Field.RconEnabled)
-                        {
-                            form.ToggleRconEnabled();
-                            createError = string.Empty;
-                            continue;
-                        }
+                        createError = string.Empty;
+                        continue;
                     }
 
-                    if (createAction == InputAction.OpenCommand)
+                    if (createAction is InputAction.Confirm or InputAction.OpenCommand)
                     {
+                        if (form.SelectedField == ServerCreateForm.Field.Submit)
+                        {
+                            if (string.IsNullOrWhiteSpace(form.Name))
+                            {
+                                createError = "Server name required";
+                                continue;
+                            }
+
+                            if (!IsValidPort(form.ServerPort))
+                            {
+                                createError = "Server port must be 1-65535";
+                                continue;
+                            }
+
+                            if (form.MaxPlayers is < 1 or > 10_000)
+                            {
+                                createError = "Max players must be 1-10000";
+                                continue;
+                            }
+
+                            if (form.ViewDistance is < 2 or > 32)
+                            {
+                                createError = "View distance must be 2-32";
+                                continue;
+                            }
+
+                            if (string.IsNullOrWhiteSpace(form.LevelName))
+                            {
+                                createError = "Level name required";
+                                continue;
+                            }
+
+                            if (string.IsNullOrWhiteSpace(form.Difficulty))
+                            {
+                                createError = "Difficulty required";
+                                continue;
+                            }
+
+                            if (!IsValidPort(form.RconPort))
+                            {
+                                createError = "RCON port must be 1-65535";
+                                continue;
+                            }
+
+                            if (form.ServerPort == form.RconPort)
+                            {
+                                createError = "Server port and RCON port must differ";
+                                continue;
+                            }
+
+                            if (form.RconEnabled)
+                            {
+                                if (string.IsNullOrWhiteSpace(form.RconPassword))
+                                {
+                                    createError = "RCON password required";
+                                    continue;
+                                }
+
+                                if (form.RconTimeoutSeconds is < 1 or > 120)
+                                {
+                                    createError = "RCON timeout must be 1-120";
+                                    continue;
+                                }
+                            }
+
+                            if (!form.AcceptEula)
+                            {
+                                createError = "You must accept the EULA to create";
+                                continue;
+                            }
+
+                            createError = string.Empty;
+                            break;
+                        }
+
                         if (form.SelectedField == ServerCreateForm.Field.Version)
                         {
                             versionOriginal = form.Version;
@@ -294,128 +429,33 @@ internal sealed class TuiApp
 
                         if (form.SelectedField == ServerCreateForm.Field.Type)
                         {
-                            var types = form.GetTypes();
                             typeOriginal = form.Type;
-                            typeCursor = Array.IndexOf(types, form.Type);
+                            typeCursor = Array.IndexOf(form.Types, form.Type);
                             if (typeCursor < 0) typeCursor = 0;
                             mode = CreateMode.SelectType;
                             createError = string.Empty;
                             continue;
                         }
 
-                        if (form.SelectedField is ServerCreateForm.Field.Name
-                            or ServerCreateForm.Field.Directory
-                            or ServerCreateForm.Field.ServerPort
-                            or ServerCreateForm.Field.MaxPlayers
-                            or ServerCreateForm.Field.MotD
-                            or ServerCreateForm.Field.ViewDistance
-                            or ServerCreateForm.Field.LevelName
-                            or ServerCreateForm.Field.Difficulty
-                            or ServerCreateForm.Field.RconPort
-                            or ServerCreateForm.Field.RconPassword
-                            or ServerCreateForm.Field.RconTimeoutSeconds
-                            or ServerCreateForm.Field.JvmMinMemory
-                            or ServerCreateForm.Field.JvmMaxMemory
-                            or ServerCreateForm.Field.JvmAdditionalFlags)
+                        if (form.IsTextEditable(form.SelectedField))
                         {
-                            editOriginal = form.SelectedField switch
-                            {
-                                ServerCreateForm.Field.Name => form.Name,
-                                ServerCreateForm.Field.Directory => form.Directory,
-                                ServerCreateForm.Field.ServerPort => form.ServerPort.ToString(),
-                                ServerCreateForm.Field.MaxPlayers => form.MaxPlayers.ToString(),
-                                ServerCreateForm.Field.MotD => form.MotD,
-                                ServerCreateForm.Field.ViewDistance => form.ViewDistance.ToString(),
-                                ServerCreateForm.Field.LevelName => form.LevelName,
-                                ServerCreateForm.Field.Difficulty => form.Difficulty,
-                                ServerCreateForm.Field.RconPort => form.RconPort.ToString(),
-                                ServerCreateForm.Field.RconPassword => form.RconPassword,
-                                ServerCreateForm.Field.RconTimeoutSeconds => form.RconTimeoutSeconds.ToString(),
-                                ServerCreateForm.Field.JvmMinMemory => form.JvmMinMemory,
-                                ServerCreateForm.Field.JvmMaxMemory => form.JvmMaxMemory,
-                                ServerCreateForm.Field.JvmAdditionalFlags => form.JvmAdditionalFlags,
-                                _ => string.Empty
-                            };
+                            editOriginal = form.GetTextValue(form.SelectedField);
                             editBuffer = editOriginal;
                             mode = CreateMode.EditText;
                             createError = string.Empty;
                             continue;
                         }
-                    }
 
-                    if (createAction == InputAction.Confirm)
-                    {
-                        if (string.IsNullOrWhiteSpace(form.Name))
+                        switch (form.SelectedField)
                         {
-                            createError = "Server name required";
-                            continue;
-                        }
-
-                        if (!IsValidPort(form.ServerPort))
-                        {
-                            createError = "Server port must be 1-65535";
-                            continue;
-                        }
-
-                        if (form.MaxPlayers is < 1 or > 10_000)
-                        {
-                            createError = "Max players must be 1-10000";
-                            continue;
-                        }
-
-                        if (form.ViewDistance is < 2 or > 32)
-                        {
-                            createError = "View distance must be 2-32";
-                            continue;
-                        }
-
-                        if (string.IsNullOrWhiteSpace(form.LevelName))
-                        {
-                            createError = "Level name required";
-                            continue;
-                        }
-
-                        if (string.IsNullOrWhiteSpace(form.Difficulty))
-                        {
-                            createError = "Difficulty required";
-                            continue;
-                        }
-
-                        if (!IsValidPort(form.RconPort))
-                        {
-                            createError = "RCON port must be 1-65535";
-                            continue;
-                        }
-
-                        if (form.ServerPort == form.RconPort)
-                        {
-                            createError = "Server port and RCON port must differ";
-                            continue;
-                        }
-
-                        if (form.RconEnabled)
-                        {
-                            if (string.IsNullOrWhiteSpace(form.RconPassword))
-                            {
-                                createError = "RCON password required";
-                                continue;
-                            }
-
-                            if (form.RconTimeoutSeconds is < 1 or > 120)
-                            {
-                                createError = "RCON timeout must be 1-120";
-                                continue;
-                            }
-                        }
-
-                        if (!form.AcceptEula)
-                        {
-                            createError = "You must accept the EULA to create";
-                            continue;
+                            case ServerCreateForm.Field.Eula: form.ToggleEula(); break;
+                            case ServerCreateForm.Field.OnlineMode: form.ToggleOnlineMode(); break;
+                            case ServerCreateForm.Field.Whitelist: form.ToggleWhitelist(); break;
+                            case ServerCreateForm.Field.RconEnabled: form.ToggleRconEnabled(); break;
                         }
 
                         createError = string.Empty;
-                        break;
+                        continue;
                     }
 
                     continue;
@@ -431,91 +471,80 @@ internal sealed class TuiApp
 
                     if (createAction is InputAction.Confirm or InputAction.CycleFocusNext or InputAction.CycleFocusPrev)
                     {
-                        if (form.SelectedField == ServerCreateForm.Field.Name)
+                        switch (form.SelectedField)
                         {
-                            form.SetName(editBuffer);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.Directory)
-                        {
-                            form.SetDirectory(editBuffer);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.ServerPort)
-                        {
-                            if (!TryParsePort(editBuffer, out var p))
-                            {
-                                createError = "Server port must be 1-65535";
-                                continue;
-                            }
+                            case ServerCreateForm.Field.Name:
+                                form.SetName(editBuffer);
+                                break;
+                            case ServerCreateForm.Field.Directory:
+                                form.SetDirectory(editBuffer);
+                                break;
+                            case ServerCreateForm.Field.ServerPort:
+                                if (!TryParsePort(editBuffer, out var sp))
+                                {
+                                    createError = "Server port must be 1-65535";
+                                    continue;
+                                }
 
-                            form.SetServerPort(p);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.MaxPlayers)
-                        {
-                            if (!int.TryParse(editBuffer.Trim(), out var mp) || mp is < 1 or > 10_000)
-                            {
-                                createError = "Max players must be 1-10000";
-                                continue;
-                            }
+                                form.ServerPort = sp;
+                                break;
+                            case ServerCreateForm.Field.MaxPlayers:
+                                if (!int.TryParse(editBuffer.Trim(), out var mp) || mp is < 1 or > 10_000)
+                                {
+                                    createError = "Max players must be 1-10000";
+                                    continue;
+                                }
 
-                            form.SetMaxPlayers(mp);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.MotD)
-                        {
-                            form.SetMotD(editBuffer);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.ViewDistance)
-                        {
-                            if (!int.TryParse(editBuffer.Trim(), out var vd) || vd is < 2 or > 32)
-                            {
-                                createError = "View distance must be 2-32";
-                                continue;
-                            }
+                                form.MaxPlayers = mp;
+                                break;
+                            case ServerCreateForm.Field.MotD:
+                                form.SetMotD(editBuffer);
+                                break;
+                            case ServerCreateForm.Field.ViewDistance:
+                                if (!int.TryParse(editBuffer.Trim(), out var vd) || vd is < 2 or > 32)
+                                {
+                                    createError = "View distance must be 2-32";
+                                    continue;
+                                }
 
-                            form.SetViewDistance(vd);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.LevelName)
-                        {
-                            form.SetLevelName(editBuffer);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.Difficulty)
-                        {
-                            form.SetDifficulty(editBuffer);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.RconPort)
-                        {
-                            if (!TryParsePort(editBuffer, out var p))
-                            {
-                                createError = "RCON port must be 1-65535";
-                                continue;
-                            }
+                                form.ViewDistance = vd;
+                                break;
+                            case ServerCreateForm.Field.LevelName:
+                                form.SetLevelName(editBuffer);
+                                break;
+                            case ServerCreateForm.Field.Difficulty:
+                                form.SetDifficulty(editBuffer);
+                                break;
+                            case ServerCreateForm.Field.RconPort:
+                                if (!TryParsePort(editBuffer, out var rp))
+                                {
+                                    createError = "RCON port must be 1-65535";
+                                    continue;
+                                }
 
-                            form.SetRconPort(p);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.RconPassword)
-                        {
-                            form.SetRconPassword(editBuffer);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.RconTimeoutSeconds)
-                        {
-                            if (!int.TryParse(editBuffer.Trim(), out var t) || t is < 1 or > 120)
-                            {
-                                createError = "RCON timeout must be 1-120";
-                                continue;
-                            }
+                                form.RconPort = rp;
+                                break;
+                            case ServerCreateForm.Field.RconPassword:
+                                form.SetRconPassword(editBuffer);
+                                break;
+                            case ServerCreateForm.Field.RconTimeoutSeconds:
+                                if (!int.TryParse(editBuffer.Trim(), out var rt) || rt is < 1 or > 120)
+                                {
+                                    createError = "RCON timeout must be 1-120";
+                                    continue;
+                                }
 
-                            form.SetRconTimeoutSeconds(t);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.JvmMinMemory)
-                        {
-                            form.SetJvmMinMemory(editBuffer);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.JvmMaxMemory)
-                        {
-                            form.SetJvmMaxMemory(editBuffer);
-                        }
-                        else if (form.SelectedField == ServerCreateForm.Field.JvmAdditionalFlags)
-                        {
-                            form.SetJvmAdditionalFlags(editBuffer);
+                                form.RconTimeoutSeconds = rt;
+                                break;
+                            case ServerCreateForm.Field.JvmMinMemory:
+                                form.SetJvmMinMemory(editBuffer);
+                                break;
+                            case ServerCreateForm.Field.JvmMaxMemory:
+                                form.SetJvmMaxMemory(editBuffer);
+                                break;
+                            case ServerCreateForm.Field.JvmAdditionalFlags:
+                                form.JvmAdditionalFlags = editBuffer;
+                                break;
                         }
 
                         editBuffer = string.Empty;
@@ -528,7 +557,7 @@ internal sealed class TuiApp
                         continue;
                     }
 
-                    if (createAction == InputAction.TextInput)
+                    if (!char.IsControl(key.KeyChar))
                     {
                         editBuffer += key.KeyChar;
                         continue;
@@ -571,7 +600,7 @@ internal sealed class TuiApp
                     if (createAction is InputAction.Confirm or InputAction.CycleFocusNext or InputAction.CycleFocusPrev)
                     {
                         if (filtered.Count > 0)
-                            form.SetVersion(filtered[versionCursor]);
+                            form.Version = filtered[versionCursor];
 
                         versionQuery = string.Empty;
                         versionCursor = 0;
@@ -587,7 +616,7 @@ internal sealed class TuiApp
                     if (createAction == InputAction.OpenCommand)
                         continue;
 
-                    if (createAction == InputAction.TextInput)
+                    if (!char.IsControl(key.KeyChar))
                     {
                         versionQuery += key.KeyChar;
                         versionCursor = 0;
@@ -599,7 +628,7 @@ internal sealed class TuiApp
 
                 if (mode == CreateMode.SelectType)
                 {
-                    var types = form.GetTypes();
+                    var types = form.Types;
                     typeCursor = Math.Clamp(typeCursor, 0, Math.Max(0, types.Length - 1));
 
                     if (createAction == InputAction.CursorUp)
@@ -618,9 +647,8 @@ internal sealed class TuiApp
                     {
                         if (types.Length > 0)
                         {
-                            var nextType = types[typeCursor];
-                            form.SetType(nextType);
-                            versions = await _service.GetAvailableVersionsAsync(nextType, _appCts.Token);
+                            form.Type = types[typeCursor];
+                            versions = await _service.GetAvailableVersionsAsync(form.Type, _appCts.Token);
                             versionQuery = string.Empty;
                             versionCursor = FindIndex(versions, form.Version);
                             if (versionCursor < 0) versionCursor = 0;
@@ -639,27 +667,7 @@ internal sealed class TuiApp
                 }
             }
 
-            await CreateServerAsync(
-                form.Name,
-                form.Version,
-                form.Directory,
-                form.Type,
-                form.ServerPort,
-                form.MaxPlayers,
-                form.MotD,
-                form.ViewDistance,
-                form.OnlineMode,
-                form.Whitelist,
-                form.LevelName,
-                form.Difficulty,
-                form.RconEnabled,
-                form.RconPort,
-                form.RconPassword,
-                form.RconTimeoutSeconds,
-                form.JvmMinMemory,
-                form.JvmMaxMemory,
-                form.JvmAdditionalFlags,
-                form.AcceptEula);
+            await RunCreateProgressAsync(form);
         }
         finally
         {
@@ -694,13 +702,6 @@ internal sealed class TuiApp
         int typeCursor,
         IReadOnlyList<string> allVersions)
     {
-        var table = new Table()
-            .HideHeaders()
-            .NoBorder()
-            .AddColumn(new TableColumn(string.Empty).Width(60));
-
-        var muted = mode is CreateMode.SelectVersion or CreateMode.SelectType;
-
         string Value(ServerCreateForm.Field field)
         {
             if (mode == CreateMode.EditText && form.SelectedField == field)
@@ -731,8 +732,41 @@ internal sealed class TuiApp
             };
         }
 
-        var fields = new[]
+        string PlainValue(ServerCreateForm.Field field)
         {
+            if (mode == CreateMode.EditText && form.SelectedField == field)
+                return editBuffer + "█";
+
+            return field switch
+            {
+                ServerCreateForm.Field.Name => form.Name ?? string.Empty,
+                ServerCreateForm.Field.Type => form.Type.ToString(),
+                ServerCreateForm.Field.Version => form.Version ?? string.Empty,
+                ServerCreateForm.Field.Directory => form.Directory ?? string.Empty,
+                ServerCreateForm.Field.ServerPort => form.ServerPort.ToString(),
+                ServerCreateForm.Field.MaxPlayers => form.MaxPlayers.ToString(),
+                ServerCreateForm.Field.MotD => form.MotD ?? string.Empty,
+                ServerCreateForm.Field.ViewDistance => form.ViewDistance.ToString(),
+                ServerCreateForm.Field.OnlineMode => form.OnlineMode ? "ON" : "OFF",
+                ServerCreateForm.Field.Whitelist => form.Whitelist ? "ON" : "OFF",
+                ServerCreateForm.Field.LevelName => form.LevelName ?? string.Empty,
+                ServerCreateForm.Field.Difficulty => form.Difficulty ?? string.Empty,
+                ServerCreateForm.Field.RconEnabled => form.RconEnabled ? "ON" : "OFF",
+                ServerCreateForm.Field.RconPort => form.RconPort.ToString(),
+                ServerCreateForm.Field.RconPassword => form.RconPassword ?? string.Empty,
+                ServerCreateForm.Field.RconTimeoutSeconds => form.RconTimeoutSeconds.ToString(),
+                ServerCreateForm.Field.JvmMinMemory => form.JvmMinMemory ?? string.Empty,
+                ServerCreateForm.Field.JvmMaxMemory => form.JvmMaxMemory ?? string.Empty,
+                ServerCreateForm.Field.JvmAdditionalFlags => form.JvmAdditionalFlags ?? string.Empty,
+                ServerCreateForm.Field.Eula => form.AcceptEula ? "ON" : "OFF",
+                _ => string.Empty
+            };
+        }
+
+        var muted = mode is CreateMode.SelectVersion or CreateMode.SelectType;
+
+        (string Label, string Value, ServerCreateForm.Field Field)[] fields =
+        [
             ("Name", Value(ServerCreateForm.Field.Name), ServerCreateForm.Field.Name),
             ("Type", Value(ServerCreateForm.Field.Type), ServerCreateForm.Field.Type),
             ("Version", Value(ServerCreateForm.Field.Version), ServerCreateForm.Field.Version),
@@ -752,23 +786,78 @@ internal sealed class TuiApp
             ("Xms", Value(ServerCreateForm.Field.JvmMinMemory), ServerCreateForm.Field.JvmMinMemory),
             ("Xmx", Value(ServerCreateForm.Field.JvmMaxMemory), ServerCreateForm.Field.JvmMaxMemory),
             ("JVM Flags", Value(ServerCreateForm.Field.JvmAdditionalFlags), ServerCreateForm.Field.JvmAdditionalFlags),
-            ("Accept EULA", Value(ServerCreateForm.Field.Eula), ServerCreateForm.Field.Eula)
-        };
+            ("Accept EULA", Value(ServerCreateForm.Field.Eula), ServerCreateForm.Field.Eula),
+        ];
+
+        var availableW = Math.Max(1, Console.WindowWidth - 4);
+        var maxW = 0;
+
+        // Compute target width from visible content so the block (and separators) truly center.
+        foreach (var (label, _, fieldEnum) in fields)
+        {
+            var s = $"→ {label}: {PlainValue(fieldEnum)}";
+            if (s.Length > maxW) maxW = s.Length;
+        }
+
+        // Button text contributes to the overall width.
+        var buttonText = "[ Create Server ]";
+        if (buttonText.Length > maxW) maxW = buttonText.Length;
+
+        if (mode == CreateMode.SelectVersion)
+        {
+            var filtered = FilterVersions(allVersions, versionQuery);
+            const int pageSize = 8;
+            var cur = filtered.Count == 0 ? 0 : Math.Clamp(versionCursor, 0, filtered.Count - 1);
+            var start = Math.Max(0, cur - (pageSize / 2));
+            var end = Math.Min(filtered.Count, start + pageSize);
+            if (end - start < pageSize && start > 0) start = Math.Max(0, end - pageSize);
+
+            if (start > 0)
+                maxW = Math.Max(maxW, "...".Length);
+
+            for (var i = start; i < end; i++)
+            {
+                var s = $"→ {filtered[i]}";
+                if (s.Length > maxW) maxW = s.Length;
+            }
+
+            if (end < filtered.Count)
+                maxW = Math.Max(maxW, "...".Length);
+
+            var search = $"Search: {versionQuery}█";
+            if (search.Length > maxW) maxW = search.Length;
+        }
+        else if (mode == CreateMode.SelectType)
+        {
+            var types = form.Types;
+            for (var i = 0; i < types.Length; i++)
+            {
+                var s = $"→ {types[i]}";
+                if (s.Length > maxW) maxW = s.Length;
+            }
+        }
+
+        var w = Math.Min(Math.Max(1, maxW), availableW);
+
+        var table = new Table()
+            .HideHeaders()
+            .NoBorder()
+            .Collapse()
+            .AddColumn(new TableColumn(string.Empty).NoWrap().Centered().Width(w));
 
         foreach (var (label, value, fieldEnum) in fields)
         {
             var isSelected = form.SelectedField == fieldEnum && mode is CreateMode.Normal or CreateMode.EditText;
             var prefix = isSelected ? "→ " : "  ";
-            var labelStyle = isSelected ? "bold yellow" : (muted ? "dim" : "white");
-            var valueStyle = isSelected ? "bold cyan" : (muted ? "dim" : "cyan");
+            var labelStyle = isSelected ? "bold yellow reverse" : (muted ? "dim" : "white");
+            var valueStyle = isSelected ? "bold cyan reverse" : (muted ? "dim" : "cyan");
 
-            var line = $"[{labelStyle}]{prefix}{label,-12}[/] [{valueStyle}]{value,-40}[/]";
-            table.AddRow(new Markup(line));
+            table.AddRow(new Markup($"[{labelStyle}]{Markup.Escape(prefix + label)}[/]: [{valueStyle}]{value}[/]"));
         }
 
         if (mode == CreateMode.SelectVersion)
         {
-            table.AddRow(new Markup("[dim]────────────────────────────────────────────────────────────[/]"));
+            table.AddRow(new Markup($"[dim]{new string('─', w)}[/]"));
 
             var filtered = FilterVersions(allVersions, versionQuery);
             const int pageSize = 8;
@@ -778,36 +867,45 @@ internal sealed class TuiApp
             if (end - start < pageSize && start > 0) start = Math.Max(0, end - pageSize);
 
             if (start > 0)
-                table.AddRow(new Markup("[dim]  ...[/]"));
+                table.AddRow(new Markup("[dim]...[/]"));
 
             for (var i = start; i < end; i++)
             {
                 var v = Markup.Escape(filtered[i]);
                 var sel = i == cur;
-                var prefix = sel ? "→ " : "  ";
-                var style = sel ? "bold cyan" : "white";
-                table.AddRow(new Markup($"[{style}]{prefix}{v}[/]"));
+                var style = sel ? "bold cyan reverse" : "white";
+                var pfx = sel ? "→ " : "  ";
+                table.AddRow(new Markup($"[{style}]{pfx}{v}[/]"));
             }
 
             if (end < filtered.Count)
-                table.AddRow(new Markup("[dim]  ...[/]"));
+                table.AddRow(new Markup("[dim]...[/]"));
 
             var q = Markup.Escape(versionQuery);
             table.AddRow(new Markup($"[dim]Search:[/] [bold]{q}[/][dim]█[/]"));
         }
         else if (mode == CreateMode.SelectType)
         {
-            table.AddRow(new Markup("[dim]────────────────────────────────────────────────────────────[/]"));
-            var types = form.GetTypes();
+            table.AddRow(new Markup($"[dim]{new string('─', w)}[/]"));
+
+            var types = form.Types;
             var cur = Math.Clamp(typeCursor, 0, Math.Max(0, types.Length - 1));
             for (var i = 0; i < types.Length; i++)
             {
                 var t = Markup.Escape(types[i].ToString());
                 var sel = i == cur;
-                var prefix = sel ? "→ " : "  ";
-                var style = sel ? "bold cyan" : "white";
-                table.AddRow(new Markup($"[{style}]{prefix}{t}[/]"));
+                var style = sel ? "bold cyan reverse" : "white";
+                var pfx = sel ? "→ " : "  ";
+                table.AddRow(new Markup($"[{style}]{pfx}{t}[/]"));
             }
+        }
+
+        if (mode is CreateMode.Normal or CreateMode.EditText)
+        {
+            var btnSelected = form.SelectedField == ServerCreateForm.Field.Submit && mode == CreateMode.Normal;
+            var btnStyle = btnSelected ? "bold green reverse" : "green";
+            table.AddRow(new Markup(string.Empty));
+            table.AddRow(new Markup($"[{btnStyle}]{Markup.Escape("[ Create Server ]")}[/]"));
         }
 
         return table;
@@ -816,7 +914,8 @@ internal sealed class TuiApp
     private static int FindIndex(IReadOnlyList<string> list, string value)
     {
         for (var i = 0; i < list.Count; i++)
-            if (list[i] == value) return i;
+            if (list[i] == value)
+                return i;
         return -1;
     }
 
@@ -1071,6 +1170,7 @@ internal sealed class TuiApp
             {
                 Row("RCON", "[red]OFF[/]");
             }
+
             grid.AddEmptyRow();
         }
 
@@ -1127,9 +1227,15 @@ internal sealed class TuiApp
 
     private IRenderable RenderStatus()
     {
-        var hints = _activePane == Pane.Command
-            ? "[dim]Esc:cancel  Enter:send  ↑↓:history[/]"
-            : "[dim]q:quit  s:start  t:stop  r:restart  d:delete  c:create  p:pw  Tab:focus  /:command  ←→:tab  Esc:back[/]";
+        string hints;
+        if (_activePane == Pane.Command)
+            hints = "[dim]Enter:send  ↑↓:history  Esc:cancel[/]";
+        else if (_activePane == Pane.Logs)
+            hints = "[dim]←:servers  →:info  ↑↓/PgUp/PgDn:scroll  f:follow  /:command  m:actions  Esc:servers[/]";
+        else if (_activePane == Pane.Info)
+            hints = "[dim]←:logs  p:pw  m:actions  Esc:servers[/]";
+        else
+            hints = "[dim]q:quit  ↑↓:nav  Enter:select  →:view  m:actions  c:create  Tab:focus[/]";
 
         if (!string.IsNullOrEmpty(_statusMsg))
         {
@@ -1170,7 +1276,10 @@ internal sealed class TuiApp
             case InputAction.TogglePassword when _selectedServerId.HasValue:
                 _showRconPassword = !_showRconPassword;
                 return;
-            case InputAction.Escape when _selectedServerId.HasValue:
+            case InputAction.Escape when _activePane is Pane.Logs or Pane.Info:
+                _activePane = Pane.Servers;
+                return;
+            case InputAction.Escape when _activePane == Pane.Servers && _selectedServerId.HasValue:
                 _ = DeselectAsync();
                 return;
             case InputAction.CycleFocusNext:
@@ -1179,13 +1288,26 @@ internal sealed class TuiApp
             case InputAction.CycleFocusPrev:
                 CycleFocus(-1);
                 return;
-            case InputAction.TabLeft when _activePane is Pane.Logs or Pane.Info:
+            case InputAction.TabLeft when _activePane == Pane.Info:
                 _activeTab = Tab.Logs;
                 _activePane = Pane.Logs;
                 return;
-            case InputAction.TabRight when _activePane is Pane.Logs or Pane.Info:
+            case InputAction.TabLeft when _activePane == Pane.Logs:
+                _activePane = Pane.Servers;
+                return;
+            case InputAction.TabRight when _activePane == Pane.Servers && _selectedServerId.HasValue:
+                _activePane = Pane.Logs;
+                _activeTab = Tab.Logs;
+                return;
+            case InputAction.TabRight when _activePane == Pane.Logs:
                 _activeTab = Tab.Info;
                 _activePane = Pane.Info;
+                return;
+            case InputAction.ToggleFollow when _selectedServerId.HasValue:
+                _logFollow = !_logFollow;
+                return;
+            case InputAction.ServerCreate:
+                _pendingAction = PendingAction.Create;
                 return;
         }
 
@@ -1194,8 +1316,29 @@ internal sealed class TuiApp
 
         if (_activePane == Pane.Logs)
         {
-            if (action == InputAction.PageUp) { ScrollLogs(+5); return; }
-            if (action == InputAction.PageDown) { ScrollLogs(-5); return; }
+            if (action == InputAction.CursorUp)
+            {
+                ScrollLogs(+1);
+                return;
+            }
+
+            if (action == InputAction.CursorDown)
+            {
+                ScrollLogs(-1);
+                return;
+            }
+
+            if (action == InputAction.PageUp)
+            {
+                ScrollLogs(+5);
+                return;
+            }
+
+            if (action == InputAction.PageDown)
+            {
+                ScrollLogs(-5);
+                return;
+            }
         }
     }
 
@@ -1215,15 +1358,19 @@ internal sealed class TuiApp
                 if (s is not null) _ = SelectServerAsync(s.Id);
                 break;
             }
-            case InputAction.ServerStart:   RunServerAction('s'); break;
-            case InputAction.ServerStop:    RunServerAction('t'); break;
-            case InputAction.ServerRestart: RunServerAction('r'); break;
-            case InputAction.ServerDelete:  DeleteServer(); break;
+            case InputAction.ServerMenu:
+            {
+                var s = _serverListVm.GetAt(_serverCursor);
+                if (s is not null)
+                {
+                    _pendingMenuServerId = s.Id;
+                    _pendingAction = PendingAction.ServerMenu;
+                }
+
+                break;
+            }
             case InputAction.ServerCreate:
                 _pendingAction = PendingAction.Create;
-                break;
-            case InputAction.ToggleFollow:
-                _logFollow = !_logFollow;
                 break;
         }
     }
@@ -1242,6 +1389,7 @@ internal sealed class TuiApp
                     _logScroll = 0;
                     _ = _commandVm.SendAsync(id, cmd, _appCts.Token);
                 }
+
                 break;
             }
             case InputAction.Escape:
@@ -1272,8 +1420,9 @@ internal sealed class TuiApp
                 _inputBuffer = cur;
                 break;
             }
-            case InputAction.TextInput:
-                _inputBuffer += k.KeyChar;
+            default:
+                if (!char.IsControl(k.KeyChar))
+                    _inputBuffer += k.KeyChar;
                 break;
         }
     }
@@ -1292,22 +1441,16 @@ internal sealed class TuiApp
     private void AppendRconOutputToLogs(string text)
     {
         if (_session is null) return;
-
-        var s = text.Replace("\r", string.Empty);
-        var parts = s.Split('\n');
-        for (var i = 0; i < parts.Length; i++)
-        {
-            var p = parts[i];
-            if (p.Length == 0) continue;
-            _session.LogBuffer.Add(p);
-        }
+        foreach (var line in text.Replace("\r", "").Split('\n'))
+            if (line.Length > 0)
+                _session.LogBuffer.Add(line);
     }
 
     private void CycleFocus(int dir)
     {
         Pane[] panes = _selectedServerId.HasValue
-            ? [Pane.Servers, Pane.JRE, Pane.Logs, Pane.Info]
-            : [Pane.Servers, Pane.JRE];
+            ? [Pane.Servers, Pane.Logs, Pane.Info]
+            : [Pane.Servers];
 
         var idx = Array.IndexOf(panes, _activePane);
         idx = ((idx + dir) % panes.Length + panes.Length) % panes.Length;
@@ -1424,7 +1567,21 @@ internal sealed class TuiApp
             layout["Help"].Update(new Align(new Markup("[dim]Y:confirm  N:cancel[/]"), HorizontalAlignment.Center));
 
             AnsiConsole.Clear();
-            AnsiConsole.Write(layout);
+            if (!TooSmall())
+            {
+                try
+                {
+                    AnsiConsole.Write(layout);
+                }
+                catch
+                {
+                    /* ignore render error, prompt still shows below */
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Terminal too small. Resize to at least {MinWidth}×{MinHeight}.");
+            }
 
             while (true)
             {
@@ -1463,19 +1620,146 @@ internal sealed class TuiApp
         }
     }
 
-    private void RunServerAction(char key)
+    private async Task<InputAction?> RunServerMenuAsync(Guid serverId)
     {
-        var server = _serverListVm.GetAt(_serverCursor);
+        var server = _serverListVm.Servers.FirstOrDefault(s => s.Id == serverId);
+        if (server is null) return null;
+
+        (string Label, InputAction Action)[] items =
+        [
+            ("Start", InputAction.ServerStart),
+            ("Stop", InputAction.ServerStop),
+            ("Restart", InputAction.ServerRestart),
+            ("Delete", InputAction.ServerDelete),
+        ];
+
+        var cursor = 0;
+
+        while (true)
+        {
+            if (TooSmall())
+            {
+                AnsiConsole.Clear();
+                Console.WriteLine($"Terminal too small. Resize to at least {MinWidth}×{MinHeight}.");
+                await Task.Delay(300);
+                continue;
+            }
+
+            AnsiConsole.Clear();
+            try
+            {
+                AnsiConsole.Write(BuildMenuLayout(server, items, cursor));
+            }
+            catch
+            {
+                await Task.Delay(300);
+                continue;
+            }
+
+            if (!Console.KeyAvailable)
+            {
+                await Task.Delay(50);
+                continue;
+            }
+
+            var key = Console.ReadKey(true);
+            var action = _keyMap.Translate(key);
+
+            if (action == InputAction.Escape) return null;
+            if (action == InputAction.CursorUp && cursor > 0) cursor--;
+            else if (action == InputAction.CursorDown && cursor < items.Length - 1) cursor++;
+            else if (action == InputAction.Confirm) return items[cursor].Action;
+        }
+    }
+
+    private static IRenderable BuildMenuLayout(
+        MinecraftServer server,
+        (string Label, InputAction Action)[] items,
+        int cursor)
+    {
+        var stateColor = server.State switch
+        {
+            ServerState.Running => "green",
+            ServerState.Starting => "yellow",
+            ServerState.Stopping => "yellow",
+            ServerState.Crashed => "red",
+            _ => "dim",
+        };
+
+        var summary = new Grid()
+            .AddColumn(new GridColumn().Width(10).NoWrap())
+            .AddColumn(new GridColumn().NoWrap());
+
+        summary.AddRow(new Markup("[dim]Name[/]"), new Markup(Markup.Escape(server.Name)));
+        summary.AddRow(new Markup("[dim]Type[/]"), new Markup(Markup.Escape(server.Type.ToString())));
+        summary.AddRow(new Markup("[dim]Version[/]"), new Markup(Markup.Escape(server.MinecraftVersion)));
+        summary.AddRow(new Markup("[dim]State[/]"), new Markup($"[{stateColor}]{server.State}[/]"));
+        summary.AddRow(new Markup("[dim]Port[/]"), new Markup(server.Options.Port.ToString()));
+        summary.AddRow(
+            new Markup("[dim]Memory[/]"),
+            new Markup($"{server.JvmOptions.MinMemory} / {server.JvmOptions.MaxMemory}")
+        );
+
+        var actionTable = new Table()
+            .HideHeaders()
+            .NoBorder()
+            .AddColumn(new TableColumn(string.Empty).NoWrap().Centered());
+
+        foreach (var (i, item) in items.Select((x, i) => (i, x)))
+        {
+            var sel = i == cursor;
+            var pfx = sel ? "→ " : "  ";
+            var style = sel ? "bold cyan" : "white";
+            actionTable.AddRow(new Markup($"[{style}]{pfx}{item.Label}[/]"));
+        }
+
+        var content = new Table()
+            .HideHeaders()
+            .NoBorder()
+            .AddColumn(new TableColumn(string.Empty).Centered());
+
+        content.AddRow(new Align(summary, HorizontalAlignment.Center));
+        content.AddRow(new Align(new Markup("[dim]─────────────────────────────────[/]"), HorizontalAlignment.Center));
+        content.AddRow(new Align(actionTable, HorizontalAlignment.Center));
+
+        var panel = new Panel(content)
+        {
+            Expand = false,
+            Border = BoxBorder.None,
+        };
+
+        var layout = new Layout()
+            .SplitRows(
+                new Layout("content"),
+                new Layout("help").Size(2));
+
+        layout["content"].Update(new Align(panel, HorizontalAlignment.Center, VerticalAlignment.Middle));
+        layout["help"].Update(new Align(
+            new Markup("[dim]↑↓:select  Enter:confirm  Esc:back[/]"),
+            HorizontalAlignment.Center));
+
+        return layout;
+    }
+
+    private void RunServerAction(InputAction action, Guid serverId)
+    {
+        var server = _serverListVm.Servers.FirstOrDefault(s => s.Id == serverId);
         if (server is null) return;
 
-        var task = key switch
+        var task = action switch
         {
-            's' => _serverListVm.StartAsync(server.Id, _appCts.Token),
-            't' => _serverListVm.StopAsync(server.Id, _appCts.Token),
-            'r' => _serverListVm.RestartAsync(server.Id, _appCts.Token),
+            InputAction.ServerStart => _serverListVm.StartAsync(server.Id, _appCts.Token),
+            InputAction.ServerStop => _serverListVm.StopAsync(server.Id, _appCts.Token),
+            InputAction.ServerRestart => _serverListVm.RestartAsync(server.Id, _appCts.Token),
             _ => Task.CompletedTask,
         };
-        var verb = key switch { 's' => "Starting", 't' => "Stopping", 'r' => "Restarting", _ => "" };
+        var verb = action switch
+        {
+            InputAction.ServerStart => "Starting",
+            InputAction.ServerStop => "Stopping",
+            InputAction.ServerRestart => "Restarting",
+            _ => ""
+        };
 
         SetStatus($"{verb} {server.Name}…");
 
@@ -1487,78 +1771,138 @@ internal sealed class TuiApp
                 return;
             }
 
-            if (key is 's' or 'r')
+            if (action is InputAction.ServerStart or InputAction.ServerRestart)
                 _ = SelectServerAsync(server.Id);
             else
                 _ui.Post(() => SetStatus($"{server.Name}: done"));
         }, TaskScheduler.Default);
     }
 
-    private async Task CreateServerAsync(
-        string name,
-        string version,
-        string dir,
-        ServerType type,
-        int serverPort,
-        int maxPlayers,
-        string motd,
-        int viewDistance,
-        bool onlineMode,
-        bool whitelist,
-        string levelName,
-        string difficulty,
-        bool rconEnabled,
-        int rconPort,
-        string rconPassword,
-        int rconTimeoutSeconds,
-        string jvmMinMemory,
-        string jvmMaxMemory,
-        string jvmAdditionalFlags,
-        bool acceptEula)
+    private async Task RunCreateProgressAsync(ServerCreateForm form)
     {
-        SetStatus($"Creating {name}…");
-        try
+        var downloadPct = 0.0;
+        var progress = new Progress<double>(v => downloadPct = Math.Clamp(v, 0.0, 1.0));
+        var statusMsg = "Downloading server files...";
+
+        var serverOpts = new ServerOptions(
+            ServerDirectory: form.Directory,
+            Port: form.ServerPort,
+            MaxPlayers: form.MaxPlayers,
+            MotD: form.MotD,
+            ViewDistance: form.ViewDistance,
+            OnlineMode: form.OnlineMode,
+            Whitelist: form.Whitelist,
+            LevelName: form.LevelName,
+            Difficulty: form.Difficulty);
+
+        var rconOpts = new RconOptions(
+            Port: form.RconPort,
+            Password: form.RconPassword,
+            Enabled: form.RconEnabled,
+            ConnectTimeoutSeconds: form.RconTimeoutSeconds);
+
+        var flags = SplitJvmFlags(form.JvmAdditionalFlags);
+        var jvmOpts = new JvmOptions(
+            MinMemory: form.JvmMinMemory,
+            MaxMemory: form.JvmMaxMemory,
+            AdditionalFlags: flags.Count == 0 ? null : flags);
+
+        var opts = new CreateServerOptions(
+            Name: form.Name,
+            MinecraftVersion: form.Version,
+            ServerDirectory: form.Directory,
+            Type: form.Type,
+            Options: serverOpts,
+            RconOptions: rconOpts,
+            JvmOptions: jvmOpts,
+            AcceptEula: form.AcceptEula);
+
+        var createTask = _service.CreateServerAsync(opts, progress, _appCts.Token).AsTask();
+
+        while (!createTask.IsCompleted)
         {
-            var serverOpts = new ServerOptions(
-                ServerDirectory: dir,
-                Port: serverPort,
-                MaxPlayers: maxPlayers,
-                MotD: motd,
-                ViewDistance: viewDistance,
-                OnlineMode: onlineMode,
-                Whitelist: whitelist,
-                LevelName: levelName,
-                Difficulty: difficulty);
+            if (!TooSmall())
+            {
+                AnsiConsole.Clear();
+                try
+                {
+                    AnsiConsole.Write(BuildProgressLayout(form.Name, form.Version, form.Type.ToString(), downloadPct,
+                        statusMsg));
+                }
+                catch { }
+            }
 
-            var rconOpts = new RconOptions(
-                Port: rconPort,
-                Password: rconPassword,
-                Enabled: rconEnabled,
-                ConnectTimeoutSeconds: rconTimeoutSeconds);
-
-            var flags = SplitJvmFlags(jvmAdditionalFlags);
-            var jvmOpts = new JvmOptions(
-                MinMemory: jvmMinMemory,
-                MaxMemory: jvmMaxMemory,
-                AdditionalFlags: flags.Count == 0 ? null : flags);
-
-            var opts = new CreateServerOptions(
-                Name: name, MinecraftVersion: version, ServerDirectory: dir,
-                Type: type,
-                Options: serverOpts,
-                RconOptions: rconOpts,
-                JvmOptions: jvmOpts,
-                AcceptEula: acceptEula);
-
-            var server = await _service.CreateServerAsync(opts, ct: _appCts.Token);
-            if (acceptEula) await _service.AcceptEulaAsync(server.Id, _appCts.Token);
-            await _serverListVm.RefreshAsync(_appCts.Token);
-            _ui.Post(() => SetStatus($"Created: {name}"));
+            await Task.Delay(100);
         }
-        catch (Exception ex)
+
+        if (createTask.IsFaulted)
         {
-            _ui.Post(() => SetStatus($"Create failed: {ex.Message}", true));
+            var msg = createTask.Exception?.InnerException?.Message ?? "Unknown error";
+            AnsiConsole.Clear();
+            try
+            {
+                AnsiConsole.Write(BuildProgressLayout(form.Name, form.Version, form.Type.ToString(), downloadPct,
+                    $"Error: {msg}"));
+            }
+            catch { }
+
+            await Task.Delay(2000);
+            _ui.Post(() => SetStatus($"Create failed: {msg}", true));
+            return;
         }
+
+        var server = createTask.Result;
+
+        if (form.AcceptEula)
+        {
+            statusMsg = "Accepting EULA...";
+            AnsiConsole.Clear();
+            try
+            {
+                AnsiConsole.Write(BuildProgressLayout(form.Name, form.Version, form.Type.ToString(), 1.0, statusMsg));
+            }
+            catch { }
+
+            await _service.AcceptEulaAsync(server.Id, _appCts.Token);
+        }
+
+        await _serverListVm.RefreshAsync(_appCts.Token);
+        _ui.Post(() => SetStatus($"Created: {form.Name}"));
+    }
+
+    private static IRenderable BuildProgressLayout(string name, string version, string type, double progress,
+        string statusMsg)
+    {
+        var pct = (int)(progress * 100);
+        var barFilled = (int)(progress * 30);
+        var bar = new string('█', barFilled) + new string('░', 30 - barFilled);
+
+        var grid = new Grid()
+            .AddColumn(new GridColumn().Width(12).NoWrap())
+            .AddColumn(new GridColumn().NoWrap());
+
+        grid.AddRow(new Markup("[dim]Name[/]"), new Markup(Markup.Escape(name)));
+        grid.AddRow(new Markup("[dim]Version[/]"), new Markup(Markup.Escape(version)));
+        grid.AddRow(new Markup("[dim]Type[/]"), new Markup(Markup.Escape(type)));
+        grid.AddEmptyRow();
+        grid.AddRow(new Markup("[dim]Status[/]"), new Markup(Markup.Escape(statusMsg)));
+        grid.AddRow(new Markup("[dim]Progress[/]"), new Markup($"[cyan]{bar}[/] [bold]{pct}%[/]"));
+
+        var panel = new Panel(grid)
+        {
+            Header = new PanelHeader("[bold]Creating Server[/]"),
+            Border = BoxBorder.Rounded,
+            Padding = new Padding(2, 1),
+        };
+
+        var layout = new Layout()
+            .SplitRows(
+                new Layout("content"),
+                new Layout("help").Size(2));
+        layout["content"].Update(new Align(panel, HorizontalAlignment.Center, VerticalAlignment.Middle));
+        layout["help"].Update(new Align(new Markup("[dim]Please wait...[/]"), HorizontalAlignment.Center));
+
+        return layout;
     }
 
     private static List<string> SplitJvmFlags(string raw)

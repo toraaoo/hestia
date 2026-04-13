@@ -20,11 +20,10 @@ internal enum InputAction
     ServerRestart,
     ServerDelete,
     ServerCreate,
+    ServerMenu,
     ToggleFollow,
 
     OpenCommand,
-    CommandHistoryUp,
-    CommandHistoryDown,
 
     TogglePassword,
 

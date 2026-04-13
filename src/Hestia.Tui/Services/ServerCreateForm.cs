@@ -5,8 +5,6 @@ namespace Hestia.Tui.Services;
 internal sealed class ServerCreateForm
 {
     private readonly string _appDataDir;
-    private readonly ServerType[] _types = [ServerType.Vanilla, ServerType.Paper, ServerType.Fabric];
-    private readonly IReadOnlyList<string> _availableVersions;
 
     public enum Field
     {
@@ -29,52 +27,48 @@ internal sealed class ServerCreateForm
         JvmMinMemory,
         JvmMaxMemory,
         JvmAdditionalFlags,
-        Eula
+        Eula,
+        Submit
     }
 
     public string Name { get; set; } = string.Empty;
     public ServerType Type { get; set; } = ServerType.Vanilla;
     public string Version { get; set; } = "1.21.4";
     public string Directory { get; set; }
-    public int ServerPort { get; private set; } = 25565;
-    public int MaxPlayers { get; private set; } = 20;
+    public int ServerPort { get; set; } = 25565;
+    public int MaxPlayers { get; set; } = 20;
     public string MotD { get; private set; } = "A Minecraft Server";
-    public int ViewDistance { get; private set; } = 10;
+    public int ViewDistance { get; set; } = 10;
     public bool OnlineMode { get; private set; } = true;
     public bool Whitelist { get; private set; }
     public string LevelName { get; private set; } = "world";
     public string Difficulty { get; private set; } = "easy";
 
-    public int RconPort { get; private set; } = 25575;
+    public int RconPort { get; set; } = 25575;
     public string RconPassword { get; private set; } = "hestia";
     public bool RconEnabled { get; private set; } = true;
-    public int RconTimeoutSeconds { get; private set; } = 5;
+    public int RconTimeoutSeconds { get; set; } = 5;
 
     public string JvmMinMemory { get; private set; } = "512M";
     public string JvmMaxMemory { get; private set; } = "2G";
-    public string JvmAdditionalFlags { get; private set; } = string.Empty;
+    public string JvmAdditionalFlags { get; set; } = string.Empty;
 
     public bool AcceptEula { get; set; }
     public Field SelectedField { get; set; } = Field.Name;
 
+    public ServerType[] Types { get; } = [ServerType.Vanilla, ServerType.Paper, ServerType.Fabric];
+
     public ServerCreateForm(string appDataDir, IReadOnlyList<string> availableVersions)
     {
         _appDataDir = appDataDir;
-        _availableVersions = availableVersions;
         Directory = Path.Combine(appDataDir, "servers", "new-server");
     }
 
-    public void MoveUp()
-    {
-        SelectedField = SelectedField == Field.Name ? Field.Eula : (Field)(SelectedField - 1);
-    }
+    public void MoveUp() =>
+        SelectedField = SelectedField == Field.Name ? Field.Submit : (Field)(SelectedField - 1);
 
-    public void MoveDown()
-    {
-        SelectedField = SelectedField == Field.Eula ? Field.Name : (Field)(SelectedField + 1);
-    }
-
-    public Field GetFieldToEdit() => SelectedField;
+    public void MoveDown() =>
+        SelectedField = SelectedField == Field.Submit ? Field.Name : (Field)(SelectedField + 1);
 
     public void SetName(string value)
     {
@@ -85,28 +79,15 @@ internal sealed class ServerCreateForm
         }
     }
 
-    public void SetType(ServerType value) => Type = value;
-
-    public void SetVersion(string value)
-    {
-        if (!string.IsNullOrWhiteSpace(value)) Version = value;
-    }
-
     public void SetDirectory(string value)
     {
         if (!string.IsNullOrWhiteSpace(value)) Directory = value;
     }
 
-    public void SetServerPort(int value) => ServerPort = value;
-
-    public void SetMaxPlayers(int value) => MaxPlayers = value;
-
     public void SetMotD(string value)
     {
         if (!string.IsNullOrWhiteSpace(value)) MotD = value;
     }
-
-    public void SetViewDistance(int value) => ViewDistance = value;
 
     public void ToggleOnlineMode() => OnlineMode = !OnlineMode;
 
@@ -122,16 +103,12 @@ internal sealed class ServerCreateForm
         if (!string.IsNullOrWhiteSpace(value)) Difficulty = value;
     }
 
-    public void SetRconPort(int value) => RconPort = value;
-
     public void SetRconPassword(string value)
     {
         if (!string.IsNullOrWhiteSpace(value)) RconPassword = value;
     }
 
     public void ToggleRconEnabled() => RconEnabled = !RconEnabled;
-
-    public void SetRconTimeoutSeconds(int value) => RconTimeoutSeconds = value;
 
     public void SetJvmMinMemory(string value)
     {
@@ -143,13 +120,33 @@ internal sealed class ServerCreateForm
         if (!string.IsNullOrWhiteSpace(value)) JvmMaxMemory = value;
     }
 
-    public void SetJvmAdditionalFlags(string value) => JvmAdditionalFlags = value ?? string.Empty;
-
     public void ToggleEula() => AcceptEula = !AcceptEula;
 
-    public ServerType[] GetTypes() => _types;
+    public bool IsTextEditable(Field field) => field is
+        Field.Name or Field.Directory or Field.ServerPort or
+        Field.MaxPlayers or Field.MotD or Field.ViewDistance or
+        Field.LevelName or Field.Difficulty or Field.RconPort or
+        Field.RconPassword or Field.RconTimeoutSeconds or
+        Field.JvmMinMemory or Field.JvmMaxMemory or Field.JvmAdditionalFlags;
 
-    public IReadOnlyList<string> GetVersions() => _availableVersions;
+    public string GetTextValue(Field field) => field switch
+    {
+        Field.Name => Name,
+        Field.Directory => Directory,
+        Field.ServerPort => ServerPort.ToString(),
+        Field.MaxPlayers => MaxPlayers.ToString(),
+        Field.MotD => MotD,
+        Field.ViewDistance => ViewDistance.ToString(),
+        Field.LevelName => LevelName,
+        Field.Difficulty => Difficulty,
+        Field.RconPort => RconPort.ToString(),
+        Field.RconPassword => RconPassword,
+        Field.RconTimeoutSeconds => RconTimeoutSeconds.ToString(),
+        Field.JvmMinMemory => JvmMinMemory,
+        Field.JvmMaxMemory => JvmMaxMemory,
+        Field.JvmAdditionalFlags => JvmAdditionalFlags,
+        _ => string.Empty
+    };
 
     private void UpdateDirectoryFromName()
     {

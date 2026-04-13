@@ -48,10 +48,7 @@ internal sealed class KeyMap
         m.Bind(ConsoleKey.LeftArrow, InputAction.TabLeft);
         m.Bind(ConsoleKey.RightArrow, InputAction.TabRight);
 
-        m.Bind(ConsoleKey.S, InputAction.ServerStart);
-        m.Bind(ConsoleKey.T, InputAction.ServerStop);
-        m.Bind(ConsoleKey.R, InputAction.ServerRestart);
-        m.Bind(ConsoleKey.D, InputAction.ServerDelete);
+        m.Bind(ConsoleKey.M, InputAction.ServerMenu);
         m.Bind(ConsoleKey.C, InputAction.ServerCreate);
         m.Bind(ConsoleKey.F, InputAction.ToggleFollow);
 
