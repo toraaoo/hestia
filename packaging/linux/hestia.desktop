@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Hestia
+Exec=/opt/hestia/Hestia.Desktop
+Terminal=false
+Categories=Utility;Game;

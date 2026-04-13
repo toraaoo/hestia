@@ -13,8 +13,10 @@ var entry = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
 var stamp = "unknown";
 try
 {
-    if (!string.IsNullOrWhiteSpace(entry.Location) && File.Exists(entry.Location))
-        stamp = File.GetLastWriteTimeUtc(entry.Location).ToString("yyyyMMdd-HHmmss'Z'");
+    // Single-file publish makes Assembly.Location empty; use the host binary in BaseDirectory.
+    var hostPath = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "hestia.exe" : "hestia");
+    if (File.Exists(hostPath))
+        stamp = File.GetLastWriteTimeUtc(hostPath).ToString("yyyyMMdd-HHmmss'Z'");
 }
 catch { }
 
