@@ -51,12 +51,17 @@ jobs:
       - name: Setup WiX
         shell: pwsh
         run: |
-          dotnet tool install --global wix
+          # Pin to avoid unexpected major bumps.
+          dotnet tool install --global wix --version 7.*
           wix --version
           # WiX v4 extensions are distributed separately (NuGet-backed).
           wix extension add -g WixToolset.UI.wixext
           wix extension add -g WixToolset.Util.wixext
           wix extension list -g
+
+          # WiX v7 requires explicit OSMF EULA acceptance.
+          # https://wixtoolset.org/osmf/
+          wix eula accept wix7
 
       - name: Build MSI
         shell: pwsh
