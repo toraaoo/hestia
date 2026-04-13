@@ -53,6 +53,10 @@ jobs:
         run: |
           dotnet tool install --global wix
           wix --version
+          # WiX v4 extensions are distributed separately (NuGet-backed).
+          wix extension add -g WixToolset.UI.wixext
+          wix extension add -g WixToolset.Util.wixext
+          wix extension list -g
 
       - name: Build MSI
         shell: pwsh
