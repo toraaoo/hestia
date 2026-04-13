@@ -241,7 +241,13 @@ internal sealed class TuiApp
                 var layout = new Layout()
                     .SplitRows(new Layout("Form"),
                         new Layout("Help").Size(string.IsNullOrWhiteSpace(createError) ? 2 : 3));
-                layout["Form"].Update(new Align(table, HorizontalAlignment.Center, VerticalAlignment.Middle));
+
+                var formPanel = new Panel(table)
+                {
+                    Expand = false,
+                    Border = BoxBorder.None,
+                };
+                layout["Form"].Update(new Align(formPanel, HorizontalAlignment.Center, VerticalAlignment.Middle));
                 layout["Help"].Update(new Align(new Markup(helpMarkup), HorizontalAlignment.Center));
                 AnsiConsole.Clear();
                 if (TooSmall())
@@ -702,6 +708,8 @@ internal sealed class TuiApp
         int typeCursor,
         IReadOnlyList<string> allVersions)
     {
+        const int FormPadding = 4;
+
         string Value(ServerCreateForm.Field field)
         {
             if (mode == CreateMode.EditText && form.SelectedField == field)
@@ -789,19 +797,24 @@ internal sealed class TuiApp
             ("Accept EULA", Value(ServerCreateForm.Field.Eula), ServerCreateForm.Field.Eula),
         ];
 
-        var availableW = Math.Max(1, Console.WindowWidth - 4);
-        var maxW = 0;
+        var availableW = Math.Max(1, Console.WindowWidth - FormPadding);
+        var seamTextW = 0;
+        var valueTextW = 0;
 
-        // Compute target width from visible content so the block (and separators) truly center.
         foreach (var (label, _, fieldEnum) in fields)
         {
-            var s = $"→ {label}: {PlainValue(fieldEnum)}";
-            if (s.Length > maxW) maxW = s.Length;
+            var prefix = form.SelectedField == fieldEnum && mode is CreateMode.Normal or CreateMode.EditText
+                ? "→ "
+                : "  ";
+            var left = prefix + label;
+            if (left.Length > seamTextW) seamTextW = left.Length;
+
+            var pv = PlainValue(fieldEnum);
+            if (pv.Length > valueTextW) valueTextW = pv.Length;
         }
 
-        // Button text contributes to the overall width.
         var buttonText = "[ Create Server ]";
-        if (buttonText.Length > maxW) maxW = buttonText.Length;
+        if (buttonText.Length > valueTextW) valueTextW = buttonText.Length;
 
         if (mode == CreateMode.SelectVersion)
         {
@@ -812,52 +825,71 @@ internal sealed class TuiApp
             var end = Math.Min(filtered.Count, start + pageSize);
             if (end - start < pageSize && start > 0) start = Math.Max(0, end - pageSize);
 
-            if (start > 0)
-                maxW = Math.Max(maxW, "...".Length);
+            if ("...".Length > valueTextW) valueTextW = "...".Length;
 
             for (var i = start; i < end; i++)
             {
-                var s = $"→ {filtered[i]}";
-                if (s.Length > maxW) maxW = s.Length;
+                var s = (i == cur ? "→ " : "  ") + filtered[i];
+                if (s.Length > valueTextW) valueTextW = s.Length;
             }
 
-            if (end < filtered.Count)
-                maxW = Math.Max(maxW, "...".Length);
-
             var search = $"Search: {versionQuery}█";
-            if (search.Length > maxW) maxW = search.Length;
+            if (search.Length > valueTextW) valueTextW = search.Length;
         }
         else if (mode == CreateMode.SelectType)
         {
             var types = form.Types;
             for (var i = 0; i < types.Length; i++)
             {
-                var s = $"→ {types[i]}";
-                if (s.Length > maxW) maxW = s.Length;
+                var s = (i == Math.Clamp(typeCursor, 0, Math.Max(0, types.Length - 1)) ? "→ " : "  ") + types[i];
+                if (s.Length > valueTextW) valueTextW = s.Length;
             }
         }
 
-        var w = Math.Min(Math.Max(1, maxW), availableW);
+        var desiredW = Math.Max(16, 2 * Math.Max(seamTextW, valueTextW));
+        var totalW = Math.Min(availableW, desiredW);
+        var leftW = totalW / 2;
+        var rightW = totalW - leftW;
 
-        var table = new Table()
+        var formTable = new Table()
             .HideHeaders()
             .NoBorder()
             .Collapse()
-            .AddColumn(new TableColumn(string.Empty).NoWrap().Centered().Width(w));
+            .AddColumn(new TableColumn(string.Empty).NoWrap().RightAligned())
+            .AddColumn(new TableColumn(string.Empty).NoWrap().LeftAligned());
+
+        formTable.Columns[0].Width(leftW);
+        formTable.Columns[1].Width(rightW);
 
         foreach (var (label, value, fieldEnum) in fields)
         {
             var isSelected = form.SelectedField == fieldEnum && mode is CreateMode.Normal or CreateMode.EditText;
-            var prefix = isSelected ? "→ " : "  ";
             var labelStyle = isSelected ? "bold yellow reverse" : (muted ? "dim" : "white");
             var valueStyle = isSelected ? "bold cyan reverse" : (muted ? "dim" : "cyan");
 
-            table.AddRow(new Markup($"[{labelStyle}]{Markup.Escape(prefix + label)}[/]: [{valueStyle}]{value}[/]"));
+            var prefix = isSelected ? "→ " : "  ";
+            formTable.AddRow(
+                new Markup($"[{labelStyle}]{Markup.Escape(prefix + label)}[/]"),
+                new Markup($"[{valueStyle}]{value}[/]"));
         }
+
+        var content = new Table()
+            .HideHeaders()
+            .NoBorder()
+            .Collapse()
+            .AddColumn(new TableColumn(string.Empty).NoWrap().Centered());
+
+        content.AddRow(new Align(formTable, HorizontalAlignment.Center));
 
         if (mode == CreateMode.SelectVersion)
         {
-            table.AddRow(new Markup($"[dim]{new string('─', w)}[/]"));
+            content.AddRow(new Align(new Markup($"[dim]{new string('─', totalW)}[/]"), HorizontalAlignment.Center));
+
+            var list = new Table()
+                .HideHeaders()
+                .NoBorder()
+                .Collapse()
+                .AddColumn(new TableColumn(string.Empty).NoWrap().Centered().Width(totalW));
 
             var filtered = FilterVersions(allVersions, versionQuery);
             const int pageSize = 8;
@@ -867,7 +899,7 @@ internal sealed class TuiApp
             if (end - start < pageSize && start > 0) start = Math.Max(0, end - pageSize);
 
             if (start > 0)
-                table.AddRow(new Markup("[dim]...[/]"));
+                list.AddRow(new Markup("[dim]...[/]"));
 
             for (var i = start; i < end; i++)
             {
@@ -875,18 +907,26 @@ internal sealed class TuiApp
                 var sel = i == cur;
                 var style = sel ? "bold cyan reverse" : "white";
                 var pfx = sel ? "→ " : "  ";
-                table.AddRow(new Markup($"[{style}]{pfx}{v}[/]"));
+                list.AddRow(new Markup($"[{style}]{pfx}{v}[/]"));
             }
 
             if (end < filtered.Count)
-                table.AddRow(new Markup("[dim]...[/]"));
+                list.AddRow(new Markup("[dim]...[/]"));
 
             var q = Markup.Escape(versionQuery);
-            table.AddRow(new Markup($"[dim]Search:[/] [bold]{q}[/][dim]█[/]"));
+            list.AddRow(new Markup($"[dim]Search:[/] [bold]{q}[/][dim]█[/]"));
+
+            content.AddRow(new Align(list, HorizontalAlignment.Center));
         }
         else if (mode == CreateMode.SelectType)
         {
-            table.AddRow(new Markup($"[dim]{new string('─', w)}[/]"));
+            content.AddRow(new Align(new Markup($"[dim]{new string('─', totalW)}[/]"), HorizontalAlignment.Center));
+
+            var list = new Table()
+                .HideHeaders()
+                .NoBorder()
+                .Collapse()
+                .AddColumn(new TableColumn(string.Empty).NoWrap().Centered().Width(totalW));
 
             var types = form.Types;
             var cur = Math.Clamp(typeCursor, 0, Math.Max(0, types.Length - 1));
@@ -896,19 +936,23 @@ internal sealed class TuiApp
                 var sel = i == cur;
                 var style = sel ? "bold cyan reverse" : "white";
                 var pfx = sel ? "→ " : "  ";
-                table.AddRow(new Markup($"[{style}]{pfx}{t}[/]"));
+                list.AddRow(new Markup($"[{style}]{pfx}{t}[/]"));
             }
+
+            content.AddRow(new Align(list, HorizontalAlignment.Center));
         }
 
         if (mode is CreateMode.Normal or CreateMode.EditText)
         {
             var btnSelected = form.SelectedField == ServerCreateForm.Field.Submit && mode == CreateMode.Normal;
             var btnStyle = btnSelected ? "bold green reverse" : "green";
-            table.AddRow(new Markup(string.Empty));
-            table.AddRow(new Markup($"[{btnStyle}]{Markup.Escape("[ Create Server ]")}[/]"));
+            content.AddRow(new Markup(string.Empty));
+            content.AddRow(new Align(
+                new Markup($"[{btnStyle}]{Markup.Escape("[ Create Server ]")}[/]"),
+                HorizontalAlignment.Center));
         }
 
-        return table;
+        return content;
     }
 
     private static int FindIndex(IReadOnlyList<string> list, string value)
