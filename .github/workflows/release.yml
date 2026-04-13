@@ -103,8 +103,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSL https://github.com/goreleaser/nfpm/releases/latest/download/nfpm_amd64.deb -o /tmp/nfpm.deb
-          sudo dpkg -i /tmp/nfpm.deb
+          # Install via the official GoReleaser apt repo.
+          # https://nfpm.goreleaser.com/docs/install/
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y nfpm
           nfpm --version
 
       - name: Test
@@ -123,8 +128,8 @@ jobs:
           set -euo pipefail
           ver="${{ steps.ver.outputs.version }}"
           mkdir -p artifacts/dist
-          VERSION="$ver" nfpm pkg -p deb -f packaging/linux/nfpm.yaml -t "artifacts/dist/hestia_${ver}_amd64.deb"
-          VERSION="$ver" nfpm pkg -p rpm -f packaging/linux/nfpm.yaml -t "artifacts/dist/hestia-${ver}-1.x86_64.rpm"
+          VERSION="$ver" nfpm package -p deb -f packaging/linux/nfpm.yaml -t "artifacts/dist/hestia_${ver}_amd64.deb"
+          VERSION="$ver" nfpm package -p rpm -f packaging/linux/nfpm.yaml -t "artifacts/dist/hestia-${ver}-1.x86_64.rpm"
 
       - name: Build tar.gz
         shell: bash
