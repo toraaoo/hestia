@@ -48,29 +48,6 @@ jobs:
         shell: pwsh
         run: ./packaging/build-stage.ps1 -Rid win-x64 -Version "${{ steps.ver.outputs.version }}"
 
-      - name: Setup WiX
-        shell: pwsh
-        run: |
-          # Pin to avoid unexpected major bumps.
-          dotnet tool install --global wix --version 7.*
-          wix --version
-          # WiX v4 extensions are distributed separately (NuGet-backed).
-          wix extension add -g WixToolset.UI.wixext
-          wix extension add -g WixToolset.Util.wixext
-          wix extension list -g
-
-          # WiX v7 requires explicit OSMF EULA acceptance.
-          # https://wixtoolset.org/osmf/
-          wix eula accept wix7
-
-      - name: Build MSI
-        shell: pwsh
-        run: |
-          $ver = "${{ steps.ver.outputs.version }}"
-          $stage = (Resolve-Path "artifacts/stage/win-x64").Path
-          New-Item -ItemType Directory -Force -Path artifacts/dist | Out-Null
-          wix build packaging/windows/Hestia.wxs -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d Version=$ver -d StagingDir=$stage -o "artifacts/dist/Hestia-$ver-win-x64.msi"
-
       - name: Build ZIP
         shell: pwsh
         run: |
