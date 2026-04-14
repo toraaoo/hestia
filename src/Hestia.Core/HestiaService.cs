@@ -45,6 +45,13 @@ public sealed class HestiaService : IHestiaService
         return provider.GetAvailableVersionsAsync(ct);
     }
 
+    public ValueTask<string> GetLatestVersionAsync(ServerType type, CancellationToken ct = default)
+    {
+        if (!_providers.TryGetValue(type, out var provider))
+            throw new NotSupportedException($"No provider registered for server type '{type}'.");
+        return provider.GetLatestVersionAsync(ct);
+    }
+
     public async ValueTask<MinecraftServer> CreateServerAsync(
         CreateServerOptions options,
         IProgress<double>? progress = null,

@@ -25,6 +25,14 @@ public sealed class Paper : IServerProvider
         return project.Versions.ToList().AsReadOnly();
     }
 
+    public async ValueTask<string> GetLatestVersionAsync(CancellationToken ct = default)
+    {
+        var versions = await GetAvailableVersionsAsync(ct).ConfigureAwait(false);
+        if (versions.Count == 0)
+            throw new InvalidOperationException("No Paper versions available.");
+        return versions[^1];
+    }
+
     public async ValueTask DownloadServerJarAsync(
         string minecraftVersion,
         string destPath,

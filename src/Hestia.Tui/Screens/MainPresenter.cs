@@ -540,6 +540,7 @@ internal sealed class MainPresenter : IAsyncDisposable
 
             var form = new ServerCreateForm(_appInfo.AppDataDirectory);
             form.Type = initialType;
+            form.Version = await _service.GetLatestVersionAsync(initialType, _appCts.Token);
 
             var existing = await _service.GetServersAsync(_appCts.Token);
             var used = new HashSet<int>(existing.SelectMany(s => new[] { s.Options.Port, s.RconOptions.Port }));

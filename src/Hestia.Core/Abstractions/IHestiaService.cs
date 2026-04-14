@@ -14,6 +14,8 @@ public interface IHestiaService
 
     ValueTask<IReadOnlyList<string>> GetAvailableVersionsAsync(ServerType type, CancellationToken ct = default);
 
+    ValueTask<string> GetLatestVersionAsync(ServerType type, CancellationToken ct = default);
+
     ValueTask<MinecraftServer> CreateServerAsync(
         CreateServerOptions options,
         IProgress<double>? progress = null,

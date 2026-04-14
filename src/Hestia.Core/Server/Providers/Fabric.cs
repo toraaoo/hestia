@@ -31,6 +31,14 @@ public sealed class Fabric : IServerProvider
             .AsReadOnly();
     }
 
+    public async ValueTask<string> GetLatestVersionAsync(CancellationToken ct = default)
+    {
+        var versions = await GetAvailableVersionsAsync(ct).ConfigureAwait(false);
+        if (versions.Count == 0)
+            throw new InvalidOperationException("No Fabric versions available.");
+        return versions[0];
+    }
+
     public async ValueTask DownloadServerJarAsync(
         string minecraftVersion,
         string destPath,

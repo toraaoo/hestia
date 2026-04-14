@@ -8,6 +8,8 @@ public interface IServerProvider
 
     ValueTask<IReadOnlyList<string>> GetAvailableVersionsAsync(CancellationToken ct = default);
 
+    ValueTask<string> GetLatestVersionAsync(CancellationToken ct = default);
+
     ValueTask DownloadServerJarAsync(
         string minecraftVersion,
         string destPath,
