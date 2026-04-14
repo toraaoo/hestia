@@ -30,7 +30,6 @@ internal static class CreateWizardModal
     {
         public CreateMode Mode { get; set; } = CreateMode.Normal;
         public CreatePage Page { get; set; } = CreatePage.Basic;
-        public bool Advanced { get; set; }
         public bool EulaCursorYes { get; set; } = true;
 
         public string EditBuffer { get; set; } = string.Empty;
@@ -57,17 +56,9 @@ internal static class CreateWizardModal
         ConsoleKeyInfo key,
         InputAction? action)
     {
-        var visibleFields = GetVisibleFields(state.Page, state.Advanced, form.RconEnabled);
+        var visibleFields = GetVisibleFields(state.Page, form.RconEnabled);
         if (visibleFields.IndexOf(form.SelectedField) < 0)
             form.SelectedField = visibleFields.Count > 0 ? visibleFields[0] : ServerCreateForm.Field.Submit;
-
-        if (state.Mode == CreateMode.Normal && key.Key == ConsoleKey.A)
-        {
-            state.Advanced = !state.Advanced;
-            if (!state.Advanced) state.Page = CreatePage.Basic;
-            state.Error = string.Empty;
-            return new KeyResult(true, null);
-        }
 
         if (action == InputAction.Escape)
             return HandleEscape(form, state)
@@ -92,7 +83,7 @@ internal static class CreateWizardModal
         InputAction? action,
         IReadOnlyList<ServerCreateForm.Field> visibleFields)
     {
-        if (state.Advanced && action is InputAction.TabLeft or InputAction.TabRight)
+        if (action is InputAction.TabLeft or InputAction.TabRight)
         {
             state.Page = action == InputAction.TabLeft ? PrevPage(state.Page) : NextPage(state.Page);
             state.Error = string.Empty;
@@ -138,8 +129,7 @@ internal static class CreateWizardModal
             return BeginEditText(form, state);
         if (form.SelectedField is ServerCreateForm.Field.OnlineMode
             or ServerCreateForm.Field.Whitelist
-            or ServerCreateForm.Field.RconEnabled
-            or ServerCreateForm.Field.Advanced)
+            or ServerCreateForm.Field.RconEnabled)
             return HandleSpacebar(form, state);
 
         state.Error = string.Empty;
@@ -153,11 +143,6 @@ internal static class CreateWizardModal
             ServerCreateForm.Field.OnlineMode => Toggle(form.ToggleOnlineMode),
             ServerCreateForm.Field.Whitelist => Toggle(form.ToggleWhitelist),
             ServerCreateForm.Field.RconEnabled => Toggle(form.ToggleRconEnabled),
-            ServerCreateForm.Field.Advanced => Toggle(() =>
-            {
-                state.Advanced = !state.Advanced;
-                if (!state.Advanced) state.Page = CreatePage.Basic;
-            }),
             _ => false,
         };
 
@@ -577,26 +562,15 @@ internal static class CreateWizardModal
 
     private static void UpdateLayout(Layout layout, ServerCreateForm form, WizardState state)
     {
-        var visibleFields = GetVisibleFields(state.Page, state.Advanced, form.RconEnabled);
+        var visibleFields = GetVisibleFields(state.Page, form.RconEnabled);
         if (visibleFields.IndexOf(form.SelectedField) < 0)
             form.SelectedField = visibleFields.Count > 0 ? visibleFields[0] : ServerCreateForm.Field.Submit;
 
-        var pageTitle = state.Advanced
-            ? state.Page switch
-            {
-                CreatePage.Basic => "Basic",
-                CreatePage.Gameplay => "Gameplay",
-                CreatePage.Network => "Network",
-                CreatePage.Java => "Java",
-                _ => "",
-            }
-            : "Basic";
+        var pageIndicator = GetPageIndicator(state.Page);
 
         var help = state.Mode switch
         {
-            CreateMode.Normal => state.Advanced
-                ? $"[dim]{Markup.Escape(pageTitle)}  ↑↓/Tab:nav  ←→:page  A:advanced  Enter:activate  Space:toggle  Esc:cancel[/]"
-                : "[dim]Basic  ↑↓/Tab:nav  A:advanced  Enter:activate  Space:toggle  Esc:cancel[/]",
+            CreateMode.Normal => "[dim]↑↓/Tab:nav  ←→:page  Enter:activate  Space:toggle  Esc:cancel[/]",
             CreateMode.EditText =>
                 "[dim]Type to edit  Enter:confirm  Esc:cancel  Tab:confirm+next  Backspace:delete[/]",
             CreateMode.SelectVersion =>
@@ -610,7 +584,16 @@ internal static class CreateWizardModal
             ? $"\n{help}"
             : $"[bold red]{Markup.Escape(state.Error)}[/]\n{help}";
 
-        var formPanel = new Panel(RenderFormContent(form, state, visibleFields))
+        var pageIndicatorMarkup = new Markup($"[dim]{pageIndicator}[/]");
+        var formContent = RenderFormContent(form, state, visibleFields);
+
+        var container = new Table()
+            .HideHeaders().NoBorder().Collapse()
+            .AddColumn(new TableColumn(string.Empty).NoWrap().Centered());
+        container.AddRow(pageIndicatorMarkup);
+        container.AddRow(formContent);
+
+        var formPanel = new Panel(container)
         {
             Expand = false,
             Border = BoxBorder.None,
@@ -814,7 +797,6 @@ internal static class CreateWizardModal
         ServerCreateForm.Field.Version => "Version",
         ServerCreateForm.Field.ServerPort => "Server Port",
         ServerCreateForm.Field.MaxPlayers => "Max Players",
-        ServerCreateForm.Field.Advanced => "Advanced",
         ServerCreateForm.Field.MotD => "MotD",
         ServerCreateForm.Field.ViewDistance => "View Dist",
         ServerCreateForm.Field.OnlineMode => "Online",
@@ -857,7 +839,6 @@ internal static class CreateWizardModal
             ServerCreateForm.Field.JvmMinMemory => form.JvmMinMemory ?? string.Empty,
             ServerCreateForm.Field.JvmMaxMemory => form.JvmMaxMemory ?? string.Empty,
             ServerCreateForm.Field.JvmAdditionalFlags => form.JvmAdditionalFlags ?? string.Empty,
-            ServerCreateForm.Field.Advanced => state.Advanced ? "ON" : "OFF",
             _ => string.Empty,
         };
     }
@@ -871,28 +852,12 @@ internal static class CreateWizardModal
             ServerCreateForm.Field.OnlineMode => form.OnlineMode ? "[green]ON[/]" : "[red]OFF[/]",
             ServerCreateForm.Field.Whitelist => form.Whitelist ? "[green]ON[/]" : "[red]OFF[/]",
             ServerCreateForm.Field.RconEnabled => form.RconEnabled ? "[green]ON[/]" : "[red]OFF[/]",
-            ServerCreateForm.Field.Advanced => state.Advanced ? "[green]ON[/]" : "[red]OFF[/]",
             _ => Markup.Escape(PlainValue(form, state, field)),
         };
     }
 
-    private static IReadOnlyList<ServerCreateForm.Field> GetVisibleFields(CreatePage page, bool advanced,
-        bool rconEnabled)
+    private static IReadOnlyList<ServerCreateForm.Field> GetVisibleFields(CreatePage page, bool rconEnabled)
     {
-        if (!advanced)
-        {
-            return new[]
-            {
-                ServerCreateForm.Field.Name,
-                ServerCreateForm.Field.Type,
-                ServerCreateForm.Field.Version,
-                ServerCreateForm.Field.ServerPort,
-                ServerCreateForm.Field.MaxPlayers,
-                ServerCreateForm.Field.Advanced,
-                ServerCreateForm.Field.Submit,
-            };
-        }
-
         List<ServerCreateForm.Field> fields = page switch
         {
             CreatePage.Basic => new List<ServerCreateForm.Field>
@@ -902,7 +867,6 @@ internal static class CreateWizardModal
                 ServerCreateForm.Field.Version,
                 ServerCreateForm.Field.ServerPort,
                 ServerCreateForm.Field.MaxPlayers,
-                ServerCreateForm.Field.Advanced,
             },
             CreatePage.Gameplay => new List<ServerCreateForm.Field>
             {
@@ -961,6 +925,24 @@ internal static class CreateWizardModal
         CreatePage.Java => CreatePage.Network,
         _ => CreatePage.Basic,
     };
+
+    private static string GetPageIndicator(CreatePage page)
+    {
+        var pages = new[] { CreatePage.Basic, CreatePage.Gameplay, CreatePage.Network, CreatePage.Java };
+        var names = new[] { "Basic", "Gameplay", "Network", "Java" };
+        var current = Array.IndexOf(pages, page);
+
+        var parts = new List<string>(pages.Length);
+        for (int i = 0; i < pages.Length; i++)
+        {
+            if (i == current)
+                parts.Add($"[bold cyan]{names[i]}[/]");
+            else
+                parts.Add(names[i]);
+        }
+
+        return string.Join("  »  ", parts);
+    }
 
     private static (int Start, int End, int Cur) VersionPage(int count, int cursor)
     {

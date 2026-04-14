@@ -27,7 +27,6 @@ internal sealed class ServerCreateForm
         JvmMinMemory,
         JvmMaxMemory,
         JvmAdditionalFlags,
-        Advanced,
         Submit
     }
 
@@ -58,7 +57,7 @@ internal sealed class ServerCreateForm
 
     public ServerType[] Types { get; } = [ServerType.Vanilla, ServerType.Paper, ServerType.Fabric];
 
-    public ServerCreateForm(string appDataDir, IReadOnlyList<string> availableVersions)
+    public ServerCreateForm(string appDataDir)
     {
         _appDataDir = appDataDir;
         Directory = Path.Combine(appDataDir, "servers", "new-server");
