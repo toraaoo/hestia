@@ -91,9 +91,8 @@ internal static class ProgressModal
 
         var panel = new Panel(grid)
         {
-            Header = new PanelHeader("[bold]Working[/]"),
-            Border = BoxBorder.Rounded,
-            Padding = new Padding(2, 1),
+            Border = BoxBorder.None,
+            Expand = true
         };
 
         var layout = new Layout()
