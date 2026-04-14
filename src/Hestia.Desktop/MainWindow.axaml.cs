@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using System.Reflection;
-using Hestia.Core;
 
 namespace Hestia.Desktop;
 
@@ -10,10 +9,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        var hostAssembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-        var appInfo = new AppInfoService(hostAssembly).GetAppInfo();
-
-        VersionText.Text = $"Version: {appInfo.Version}";
-        AppDataText.Text = appInfo.AppDataDirectory;
+        VersionText.Text = $"Version: 1.0.0"; // appInfo.Version.ToString();
+        AppDataText.Text = $"App Data Path: {Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}";
     }
 }
