@@ -1,30 +1,40 @@
+using Hestia.Core;
+using Hestia.Core.Java;
 using Hestia.Core.Utils;
 
 namespace Hestia.Tui;
 
 public static class Program
 {
-    private class ConsoleDownloadCallback : Downloader.IDownloadCallback
+    private class ConsoleDownloadCallback : IProgressCallback
     {
         public void OnProgress(double progress)
         {
-            Console.WriteLine($"Download progress: {progress:P2}");
+            Console.WriteLine($"\rDownload progress: {progress:P2}");
         }
     }
 
     private static async Task Main(string[] args)
     {
-        var downloader = new Downloader();
-        const string url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk-sources_21.0.10_7.tar.gz";
-        const string destination = "file.zip";
+        var javaManager = new Manager();
 
+        Console.WriteLine("Available Java versions:");
+        var availableVersions = await javaManager.ListAvailableVersions();
+        foreach (var version in availableVersions)
+        {
+            Console.WriteLine($"- {version.Major}.{version.Minor}.{version.Security}+{version.Build}");
+        }
 
-        await downloader.Download(
-            url,
-            destination,
-            callback: new ConsoleDownloadCallback(),
-            checksum: "a286b69953cdb56ab2dc74287e6ebaca8fad7d397a4b5f975b73d23eedeec251"
-        );
-        Console.WriteLine("Download completed successfully.");
+        Console.WriteLine("\nEnter the version you want to install (e.g., 17.0.2):");
+        var versionToInstall = Console.ReadLine()?.Trim();
+
+        if (!string.IsNullOrEmpty(versionToInstall))
+        {
+            Console.WriteLine($"Installing Java {versionToInstall}...");
+            var callback = new ConsoleDownloadCallback();
+
+            var installationPath = await javaManager.InstallAsync(versionToInstall, callback);
+            Console.WriteLine($"Java {versionToInstall} installed at: {installationPath}");
+        }
     }
 }

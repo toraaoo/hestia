@@ -4,21 +4,16 @@ namespace Hestia.Core.Utils;
 
 public class Downloader
 {
-    public interface IDownloadCallback
+    private readonly HttpClient _httpClient = new(new HttpClientHandler
     {
-        void OnStart() { }
-        void OnProgress(double progress);
-        void OnCompleted() { }
-        void OnError(Exception ex) { }
-    }
-
-    private readonly HttpClient _httpClient = new();
+        AutomaticDecompression = System.Net.DecompressionMethods.None
+    });
 
     public async Task Download(
         string url,
         string destination,
         string? checksum = null,
-        IDownloadCallback? callback = null
+        IProgressCallback? callback = null
     )
     {
         var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -61,8 +56,8 @@ public class Downloader
 
                     if (canReportProgress)
                     {
-                        var progress = (double)totalReadBytes / totalBytes!.Value * 100;
-                        callback?.OnProgress(Math.Min(progress, 100));
+                        var progress = (double)totalReadBytes / totalBytes!.Value;
+                        callback?.OnProgress(Math.Min(progress, 1.0));
                     }
                 }
 
@@ -116,7 +111,7 @@ public class Downloader
 
     public async Task DownloadMultiple(
         IEnumerable<(string url, string destination, string? checksum)> downloads,
-        IDownloadCallback? callback = null
+        IProgressCallback? callback = null
     )
     {
         foreach (var (url, destination, checksum) in downloads)
