@@ -8,7 +8,7 @@ on:
     inputs:
       version:
         description: 'Version to release (X.Y.Z). Required for manual runs.'
-        required: false
+        required: true
         type: string
 
 permissions:
