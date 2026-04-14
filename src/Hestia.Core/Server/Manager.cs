@@ -293,6 +293,16 @@ public sealed class Manager : IServerManager, IAsyncDisposable
             yield return line;
     }
 
+    public ValueTask<(DateTimeOffset StartedAt, int ProcessId)?> GetRuntimeInfoAsync(
+        Guid serverId,
+        CancellationToken ct = default)
+    {
+        if (_running.TryGetValue(serverId, out var ctx))
+            return ValueTask.FromResult<(DateTimeOffset, int)?>(
+                (ctx.StartedAt, ctx.Process.Id));
+        return ValueTask.FromResult<(DateTimeOffset, int)?>(null);
+    }
+
     public async ValueTask DisposeAsync()
     {
         foreach (var (id, _) in _running.ToArray())

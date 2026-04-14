@@ -48,7 +48,9 @@ internal sealed class KeyMap
         m.Bind(ConsoleKey.LeftArrow, InputAction.TabLeft);
         m.Bind(ConsoleKey.RightArrow, InputAction.TabRight);
 
-        m.Bind(ConsoleKey.M, InputAction.ServerMenu);
+        m.Bind(ConsoleKey.X, InputAction.ServerMenu);
+        m.Bind(ConsoleKey.S, InputAction.ServerToggle);
+        m.Bind(ConsoleKey.R, InputAction.ServerRestart);
         m.Bind(ConsoleKey.C, InputAction.ServerCreate);
         m.Bind(ConsoleKey.F, InputAction.ToggleFollow);
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Hestia.Core.Abstractions;
@@ -9,6 +10,7 @@ public sealed class Monitor : IServerMonitor
 {
     private readonly IServerManager _serverManager;
     private readonly IEventBus _eventBus;
+    private readonly ConcurrentDictionary<Guid, (DateTime Time, TimeSpan CpuTime)> _prevCpu = new();
 
     public Monitor(
         IServerManager serverManager,
@@ -73,13 +75,14 @@ public sealed class Monitor : IServerMonitor
         }
     }
 
-    private Task<ServerStatus> SampleStatusAsync(
+    private async Task<ServerStatus> SampleStatusAsync(
         Server.MinecraftServer server,
         CancellationToken ct)
     {
         if (server.State != ServerState.Running)
         {
-            return Task.FromResult(new ServerStatus(
+            _prevCpu.TryRemove(server.Id, out _);
+            return new ServerStatus(
                 ServerId: server.Id,
                 State: server.State,
                 PlayerCount: 0,
@@ -87,14 +90,21 @@ public sealed class Monitor : IServerMonitor
                 OnlinePlayers: [],
                 Tps: null,
                 Resources: null,
-                Uptime: null));
+                Uptime: null);
         }
 
-        var resources = SampleProcessResources(server);
+        var runtimeInfo = await _serverManager.GetRuntimeInfoAsync(server.Id, ct).ConfigureAwait(false);
+        var uptime = runtimeInfo is { } ri
+            ? DateTimeOffset.UtcNow - ri.StartedAt
+            : (TimeSpan?)null;
+
+        var resources = runtimeInfo is { } ri2
+            ? SampleProcessResources(server.Id, ri2.ProcessId, server.JvmOptions.MaxMemory)
+            : null;
 
         // Intentionally avoid RCON polling here. It causes the Minecraft server to spam
         // "RCON Client ... started/shutting down" logs due to frequent connect/disconnect.
-        return Task.FromResult(new ServerStatus(
+        return new ServerStatus(
             ServerId: server.Id,
             State: server.State,
             PlayerCount: 0,
@@ -102,31 +112,57 @@ public sealed class Monitor : IServerMonitor
             OnlinePlayers: [],
             Tps: null,
             Resources: resources,
-            Uptime: null));
+            Uptime: uptime);
     }
 
-    private static ResourceUsage? SampleProcessResources(Server.MinecraftServer server)
+    private ResourceUsage? SampleProcessResources(Guid serverId, int processId, string maxMemory)
     {
         try
         {
-            var processes = Process.GetProcessesByName("java");
-            foreach (var proc in processes)
+            var proc = Process.GetProcessById(processId);
+            try
             {
-                try
+                proc.Refresh();
+                var memBytes = proc.WorkingSet64;
+                var memLimit = ParseMemoryString(maxMemory);
+
+                var now = DateTime.UtcNow;
+                var cpuTime = proc.TotalProcessorTime;
+                double cpuPct = 0.0;
+                if (_prevCpu.TryGetValue(serverId, out var prev))
                 {
-                    proc.Refresh();
-                    var memBytes = proc.WorkingSet64;
-                    return new ResourceUsage(
-                        CpuPercent: 0.0,
-                        MemoryBytes: memBytes,
-                        MemoryLimitBytes: 0);
+                    var elapsed = (now - prev.Time).TotalMilliseconds;
+                    var cpuUsed = (cpuTime - prev.CpuTime).TotalMilliseconds;
+                    if (elapsed > 0)
+                        cpuPct = cpuUsed / elapsed / Environment.ProcessorCount * 100.0;
                 }
-                catch { }
-                finally { proc.Dispose(); }
+                _prevCpu[serverId] = (now, cpuTime);
+
+                return new ResourceUsage(
+                    CpuPercent: cpuPct,
+                    MemoryBytes: memBytes,
+                    MemoryLimitBytes: memLimit);
             }
+            catch { }
+            finally { proc.Dispose(); }
         }
         catch { }
         return null;
+    }
+
+    private static long ParseMemoryString(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return 0;
+        var upper = s.ToUpperInvariant().TrimEnd('B');
+        long mult = upper[^1] switch
+        {
+            'G' => 1024L * 1024 * 1024,
+            'M' => 1024L * 1024,
+            'K' => 1024L,
+            _ => 1,
+        };
+        var digits = upper.TrimEnd('G', 'M', 'K');
+        return long.TryParse(digits, out var n) ? n * mult : 0;
     }
 
     private sealed class MonitorHandle(CancellationTokenSource cts, Task task) : IAsyncDisposable

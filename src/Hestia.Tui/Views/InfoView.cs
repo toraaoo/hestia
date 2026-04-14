@@ -1,3 +1,5 @@
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using Hestia.Core.Monitoring;
 using Hestia.Core.Server;
 using Hestia.Tui.Screens;
@@ -23,13 +25,13 @@ internal static class InfoView
 
         if (server is not null)
         {
-            const string Host = "127.0.0.1";
+            var host = GetLocalIp();
             Row("Name", Markup.Escape(server.Name));
             Row("Type", Markup.Escape(server.Type.ToString()));
             Row("Version", Markup.Escape(server.MinecraftVersion));
             Row("Dir", $"[dim]{Markup.Escape(server.Options.ServerDirectory)}[/]");
             Row("Port", server.Options.Port.ToString());
-            Row("Join", $"{Host}:{server.Options.Port}");
+            Row("Join", $"{host}:{server.Options.Port}");
 
             if (server.RconOptions.Enabled)
             {
@@ -37,7 +39,7 @@ internal static class InfoView
                     ? server.RconOptions.Password
                     : new string('*', Math.Clamp(server.RconOptions.Password.Length, 8, 24));
                 Row("RCON", "[green]ON[/]");
-                Row("RCON cmd", Markup.Escape($"mcrcon -H {Host} -P {server.RconOptions.Port} -p {pw}"));
+                Row("RCON cmd", Markup.Escape($"mcrcon -H {host} -P {server.RconOptions.Port} -p {pw}"));
             }
             else
             {
@@ -96,5 +98,24 @@ internal static class InfoView
             Border = focused ? BoxBorder.Double : BoxBorder.Rounded,
             Expand = true,
         };
+    }
+
+    private static string GetLocalIp()
+    {
+        try
+        {
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up) continue;
+                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                foreach (var addr in ni.GetIPProperties().UnicastAddresses)
+                {
+                    if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
+                        return addr.Address.ToString();
+                }
+            }
+        }
+        catch { }
+        return "127.0.0.1";
     }
 }

@@ -27,4 +27,8 @@ public interface IServerManager
     IAsyncEnumerable<string> StreamConsoleOutputAsync(
         Guid serverId,
         CancellationToken ct = default);
+
+    ValueTask<(DateTimeOffset StartedAt, int ProcessId)?> GetRuntimeInfoAsync(
+        Guid serverId,
+        CancellationToken ct = default);
 }

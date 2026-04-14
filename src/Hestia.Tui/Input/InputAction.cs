@@ -18,6 +18,7 @@ internal enum InputAction
     ServerStart,
     ServerStop,
     ServerRestart,
+    ServerToggle,
     ServerDelete,
     ServerCreate,
     ServerMenu,

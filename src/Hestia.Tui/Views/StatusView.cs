@@ -11,9 +11,9 @@ internal static class StatusView
         var hints = vm.ActivePane switch
         {
             Pane.Command => "[dim]Enter:send  ↑↓:history  Esc:cancel[/]",
-            Pane.Logs    => "[dim]←:servers  →:info  ↑↓/PgUp/PgDn:scroll  f:follow  /:command  m:actions  Esc:servers[/]",
-            Pane.Info    => "[dim]←:logs  p:pw  m:actions  Esc:servers[/]",
-            _            => "[dim]q:quit  ↑↓:nav  Enter:select  →:view  m:actions  c:create  Tab:focus[/]",
+            Pane.Logs    => "[dim]←:servers  →:info  ↑↓/PgUp/PgDn:scroll  f:follow  /:command  x:actions  Esc:servers[/]",
+            Pane.Info    => "[dim]←:logs  p:pw  x:actions  Esc:servers[/]",
+            _            => "[dim]q:quit  ↑↓:nav  Enter:select  s:start/stop  r:restart  x:menu  c:create[/]",
         };
 
         if (!string.IsNullOrEmpty(vm.StatusMsg))

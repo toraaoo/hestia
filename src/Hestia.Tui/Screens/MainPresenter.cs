@@ -285,6 +285,25 @@ internal sealed class MainPresenter : IAsyncDisposable
                     EnqueueModal(new ServerMenuModalRequest(s.Id, s));
                 break;
             }
+            case InputAction.ServerToggle:
+            {
+                var s = ServerListVm.GetAt(ServerCursor);
+                if (s is not null)
+                {
+                    var act = s.State == ServerState.Running
+                        ? InputAction.ServerStop
+                        : InputAction.ServerStart;
+                    _ = HandleServerMenuActionAsync(act, _appCts!.Token);
+                }
+                break;
+            }
+            case InputAction.ServerRestart:
+            {
+                var s = ServerListVm.GetAt(ServerCursor);
+                if (s is not null)
+                    _ = HandleServerMenuActionAsync(InputAction.ServerRestart, _appCts!.Token);
+                break;
+            }
         }
     }
 
@@ -519,7 +538,7 @@ internal sealed class MainPresenter : IAsyncDisposable
             foreach (var t in types)
                 byType[t] = await _service.GetAvailableVersionsAsync(t, _appCts.Token);
 
-            var form = new ServerCreateForm(_appInfo.AppDataDirectory, byType[initialType]);
+            var form = new ServerCreateForm(_appInfo.AppDataDirectory);
             form.Type = initialType;
 
             var existing = await _service.GetServersAsync(_appCts.Token);
