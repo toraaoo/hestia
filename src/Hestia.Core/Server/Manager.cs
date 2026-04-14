@@ -191,7 +191,8 @@ public sealed class Manager : IServerManager, IAsyncDisposable
             ConsoleChannel: consoleChannel,
             LifetimeCts: lifetime,
             StartedAt: DateTimeOffset.UtcNow,
-            ReadTask: Task.CompletedTask);
+            ReadTask: Task.CompletedTask,
+            OnlinePlayers: new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase));
 
         _running[serverId] = ctx;
 
@@ -200,7 +201,7 @@ public sealed class Manager : IServerManager, IAsyncDisposable
         var readTask = Task.Run(async () =>
         {
             await ReadConsoleLoopAsync(
-                process, serverId, consoleChannel.Writer, startedTcs, logFile, lifetime.Token)
+                process, serverId, consoleChannel.Writer, startedTcs, logFile, ctx.OnlinePlayers, lifetime.Token)
                 .ConfigureAwait(false);
         }, CancellationToken.None);
 
@@ -303,6 +304,11 @@ public sealed class Manager : IServerManager, IAsyncDisposable
         return ValueTask.FromResult<(DateTimeOffset, int)?>(null);
     }
 
+    public IReadOnlyList<string> GetOnlinePlayers(Guid serverId) =>
+        _running.TryGetValue(serverId, out var ctx)
+            ? [.. ctx.OnlinePlayers.Keys]
+            : [];
+
     public async ValueTask DisposeAsync()
     {
         foreach (var (id, _) in _running.ToArray())
@@ -317,6 +323,7 @@ public sealed class Manager : IServerManager, IAsyncDisposable
         ChannelWriter<string> writer,
         TaskCompletionSource startedTcs,
         string logFile,
+        ConcurrentDictionary<string, byte> onlinePlayers,
         CancellationToken ct)
     {
         try
@@ -328,6 +335,8 @@ public sealed class Manager : IServerManager, IAsyncDisposable
 
                 writer.TryWrite(line);
                 await File.AppendAllTextAsync(logFile, line + Environment.NewLine, ct).ConfigureAwait(false);
+
+                ParsePlayerEvent(line, onlinePlayers);
 
                 if (!startedTcs.Task.IsCompleted &&
                     line.Contains("]: Done", StringComparison.Ordinal))
@@ -345,6 +354,24 @@ public sealed class Manager : IServerManager, IAsyncDisposable
         {
             startedTcs.TrySetResult();
             writer.TryComplete();
+        }
+    }
+
+    private static void ParsePlayerEvent(string line, ConcurrentDictionary<string, byte> players)
+    {
+        var sep = line.IndexOf("]: ", StringComparison.Ordinal);
+        if (sep < 0) return;
+
+        var msg = line.AsSpan(sep + 3);
+        if (msg.EndsWith(" joined the game", StringComparison.Ordinal))
+        {
+            var name = msg[..^" joined the game".Length].ToString();
+            players.TryAdd(name, 0);
+        }
+        else if (msg.EndsWith(" left the game", StringComparison.Ordinal))
+        {
+            var name = msg[..^" left the game".Length].ToString();
+            players.TryRemove(name, out _);
         }
     }
 
@@ -449,5 +476,6 @@ public sealed class Manager : IServerManager, IAsyncDisposable
         Channel<string> ConsoleChannel,
         CancellationTokenSource LifetimeCts,
         DateTimeOffset StartedAt,
-        Task ReadTask);
+        Task ReadTask,
+        ConcurrentDictionary<string, byte> OnlinePlayers);
 }

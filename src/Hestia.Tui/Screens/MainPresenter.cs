@@ -235,6 +235,32 @@ internal sealed class MainPresenter : IAsyncDisposable
             case InputAction.ServerCreate:
                 _ = RequestCreateAsync();
                 return;
+            case InputAction.ServerMenu:
+            {
+                var s = ServerListVm.GetAt(ServerCursor);
+                if (s is not null)
+                    EnqueueModal(new ServerMenuModalRequest(s.Id, s));
+                return;
+            }
+            case InputAction.ServerToggle:
+            {
+                var s = ServerListVm.GetAt(ServerCursor);
+                if (s is not null)
+                {
+                    var act = s.State == ServerState.Running
+                        ? InputAction.ServerStop
+                        : InputAction.ServerStart;
+                    _ = HandleServerMenuActionAsync(act, _appCts!.Token);
+                }
+                return;
+            }
+            case InputAction.ServerRestart:
+            {
+                var s = ServerListVm.GetAt(ServerCursor);
+                if (s is not null)
+                    _ = HandleServerMenuActionAsync(InputAction.ServerRestart, _appCts!.Token);
+                return;
+            }
         }
 
         if (ActivePane == Pane.Servers)
@@ -276,32 +302,6 @@ internal sealed class MainPresenter : IAsyncDisposable
             {
                 var s = ServerListVm.GetAt(ServerCursor);
                 if (s is not null) _ = SelectServerAsync(s.Id);
-                break;
-            }
-            case InputAction.ServerMenu:
-            {
-                var s = ServerListVm.GetAt(ServerCursor);
-                if (s is not null)
-                    EnqueueModal(new ServerMenuModalRequest(s.Id, s));
-                break;
-            }
-            case InputAction.ServerToggle:
-            {
-                var s = ServerListVm.GetAt(ServerCursor);
-                if (s is not null)
-                {
-                    var act = s.State == ServerState.Running
-                        ? InputAction.ServerStop
-                        : InputAction.ServerStart;
-                    _ = HandleServerMenuActionAsync(act, _appCts!.Token);
-                }
-                break;
-            }
-            case InputAction.ServerRestart:
-            {
-                var s = ServerListVm.GetAt(ServerCursor);
-                if (s is not null)
-                    _ = HandleServerMenuActionAsync(InputAction.ServerRestart, _appCts!.Token);
                 break;
             }
         }

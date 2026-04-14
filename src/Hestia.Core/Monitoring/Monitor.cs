@@ -102,14 +102,16 @@ public sealed class Monitor : IServerMonitor
             ? SampleProcessResources(server.Id, ri2.ProcessId, server.JvmOptions.MaxMemory)
             : null;
 
-        // Intentionally avoid RCON polling here. It causes the Minecraft server to spam
-        // "RCON Client ... started/shutting down" logs due to frequent connect/disconnect.
+        var onlinePlayers = _serverManager.GetOnlinePlayers(server.Id)
+            .Select(name => new PlayerInfo(name, Guid.Empty))
+            .ToList();
+
         return new ServerStatus(
             ServerId: server.Id,
             State: server.State,
-            PlayerCount: 0,
+            PlayerCount: onlinePlayers.Count,
             MaxPlayers: server.Options.MaxPlayers,
-            OnlinePlayers: [],
+            OnlinePlayers: onlinePlayers,
             Tps: null,
             Resources: resources,
             Uptime: uptime);

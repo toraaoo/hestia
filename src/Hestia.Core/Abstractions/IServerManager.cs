@@ -31,4 +31,6 @@ public interface IServerManager
     ValueTask<(DateTimeOffset StartedAt, int ProcessId)?> GetRuntimeInfoAsync(
         Guid serverId,
         CancellationToken ct = default);
+
+    IReadOnlyList<string> GetOnlinePlayers(Guid serverId);
 }
