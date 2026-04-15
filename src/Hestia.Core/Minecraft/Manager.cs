@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using Hestia.Core.Minecraft.Models;
 using Hestia.Core.Minecraft.Providers;
@@ -83,7 +82,6 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs, IEnumerable
         var instance = _launcher.Launch(server, javaExePath, serverDir);
         _instances[id] = instance;
 
-        // Clean up when the process exits
         instance.Output.Subscribe(
             onNext: _ => { },
             onCompleted: () => _instances.Remove(id)
@@ -102,11 +100,9 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs, IEnumerable
         await instance.DisposeAsync();
     }
 
-    public bool IsRunning(Guid id) =>
-        _instances.TryGetValue(id, out var instance) && instance.IsRunning;
+    public bool IsRunning(Guid id) => _instances.TryGetValue(id, out var instance) && instance.IsRunning;
 
-    public ServerInstance? GetInstance(Guid id) =>
-        _instances.TryGetValue(id, out var instance) ? instance : null;
+    public ServerInstance? GetInstance(Guid id) => _instances.GetValueOrDefault(id);
 
     public async Task<ServerMetrics> GetMetricsAsync(Guid id)
     {
@@ -140,6 +136,10 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs, IEnumerable
             enable-rcon=true
             rcon.port={server.RconPort}
             rcon.password={server.RconPassword}
+            level-name={server.World.Name}
+            level-seed={server.World.Seed ?? ""}
+            default-game-mode={WorldPropertyValues.Of(server.World.GameMode)}
+            difficulty={WorldPropertyValues.Of(server.World.Difficulty)}
             """;
         File.WriteAllText(path, content);
     }
@@ -156,7 +156,6 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs, IEnumerable
         if (installed.Count == 0)
             throw new HestiaException("No Java installations found. Create the server first to auto-install Java.");
 
-        // Pick highest installed version (installations are named jdk-{version})
         return installed
             .Select(name => name.Replace("jdk-", string.Empty))
             .OrderByDescending(v => int.TryParse(v, out var n) ? n : 0)
@@ -170,7 +169,6 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs, IEnumerable
             ? "java.exe"
             : "java";
 
-        // JDK archives extract to a versioned subdirectory; find the bin/java within
         var bin = FindJavaExecutable(dir, exe)
             ?? throw new HestiaException($"Could not locate Java executable in '{dir}'.");
 
@@ -182,20 +180,11 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs, IEnumerable
         if (!Directory.Exists(root))
             return null;
 
-        // Direct path: root/bin/java
         var direct = Path.Combine(root, "bin", exe);
         if (File.Exists(direct))
             return direct;
 
-        // Some archives extract one level deeper: root/{jdk-version}/bin/java
-        foreach (var subdir in Directory.GetDirectories(root))
-        {
-            var nested = Path.Combine(subdir, "bin", exe);
-            if (File.Exists(nested))
-                return nested;
-        }
-
-        return null;
+        return Directory.GetDirectories(root).Select(subdir => Path.Combine(subdir, "bin", exe)).FirstOrDefault(nested => File.Exists(nested));
     }
 
     private void ThrowIfRunning(Guid id)

@@ -22,4 +22,5 @@ public record Server
     public int RconPort { get; init; } = 25575;
     public string RconPassword { get; init; } = string.Empty;
     public List<string> JvmArgs { get; init; } = ["-Xmx2G", "-Xms512M"];
+    public WorldConfig World { get; init; } = new();
 }

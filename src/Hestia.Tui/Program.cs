@@ -52,6 +52,12 @@ public static class Program
         // Give servers a moment to start accepting RCON
         Console.WriteLine("\nWaiting for servers to initialize...");
         await Task.Delay(TimeSpan.FromSeconds(15));
+        
+        var metrics = await instance1.GetMetricsAsync();
+        var metrics2 = await instance2.GetMetricsAsync();
+        
+        
+        
 
         Console.WriteLine("\n=== Sending commands ===");
 
