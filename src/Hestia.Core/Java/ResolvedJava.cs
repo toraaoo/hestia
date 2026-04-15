@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using Hestia.Core.Utils;
 using ICSharpCode.SharpZipLib.Tar;
 
@@ -50,8 +51,29 @@ public class ResolvedJava
                 {
                     using var fileStream = File.OpenRead(downloadPath);
                     using var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress);
-                    using var tarArchive = TarArchive.CreateInputTarArchive(gzipStream, System.Text.Encoding.UTF8);
-                    tarArchive.ExtractContents(javaDir);
+                    using var tarInput = new TarInputStream(gzipStream, System.Text.Encoding.UTF8);
+
+                    TarEntry? entry;
+                    while ((entry = tarInput.GetNextEntry()) != null)
+                    {
+                        var destPath = Path.Combine(javaDir, entry.Name);
+
+                        if (entry.IsDirectory)
+                        {
+                            Directory.CreateDirectory(destPath);
+                            continue;
+                        }
+
+                        Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+
+                        using (var outStream = File.Create(destPath))
+                            tarInput.CopyEntryContents(outStream);
+
+                        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) continue;
+                        
+                        var mode = (UnixFileMode)(entry.TarHeader.Mode & 0x1FF);
+                        File.SetUnixFileMode(destPath, mode);
+                    }
                 }
 
                 var extracted = Directory.GetDirectories(javaDir)

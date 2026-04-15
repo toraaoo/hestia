@@ -13,6 +13,7 @@ public class Downloader
         string url,
         string destination,
         string? checksum = null,
+        string checksumAlgorithm = "sha256",
         IProgressCallback? callback = null
     )
     {
@@ -66,19 +67,17 @@ public class Downloader
 
             if (!string.IsNullOrEmpty(checksum))
             {
-                using var sha256 = SHA256.Create();
+                using var hash = CreateHashAlgorithm(checksumAlgorithm);
                 await using var stream = File.OpenRead(tempFile);
 
-                var computedHash = await sha256.ComputeHashAsync(stream);
+                var computedHash = await hash.ComputeHashAsync(stream);
                 var computedHashString = BitConverter
                     .ToString(computedHash)
                     .Replace("-", "")
                     .ToLowerInvariant();
 
                 if (!computedHashString.Equals(checksum, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new DownloadException("Checksum validation failed.");
-                }
+                    throw new DownloadException($"Checksum validation failed (algorithm: {checksumAlgorithm}).");
             }
 
             if (File.Exists(destination))
@@ -109,6 +108,15 @@ public class Downloader
         }
     }
 
+    private static HashAlgorithm CreateHashAlgorithm(string algorithm) =>
+        algorithm.ToLowerInvariant() switch
+        {
+            "sha1" => SHA1.Create(),
+            "sha256" => SHA256.Create(),
+            "sha512" => SHA512.Create(),
+            _ => throw new DownloadException($"Unknown checksum algorithm '{algorithm}'.")
+        };
+
     public async Task DownloadMultiple(
         IEnumerable<(string url, string destination, string? checksum)> downloads,
         IProgressCallback? callback = null
@@ -118,7 +126,7 @@ public class Downloader
         {
             try
             {
-                await Download(url, destination, checksum, callback);
+                await Download(url, destination, checksum, callback: callback);
             }
             catch (Exception ex)
             {
