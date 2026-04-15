@@ -3,8 +3,8 @@ namespace Hestia.Core.Minecraft.Models;
 public enum ServerType
 {
     Vanilla,
+    Fabric,
 
-    // Fabric,
     // Paper,
     // Spigot,
     // Forge,

@@ -2,32 +2,20 @@ using System.Text.Json.Serialization;
 
 namespace Hestia.Core.Minecraft.Providers.Dtos;
 
-public record VersionDetails
-{
-    [JsonPropertyName("downloads")]
-    public VersionDownloads Downloads { get; init; } = new();
+public record VersionDetails(
+    [property: JsonPropertyName("downloads")] VersionDownloads Downloads,
+    [property: JsonPropertyName("javaVersion")] JavaVersionInfo? JavaVersion
+);
 
-    [JsonPropertyName("javaVersion")]
-    public JavaVersionInfo? JavaVersion { get; init; }
-}
+public record VersionDownloads(
+    [property: JsonPropertyName("server")] DownloadArtifact? Server
+);
 
-public record VersionDownloads
-{
-    [JsonPropertyName("server")]
-    public DownloadArtifact? Server { get; init; }
-}
+public record DownloadArtifact(
+    [property: JsonPropertyName("url")] string Url,
+    [property: JsonPropertyName("sha1")] string Sha1
+);
 
-public record DownloadArtifact
-{
-    [JsonPropertyName("url")]
-    public string Url { get; init; } = string.Empty;
-
-    [JsonPropertyName("sha1")]
-    public string Sha1 { get; init; } = string.Empty;
-}
-
-public record JavaVersionInfo
-{
-    [JsonPropertyName("majorVersion")]
-    public int MajorVersion { get; init; }
-}
+public record JavaVersionInfo(
+    [property: JsonPropertyName("majorVersion")] int MajorVersion
+);

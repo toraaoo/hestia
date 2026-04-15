@@ -2,20 +2,12 @@ using System.Text.Json.Serialization;
 
 namespace Hestia.Core.Minecraft.Providers.Dtos;
 
-public record VersionManifest
-{
-    [JsonPropertyName("versions")]
-    public List<VersionEntry> Versions { get; init; } = [];
-}
+public record VersionManifest(
+    [property: JsonPropertyName("versions")] List<VersionEntry> Versions
+);
 
-public record VersionEntry
-{
-    [JsonPropertyName("id")]
-    public string Id { get; init; } = string.Empty;
-
-    [JsonPropertyName("type")]
-    public string Type { get; init; } = string.Empty;
-
-    [JsonPropertyName("url")]
-    public string Url { get; init; } = string.Empty;
-}
+public record VersionEntry(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("url")] string Url
+);

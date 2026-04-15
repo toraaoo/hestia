@@ -5,9 +5,15 @@ using Hestia.Core.Utils;
 
 namespace Hestia.Core.Minecraft;
 
-public class Manager(Java.Manager javaManager, AppDataFileSystem fs, IEnumerable<IProvider> providers)
+public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    private static readonly IReadOnlyList<IProvider> Providers = typeof(IProvider).Assembly
+        .GetTypes()
+        .Where(t => t is { IsAbstract: false, IsInterface: false } && t.IsAssignableTo(typeof(IProvider)))
+        .Select(t => (IProvider)Activator.CreateInstance(t)!)
+        .ToList();
 
     private readonly Launcher _launcher = new();
     private readonly Dictionary<Guid, ServerInstance> _instances = [];
@@ -111,8 +117,8 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs, IEnumerable
         return await instance.GetMetricsAsync();
     }
 
-    private IProvider FindProvider(ServerType type) =>
-        providers.FirstOrDefault(p => p.Type == type)
+    private static IProvider FindProvider(ServerType type) =>
+        Providers.FirstOrDefault(p => p.Type == type)
             ?? throw new HestiaException($"No provider registered for server type '{type}'.");
 
     private async Task DownloadJarAsync(ResolvedServer resolved, IProgressCallback? callback)

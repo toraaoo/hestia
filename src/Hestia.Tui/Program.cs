@@ -1,6 +1,5 @@
 using Hestia.Core.Minecraft;
 using Hestia.Core.Minecraft.Models;
-using Hestia.Core.Minecraft.Providers;
 using Hestia.Core.Utils;
 
 namespace Hestia.Tui;
@@ -11,7 +10,7 @@ public static class Program
     {
         var fs = new AppDataFileSystem();
         var javaManager = new Core.Java.Manager();
-        var mcManager = new Manager(javaManager, fs, [new VanillaProvider()]);
+        var mcManager = new Manager(javaManager, fs);
 
         var progress = new ConsoleProgress();
 
