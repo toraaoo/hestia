@@ -16,7 +16,20 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
         .ToList();
 
     private readonly Launcher _launcher = new();
-    private readonly Dictionary<Guid, ServerInstance> _instances = [];
+
+    private sealed class RuntimeState(ServerInstance instance)
+    {
+        public ServerInstance Instance { get; } = instance;
+        public CancellationTokenSource Cts { get; } = new();
+        public bool StopRequested { get; set; }
+    }
+
+    private static readonly TimeSpan StabilityWindow = TimeSpan.FromSeconds(15);
+
+    private readonly Lock _gate = new();
+    private readonly Dictionary<Guid, RuntimeState> _runtime = [];
+    private readonly Dictionary<Guid, ServerStatus> _status = [];
+    private readonly HashSet<Guid> _rconReady = [];
 
     public async Task<Server> CreateAsync(Server server, IProgressCallback? callback = null)
     {
@@ -86,35 +99,188 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
         var serverDir = fs.Servers.GetServerDir(id);
 
         var instance = _launcher.Launch(server, javaExePath, serverDir);
-        _instances[id] = instance;
 
-        instance.Output.Subscribe(
-            onNext: _ => { },
-            onCompleted: () => _instances.Remove(id)
-        );
+        lock (_gate)
+        {
+            if (_runtime.Remove(id, out var old))
+            {
+                old.Cts.Cancel();
+                old.Cts.Dispose();
+            }
+
+            _runtime[id] = new RuntimeState(instance);
+            _status[id] = ServerStatus.Starting;
+            _rconReady.Remove(id);
+        }
+
+        _ = RunLifecycleAsync(id, instance);
 
         return Task.FromResult(instance);
     }
 
     public async Task StopAsync(Guid id)
     {
-        if (!_instances.TryGetValue(id, out var instance))
-            return;
+        ServerInstance? instance;
+        lock (_gate)
+        {
+            if (!_runtime.TryGetValue(id, out var state))
+                return;
 
-        await instance.StopAsync();
-        _instances.Remove(id);
-        await instance.DisposeAsync();
+            state.StopRequested = true;
+            state.Cts.Cancel();
+            instance = state.Instance;
+        }
+
+        await instance!.StopAsync();
     }
 
-    public bool IsRunning(Guid id) => _instances.TryGetValue(id, out var instance) && instance.IsRunning;
+    public bool IsRunning(Guid id)
+    {
+        lock (_gate)
+            return _runtime.TryGetValue(id, out var state) && state.Instance.IsRunning;
+    }
 
-    public ServerInstance? GetInstance(Guid id) => _instances.GetValueOrDefault(id);
+    public ServerInstance? GetInstance(Guid id)
+    {
+        lock (_gate)
+            return _runtime.TryGetValue(id, out var state) ? state.Instance : null;
+    }
+
+    public ServerStatus GetStatus(Guid id)
+    {
+        lock (_gate)
+            return _status.TryGetValue(id, out var status) ? status : ServerStatus.Stopped;
+    }
 
     public async Task<ServerMetrics> GetMetricsAsync(Guid id)
     {
         var instance = GetInstance(id)
             ?? throw new HestiaException($"Server '{id}' is not running.");
         return await instance.GetMetricsAsync();
+    }
+
+    private async Task RunLifecycleAsync(Guid id, ServerInstance instance)
+    {
+        RuntimeState? state;
+        lock (_gate)
+        {
+            if (!_runtime.TryGetValue(id, out state) || !ReferenceEquals(state.Instance, instance))
+                return;
+        }
+
+        var ct = state.Cts.Token;
+
+        _ = MarkRunningAfterStabilityAsync(id, instance, ct);
+        _ = ProbeRconAsync(id, instance, ct);
+
+        int? exitCode;
+        try
+        {
+            exitCode = await instance.WaitForExitAsync();
+        }
+        catch
+        {
+            exitCode = null;
+        }
+
+        bool stopRequested;
+        lock (_gate)
+        {
+            if (!_runtime.TryGetValue(id, out state) || !ReferenceEquals(state.Instance, instance))
+                return;
+
+            stopRequested = state.StopRequested;
+
+            _runtime.Remove(id);
+            _rconReady.Remove(id);
+            state.Cts.Cancel();
+            state.Cts.Dispose();
+
+            _status[id] = stopRequested ? ServerStatus.Stopped : ServerStatus.Crashed;
+        }
+
+        await instance.DisposeAsync();
+    }
+
+    private async Task MarkRunningAfterStabilityAsync(Guid id, ServerInstance instance, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(StabilityWindow, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        TryMarkRunning(id, instance);
+    }
+
+    private void TryMarkRunning(Guid id, ServerInstance instance)
+    {
+        lock (_gate)
+        {
+            if (!_runtime.TryGetValue(id, out var state) || !ReferenceEquals(state.Instance, instance))
+                return;
+
+            if (!instance.IsRunning)
+                return;
+
+            if (_status.TryGetValue(id, out var s) && (s == ServerStatus.Crashed || s == ServerStatus.Stopped))
+                return;
+
+            _status[id] = ServerStatus.Running;
+        }
+    }
+
+    private async Task ProbeRconAsync(Guid id, ServerInstance instance, CancellationToken ct)
+    {
+        var delay = TimeSpan.FromMilliseconds(200);
+
+        while (!ct.IsCancellationRequested)
+        {
+            lock (_gate)
+            {
+                if (!_runtime.TryGetValue(id, out var state) || !ReferenceEquals(state.Instance, instance))
+                    return;
+
+                if (_status.TryGetValue(id, out var s) && (s == ServerStatus.Crashed || s == ServerStatus.Stopped))
+                    return;
+
+                if (_rconReady.Contains(id))
+                    return;
+            }
+
+            try
+            {
+                var task = instance.SendCommandAsync("list");
+                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(2), ct);
+                var completed = await Task.WhenAny(task, timeoutTask);
+                if (completed == timeoutTask)
+                {
+                    if (ct.IsCancellationRequested)
+                        return;
+                    throw new TimeoutException("RCON probe timed out.");
+                }
+
+                _ = await task;
+
+                lock (_gate)
+                {
+                    if (_runtime.TryGetValue(id, out var state) && ReferenceEquals(state.Instance, instance))
+                        _rconReady.Add(id);
+                }
+
+                return;
+            }
+            catch
+            {
+                try { await Task.Delay(delay, ct); }
+                catch (OperationCanceledException) { return; }
+
+                delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 2000));
+            }
+        }
     }
 
     private static IProvider FindProvider(ServerType type) =>

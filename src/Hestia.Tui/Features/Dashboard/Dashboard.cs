@@ -43,7 +43,7 @@ public sealed class DashboardScreen(Manager manager) : ScreenBase
         }
 
         _layout["Left"].Update(_serverList.Render(_focus == Focus.ServerList));
-        _layout["Content"].Update(_content.Render(_serverList.Selected, _focus == Focus.Content));
+        _layout["Content"].Update(_content.Render(_serverList.Selected, _focus == Focus.Content, manager));
         _layout["Footer"].Update(
             new Markup("[dim] [b]Tab[/] switch panel · [b]↑↓[/] navigate · [b]←→[/] cycle tabs · [b]Q[/] quit[/]")
         );

@@ -1,3 +1,4 @@
+using Hestia.Core.Minecraft;
 using Hestia.Core.Minecraft.Models;
 using Hestia.Tui.Features.Dashboard.Tabs;
 using Spectre.Console;
@@ -15,14 +16,14 @@ public sealed class ContentPanel(List<ITab> tabs)
     public Task OnServerChangedAsync(Server? server, CancellationToken ct) =>
         tabs[_activeTab].OnServerChangedAsync(server, ct);
 
-    public IRenderable Render(Server? server, bool focused)
+    public IRenderable Render(Server? server, bool focused, Manager manager)
     {
-        var color = focused ? Color.Yellow : Color.Grey;
+        var color = focused ? Color.Green : Color.Grey;
         var headerParts = tabs.Select((tab, i) =>
             i == _activeTab ? $"[bold {color}] {tab.Title} [/]" : $"[dim] {tab.Title} [/]");
         var tabBar = string.Join("[grey]·[/]", headerParts);
 
-        return new Panel(tabs[_activeTab].Render(server))       
+        return new Panel(tabs[_activeTab].Render(server, manager))
             .Header(tabBar)
             .Border(BoxBorder.Rounded)
             .BorderColor(color)

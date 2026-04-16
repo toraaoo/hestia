@@ -19,6 +19,7 @@ public sealed class ServerInstance : IAsyncDisposable
     private readonly Process _process;
     private readonly RconClient _rcon = new();
     private bool _rconConnected;
+    private readonly TaskCompletionSource<int> _exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public Server Server { get; }
     public IObservable<string> Output { get; }
@@ -31,7 +32,24 @@ public sealed class ServerInstance : IAsyncDisposable
         _process = process;
         Output = output;
         StartedAt = DateTime.UtcNow;
+
+        process.Exited += (_, _) =>
+        {
+            try
+            {
+                _exited.TrySetResult(process.ExitCode);
+            }
+            catch (Exception ex)
+            {
+                _exited.TrySetException(ex);
+            }
+        };
+
+        if (process.HasExited)
+            _exited.TrySetResult(process.ExitCode);
     }
+
+    public Task<int> WaitForExitAsync() => _exited.Task;
 
     public async Task<string> SendCommandAsync(string command)
     {
