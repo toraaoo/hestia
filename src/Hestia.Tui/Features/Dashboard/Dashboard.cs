@@ -21,8 +21,8 @@ public sealed class DashboardScreen : ScreenBase
             );
 
         _layout["Main"].SplitColumns(
-            new Layout("Left").Ratio(20),
-            new Layout("Content").Ratio(80)
+            new Layout("Left").Ratio(25),
+            new Layout("Content").Ratio(75)
         );
 
         _layout["Footer"].Update(

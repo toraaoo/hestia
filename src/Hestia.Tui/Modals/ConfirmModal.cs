@@ -8,22 +8,29 @@ namespace Hestia.Tui.Modals;
 /// Full-screen confirmation dialog. Returns true if the user confirmed.
 /// Demonstrates how to implement <see cref="ModalBase{TResult}"/>.
 /// </summary>
-public sealed class ConfirmModal : ModalBase<bool>
+public sealed class ConfirmModal(string message) : ModalBase<bool>
 {
-    private readonly string _message;
+    public override IRenderable Render()
+    {
+        var root = new Layout("Root")
+            .SplitRows(new Layout("Content"));
 
-    public ConfirmModal(string message) => _message = message;
+        var content = new Panel(
+                new Align(
+                    new Markup($"{message}\n\n[dim]Press [b]Enter[/] to confirm · [b]Esc[/] to cancel[/]"),
+                    HorizontalAlignment.Center,
+                    VerticalAlignment.Middle
+                )
+            )
+            .Border(BoxBorder.None)
+            .Expand();
 
-    public override IRenderable Render() =>
-        Align.Center(new Panel(
-            new Markup($"[yellow]{_message}[/]\n\n[dim]Press [b]Enter[/] to confirm · [b]Esc[/] to cancel[/]")
-        )
-        {
-            Border = BoxBorder.None,
-            Header = new PanelHeader("[bold red]Confirm[/]"),
-            Padding = new Padding(2, 1),
-            Expand = true
-        });
+
+        root["Content"].Update(content);
+
+        return root;
+    }
+
 
     public override void OnInput(InputAction action)
     {
