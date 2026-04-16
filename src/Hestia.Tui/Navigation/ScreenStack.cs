@@ -18,6 +18,7 @@ public sealed class ScreenStack
     {
         var stack = new Stack<IScreen>();
         stack.Push(initialScreen);
+        await initialScreen.LoadAsync(ct);
         var quit = false;
 
         while (stack.Count > 0 && !quit && !ct.IsCancellationRequested)
@@ -75,7 +76,10 @@ public sealed class ScreenStack
                         }
 
                         if (host.PendingPush != null)
+                        {
                             stack.Push(host.PendingPush);
+                            await host.PendingPush.LoadAsync(ct);
+                        }
                         else if (host.PendingPop && stack.Count > 0)
                             stack.Pop();
                     }
@@ -90,7 +94,10 @@ public sealed class ScreenStack
             await modalHost.PendingModal(ct);
 
             if (modalHost.PendingPush != null)
+            {
                 stack.Push(modalHost.PendingPush);
+                await modalHost.PendingPush.LoadAsync(ct);
+            }
             else if (modalHost.PendingPop && stack.Count > 0)
                 stack.Pop();
         }

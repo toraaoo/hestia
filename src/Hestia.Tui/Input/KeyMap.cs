@@ -22,6 +22,7 @@ public sealed class KeyMap
         [InputAction.MoveLeft]  = new KeyBinding(ConsoleKey.LeftArrow),
         [InputAction.MoveRight] = new KeyBinding(ConsoleKey.RightArrow),
         [InputAction.Delete]    = new KeyBinding(ConsoleKey.D),
+        [InputAction.Tab]       = new KeyBinding(ConsoleKey.Tab),
     };
 
     private readonly Dictionary<InputAction, KeyBinding> _bindings = new(DefaultBindings);
