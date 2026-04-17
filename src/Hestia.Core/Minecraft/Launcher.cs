@@ -9,7 +9,7 @@ internal sealed class Launcher
 {
     public ServerInstance Launch(Server server, string javaExePath, string serverDir)
     {
-        string[] args = [..server.JvmArgs, "-jar", "server.jar", "nogui"];
+        string[] args = [..server.Jvm.BuildArgs(), "-jar", "server.jar", "nogui"];
 
         var startInfo = new ProcessStartInfo
         {

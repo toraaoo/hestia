@@ -28,7 +28,7 @@ public sealed class StatusTab : ITab
         grid.AddRow("[dim]Status[/]",  statusMarkup);
         grid.AddRow("[dim]Type[/]",    server.Type.ToString());
         grid.AddRow("[dim]Version[/]", server.Version);
-        grid.AddRow("[dim]Host[/]",    $"{server.Host}:{server.Port}");
+        grid.AddRow("[dim]Host[/]",    $"{server.Host}:{server.Network.Port}");
         grid.AddRow("[dim]World[/]",   server.World.Name);
         return grid;
     }

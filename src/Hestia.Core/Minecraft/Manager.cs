@@ -42,11 +42,11 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
         if (!javaManager.IsInstalled(javaVersion))
             await javaManager.InstallAsync(javaVersion, callback);
 
-        fs.Servers.EnsureServerDir(server.Id);
+        Directory.CreateDirectory(ResolveServerDir(server));
 
         await DownloadJarAsync(resolved, callback);
         WriteServerProperties(server);
-        WriteEula(server.Id);
+        WriteEula(server);
 
         var servers = LoadServers();
         servers.Add(server);
@@ -60,9 +60,16 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
         ThrowIfRunning(id);
 
         var servers = LoadServers();
+        var server = servers.Find(s => s.Id == id);
         servers.RemoveAll(s => s.Id == id);
         SaveServers(servers);
-        fs.Servers.DeleteServer(id);
+
+        if (server is not null)
+        {
+            var dir = ResolveServerDir(server);
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, recursive: true);
+        }
 
         return Task.CompletedTask;
     }
@@ -96,7 +103,7 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
 
         var javaVersion = ResolveInstalledJavaVersion(server);
         var javaExePath = GetJavaExePath(javaVersion);
-        var serverDir = fs.Servers.GetServerDir(id);
+        var serverDir = ResolveServerDir(server);
 
         var instance = _launcher.Launch(server, javaExePath, serverDir);
 
@@ -290,7 +297,7 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
     private async Task DownloadJarAsync(ResolvedServer resolved, IProgressCallback? callback)
     {
         var downloader = new Downloader();
-        var jarPath = fs.Servers.GetJarPath(resolved.Server.Id);
+        var jarPath = Path.Combine(ResolveServerDir(resolved.Server), "server.jar");
         await downloader.Download(
             resolved.DownloadUrl,
             jarPath,
@@ -302,25 +309,61 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
 
     private void WriteServerProperties(Server server)
     {
-        var path = fs.Servers.GetPropertiesPath(server.Id);
-        var content = $"""
-            server-port={server.Port}
-            enable-rcon=true
-            rcon.port={server.RconPort}
-            rcon.password={server.RconPassword}
-            level-name={server.World.Name}
-            level-seed={server.World.Seed ?? ""}
-            default-game-mode={WorldPropertyValues.Of(server.World.GameMode)}
-            difficulty={WorldPropertyValues.Of(server.World.Difficulty)}
-            """;
-        File.WriteAllText(path, content);
+        var path = Path.Combine(ResolveServerDir(server), "server.properties");
+        var updates = new Dictionary<string, string>
+        {
+            ["server-port"]        = server.Network.Port.ToString(),
+            ["max-players"]        = server.Network.MaxPlayers.ToString(),
+            ["motd"]               = server.Network.MotD,
+            ["view-distance"]      = server.Network.ViewDistance.ToString(),
+            ["online-mode"]        = server.Network.OnlineMode.ToString().ToLowerInvariant(),
+            ["white-list"]         = server.Network.Whitelist.ToString().ToLowerInvariant(),
+            ["enable-rcon"]        = server.Rcon.Enabled.ToString().ToLowerInvariant(),
+            ["rcon.port"]          = server.Rcon.Port.ToString(),
+            ["rcon.password"]      = server.Rcon.Password,
+            ["level-name"]         = server.World.Name,
+            ["level-seed"]         = server.World.Seed ?? "",
+            ["default-game-mode"]  = WorldPropertyValues.Of(server.World.GameMode),
+            ["difficulty"]         = WorldPropertyValues.Of(server.World.Difficulty),
+        };
+        MergeServerProperties(path, updates);
     }
 
-    private void WriteEula(Guid id)
+    private static void MergeServerProperties(string path, Dictionary<string, string> updates)
     {
-        var path = Path.Combine(fs.Servers.GetServerDir(id), "eula.txt");
-        File.WriteAllText(path, "eula=true\n");
+        var lines = File.Exists(path) ? [..File.ReadAllLines(path)] : new List<string>();
+        var written = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i];
+            if (line.StartsWith('#') || !line.Contains('='))
+                continue;
+
+            var eq = line.IndexOf('=');
+            var key = line[..eq].Trim();
+
+            if (updates.TryGetValue(key, out var value))
+            {
+                lines[i] = $"{key}={value}";
+                written.Add(key);
+            }
+        }
+
+        foreach (var (key, value) in updates)
+        {
+            if (!written.Contains(key))
+                lines.Add($"{key}={value}");
+        }
+
+        File.WriteAllLines(path, lines);
     }
+
+    private void WriteEula(Server server) =>
+        File.WriteAllText(Path.Combine(ResolveServerDir(server), "eula.txt"), "eula=true\n");
+
+    private string ResolveServerDir(Server server) =>
+        server.Directory ?? fs.Servers.GetServerDir(server.Id);
 
     private string ResolveInstalledJavaVersion(Server server)
     {
@@ -371,21 +414,21 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
 
         foreach (var other in existing)
         {
-            if (other.Port == server.Port)
+            if (other.Network.Port == server.Network.Port)
                 throw new HestiaException(
-                    $"Port {server.Port} is already used by server '{other.Name}' ({other.Id}).");
+                    $"Port {server.Network.Port} is already used by server '{other.Name}' ({other.Id}).");
 
-            if (other.RconPort == server.RconPort)
+            if (server.Rcon.Enabled && other.Rcon.Enabled && other.Rcon.Port == server.Rcon.Port)
                 throw new HestiaException(
-                    $"RCON port {server.RconPort} is already used by server '{other.Name}' ({other.Id}).");
+                    $"RCON port {server.Rcon.Port} is already used by server '{other.Name}' ({other.Id}).");
 
-            if (other.Port == server.RconPort)
+            if (server.Rcon.Enabled && other.Network.Port == server.Rcon.Port)
                 throw new HestiaException(
-                    $"RCON port {server.RconPort} conflicts with the game port of server '{other.Name}' ({other.Id}).");
+                    $"RCON port {server.Rcon.Port} conflicts with the game port of server '{other.Name}' ({other.Id}).");
 
-            if (other.RconPort == server.Port)
+            if (other.Rcon.Enabled && other.Rcon.Port == server.Network.Port)
                 throw new HestiaException(
-                    $"Port {server.Port} conflicts with the RCON port of server '{other.Name}' ({other.Id}).");
+                    $"Port {server.Network.Port} conflicts with the RCON port of server '{other.Name}' ({other.Id}).");
         }
     }
 

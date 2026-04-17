@@ -76,9 +76,9 @@ public sealed class ServerInstance : IAsyncDisposable
                 tps = double.Parse(tpsMatch.Groups["tps1"].Value, CultureInfo.InvariantCulture);
         }
 
-        var connectUrl = Server.Port == 25565
+        var connectUrl = Server.Network.Port == 25565
             ? Server.Host
-            : $"{Server.Host}:{Server.Port}";
+            : $"{Server.Host}:{Server.Network.Port}";
 
         return new ServerMetrics
         {
@@ -122,7 +122,7 @@ public sealed class ServerInstance : IAsyncDisposable
         if (_rconConnected)
             return;
 
-        await _rcon.ConnectAsync(Server.Host, Server.RconPort, Server.RconPassword);
+        await _rcon.ConnectAsync(Server.Host, Server.Rcon.Port, Server.Rcon.Password);
         _rconConnected = true;
     }
 }
