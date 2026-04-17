@@ -18,7 +18,7 @@ public abstract class ModalBase<TResult> : IModal<TResult>, IView
 
     protected void Complete(TResult result) => _tcs?.TrySetResult(result);
 
-    public async Task<TResult> ShowAsync(CancellationToken ct)
+    public async Task<TResult> ShowAsync(KeyMap keyMap, CancellationToken ct)
     {
         await WaitForTerminalSizeAsync(ct);
 
@@ -38,7 +38,7 @@ public abstract class ModalBase<TResult> : IModal<TResult>, IView
                     if (Console.KeyAvailable)
                     {
                         var key = Console.ReadKey(true);
-                        if (ScreenContext.KeyMap.Resolve(key) is { } action)
+                        if (keyMap.Resolve(key) is { } action)
                             OnInput(action);
                     }
 

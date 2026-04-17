@@ -10,7 +10,7 @@ namespace Hestia.Tui.Features.Samples;
 /// Demonstrates list navigation, screen push, and modal usage.
 /// ↑↓ navigate · Enter → <see cref="SampleDetailScreen"/> · D → <see cref="ConfirmModal"/> · Esc back
 /// </summary>
-public sealed class SampleScreen : ScreenBase
+public sealed class SampleScreen(INavigator navigator, Func<string, SampleDetailScreen> detailFactory) : ScreenBase
 {
     private readonly List<string> _items = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"];
     private int _cursor;
@@ -66,12 +66,12 @@ public sealed class SampleScreen : ScreenBase
                 break;
 
             case InputAction.Confirm when _items.Count > 0:
-                ScreenContext.Host.Push(new SampleDetailScreen(_items[_cursor]));
+                navigator.Push(detailFactory(_items[_cursor]));
                 break;
 
             case InputAction.Delete when _items.Count > 0:
                 var target = _items[_cursor];
-                ScreenContext.Host.ShowModal(
+                navigator.ShowModal(
                     new ConfirmModal($"Delete '{target}'?"),
                     confirmed =>
                     {
@@ -84,7 +84,7 @@ public sealed class SampleScreen : ScreenBase
 
             case InputAction.Back:
             case InputAction.Quit:
-                ScreenContext.Host.Pop();
+                navigator.Pop();
                 break;
         }
     }

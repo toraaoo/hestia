@@ -31,11 +31,6 @@ public sealed class ServerListPanel
         var columnWidth = (sidePanelWidth - 2 - cursorAndStatusWidth * 2) / 3;
 
         var table = new Table()
-            .AddColumn(new TableColumn("").NoWrap().Centered().Width(3)) // cursor
-            .AddColumn(new TableColumn("").NoWrap().Centered().Width(3)) // status
-            .AddColumn(new TableColumn("Name").Centered().Width(columnWidth))
-            .AddColumn(new TableColumn("Type").Centered().Width(columnWidth))
-            .AddColumn(new TableColumn("Version").Centered().Width(columnWidth))
             .HideHeaders()
             .Border(TableBorder.None)
             .Expand();
@@ -44,10 +39,18 @@ public sealed class ServerListPanel
 
         if (_servers.Count == 0)
         {
-            table.AddRow("", "[dim(no servers)[/]");
+            table
+                .AddColumn(new TableColumn("").NoWrap().Width(sidePanelWidth - 2))
+                .AddRow("[dim] (no servers)[/]");
         }
         else
         {
+            table.AddColumn(new TableColumn("").NoWrap().Centered().Width(3)) // cursor
+                .AddColumn(new TableColumn("").NoWrap().Centered().Width(3)) // status
+                .AddColumn(new TableColumn("Name").Centered().Width(columnWidth))
+                .AddColumn(new TableColumn("Type").Centered().Width(columnWidth))
+                .AddColumn(new TableColumn("Version").Centered().Width(columnWidth));
+
             var truncateLength = columnWidth - 4;
 
             foreach (var (server, i) in _servers.Select((s, i) => (s, i)))

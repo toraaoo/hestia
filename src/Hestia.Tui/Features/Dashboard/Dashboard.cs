@@ -7,7 +7,7 @@ using Spectre.Console.Rendering;
 
 namespace Hestia.Tui.Features.Dashboard;
 
-public sealed class DashboardScreen(Manager manager) : ScreenBase
+public sealed class DashboardScreen(Manager manager, INavigator navigator) : ScreenBase
 {
     private enum Focus
     {
@@ -56,7 +56,7 @@ public sealed class DashboardScreen(Manager manager) : ScreenBase
         switch (action)
         {
             case InputAction.Quit:
-                ScreenContext.Host.Quit();
+                navigator.Quit();
                 return;
 
             case InputAction.Tab:

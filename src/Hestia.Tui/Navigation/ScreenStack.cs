@@ -3,102 +3,68 @@ using Spectre.Console;
 
 namespace Hestia.Tui.Navigation;
 
-/// <summary>
-/// Drives the screen lifecycle via a single persistent Spectre live loop.
-/// Push/pop navigate without restarting the loop.
-/// Only modals exit the loop (full-screen takeover), after which it restarts clean.
-/// </summary>
-public sealed class ScreenStack
+public sealed class ScreenStack(Navigator navigator, KeyMap keyMap)
 {
-    private readonly KeyMap _keyMap;
-
-    public ScreenStack(KeyMap keyMap) => _keyMap = keyMap;
-
     public async Task RunAsync(IScreen initialScreen, CancellationToken ct)
     {
         var stack = new Stack<IScreen>();
         stack.Push(initialScreen);
         await initialScreen.LoadAsync(ct);
-        var quit = false;
 
-        while (stack.Count > 0 && !quit && !ct.IsCancellationRequested)
+        while (stack.Count > 0 && !ct.IsCancellationRequested)
         {
-            ScreenHost? modalHost = null;
-
             AnsiConsole.Clear();
+            var screen = stack.Peek();
+            var host = new ScreenHost(keyMap);
+            navigator.Activate(host);
 
-            await AnsiConsole.Live(stack.Peek().Render())
+            await AnsiConsole.Live(screen.Render())
                 .StartAsync(async ctx =>
                 {
-                    // Outer: runs each screen in the stack without restarting the live loop.
-                    while (stack.Count > 0 && modalHost == null && !quit && !ct.IsCancellationRequested)
+                    while (!host.HasPendingNavigation && !ct.IsCancellationRequested)
                     {
-                        var screen = stack.Peek();
-                        var host = new ScreenHost();
+                        ctx.UpdateTarget(screen.Render());
+                        ctx.Refresh();
 
-                        // Inner: runs until this screen signals a navigation intent.
-                        while (!host.HasPendingNavigation && !ct.IsCancellationRequested)
+                        if (Console.KeyAvailable)
                         {
-                            ctx.UpdateTarget(screen.Render());
-                            ctx.Refresh();
-
-                            if (Console.KeyAvailable)
-                            {
-                                var key = Console.ReadKey(true);
-                                if (_keyMap.Resolve(key) is { } action)
-                                {
-                                    ScreenContext.Set(host, _keyMap);
-                                    screen.OnInput(action);
-                                }
-                            }
-
-                            try
-                            {
-                                await Task.Delay(50, ct).ConfigureAwait(false);
-                            }
-                            catch (OperationCanceledException)
-                            {
-                                break;
-                            }
+                            var key = Console.ReadKey(true);
+                            if (keyMap.Resolve(key) is { } action)
+                                screen.OnInput(action);
                         }
 
-                        if (host.WantsQuit)
+                        try
                         {
-                            quit = true;
-                            return;
+                            await Task.Delay(50, ct).ConfigureAwait(false);
                         }
-
-                        // Modal needs full-screen takeover — must exit live loop.
-                        if (host.PendingModal != null)
+                        catch (OperationCanceledException)
                         {
-                            modalHost = host;
-                            return;
+                            break;
                         }
-
-                        if (host.PendingPush != null)
-                        {
-                            stack.Push(host.PendingPush);
-                            await host.PendingPush.LoadAsync(ct);
-                        }
-                        else if (host.PendingPop && stack.Count > 0)
-                            stack.Pop();
                     }
                 });
 
-            if (modalHost?.PendingModal == null || quit) continue;
+            navigator.Deactivate();
 
-            // Re-set context: AsyncLocal values from inside StartAsync don't flow back out.
-            ScreenContext.Set(modalHost, _keyMap);
+            if (host.WantsQuit) break;
 
-            // Run modal outside live loop; its callback may set further push/pop on same host.
-            await modalHost.PendingModal(ct);
-
-            if (modalHost.PendingPush != null)
+            if (host.PendingModal != null)
             {
-                stack.Push(modalHost.PendingPush);
-                await modalHost.PendingPush.LoadAsync(ct);
+                await host.PendingModal(ct);
+                if (host.PendingPush != null)
+                {
+                    stack.Push(host.PendingPush);
+                    await host.PendingPush.LoadAsync(ct);
+                }
+                else if (host.PendingPop && stack.Count > 0)
+                    stack.Pop();
             }
-            else if (modalHost.PendingPop && stack.Count > 0)
+            else if (host.PendingPush != null)
+            {
+                stack.Push(host.PendingPush);
+                await host.PendingPush.LoadAsync(ct);
+            }
+            else if (host.PendingPop && stack.Count > 0)
                 stack.Pop();
         }
     }

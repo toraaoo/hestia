@@ -8,12 +8,9 @@ namespace Hestia.Tui.Features.Samples;
 /// <summary>
 /// Demonstrates receiving data from a parent screen and popping back.
 /// </summary>
-public sealed class SampleDetailScreen : ScreenBase
+public sealed class SampleDetailScreen(string item, INavigator navigator) : ScreenBase
 {
-    private readonly string _item;
     private Layout? _layout;
-
-    public SampleDetailScreen(string item) => _item = item;
 
     public override IRenderable Render()
     {
@@ -24,9 +21,9 @@ public sealed class SampleDetailScreen : ScreenBase
 
         _layout["Content"].Update(
             new Panel(
-                new Markup($"[bold]Item:[/] [cyan]{_item}[/]\n\n[dim]This is the detail view for the selected item.[/]")
+                new Markup($"[bold]Item:[/] [cyan]{item}[/]\n\n[dim]This is the detail view for the selected item.[/]")
             )
-                .Header($"[bold]Detail: {_item}[/]")
+                .Header($"[bold]Detail: {item}[/]")
                 .BorderColor(Color.Cyan1)
                 .Expand()
         );
@@ -41,6 +38,6 @@ public sealed class SampleDetailScreen : ScreenBase
     public override void OnInput(InputAction action)
     {
         if (action is InputAction.Back or InputAction.Quit)
-            ScreenContext.Host.Pop();
+            navigator.Pop();
     }
 }
