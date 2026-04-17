@@ -37,7 +37,7 @@ public sealed class DashboardScreen(Manager manager) : ScreenBase
                 );
 
             _layout["Main"].SplitColumns(
-                new Layout("Left").Ratio(25),
+                new Layout("Left").Ratio(25).MinimumSize(40),
                 new Layout("Content").Ratio(75)
             );
         }

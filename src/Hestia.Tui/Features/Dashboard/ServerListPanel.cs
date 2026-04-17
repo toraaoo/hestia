@@ -1,5 +1,6 @@
 using Hestia.Core.Minecraft;
 using Hestia.Core.Minecraft.Models;
+using Hestia.Tui.Utils.Extensions;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
@@ -24,26 +25,47 @@ public sealed class ServerListPanel
 
     public IRenderable Render(bool focused)
     {
+        var terminalWidth = AnsiConsole.Console.Profile.Width;
+        var sidePanelWidth = Math.Max(40 - 2, terminalWidth / 4);
+        const int cursorAndStatusWidth = 3;
+        var columnWidth = (sidePanelWidth - 2 - cursorAndStatusWidth * 2) / 3;
+
         var table = new Table()
-            .Expand()
+            .AddColumn(new TableColumn("").NoWrap().Centered().Width(3)) // cursor
+            .AddColumn(new TableColumn("").NoWrap().Centered().Width(3)) // status
+            .AddColumn(new TableColumn("Name").Centered().Width(columnWidth))
+            .AddColumn(new TableColumn("Type").Centered().Width(columnWidth))
+            .AddColumn(new TableColumn("Version").Centered().Width(columnWidth))
             .HideHeaders()
             .Border(TableBorder.None)
-            .AddColumn(new TableColumn("Server"));
+            .Expand();
 
         var color = focused ? Color.Green : Color.Grey;
 
         if (_servers.Count == 0)
         {
-            table.AddRow("[dim]  (no servers)[/]");
+            table.AddRow("", "[dim(no servers)[/]");
         }
         else
         {
+            var truncateLength = columnWidth - 4;
+
             foreach (var (server, i) in _servers.Select((s, i) => (s, i)))
             {
                 var active = i == _cursor;
                 var dot = _manager is null ? "[dim]○[/]" : StatusDot(_manager.GetStatus(server.Id));
-                var label = active ? $"[bold {color}] {dot} {server.Name}[/]" : $"   {dot} {server.Name}";
-                table.AddRow(label);
+
+                var name = server.Name.Truncate(truncateLength);
+                var type = server.Type.ToString().Truncate(truncateLength);
+                var version = server.Version.Truncate(truncateLength);
+
+                table.AddRow(
+                    active ? $"[{color}] →[/]" : "  ",
+                    active ? $"[{color}]{dot}[/]" : dot,
+                    active ? $"[{color}]{name}[/]" : name,
+                    active ? $"[{color}]{type}[/]" : type,
+                    active ? $"[{color}]{version}[/]" : version
+                );
             }
         }
 
@@ -56,9 +78,9 @@ public sealed class ServerListPanel
 
     private static string StatusDot(ServerStatus status) => status switch
     {
-        ServerStatus.Running  => "[green]●[/]",
+        ServerStatus.Running => "[green]●[/]",
         ServerStatus.Starting => "[blink yellow]●[/]",
-        ServerStatus.Crashed  => "[blink red]●[/]",
-        _                     => "[dim]○[/]",
+        ServerStatus.Crashed => "[blink red]●[/]",
+        _ => "[dim]○[/]",
     };
 }
