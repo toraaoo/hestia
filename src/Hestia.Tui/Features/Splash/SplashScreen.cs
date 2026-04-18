@@ -13,7 +13,7 @@ public sealed class SplashScreen(INavigator navigator, DashboardScreen dashboard
 
     public override Task LoadAsync(CancellationToken ct)
     {
-        // _ = Task.Delay(1500, ct).ContinueWith(_ => _ready = true, TaskScheduler.Default);
+        _ = Task.Delay(1500, ct).ContinueWith(_ => _ready = true, TaskScheduler.Default);
         return Task.CompletedTask;
     }
 

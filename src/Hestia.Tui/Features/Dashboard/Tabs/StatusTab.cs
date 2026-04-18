@@ -5,11 +5,11 @@ using Spectre.Console.Rendering;
 
 namespace Hestia.Tui.Features.Dashboard.Tabs;
 
-public sealed class StatusTab : ITab
+public sealed class StatusTab(Manager manager) : ITab
 {
     public string Title => "Status";
 
-    public IRenderable Render(Server? server, Manager manager)
+    public IRenderable Render(Server? server)
     {
         if (server is null)
             return new Markup("[dim]  (no server selected)[/]");

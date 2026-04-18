@@ -16,11 +16,16 @@ public abstract class ModalBase<TResult> : IModal<TResult>, IView
 
     public virtual void OnInput(InputAction action) { }
 
+    public virtual bool OnRawKey(ConsoleKeyInfo key) => false;
+
     protected void Complete(TResult result) => _tcs?.TrySetResult(result);
+
+    protected virtual Task OnShowAsync(CancellationToken ct) => Task.CompletedTask;
 
     public async Task<TResult> ShowAsync(KeyMap keyMap, CancellationToken ct)
     {
         await WaitForTerminalSizeAsync(ct);
+        _ = OnShowAsync(ct);
 
         _tcs = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         ct.Register(() => _tcs.TrySetCanceled());
@@ -38,7 +43,7 @@ public abstract class ModalBase<TResult> : IModal<TResult>, IView
                     if (Console.KeyAvailable)
                     {
                         var key = Console.ReadKey(true);
-                        if (keyMap.Resolve(key) is { } action)
+                        if (!OnRawKey(key) && keyMap.Resolve(key) is { } action)
                             OnInput(action);
                     }
 

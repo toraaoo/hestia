@@ -11,4 +11,5 @@ public enum InputAction
     MoveRight,
     Delete,
     Tab,
+    New,
 }

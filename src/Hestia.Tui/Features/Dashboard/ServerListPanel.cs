@@ -14,10 +14,14 @@ public sealed class ServerListPanel
 
     public Server? Selected => _servers.Count > 0 ? _servers[_cursor] : null;
 
-    public void Load(Manager manager)
+    public void Load(Manager manager) => Reload(manager);
+
+    public void Reload(Manager manager)
     {
         _manager = manager;
-        _servers = manager.List().ToList();
+        var updated = manager.List().ToList();
+        _cursor = Math.Clamp(_cursor, 0, Math.Max(0, updated.Count - 1));
+        _servers = updated;
     }
 
     public void MoveUp() => _cursor = Math.Max(0, _cursor - 1);

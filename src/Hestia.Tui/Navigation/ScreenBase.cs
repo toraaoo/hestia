@@ -8,4 +8,5 @@ public abstract class ScreenBase : IScreen
     public abstract IRenderable Render();
     public virtual void OnInput(InputAction action) { }
     public virtual Task LoadAsync(CancellationToken ct) => Task.CompletedTask;
+    public virtual bool OnRawKey(ConsoleKeyInfo key) => false;
 }

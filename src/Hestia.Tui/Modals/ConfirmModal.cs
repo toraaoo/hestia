@@ -12,14 +12,21 @@ public sealed class ConfirmModal(string message) : ModalBase<bool>
 {
     public override IRenderable Render()
     {
-        return new Align(
-            new Rows(
-                new Markup($"{message}\n"),
-                new Markup("[dim]Press [b]Enter[/] to confirm or [b]Esc[/] to cancel[/]")
-            ),
-            HorizontalAlignment.Center,
-            VerticalAlignment.Middle
-        );
+        var root = new Layout("Root")
+            .SplitRows(new Layout("Content"));
+
+        var content = new Panel(new Align(
+                new Markup($"{message}\n\n[dim]Press [b]Enter[/] to confirm · [b]Esc[/] to cancel[/]"),
+                HorizontalAlignment.Center,
+                VerticalAlignment.Middle
+            ))
+            .Border(BoxBorder.None)
+            .Expand();
+
+
+        root["Content"].Update(content);
+
+        return root;
     }
 
 

@@ -1,5 +1,6 @@
 using Hestia.Core.Minecraft;
 using Hestia.Core.Utils;
+using Hestia.Tui.Features.CreateServer;
 using Hestia.Tui.Features.Dashboard;
 using Hestia.Tui.Features.Samples;
 using Hestia.Tui.Features.Splash;
@@ -34,10 +35,13 @@ public class App : AsyncCommand
             services.AddTransient<DashboardScreen>();
             services.AddTransient<SampleScreen>();
             services.AddTransient<SplashScreen>();
+            services.AddTransient<CreateServerScreen>();
 
             // Factory for runtime-param screens
             services.AddTransient<Func<string, SampleDetailScreen>>(sp =>
                 item => new SampleDetailScreen(item, sp.GetRequiredService<INavigator>()));
+            services.AddTransient<Func<CreateServerScreen>>(sp =>
+                () => sp.GetRequiredService<CreateServerScreen>());
 
             await using var sp = services.BuildServiceProvider();
 

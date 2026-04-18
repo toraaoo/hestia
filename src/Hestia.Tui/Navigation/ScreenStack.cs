@@ -29,7 +29,7 @@ public sealed class ScreenStack(Navigator navigator, KeyMap keyMap)
                         if (Console.KeyAvailable)
                         {
                             var key = Console.ReadKey(true);
-                            if (keyMap.Resolve(key) is { } action)
+                            if (!screen.OnRawKey(key) && keyMap.Resolve(key) is { } action)
                                 screen.OnInput(action);
                         }
 
