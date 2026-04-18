@@ -55,6 +55,12 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
         return server;
     }
 
+    public async Task<List<MinecraftVersion>> GetAvailableVersionsAsync(ServerType type)
+    {
+        var provider = FindProvider(type);
+        return await provider.GetVersionsAsync();
+    }
+
     public Task DeleteAsync(Guid id)
     {
         ThrowIfRunning(id);
@@ -99,7 +105,7 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
 
         var servers = LoadServers();
         var server = servers.Find(s => s.Id == id)
-            ?? throw new HestiaException($"Server '{id}' not found.");
+                     ?? throw new HestiaException($"Server '{id}' not found.");
 
         var javaVersion = ResolveInstalledJavaVersion(server);
         var javaExePath = GetJavaExePath(javaVersion);
@@ -156,7 +162,7 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
     public ServerStatus GetStatus(Guid id)
     {
         lock (_gate)
-            return _status.TryGetValue(id, out var status) ? status : ServerStatus.Stopped;
+            return _status.GetValueOrDefault(id, ServerStatus.Stopped);
     }
 
     public string GetServerLogsDir(Guid id) => fs.Servers.GetLogsDir(id);
@@ -164,7 +170,7 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
     public async Task<ServerMetrics> GetMetricsAsync(Guid id)
     {
         var instance = GetInstance(id)
-            ?? throw new HestiaException($"Server '{id}' is not running.");
+                       ?? throw new HestiaException($"Server '{id}' is not running.");
         return await instance.GetMetricsAsync();
     }
 
@@ -205,7 +211,7 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
             state.Cts.Cancel();
             state.Cts.Dispose();
 
-            _status[id] = stopRequested ? ServerStatus.Stopped : ServerStatus.Crashed;
+            _status[id] = (stopRequested || exitCode == 0) ? ServerStatus.Stopped : ServerStatus.Crashed;
         }
 
         await instance.DisposeAsync();
@@ -235,7 +241,7 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
             if (!instance.IsRunning)
                 return;
 
-            if (_status.TryGetValue(id, out var s) && (s == ServerStatus.Crashed || s == ServerStatus.Stopped))
+            if (_status.TryGetValue(id, out var s) && s is ServerStatus.Crashed or ServerStatus.Stopped)
                 return;
 
             _status[id] = ServerStatus.Running;
@@ -253,7 +259,7 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
                 if (!_runtime.TryGetValue(id, out var state) || !ReferenceEquals(state.Instance, instance))
                     return;
 
-                if (_status.TryGetValue(id, out var s) && (s == ServerStatus.Crashed || s == ServerStatus.Stopped))
+                if (_status.TryGetValue(id, out var s) && s is ServerStatus.Crashed or ServerStatus.Stopped)
                     return;
 
                 if (_rconReady.Contains(id))
@@ -280,12 +286,19 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
                         _rconReady.Add(id);
                 }
 
+                TryMarkRunning(id, instance);
                 return;
             }
             catch
             {
-                try { await Task.Delay(delay, ct); }
-                catch (OperationCanceledException) { return; }
+                try
+                {
+                    await Task.Delay(delay, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
 
                 delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 2000));
             }
@@ -294,7 +307,7 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
 
     private static IProvider FindProvider(ServerType type) =>
         Providers.FirstOrDefault(p => p.Type == type)
-            ?? throw new HestiaException($"No provider registered for server type '{type}'.");
+        ?? throw new HestiaException($"No provider registered for server type '{type}'.");
 
     private async Task DownloadJarAsync(ResolvedServer resolved, IProgressCallback? callback)
     {
@@ -314,19 +327,19 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
         var path = Path.Combine(ResolveServerDir(server), "server.properties");
         var updates = new Dictionary<string, string>
         {
-            ["server-port"]        = server.Network.Port.ToString(),
-            ["max-players"]        = server.Network.MaxPlayers.ToString(),
-            ["motd"]               = server.Network.MotD,
-            ["view-distance"]      = server.Network.ViewDistance.ToString(),
-            ["online-mode"]        = server.Network.OnlineMode.ToString().ToLowerInvariant(),
-            ["white-list"]         = server.Network.Whitelist.ToString().ToLowerInvariant(),
-            ["enable-rcon"]        = server.Rcon.Enabled.ToString().ToLowerInvariant(),
-            ["rcon.port"]          = server.Rcon.Port.ToString(),
-            ["rcon.password"]      = server.Rcon.Password,
-            ["level-name"]         = server.World.Name,
-            ["level-seed"]         = server.World.Seed ?? "",
-            ["default-game-mode"]  = WorldPropertyValues.Of(server.World.GameMode),
-            ["difficulty"]         = WorldPropertyValues.Of(server.World.Difficulty),
+            ["server-port"] = server.Network.Port.ToString(),
+            ["max-players"] = server.Network.MaxPlayers.ToString(),
+            ["motd"] = server.Network.MotD,
+            ["view-distance"] = server.Network.ViewDistance.ToString(),
+            ["online-mode"] = server.Network.OnlineMode.ToString().ToLowerInvariant(),
+            ["white-list"] = server.Network.Whitelist.ToString().ToLowerInvariant(),
+            ["enable-rcon"] = server.Rcon.Enabled.ToString().ToLowerInvariant(),
+            ["rcon.port"] = server.Rcon.Port.ToString(),
+            ["rcon.password"] = server.Rcon.Password,
+            ["level-name"] = server.World.Name,
+            ["level-seed"] = server.World.Seed ?? "",
+            ["default-game-mode"] = WorldPropertyValues.Of(server.World.GameMode),
+            ["difficulty"] = WorldPropertyValues.Of(server.World.Difficulty),
         };
         MergeServerProperties(path, updates);
     }
@@ -387,7 +400,7 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
             : "java";
 
         var bin = FindJavaExecutable(dir, exe)
-            ?? throw new HestiaException($"Could not locate Java executable in '{dir}'.");
+                  ?? throw new HestiaException($"Could not locate Java executable in '{dir}'.");
 
         return bin;
     }
@@ -401,7 +414,8 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
         if (File.Exists(direct))
             return direct;
 
-        return Directory.GetDirectories(root).Select(subdir => Path.Combine(subdir, "bin", exe)).FirstOrDefault(nested => File.Exists(nested));
+        return Directory.GetDirectories(root).Select(subdir => Path.Combine(subdir, "bin", exe))
+            .FirstOrDefault(nested => File.Exists(nested));
     }
 
     private void ThrowIfRunning(Guid id)

@@ -4,6 +4,7 @@ using Hestia.Core.Minecraft;
 using Hestia.Core.Minecraft.Models;
 using Hestia.Core.Utils;
 using Hestia.Tui.Input;
+using Hestia.Tui.Modals;
 using Hestia.Tui.Navigation;
 using Spectre.Console;
 using Spectre.Console.Rendering;
@@ -12,53 +13,59 @@ namespace Hestia.Tui.Features.CreateServer;
 
 public sealed class CreateServerScreen(Manager manager, INavigator navigator) : ScreenBase
 {
-    private enum Step { Form, Creating, Done, Error }
+    private enum Step
+    {
+        Form,
+        Creating,
+        Done,
+        Error
+    }
 
     // Tab 0 – Essential : Name(0) Type(1) Version(2) [Create](3)
     // Tab 1 – Network   : Port(0) MaxPlayers(1) MotD(2) ViewDist(3) OnlineMode(4) Whitelist(5) [Create](6)
     // Tab 2 – RCON      : Enabled(0) Port(1) Password(2) Timeout(3) [Create](4)
     // Tab 3 – JVM       : Min(0) Max(1) [Create](2)
     // Tab 4 – World     : WorldName(0) Seed(1) GameMode(2) Difficulty(3) [Create](4)
-    private static readonly string[] TabNames        = ["Essential", "Network", "RCON", "JVM", "World"];
-    private static readonly int[]    TabFieldCounts  = [4, 7, 5, 3, 5];
+    private static readonly string[] TabNames = ["Essential", "Network", "RCON", "JVM", "World"];
+    private static readonly int[] TabFieldCounts = [4, 7, 5, 3, 5];
 
     private int _tabIndex;
     private readonly int[] _fieldCursors = new int[5];
-    private readonly int[] _offsets      = new int[5];
+    private readonly int[] _offsets = new int[5];
 
     // ── Essential ─────────────────────────────────────────────────────
-    private string           _name            = "";
-    private ServerType       _type            = ServerType.Vanilla;
+    private string _name = "";
+    private ServerType _type = ServerType.Vanilla;
     private MinecraftVersion? _selectedVersion;
 
     // ── Network ───────────────────────────────────────────────────────
-    private string _port         = "25565";
-    private string _maxPlayers   = "20";
-    private string _motd         = "A Minecraft Server";
+    private string _port = "25565";
+    private string _maxPlayers = "20";
+    private string _motd = "A Minecraft Server";
     private string _viewDistance = "10";
-    private bool   _onlineMode   = true;
-    private bool   _whitelist    = false;
+    private bool _onlineMode = true;
+    private bool _whitelist = false;
 
     // ── RCON ──────────────────────────────────────────────────────────
-    private bool   _rconEnabled  = false;
-    private string _rconPort     = "25575";
+    private bool _rconEnabled = false;
+    private string _rconPort = "25575";
     private string _rconPassword = "";
-    private string _rconTimeout  = "10";
+    private string _rconTimeout = "10";
 
     // ── JVM ───────────────────────────────────────────────────────────
     private string _jvmMin = "512M";
     private string _jvmMax = "2G";
 
     // ── World ─────────────────────────────────────────────────────────
-    private string     _worldName  = "world";
-    private string     _worldSeed  = "";
-    private GameMode   _gameMode   = GameMode.Survival;
+    private string _worldName = "world";
+    private string _worldSeed = "";
+    private GameMode _gameMode = GameMode.Survival;
     private Difficulty _difficulty = Difficulty.Normal;
 
     // ── Step state ────────────────────────────────────────────────────
-    private Step    _step          = Step.Form;
-    private double  _progress;
-    private string  _progressLabel = "";
+    private Step _step = Step.Form;
+    private double _progress;
+    private string _progressLabel = "";
     private string? _errorMessage;
     private Layout? _layout;
 
@@ -73,7 +80,7 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
             .Concat(existing.Where(s => s.Rcon.Enabled).Select(s => s.Rcon.Port))
             .ToHashSet();
 
-        _port     = FindFreePort(occupied, 25565).ToString();
+        _port = FindFreePort(occupied, 25565).ToString();
         _rconPort = FindFreePort(occupied, 25575).ToString();
         return Task.CompletedTask;
     }
@@ -169,34 +176,70 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
 
     private void HandleConfirm()
     {
-        var cursor   = _fieldCursors[_tabIndex];
+        var cursor = _fieldCursors[_tabIndex];
         var isCreate = cursor == TabFieldCounts[_tabIndex] - 1;
-        if (isCreate) { RunCreate(); return; }
+        if (isCreate)
+        {
+            navigator.ShowModal(
+                new ConfirmModal(
+                    "By creating this server you agree to the [bold]Minecraft EULA[/].\n" +
+                    "https://www.minecraft.net/en-us/eula\n\n" +
+                    "Hestia will automatically accept it on your behalf."
+                ),
+                accepted =>
+                {
+                    if (accepted) RunCreate();
+                });
+            return;
+        }
 
         switch (_tabIndex, cursor)
         {
             case (0, 1):
                 navigator.ShowModal(
-                    new EnumPickerModal<ServerType>("Server Type", _type),
-                    result => { if (result.HasValue) { _type = result.Value; _selectedVersion = null; } });
+                    new ListSelectModal<ServerType>("Server Type", Enum.GetValues<ServerType>(), t => t.ToString()!),
+                    result =>
+                    {
+                        if (!result.HasValue) return;
+
+                        _type = result.Value;
+                        _selectedVersion = null;
+                    });
                 break;
             case (0, 2):
+            {
+                var serverType = _type;
                 navigator.ShowModal(
-                    new VersionPickerModal(_type),
-                    result => { if (result is not null) _selectedVersion = result; });
+                    new ListSelectModal<MinecraftVersion>(
+                        $"Pick Version ({serverType})",
+                        _ => manager.GetAvailableVersionsAsync(serverType),
+                        v => v.Version,
+                        filters: [("Hide Snapshots", (MinecraftVersion v) => !v.IsSnapshot)]
+                    ),
+                    result =>
+                    {
+                        if (result.HasValue) _selectedVersion = result.Value;
+                    });
                 break;
-            case (1, 4): _onlineMode  = !_onlineMode;  break;
-            case (1, 5): _whitelist   = !_whitelist;   break;
+            }
+            case (1, 4): _onlineMode = !_onlineMode; break;
+            case (1, 5): _whitelist = !_whitelist; break;
             case (2, 0): _rconEnabled = !_rconEnabled; break;
             case (4, 2):
                 navigator.ShowModal(
-                    new EnumPickerModal<GameMode>("Game Mode", _gameMode),
-                    result => { if (result.HasValue) _gameMode = result.Value; });
+                    new ListSelectModal<GameMode>("Game Mode", Enum.GetValues<GameMode>(), t => t.ToString()!),
+                    result =>
+                    {
+                        if (result.HasValue) _gameMode = result.Value;
+                    });
                 break;
             case (4, 3):
                 navigator.ShowModal(
-                    new EnumPickerModal<Difficulty>("Difficulty", _difficulty),
-                    result => { if (result.HasValue) _difficulty = result.Value; });
+                    new ListSelectModal<Difficulty>("Difficulty", Enum.GetValues<Difficulty>(), t => t.ToString()!),
+                    result =>
+                    {
+                        if (result.HasValue) _difficulty = result.Value;
+                    });
                 break;
         }
     }
@@ -205,8 +248,8 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
     {
         switch (_tabIndex, _fieldCursors[_tabIndex])
         {
-            case (1, 4): _onlineMode  = !_onlineMode;  break;
-            case (1, 5): _whitelist   = !_whitelist;   break;
+            case (1, 4): _onlineMode = !_onlineMode; break;
+            case (1, 5): _whitelist = !_whitelist; break;
             case (2, 0): _rconEnabled = !_rconEnabled; break;
         }
     }
@@ -274,8 +317,8 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
             return;
         }
 
-        _step          = Step.Creating;
-        _progress      = 0;
+        _step = Step.Creating;
+        _progress = 0;
         _progressLabel = "Preparing…";
         _ = RunCreateAsync();
     }
@@ -286,38 +329,38 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
         {
             var server = new Server
             {
-                Name    = _name,
-                Type    = _type,
+                Name = _name,
+                Type = _type,
                 Version = _selectedVersion!.Version,
                 Network = new NetworkConfig
                 {
-                    Port         = int.Parse(_port),
-                    MaxPlayers   = int.Parse(_maxPlayers),
-                    MotD         = _motd,
+                    Port = int.Parse(_port),
+                    MaxPlayers = int.Parse(_maxPlayers),
+                    MotD = _motd,
                     ViewDistance = int.Parse(_viewDistance),
-                    OnlineMode   = _onlineMode,
-                    Whitelist    = _whitelist,
+                    OnlineMode = _onlineMode,
+                    Whitelist = _whitelist,
                 },
                 Rcon = new RconConfig
                 {
-                    Enabled        = _rconEnabled,
-                    Port           = int.Parse(_rconPort),
-                    Password       = _rconPassword,
+                    Enabled = _rconEnabled,
+                    Port = int.Parse(_rconPort),
+                    Password = _rconPassword,
                     TimeoutSeconds = int.Parse(_rconTimeout),
                 },
-                Jvm   = new JvmConfig { MinMemory = _jvmMin, MaxMemory = _jvmMax },
+                Jvm = new JvmConfig { MinMemory = _jvmMin, MaxMemory = _jvmMax },
                 World = new WorldConfig
                 {
-                    Name       = _worldName,
-                    Seed       = string.IsNullOrWhiteSpace(_worldSeed) ? null : _worldSeed,
-                    GameMode   = _gameMode,
+                    Name = _worldName,
+                    Seed = string.IsNullOrWhiteSpace(_worldSeed) ? null : _worldSeed,
+                    GameMode = _gameMode,
                     Difficulty = _difficulty,
                 },
             };
 
             await manager.CreateAsync(server, new ProgressRelay(p =>
             {
-                _progress      = p;
+                _progress = p;
                 _progressLabel = $"Downloading… {p:P0}";
             }));
 
@@ -326,7 +369,7 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
         catch (Exception ex)
         {
             _errorMessage = ex.Message;
-            _step         = Step.Error;
+            _step = Step.Error;
         }
     }
 
@@ -347,8 +390,8 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
         return _step switch
         {
             Step.Creating => RenderCreating(),
-            Step.Error    => RenderError(),
-            _             => RenderForm(),
+            Step.Error => RenderFormLayout(_errorMessage),
+            _ => RenderFormLayout(null),
         };
     }
 
@@ -358,33 +401,24 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
         _layout = new Layout("Root")
             .SplitRows(
                 new Layout("Main"),
-                new Layout("Footer").Size(1)
+                new Layout("Footer").Size(3)
             );
     }
 
-    private IRenderable RenderForm()
+    private IRenderable RenderFormLayout(string? error)
     {
-        _layout!["Main"].Update(RenderFormPanel());
-        _layout["Footer"].Update(new Markup(FooterHint()));
+        _layout!["Main"].Update(Align.Center(
+            new Rows(
+                RenderPageIndicator(),
+                RenderCurrentTab()
+            ),
+            VerticalAlignment.Middle
+        ));
+        _layout["Footer"].Update(RenderHelp(error));
         return _layout;
     }
 
-    private IRenderable RenderFormPanel()
-    {
-        var rows = new List<IRenderable>
-        {
-            RenderTabBar(),
-            new Rule().RuleStyle(Style.Parse("dim")),
-            RenderCurrentTab(),
-        };
-
-        return new Panel(new Rows(rows))
-            .Header("[bold] Create Server [/]")
-            .Border(BoxBorder.None)
-            .Expand();
-    }
-
-    private Markup RenderTabBar()
+    private Markup RenderPageIndicator()
     {
         var parts = TabNames.Select((n, i) =>
             i == _tabIndex ? $"[bold green] {n} [/]" : $"[dim] {n} [/]");
@@ -393,210 +427,181 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
 
     private IRenderable RenderCurrentTab()
     {
-        var windowSize = Math.Max(3, Console.WindowHeight - 8);
-        var offset     = _offsets[_tabIndex];
-        var rows       = GetTabFieldRows();
-        var t          = MakeTable();
+        const int sideW = 20;
 
-        var end = Math.Min(offset + windowSize, rows.Count);
+        var windowSize = Math.Max(3, Console.WindowHeight - 10);
+        var offset = _offsets[_tabIndex];
+        var fields = GetTabFields();
+
+        var formTable = new Table()
+            .HideHeaders().NoBorder().Collapse()
+            .AddColumn(new TableColumn("").NoWrap().RightAligned().Width(sideW))
+            .AddColumn(new TableColumn("").NoWrap().Centered().Width(1))
+            .AddColumn(new TableColumn("").NoWrap().LeftAligned().Width(sideW));
+
+        var end = Math.Min(offset + windowSize, fields.Count);
         for (var i = offset; i < end; i++)
-            rows[i](t);
+        {
+            var f = fields[i];
+            var sel = IsActive(f.Index);
+            var prefix = sel ? "→ " : "  ";
+            formTable.AddRow(
+                new Markup(sel
+                    ? $"[bold green reverse]{Markup.Escape(prefix + f.Label)}[/]"
+                    : $"[white]{Markup.Escape(prefix + f.Label)}[/]"),
+                new Markup("[dim]:[/]"),
+                new Markup(sel
+                    ? $"[bold green reverse]{f.Value}[/]"
+                    : $"[green]{f.Value}[/]")
+            );
+        }
 
-        return t;
+        var btnSel = IsActive(TabFieldCounts[_tabIndex] - 1);
+        var content = new Table()
+            .HideHeaders().NoBorder().Collapse()
+            .AddColumn(new TableColumn("").NoWrap().Centered());
+        content.AddRow(new Align(formTable, HorizontalAlignment.Center));
+        content.AddRow(new Markup(""));
+        content.AddRow(new Align(
+            new Markup(btnSel
+                ? "[bold green reverse][[ Create Server ]][/]"
+                : "[green][[ Create Server ]][/]"
+            ),
+            HorizontalAlignment.Center)
+        );
+
+        return content;
     }
 
-    private List<Action<Table>> GetTabFieldRows() => _tabIndex switch
+    private readonly record struct FieldEntry(int Index, string Label, string Value);
+
+    private List<FieldEntry> GetTabFields() => _tabIndex switch
     {
         0 =>
         [
-            t => AddRow(t, 0, "Name",    TextField(_name, 0)),
-            t => AddRow(t, 1, "Type",    PickerDisplay(_type.ToString(), 1)),
-            t => AddRow(t, 2, "Version", VersionDisplay()),
-            t => AddCreateButton(t, 3),
+            new FieldEntry(0, "Name", TextField(_name, 0)),
+            new FieldEntry(1, "Type", PlainPickerValue(_type.ToString())),
+            new FieldEntry(2, "Version", PlainVersionValue()),
         ],
         1 =>
         [
-            t => AddRow(t, 0, "Port",          TextField(_port, 0)),
-            t => AddRow(t, 1, "Max Players",   TextField(_maxPlayers, 1)),
-            t => AddRow(t, 2, "MotD",          TextField(_motd, 2)),
-            t => AddRow(t, 3, "View Distance", TextField(_viewDistance, 3)),
-            t => AddRow(t, 4, "Online Mode",   BoolDisplay(_onlineMode, 4)),
-            t => AddRow(t, 5, "Whitelist",     BoolDisplay(_whitelist, 5)),
-            t => AddCreateButton(t, 6),
+            new FieldEntry(0, "Port", TextField(_port, 0)),
+            new FieldEntry(1, "Max Players", TextField(_maxPlayers, 1)),
+            new FieldEntry(2, "MotD", TextField(_motd, 2)),
+            new FieldEntry(3, "View Distance", TextField(_viewDistance, 3)),
+            new FieldEntry(4, "Online Mode", BoolValue(_onlineMode)),
+            new FieldEntry(5, "Whitelist", BoolValue(_whitelist)),
         ],
         2 =>
         [
-            t => AddRow(t, 0, "Enabled",     BoolDisplay(_rconEnabled, 0)),
-            t => AddRow(t, 1, "Port",        TextField(_rconPort, 1)),
-            t => AddRow(t, 2, "Password",    TextField(_rconPassword, 2)),
-            t => AddRow(t, 3, "Timeout (s)", TextField(_rconTimeout, 3)),
-            t => AddCreateButton(t, 4),
+            new FieldEntry(0, "Enabled", BoolValue(_rconEnabled)),
+            new FieldEntry(1, "Port", TextField(_rconPort, 1)),
+            new FieldEntry(2, "Password", TextField(_rconPassword, 2)),
+            new FieldEntry(3, "Timeout (s)", TextField(_rconTimeout, 3)),
         ],
         3 =>
         [
-            t => AddRow(t, 0, "Min Memory", TextField(_jvmMin, 0)),
-            t => AddRow(t, 1, "Max Memory", TextField(_jvmMax, 1)),
-            t => AddCreateButton(t, 2),
+            new FieldEntry(0, "Min Memory", TextField(_jvmMin, 0)),
+            new FieldEntry(1, "Max Memory", TextField(_jvmMax, 1)),
         ],
         _ =>
         [
-            t => AddRow(t, 0, "World Name",  TextField(_worldName, 0)),
-            t => AddRow(t, 1, "Seed",        TextField(_worldSeed, 1, "(random)")),
-            t => AddRow(t, 2, "Game Mode",   PickerDisplay(_gameMode.ToString(), 2)),
-            t => AddRow(t, 3, "Difficulty",  PickerDisplay(_difficulty.ToString(), 3)),
-            t => AddCreateButton(t, 4),
+            new FieldEntry(0, "World Name", TextField(_worldName, 0)),
+            new FieldEntry(1, "Seed", TextField(_worldSeed, 1, "(random)")),
+            new FieldEntry(2, "Game Mode", PlainPickerValue(_gameMode.ToString())),
+            new FieldEntry(3, "Difficulty", PlainPickerValue(_difficulty.ToString())),
         ],
     };
 
-    // ── Creating / Error ──────────────────────────────────────────────
+    // ── Creating ──────────────────────────────────────────────────────
 
     private IRenderable RenderCreating()
     {
         const int barWidth = 40;
         var filled = (int)(_progress * barWidth);
-        var bar    = new string('█', filled) + new string('░', barWidth - filled);
+        var bar = new string('█', filled) + new string('░', barWidth - filled);
 
-        var panel = new Panel(Align.Center(new Rows(
-            new Markup($"[bold]Creating [green]{Markup.Escape(_name)}[/]…[/]"),
-            new Markup(""),
+        var content = new Rows(
             new Markup(_progressLabel),
             new Markup($"[green]{bar}[/] [bold]{_progress:P0}[/]")
-        ), VerticalAlignment.Middle))
-            .Header("[bold] Create Server [/]")
-            .Border(BoxBorder.Rounded)
-            .BorderColor(Color.Yellow)
-            .Expand();
+        );
 
-        _layout!["Main"].Update(panel);
-        _layout["Footer"].Update(new Markup(""));
-        return _layout;
-    }
-
-    private IRenderable RenderError()
-    {
-        var errorLines = (_errorMessage ?? "Unknown error")
-            .Split('\n')
-            .Select(l => (IRenderable)new Markup(Markup.Escape(l)))
-            .ToList();
-
-        var panel = new Panel(new Rows(
-            [
-                (IRenderable)new Markup("[red bold]Cannot create server:[/]"),
-                new Markup(""),
-                ..errorLines,
-                new Markup(""),
-                new Markup("[dim][b]Enter[/] or [b]Esc[/] to dismiss[/]"),
-            ]
-        ))
-            .Header("[bold] Create Server [/]")
-            .Border(BoxBorder.Rounded)
-            .BorderColor(Color.Red)
-            .Expand();
-
-        _layout!["Main"].Update(panel);
+        _layout!["Header"].Update(new Align(
+            new Markup($"[bold]Creating [green]{Markup.Escape(_name)}[/]…[/]"),
+            HorizontalAlignment.Center, VerticalAlignment.Middle));
+        _layout["Main"].Update(new Align(content, HorizontalAlignment.Center, VerticalAlignment.Middle));
         _layout["Footer"].Update(new Markup(""));
         return _layout;
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // Table / field helpers
+    // Field value helpers
     // ─────────────────────────────────────────────────────────────────
-
-    private static Table MakeTable() =>
-        new Table()
-            .HideHeaders()
-            .Border(TableBorder.None)
-            .Expand()
-            .AddColumn(new TableColumn("").Width(3))
-            .AddColumn(new TableColumn("").Width(18))
-            .AddColumn(new TableColumn(""));
 
     private bool IsActive(int index) => _fieldCursors[_tabIndex] == index;
 
-    private void AddRow(Table t, int index, string label, string value)
-    {
-        var f = IsActive(index);
-        t.AddRow(
-            new Markup(f ? "[green]>[/]" : ""),
-            new Markup(f ? $"[bold]{Markup.Escape(label)}[/]" : $"[dim]{Markup.Escape(label)}[/]"),
-            new Markup(value));
-    }
-
-    private void AddCreateButton(Table t, int index)
-    {
-        var f = IsActive(index);
-        t.AddRow(
-            new Markup(f ? "[green]>[/]" : ""),
-            new Markup(""),
-            new Markup(f
-                ? "[bold green][[Create Server]][/]  [dim]Enter[/]"
-                : "[dim][[Create Server]][/]"));
-    }
-
     private string TextField(string value, int index, string placeholder = "")
     {
-        var f       = IsActive(index);
+        var active = IsActive(index);
         var display = value.Length > 0
             ? Markup.Escape(value)
-            : placeholder.Length > 0 ? $"[dim]{Markup.Escape(placeholder)}[/]" : "";
-        return f ? display + "[blink]_[/]" : display;
+            : placeholder.Length > 0
+                ? $"[dim]{Markup.Escape(placeholder)}[/]"
+                : "";
+        return active ? display + "[blink]_[/]" : display;
     }
 
-    private string BoolDisplay(bool on, int index)
-    {
-        var f    = IsActive(index);
-        var hint = f ? "  [dim]← → Enter[/]" : "";
-        return on ? $"[green]On[/]{hint}" : $"Off{hint}";
-    }
+    private static string BoolValue(bool on) =>
+        on ? "[green]On[/]" : "[red]Off[/]";
 
-    private string PickerDisplay(string value, int index)
-    {
-        var f    = IsActive(index);
-        var hint = f ? "  [dim]Enter[/]" : "";
-        return f ? $"[bold green]{Markup.Escape(value)}[/]{hint}" : Markup.Escape(value);
-    }
+    private static string PlainPickerValue(string value) =>
+        Markup.Escape(value);
 
-    private string VersionDisplay()
+    private string PlainVersionValue()
     {
-        var f = IsActive(2);
         if (_selectedVersion is null)
-            return f ? "[dim](press Enter to pick)[/]  [dim]Enter[/]" : "[dim](none)[/]";
-        var ver = $"[bold green]{Markup.Escape(_selectedVersion.Version)}[/]"
-                  + (_selectedVersion.IsSnapshot ? " [dim](snapshot)[/]" : "");
-        return f ? ver + "  [dim]Enter[/]" : ver;
+            return "[dim](none — press Enter)[/]";
+        return Markup.Escape(_selectedVersion.Version)
+               + (_selectedVersion.IsSnapshot ? " [dim](snapshot)[/]" : "");
     }
 
-    private string FooterHint()
+    private IRenderable RenderHelp(string? error)
     {
-        var isCreate = _fieldCursors[_tabIndex] == TabFieldCounts[_tabIndex] - 1;
-        return isCreate
-            ? "[dim] [b]↑↓[/] field · [b]Tab[/] section · [b]Enter[/] CREATE · [b]Esc[/] back[/]"
-            : "[dim] [b]↑↓[/] field · [b]Tab[/] section · [b]Enter[/] pick/toggle · [b]Esc[/] back[/]";
+        const string hint = "[dim]↑↓/Tab:nav  ←→:page  Enter:activate  Space:toggle  Esc:cancel[/]";
+        var dismiss = "[dim][b]Enter[/] or [b]Esc[/] to dismiss[/]";
+        var text = string.IsNullOrWhiteSpace(error)
+            ? hint
+            : $"[bold red]{Markup.Escape(error)}[/]\n{dismiss}";
+        return new Align(new Markup(text), HorizontalAlignment.Center, VerticalAlignment.Middle);
     }
 
 
     private StringRef? ActiveTextField() => (_tabIndex, _fieldCursors[_tabIndex]) switch
     {
-        (0, 0) => Ref(() => _name,         v => _name = v),
-        (1, 0) => Ref(() => _port,         v => _port = v),
-        (1, 1) => Ref(() => _maxPlayers,   v => _maxPlayers = v),
-        (1, 2) => Ref(() => _motd,         v => _motd = v),
+        (0, 0) => Ref(() => _name, v => _name = v),
+        (1, 0) => Ref(() => _port, v => _port = v),
+        (1, 1) => Ref(() => _maxPlayers, v => _maxPlayers = v),
+        (1, 2) => Ref(() => _motd, v => _motd = v),
         (1, 3) => Ref(() => _viewDistance, v => _viewDistance = v),
-        (2, 1) => Ref(() => _rconPort,     v => _rconPort = v),
+        (2, 1) => Ref(() => _rconPort, v => _rconPort = v),
         (2, 2) => Ref(() => _rconPassword, v => _rconPassword = v),
-        (2, 3) => Ref(() => _rconTimeout,  v => _rconTimeout = v),
-        (3, 0) => Ref(() => _jvmMin,       v => _jvmMin = v),
-        (3, 1) => Ref(() => _jvmMax,       v => _jvmMax = v),
-        (4, 0) => Ref(() => _worldName,    v => _worldName = v),
-        (4, 1) => Ref(() => _worldSeed,    v => _worldSeed = v),
-        _      => null,
+        (2, 3) => Ref(() => _rconTimeout, v => _rconTimeout = v),
+        (3, 0) => Ref(() => _jvmMin, v => _jvmMin = v),
+        (3, 1) => Ref(() => _jvmMax, v => _jvmMax = v),
+        (4, 0) => Ref(() => _worldName, v => _worldName = v),
+        (4, 1) => Ref(() => _worldSeed, v => _worldSeed = v),
+        _ => null,
     };
 
     private static StringRef Ref(Func<string> get, Action<string> set) => new(get, set);
 
     private sealed class StringRef(Func<string> get, Action<string> set)
     {
-        public string Value { get => get(); set => set(value); }
+        public string Value
+        {
+            get => get();
+            set => set(value);
+        }
     }
 
     private sealed class ProgressRelay(Action<double> onProgress) : IProgressCallback

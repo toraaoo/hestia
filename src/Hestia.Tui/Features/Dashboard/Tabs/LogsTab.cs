@@ -60,12 +60,13 @@ public sealed class LogsTab(Manager manager) : Tab
 
 
         var isRunning = manager.GetStatus(Server.Id) is ServerStatus.Running or ServerStatus.Starting;
-        // H - 3: footer(1) + panel top border(1) + panel bottom border(1)
-        var logRows = Math.Max(2, AnsiConsole.Profile.Height - 3) - 1;
 
-        var termWidth = AnsiConsole.Profile.Width;
-        var leftWidth = Math.Max(40, termWidth / 4);
-        var columnWidth = Math.Max(20, termWidth - leftWidth - 6);
+        var windowWidth = AnsiConsole.Profile.Width;
+        var windowHeight = AnsiConsole.Profile.Height;
+
+        var leftWidth = Math.Max(40, (int)(windowWidth * 0.25));
+        var columnWidth = Math.Max(20, windowWidth - leftWidth - 6);
+        var logRows = Math.Max(2, windowHeight - 4) - 1;
 
         var selected = new List<string>();
         var rowsUsed = 0;
@@ -73,7 +74,7 @@ public sealed class LogsTab(Manager manager) : Tab
         {
             for (var i = _lines.Count - 1; i >= 0; i--)
             {
-                var line = _lines[i] ?? "";
+                var line = _lines[i].Replace("\t", "    ");
                 var lineRows = Math.Max(1, (line.Length + columnWidth - 1) / columnWidth);
                 if (rowsUsed + lineRows > logRows) break;
                 selected.Insert(0, line);
@@ -133,18 +134,10 @@ public sealed class LogsTab(Manager manager) : Tab
         var cmd = _commandInput;
         _commandInput = "";
 
-        AppendLine($"> {cmd}");
-
-        _ = CaptureResponseAsync(manager.GetInstance(Server.Id), cmd);
-    }
-
-    private async Task CaptureResponseAsync(ServerInstance? instance, string cmd)
-    {
-        if (instance is null) return;
-        var response = await instance.SendCommandAsync(cmd);
-        if (string.IsNullOrWhiteSpace(response)) return;
-
-        AppendLine(response);
+        if (cmd.Equals("stop", StringComparison.OrdinalIgnoreCase))
+            _ = manager.StopAsync(Server.Id);
+        else
+            _ = manager.GetInstance(Server.Id)?.SendUserCommandAsync(cmd);
     }
 
     private IDisposable? SubscribeToLogs(Server server)

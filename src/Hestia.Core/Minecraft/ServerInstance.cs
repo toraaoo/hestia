@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Text.RegularExpressions;
 using Hestia.Core.Minecraft.Models;
 using Hestia.Core.Minecraft.Rcon;
@@ -18,6 +20,7 @@ public sealed class ServerInstance : IAsyncDisposable
 
     private readonly Process _process;
     private readonly RconClient _rcon = new();
+    private readonly Subject<string> _rconEvents = new();
     private bool _rconConnected;
     private readonly TaskCompletionSource<int> _exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -30,7 +33,7 @@ public sealed class ServerInstance : IAsyncDisposable
     {
         Server = server;
         _process = process;
-        Output = output;
+        Output = Observable.Merge(output, _rconEvents.AsObservable());
         StartedAt = DateTime.UtcNow;
 
         process.Exited += (_, _) =>
@@ -55,6 +58,14 @@ public sealed class ServerInstance : IAsyncDisposable
     {
         await EnsureRconAsync();
         return await _rcon.SendCommandAsync(command);
+    }
+
+    public async Task SendUserCommandAsync(string command)
+    {
+        _rconEvents.OnNext($"> {command}");
+        var response = await SendCommandAsync(command);
+        if (!string.IsNullOrWhiteSpace(response))
+            _rconEvents.OnNext(response);
     }
 
     public async Task<ServerMetrics> GetMetricsAsync()
@@ -113,6 +124,7 @@ public sealed class ServerInstance : IAsyncDisposable
         if (IsRunning)
             await StopAsync();
 
+        _rconEvents.OnCompleted();
         _rcon.Dispose();
         _process.Dispose();
     }
