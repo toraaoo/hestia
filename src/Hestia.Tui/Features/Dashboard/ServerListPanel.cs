@@ -1,24 +1,26 @@
 using Hestia.Core.Minecraft;
 using Hestia.Core.Minecraft.Models;
 using Hestia.Tui.Input;
+using Hestia.Tui.Modals;
+using Hestia.Tui.Navigation;
 using Hestia.Tui.Utils.Extensions;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
 namespace Hestia.Tui.Features.Dashboard;
 
-public sealed class ServerListPanel(
-    Manager manager,
-    Action<Guid> onStart,
-    Action<Guid> onStop,
-    Action<Guid> onDelete,
-    Action onNew,
-    Action<Server?> onSelectionChanged) : IPanel
+public sealed class ServerListPanel(Manager manager, INavigator navigator) : IPanel
 {
     private List<Server> _servers = [];
     private int _cursor;
+    private CancellationTokenSource _statusCts = new();
 
     public Server? Selected => _servers.Count > 0 ? _servers[_cursor] : null;
+    public bool IsWorking { get; private set; }
+
+    public event Action<string?>? StatusChanged;
+    public event Action? NewRequested;
+    public event Action<Server?>? SelectionChanged;
 
     public void Load() => Reload();
 
@@ -29,9 +31,6 @@ public sealed class ServerListPanel(
         _servers = updated;
     }
 
-    public void MoveUp() => _cursor = Math.Max(0, _cursor - 1);
-    public void MoveDown() => _cursor = Math.Min(_servers.Count - 1, _cursor + 1);
-
     public bool OnRawKey(ConsoleKeyInfo key) => false;
 
     public void OnInput(InputAction action)
@@ -41,31 +40,49 @@ public sealed class ServerListPanel(
         switch (action)
         {
             case InputAction.MoveUp:
-                MoveUp();
+                _cursor = Math.Max(0, _cursor - 1);
                 break;
             case InputAction.MoveDown:
-                MoveDown();
+                _cursor = Math.Min(_servers.Count - 1, _cursor + 1);
                 break;
         }
 
         if (Selected != prev)
-            onSelectionChanged(Selected);
+            SelectionChanged?.Invoke(Selected);
 
-        if (action == InputAction.New)
+        switch (action)
         {
-            onNew();
-        }
-        else if (action == InputAction.Confirm && Selected is { } sel)
-        {
-            var status = manager.GetStatus(sel.Id);
-            if (status is ServerStatus.Stopped or ServerStatus.Crashed)
-                onStart(sel.Id);
-            else if (status == ServerStatus.Running)
-                onStop(sel.Id);
-        }
-        else if (action == InputAction.Delete && Selected is { } del)
-        {
-            onDelete(del.Id);
+            case InputAction.New:
+                NewRequested?.Invoke();
+                break;
+            case InputAction.Confirm when Selected is { } sel:
+            {
+                var status = manager.GetStatus(sel.Id);
+                switch (status)
+                {
+                    case ServerStatus.Stopped or ServerStatus.Crashed:
+                        _ = StartServerAsync(sel.Id);
+                        break;
+                    case ServerStatus.Running:
+                        navigator.ShowModal(
+                            new ConfirmModal($"Stop '{Selected?.Name}'?"),
+                            confirmed =>
+                            {
+                                if (confirmed) _ = StopServerAsync(sel.Id);
+                            });
+                        break;
+                }
+
+                break;
+            }
+            case InputAction.Delete when Selected is { } del:
+                navigator.ShowModal(
+                    new ConfirmModal($"Delete '{Selected?.Name}'? This cannot be undone."),
+                    confirmed =>
+                    {
+                        if (confirmed) _ = DeleteServerAsync(del.Id);
+                    });
+                break;
         }
     }
 
@@ -123,6 +140,75 @@ public sealed class ServerListPanel(
             .Border(BoxBorder.Rounded)
             .BorderColor(focused ? Color.Green : Color.Grey)
             .Expand();
+    }
+
+    private void SetTransientStatus(string message)
+    {
+        _statusCts.Cancel();
+        _statusCts = new CancellationTokenSource();
+        var ct = _statusCts.Token;
+        StatusChanged?.Invoke(message);
+        _ = Task.Delay(3000, ct).ContinueWith(_ => StatusChanged?.Invoke(null), ct);
+    }
+
+    private async Task StartServerAsync(Guid id)
+    {
+        IsWorking = true;
+        SetTransientStatus("Starting…");
+        try
+        {
+            await manager.StartAsync(id);
+            Reload();
+            SetTransientStatus("Server started.");
+        }
+        catch (Exception ex)
+        {
+            SetTransientStatus($"Error: {ex.Message}");
+        }
+        finally
+        {
+            IsWorking = false;
+        }
+    }
+
+    private async Task StopServerAsync(Guid id)
+    {
+        IsWorking = true;
+        SetTransientStatus("Stopping…");
+        try
+        {
+            await manager.StopAsync(id);
+            Reload();
+            SetTransientStatus("Server stopped.");
+        }
+        catch (Exception ex)
+        {
+            SetTransientStatus($"Error: {ex.Message}");
+        }
+        finally
+        {
+            IsWorking = false;
+        }
+    }
+
+    private async Task DeleteServerAsync(Guid id)
+    {
+        IsWorking = true;
+        SetTransientStatus("Deleting…");
+        try
+        {
+            await manager.DeleteAsync(id);
+            Reload();
+            SetTransientStatus("Deleted.");
+        }
+        catch (Exception ex)
+        {
+            SetTransientStatus($"Error: {ex.Message}");
+        }
+        finally
+        {
+            IsWorking = false;
+        }
     }
 
     private static string StatusDot(ServerStatus status) => status switch

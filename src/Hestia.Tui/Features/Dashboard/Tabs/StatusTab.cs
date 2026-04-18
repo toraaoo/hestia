@@ -5,16 +5,16 @@ using Spectre.Console.Rendering;
 
 namespace Hestia.Tui.Features.Dashboard.Tabs;
 
-public sealed class StatusTab(Manager manager) : ITab
+public sealed class StatusTab(Manager manager) : Tab
 {
-    public string Title => "Status";
+    public override string Title => "Status";
 
-    public IRenderable Render(Server? server)
+    public override IRenderable Render()
     {
-        if (server is null)
+        if (Server is null)
             return new Markup("[dim]  (no server selected)[/]");
 
-        var status = manager.GetStatus(server.Id);
+        var status = manager.GetStatus(Server.Id);
         var statusMarkup = status switch
         {
             ServerStatus.Running  => "[green]Running[/]",
@@ -24,12 +24,12 @@ public sealed class StatusTab(Manager manager) : ITab
         };
 
         var grid = new Grid().AddColumn().AddColumn();
-        grid.AddRow("[dim]Name[/]",    $"[bold]{server.Name}[/]");
+        grid.AddRow("[dim]Name[/]",    $"[bold]{Server.Name}[/]");
         grid.AddRow("[dim]Status[/]",  statusMarkup);
-        grid.AddRow("[dim]Type[/]",    server.Type.ToString());
-        grid.AddRow("[dim]Version[/]", server.Version);
-        grid.AddRow("[dim]Host[/]",    $"{server.Host}:{server.Network.Port}");
-        grid.AddRow("[dim]World[/]",   server.World.Name);
+        grid.AddRow("[dim]Type[/]",    Server.Type.ToString());
+        grid.AddRow("[dim]Version[/]", Server.Version);
+        grid.AddRow("[dim]Host[/]",    $"{Server.Host}:{Server.Network.Port}");
+        grid.AddRow("[dim]World[/]",   Server.World.Name);
         return grid;
     }
 }
