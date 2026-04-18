@@ -155,25 +155,30 @@ public sealed class ListSelectModal<T> : ModalBase<ListSelectResult<T>>
 
     public override IRenderable Render()
     {
-        var searchText = string.IsNullOrEmpty(_search)
-            ? "[dim](type to filter)[blink]_[/][/]"
-            : Markup.Escape(_search) + "[blink]_[/]";
+        var fieldWidth = Math.Clamp(Console.WindowWidth - 40, 20, 50);
+        var searchContent = string.IsNullOrEmpty(_search)
+            ? "(type to filter)"
+            : _search;
+        var visibleSearch = searchContent.Length > fieldWidth - 1
+            ? searchContent[^(fieldWidth - 1)..]
+            : searchContent;
+        var paddedSearch = visibleSearch.PadRight(fieldWidth - 1);
+        var searchText = Markup.Escape(paddedSearch) + "[blink]_[/]";
 
         var header = new Table().HideHeaders().NoBorder().Collapse()
-            .AddColumn(new TableColumn("").NoWrap())
             .AddColumn(new TableColumn("").NoWrap());
-        header.AddRow(
-            new Markup($"[dim]Search:[/] {searchText}"),
-            new Markup(BuildFilterHint())
-        );
+        header.AddRow(new Markup($"[dim]Search:[/] {searchText}"));
 
         var countInfo = _filtered.Count > 0
             ? $"[dim]{_filtered.Count}"
               + (string.IsNullOrEmpty(_search) ? "" : $" of {_all.Count}")
-              + " items[/]  "
+              + " items[/]"
             : "  ";
 
-        var footer = new Markup($"{countInfo}[dim]↑↓ nav · Enter select · Esc cancel[/]");
+        var filterLabel = BuildFilterHint();
+        var footer = new Markup(
+            $"{countInfo} · [dim]↑↓ nav · [b]Enter[/] select · [b]Esc[/] cancel · [b]Tab[/][/] {filterLabel}"
+        );
 
         var body = RenderBody();
 
@@ -205,12 +210,9 @@ public sealed class ListSelectModal<T> : ModalBase<ListSelectResult<T>>
     private string BuildFilterHint()
     {
         if (_filters.Length == 0) return "";
-
-        var more = _filters.Length > 1 ? $"  [dim]+{_filters.Length - 1}[/]" : "";
         var f = _filters[0];
-        return _filterEnabled[0]
-            ? $"[green][[x]] {Markup.Escape(f.Label)}[/]{more}  [dim]Tab[/]"
-            : $"[dim][[ ]] {Markup.Escape(f.Label)}[/]{more}  [dim]Tab[/]";
+        var state = _filterEnabled[0] ? "Show" : "Hide";
+        return $"[{(_filterEnabled[0] ? "dim green" : "dim")}]{state} {Markup.Escape(f.Label)}[/]";
     }
 
     private IRenderable RenderBody()

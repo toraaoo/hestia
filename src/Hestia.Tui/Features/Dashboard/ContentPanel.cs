@@ -35,8 +35,8 @@ public sealed class ContentPanel(List<Tab> tabs) : IPanel
     {
         var color = focused ? Color.Green : Color.Grey;
         var headerParts = tabs.Select((tab, i) =>
-            i == _activeTab ? $"[bold {color}] {tab.Title} [/]" : $"[dim] {tab.Title} [/]");
-        var tabBar = string.Join("[grey]·[/]", headerParts);
+            i == _activeTab ? $"[{color}] {tab.Title} [/]" : $"[dim] {tab.Title} [/]");
+        var tabBar = string.Join("[dim]·[/]", headerParts);
 
         return new Panel(tabs[_activeTab].Render())
             .Header(tabBar)

@@ -97,7 +97,7 @@ public sealed class DashboardScreen : ScreenBase
 
             var side = new Layout("Side")
                 .Ratio(25)
-                .MinimumSize(40);
+                .MinimumSize(45);
 
             side = showHeader
                 ? side.SplitRows(
@@ -162,8 +162,6 @@ public sealed class DashboardScreen : ScreenBase
             case Focus.Content:
                 _content.OnInput(action);
                 break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(action), action, null);
         }
     }
 

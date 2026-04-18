@@ -47,7 +47,7 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
     private bool _whitelist = false;
 
     // ── RCON ──────────────────────────────────────────────────────────
-    private bool _rconEnabled = false;
+    private bool _rconEnabled = true;
     private string _rconPort = "25575";
     private string _rconPassword = "";
     private string _rconTimeout = "10";
@@ -214,7 +214,7 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
                         $"Pick Version ({serverType})",
                         _ => manager.GetAvailableVersionsAsync(serverType),
                         v => v.Version,
-                        filters: [("Hide Snapshots", (MinecraftVersion v) => !v.IsSnapshot)]
+                        filters: [("Snapshots", v => !v.IsSnapshot)]
                     ),
                     result =>
                     {
@@ -526,10 +526,14 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
             new Markup($"[green]{bar}[/] [bold]{_progress:P0}[/]")
         );
 
-        _layout!["Header"].Update(new Align(
-            new Markup($"[bold]Creating [green]{Markup.Escape(_name)}[/]…[/]"),
-            HorizontalAlignment.Center, VerticalAlignment.Middle));
-        _layout["Main"].Update(new Align(content, HorizontalAlignment.Center, VerticalAlignment.Middle));
+        _layout!["Main"].Update(Align.Center(
+            new Rows(
+                new Markup($"[bold]Creating [green]{Markup.Escape(_name)}[/]…[/]"),
+                new Markup(""),
+                content
+            ),
+            VerticalAlignment.Middle
+        ));
         _layout["Footer"].Update(new Markup(""));
         return _layout;
     }
