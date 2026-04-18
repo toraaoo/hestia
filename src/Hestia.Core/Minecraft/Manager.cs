@@ -159,6 +159,8 @@ public class Manager(Java.Manager javaManager, AppDataFileSystem fs)
             return _status.TryGetValue(id, out var status) ? status : ServerStatus.Stopped;
     }
 
+    public string GetServerLogsDir(Guid id) => fs.Servers.GetLogsDir(id);
+
     public async Task<ServerMetrics> GetMetricsAsync(Guid id)
     {
         var instance = GetInstance(id)
