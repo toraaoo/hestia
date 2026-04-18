@@ -24,6 +24,9 @@ public sealed class DashboardScreen : ScreenBase
 
     private Focus _focus = Focus.ServerList;
     private Layout? _layout;
+    private bool _showHeader;
+    private int _lastWindowWidth = -1;
+    private int _lastWindowHeight = -1;
     private bool _needsReload;
     private string? _statusMessage;
 
@@ -53,6 +56,31 @@ public sealed class DashboardScreen : ScreenBase
 
     public override IRenderable Render()
     {
+        // Force a layout rebuild on real terminal resize events.
+        // (Spectre.Live doesn't always reflow Layouts automatically.)
+        int windowWidth;
+        int windowHeight;
+        try
+        {
+            windowWidth = Console.WindowWidth;
+            windowHeight = Console.WindowHeight;
+        }
+        catch
+        {
+            windowWidth = AnsiConsole.Profile.Width;
+            windowHeight = AnsiConsole.Profile.Height;
+        }
+
+        if (windowWidth != _lastWindowWidth || windowHeight != _lastWindowHeight)
+        {
+            _lastWindowWidth = windowWidth;
+            _lastWindowHeight = windowHeight;
+            _layout = null;
+        }
+
+        var showHeader = windowHeight >= 30;
+        _showHeader = showHeader;
+
         if (_needsReload)
         {
             _serverList.Reload();
@@ -67,28 +95,39 @@ public sealed class DashboardScreen : ScreenBase
                     new Layout("Footer").Size(1)
                 );
 
+            var side = new Layout("Side")
+                .Ratio(25)
+                .MinimumSize(40);
+
+            side = showHeader
+                ? side.SplitRows(
+                    new Layout("Header").Size(9),
+                    new Layout("ServerList")
+                )
+                : side.SplitRows(
+                    new Layout("ServerList")
+                );
+
             _layout["Main"].SplitColumns(
-                new Layout("Side")
-                    .Ratio(25)
-                    .MinimumSize(40)
-                    .SplitRows(
-                        new Layout("Header").Size(9),
-                        new Layout("ServerList")
-                    )
-                ,
+                side,
                 new Layout("Content").Ratio(75)
             );
+
+            _showHeader = showHeader;
         }
 
-        _layout["Header"].Update(
-            Align.Center(
-                new Rows(
-                    new Markup($"[bold green]{Ascii.Header}[/]"),
-                    new Markup("[dim] Manage your servers with ease[/]")
-                ),
-                VerticalAlignment.Middle
-            )
-        );
+        if (_showHeader)
+        {
+            _layout["Header"].Update(
+                Align.Center(
+                    new Rows(
+                        new Markup($"[bold green]{Ascii.Header}[/]"),
+                        new Markup("[dim] Manage your servers with ease[/]")
+                    ),
+                    VerticalAlignment.Middle
+                )
+            );
+        }
         _layout["ServerList"].Update(_serverList.Render(_focus == Focus.ServerList));
         _layout["Content"].Update(_content.Render(_focus == Focus.Content));
         _layout["Footer"].Update(_statusMessage is not null
