@@ -1,24 +1,29 @@
 using Hestia.Core.Minecraft;
 using Hestia.Core.Minecraft.Models;
+using Hestia.Tui.Input;
 using Hestia.Tui.Utils.Extensions;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
 namespace Hestia.Tui.Features.Dashboard;
 
-public sealed class ServerListPanel
+public sealed class ServerListPanel(
+    Manager manager,
+    Action<Guid> onStart,
+    Action<Guid> onStop,
+    Action<Guid> onDelete,
+    Action onNew,
+    Action<Server?> onSelectionChanged) : IPanel
 {
     private List<Server> _servers = [];
-    private Manager? _manager;
     private int _cursor;
 
     public Server? Selected => _servers.Count > 0 ? _servers[_cursor] : null;
 
-    public void Load(Manager manager) => Reload(manager);
+    public void Load() => Reload();
 
-    public void Reload(Manager manager)
+    public void Reload()
     {
-        _manager = manager;
         var updated = manager.List().ToList();
         _cursor = Math.Clamp(_cursor, 0, Math.Max(0, updated.Count - 1));
         _servers = updated;
@@ -26,6 +31,43 @@ public sealed class ServerListPanel
 
     public void MoveUp() => _cursor = Math.Max(0, _cursor - 1);
     public void MoveDown() => _cursor = Math.Min(_servers.Count - 1, _cursor + 1);
+
+    public bool OnRawKey(ConsoleKeyInfo key) => false;
+
+    public void OnInput(InputAction action)
+    {
+        var prev = Selected;
+
+        switch (action)
+        {
+            case InputAction.MoveUp:
+                MoveUp();
+                break;
+            case InputAction.MoveDown:
+                MoveDown();
+                break;
+        }
+
+        if (Selected != prev)
+            onSelectionChanged(Selected);
+
+        if (action == InputAction.New)
+        {
+            onNew();
+        }
+        else if (action == InputAction.Confirm && Selected is { } sel)
+        {
+            var status = manager.GetStatus(sel.Id);
+            if (status is ServerStatus.Stopped or ServerStatus.Crashed)
+                onStart(sel.Id);
+            else if (status == ServerStatus.Running)
+                onStop(sel.Id);
+        }
+        else if (action == InputAction.Delete && Selected is { } del)
+        {
+            onDelete(del.Id);
+        }
+    }
 
     public IRenderable Render(bool focused)
     {
@@ -60,7 +102,7 @@ public sealed class ServerListPanel
             foreach (var (server, i) in _servers.Select((s, i) => (s, i)))
             {
                 var active = i == _cursor;
-                var dot = _manager is null ? "[dim]○[/]" : StatusDot(_manager.GetStatus(server.Id));
+                var dot = StatusDot(manager.GetStatus(server.Id));
 
                 var name = server.Name.Truncate(truncateLength);
                 var type = server.Type.ToString().Truncate(truncateLength);

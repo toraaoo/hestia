@@ -10,35 +10,50 @@ using Spectre.Console.Rendering;
 
 namespace Hestia.Tui.Features.Dashboard;
 
-public sealed class DashboardScreen(
-    Manager manager,
-    INavigator navigator,
-    Func<CreateServerScreen> createServerFactory) : ScreenBase
+public sealed class DashboardScreen : ScreenBase
 {
-    private enum Focus
-    {
-        ServerList,
-        Content
-    }
+    private enum Focus { ServerList, Content }
 
-    private readonly ServerListPanel _serverList = new();
-
-    private readonly ContentPanel _content = new(
-        [
-            new LogsTab(manager),
-            new StatusTab(manager)
-        ]
-    );
+    private readonly Manager _manager;
+    private readonly ServerListPanel _serverList;
+    private readonly ContentPanel _content;
+    private readonly INavigator _navigator;
 
     private Focus _focus = Focus.ServerList;
     private Layout? _layout;
     private string? _statusMessage;
     private bool _isWorking;
     private bool _needsReload;
+    private CancellationTokenSource _statusCts = new();
+
+    public DashboardScreen(Manager manager, INavigator navigator, Func<CreateServerScreen> createServerFactory)
+    {
+        _manager = manager;
+        _navigator = navigator;
+
+        _content = new ContentPanel([new LogsTab(manager), new StatusTab(manager)]);
+
+        _serverList = new ServerListPanel(
+            manager,
+            onStart: id => _ = StartServerAsync(id),
+            onStop: id => navigator.ShowModal(
+                new ConfirmModal($"Stop '{_serverList.Selected?.Name}'?"),
+                confirmed => { if (confirmed) _ = StopServerAsync(id); }),
+            onDelete: id => navigator.ShowModal(
+                new ConfirmModal($"Delete '{_serverList.Selected?.Name}'? This cannot be undone."),
+                confirmed => { if (confirmed) _ = DeleteServerAsync(id); }),
+            onNew: () => { _needsReload = true; navigator.Push(createServerFactory()); },
+            onSelectionChanged: server =>
+            {
+                _statusMessage = null;
+                _ = _content.OnServerChangedAsync(server, CancellationToken.None);
+            }
+        );
+    }
 
     public override async Task LoadAsync(CancellationToken ct)
     {
-        _serverList.Load(manager);
+        _serverList.Load();
         await _content.OnServerChangedAsync(_serverList.Selected, ct);
     }
 
@@ -46,7 +61,7 @@ public sealed class DashboardScreen(
     {
         if (_needsReload)
         {
-            _serverList.Reload(manager);
+            _serverList.Reload();
             _needsReload = false;
         }
 
@@ -65,11 +80,10 @@ public sealed class DashboardScreen(
         }
 
         _layout["Left"].Update(_serverList.Render(_focus == Focus.ServerList));
-        _layout["Content"].Update(_content.Render(_serverList.Selected, _focus == Focus.Content));
+        _layout["Content"].Update(_content.Render(_focus == Focus.Content));
         _layout["Footer"].Update(_statusMessage is not null
             ? new Markup($"[dim] {_statusMessage}[/]")
-            : new Markup(
-                "[dim] [b]Tab[/] panel · [b]↑↓[/] nav · [b]←→[/] tabs · [b]N[/] new · [b]Enter[/] start/stop · [b]D[/] delete · [b]Q[/] quit[/]")
+            : new Markup("[dim] [b]Tab[/] panel · [b]↑↓[/] nav · [b]←→[/] tabs · [b]N[/] new · [b]Enter[/] start/stop · [b]D[/] delete · [b]Q[/] quit[/]")
         );
 
         return _layout;
@@ -77,73 +91,34 @@ public sealed class DashboardScreen(
 
     public override void OnInput(InputAction action)
     {
-        switch (action)
-        {
-            case InputAction.Quit:
-                navigator.Quit();
-                return;
+        if (action == InputAction.Quit) { _navigator.Quit(); return; }
+        if (action == InputAction.Tab) { ToggleFocus(); return; }
 
-            case InputAction.Tab:
-                _focus = _focus == Focus.ServerList ? Focus.Content : Focus.ServerList;
-                return;
-        }
+        if (_focus == Focus.ServerList && !_isWorking)
+            _serverList.OnInput(action);
+        else if (_focus == Focus.Content)
+            _content.OnInput(action);
+    }
 
-        if (_focus == Focus.ServerList)
-        {
-            if (_isWorking) return;
+    public override bool OnRawKey(ConsoleKeyInfo key)
+    {
+        if (_focus == Focus.ServerList && !_isWorking)
+            return _serverList.OnRawKey(key);
+        if (_focus == Focus.Content)
+            return _content.OnRawKey(key);
+        return false;
+    }
 
-            var prev = _serverList.Selected;
+    private void ToggleFocus() =>
+        _focus = _focus == Focus.ServerList ? Focus.Content : Focus.ServerList;
 
-            if (action == InputAction.MoveUp) _serverList.MoveUp();
-            else if (action == InputAction.MoveDown) _serverList.MoveDown();
-
-            if (_serverList.Selected != prev)
-            {
-                _statusMessage = null;
-                _ = _content.OnServerChangedAsync(_serverList.Selected, CancellationToken.None);
-            }
-
-            if (action == InputAction.New)
-            {
-                _needsReload = true;
-                navigator.Push(createServerFactory());
-            }
-            else if (action == InputAction.Confirm && _serverList.Selected is { } sel)
-            {
-                var status = manager.GetStatus(sel.Id);
-                if (status is ServerStatus.Stopped or ServerStatus.Crashed)
-                    _ = StartServerAsync(sel.Id);
-                else if (status == ServerStatus.Running)
-                    navigator.ShowModal(
-                        new ConfirmModal($"Stop '{sel.Name}'?"),
-                        confirmed =>
-                        {
-                            if (confirmed) _ = StopServerAsync(sel.Id);
-                        });
-            }
-            else if (action == InputAction.Delete && _serverList.Selected is { } del)
-            {
-                navigator.ShowModal(
-                    new ConfirmModal($"Delete '{del.Name}'? This cannot be undone."),
-                    confirmed =>
-                    {
-                        if (confirmed) _ = DeleteServerAsync(del.Id);
-                    }
-                );
-            }
-        }
-        else
-        {
-            switch (action)
-            {
-                case InputAction.MoveLeft:
-                    _content.MoveLeft();
-                    break;
-                case InputAction.MoveRight:
-                    _content.MoveRight();
-                    break;
-            }
-        }
+    private void SetTransientStatus(string message)
+    {
+        _statusCts.Cancel();
+        _statusCts = new CancellationTokenSource();
+        var ct = _statusCts.Token;
+        _statusMessage = message;
+        _ = Task.Delay(3000, ct).ContinueWith(_ => _statusMessage = null, ct);
     }
 
     private async Task StartServerAsync(Guid id)
@@ -152,13 +127,12 @@ public sealed class DashboardScreen(
         _statusMessage = "Starting…";
         try
         {
-            await manager.StartAsync(id);
-            _serverList.Reload(manager);
-            _statusMessage = "Server started.";
+            await _manager.StartAsync(id);
+            _serverList.Reload();
         }
         catch (Exception ex)
         {
-            _statusMessage = $"Error: {ex.Message}";
+            SetTransientStatus($"Error: {ex.Message}");
         }
         finally
         {
@@ -172,13 +146,13 @@ public sealed class DashboardScreen(
         _statusMessage = "Stopping…";
         try
         {
-            await manager.StopAsync(id);
-            _serverList.Reload(manager);
-            _statusMessage = "Server stopped.";
+            await _manager.StopAsync(id);
+            _serverList.Reload();
+            SetTransientStatus("Server stopped.");
         }
         catch (Exception ex)
         {
-            _statusMessage = $"Error: {ex.Message}";
+            SetTransientStatus($"Error: {ex.Message}");
         }
         finally
         {
@@ -192,17 +166,18 @@ public sealed class DashboardScreen(
         _statusMessage = "Deleting…";
         try
         {
-            await manager.DeleteAsync(id);
-            _serverList.Reload(manager);
-            _statusMessage = "Deleted.";
+            await _manager.DeleteAsync(id);
+            _serverList.Reload();
+            SetTransientStatus("Deleted.");
         }
         catch (Exception ex)
         {
-            _statusMessage = $"Error: {ex.Message}";
+            SetTransientStatus($"Error: {ex.Message}");
         }
         finally
         {
             _isWorking = false;
         }
     }
+
 }
