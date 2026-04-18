@@ -456,12 +456,12 @@ public sealed class CreateServerScreen(Manager manager, INavigator navigator) : 
         var filled = (int)(_progress * barWidth);
         var bar    = new string('█', filled) + new string('░', barWidth - filled);
 
-        var panel = new Panel(new Rows(
+        var panel = new Panel(Align.Center(new Rows(
             new Markup($"[bold]Creating [green]{Markup.Escape(_name)}[/]…[/]"),
             new Markup(""),
             new Markup(_progressLabel),
             new Markup($"[green]{bar}[/] [bold]{_progress:P0}[/]")
-        ))
+        ), VerticalAlignment.Middle))
             .Header("[bold] Create Server [/]")
             .Border(BoxBorder.Rounded)
             .BorderColor(Color.Yellow)

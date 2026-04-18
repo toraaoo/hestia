@@ -4,6 +4,7 @@ using Hestia.Tui.Features.CreateServer;
 using Hestia.Tui.Features.Dashboard.Tabs;
 using Hestia.Tui.Input;
 using Hestia.Tui.Navigation;
+using Hestia.Tui.Utils;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
@@ -67,16 +68,34 @@ public sealed class DashboardScreen : ScreenBase
                 );
 
             _layout["Main"].SplitColumns(
-                new Layout("Left").Ratio(25).MinimumSize(40),
+                new Layout("Side")
+                    .Ratio(25)
+                    .MinimumSize(40)
+                    .SplitRows(
+                        new Layout("Header").Size(9),
+                        new Layout("ServerList")
+                    )
+                ,
                 new Layout("Content").Ratio(75)
             );
         }
 
-        _layout["Left"].Update(_serverList.Render(_focus == Focus.ServerList));
+        _layout["Header"].Update(
+            Align.Center(
+                new Rows(
+                    new Markup($"[bold green]{Ascii.Header}[/]"),
+                    new Markup("[dim] Manage your servers with ease[/]")
+                ),
+                VerticalAlignment.Middle
+            )
+        );
+        _layout["ServerList"].Update(_serverList.Render(_focus == Focus.ServerList));
         _layout["Content"].Update(_content.Render(_focus == Focus.Content));
         _layout["Footer"].Update(_statusMessage is not null
             ? new Markup($"[dim] {_statusMessage}[/]")
-            : new Markup("[dim] [b]Tab[/] panel · [b]↑↓[/] nav · [b]←→[/] tabs · [b]N[/] new · [b]Enter[/] start/stop · [b]D[/] delete · [b]Q[/] quit[/]")
+            : new Markup(
+                "[dim] [b]Tab[/] panel · [b]↑↓[/] nav · [b]←→[/] tabs · [b]N[/] new · [b]Enter[/] start/stop · [b]D[/] delete · [b]Q[/] quit[/]"
+            )
         );
 
         return _layout;

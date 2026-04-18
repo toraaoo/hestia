@@ -63,12 +63,10 @@ public sealed class LogsTab(Manager manager) : Tab
         // H - 3: footer(1) + panel top border(1) + panel bottom border(1)
         var logRows = Math.Max(2, AnsiConsole.Profile.Height - 3) - 1;
 
-        // Approximate column width: terminal width minus left panel (25%, min 40) minus panel/table padding (4)
         var termWidth = AnsiConsole.Profile.Width;
         var leftWidth = Math.Max(40, termWidth / 4);
-        var columnWidth = Math.Max(20, termWidth - leftWidth - 4);
+        var columnWidth = Math.Max(20, termWidth - leftWidth - 6);
 
-        // Select lines newest→oldest, counting actual wrapped rows per line to avoid overflow
         var selected = new List<string>();
         var rowsUsed = 0;
         lock (_lock)
@@ -119,13 +117,10 @@ public sealed class LogsTab(Manager manager) : Tab
             return true;
         }
 
-        if (key.KeyChar >= ' ' && key.KeyChar != '\0')
-        {
-            _commandInput += key.KeyChar;
-            return true;
-        }
+        if (key.KeyChar is < ' ' or '\0') return false;
 
-        return false;
+        _commandInput += key.KeyChar;
+        return true;
     }
 
     public override void OnInput(InputAction action)
@@ -137,7 +132,19 @@ public sealed class LogsTab(Manager manager) : Tab
 
         var cmd = _commandInput;
         _commandInput = "";
-        _ = manager.GetInstance(Server.Id)?.SendCommandAsync(cmd);
+
+        AppendLine($"> {cmd}");
+
+        _ = CaptureResponseAsync(manager.GetInstance(Server.Id), cmd);
+    }
+
+    private async Task CaptureResponseAsync(ServerInstance? instance, string cmd)
+    {
+        if (instance is null) return;
+        var response = await instance.SendCommandAsync(cmd);
+        if (string.IsNullOrWhiteSpace(response)) return;
+
+        AppendLine(response);
     }
 
     private IDisposable? SubscribeToLogs(Server server)
@@ -145,14 +152,16 @@ public sealed class LogsTab(Manager manager) : Tab
         var instance = manager.GetInstance(server.Id);
         _subscribedInstance = instance;
 
-        return instance?.Output.Subscribe(line =>
+        return instance?.Output.Subscribe(line => AppendLine(line.Replace("\t", "    ")));
+    }
+
+    private void AppendLine(string line)
+    {
+        lock (_lock)
         {
-            lock (_lock)
-            {
-                _lines.Add(line.Replace("\t", "    "));
-                if (_lines.Count > MaxBuffer)
-                    _lines.RemoveAt(0);
-            }
-        });
+            _lines.Add(line);
+            if (_lines.Count > MaxBuffer)
+                _lines.RemoveAt(0);
+        }
     }
 }
