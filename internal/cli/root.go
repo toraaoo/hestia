@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	cmdconfig "github.com/toraaoo/hestia/internal/cli/commands/config"
 	cmddaemon "github.com/toraaoo/hestia/internal/cli/commands/daemon"
+	cmdversions "github.com/toraaoo/hestia/internal/cli/commands/versions"
 )
 
 func newRootCmd() *cobra.Command {
@@ -16,6 +17,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(
 		cmddaemon.NewCmd(),
 		cmdconfig.NewCmd(),
+		cmdversions.NewCmd(),
 	)
 	return cmd
 }
