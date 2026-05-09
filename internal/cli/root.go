@@ -1,0 +1,25 @@
+package cli
+
+import (
+	"github.com/spf13/cobra"
+	cmdconfig "github.com/toraaoo/hestia/internal/cli/commands/config"
+	cmddaemon "github.com/toraaoo/hestia/internal/cli/commands/daemon"
+)
+
+func newRootCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "hestia",
+		Short:         "Hestia — Minecraft server manager",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+	cmd.AddCommand(
+		cmddaemon.NewCmd(),
+		cmdconfig.NewCmd(),
+	)
+	return cmd
+}
+
+func Execute() error {
+	return newRootCmd().Execute()
+}
