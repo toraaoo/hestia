@@ -13,7 +13,7 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 
 	cfg, err := server.LoadConfig(name)
 	if err != nil {
-		http.Error(w, "server not found", http.StatusNotFound)
+		writeError(w, "server not found", http.StatusNotFound)
 		return
 	}
 
@@ -26,18 +26,18 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 	existing, err := server.LoadConfig(name)
 	if err != nil {
-		http.Error(w, "server not found", http.StatusNotFound)
+		writeError(w, "server not found", http.StatusNotFound)
 		return
 	}
 
 	if proc := procManager.Get(name); proc != nil && proc.GetState() != process.StateStopped {
-		http.Error(w, "stop server before changing config", http.StatusConflict)
+		writeError(w, "stop server before changing config", http.StatusConflict)
 		return
 	}
 
 	var updates map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -63,12 +63,12 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := existing.Save(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if err := existing.WriteProperties(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

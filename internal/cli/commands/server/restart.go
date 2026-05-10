@@ -1,12 +1,10 @@
 package server
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
 	"github.com/toraaoo/hestia/internal/client"
-	"github.com/toraaoo/hestia/internal/config"
 )
 
 func newRestartCmd() *cobra.Command {
@@ -15,18 +13,13 @@ func newRestartCmd() *cobra.Command {
 		Short: "Restart a server",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load()
-			if err != nil {
-				return err
-			}
-
-			c := client.New(cfg.Daemon.Sock)
-			if err := c.Do(context.Background(), "POST", "/servers/"+args[0]+"/restart", nil, nil); err != nil {
-				return err
-			}
-
-			fmt.Printf("Restarting server %s\n", args[0])
-			return nil
+			return withClient(cmd, func(c *client.Client) error {
+				if err := c.RestartServer(cmd.Context(), args[0]); err != nil {
+					return err
+				}
+				fmt.Printf("Restarting server %s\n", args[0])
+				return nil
+			})
 		},
 	}
 }

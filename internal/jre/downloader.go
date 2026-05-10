@@ -5,11 +5,12 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/toraaoo/hestia/internal/httpc"
 )
 
 func adoptiumArch() string {
@@ -43,13 +44,13 @@ func downloadURL(majorVersion int) string {
 
 func Download(majorVersion int) error {
 	url := downloadURL(majorVersion)
-	resp, err := http.Get(url)
+	resp, err := httpc.GetDownload(url)
 	if err != nil {
 		return fmt.Errorf("fetch jre: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != 200 {
 		return fmt.Errorf("adoptium api: %s", resp.Status)
 	}
 
@@ -64,7 +65,9 @@ func Download(majorVersion int) error {
 		tmpFile.Close()
 		return fmt.Errorf("download jre: %w", err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("close temp file: %w", err)
+	}
 
 	f, err := os.Open(tmpPath)
 	if err != nil {

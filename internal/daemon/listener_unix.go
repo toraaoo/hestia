@@ -5,6 +5,8 @@ package daemon
 import (
 	"net"
 	"os"
+
+	"github.com/toraaoo/hestia/internal/log"
 )
 
 func listen(path string) (net.Listener, error) {
@@ -12,5 +14,7 @@ func listen(path string) (net.Listener, error) {
 }
 
 func cleanupListener(path string) {
-	os.Remove(path)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		log.Warn("remove socket", "path", path, "err", err)
+	}
 }

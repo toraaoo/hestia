@@ -27,7 +27,7 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 
 	logs, err := procManager.Logs(name, lines)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeError(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -38,14 +38,14 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 func handleLogStream(w http.ResponseWriter, r *http.Request, name string, lines int) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		writeError(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
 	logs, _ := procManager.Logs(name, lines)
 	ch, err := procManager.Subscribe(name)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeError(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	defer procManager.Unsubscribe(name, ch)
@@ -78,12 +78,12 @@ func handleConsole(w http.ResponseWriter, r *http.Request) {
 
 	var req consoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if err := procManager.SendCommand(name, req.Command); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		writeError(w, err.Error(), http.StatusConflict)
 		return
 	}
 

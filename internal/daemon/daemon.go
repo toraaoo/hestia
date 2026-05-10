@@ -5,10 +5,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/toraaoo/hestia/internal/config"
 	"github.com/toraaoo/hestia/internal/daemon/api"
 	"github.com/toraaoo/hestia/internal/daemon/process"
+	"github.com/toraaoo/hestia/internal/log"
 )
 
 func Run() error {
@@ -16,6 +18,9 @@ func Run() error {
 	if err != nil {
 		return err
 	}
+
+	log.Init(cfg.Daemon.LogLevel)
+	log.Info("starting hestiad")
 
 	if err := os.MkdirAll(config.DefaultDir(), 0o700); err != nil {
 		return err
@@ -37,11 +42,25 @@ func Run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	go srv.Serve(ln) //nolint:errcheck
+	srvErr := make(chan error, 1)
+	go func() {
+		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+			srvErr <- err
+		}
+	}()
 
 	select {
+	case err := <-srvErr:
+		return err
 	case <-ctx.Done():
+		log.Info("shutting down", "reason", "signal")
 	case <-shutdownCh:
+		log.Info("shutting down", "reason", "request")
 	}
-	return srv.Shutdown(context.Background())
+
+	pm.StopAll()
+
+	shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return srv.Shutdown(shutCtx)
 }

@@ -34,18 +34,18 @@ type serverInfo struct {
 func handleCreateServer(w http.ResponseWriter, r *http.Request) {
 	var req createRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if req.Name == "" || req.Version == "" {
-		http.Error(w, "name and version required", http.StatusBadRequest)
+		writeError(w, "name and version required", http.StatusBadRequest)
 		return
 	}
 
 	cfg, err := server.Create(req.Name, req.Version)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		writeError(w, err.Error(), http.StatusConflict)
 		return
 	}
 
@@ -54,11 +54,17 @@ func handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		cfg.Save()
 	}
 
+	provider, err := jar.GetProvider(cfg.Jar)
+	if err != nil {
+		server.Delete(req.Name)
+		writeError(w, "unsupported jar type: "+cfg.Jar, http.StatusBadRequest)
+		return
+	}
+
 	jarPath := server.JarPath(req.Name)
-	provider := jar.VanillaProvider{}
 	if err := provider.DownloadServer(req.Version, jarPath); err != nil {
 		server.Delete(req.Name)
-		http.Error(w, "download server: "+err.Error(), http.StatusInternalServerError)
+		writeError(w, "download server: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -69,7 +75,7 @@ func handleCreateServer(w http.ResponseWriter, r *http.Request) {
 func handleListServers(w http.ResponseWriter, r *http.Request) {
 	names, err := server.List()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -105,7 +111,7 @@ func handleGetServer(w http.ResponseWriter, r *http.Request) {
 
 	cfg, err := server.LoadConfig(name)
 	if err != nil {
-		http.Error(w, "server not found", http.StatusNotFound)
+		writeError(w, "server not found", http.StatusNotFound)
 		return
 	}
 
@@ -128,12 +134,12 @@ func handleDeleteServer(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimPrefix(r.URL.Path, "/servers/")
 
 	if proc := procManager.Get(name); proc != nil && proc.GetState() != process.StateStopped {
-		http.Error(w, "server must be stopped first", http.StatusConflict)
+		writeError(w, "server must be stopped first", http.StatusConflict)
 		return
 	}
 
 	if err := server.Delete(name); err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeError(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -143,7 +149,7 @@ func handleDeleteServer(w http.ResponseWriter, r *http.Request) {
 func handleStartServer(w http.ResponseWriter, r *http.Request) {
 	name := extractServerName(r.URL.Path, "/start")
 	if err := procManager.Start(name); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		writeError(w, err.Error(), http.StatusConflict)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
@@ -152,7 +158,7 @@ func handleStartServer(w http.ResponseWriter, r *http.Request) {
 func handleStopServer(w http.ResponseWriter, r *http.Request) {
 	name := extractServerName(r.URL.Path, "/stop")
 	if err := procManager.Stop(name); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		writeError(w, err.Error(), http.StatusConflict)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
@@ -163,13 +169,13 @@ func handleRestartServer(w http.ResponseWriter, r *http.Request) {
 
 	if proc := procManager.Get(name); proc != nil && proc.GetState() == process.StateRunning {
 		if err := procManager.Stop(name); err != nil {
-			http.Error(w, err.Error(), http.StatusConflict)
+			writeError(w, err.Error(), http.StatusConflict)
 			return
 		}
 	}
 
 	if err := procManager.Start(name); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		writeError(w, err.Error(), http.StatusConflict)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)

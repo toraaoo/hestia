@@ -1,7 +1,6 @@
 package versions
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -31,7 +30,7 @@ func NewCmd() *cobra.Command {
 			}
 
 			var resp VersionsResponse
-			if err := c.Do(context.Background(), "GET", path, nil, &resp); err != nil {
+			if err := c.Do(cmd.Context(), "GET", path, nil, &resp); err != nil {
 				return fallbackLocal(snapshots, latest, jsonOut)
 			}
 
@@ -54,7 +53,10 @@ type VersionsResponse struct {
 }
 
 func fallbackLocal(snapshots, latest, jsonOut bool) error {
-	provider := jar.VanillaProvider{}
+	provider, err := jar.GetProvider("vanilla")
+	if err != nil {
+		return err
+	}
 	versions, err := provider.ListVersions(snapshots)
 	if err != nil {
 		return err

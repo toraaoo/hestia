@@ -3,7 +3,8 @@ package jar
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
+
+	"github.com/toraaoo/hestia/internal/httpc"
 )
 
 const manifestURL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
@@ -41,13 +42,13 @@ func fetchManifest() (*versionManifest, error) {
 		return cached, nil
 	}
 
-	resp, err := http.Get(manifestURL)
+	resp, err := httpc.Get(manifestURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetch manifest: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("manifest api: %s", resp.Status)
 	}
 
@@ -61,13 +62,13 @@ func fetchManifest() (*versionManifest, error) {
 }
 
 func fetchVersionMeta(url string) (*versionMeta, error) {
-	resp, err := http.Get(url)
+	resp, err := httpc.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("fetch version meta: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("version meta api: %s", resp.Status)
 	}
 

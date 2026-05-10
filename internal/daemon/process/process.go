@@ -11,6 +11,7 @@ import (
 
 	"github.com/toraaoo/hestia/internal/jar"
 	"github.com/toraaoo/hestia/internal/jre"
+	"github.com/toraaoo/hestia/internal/log"
 	"github.com/toraaoo/hestia/internal/server"
 )
 
@@ -89,6 +90,30 @@ func (m *Manager) Stop(name string) error {
 	return proc.stop()
 }
 
+// StopAll stops all running processes concurrently and waits for them to finish.
+func (m *Manager) StopAll() {
+	m.mu.RLock()
+	var names []string
+	for name, p := range m.procs {
+		if p.State != StateStopped {
+			names = append(names, name)
+		}
+	}
+	m.mu.RUnlock()
+
+	var wg sync.WaitGroup
+	for _, name := range names {
+		wg.Add(1)
+		go func(n string) {
+			defer wg.Done()
+			if err := m.Stop(n); err != nil {
+				log.Warn("stop server on shutdown", "server", n, "err", err)
+			}
+		}(name)
+	}
+	wg.Wait()
+}
+
 func (m *Manager) SendCommand(name, cmd string) error {
 	m.mu.RLock()
 	proc := m.procs[name]
@@ -137,9 +162,16 @@ func (p *Process) run() {
 		p.mu.Lock()
 		p.State = StateStopped
 		p.mu.Unlock()
+		log.Info("server stopped", "server", p.Name)
 	}()
 
-	javaVersion, err := jar.VanillaProvider{}.GetJavaVersion(p.Config.Version)
+	provider, err := jar.GetProvider(p.Config.Jar)
+	if err != nil {
+		p.ring.Write(fmt.Sprintf("ERROR: unknown jar provider %q: %v\n", p.Config.Jar, err))
+		return
+	}
+
+	javaVersion, err := provider.GetJavaVersion(p.Config.Version)
 	if err != nil {
 		p.ring.Write(fmt.Sprintf("ERROR: get java version: %v\n", err))
 		return
@@ -154,7 +186,6 @@ func (p *Process) run() {
 	jarPath := server.JarPath(p.Name)
 	if _, err := os.Stat(jarPath); os.IsNotExist(err) {
 		p.ring.Write(fmt.Sprintf("Downloading server jar %s...\n", p.Config.Version))
-		provider := jar.VanillaProvider{}
 		if err := provider.DownloadServer(p.Config.Version, jarPath); err != nil {
 			p.ring.Write(fmt.Sprintf("ERROR: download server: %v\n", err))
 			return
@@ -176,18 +207,37 @@ func (p *Process) run() {
 	)
 	p.cmd.Dir = serverDir
 
-	p.logw, err = NewLogWriter(serverDir, p.ring)
+	logw, err := NewLogWriter(serverDir, p.ring)
 	if err != nil {
 		p.ring.Write(fmt.Sprintf("ERROR: create log writer: %v\n", err))
 		return
 	}
-	defer p.logw.Close()
+	p.logw = logw
 
-	p.stdin, _ = p.cmd.StdinPipe()
-	stdout, _ := p.cmd.StdoutPipe()
-	stderr, _ := p.cmd.StderrPipe()
+	stdin, err := p.cmd.StdinPipe()
+	if err != nil {
+		logw.Close()
+		p.ring.Write(fmt.Sprintf("ERROR: stdin pipe: %v\n", err))
+		return
+	}
+	p.stdin = stdin
+
+	stdout, err := p.cmd.StdoutPipe()
+	if err != nil {
+		logw.Close()
+		p.ring.Write(fmt.Sprintf("ERROR: stdout pipe: %v\n", err))
+		return
+	}
+
+	stderr, err := p.cmd.StderrPipe()
+	if err != nil {
+		logw.Close()
+		p.ring.Write(fmt.Sprintf("ERROR: stderr pipe: %v\n", err))
+		return
+	}
 
 	if err := p.cmd.Start(); err != nil {
+		logw.Close()
 		p.ring.Write(fmt.Sprintf("ERROR: start server: %v\n", err))
 		return
 	}
@@ -196,11 +246,17 @@ func (p *Process) run() {
 	p.PID = p.cmd.Process.Pid
 	p.State = StateRunning
 	p.mu.Unlock()
+	log.Info("server started", "server", p.Name, "pid", p.PID)
 
-	go ScanLines(stdout, p.logw)
-	go ScanLines(stderr, p.logw)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); ScanLines(stdout, logw) }()
+	go func() { defer wg.Done(); ScanLines(stderr, logw) }()
 
 	p.cmd.Wait()
+	wg.Wait()
+	logw.Close()
+	p.logw = nil
 }
 
 func (p *Process) stop() error {

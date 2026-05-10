@@ -3,6 +3,7 @@ package process
 import (
 	"bufio"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -73,12 +74,16 @@ func NewLogWriter(serverDir string, ring *RingBuffer) (*LogWriter, error) {
 func (w *LogWriter) Write(p []byte) (int, error) {
 	line := string(p)
 	w.ring.Write(line)
-	w.file.Write(p)
+
+	ll := LogLine{Time: time.Now(), Text: line}
 
 	w.mu.Lock()
+	if _, err := w.file.Write(p); err != nil {
+		slog.Error("log file write failed", "err", err)
+	}
 	for _, ch := range w.subs {
 		select {
-		case ch <- LogLine{Time: time.Now(), Text: line}:
+		case ch <- ll:
 		default:
 		}
 	}

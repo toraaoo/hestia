@@ -18,10 +18,15 @@ type versionsResponse struct {
 func handleVersions(w http.ResponseWriter, r *http.Request) {
 	snapshots := r.URL.Query().Get("snapshots") == "true"
 
-	provider := jar.VanillaProvider{}
+	provider, err := jar.GetProvider("vanilla")
+	if err != nil {
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	versions, err := provider.ListVersions(snapshots)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

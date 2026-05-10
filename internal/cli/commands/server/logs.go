@@ -2,19 +2,13 @@ package server
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/toraaoo/hestia/internal/client"
-	"github.com/toraaoo/hestia/internal/config"
 )
-
-type logLine struct {
-	Text string `json:"text"`
-}
 
 func newLogsCmd() *cobra.Command {
 	var follow bool
@@ -25,26 +19,22 @@ func newLogsCmd() *cobra.Command {
 		Short: "Show server logs",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load()
-			if err != nil {
-				return err
-			}
-
 			if follow {
-				return streamLogs(cfg.Daemon.Sock, args[0], lines)
+				return withClient(cmd, func(c *client.Client) error {
+					return streamLogs(cmd, c, args[0], lines)
+				})
 			}
 
-			c := client.New(cfg.Daemon.Sock)
-			path := fmt.Sprintf("/servers/%s/logs?lines=%d", args[0], lines)
-			var logs []logLine
-			if err := c.Do(context.Background(), "GET", path, nil, &logs); err != nil {
-				return err
-			}
-
-			for _, l := range logs {
-				fmt.Print(l.Text)
-			}
-			return nil
+			return withClient(cmd, func(c *client.Client) error {
+				logs, err := c.GetLogs(cmd.Context(), args[0], lines)
+				if err != nil {
+					return err
+				}
+				for _, l := range logs {
+					fmt.Print(l.Text)
+				}
+				return nil
+			})
 		},
 	}
 
@@ -53,16 +43,14 @@ func newLogsCmd() *cobra.Command {
 	return cmd
 }
 
-func streamLogs(sock, name string, lines int) error {
-	c := client.New(sock)
+func streamLogs(cmd *cobra.Command, c *client.Client, name string, lines int) error {
 	path := fmt.Sprintf("/servers/%s/logs?follow=true&lines=%d", name, lines)
-
-	req, err := http.NewRequest("GET", "http://hestiad"+path, nil)
+	req, err := http.NewRequestWithContext(cmd.Context(), "GET", "http://hestiad"+path, nil)
 	if err != nil {
 		return err
 	}
 
-	resp, err := c.DoRaw(context.Background(), req)
+	resp, err := c.DoRaw(cmd.Context(), req)
 	if err != nil {
 		return err
 	}

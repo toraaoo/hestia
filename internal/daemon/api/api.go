@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/toraaoo/hestia/internal/daemon/process"
@@ -39,4 +40,14 @@ func ping(w http.ResponseWriter, r *http.Request) {
 func handleShutdown(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	close(shutdownCh)
+}
+
+type apiError struct {
+	Error string `json:"error"`
+}
+
+func writeError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(apiError{Error: msg})
 }
