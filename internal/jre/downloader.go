@@ -53,12 +53,31 @@ func Download(majorVersion int) error {
 		return fmt.Errorf("adoptium api: %s", resp.Status)
 	}
 
+	tmpFile, err := os.CreateTemp("", "jre-*.tar.gz")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("download jre: %w", err)
+	}
+	tmpFile.Close()
+
+	f, err := os.Open(tmpPath)
+	if err != nil {
+		return fmt.Errorf("open temp file: %w", err)
+	}
+	defer f.Close()
+
 	destDir := versionDir(majorVersion)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return fmt.Errorf("create jre dir: %w", err)
 	}
 
-	if err := extractTarGz(resp.Body, destDir); err != nil {
+	if err := extractTarGz(f, destDir); err != nil {
 		os.RemoveAll(destDir)
 		return fmt.Errorf("extract jre: %w", err)
 	}

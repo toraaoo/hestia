@@ -23,7 +23,6 @@ func New(sockPath string) *Client {
 	return &Client{http: &http.Client{Transport: transport}}
 }
 
-// Do performs a request against the daemon. body and dest are optional.
 func (c *Client) Do(ctx context.Context, method, path string, body io.Reader, dest any) error {
 	req, err := http.NewRequestWithContext(ctx, method, "http://hestiad"+path, body)
 	if err != nil {
@@ -41,4 +40,16 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader, de
 		return json.NewDecoder(resp.Body).Decode(dest)
 	}
 	return nil
+}
+
+func (c *Client) DoRaw(ctx context.Context, req *http.Request) (*http.Response, error) {
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("daemon unreachable: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		resp.Body.Close()
+		return nil, fmt.Errorf("daemon error: %s", resp.Status)
+	}
+	return resp, nil
 }

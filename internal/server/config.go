@@ -12,29 +12,29 @@ import (
 )
 
 type Config struct {
-	Name    string `toml:"name"`
-	Version string `toml:"version"`
-	Jar     string `toml:"jar"`
-	Memory  string `toml:"memory"`
-	Port    int    `toml:"port"`
+	Name    string `toml:"name" json:"name"`
+	Version string `toml:"version" json:"version"`
+	Jar     string `toml:"jar" json:"jar"`
+	Memory  string `toml:"memory" json:"memory"`
+	Port    int    `toml:"port" json:"port"`
 
-	RCON  RCONConfig  `toml:"rcon"`
-	World WorldConfig `toml:"world"`
+	RCON  RCONConfig  `toml:"rcon" json:"rcon"`
+	World WorldConfig `toml:"world" json:"world"`
 }
 
 type RCONConfig struct {
-	Enabled  bool   `toml:"enabled"`
-	Password string `toml:"password"`
-	Port     int    `toml:"port"`
+	Enabled  bool   `toml:"enabled" json:"enabled"`
+	Password string `toml:"password" json:"password"`
+	Port     int    `toml:"port" json:"port"`
 }
 
 type WorldConfig struct {
-	Name       string `toml:"name"`
-	Seed       string `toml:"seed"`
-	Gamemode   string `toml:"gamemode"`
-	Difficulty string `toml:"difficulty"`
-	MaxPlayers int    `toml:"max_players"`
-	MOTD       string `toml:"motd"`
+	Name       string `toml:"name" json:"name"`
+	Seed       string `toml:"seed" json:"seed"`
+	Gamemode   string `toml:"gamemode" json:"gamemode"`
+	Difficulty string `toml:"difficulty" json:"difficulty"`
+	MaxPlayers int    `toml:"max_players" json:"max_players"`
+	MOTD       string `toml:"motd" json:"motd"`
 }
 
 func DefaultConfig(name, version string) *Config {

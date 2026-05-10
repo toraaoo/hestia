@@ -8,6 +8,7 @@ import (
 
 	"github.com/toraaoo/hestia/internal/config"
 	"github.com/toraaoo/hestia/internal/daemon/api"
+	"github.com/toraaoo/hestia/internal/daemon/process"
 )
 
 func Run() error {
@@ -20,9 +21,10 @@ func Run() error {
 		return err
 	}
 
+	pm := process.NewManager()
 	mux := http.NewServeMux()
 	shutdownCh := make(chan struct{})
-	api.Register(mux, shutdownCh)
+	api.Register(mux, shutdownCh, pm)
 
 	ln, err := listen(cfg.Daemon.Sock)
 	if err != nil {
