@@ -5,9 +5,14 @@ CMD_PATH    := ./cmd/hestia
 DAEMON_PATH := ./cmd/hestiad
 DATA_DIR    := $(PWD)/.hestia
 
+MAKEFLAGS += --no-print-directory
+
 .PHONY: build test lint clean install install-system install-service dev release help
 
 build:
+ifeq ($(DEV),1)
+	@hestia daemon stop > /dev/null 2>&1 || true
+endif
 	go build -o $(BUILD_DIR)/$(BINARY_NAME) $(CMD_PATH)
 	go build -o $(BUILD_DIR)/$(DAEMON_NAME) $(DAEMON_PATH)
 
@@ -34,7 +39,14 @@ install-service: install-system
 	@echo "Enable with: systemctl enable --now hestiad"
 
 dev: build
-	@HESTIA_DATA_DIR=$(DATA_DIR) PATH="$(PWD)/dist:$$PATH" $$SHELL
+ifeq ($(DEV),1)
+	@echo "Already in a dev shell! Exit first or just keep working."
+else
+	@HESTIA_DATA_DIR=$(DATA_DIR) \
+	PATH="$(PWD)/dist:$$PATH" \
+	DEV=1 \
+	exec $$SHELL
+endif
 
 release:
 	goreleaser release --snapshot --clean
