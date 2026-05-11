@@ -155,10 +155,6 @@ hestia mod remove <server> <mod>    # Remove a mod
 
 ### Backups
 
-<p align="center">
-  <img src="docs/assets/demo.gif" alt="Backup Management" width="800">
-</p>
-
 ```sh
 # Create backup
 hestia backup create <name>
@@ -173,12 +169,6 @@ hestia backup delete <name> <backup>
 hestia backup prune <name> --keep-last 5
 hestia backup prune <name> --keep-days 7 --min-backups 3
 ```
-
-### Versions
-
-<p align="center">
-  <img src="docs/assets/versions.gif" alt="Version Listing" width="800">
-</p>
 
 ```sh
 hestia versions                      # List vanilla releases
