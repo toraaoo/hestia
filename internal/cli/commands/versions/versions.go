@@ -15,6 +15,7 @@ import (
 
 func NewCmd() *cobra.Command {
 	var snapshots, latest, jsonOut bool
+	var jarName string
 
 	cmd := &cobra.Command{
 		Use:   "versions",
@@ -27,13 +28,19 @@ func NewCmd() *cobra.Command {
 
 			c := client.New(cfg.Daemon.Sock)
 			path := "/versions"
+			sep := "?"
 			if snapshots {
-				path += "?snapshots=true"
+				path += sep + "snapshots=true"
+				sep = "&"
+			}
+			if jarName != "" {
+				path += sep + "jar=" + jarName
+				sep = "&"
 			}
 
 			var resp VersionsResponse
 			if err := c.Do(cmd.Context(), "GET", path, nil, &resp); err != nil {
-				return fallbackLocal(snapshots, latest, jsonOut)
+				return fallbackLocal(jarName, snapshots, latest, jsonOut)
 			}
 
 			return printVersions(resp.Versions, resp.Latest, latest, jsonOut)
@@ -43,6 +50,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&snapshots, "snapshots", false, "Include snapshot versions")
 	cmd.Flags().BoolVar(&latest, "latest", false, "Show only latest versions")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().StringVar(&jarName, "jar", "", "JAR provider to list versions for: vanilla, paper, fabric")
 	return cmd
 }
 
@@ -54,8 +62,11 @@ type VersionsResponse struct {
 	Versions []jar.Version `json:"versions"`
 }
 
-func fallbackLocal(snapshots, latest, jsonOut bool) error {
-	provider, err := jar.GetProvider("vanilla")
+func fallbackLocal(jarName string, snapshots, latest, jsonOut bool) error {
+	if jarName == "" {
+		jarName = "vanilla"
+	}
+	provider, err := jar.GetProvider(jarName)
 	if err != nil {
 		return err
 	}

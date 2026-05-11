@@ -17,7 +17,7 @@ lint:
 	golangci-lint run ./...
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) .hestia
 
 install:
 	go install $(CMD_PATH)

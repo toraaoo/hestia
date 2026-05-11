@@ -44,11 +44,12 @@ func runAttach(ctx context.Context, c *client.Client, name string, useRCON bool,
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		fmt.Println("\nDetaching...")
+		fmt.Println("\nStopping server...")
+		_ = c.StopServer(context.Background(), name)
 		cancel()
 	}()
 
-	fmt.Printf("Attached to %s. Ctrl+C to detach, /exit to quit.\n", name)
+	fmt.Printf("Attached to %s. Ctrl+C to stop, /detach to detach.\n", name)
 
 	errCh := make(chan error, 2)
 
@@ -58,7 +59,7 @@ func runAttach(ctx context.Context, c *client.Client, name string, useRCON bool,
 
 	go func() {
 		if useRCON {
-			errCh <- readStdinRCON(ctx, name, cancel)
+			errCh <- readStdinRCON(ctx, c, name, cancel)
 		} else {
 			errCh <- readStdinHTTP(ctx, c, name, cancel)
 		}
@@ -105,7 +106,13 @@ func readStdinHTTP(ctx context.Context, c *client.Client, name string, cancel co
 			return nil
 		default:
 			command := scanner.Text()
-			if command == "/exit" || command == "/detach" {
+			if command == "/detach" {
+				cancel()
+				return nil
+			}
+			if command == "/stop" {
+				fmt.Println("Stopping server...")
+				_ = c.StopServer(context.Background(), name)
 				cancel()
 				return nil
 			}
@@ -119,7 +126,7 @@ func readStdinHTTP(ctx context.Context, c *client.Client, name string, cancel co
 	return nil
 }
 
-func readStdinRCON(ctx context.Context, name string, cancel context.CancelFunc) error {
+func readStdinRCON(ctx context.Context, c *client.Client, name string, cancel context.CancelFunc) error {
 	cfg, err := server.LoadConfig(name)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -143,7 +150,13 @@ func readStdinRCON(ctx context.Context, name string, cancel context.CancelFunc) 
 			return nil
 		default:
 			command := scanner.Text()
-			if command == "/exit" || command == "/detach" {
+			if command == "/detach" {
+				cancel()
+				return nil
+			}
+			if command == "/stop" {
+				fmt.Println("Stopping server...")
+				_ = c.StopServer(context.Background(), name)
 				cancel()
 				return nil
 			}
