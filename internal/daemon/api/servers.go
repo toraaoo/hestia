@@ -114,32 +114,39 @@ func handleCreateServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	applyRequestToConfig(cfg, req)
-	cfg.Save()
+	if err := cfg.Save(); err != nil {
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	provider, err := jar.GetProvider(cfg.Jar)
 	if err != nil {
-		server.Delete(req.Name)
+		_ = server.Delete(req.Name)
 		writeError(w, "unsupported jar type: "+cfg.Jar, http.StatusBadRequest)
 		return
 	}
 
 	jarPath := server.JarPath(req.Name)
 	if err := provider.DownloadServer(req.Version, jarPath, nil); err != nil {
-		server.Delete(req.Name)
+		_ = server.Delete(req.Name)
 		writeError(w, "download server: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	javaVersion, _ := provider.GetJavaVersion(req.Version)
 	if javaVersion > 0 && !jre.IsInstalled(javaVersion) {
-		jre.Download(javaVersion, nil)
+		if err := jre.Download(javaVersion, nil); err != nil {
+			_ = server.Delete(req.Name)
+			writeError(w, "download jre: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cfg)
+	_ = json.NewEncoder(w).Encode(cfg)
 }
 
-func handleCreateServerSSE(w http.ResponseWriter, r *http.Request, req createRequest) {
+func handleCreateServerSSE(w http.ResponseWriter, _ *http.Request, req createRequest) {
 	sse, err := NewSSEWriter(w)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
@@ -148,26 +155,30 @@ func handleCreateServerSSE(w http.ResponseWriter, r *http.Request, req createReq
 
 	cfg, err := server.Create(req.Name, req.Version)
 	if err != nil {
-		sse.WriteError(err.Error())
+		_ = sse.WriteError(err.Error())
 		return
 	}
 
 	applyRequestToConfig(cfg, req)
-	cfg.Save()
-
-	provider, err := jar.GetProvider(cfg.Jar)
-	if err != nil {
-		server.Delete(req.Name)
-		sse.WriteError("unsupported jar type: " + cfg.Jar)
+	if err := cfg.Save(); err != nil {
+		_ = server.Delete(req.Name)
+		_ = sse.WriteError("save config: " + err.Error())
 		return
 	}
 
-	cb := func(evt progress.Event) { sse.WriteEvent(evt) }
+	provider, err := jar.GetProvider(cfg.Jar)
+	if err != nil {
+		_ = server.Delete(req.Name)
+		_ = sse.WriteError("unsupported jar type: " + cfg.Jar)
+		return
+	}
+
+	cb := func(evt progress.Event) { _ = sse.WriteEvent(evt) }
 
 	jarPath := server.JarPath(req.Name)
 	if err := provider.DownloadServer(req.Version, jarPath, cb); err != nil {
-		server.Delete(req.Name)
-		sse.WriteError("download server: " + err.Error())
+		_ = server.Delete(req.Name)
+		_ = sse.WriteError("download server: " + err.Error())
 		return
 	}
 
@@ -178,14 +189,14 @@ func handleCreateServerSSE(w http.ResponseWriter, r *http.Request, req createReq
 			cb(progress.Event{Type: progress.EventComplete, Category: progress.CategoryExtract, Message: "skipped"})
 		} else {
 			if err := jre.Download(javaVersion, cb); err != nil {
-				server.Delete(req.Name)
-				sse.WriteError("download jre: " + err.Error())
+				_ = server.Delete(req.Name)
+				_ = sse.WriteError("download jre: " + err.Error())
 				return
 			}
 		}
 	}
 
-	sse.WriteDone(cfg)
+	_ = sse.WriteDone(cfg)
 }
 
 func handleListServers(w http.ResponseWriter, r *http.Request) {
@@ -218,7 +229,7 @@ func handleListServers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(servers)
+	_ = json.NewEncoder(w).Encode(servers)
 }
 
 func handleGetServer(w http.ResponseWriter, r *http.Request) {
@@ -243,7 +254,7 @@ func handleGetServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func handleDeleteServer(w http.ResponseWriter, r *http.Request) {

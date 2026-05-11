@@ -46,7 +46,7 @@ type Spinner struct {
 
 func NewSpinner(w io.Writer, msg string) *Spinner {
 	return &Spinner{
-		frames: []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "���", "⠧", "⠇", "⠏"},
+		frames: []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
 		msg:    msg,
 		w:      w,
 		stop:   make(chan struct{}),
@@ -62,11 +62,11 @@ func (s *Spinner) Start() {
 		for {
 			select {
 			case <-s.stop:
-				fmt.Fprintf(s.w, "\r\033[2K")
+				_, _ = fmt.Fprintf(s.w, "\r\033[2K")
 				return
 			case <-ticker.C:
 				frame := lipgloss.NewStyle().Foreground(ColorAccent).Render(s.frames[s.idx])
-				fmt.Fprintf(s.w, "\r%s %s", frame, s.msg)
+				_, _ = fmt.Fprintf(s.w, "\r%s %s", frame, s.msg)
 				s.idx = (s.idx + 1) % len(s.frames)
 			}
 		}

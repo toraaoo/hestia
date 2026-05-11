@@ -50,8 +50,14 @@ func (s *SSEWriter) WriteError(errMsg string) error {
 }
 
 func (s *SSEWriter) WriteDone(result any) error {
-	data, _ := json.Marshal(map[string]any{"done": true, "result": result})
-	fmt.Fprintf(s.w, "data: %s\n\n", data)
+	data, err := json.Marshal(map[string]any{"done": true, "result": result})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(s.w, "data: %s\n\n", data)
+	if err != nil {
+		return err
+	}
 	s.flusher.Flush()
 	return nil
 }

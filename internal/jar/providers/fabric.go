@@ -44,7 +44,7 @@ func fabricGet[T any](url string) (T, error) {
 	if err != nil {
 		return zero, fmt.Errorf("fabric api: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return zero, fmt.Errorf("fabric api: %s", resp.Status)

@@ -32,7 +32,7 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(logs)
+	_ = json.NewEncoder(w).Encode(logs)
 }
 
 func handleLogStream(w http.ResponseWriter, r *http.Request, name string, lines int) {
@@ -55,7 +55,7 @@ func handleLogStream(w http.ResponseWriter, r *http.Request, name string, lines 
 	w.Header().Set("Connection", "keep-alive")
 
 	for _, line := range logs {
-		fmt.Fprintf(w, "data: %s\n\n", strings.TrimSpace(line.Text))
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", strings.TrimSpace(line.Text))
 	}
 	flusher.Flush()
 
@@ -65,7 +65,7 @@ func handleLogStream(w http.ResponseWriter, r *http.Request, name string, lines 
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "data: %s\n\n", strings.TrimSpace(line.Text))
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", strings.TrimSpace(line.Text))
 			flusher.Flush()
 		case <-r.Context().Done():
 			return

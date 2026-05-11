@@ -37,7 +37,7 @@ func RunPaginator(items []string, perPage int) error {
 		}
 		return nil
 	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
+	defer func() { _ = term.Restore(int(os.Stdin.Fd()), oldState) }()
 
 	// enter alternate screen + hide cursor
 	fmt.Print("\033[?1049h\033[?25l")
@@ -73,7 +73,7 @@ func RunPaginator(items []string, perPage int) error {
 		help := "j/k scroll  space/b page  g/G top/end  q quit"
 		statusLine := lipgloss.NewStyle().Foreground(ColorMuted).Render(status + "  " + help)
 
-		sb.WriteString(fmt.Sprintf("\033[%d;1H\033[2K", termH))
+		fmt.Fprintf(&sb, "\033[%d;1H\033[2K", termH)
 		sb.WriteString(statusLine)
 
 		fmt.Print(sb.String())
@@ -90,30 +90,30 @@ func RunPaginator(items []string, perPage int) error {
 
 		input := string(buf[:n])
 
-		switch {
-		case input == "q" || input == "\x03":
+		switch input {
+		case "q", "\x03":
 			return nil
-		case input == "j" || input == "\x1b[B":
+		case "j", "\x1b[B":
 			if offset < maxOffset {
 				offset++
 			}
-		case input == "k" || input == "\x1b[A":
+		case "k", "\x1b[A":
 			if offset > 0 {
 				offset--
 			}
-		case input == " " || input == "\x1b[6~":
+		case " ", "\x1b[6~":
 			offset += viewHeight
 			if offset > maxOffset {
 				offset = maxOffset
 			}
-		case input == "b" || input == "\x1b[5~":
+		case "b", "\x1b[5~":
 			offset -= viewHeight
 			if offset < 0 {
 				offset = 0
 			}
-		case input == "g":
+		case "g":
 			offset = 0
-		case input == "G":
+		case "G":
 			offset = maxOffset
 		}
 		render()

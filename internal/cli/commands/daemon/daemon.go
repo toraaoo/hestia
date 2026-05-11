@@ -65,14 +65,14 @@ func newStartCmd() *cobra.Command {
 			c := newClient()
 
 			if IsDaemonRunning(ctx, c) {
-				fmt.Fprintln(cmd.OutOrStdout(), "daemon already running")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "daemon already running")
 				return nil
 			}
 
 			if err := StartDaemon(ctx, c); err != nil {
 				return err
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), "daemon started")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "daemon started")
 			return nil
 		},
 	}
@@ -87,7 +87,7 @@ func newStopCmd() *cobra.Command {
 			c := newClient()
 
 			if !IsDaemonRunning(ctx, c) {
-				fmt.Fprintln(cmd.OutOrStdout(), "daemon not running")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "daemon not running")
 				return nil
 			}
 
@@ -98,7 +98,7 @@ func newStopCmd() *cobra.Command {
 			deadline := time.Now().Add(5 * time.Second)
 			for time.Now().Before(deadline) {
 				if !IsDaemonRunning(ctx, c) {
-					fmt.Fprintln(cmd.OutOrStdout(), "daemon stopped")
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), "daemon stopped")
 					return nil
 				}
 				time.Sleep(100 * time.Millisecond)
@@ -116,9 +116,9 @@ func newStatusCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := newClient()
 			if IsDaemonRunning(cmd.Context(), c) {
-				fmt.Fprintln(cmd.OutOrStdout(), "daemon: running")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "daemon: running")
 			} else {
-				fmt.Fprintln(cmd.OutOrStdout(), "daemon: not running")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "daemon: not running")
 			}
 			return nil
 		},

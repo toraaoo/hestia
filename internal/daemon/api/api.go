@@ -33,11 +33,11 @@ func Register(mux *http.ServeMux, shutdown chan struct{}, pm *process.Manager) {
 	mux.HandleFunc("PUT /servers/{name}/config", handleUpdateConfig)
 }
 
-func ping(w http.ResponseWriter, r *http.Request) {
+func ping(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func handleShutdown(w http.ResponseWriter, r *http.Request) {
+func handleShutdown(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	close(shutdownCh)
 }
@@ -49,5 +49,5 @@ type apiError struct {
 func writeError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(apiError{Error: msg})
+	_ = json.NewEncoder(w).Encode(apiError{Error: msg})
 }

@@ -194,7 +194,10 @@ func (p *Process) run() {
 
 	serverDir := server.ServerDir(p.Name)
 	eulaPath := serverDir + "/eula.txt"
-	os.WriteFile(eulaPath, []byte("eula=true\n"), 0644)
+	if err := os.WriteFile(eulaPath, []byte("eula=true\n"), 0644); err != nil {
+		p.ring.Write(fmt.Sprintf("ERROR: write eula: %v\n", err))
+		return
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	p.cancel = cancel
@@ -216,7 +219,7 @@ func (p *Process) run() {
 
 	stdin, err := p.cmd.StdinPipe()
 	if err != nil {
-		logw.Close()
+		_ = logw.Close()
 		p.ring.Write(fmt.Sprintf("ERROR: stdin pipe: %v\n", err))
 		return
 	}
@@ -224,20 +227,20 @@ func (p *Process) run() {
 
 	stdout, err := p.cmd.StdoutPipe()
 	if err != nil {
-		logw.Close()
+		_ = logw.Close()
 		p.ring.Write(fmt.Sprintf("ERROR: stdout pipe: %v\n", err))
 		return
 	}
 
 	stderr, err := p.cmd.StderrPipe()
 	if err != nil {
-		logw.Close()
+		_ = logw.Close()
 		p.ring.Write(fmt.Sprintf("ERROR: stderr pipe: %v\n", err))
 		return
 	}
 
 	if err := p.cmd.Start(); err != nil {
-		logw.Close()
+		_ = logw.Close()
 		p.ring.Write(fmt.Sprintf("ERROR: start server: %v\n", err))
 		return
 	}
@@ -253,9 +256,9 @@ func (p *Process) run() {
 	go func() { defer wg.Done(); ScanLines(stdout, logw) }()
 	go func() { defer wg.Done(); ScanLines(stderr, logw) }()
 
-	p.cmd.Wait()
+	_ = p.cmd.Wait()
 	wg.Wait()
-	logw.Close()
+	_ = logw.Close()
 	p.logw = nil
 }
 
@@ -268,7 +271,7 @@ func (p *Process) stop() error {
 	p.State = StateStopping
 	p.mu.Unlock()
 
-	p.sendCommand("stop")
+	_ = p.sendCommand("stop")
 
 	done := make(chan struct{})
 	go func() {

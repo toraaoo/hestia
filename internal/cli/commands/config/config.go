@@ -19,7 +19,7 @@ func newGetCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// TODO: load config, print value at key
-			fmt.Fprintf(cmd.OutOrStdout(), "%s: not implemented\n", args[0])
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: not implemented\n", args[0])
 			return nil
 		},
 	}
@@ -32,7 +32,7 @@ func newSetCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// TODO: load config, update key, write back
-			fmt.Fprintf(cmd.OutOrStdout(), "set %s=%s: not implemented\n", args[0], args[1])
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "set %s=%s: not implemented\n", args[0], args[1])
 			return nil
 		},
 	}

@@ -125,6 +125,6 @@ func (w *LogWriter) Close() error {
 func ScanLines(r io.Reader, w *LogWriter) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		w.Write(append(scanner.Bytes(), '\n'))
+		_, _ = w.Write(append(scanner.Bytes(), '\n'))
 	}
 }

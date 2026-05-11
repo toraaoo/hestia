@@ -54,7 +54,7 @@ func streamLogs(cmd *cobra.Command, c *client.Client, name string, lines int) er
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {

@@ -53,7 +53,7 @@ func tryDownload(url, destPath string, opts Options) (retErr error) {
 	if err != nil {
 		return fmt.Errorf("fetch: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("http %s", resp.Status)
@@ -66,8 +66,8 @@ func tryDownload(url, destPath string, opts Options) (retErr error) {
 	}
 	defer func() {
 		if retErr != nil {
-			f.Close()
-			os.Remove(tmpPath)
+			_ = f.Close()
+			_ = os.Remove(tmpPath)
 		}
 	}()
 
@@ -96,7 +96,7 @@ func tryDownload(url, destPath string, opts Options) (retErr error) {
 	if h != nil {
 		got := hex.EncodeToString(h.Sum(nil))
 		if got != opts.SHA1 {
-			os.Remove(tmpPath)
+			_ = os.Remove(tmpPath)
 			return fmt.Errorf("sha1 mismatch: got %s, want %s", got, opts.SHA1)
 		}
 	}

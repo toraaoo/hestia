@@ -38,7 +38,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader, de
 	if err != nil {
 		return fmt.Errorf("daemon unreachable: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		var e struct{ Error string }
 		if json.NewDecoder(resp.Body).Decode(&e) == nil && e.Error != "" {
@@ -52,13 +52,13 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader, de
 	return nil
 }
 
-func (c *Client) DoRaw(ctx context.Context, req *http.Request) (*http.Response, error) {
+func (c *Client) DoRaw(_ context.Context, req *http.Request) (*http.Response, error) {
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("daemon unreachable: %w", err)
 	}
 	if resp.StatusCode >= 400 {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("daemon error: %s", resp.Status)
 	}
 	return resp, nil
@@ -138,7 +138,7 @@ func (c *Client) CreateServerWithProgress(ctx context.Context, req CreateRequest
 	if err != nil {
 		return nil, fmt.Errorf("daemon unreachable: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return c.readSSE(resp.Body, handler)
 }

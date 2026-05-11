@@ -17,7 +17,7 @@ func newLsCmd() *cobra.Command {
 		Use:     "ls",
 		Aliases: []string{"list"},
 		Short:   "List servers",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return withClient(cmd, func(c *client.Client) error {
 				servers, err := c.ListServers(cmd.Context())
 				if err != nil {

@@ -46,7 +46,7 @@ func FetchManifest() (*VersionManifest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetch manifest: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("manifest api: %s", resp.Status)
@@ -57,7 +57,7 @@ func FetchManifest() (*VersionManifest, error) {
 		return nil, fmt.Errorf("decode manifest: %w", err)
 	}
 
-	saveManifestCache(&m)
+	_ = saveManifestCache(&m)
 	return &m, nil
 }
 
@@ -66,7 +66,7 @@ func FetchVersionMeta(url string) (*VersionMeta, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetch version meta: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("version meta api: %s", resp.Status)

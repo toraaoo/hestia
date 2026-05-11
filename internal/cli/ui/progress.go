@@ -69,7 +69,7 @@ func (m *MultiProgress) Handle(evt pb.Event) {
 
 func (m *MultiProgress) render() {
 	if m.rendered > 0 {
-		fmt.Fprintf(m.writer, "\033[%dA", m.rendered)
+		_, _ = fmt.Fprintf(m.writer, "\033[%dA", m.rendered)
 	}
 
 	muted := lipgloss.NewStyle().Foreground(ColorMuted)
@@ -93,7 +93,7 @@ func (m *MultiProgress) render() {
 			size := formatSize(l.current, l.total)
 			line = fmt.Sprintf("%s %s %s", label, bar, size)
 		}
-		fmt.Fprintf(m.writer, "\033[2K%s\n", line)
+		_, _ = fmt.Fprintf(m.writer, "\033[2K%s\n", line)
 	}
 	m.rendered = len(m.order)
 }
@@ -157,9 +157,9 @@ func (m *MultiProgress) Clear() {
 	defer m.mu.Unlock()
 	if m.rendered > 0 {
 		for range m.rendered {
-			fmt.Fprintf(m.writer, "\033[2K\033[1A")
+			_, _ = fmt.Fprintf(m.writer, "\033[2K\033[1A")
 		}
-		fmt.Fprintf(m.writer, "\033[2K")
+		_, _ = fmt.Fprintf(m.writer, "\033[2K")
 		m.rendered = 0
 	}
 }

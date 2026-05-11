@@ -28,14 +28,15 @@ func NewCmd() *cobra.Command {
 
 			c := client.New(cfg.Daemon.Sock)
 			path := "/versions"
-			sep := "?"
 			if snapshots {
-				path += sep + "snapshots=true"
-				sep = "&"
+				path += "?snapshots=true"
 			}
 			if jarName != "" {
-				path += sep + "jar=" + jarName
-				sep = "&"
+				if snapshots {
+					path += "&jar=" + jarName
+				} else {
+					path += "?jar=" + jarName
+				}
 			}
 
 			var resp VersionsResponse
@@ -111,10 +112,11 @@ func printVersions(versions []jar.Version, latestInfo struct {
 			date = v.ReleaseTime
 		}
 
-		marker := ""
-		if v.ID == latestInfo.Release {
+		var marker string
+		switch v.ID {
+		case latestInfo.Release:
 			marker = " (latest release)"
-		} else if v.ID == latestInfo.Snapshot {
+		case latestInfo.Snapshot:
 			marker = " (latest snapshot)"
 		}
 		items[i] = fmt.Sprintf("%s  %s  %s%s", v.ID, v.Type, date, marker)

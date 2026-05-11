@@ -81,7 +81,7 @@ func streamLogsAttach(ctx context.Context, c *client.Client, name string, lines 
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
@@ -141,7 +141,7 @@ func readStdinRCON(ctx context.Context, c *client.Client, name string, cancel co
 	if err != nil {
 		return fmt.Errorf("failed to connect RCON: %w", err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {

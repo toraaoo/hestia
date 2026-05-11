@@ -3,17 +3,34 @@ version: "2"
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
-    - gofmt
     - misspell
     - revive
 
+  settings:
+    revive:
+      rules:
+        # This repo exports plenty of symbols from internal packages; requiring doc comments everywhere
+        # adds noise without improving the public API.
+        - name: exported
+          disabled: true
+        # Package comments aren't useful for internal-only packages.
+        - name: package-comments
+          disabled: true
+
+  exclusions:
+    rules:
+      - path: "_test\\.go"
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+
 issues:
-  exclude-rules:
-    - path: "_test\\.go"
-      linters:
-        - errcheck
+  # Lint the whole codebase.
+  new: false

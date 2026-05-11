@@ -22,12 +22,12 @@ func Create(name, version string) (*Config, error) {
 	}
 
 	if err := cfg.Save(); err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 		return nil, err
 	}
 
 	if err := cfg.WriteProperties(); err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 		return nil, err
 	}
 

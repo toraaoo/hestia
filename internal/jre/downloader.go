@@ -59,7 +59,7 @@ func Download(majorVersion int, cb progress.Callback) error {
 		}
 		return fmt.Errorf("fetch jre: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		if cb != nil {
@@ -73,7 +73,7 @@ func Download(majorVersion int, cb progress.Callback) error {
 		return fmt.Errorf("create temp file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	total := resp.ContentLength
 	var downloaded int64
@@ -82,7 +82,7 @@ func Download(majorVersion int, cb progress.Callback) error {
 		n, readErr := resp.Body.Read(buf)
 		if n > 0 {
 			if _, writeErr := tmpFile.Write(buf[:n]); writeErr != nil {
-				tmpFile.Close()
+				_ = tmpFile.Close()
 				return fmt.Errorf("write temp: %w", writeErr)
 			}
 			downloaded += int64(n)
@@ -94,7 +94,7 @@ func Download(majorVersion int, cb progress.Callback) error {
 			break
 		}
 		if readErr != nil {
-			tmpFile.Close()
+			_ = tmpFile.Close()
 			return fmt.Errorf("download jre: %w", readErr)
 		}
 	}
@@ -111,7 +111,7 @@ func Download(majorVersion int, cb progress.Callback) error {
 	if err != nil {
 		return fmt.Errorf("open temp file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	destDir := versionDir(majorVersion)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
@@ -119,7 +119,7 @@ func Download(majorVersion int, cb progress.Callback) error {
 	}
 
 	if err := extractArchive(f, destDir); err != nil {
-		os.RemoveAll(destDir)
+		_ = os.RemoveAll(destDir)
 		if cb != nil {
 			cb(progress.Event{Type: progress.EventError, Category: progress.CategoryExtract, Error: err.Error()})
 		}
@@ -220,16 +220,16 @@ func extractZip(zr *zip.Reader, destDir string) error {
 		}
 		out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 		if err != nil {
-			rc.Close()
+			_ = rc.Close()
 			return err
 		}
 		if _, err := io.Copy(out, rc); err != nil {
-			out.Close()
-			rc.Close()
+			_ = out.Close()
+			_ = rc.Close()
 			return err
 		}
-		out.Close()
-		rc.Close()
+		_ = out.Close()
+		_ = rc.Close()
 	}
 	return nil
 }
@@ -239,7 +239,7 @@ func extractTarGz(r io.Reader, destDir string) error {
 	if err != nil {
 		return err
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 
 	tr := tar.NewReader(gz)
 	var stripPrefix string
@@ -287,15 +287,15 @@ func extractTarGz(r io.Reader, destDir string) error {
 				return err
 			}
 			if _, err := io.Copy(f, tr); err != nil {
-				f.Close()
+				_ = f.Close()
 				return err
 			}
-			f.Close()
+			_ = f.Close()
 		case tar.TypeSymlink:
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return err
 			}
-			os.Remove(target)
+			_ = os.Remove(target)
 			if err := os.Symlink(hdr.Linkname, target); err != nil {
 				return err
 			}
