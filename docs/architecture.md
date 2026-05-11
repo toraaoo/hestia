@@ -20,16 +20,29 @@ processes.
 
 ```
 hestia
-├── server
-│   ├── create <name> [--version] [--jar] [--port] [--memory]
-│   ├── start  <name>
-│   ├── stop   <name>
-│   ├── restart <name>
-│   ├── rm     <name>
-│   ├── ls
-│   ├── logs   <name> [-f]
-│   ├── console <name>
-│   └── inspect <name>
+├── create <name> [--version] [--jar] [--port] [--memory] ...
+├── start <name>
+├── stop <name>
+├── restart <name>
+├── rm <name>
+├── ps (aliases: ls, list)
+├── logs <name> [-f]
+├── attach <name> [--rcon]
+├── inspect <name>
+├── configure <name> [key] [value]
+├── upgrade <name> [version]
+├── mod
+│   ├── install <server> <mod>
+│   ├── list <server>
+│   └── remove <server> <mod>
+├── backup
+│   ├── create <name>
+│   ├── list <name>
+│   ├── restore <name> <backup>
+│   ├── delete <name> <backup>
+│   └── prune <name>
+├── versions
+├── version
 ├── daemon
 │   ├── start
 │   ├── stop
@@ -37,15 +50,6 @@ hestia
 └── config
     ├── get <key>
     └── set <key> <value>
-```
-
-Future (plugin system):
-
-```
-hestia plugin
-    ├── install <name>
-    ├── remove  <name>
-    └── ls
 ```
 
 ---
@@ -77,6 +81,17 @@ POST   /servers/{name}/stop       stop server
 POST   /servers/{name}/restart    restart server
 DELETE /servers/{name}            remove server
 GET    /servers/{name}/logs       stream logs (chunked)
+POST   /servers/{name}/upgrade    upgrade server version
+
+GET    /servers/{name}/backups         list backups
+POST   /servers/{name}/backups         create backup
+POST   /servers/{name}/backups/restore restore backup
+DELETE /servers/{name}/backups/{name}  delete backup
+POST   /servers/{name}/backups/prune   prune old backups
+
+GET    /servers/{name}/mods       list mods
+POST   /servers/{name}/mods       install mod
+DELETE /servers/{name}/mods/{mod} remove mod
 ```
 
 All requests/responses: `Content-Type: application/json`.
@@ -90,12 +105,16 @@ All requests/responses: `Content-Type: application/json`.
 ├── config.toml           global config
 ├── daemon.sock           unix socket       (runtime, deleted on stop)
 ├── daemon.pid            daemon PID file   (runtime)
+├── jre/                  downloaded JREs
+│   └── java-21/
 └── servers/
     └── <name>/
         ├── hestia.toml   per-server config
         ├── server.jar    minecraft jar
+        ├── backups/
         ├── logs/
         │   └── latest.log
+        ├── mods/         mods and plugins
         └── world/
 ```
 
@@ -116,12 +135,16 @@ log_level = "info"
 ```toml
 name = "survival"
 version = "1.21.4"
-jar = "paper"       # paper | vanilla | fabric | forge
+jar = "paper"       # paper | vanilla | fabric
 memory = "2G"
 port = 25565
 
 [jvm]
 flags = ["-XX:+UseG1GC"]
+
+[rcon]
+enabled = true
+port = 25575
 ```
 
 ---
@@ -137,9 +160,10 @@ hestia/
 │   ├── cli/
 │   │   ├── root.go               root cobra command + Execute()
 │   │   └── commands/
-│   │       ├── server/           server subcommands
+│   │       ├── server/           server lifecycle commands
 │   │       ├── daemon/           daemon subcommands
-│   │       └── config/           config subcommands
+│   │       ├── config/           global config subcommands
+│   │       └── versions/         version listing
 │   ├── daemon/
 │   │   ├── daemon.go             daemon lifecycle (start, stop, signal handling)
 │   │   ├── api/                  HTTP handlers (one file per resource)
@@ -148,7 +172,17 @@ hestia/
 │   │   └── client.go             typed HTTP client over unix socket
 │   ├── server/
 │   │   ├── config.go             server config struct + TOML marshal/unmarshal
-│   │   └── state.go              server runtime state (running, stopped, etc.)
+│   │   └── storage.go            server storage operations
+│   ├── backup/
+│   │   ├── backup.go             backup creation and restoration
+│   │   ├── retention.go          retention policy logic
+│   │   └── scheduler.go          backup scheduling
+│   ├── jar/
+│   │   ├── registry.go           JAR provider registry
+│   │   └── providers/            vanilla, paper, fabric providers
+│   ├── jre/
+│   │   ├── manager.go            JRE version management
+│   │   └── downloader.go         JRE download logic
 │   └── config/
 │       └── config.go             global config (TOML, ~/.hestia/config.toml)
 └── pkg/                          public API surface (empty until needed)
@@ -164,7 +198,7 @@ touches `daemon` or `process` directly.
 Docker-style subprocess plugins: executables named `hestia-<name>` found on `$PATH` or in `~/.hestia/plugins/`.
 
 ```
-hestia backup ...   →   exec hestia-backup ...
+hestia myplugin ...   →   exec hestia-myplugin ...
 ```
 
 `hestia plugin install <name>` fetches and places the binary.

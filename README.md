@@ -1,13 +1,14 @@
 # Hestia
 
-[![Go](https://github.com/toraaoo/hestia/actions/workflows/go.yaml/badge.svg)](https://github.com/toraaoo/hestia/actions/workflows/go.yaml)
+[![CI](https://github.com/toraaoo/hestia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/toraaoo/hestia/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Docker for Minecraft servers.**
 
-Hestia is a CLI tool for managing Minecraft servers. A persistent background daemon owns your server processes — they keep running after you close the terminal.
+Hestia is a CLI tool for managing Minecraft servers. A persistent background daemon owns your server processes — they
+keep running after you close the terminal.
 
-![Demo](docs/assets/demo.gif)
+<img src="docs/assets/demo.gif" alt="Hestia Demo" width="1280">
 
 ## Features
 
@@ -15,6 +16,7 @@ Hestia is a CLI tool for managing Minecraft servers. A persistent background dae
 - **Persistent daemon** — Servers survive terminal exit
 - **Multiple JAR types** — Vanilla, Paper, Fabric
 - **Auto JRE management** — Downloads correct Java version automatically
+- **Mod management** — Install and manage mods/plugins
 - **Backup system** — Create, restore, prune backups with retention policies
 - **RCON support** — Built-in console access and command execution
 - **Progress display** — Live download progress for JARs and JREs
@@ -26,19 +28,17 @@ Hestia is a CLI tool for managing Minecraft servers. A persistent background dae
 hestiad &
 
 # Create and start a server
-hestia server create survival --version 1.21.4 --jar paper --memory 4G
+hestia create survival --version 1.21.4 --memory 4G
 
 # View running servers
-hestia server ps
+hestia ps
 
 # Attach to server console
-hestia server attach survival
+hestia attach survival
 
 # Stop server
-hestia server stop survival
+hestia stop survival
 ```
-
-![Server Create](docs/assets/server-create.gif)
 
 ## Installation
 
@@ -65,76 +65,127 @@ make install    # installs to $GOBIN
 
 ## Usage
 
-### Server Management
+### Creating Servers
+
+<p align="center">
+  <img src="docs/assets/server-create.gif" alt="Server Create" width="800">
+</p>
 
 ```sh
-# Create server (downloads JAR + JRE automatically)
-hestia server create <name> [flags]
-  --version     Minecraft version (default: latest)
-  --jar         JAR type: vanilla, paper, fabric (default: vanilla)
-  --memory      Memory allocation (e.g., 2G, 4096M)
-  --port        Server port (auto-assigned if 0)
-  --detach      Don't attach after creating
-
-# World configuration
-  --world       World name
-  --seed        World seed
-  --gamemode    survival, creative, adventure, spectator
-  --difficulty  peaceful, easy, normal, hard
-  --max-players Maximum players
-  --motd        Server message of the day
-
-# RCON options
-  --rcon            Enable RCON
-  --no-rcon         Disable RCON
-  --rcon-password   RCON password
-  --rcon-port       RCON port
-
-# Lifecycle
-hestia server start <name>
-hestia server stop <name>
-hestia server restart <name>
-hestia server rm <name>
-
-# Monitoring
-hestia server ps                  # List all servers
-hestia server inspect <name>      # Show server details
-hestia server logs <name> [-f]    # View logs (-f to follow)
-hestia server attach <name>       # Attach to console
-hestia server console <name>      # RCON console
+hestia create <name> [flags]
 ```
 
-![Server PS](docs/assets/server-ps.gif)
+| Flag            | Description                                         |
+|-----------------|-----------------------------------------------------|
+| `--version`     | Minecraft version (default: latest)                 |
+| `--jar`         | JAR type: vanilla, paper, fabric (default: vanilla) |
+| `--memory`      | Memory allocation (e.g., 2G, 4096M)                 |
+| `--port`        | Server port (auto-assigned if 0)                    |
+| `--detach, -d`  | Don't attach after creating                         |
+| `--gamemode`    | survival, creative, adventure, spectator            |
+| `--difficulty`  | peaceful, easy, normal, hard                        |
+| `--seed`        | World seed                                          |
+| `--max-players` | Maximum players                                     |
+| `--motd`        | Server message of the day                           |
+
+**Examples:**
+
+```sh
+# Vanilla server with defaults
+hestia create myserver
+
+# Paper server with 4GB RAM
+hestia create survival --jar paper --memory 4G --version 1.21.4
+
+# Creative server with seed
+hestia create creative --gamemode creative --seed "minecraft" --memory 2G
+```
+
+### Server Lifecycle
+
+```sh
+hestia start <name>      # Start server
+hestia stop <name>       # Stop server
+hestia restart <name>    # Restart server
+hestia rm <name>         # Remove server
+```
+
+### Monitoring Servers
+
+<p align="center">
+  <img src="docs/assets/server-ps.gif" alt="Server PS" width="800">
+</p>
+
+```sh
+hestia ps                     # List all servers (aliases: ls, list)
+hestia inspect <name>         # Show server details
+hestia logs <name> [-f]       # View logs (-f to follow)
+hestia attach <name>          # Attach to console
+hestia attach <name> --rcon   # Attach with RCON responses
+```
+
+### Server Configuration
+
+```sh
+hestia configure <name>              # View config
+hestia configure <name> memory 4G    # Set config value
+```
+
+### Upgrading Servers
+
+```sh
+hestia upgrade <name> [version]
+  --version    Target version (default: latest)
+  --restart    Restart server after upgrade
+  --no-backup  Skip backup of current server.jar
+  --force      Skip downgrade confirmation
+```
+
+### Mod Management
+
+<p align="center">
+  <img src="docs/assets/mods.gif" alt="Mod Management" width="800">
+</p>
+
+```sh
+hestia mod install <server> <mod>   # Install a mod
+hestia mod list <server>            # List installed mods
+hestia mod remove <server> <mod>    # Remove a mod
+```
 
 ### Backups
 
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Backup Management" width="800">
+</p>
+
 ```sh
 # Create backup
-hestia server backup create <name>
-  --full    Full backup (world + config + plugins)
-  --force   Force backup without RCON (unsafe)
+hestia backup create <name>
+hestia backup create <name> --full    # Full backup (world + config + plugins)
 
 # Manage backups
-hestia server backup list <name>
-hestia server backup restore <name> <backup>
-hestia server backup delete <name> <backup>
+hestia backup list <name>
+hestia backup restore <name> <backup>
+hestia backup delete <name> <backup>
 
 # Prune old backups
-hestia server backup prune <name>
-  --keep-last    Keep N most recent
-  --keep-days    Keep backups newer than N days
-  --min-backups  Always keep at least N backups
+hestia backup prune <name> --keep-last 5
+hestia backup prune <name> --keep-days 7 --min-backups 3
 ```
 
 ### Versions
 
+<p align="center">
+  <img src="docs/assets/versions.gif" alt="Version Listing" width="800">
+</p>
+
 ```sh
-# List available versions
-hestia versions
-  --jar        Filter by JAR type (vanilla, paper, fabric)
-  --snapshots  Include snapshots
-  --latest     Show only latest versions
-  --json       Output as JSON
+hestia versions                      # List vanilla releases
+hestia versions --jar paper          # List Paper versions
+hestia versions --jar fabric         # List Fabric versions
+hestia versions --latest             # Show only latest
+hestia versions --snapshots          # Include snapshots
 ```
 
 ### Daemon
@@ -145,7 +196,7 @@ hestia daemon stop     # Stop daemon
 hestia daemon status   # Check if running
 ```
 
-### Configuration
+### Global Configuration
 
 ```sh
 hestia config get <key>
@@ -158,7 +209,7 @@ hestia config set <key> <value>
 hestia CLI  ──HTTP/Unix socket──▶  hestiad daemon  ──▶  minecraft process(es)
 ```
 
-The CLI is a thin HTTP client. All state lives in the daemon. Servers stored under `~/.hestia/servers/`.
+The CLI is a thin HTTP client. All state lives in the daemon.
 
 ### Storage Layout
 
@@ -175,6 +226,7 @@ The CLI is a thin HTTP client. All state lives in the daemon. Servers stored und
         ├── server.jar
         ├── backups/
         ├── logs/
+        ├── mods/
         └── world/
 ```
 
@@ -193,7 +245,7 @@ log_level = "info"
 ```toml
 name = "survival"
 version = "1.21.4"
-jar = "paper"
+jar = "vanilla"
 memory = "4G"
 port = 25565
 
@@ -207,11 +259,11 @@ port = 25575
 
 ## JAR Providers
 
-| Provider | Description |
-|----------|-------------|
-| `vanilla` | Official Mojang server |
-| `paper` | High-performance Paper server |
-| `fabric` | Fabric mod loader |
+| Provider  | Description                   |
+|-----------|-------------------------------|
+| `vanilla` | Official Mojang server        |
+| `paper`   | High-performance Paper server |
+| `fabric`  | Fabric mod loader             |
 
 ## Documentation
 
