@@ -1,0 +1,15 @@
+[Unit]
+Description=Hestia Minecraft Server Manager
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/hestiad
+Restart=on-failure
+RestartSec=5
+User=minecraft
+Group=minecraft
+Environment=HESTIA_DATA_DIR=/var/lib/hestia
+
+[Install]
+WantedBy=multi-user.target

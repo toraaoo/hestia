@@ -48,6 +48,23 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 
+nfpms:
+  - id: packages
+    package_name: hestia
+    vendor: Hestia
+    homepage: https://github.com/toraaoo/hestia
+    maintainer: Hestia Maintainers
+    description: Minecraft server manager
+    license: MIT
+    formats: [deb, rpm]
+    bindir: /usr/bin
+    contents:
+      - src: configs/hestiad.service
+        dst: /lib/systemd/system/hestiad.service
+        type: config
+    scripts:
+      postinstall: configs/postinstall.sh
+
 changelog:
   sort: asc
   filters:

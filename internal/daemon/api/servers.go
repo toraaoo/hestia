@@ -42,6 +42,7 @@ type createRequest struct {
 type serverInfo struct {
 	Name    string        `json:"name"`
 	Version string        `json:"version"`
+	Jar     string        `json:"jar"`
 	Port    int           `json:"port"`
 	State   process.State `json:"state"`
 	PID     int           `json:"pid,omitempty"`
@@ -216,6 +217,7 @@ func handleListServers(w http.ResponseWriter, r *http.Request) {
 		info := serverInfo{
 			Name:    cfg.Name,
 			Version: cfg.Version,
+			Jar:     cfg.Jar,
 			Port:    cfg.Port,
 			State:   process.StateStopped,
 		}
@@ -312,4 +314,151 @@ func extractServerName(path, suffix string) string {
 	path = strings.TrimPrefix(path, "/servers/")
 	path = strings.TrimSuffix(path, suffix)
 	return path
+}
+
+type upgradeRequest struct {
+	Version  string `json:"version"`
+	NoBackup bool   `json:"no_backup,omitempty"`
+}
+
+func handleUpgradeServer(w http.ResponseWriter, r *http.Request) {
+	name := extractServerName(r.URL.Path, "/upgrade")
+
+	var req upgradeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.Version == "" {
+		writeError(w, "version required", http.StatusBadRequest)
+		return
+	}
+
+	cfg, err := server.LoadConfig(name)
+	if err != nil {
+		writeError(w, "server not found", http.StatusNotFound)
+		return
+	}
+
+	if r.Header.Get("Accept") == "text/event-stream" {
+		handleUpgradeServerSSE(w, r, name, cfg, req)
+		return
+	}
+
+	if proc := procManager.Get(name); proc != nil && proc.GetState() != process.StateStopped {
+		if err := procManager.Stop(name); err != nil {
+			writeError(w, "stop server: "+err.Error(), http.StatusConflict)
+			return
+		}
+	}
+
+	var backupPath string
+	if !req.NoBackup {
+		backupPath, err = server.BackupJar(name)
+		if err != nil {
+			writeError(w, "backup jar: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = server.PruneBackups(name, 3)
+	}
+
+	provider, err := jar.GetProvider(cfg.Jar)
+	if err != nil {
+		writeError(w, "unsupported jar type: "+cfg.Jar, http.StatusBadRequest)
+		return
+	}
+
+	jarPath := server.JarPath(name)
+	if err := provider.DownloadServer(req.Version, jarPath, nil); err != nil {
+		writeError(w, "download server: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	javaVersion, _ := provider.GetJavaVersion(req.Version)
+	if javaVersion > 0 && !jre.IsInstalled(javaVersion) {
+		if err := jre.Download(javaVersion, nil); err != nil {
+			writeError(w, "download jre: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	cfg.Version = req.Version
+	if err := cfg.Save(); err != nil {
+		writeError(w, "save config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := map[string]any{
+		"version":     req.Version,
+		"backup_path": backupPath,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func handleUpgradeServerSSE(w http.ResponseWriter, _ *http.Request, name string, cfg *server.Config, req upgradeRequest) {
+	sse, err := NewSSEWriter(w)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	cb := func(evt progress.Event) { _ = sse.WriteEvent(evt) }
+
+	if proc := procManager.Get(name); proc != nil && proc.GetState() != process.StateStopped {
+		if err := procManager.Stop(name); err != nil {
+			_ = sse.WriteError("stop server: " + err.Error())
+			return
+		}
+	}
+
+	var backupPath string
+	if !req.NoBackup {
+		cb(progress.Event{Type: progress.EventStart, Category: progress.CategoryBackup, Message: "backing up server.jar"})
+		backupPath, err = server.BackupJar(name)
+		if err != nil {
+			_ = sse.WriteError("backup jar: " + err.Error())
+			return
+		}
+		_ = server.PruneBackups(name, 3)
+		cb(progress.Event{Type: progress.EventComplete, Category: progress.CategoryBackup, Message: backupPath})
+	}
+
+	provider, err := jar.GetProvider(cfg.Jar)
+	if err != nil {
+		_ = sse.WriteError("unsupported jar type: " + cfg.Jar)
+		return
+	}
+
+	jarPath := server.JarPath(name)
+	if err := provider.DownloadServer(req.Version, jarPath, cb); err != nil {
+		_ = sse.WriteError("download server: " + err.Error())
+		return
+	}
+
+	javaVersion, _ := provider.GetJavaVersion(req.Version)
+	if javaVersion > 0 {
+		if jre.IsInstalled(javaVersion) {
+			cb(progress.Event{Type: progress.EventComplete, Category: progress.CategoryJRE, Message: "cached"})
+			cb(progress.Event{Type: progress.EventComplete, Category: progress.CategoryExtract, Message: "skipped"})
+		} else {
+			if err := jre.Download(javaVersion, cb); err != nil {
+				_ = sse.WriteError("download jre: " + err.Error())
+				return
+			}
+		}
+	}
+
+	cfg.Version = req.Version
+	if err := cfg.Save(); err != nil {
+		_ = sse.WriteError("save config: " + err.Error())
+		return
+	}
+
+	result := map[string]any{
+		"version":     req.Version,
+		"backup_path": backupPath,
+	}
+	_ = sse.WriteDone(result)
 }

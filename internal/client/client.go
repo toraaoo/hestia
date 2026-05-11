@@ -69,6 +69,7 @@ func (c *Client) DoRaw(_ context.Context, req *http.Request) (*http.Response, er
 type ServerInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
+	Jar     string `json:"jar"`
 	Port    int    `json:"port"`
 	State   string `json:"state"`
 	PID     int    `json:"pid,omitempty"`
@@ -98,6 +99,11 @@ type CreateRequest struct {
 type LogLine struct {
 	Time time.Time `json:"time"`
 	Text string    `json:"text"`
+}
+
+type UpgradeRequest struct {
+	Version  string `json:"version"`
+	NoBackup bool   `json:"no_backup,omitempty"`
 }
 
 // Typed methods
@@ -191,6 +197,37 @@ func (c *Client) DeleteServer(ctx context.Context, name string) error {
 	return c.Do(ctx, "DELETE", "/servers/"+name, nil, nil)
 }
 
+func (c *Client) UpgradeServer(ctx context.Context, name string, req UpgradeRequest) (map[string]any, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	var resp map[string]any
+	return resp, c.Do(ctx, "POST", "/servers/"+name+"/upgrade", bytes.NewReader(body), &resp)
+}
+
+func (c *Client) UpgradeServerWithProgress(ctx context.Context, name string, req UpgradeRequest, handler func(progress.Event)) (map[string]any, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", "http://hestiad/servers/"+name+"/upgrade", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Accept", "text/event-stream")
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("daemon unreachable: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	return c.readSSE(resp.Body, handler)
+}
+
 func (c *Client) GetLogs(ctx context.Context, name string, lines int) ([]LogLine, error) {
 	var logs []LogLine
 	path := fmt.Sprintf("/servers/%s/logs?lines=%d", name, lines)
@@ -216,4 +253,62 @@ func (c *Client) SendConsoleCommand(ctx context.Context, name, command string) e
 		return err
 	}
 	return c.Do(ctx, "POST", "/servers/"+name+"/console", bytes.NewReader(body), nil)
+}
+
+type BackupInfo struct {
+	Name      string    `json:"name"`
+	Path      string    `json:"path"`
+	Type      string    `json:"type"`
+	Size      int64     `json:"size"`
+	CreatedAt time.Time `json:"created_at"`
+	WorldName string    `json:"world_name,omitempty"`
+	Version   string    `json:"version,omitempty"`
+}
+
+type BackupRequest struct {
+	Type  string `json:"type,omitempty"`
+	Force bool   `json:"force,omitempty"`
+}
+
+type PruneRequest struct {
+	KeepLast   int `json:"keep_last,omitempty"`
+	KeepDays   int `json:"keep_days,omitempty"`
+	MinBackups int `json:"min_backups,omitempty"`
+}
+
+type PruneResult struct {
+	Deleted int      `json:"deleted"`
+	Names   []string `json:"names"`
+}
+
+func (c *Client) CreateBackup(ctx context.Context, serverName string, req BackupRequest) (*BackupInfo, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	var info BackupInfo
+	return &info, c.Do(ctx, "POST", "/servers/"+serverName+"/backup", bytes.NewReader(body), &info)
+}
+
+func (c *Client) ListBackups(ctx context.Context, serverName string) ([]BackupInfo, error) {
+	var backups []BackupInfo
+	return backups, c.Do(ctx, "GET", "/servers/"+serverName+"/backups", nil, &backups)
+}
+
+func (c *Client) RestoreBackup(ctx context.Context, serverName, backupName string) (map[string]any, error) {
+	var result map[string]any
+	return result, c.Do(ctx, "POST", "/servers/"+serverName+"/backups/"+backupName+"/restore", nil, &result)
+}
+
+func (c *Client) DeleteBackup(ctx context.Context, serverName, backupName string) error {
+	return c.Do(ctx, "DELETE", "/servers/"+serverName+"/backups/"+backupName, nil, nil)
+}
+
+func (c *Client) PruneBackups(ctx context.Context, serverName string, req PruneRequest) (*PruneResult, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	var result PruneResult
+	return &result, c.Do(ctx, "POST", "/servers/"+serverName+"/backups/prune", bytes.NewReader(body), &result)
 }

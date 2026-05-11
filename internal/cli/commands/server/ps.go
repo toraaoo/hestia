@@ -10,13 +10,13 @@ import (
 	"github.com/toraaoo/hestia/internal/client"
 )
 
-func newLsCmd() *cobra.Command {
+func newPsCmd() *cobra.Command {
 	var jsonOut bool
 
 	cmd := &cobra.Command{
-		Use:     "ls",
-		Aliases: []string{"list"},
-		Short:   "List servers",
+		Use:     "ps",
+		Aliases: []string{"ls", "list"},
+		Short:   "Show server status",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return withClient(cmd, func(c *client.Client) error {
 				servers, err := c.ListServers(cmd.Context())
@@ -41,14 +41,14 @@ func newLsCmd() *cobra.Command {
 					if s.PID > 0 {
 						pid = fmt.Sprintf("%d", s.PID)
 					}
-					state := ui.StateStyle(s.State).Render(s.State)
-					rows[i] = []string{s.Name, s.Version, fmt.Sprintf("%d", s.Port), state, pid}
+					status := ui.StateStyle(s.State).Render(s.State)
+					rows[i] = []string{s.Name, s.Jar, s.Version, fmt.Sprintf("%d", s.Port), status, pid}
 				}
 
 				fmt.Println(ui.RenderTable(
-					[]string{"NAME", "VERSION", "PORT", "STATE", "PID"},
+					[]string{"NAME", "TYPE", "VERSION", "PORT", "STATUS", "PID"},
 					rows,
-					[]int{20, 12, 8, 10, 8},
+					[]int{20, 10, 12, 8, 10, 8},
 				))
 				return nil
 			})

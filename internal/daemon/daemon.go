@@ -7,11 +7,30 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/toraaoo/hestia/internal/backup"
 	"github.com/toraaoo/hestia/internal/config"
 	"github.com/toraaoo/hestia/internal/daemon/api"
 	"github.com/toraaoo/hestia/internal/daemon/process"
 	"github.com/toraaoo/hestia/internal/log"
+	"github.com/toraaoo/hestia/internal/server"
 )
+
+type processManagerState struct {
+	pm *process.Manager
+}
+
+func (s *processManagerState) IsRunning(serverName string) bool {
+	proc := s.pm.Get(serverName)
+	return proc != nil && proc.GetState() == process.StateRunning
+}
+
+func (s *processManagerState) GetRCONInfo(serverName string) (port int, password string, enabled bool) {
+	cfg, err := server.LoadConfig(serverName)
+	if err != nil {
+		return 0, "", false
+	}
+	return cfg.RCON.Port, cfg.RCON.Password, cfg.RCON.Enabled
+}
 
 func Run() error {
 	cfg, err := config.Load()
@@ -27,6 +46,14 @@ func Run() error {
 	}
 
 	pm := process.NewManager()
+
+	backupScheduler := backup.NewScheduler(&processManagerState{pm: pm})
+	if err := backup.LoadSchedules(backupScheduler); err != nil {
+		log.Warn("failed to load backup schedules", "error", err)
+	}
+	backupScheduler.Start()
+	defer backupScheduler.Stop()
+
 	mux := http.NewServeMux()
 	shutdownCh := make(chan struct{})
 	api.Register(mux, shutdownCh, pm)

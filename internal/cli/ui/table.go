@@ -55,7 +55,7 @@ func RenderTable(headers []string, rows [][]string, widths []int) string {
 }
 
 func truncate(s string, max int) string {
-	if len(s) <= max {
+	if lipgloss.Width(s) <= max {
 		return s
 	}
 	if max <= 3 {

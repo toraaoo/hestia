@@ -18,8 +18,9 @@ type Config struct {
 	Memory  string `toml:"memory" json:"memory"`
 	Port    int    `toml:"port" json:"port"`
 
-	RCON  RCONConfig  `toml:"rcon" json:"rcon"`
-	World WorldConfig `toml:"world" json:"world"`
+	RCON   RCONConfig   `toml:"rcon" json:"rcon"`
+	World  WorldConfig  `toml:"world" json:"world"`
+	Backup BackupConfig `toml:"backup" json:"backup"`
 }
 
 type RCONConfig struct {
@@ -35,6 +36,19 @@ type WorldConfig struct {
 	Difficulty string `toml:"difficulty" json:"difficulty"`
 	MaxPlayers int    `toml:"max_players" json:"max_players"`
 	MOTD       string `toml:"motd" json:"motd"`
+}
+
+type BackupConfig struct {
+	Enabled   bool            `toml:"enabled" json:"enabled"`
+	Schedule  string          `toml:"schedule" json:"schedule"`
+	Type      string          `toml:"type" json:"type"`
+	Retention RetentionConfig `toml:"retention" json:"retention"`
+}
+
+type RetentionConfig struct {
+	KeepLast   int `toml:"keep_last" json:"keep_last"`
+	KeepDays   int `toml:"keep_days" json:"keep_days"`
+	MinBackups int `toml:"min_backups" json:"min_backups"`
 }
 
 func DefaultConfig(name, version string) *Config {
@@ -56,6 +70,16 @@ func DefaultConfig(name, version string) *Config {
 			Difficulty: "normal",
 			MaxPlayers: 20,
 			MOTD:       "A Minecraft Server",
+		},
+		Backup: BackupConfig{
+			Enabled:  false,
+			Schedule: "0 */6 * * *",
+			Type:     "world",
+			Retention: RetentionConfig{
+				KeepLast:   10,
+				KeepDays:   7,
+				MinBackups: 3,
+			},
 		},
 	}
 }

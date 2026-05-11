@@ -11,16 +11,18 @@ func NewCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newCreateCmd(),
-		newLsCmd(),
+		newPsCmd(),
 		newInspectCmd(),
 		newRmCmd(),
 		newStartCmd(),
 		newStopCmd(),
 		newRestartCmd(),
+		newUpgradeCmd(),
 		newLogsCmd(),
 		newAttachCmd(),
 		newConsoleCmd(),
 		newConfigCmd(),
+		newBackupCmd(),
 	)
 	return cmd
 }

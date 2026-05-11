@@ -16,6 +16,7 @@ const (
 	CategoryJar      Category = "jar"
 	CategoryJRE      Category = "jre"
 	CategoryExtract  Category = "extract"
+	CategoryBackup   Category = "backup"
 )
 
 type Event struct {
