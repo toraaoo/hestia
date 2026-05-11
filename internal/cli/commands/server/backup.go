@@ -55,8 +55,8 @@ func newBackupCreateCmd() *cobra.Command {
 					return enc.Encode(info)
 				}
 
-				fmt.Fprintf(cmd.OutOrStdout(), "Created backup: %s (%s)\n", info.Name, formatBytes(info.Size))
-				return nil
+				_, err = fmt.Fprintf(cmd.OutOrStdout(), "Created backup: %s (%s)\n", info.Name, formatBytes(info.Size))
+				return err
 			})
 		},
 	}
@@ -88,8 +88,8 @@ func newBackupListCmd() *cobra.Command {
 				}
 
 				if len(backups) == 0 {
-					fmt.Fprintln(cmd.OutOrStdout(), "No backups found")
-					return nil
+					_, err = fmt.Fprintln(cmd.OutOrStdout(), "No backups found")
+					return err
 				}
 
 				headers := []string{"NAME", "TYPE", "SIZE", "CREATED"}
@@ -105,8 +105,8 @@ func newBackupListCmd() *cobra.Command {
 					})
 				}
 
-				fmt.Fprint(cmd.OutOrStdout(), ui.RenderTable(headers, rows, widths))
-				return nil
+				_, err = fmt.Fprint(cmd.OutOrStdout(), ui.RenderTable(headers, rows, widths))
+				return err
 			})
 		},
 	}
@@ -127,9 +127,12 @@ func newBackupRestoreCmd() *cobra.Command {
 					return err
 				}
 
-				fmt.Fprintf(cmd.OutOrStdout(), "Restored: %s\n", result["restored"])
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Restored: %s\n", result["restored"]); err != nil {
+					return err
+				}
 				if wasRunning, ok := result["was_running"].(bool); ok && wasRunning {
-					fmt.Fprintln(cmd.OutOrStdout(), "Server was stopped for restore. Restart with: hestia server start", args[0])
+					_, err := fmt.Fprintln(cmd.OutOrStdout(), "Server was stopped for restore. Restart with: hestia server start", args[0])
+					return err
 				}
 				return nil
 			})
@@ -148,8 +151,8 @@ func newBackupDeleteCmd() *cobra.Command {
 				if err := c.DeleteBackup(cmd.Context(), args[0], args[1]); err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "Deleted: %s\n", args[1])
-				return nil
+				_, err := fmt.Fprintf(cmd.OutOrStdout(), "Deleted: %s\n", args[1])
+				return err
 			})
 		},
 	}
@@ -181,13 +184,17 @@ func newBackupPruneCmd() *cobra.Command {
 				}
 
 				if result.Deleted == 0 {
-					fmt.Fprintln(cmd.OutOrStdout(), "No backups to prune")
-					return nil
+					_, err := fmt.Fprintln(cmd.OutOrStdout(), "No backups to prune")
+					return err
 				}
 
-				fmt.Fprintf(cmd.OutOrStdout(), "Deleted %d backup(s):\n", result.Deleted)
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Deleted %d backup(s):\n", result.Deleted); err != nil {
+					return err
+				}
 				for _, name := range result.Names {
-					fmt.Fprintf(cmd.OutOrStdout(), "  - %s\n", name)
+					if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  - %s\n", name); err != nil {
+						return err
+					}
 				}
 				return nil
 			})

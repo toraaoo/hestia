@@ -69,7 +69,9 @@ func createWithRCON(opts Options) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("rcon connect: %w", err)
 	}
-	defer client.Close()
+	defer func() {
+		_ = client.Close()
+	}()
 
 	if _, err := client.Execute("save-off"); err != nil {
 		return nil, fmt.Errorf("save-off: %w", err)
@@ -152,17 +154,31 @@ func createArchive(opts Options) (*Info, error) {
 }
 
 func createTarGz(dest, baseDir string, sources []string) error {
+	var retErr error
+
 	f, err := os.Create(dest)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	gw := gzip.NewWriter(f)
-	defer gw.Close()
+	defer func() {
+		if err := gw.Close(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	tw := tar.NewWriter(gw)
-	defer tw.Close()
+	defer func() {
+		if err := tw.Close(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	for _, src := range sources {
 		srcPath := filepath.Join(baseDir, src)
@@ -202,17 +218,21 @@ func createTarGz(dest, baseDir string, sources []string) error {
 			if err != nil {
 				return err
 			}
-			defer file.Close()
 
-			_, err = io.Copy(tw, file)
-			return err
+			_, copyErr := io.Copy(tw, file)
+			closeErr := file.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+			return closeErr
 		})
 		if err != nil {
-			return err
+			retErr = err
+			return retErr
 		}
 	}
 
-	return nil
+	return retErr
 }
 
 func List(serverName string) ([]Info, error) {
@@ -296,17 +316,27 @@ func Restore(serverName, backupName string) error {
 }
 
 func extractTarGz(src, dest string) error {
+	var retErr error
+
 	f, err := os.Open(src)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	gr, err := gzip.NewReader(f)
 	if err != nil {
 		return err
 	}
-	defer gr.Close()
+	defer func() {
+		if err := gr.Close(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	tr := tar.NewReader(gr)
 
@@ -338,11 +368,15 @@ func extractTarGz(src, dest string) error {
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(outFile, tr); err != nil {
-				outFile.Close()
-				return err
+
+			_, copyErr := io.Copy(outFile, tr)
+			closeErr := outFile.Close()
+			if copyErr != nil {
+				return copyErr
 			}
-			outFile.Close()
+			if closeErr != nil {
+				return closeErr
+			}
 		case tar.TypeSymlink:
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return err
@@ -353,7 +387,7 @@ func extractTarGz(src, dest string) error {
 		}
 	}
 
-	return nil
+	return retErr
 }
 
 func Delete(serverName, backupName string) error {
