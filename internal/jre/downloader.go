@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/toraaoo/hestia/internal/httpc"
+	"github.com/toraaoo/hestia/internal/progress"
 )
 
 func adoptiumArch() string {
@@ -42,15 +43,26 @@ func downloadURL(majorVersion int) string {
 	)
 }
 
-func Download(majorVersion int) error {
+func Download(majorVersion int, cb progress.Callback) error {
 	url := downloadURL(majorVersion)
+
+	if cb != nil {
+		cb(progress.Event{Type: progress.EventStart, Category: progress.CategoryJRE, Message: "downloading"})
+	}
+
 	resp, err := httpc.GetDownload(url)
 	if err != nil {
+		if cb != nil {
+			cb(progress.Event{Type: progress.EventError, Category: progress.CategoryJRE, Error: err.Error()})
+		}
 		return fmt.Errorf("fetch jre: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
+		if cb != nil {
+			cb(progress.Event{Type: progress.EventError, Category: progress.CategoryJRE, Error: resp.Status})
+		}
 		return fmt.Errorf("adoptium api: %s", resp.Status)
 	}
 
@@ -61,12 +73,36 @@ func Download(majorVersion int) error {
 	tmpPath := tmpFile.Name()
 	defer os.Remove(tmpPath)
 
-	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("download jre: %w", err)
+	total := resp.ContentLength
+	var downloaded int64
+	buf := make([]byte, 32*1024)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := tmpFile.Write(buf[:n]); writeErr != nil {
+				tmpFile.Close()
+				return fmt.Errorf("write temp: %w", writeErr)
+			}
+			downloaded += int64(n)
+			if cb != nil {
+				cb(progress.Event{Type: progress.EventProgress, Category: progress.CategoryJRE, Current: downloaded, Total: total})
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			tmpFile.Close()
+			return fmt.Errorf("download jre: %w", readErr)
+		}
 	}
 	if err := tmpFile.Close(); err != nil {
 		return fmt.Errorf("close temp file: %w", err)
+	}
+
+	if cb != nil {
+		cb(progress.Event{Type: progress.EventComplete, Category: progress.CategoryJRE})
+		cb(progress.Event{Type: progress.EventStart, Category: progress.CategoryExtract, Message: "extracting"})
 	}
 
 	f, err := os.Open(tmpPath)
@@ -80,14 +116,21 @@ func Download(majorVersion int) error {
 		return fmt.Errorf("create jre dir: %w", err)
 	}
 
-	if err := extractTarGz(f, destDir); err != nil {
+	if err := extractTarGz(f, destDir, cb); err != nil {
 		os.RemoveAll(destDir)
+		if cb != nil {
+			cb(progress.Event{Type: progress.EventError, Category: progress.CategoryExtract, Error: err.Error()})
+		}
 		return fmt.Errorf("extract jre: %w", err)
+	}
+
+	if cb != nil {
+		cb(progress.Event{Type: progress.EventComplete, Category: progress.CategoryExtract})
 	}
 	return nil
 }
 
-func extractTarGz(r io.Reader, destDir string) error {
+func extractTarGz(r io.Reader, destDir string, _ progress.Callback) error {
 	gz, err := gzip.NewReader(r)
 	if err != nil {
 		return err

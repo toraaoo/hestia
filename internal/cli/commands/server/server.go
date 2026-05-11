@@ -18,6 +18,7 @@ func NewCmd() *cobra.Command {
 		newStopCmd(),
 		newRestartCmd(),
 		newLogsCmd(),
+		newAttachCmd(),
 		newConsoleCmd(),
 		newConfigCmd(),
 	)

@@ -2,14 +2,14 @@ package jar
 
 import "fmt"
 
-var providers = map[string]func() JarProvider{}
+var providerRegistry = map[string]func() JarProvider{}
 
 func Register(name string, factory func() JarProvider) {
-	providers[name] = factory
+	providerRegistry[name] = factory
 }
 
 func GetProvider(name string) (JarProvider, error) {
-	f, ok := providers[name]
+	f, ok := providerRegistry[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown jar provider: %s", name)
 	}
@@ -17,13 +17,9 @@ func GetProvider(name string) (JarProvider, error) {
 }
 
 func ListProviders() []string {
-	names := make([]string, 0, len(providers))
-	for name := range providers {
+	names := make([]string, 0, len(providerRegistry))
+	for name := range providerRegistry {
 		names = append(names, name)
 	}
 	return names
-}
-
-func init() {
-	Register("vanilla", func() JarProvider { return VanillaProvider{} })
 }

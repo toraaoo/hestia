@@ -12,7 +12,7 @@ import (
 const cacheTTL = time.Hour
 
 type cachedManifest struct {
-	Manifest  *versionManifest `json:"manifest"`
+	Manifest  *VersionManifest `json:"manifest"`
 	FetchedAt time.Time        `json:"fetchedAt"`
 }
 
@@ -24,7 +24,7 @@ func manifestCachePath() string {
 	return filepath.Join(cacheDir(), "versions.json")
 }
 
-func loadCachedManifest() (*versionManifest, bool) {
+func loadCachedManifest() (*VersionManifest, bool) {
 	data, err := os.ReadFile(manifestCachePath())
 	if err != nil {
 		return nil, false
@@ -39,7 +39,7 @@ func loadCachedManifest() (*versionManifest, bool) {
 	return cached.Manifest, true
 }
 
-func saveManifestCache(m *versionManifest) error {
+func saveManifestCache(m *VersionManifest) error {
 	if err := os.MkdirAll(cacheDir(), 0755); err != nil {
 		return err
 	}

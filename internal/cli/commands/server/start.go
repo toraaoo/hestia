@@ -2,8 +2,10 @@ package server
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/toraaoo/hestia/internal/cli/ui"
 	"github.com/toraaoo/hestia/internal/client"
 )
 
@@ -14,10 +16,15 @@ func newStartCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withClient(cmd, func(c *client.Client) error {
-				if err := c.StartServer(cmd.Context(), args[0]); err != nil {
+				name := args[0]
+				spinner := ui.NewSpinner(os.Stdout, fmt.Sprintf("Starting %s...", name))
+				spinner.Start()
+				err := c.StartServer(cmd.Context(), name)
+				spinner.Stop()
+				if err != nil {
 					return err
 				}
-				fmt.Printf("Starting server %s\n", args[0])
+				fmt.Printf("%s Started server %s\n", ui.StateRunning.Render("✓"), name)
 				return nil
 			})
 		},

@@ -6,9 +6,11 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/toraaoo/hestia/internal/cli/ui"
 	"github.com/toraaoo/hestia/internal/client"
 	"github.com/toraaoo/hestia/internal/config"
 	"github.com/toraaoo/hestia/internal/jar"
+	"golang.org/x/term"
 )
 
 func NewCmd() *cobra.Command {
@@ -86,16 +88,25 @@ func printVersions(versions []jar.Version, latestInfo struct {
 		return enc.Encode(versions)
 	}
 
-	for _, v := range versions {
+	items := make([]string, len(versions))
+	for i, v := range versions {
 		marker := ""
 		if v.ID == latestInfo.Release {
 			marker = " (latest release)"
 		} else if v.ID == latestInfo.Snapshot {
 			marker = " (latest snapshot)"
 		}
-		fmt.Printf("%s  %s  %s%s\n", v.ID, v.Type, v.ReleaseTime[:10], marker)
+		items[i] = fmt.Sprintf("%s  %s  %s%s", v.ID, v.Type, v.ReleaseTime[:10], marker)
 	}
-	return nil
+
+	if !term.IsTerminal(int(os.Stdout.Fd())) || latest {
+		for _, item := range items {
+			fmt.Println(item)
+		}
+		return nil
+	}
+
+	return ui.RunPaginator(items, 20)
 }
 
 func filterLatest(versions []jar.Version, release, snapshot string) []jar.Version {

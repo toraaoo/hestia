@@ -34,7 +34,7 @@ func GetJRE(majorVersion int) (string, error) {
 	if IsInstalled(majorVersion) {
 		return javaBinaryPath(majorVersion), nil
 	}
-	if err := Download(majorVersion); err != nil {
+	if err := Download(majorVersion, nil); err != nil {
 		return "", fmt.Errorf("download jre %d: %w", majorVersion, err)
 	}
 	path := javaBinaryPath(majorVersion)

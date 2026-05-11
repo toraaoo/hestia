@@ -10,10 +10,10 @@ import (
 
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "hestia",
-		Short:         "Hestia — Minecraft server manager",
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Use:   "hestia",
+		Short: "Hestia — Minecraft server manager",
+		//SilenceUsage: true,
+		//SilenceErrors: true,
 	}
 	cmd.AddCommand(
 		cmddaemon.NewCmd(),

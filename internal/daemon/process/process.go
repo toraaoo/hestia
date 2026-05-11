@@ -186,7 +186,7 @@ func (p *Process) run() {
 	jarPath := server.JarPath(p.Name)
 	if _, err := os.Stat(jarPath); os.IsNotExist(err) {
 		p.ring.Write(fmt.Sprintf("Downloading server jar %s...\n", p.Config.Version))
-		if err := provider.DownloadServer(p.Config.Version, jarPath); err != nil {
+		if err := provider.DownloadServer(p.Config.Version, jarPath, nil); err != nil {
 			p.ring.Write(fmt.Sprintf("ERROR: download server: %v\n", err))
 			return
 		}

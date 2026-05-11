@@ -9,22 +9,22 @@ import (
 
 const manifestURL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
-type versionManifest struct {
+type VersionManifest struct {
 	Latest struct {
 		Release  string `json:"release"`
 		Snapshot string `json:"snapshot"`
 	} `json:"latest"`
-	Versions []manifestVersion `json:"versions"`
+	Versions []ManifestVersion `json:"versions"`
 }
 
-type manifestVersion struct {
+type ManifestVersion struct {
 	ID          string `json:"id"`
 	Type        string `json:"type"`
 	URL         string `json:"url"`
 	ReleaseTime string `json:"releaseTime"`
 }
 
-type versionMeta struct {
+type VersionMeta struct {
 	Downloads struct {
 		Server struct {
 			URL  string `json:"url"`
@@ -37,7 +37,7 @@ type versionMeta struct {
 	} `json:"javaVersion"`
 }
 
-func fetchManifest() (*versionManifest, error) {
+func FetchManifest() (*VersionManifest, error) {
 	if cached, ok := loadCachedManifest(); ok {
 		return cached, nil
 	}
@@ -52,7 +52,7 @@ func fetchManifest() (*versionManifest, error) {
 		return nil, fmt.Errorf("manifest api: %s", resp.Status)
 	}
 
-	var m versionManifest
+	var m VersionManifest
 	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
 		return nil, fmt.Errorf("decode manifest: %w", err)
 	}
@@ -61,7 +61,7 @@ func fetchManifest() (*versionManifest, error) {
 	return &m, nil
 }
 
-func fetchVersionMeta(url string) (*versionMeta, error) {
+func FetchVersionMeta(url string) (*VersionMeta, error) {
 	resp, err := httpc.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("fetch version meta: %w", err)
@@ -72,18 +72,34 @@ func fetchVersionMeta(url string) (*versionMeta, error) {
 		return nil, fmt.Errorf("version meta api: %s", resp.Status)
 	}
 
-	var meta versionMeta
+	var meta VersionMeta
 	if err := json.NewDecoder(resp.Body).Decode(&meta); err != nil {
 		return nil, fmt.Errorf("decode version meta: %w", err)
 	}
 	return &meta, nil
 }
 
-func findVersion(manifest *versionManifest, versionID string) (*manifestVersion, error) {
+func FindVersion(manifest *VersionManifest, versionID string) (*ManifestVersion, error) {
 	for i := range manifest.Versions {
 		if manifest.Versions[i].ID == versionID {
 			return &manifest.Versions[i], nil
 		}
 	}
 	return nil, fmt.Errorf("version not found: %s", versionID)
+}
+
+func GetLatestRelease() (string, error) {
+	manifest, err := FetchManifest()
+	if err != nil {
+		return "", err
+	}
+	return manifest.Latest.Release, nil
+}
+
+func GetLatestSnapshot() (string, error) {
+	manifest, err := FetchManifest()
+	if err != nil {
+		return "", err
+	}
+	return manifest.Latest.Snapshot, nil
 }

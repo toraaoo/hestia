@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -8,7 +9,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/toraaoo/hestia/internal/progress"
 )
 
 // Client sends requests to the hestiad daemon over a Unix socket.
@@ -75,6 +79,20 @@ type CreateRequest struct {
 	Version string `json:"version"`
 	Memory  string `json:"memory,omitempty"`
 	Port    int    `json:"port,omitempty"`
+	Jar     string `json:"jar,omitempty"`
+
+	// RCON
+	RCONEnabled  *bool  `json:"rcon_enabled,omitempty"`
+	RCONPassword string `json:"rcon_password,omitempty"`
+	RCONPort     int    `json:"rcon_port,omitempty"`
+
+	// World
+	WorldName  string `json:"world_name,omitempty"`
+	Seed       string `json:"seed,omitempty"`
+	Gamemode   string `json:"gamemode,omitempty"`
+	Difficulty string `json:"difficulty,omitempty"`
+	MaxPlayers int    `json:"max_players,omitempty"`
+	MOTD       string `json:"motd,omitempty"`
 }
 
 type LogLine struct {
@@ -101,6 +119,60 @@ func (c *Client) CreateServer(ctx context.Context, req CreateRequest) (map[strin
 	}
 	var resp map[string]any
 	return resp, c.Do(ctx, "POST", "/servers", bytes.NewReader(body), &resp)
+}
+
+func (c *Client) CreateServerWithProgress(ctx context.Context, req CreateRequest, handler func(progress.Event)) (map[string]any, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", "http://hestiad/servers", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Accept", "text/event-stream")
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("daemon unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return c.readSSE(resp.Body, handler)
+}
+
+func (c *Client) readSSE(r io.Reader, handler func(progress.Event)) (map[string]any, error) {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		data := strings.TrimPrefix(line, "data: ")
+
+		var msg map[string]any
+		if err := json.Unmarshal([]byte(data), &msg); err != nil {
+			continue
+		}
+
+		if done, ok := msg["done"].(bool); ok && done {
+			if result, ok := msg["result"].(map[string]any); ok {
+				return result, nil
+			}
+			return nil, nil
+		}
+
+		var evt progress.Event
+		if err := json.Unmarshal([]byte(data), &evt); err == nil {
+			if evt.Type == progress.EventError && evt.Error != "" {
+				return nil, fmt.Errorf("%s", evt.Error)
+			}
+			handler(evt)
+		}
+	}
+	return nil, scanner.Err()
 }
 
 func (c *Client) StartServer(ctx context.Context, name string) error {

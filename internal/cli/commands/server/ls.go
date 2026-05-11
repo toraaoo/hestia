@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/toraaoo/hestia/internal/cli/ui"
 	"github.com/toraaoo/hestia/internal/client"
 )
 
@@ -34,14 +35,21 @@ func newLsCmd() *cobra.Command {
 					return nil
 				}
 
-				fmt.Printf("%-20s %-12s %-8s %-10s %s\n", "NAME", "VERSION", "PORT", "STATE", "PID")
-				for _, s := range servers {
+				rows := make([][]string, len(servers))
+				for i, s := range servers {
 					pid := ""
 					if s.PID > 0 {
 						pid = fmt.Sprintf("%d", s.PID)
 					}
-					fmt.Printf("%-20s %-12s %-8d %-10s %s\n", s.Name, s.Version, s.Port, s.State, pid)
+					state := ui.StateStyle(s.State).Render(s.State)
+					rows[i] = []string{s.Name, s.Version, fmt.Sprintf("%d", s.Port), state, pid}
 				}
+
+				fmt.Println(ui.RenderTable(
+					[]string{"NAME", "VERSION", "PORT", "STATE", "PID"},
+					rows,
+					[]int{20, 12, 8, 10, 8},
+				))
 				return nil
 			})
 		},

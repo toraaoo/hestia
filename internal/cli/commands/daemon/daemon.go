@@ -21,8 +21,39 @@ func newClient() *client.Client {
 	return client.New(config.DefaultSockPath())
 }
 
-func isDaemonRunning(ctx context.Context, c *client.Client) bool {
+// IsDaemonRunning checks if daemon is responding to ping.
+func IsDaemonRunning(ctx context.Context, c *client.Client) bool {
 	return c.Do(ctx, "GET", "/ping", nil, nil) == nil
+}
+
+// StartDaemon spawns hestiad and waits for it to be ready.
+func StartDaemon(ctx context.Context, c *client.Client) error {
+	if IsDaemonRunning(ctx, c) {
+		return nil
+	}
+
+	daemonCmd := exec.Command("hestiad")
+	daemonCmd.Stdout = nil
+	daemonCmd.Stderr = nil
+	daemonCmd.Stdin = nil
+	if err := daemonCmd.Start(); err != nil {
+		return fmt.Errorf("failed to start daemon: %w", err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if IsDaemonRunning(ctx, c) {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return fmt.Errorf("daemon failed to start within timeout")
+}
+
+// EnsureDaemon starts daemon if not running.
+func EnsureDaemon(ctx context.Context, c *client.Client) error {
+	return StartDaemon(ctx, c)
 }
 
 func newStartCmd() *cobra.Command {
@@ -33,29 +64,16 @@ func newStartCmd() *cobra.Command {
 			ctx := cmd.Context()
 			c := newClient()
 
-			if isDaemonRunning(ctx, c) {
+			if IsDaemonRunning(ctx, c) {
 				fmt.Fprintln(cmd.OutOrStdout(), "daemon already running")
 				return nil
 			}
 
-			daemonCmd := exec.Command("hestiad")
-			daemonCmd.Stdout = nil
-			daemonCmd.Stderr = nil
-			daemonCmd.Stdin = nil
-			if err := daemonCmd.Start(); err != nil {
-				return fmt.Errorf("failed to start daemon: %w", err)
+			if err := StartDaemon(ctx, c); err != nil {
+				return err
 			}
-
-			deadline := time.Now().Add(2 * time.Second)
-			for time.Now().Before(deadline) {
-				if isDaemonRunning(ctx, c) {
-					fmt.Fprintln(cmd.OutOrStdout(), "daemon started")
-					return nil
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-
-			return fmt.Errorf("daemon failed to start within timeout")
+			fmt.Fprintln(cmd.OutOrStdout(), "daemon started")
+			return nil
 		},
 	}
 }
@@ -68,7 +86,7 @@ func newStopCmd() *cobra.Command {
 			ctx := cmd.Context()
 			c := newClient()
 
-			if !isDaemonRunning(ctx, c) {
+			if !IsDaemonRunning(ctx, c) {
 				fmt.Fprintln(cmd.OutOrStdout(), "daemon not running")
 				return nil
 			}
@@ -79,7 +97,7 @@ func newStopCmd() *cobra.Command {
 
 			deadline := time.Now().Add(5 * time.Second)
 			for time.Now().Before(deadline) {
-				if !isDaemonRunning(ctx, c) {
+				if !IsDaemonRunning(ctx, c) {
 					fmt.Fprintln(cmd.OutOrStdout(), "daemon stopped")
 					return nil
 				}
@@ -97,7 +115,7 @@ func newStatusCmd() *cobra.Command {
 		Short: "Show daemon status",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := newClient()
-			if isDaemonRunning(cmd.Context(), c) {
+			if IsDaemonRunning(cmd.Context(), c) {
 				fmt.Fprintln(cmd.OutOrStdout(), "daemon: running")
 			} else {
 				fmt.Fprintln(cmd.OutOrStdout(), "daemon: not running")

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/toraaoo/hestia/internal/daemon"
+	_ "github.com/toraaoo/hestia/internal/jar/providers"
 )
 
 func main() {
