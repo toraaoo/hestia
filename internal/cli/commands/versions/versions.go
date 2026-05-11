@@ -77,6 +77,9 @@ func fallbackLocal(jarName string, snapshots, latest, jsonOut bool) error {
 
 	latestRelease, _ := jar.GetLatestRelease()
 	latestSnapshot, _ := jar.GetLatestSnapshot()
+	if jarName != "vanilla" {
+		latestRelease, latestSnapshot = jar.ComputeLatest(versions)
+	}
 
 	resp := VersionsResponse{Versions: versions}
 	resp.Latest.Release = latestRelease
@@ -101,13 +104,20 @@ func printVersions(versions []jar.Version, latestInfo struct {
 
 	items := make([]string, len(versions))
 	for i, v := range versions {
+		date := "-"
+		if len(v.ReleaseTime) >= 10 {
+			date = v.ReleaseTime[:10]
+		} else if v.ReleaseTime != "" {
+			date = v.ReleaseTime
+		}
+
 		marker := ""
 		if v.ID == latestInfo.Release {
 			marker = " (latest release)"
 		} else if v.ID == latestInfo.Snapshot {
 			marker = " (latest snapshot)"
 		}
-		items[i] = fmt.Sprintf("%s  %s  %s%s", v.ID, v.Type, v.ReleaseTime[:10], marker)
+		items[i] = fmt.Sprintf("%s  %s  %s%s", v.ID, v.Type, date, marker)
 	}
 
 	if !term.IsTerminal(int(os.Stdout.Fd())) || latest {

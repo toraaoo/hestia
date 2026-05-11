@@ -35,8 +35,12 @@ func handleVersions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := versionsResponse{Versions: versions}
-	resp.Latest.Release, _ = jar.GetLatestRelease()
-	resp.Latest.Snapshot, _ = jar.GetLatestSnapshot()
+	if jarName == "vanilla" {
+		resp.Latest.Release, _ = jar.GetLatestRelease()
+		resp.Latest.Snapshot, _ = jar.GetLatestSnapshot()
+	} else {
+		resp.Latest.Release, resp.Latest.Snapshot = jar.ComputeLatest(versions)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
