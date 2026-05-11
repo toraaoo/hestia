@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/toraaoo/hestia/internal/config"
 )
@@ -18,7 +19,11 @@ func versionDir(majorVersion int) string {
 }
 
 func javaBinaryPath(majorVersion int) string {
-	return filepath.Join(versionDir(majorVersion), "bin", "java")
+	b := "java"
+	if runtime.GOOS == "windows" {
+		b = "java.exe"
+	}
+	return filepath.Join(versionDir(majorVersion), "bin", b)
 }
 
 func IsInstalled(majorVersion int) bool {
@@ -27,7 +32,13 @@ func IsInstalled(majorVersion int) bool {
 	if err != nil {
 		return false
 	}
-	return !info.IsDir() && info.Mode()&0111 != 0
+	if info.IsDir() {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		return true
+	}
+	return info.Mode()&0111 != 0
 }
 
 func GetJRE(majorVersion int) (string, error) {

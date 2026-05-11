@@ -2,12 +2,14 @@ package jre
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/toraaoo/hestia/internal/httpc"
@@ -116,7 +118,7 @@ func Download(majorVersion int, cb progress.Callback) error {
 		return fmt.Errorf("create jre dir: %w", err)
 	}
 
-	if err := extractTarGz(f, destDir, cb); err != nil {
+	if err := extractArchive(f, destDir); err != nil {
 		os.RemoveAll(destDir)
 		if cb != nil {
 			cb(progress.Event{Type: progress.EventError, Category: progress.CategoryExtract, Error: err.Error()})
@@ -130,7 +132,109 @@ func Download(majorVersion int, cb progress.Callback) error {
 	return nil
 }
 
-func extractTarGz(r io.Reader, destDir string, _ progress.Callback) error {
+func extractArchive(f *os.File, destDir string) error {
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	var magic [4]byte
+	_, err := io.ReadFull(f, magic[:])
+	if err != nil {
+		return err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+
+	if magic[0] == 'P' && magic[1] == 'K' {
+		st, err := f.Stat()
+		if err != nil {
+			return err
+		}
+		zr, err := zip.NewReader(f, st.Size())
+		if err != nil {
+			return err
+		}
+		return extractZip(zr, destDir)
+	}
+
+	if magic[0] == 0x1f && magic[1] == 0x8b {
+		return extractTarGz(f, destDir)
+	}
+
+	return fmt.Errorf("unknown archive format (magic=%s)", strconv.QuoteToASCII(string(magic[:])))
+}
+
+func safeJoin(destDir, name string) (string, error) {
+	name = filepath.Clean(name)
+	name = strings.TrimPrefix(name, string(filepath.Separator))
+	if name == "." || name == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(name, ".."+string(filepath.Separator)) || name == ".." {
+		return "", fmt.Errorf("invalid path: %q", name)
+	}
+	target := filepath.Join(destDir, name)
+	if rel, err := filepath.Rel(destDir, target); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("invalid path: %q", name)
+	}
+	return target, nil
+}
+
+func extractZip(zr *zip.Reader, destDir string) error {
+	var stripPrefix string
+	for _, f := range zr.File {
+		if stripPrefix == "" {
+			parts := strings.SplitN(f.Name, "/", 2)
+			if len(parts) > 0 {
+				stripPrefix = parts[0] + "/"
+			}
+		}
+
+		name := strings.TrimPrefix(f.Name, stripPrefix)
+		if name == "" {
+			continue
+		}
+
+		name = filepath.FromSlash(name)
+		target, err := safeJoin(destDir, name)
+		if err != nil {
+			return err
+		}
+		if target == "" {
+			continue
+		}
+
+		if strings.HasSuffix(f.Name, "/") {
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			return err
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			rc.Close()
+			return err
+		}
+		if _, err := io.Copy(out, rc); err != nil {
+			out.Close()
+			rc.Close()
+			return err
+		}
+		out.Close()
+		rc.Close()
+	}
+	return nil
+}
+
+func extractTarGz(r io.Reader, destDir string) error {
 	gz, err := gzip.NewReader(r)
 	if err != nil {
 		return err
@@ -160,8 +264,14 @@ func extractTarGz(r io.Reader, destDir string, _ progress.Callback) error {
 		if name == "" {
 			continue
 		}
-
-		target := filepath.Join(destDir, name)
+		name = filepath.FromSlash(name)
+		target, err := safeJoin(destDir, name)
+		if err != nil {
+			return err
+		}
+		if target == "" {
+			continue
+		}
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
