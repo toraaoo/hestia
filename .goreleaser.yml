@@ -21,6 +21,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
+      - -X github.com/toraaoo/hestia/internal/version.Version={{.Version}}
+      - -X github.com/toraaoo/hestia/internal/version.GitCommit={{.ShortCommit}}
+      - -X github.com/toraaoo/hestia/internal/version.BuildDate={{.Date}}
   - id: hestiad
     main: ./cmd/hestiad
     binary: hestiad
