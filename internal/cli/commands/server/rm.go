@@ -8,7 +8,7 @@ import (
 	"github.com/toraaoo/hestia/internal/client"
 )
 
-func newRmCmd() *cobra.Command {
+func (sc *Commands) newRmCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
@@ -17,7 +17,7 @@ func newRmCmd() *cobra.Command {
 		Short:   "Remove a server",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				name := args[0]
 				ctx := cmd.Context()
 

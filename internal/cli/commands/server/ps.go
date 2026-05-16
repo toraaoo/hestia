@@ -10,7 +10,7 @@ import (
 	"github.com/toraaoo/hestia/internal/client"
 )
 
-func newPsCmd() *cobra.Command {
+func (sc *Commands) newPsCmd() *cobra.Command {
 	var jsonOut bool
 
 	cmd := &cobra.Command{
@@ -18,7 +18,7 @@ func newPsCmd() *cobra.Command {
 		Aliases: []string{"ls", "list"},
 		Short:   "Show server status",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				servers, err := c.ListServers(cmd.Context())
 				if err != nil {
 					return err

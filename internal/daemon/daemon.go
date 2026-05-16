@@ -2,78 +2,54 @@ package daemon
 
 import (
 	"context"
+	"errors"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/toraaoo/hestia/internal/backup"
-	"github.com/toraaoo/hestia/internal/config"
-	"github.com/toraaoo/hestia/internal/daemon/api"
-	"github.com/toraaoo/hestia/internal/daemon/process"
-	"github.com/toraaoo/hestia/internal/jar/loaders"
+	"github.com/toraaoo/hestia/internal/app"
 	"github.com/toraaoo/hestia/internal/log"
-	"github.com/toraaoo/hestia/internal/server"
 )
 
-type processManagerState struct {
-	pm *process.Manager
+type Daemon struct {
+	app      *app.DaemonApp
+	listener net.Listener
+	server   *http.Server
 }
 
-func (s *processManagerState) IsRunning(serverName string) bool {
-	proc := s.pm.Get(serverName)
-	return proc != nil && proc.GetState() == process.StateRunning
+func New(app *app.DaemonApp) *Daemon {
+	return &Daemon{app: app, server: app.HTTP}
 }
 
-func (s *processManagerState) GetRCONInfo(serverName string) (port int, password string, enabled bool) {
-	cfg, err := server.LoadConfig(serverName)
-	if err != nil {
-		return 0, "", false
-	}
-	return cfg.RCON.Port, cfg.RCON.Password, cfg.RCON.Enabled
-}
-
-func Run() error {
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
-
-	log.Init(cfg.Daemon.LogLevel)
+func (d *Daemon) Run(ctx context.Context) error {
+	log.Init(d.app.Config.Daemon.LogLevel)
 	log.Info("starting hestiad")
 
-	if err := os.MkdirAll(config.DefaultDir(), 0o700); err != nil {
+	if err := os.MkdirAll(d.app.Paths.DataDir, 0o700); err != nil {
 		return err
 	}
 
-	jars := loaders.NewRegistry()
-	pm := process.NewManager(jars)
-
-	backupScheduler := backup.NewScheduler(&processManagerState{pm: pm})
-	if err := backup.LoadSchedules(backupScheduler); err != nil {
+	if err := d.app.Scheduler.LoadSchedules(); err != nil {
 		log.Warn("failed to load backup schedules", "error", err)
 	}
-	backupScheduler.Start()
-	defer backupScheduler.Stop()
+	d.app.Scheduler.Start()
+	defer d.app.Scheduler.Stop()
 
-	mux := http.NewServeMux()
-	shutdownCh := make(chan struct{})
-	api.Register(mux, shutdownCh, pm, jars)
-
-	ln, err := listen(cfg.Daemon.Sock)
+	ln, err := listen(d.app.Config.Daemon.Sock)
 	if err != nil {
 		return err
 	}
-	defer cleanupListener(cfg.Daemon.Sock)
+	d.listener = ln
+	defer cleanupListener(d.app.Config.Daemon.Sock)
 
-	srv := &http.Server{Handler: mux}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt)
 	defer stop()
 
 	srvErr := make(chan error, 1)
 	go func() {
-		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+		if err := d.server.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			srvErr <- err
 		}
 	}()
@@ -83,13 +59,26 @@ func Run() error {
 		return err
 	case <-ctx.Done():
 		log.Info("shutting down", "reason", "signal")
-	case <-shutdownCh:
+	case <-d.app.Shutdown.Done():
 		log.Info("shutting down", "reason", "request")
 	}
 
-	pm.StopAll()
+	d.app.Processes.StopAll()
 
 	shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	return srv.Shutdown(shutCtx)
+	return d.Shutdown(shutCtx)
+}
+
+func (d *Daemon) Shutdown(ctx context.Context) error {
+	return d.server.Shutdown(ctx)
+}
+
+func Run() error {
+	ctx := context.Background()
+	daemonApp, err := app.NewDaemonApp(ctx)
+	if err != nil {
+		return err
+	}
+	return New(daemonApp).Run(ctx)
 }

@@ -5,13 +5,12 @@ import (
 	"net/http"
 
 	"github.com/toraaoo/hestia/internal/daemon/process"
-	"github.com/toraaoo/hestia/internal/server"
 )
 
-func handleGetConfig(w http.ResponseWriter, r *http.Request) {
-	name := extractServerName(r.URL.Path, "/config")
+func (h *Handler) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
 
-	cfg, err := server.LoadConfig(name)
+	cfg, err := h.servers.LoadConfig(name)
 	if err != nil {
 		writeError(w, "server not found", http.StatusNotFound)
 		return
@@ -21,16 +20,16 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(cfg)
 }
 
-func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
-	name := extractServerName(r.URL.Path, "/config")
+func (h *Handler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
 
-	existing, err := server.LoadConfig(name)
+	existing, err := h.servers.LoadConfig(name)
 	if err != nil {
 		writeError(w, "server not found", http.StatusNotFound)
 		return
 	}
 
-	if proc := procManager.Get(name); proc != nil && proc.GetState() != process.StateStopped {
+	if proc := h.processes.Get(name); proc != nil && proc.GetState() != process.StateStopped {
 		writeError(w, "stop server before changing config", http.StatusConflict)
 		return
 	}
@@ -62,12 +61,12 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := existing.Save(); err != nil {
+	if err := h.servers.SaveConfig(existing); err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := existing.WriteProperties(); err != nil {
+	if err := h.servers.WriteProperties(existing); err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

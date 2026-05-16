@@ -8,17 +8,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/toraaoo/hestia/internal/client"
-	"github.com/toraaoo/hestia/internal/config"
 )
 
-func NewCmd() *cobra.Command {
+func NewCmd(client *client.Client) *cobra.Command {
 	cmd := &cobra.Command{Use: "daemon", Short: "Manage the hestia daemon"}
-	cmd.AddCommand(newStartCmd(), newStopCmd(), newStatusCmd())
+	cmd.AddCommand(newStartCmd(client), newStopCmd(client), newStatusCmd(client))
 	return cmd
-}
-
-func newClient() *client.Client {
-	return client.New(config.DefaultSockPath())
 }
 
 // IsDaemonRunning checks if daemon is responding to ping.
@@ -56,14 +51,12 @@ func EnsureDaemon(ctx context.Context, c *client.Client) error {
 	return StartDaemon(ctx, c)
 }
 
-func newStartCmd() *cobra.Command {
+func newStartCmd(c *client.Client) *cobra.Command {
 	return &cobra.Command{
 		Use:   "start",
 		Short: "Start the daemon",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			c := newClient()
-
 			if IsDaemonRunning(ctx, c) {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "daemon already running")
 				return nil
@@ -78,14 +71,12 @@ func newStartCmd() *cobra.Command {
 	}
 }
 
-func newStopCmd() *cobra.Command {
+func newStopCmd(c *client.Client) *cobra.Command {
 	return &cobra.Command{
 		Use:   "stop",
 		Short: "Stop the daemon",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			c := newClient()
-
 			if !IsDaemonRunning(ctx, c) {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "daemon not running")
 				return nil
@@ -109,12 +100,11 @@ func newStopCmd() *cobra.Command {
 	}
 }
 
-func newStatusCmd() *cobra.Command {
+func newStatusCmd(c *client.Client) *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
 		Short: "Show daemon status",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c := newClient()
 			if IsDaemonRunning(cmd.Context(), c) {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "daemon: running")
 			} else {

@@ -13,10 +13,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/toraaoo/hestia/internal/client"
 	"github.com/toraaoo/hestia/internal/rcon"
-	"github.com/toraaoo/hestia/internal/server"
 )
 
-func newAttachCmd() *cobra.Command {
+func (sc *Commands) newAttachCmd() *cobra.Command {
 	var useRCON bool
 	var lines int
 
@@ -25,7 +24,7 @@ func newAttachCmd() *cobra.Command {
 		Short: "Attach to server (stream logs + send commands)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				return runAttach(cmd.Context(), c, args[0], useRCON, lines)
 			})
 		},
@@ -127,17 +126,17 @@ func readStdinHTTP(ctx context.Context, c *client.Client, name string, cancel co
 }
 
 func readStdinRCON(ctx context.Context, c *client.Client, name string, cancel context.CancelFunc) error {
-	cfg, err := server.LoadConfig(name)
+	info, err := c.GetServerDetails(ctx, name)
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return fmt.Errorf("failed to get server config: %w", err)
 	}
 
-	if !cfg.RCON.Enabled {
+	if !info.RCON.Enabled {
 		return fmt.Errorf("RCON not enabled for server %s", name)
 	}
 
-	addr := fmt.Sprintf("localhost:%d", cfg.RCON.Port)
-	rc, err := rcon.Dial(addr, cfg.RCON.Password)
+	addr := fmt.Sprintf("localhost:%d", info.RCON.Port)
+	rc, err := rcon.Dial(addr, info.RCON.Password)
 	if err != nil {
 		return fmt.Errorf("failed to connect RCON: %w", err)
 	}

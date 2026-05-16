@@ -12,8 +12,8 @@ type consoleRequest struct {
 	Command string `json:"command"`
 }
 
-func handleLogs(w http.ResponseWriter, r *http.Request) {
-	name := extractServerName(r.URL.Path, "/logs")
+func (h *Handler) handleLogs(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
 	follow := r.URL.Query().Get("follow") == "true"
 	lines := 100
 	if n, err := strconv.Atoi(r.URL.Query().Get("lines")); err == nil && n > 0 {
@@ -21,11 +21,11 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if follow {
-		handleLogStream(w, r, name, lines)
+		h.handleLogStream(w, r, name, lines)
 		return
 	}
 
-	logs, err := procManager.Logs(name, lines)
+	logs, err := h.processes.Logs(name, lines)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusNotFound)
 		return
@@ -35,20 +35,20 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(logs)
 }
 
-func handleLogStream(w http.ResponseWriter, r *http.Request, name string, lines int) {
+func (h *Handler) handleLogStream(w http.ResponseWriter, r *http.Request, name string, lines int) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		writeError(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
-	logs, _ := procManager.Logs(name, lines)
-	ch, err := procManager.Subscribe(name)
+	logs, _ := h.processes.Logs(name, lines)
+	ch, err := h.processes.Subscribe(name)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	defer procManager.Unsubscribe(name, ch)
+	defer h.processes.Unsubscribe(name, ch)
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -73,8 +73,8 @@ func handleLogStream(w http.ResponseWriter, r *http.Request, name string, lines 
 	}
 }
 
-func handleConsole(w http.ResponseWriter, r *http.Request) {
-	name := extractServerName(r.URL.Path, "/console")
+func (h *Handler) handleConsole(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
 
 	var req consoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -82,7 +82,7 @@ func handleConsole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := procManager.SendCommand(name, req.Command); err != nil {
+	if err := h.processes.SendCommand(name, req.Command); err != nil {
 		writeError(w, err.Error(), http.StatusConflict)
 		return
 	}

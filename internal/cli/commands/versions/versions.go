@@ -8,13 +8,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/toraaoo/hestia/internal/cli/ui"
 	"github.com/toraaoo/hestia/internal/client"
-	"github.com/toraaoo/hestia/internal/config"
 	"github.com/toraaoo/hestia/internal/jar"
-	"github.com/toraaoo/hestia/internal/jar/loaders"
 	"golang.org/x/term"
 )
 
-func NewCmd() *cobra.Command {
+func NewCmd(c *client.Client, registry *jar.Registry) *cobra.Command {
 	var snapshots, latest, jsonOut bool
 	var jarName string
 
@@ -22,12 +20,6 @@ func NewCmd() *cobra.Command {
 		Use:   "versions",
 		Short: "List available Minecraft versions",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load()
-			if err != nil {
-				return err
-			}
-
-			c := client.New(cfg.Daemon.Sock)
 			path := "/versions"
 			if snapshots {
 				path += "?snapshots=true"
@@ -42,7 +34,7 @@ func NewCmd() *cobra.Command {
 
 			var resp VersionsResponse
 			if err := c.Do(cmd.Context(), "GET", path, nil, &resp); err != nil {
-				return fallbackLocal(jarName, snapshots, latest, jsonOut)
+				return fallbackLocal(registry, jarName, snapshots, latest, jsonOut)
 			}
 
 			return printVersions(resp.Versions, resp.Latest, latest, jsonOut)
@@ -64,11 +56,10 @@ type VersionsResponse struct {
 	Versions []jar.Version `json:"versions"`
 }
 
-func fallbackLocal(jarName string, snapshots, latest, jsonOut bool) error {
+func fallbackLocal(registry *jar.Registry, jarName string, snapshots, latest, jsonOut bool) error {
 	if jarName == "" {
 		jarName = "vanilla"
 	}
-	registry := loaders.NewRegistry()
 	provider, err := registry.GetProvider(jarName)
 	if err != nil {
 		return err

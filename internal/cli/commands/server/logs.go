@@ -10,7 +10,7 @@ import (
 	"github.com/toraaoo/hestia/internal/client"
 )
 
-func newLogsCmd() *cobra.Command {
+func (sc *Commands) newLogsCmd() *cobra.Command {
 	var follow bool
 	var lines int
 
@@ -20,12 +20,12 @@ func newLogsCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if follow {
-				return withClient(cmd, func(c *client.Client) error {
+				return sc.withClient(cmd, func(c *client.Client) error {
 					return streamLogs(cmd, c, args[0], lines)
 				})
 			}
 
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				logs, err := c.GetLogs(cmd.Context(), args[0], lines)
 				if err != nil {
 					return err

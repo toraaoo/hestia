@@ -64,9 +64,9 @@ func TestGenerateProperties(t *testing.T) {
 
 func TestCreateAndDelete(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("HESTIA_DATA_DIR", tmpDir)
+	store := NewStore(filepath.Join(tmpDir, "servers"))
 
-	cfg, err := Create("testserver", "1.21.4")
+	cfg, err := store.Create("testserver", "1.21.4")
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestCreateAndDelete(t *testing.T) {
 		t.Errorf("expected name testserver, got %s", cfg.Name)
 	}
 
-	if !Exists("testserver") {
+	if !store.Exists("testserver") {
 		t.Error("server should exist after Create")
 	}
 
@@ -89,25 +89,25 @@ func TestCreateAndDelete(t *testing.T) {
 		t.Errorf("server.properties not found: %v", err)
 	}
 
-	_, err = Create("testserver", "1.21.4")
+	_, err = store.Create("testserver", "1.21.4")
 	if err == nil {
 		t.Error("expected error when creating duplicate server")
 	}
 
-	if err := Delete("testserver"); err != nil {
+	if err := store.Delete("testserver"); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	if Exists("testserver") {
+	if store.Exists("testserver") {
 		t.Error("server should not exist after Delete")
 	}
 }
 
 func TestList(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("HESTIA_DATA_DIR", tmpDir)
+	store := NewStore(filepath.Join(tmpDir, "servers"))
 
-	names, err := List()
+	names, err := store.List()
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -115,10 +115,10 @@ func TestList(t *testing.T) {
 		t.Errorf("expected empty list, got %v", names)
 	}
 
-	Create("server1", "1.21.4")
-	Create("server2", "1.20.4")
+	_, _ = store.Create("server1", "1.21.4")
+	_, _ = store.Create("server2", "1.20.4")
 
-	names, err = List()
+	names, err = store.List()
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -129,11 +129,11 @@ func TestList(t *testing.T) {
 
 func TestLoadConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("HESTIA_DATA_DIR", tmpDir)
+	store := NewStore(filepath.Join(tmpDir, "servers"))
 
-	Create("loadtest", "1.21.4")
+	_, _ = store.Create("loadtest", "1.21.4")
 
-	cfg, err := LoadConfig("loadtest")
+	cfg, err := store.LoadConfig("loadtest")
 	if err != nil {
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
@@ -148,9 +148,9 @@ func TestLoadConfig(t *testing.T) {
 
 func TestJarPath(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("HESTIA_DATA_DIR", tmpDir)
+	store := NewStore(filepath.Join(tmpDir, "servers"))
 
-	path := JarPath("myserver")
+	path := store.JarPath("myserver")
 	expected := filepath.Join(tmpDir, "servers", "myserver", "server.jar")
 	if path != expected {
 		t.Errorf("expected %s, got %s", expected, path)

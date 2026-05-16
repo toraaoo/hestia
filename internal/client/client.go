@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/toraaoo/hestia/internal/progress"
+	"github.com/toraaoo/hestia/internal/server"
 )
 
 // Client sends requests to the hestiad daemon over a Unix socket.
@@ -75,6 +76,12 @@ type ServerInfo struct {
 	PID     int    `json:"pid,omitempty"`
 }
 
+type ServerDetails struct {
+	server.Config
+	State string `json:"state"`
+	PID   int    `json:"pid,omitempty"`
+}
+
 type CreateRequest struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
@@ -116,6 +123,11 @@ func (c *Client) ListServers(ctx context.Context) ([]ServerInfo, error) {
 func (c *Client) GetServer(ctx context.Context, name string) (map[string]any, error) {
 	var info map[string]any
 	return info, c.Do(ctx, "GET", "/servers/"+name, nil, &info)
+}
+
+func (c *Client) GetServerDetails(ctx context.Context, name string) (*ServerDetails, error) {
+	var info ServerDetails
+	return &info, c.Do(ctx, "GET", "/servers/"+name, nil, &info)
 }
 
 func (c *Client) CreateServer(ctx context.Context, req CreateRequest) (map[string]any, error) {

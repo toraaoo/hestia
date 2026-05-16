@@ -10,10 +10,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/toraaoo/hestia/internal/cli/ui"
 	"github.com/toraaoo/hestia/internal/client"
-	"github.com/toraaoo/hestia/internal/jar/loaders"
 )
 
-func newCreateCmd() *cobra.Command {
+func (sc *Commands) newCreateCmd() *cobra.Command {
 	var (
 		// Basic
 		version string
@@ -45,10 +44,10 @@ func newCreateCmd() *cobra.Command {
 		Short: "Create and start a new server",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				ver := version
 				if ver == "" {
-					latest, err := latestVanillaRelease()
+					latest, err := sc.latestVanillaRelease()
 					if err != nil {
 						return fmt.Errorf("get latest version: %w", err)
 					}
@@ -147,13 +146,12 @@ func newCreateCmd() *cobra.Command {
 	return cmd
 }
 
-func latestVanillaRelease() (string, error) {
-	registry := loaders.NewRegistry()
-	provider, err := registry.GetProvider("vanilla")
+func (sc *Commands) latestVanillaRelease() (string, error) {
+	provider, err := sc.providers.GetProvider("vanilla")
 	if err != nil {
 		return "", err
 	}
-	release, _, err := registry.ResolveLatestVersions(provider)
+	release, _, err := sc.providers.ResolveLatestVersions(provider)
 	if err != nil {
 		return "", err
 	}

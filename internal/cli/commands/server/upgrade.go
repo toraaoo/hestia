@@ -12,7 +12,7 @@ import (
 	"github.com/toraaoo/hestia/internal/client"
 )
 
-func newUpgradeCmd() *cobra.Command {
+func (sc *Commands) newUpgradeCmd() *cobra.Command {
 	var (
 		version  string
 		noBackup bool
@@ -26,7 +26,7 @@ func newUpgradeCmd() *cobra.Command {
 		Short: "Upgrade server to a new version",
 		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				name := args[0]
 
 				targetVersion := version
@@ -34,7 +34,7 @@ func newUpgradeCmd() *cobra.Command {
 					targetVersion = args[1]
 				}
 				if targetVersion == "" {
-					latest, err := latestVanillaRelease()
+					latest, err := sc.latestVanillaRelease()
 					if err != nil {
 						return fmt.Errorf("get latest version: %w", err)
 					}

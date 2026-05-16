@@ -9,17 +9,25 @@ import (
 	"path/filepath"
 
 	"github.com/toraaoo/hestia/internal/download"
-	"github.com/toraaoo/hestia/internal/httpc"
 	"github.com/toraaoo/hestia/internal/jar"
 	"github.com/toraaoo/hestia/internal/progress"
 )
 
 const fabricAPIBase = "https://meta.fabricmc.net/v2"
 
-type FabricLoader struct{}
+type FabricLoader struct {
+	http       *download.Client
+	downloader *download.Client
+}
 
-func NewFabricLoader() FabricLoader {
-	return FabricLoader{}
+func NewFabricLoader(httpClient, downloadClient *download.Client) FabricLoader {
+	if httpClient == nil {
+		httpClient = download.NewClient(nil, "hestia/1.0")
+	}
+	if downloadClient == nil {
+		downloadClient = download.NewClient(nil, "hestia/1.0")
+	}
+	return FabricLoader{http: httpClient, downloader: downloadClient}
 }
 
 func (FabricLoader) Name() string { return "fabric" }
@@ -47,7 +55,7 @@ type fabricCompatibleLoaderVersion struct {
 }
 
 func (p FabricLoader) get(url string, target any) error {
-	resp, err := httpc.Get(url)
+	resp, err := p.http.Get(url)
 	if err != nil {
 		return fmt.Errorf("fabric api: %w", err)
 	}
@@ -179,7 +187,7 @@ func (p FabricLoader) DownloadServer(version, destPath string, cb progress.Callb
 		}
 	}
 
-	err = download.File(downloadURL, destPath, download.Options{
+	err = p.downloader.File(downloadURL, destPath, download.Options{
 		Progress: progressFn,
 	})
 	if err != nil {

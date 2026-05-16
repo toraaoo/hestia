@@ -10,17 +10,33 @@ import (
 	"time"
 
 	"github.com/toraaoo/hestia/internal/jar"
-	"github.com/toraaoo/hestia/internal/jre"
 	"github.com/toraaoo/hestia/internal/log"
+	"github.com/toraaoo/hestia/internal/progress"
 	"github.com/toraaoo/hestia/internal/server"
 )
+
+type ServerStore interface {
+	LoadConfig(name string) (*server.Config, error)
+	ServerDir(name string) string
+	JarPath(name string) string
+}
+
+type JREManager interface {
+	Get(majorVersion int, cb progress.Callback) (string, error)
+}
+
+type JarRegistry interface {
+	GetProvider(name string) (jar.Loader, error)
+}
 
 type Process struct {
 	Name   string
 	Config *server.Config
 	State  State
 	PID    int
-	jars   *jar.Registry
+	store  ServerStore
+	jre    JREManager
+	jars   JarRegistry
 
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
@@ -32,13 +48,17 @@ type Process struct {
 
 type Manager struct {
 	procs map[string]*Process
-	jars  *jar.Registry
+	store ServerStore
+	jre   JREManager
+	jars  JarRegistry
 	mu    sync.RWMutex
 }
 
-func NewManager(jars *jar.Registry) *Manager {
+func NewManager(store ServerStore, jre JREManager, jars JarRegistry) *Manager {
 	return &Manager{
 		procs: make(map[string]*Process),
+		store: store,
+		jre:   jre,
 		jars:  jars,
 	}
 }
@@ -60,7 +80,7 @@ func (m *Manager) All() []*Process {
 }
 
 func (m *Manager) Start(name string) error {
-	cfg, err := server.LoadConfig(name)
+	cfg, err := m.store.LoadConfig(name)
 	if err != nil {
 		return err
 	}
@@ -75,6 +95,8 @@ func (m *Manager) Start(name string) error {
 		Name:   name,
 		Config: cfg,
 		State:  StateStarting,
+		store:  m.store,
+		jre:    m.jre,
 		jars:   m.jars,
 		ring:   NewRingBuffer(1000),
 	}
@@ -183,13 +205,13 @@ func (p *Process) run() {
 		return
 	}
 
-	javaPath, err := jre.GetJRE(javaVersion)
+	javaPath, err := p.jre.Get(javaVersion, nil)
 	if err != nil {
 		p.ring.Write(fmt.Sprintf("ERROR: get jre: %v\n", err))
 		return
 	}
 
-	jarPath := server.JarPath(p.Name)
+	jarPath := p.store.JarPath(p.Name)
 	if _, err := os.Stat(jarPath); os.IsNotExist(err) {
 		p.ring.Write(fmt.Sprintf("Downloading server jar %s...\n", p.Config.Version))
 		if err := provider.DownloadServer(p.Config.Version, jarPath, nil); err != nil {
@@ -198,7 +220,7 @@ func (p *Process) run() {
 		}
 	}
 
-	serverDir := server.ServerDir(p.Name)
+	serverDir := p.store.ServerDir(p.Name)
 	eulaPath := serverDir + "/eula.txt"
 	if err := os.WriteFile(eulaPath, []byte("eula=true\n"), 0644); err != nil {
 		p.ring.Write(fmt.Sprintf("ERROR: write eula: %v\n", err))

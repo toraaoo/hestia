@@ -2,8 +2,6 @@ package server
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -42,13 +40,4 @@ func (c *Config) GenerateProperties() string {
 		sb.WriteString("\n")
 	}
 	return sb.String()
-}
-
-func (c *Config) WriteProperties() error {
-	dir := ServerDir(c.Name)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("create server dir: %w", err)
-	}
-	path := filepath.Join(dir, "server.properties")
-	return os.WriteFile(path, []byte(c.GenerateProperties()), 0644)
 }

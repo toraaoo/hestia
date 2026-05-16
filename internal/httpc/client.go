@@ -5,24 +5,26 @@ import (
 	"time"
 )
 
-var (
-	Default  = &http.Client{Timeout: 30 * time.Second}
-	Download = &http.Client{Timeout: 10 * time.Minute}
-)
-
-func Get(url string) (*http.Response, error) {
-	return doGet(Default, url)
+type Client struct {
+	http      *http.Client
+	userAgent string
 }
 
-func GetDownload(url string) (*http.Response, error) {
-	return doGet(Download, url)
+func NewClient(httpClient *http.Client, userAgent string) *Client {
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	}
+	if userAgent == "" {
+		userAgent = "hestia/1.0"
+	}
+	return &Client{http: httpClient, userAgent: userAgent}
 }
 
-func doGet(c *http.Client, url string) (*http.Response, error) {
+func (c *Client) Get(url string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "hestia/1.0")
-	return c.Do(req)
+	req.Header.Set("User-Agent", c.userAgent)
+	return c.http.Do(req)
 }

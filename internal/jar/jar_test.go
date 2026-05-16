@@ -9,7 +9,7 @@ import (
 )
 
 func TestVanillaProviderName(t *testing.T) {
-	registry := loaders.NewRegistry()
+	registry := loaders.NewRegistry(nil, nil)
 	p, err := registry.GetProvider("vanilla")
 	if err != nil {
 		t.Fatalf("GetProvider failed: %v", err)
@@ -24,7 +24,7 @@ func TestListVersions(t *testing.T) {
 		t.Skip("set HESTIA_INTEGRATION_TEST=1 to run")
 	}
 
-	registry := loaders.NewRegistry()
+	registry := loaders.NewRegistry(nil, nil)
 	p, _ := registry.GetProvider("vanilla")
 	versions, err := p.ListVersions(false)
 	if err != nil {
@@ -47,7 +47,7 @@ func TestListVersionsWithSnapshots(t *testing.T) {
 		t.Skip("set HESTIA_INTEGRATION_TEST=1 to run")
 	}
 
-	registry := loaders.NewRegistry()
+	registry := loaders.NewRegistry(nil, nil)
 	p, _ := registry.GetProvider("vanilla")
 	versions, err := p.ListVersions(true)
 	if err != nil {
@@ -71,7 +71,7 @@ func TestGetJavaVersion(t *testing.T) {
 		t.Skip("set HESTIA_INTEGRATION_TEST=1 to run")
 	}
 
-	registry := loaders.NewRegistry()
+	registry := loaders.NewRegistry(nil, nil)
 	p, _ := registry.GetProvider("vanilla")
 	jv, err := p.GetJavaVersion("1.21.4")
 	if err != nil {
@@ -91,7 +91,7 @@ func TestDownloadServer(t *testing.T) {
 	tmpDir := t.TempDir()
 	destPath := filepath.Join(tmpDir, "server.jar")
 
-	registry := loaders.NewRegistry()
+	registry := loaders.NewRegistry(nil, nil)
 	p, _ := registry.GetProvider("vanilla")
 	if err := p.DownloadServer("1.21.4", destPath, nil); err != nil {
 		t.Fatalf("DownloadServer failed: %v", err)
@@ -112,7 +112,7 @@ func TestGetLatestVanillaVersions(t *testing.T) {
 		t.Skip("set HESTIA_INTEGRATION_TEST=1 to run")
 	}
 
-	registry := loaders.NewRegistry()
+	registry := loaders.NewRegistry(nil, nil)
 	p, err := registry.GetProvider("vanilla")
 	if err != nil {
 		t.Fatalf("GetProvider failed: %v", err)

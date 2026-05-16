@@ -8,13 +8,13 @@ import (
 	"github.com/toraaoo/hestia/internal/client"
 )
 
-func newInspectCmd() *cobra.Command {
+func (sc *Commands) newInspectCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "inspect <name>",
 		Short: "Show server details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				info, err := c.GetServer(cmd.Context(), args[0])
 				if err != nil {
 					return err

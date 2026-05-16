@@ -8,10 +8,20 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/BurntSushi/toml"
 )
 
-func Create(name, version string) (*Config, error) {
-	dir := ServerDir(name)
+type Store struct {
+	serversDir string
+}
+
+func NewStore(serversDir string) *Store {
+	return &Store{serversDir: serversDir}
+}
+
+func (s *Store) Create(name, version string) (*Config, error) {
+	dir := s.ServerDir(name)
 	if _, err := os.Stat(dir); err == nil {
 		return nil, fmt.Errorf("server %q already exists", name)
 	}
@@ -25,12 +35,12 @@ func Create(name, version string) (*Config, error) {
 		return nil, fmt.Errorf("create server dir: %w", err)
 	}
 
-	if err := cfg.Save(); err != nil {
+	if err := s.SaveConfig(cfg); err != nil {
 		_ = os.RemoveAll(dir)
 		return nil, err
 	}
 
-	if err := cfg.WriteProperties(); err != nil {
+	if err := s.WriteProperties(cfg); err != nil {
 		_ = os.RemoveAll(dir)
 		return nil, err
 	}
@@ -38,23 +48,21 @@ func Create(name, version string) (*Config, error) {
 	return cfg, nil
 }
 
-func Delete(name string) error {
-	dir := ServerDir(name)
+func (s *Store) Delete(name string) error {
+	dir := s.ServerDir(name)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return fmt.Errorf("server %q not found", name)
 	}
 	return os.RemoveAll(dir)
 }
 
-func Exists(name string) bool {
-	dir := ServerDir(name)
-	_, err := os.Stat(dir)
+func (s *Store) Exists(name string) bool {
+	_, err := os.Stat(s.ServerDir(name))
 	return err == nil
 }
 
-func List() ([]string, error) {
-	dir := ServersDir()
-	entries, err := os.ReadDir(dir)
+func (s *Store) List() ([]string, error) {
+	entries, err := os.ReadDir(s.serversDir)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -65,21 +73,62 @@ func List() ([]string, error) {
 	var names []string
 	for _, e := range entries {
 		if e.IsDir() {
-			configPath := filepath.Join(dir, e.Name(), "hestia.toml")
+			configPath := filepath.Join(s.serversDir, e.Name(), "hestia.toml")
 			if _, err := os.Stat(configPath); err == nil {
 				names = append(names, e.Name())
 			}
 		}
 	}
+	sort.Strings(names)
 	return names, nil
 }
 
-func JarPath(name string) string {
-	return filepath.Join(ServerDir(name), "server.jar")
+func (s *Store) LoadConfig(name string) (*Config, error) {
+	path := filepath.Join(s.ServerDir(name), "hestia.toml")
+	var cfg Config
+	if _, err := toml.DecodeFile(path, &cfg); err != nil {
+		return nil, fmt.Errorf("load config: %w", err)
+	}
+	return &cfg, nil
 }
 
-func BackupsDir(name string) string {
-	return filepath.Join(ServerDir(name), "backups")
+func (s *Store) SaveConfig(cfg *Config) error {
+	dir := s.ServerDir(cfg.Name)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("create server dir: %w", err)
+	}
+	path := filepath.Join(dir, "hestia.toml")
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("create config: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+	return toml.NewEncoder(f).Encode(cfg)
+}
+
+func (s *Store) WriteProperties(cfg *Config) error {
+	dir := s.ServerDir(cfg.Name)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("create server dir: %w", err)
+	}
+	path := filepath.Join(dir, "server.properties")
+	return os.WriteFile(path, []byte(cfg.GenerateProperties()), 0644)
+}
+
+func (s *Store) ServerDir(name string) string {
+	return filepath.Join(s.serversDir, name)
+}
+
+func (s *Store) ServersDir() string {
+	return s.serversDir
+}
+
+func (s *Store) JarPath(name string) string {
+	return filepath.Join(s.ServerDir(name), "server.jar")
+}
+
+func (s *Store) BackupsDir(name string) string {
+	return filepath.Join(s.ServerDir(name), "backups")
 }
 
 type BackupInfo struct {
@@ -88,18 +137,18 @@ type BackupInfo struct {
 	Time    time.Time
 }
 
-func BackupJar(name string) (string, error) {
-	cfg, err := LoadConfig(name)
+func (s *Store) BackupJar(name string) (string, error) {
+	cfg, err := s.LoadConfig(name)
 	if err != nil {
 		return "", err
 	}
 
-	jarPath := JarPath(name)
+	jarPath := s.JarPath(name)
 	if _, err := os.Stat(jarPath); os.IsNotExist(err) {
 		return "", fmt.Errorf("server.jar not found")
 	}
 
-	backupDir := BackupsDir(name)
+	backupDir := s.BackupsDir(name)
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		return "", fmt.Errorf("create backups dir: %w", err)
 	}
@@ -127,8 +176,8 @@ func BackupJar(name string) (string, error) {
 	return backupPath, nil
 }
 
-func ListBackups(name string) ([]BackupInfo, error) {
-	backupDir := BackupsDir(name)
+func (s *Store) ListJarBackups(name string) ([]BackupInfo, error) {
+	backupDir := s.BackupsDir(name)
 	entries, err := os.ReadDir(backupDir)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -146,10 +195,9 @@ func ListBackups(name string) ([]BackupInfo, error) {
 		if err != nil {
 			continue
 		}
-		version := extractVersion(e.Name())
 		backups = append(backups, BackupInfo{
 			Path:    filepath.Join(backupDir, e.Name()),
-			Version: version,
+			Version: extractVersion(e.Name()),
 			Time:    info.ModTime(),
 		})
 	}
@@ -171,8 +219,8 @@ func extractVersion(filename string) string {
 	return ""
 }
 
-func PruneBackups(name string, keep int) error {
-	backups, err := ListBackups(name)
+func (s *Store) PruneJarBackups(name string, keep int) error {
+	backups, err := s.ListJarBackups(name)
 	if err != nil {
 		return err
 	}

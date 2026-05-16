@@ -3,12 +3,8 @@ package server
 import (
 	"fmt"
 	"net"
-	"os"
-	"path/filepath"
 
-	"github.com/BurntSushi/toml"
 	"github.com/google/uuid"
-	"github.com/toraaoo/hestia/internal/config"
 )
 
 type Config struct {
@@ -118,36 +114,4 @@ func isPortFree(port int) bool {
 	}
 	_ = ln.Close()
 	return true
-}
-
-func LoadConfig(serverName string) (*Config, error) {
-	path := filepath.Join(ServerDir(serverName), "hestia.toml")
-	var cfg Config
-	_, err := toml.DecodeFile(path, &cfg)
-	if err != nil {
-		return nil, fmt.Errorf("load config: %w", err)
-	}
-	return &cfg, nil
-}
-
-func (c *Config) Save() error {
-	dir := ServerDir(c.Name)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("create server dir: %w", err)
-	}
-	path := filepath.Join(dir, "hestia.toml")
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("create config: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-	return toml.NewEncoder(f).Encode(c)
-}
-
-func ServersDir() string {
-	return filepath.Join(config.DefaultDir(), "servers")
-}
-
-func ServerDir(name string) string {
-	return filepath.Join(ServersDir(), name)
 }

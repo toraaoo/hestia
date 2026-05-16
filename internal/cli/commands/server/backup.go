@@ -9,22 +9,22 @@ import (
 	"github.com/toraaoo/hestia/internal/client"
 )
 
-func newBackupCmd() *cobra.Command {
+func (sc *Commands) newBackupCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "backup",
 		Short: "Manage server backups",
 	}
 	cmd.AddCommand(
-		newBackupCreateCmd(),
-		newBackupListCmd(),
-		newBackupRestoreCmd(),
-		newBackupDeleteCmd(),
-		newBackupPruneCmd(),
+		sc.newBackupCreateCmd(),
+		sc.newBackupListCmd(),
+		sc.newBackupRestoreCmd(),
+		sc.newBackupDeleteCmd(),
+		sc.newBackupPruneCmd(),
 	)
 	return cmd
 }
 
-func newBackupCreateCmd() *cobra.Command {
+func (sc *Commands) newBackupCreateCmd() *cobra.Command {
 	var (
 		full    bool
 		force   bool
@@ -36,7 +36,7 @@ func newBackupCreateCmd() *cobra.Command {
 		Short: "Create a backup",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				req := client.BackupRequest{Force: force}
 				if full {
 					req.Type = "full"
@@ -67,7 +67,7 @@ func newBackupCreateCmd() *cobra.Command {
 	return cmd
 }
 
-func newBackupListCmd() *cobra.Command {
+func (sc *Commands) newBackupListCmd() *cobra.Command {
 	var jsonOut bool
 
 	cmd := &cobra.Command{
@@ -75,7 +75,7 @@ func newBackupListCmd() *cobra.Command {
 		Short: "List backups",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				backups, err := c.ListBackups(cmd.Context(), args[0])
 				if err != nil {
 					return err
@@ -115,13 +115,13 @@ func newBackupListCmd() *cobra.Command {
 	return cmd
 }
 
-func newBackupRestoreCmd() *cobra.Command {
+func (sc *Commands) newBackupRestoreCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restore <server> <backup>",
 		Short: "Restore from backup",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				result, err := c.RestoreBackup(cmd.Context(), args[0], args[1])
 				if err != nil {
 					return err
@@ -141,13 +141,13 @@ func newBackupRestoreCmd() *cobra.Command {
 	return cmd
 }
 
-func newBackupDeleteCmd() *cobra.Command {
+func (sc *Commands) newBackupDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete <server> <backup>",
 		Short: "Delete a backup",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				if err := c.DeleteBackup(cmd.Context(), args[0], args[1]); err != nil {
 					return err
 				}
@@ -159,7 +159,7 @@ func newBackupDeleteCmd() *cobra.Command {
 	return cmd
 }
 
-func newBackupPruneCmd() *cobra.Command {
+func (sc *Commands) newBackupPruneCmd() *cobra.Command {
 	var (
 		keepLast   int
 		keepDays   int
@@ -171,7 +171,7 @@ func newBackupPruneCmd() *cobra.Command {
 		Short: "Remove old backups",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				req := client.PruneRequest{
 					KeepLast:   keepLast,
 					KeepDays:   keepDays,

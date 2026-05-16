@@ -46,8 +46,8 @@ func (p RetentionPolicy) Apply(backups []Info) []Info {
 	return toDelete
 }
 
-func Prune(serverName string, policy RetentionPolicy) ([]string, error) {
-	backups, err := List(serverName)
+func (s *Service) Prune(serverName string, policy RetentionPolicy) ([]string, error) {
+	backups, err := s.List(serverName)
 	if err != nil {
 		return nil, err
 	}

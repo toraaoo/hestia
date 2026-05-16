@@ -1,6 +1,7 @@
 package download
 
 import (
+	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
 	"hash"
@@ -8,22 +9,39 @@ import (
 	"net/http"
 	"os"
 	"time"
-
-	"crypto/sha1"
 )
 
-var client = &http.Client{Timeout: 10 * time.Minute}
-
-// Options configures a download.
-type Options struct {
-	SHA1     string // expected hex checksum; skipped if empty
-	Progress func(downloaded, total int64)
-	Retries  int // default 3
+type Client struct {
+	http      *http.Client
+	userAgent string
 }
 
-// File downloads url to destPath atomically (temp file + rename).
-// Retries on transient errors with exponential backoff.
-func File(url, destPath string, opts Options) error {
+func NewClient(httpClient *http.Client, userAgent string) *Client {
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 10 * time.Minute}
+	}
+	if userAgent == "" {
+		userAgent = "hestia/1.0"
+	}
+	return &Client{http: httpClient, userAgent: userAgent}
+}
+
+type Options struct {
+	SHA1     string
+	Progress func(downloaded, total int64)
+	Retries  int
+}
+
+func (c *Client) Get(url string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+	return c.http.Do(req)
+}
+
+func (c *Client) File(url, destPath string, opts Options) error {
 	if opts.Retries == 0 {
 		opts.Retries = 3
 	}
@@ -33,7 +51,7 @@ func File(url, destPath string, opts Options) error {
 		if attempt > 0 {
 			time.Sleep(time.Duration(attempt) * 2 * time.Second)
 		}
-		if err := tryDownload(url, destPath, opts); err != nil {
+		if err := c.tryDownload(url, destPath, opts); err != nil {
 			lastErr = err
 			continue
 		}
@@ -42,14 +60,8 @@ func File(url, destPath string, opts Options) error {
 	return lastErr
 }
 
-func tryDownload(url, destPath string, opts Options) (retErr error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("User-Agent", "hestia/1.0")
-
-	resp, err := client.Do(req)
+func (c *Client) tryDownload(url, destPath string, opts Options) (retErr error) {
+	resp, err := c.Get(url)
 	if err != nil {
 		return fmt.Errorf("fetch: %w", err)
 	}

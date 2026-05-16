@@ -7,27 +7,23 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/toraaoo/hestia/internal/config"
+	"github.com/toraaoo/hestia/internal/progress"
 )
 
-func jreDir() string {
-	return filepath.Join(config.DefaultDir(), "jre")
+type Manager struct {
+	rootDir    string
+	downloader *Downloader
 }
 
-func versionDir(majorVersion int) string {
-	return filepath.Join(jreDir(), fmt.Sprintf("java-%d", majorVersion))
-}
-
-func javaBinaryPath(majorVersion int) string {
-	b := "java"
-	if runtime.GOOS == "windows" {
-		b = "java.exe"
+func NewManager(rootDir string, downloader *Downloader) *Manager {
+	if downloader == nil {
+		downloader = NewDownloader(nil)
 	}
-	return filepath.Join(versionDir(majorVersion), "bin", b)
+	return &Manager{rootDir: rootDir, downloader: downloader}
 }
 
-func IsInstalled(majorVersion int) bool {
-	path := javaBinaryPath(majorVersion)
+func (m *Manager) IsInstalled(majorVersion int) bool {
+	path := m.JavaBinaryPath(majorVersion)
 	info, err := os.Stat(path)
 	if err != nil {
 		return false
@@ -41,25 +37,41 @@ func IsInstalled(majorVersion int) bool {
 	return info.Mode()&0111 != 0
 }
 
-func GetJRE(majorVersion int) (string, error) {
-	if IsInstalled(majorVersion) {
-		return javaBinaryPath(majorVersion), nil
+func (m *Manager) Get(majorVersion int, cb progress.Callback) (string, error) {
+	if m.IsInstalled(majorVersion) {
+		return m.JavaBinaryPath(majorVersion), nil
 	}
-	if err := Download(majorVersion, nil); err != nil {
+	if err := m.Download(majorVersion, cb); err != nil {
 		return "", fmt.Errorf("download jre %d: %w", majorVersion, err)
 	}
-	path := javaBinaryPath(majorVersion)
+	path := m.JavaBinaryPath(majorVersion)
 	if _, err := os.Stat(path); err != nil {
 		return "", fmt.Errorf("jre binary not found after download: %s", path)
 	}
 	return path, nil
 }
 
-func Verify(majorVersion int) error {
-	path, err := GetJRE(majorVersion)
+func (m *Manager) Download(majorVersion int, cb progress.Callback) error {
+	return m.downloader.Download(majorVersion, m.versionDir(majorVersion), cb)
+}
+
+func (m *Manager) Verify(majorVersion int) error {
+	path, err := m.Get(majorVersion, nil)
 	if err != nil {
 		return err
 	}
 	cmd := exec.Command(path, "-version")
 	return cmd.Run()
+}
+
+func (m *Manager) JavaBinaryPath(majorVersion int) string {
+	b := "java"
+	if runtime.GOOS == "windows" {
+		b = "java.exe"
+	}
+	return filepath.Join(m.versionDir(majorVersion), "bin", b)
+}
+
+func (m *Manager) versionDir(majorVersion int) string {
+	return filepath.Join(m.rootDir, fmt.Sprintf("java-%d", majorVersion))
 }

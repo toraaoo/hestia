@@ -10,13 +10,13 @@ import (
 	"github.com/toraaoo/hestia/internal/client"
 )
 
-func newConfigureCmd() *cobra.Command {
+func (sc *Commands) newConfigureCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "configure <name> [key] [value]",
 		Short: "View or modify server configuration",
 		Args:  cobra.RangeArgs(1, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				name := args[0]
 
 				if len(args) == 1 {

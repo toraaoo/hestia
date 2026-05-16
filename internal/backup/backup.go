@@ -42,30 +42,57 @@ type Options struct {
 	RCONPass   string
 }
 
-var locks sync.Map
+type Service struct {
+	store    *server.Store
+	rconDial RCONDialer
+	locks    sync.Map
+	now      func() time.Time
+}
 
-func getLock(serverName string) *sync.Mutex {
-	v, _ := locks.LoadOrStore(serverName, &sync.Mutex{})
+type RCONDialer interface {
+	Dial(addr, password string) (RCONClient, error)
+}
+
+type RCONClient interface {
+	Execute(command string) (string, error)
+	Close() error
+}
+
+type defaultRCONDialer struct{}
+
+func (defaultRCONDialer) Dial(addr, password string) (RCONClient, error) {
+	return rcon.Dial(addr, password)
+}
+
+func NewService(store *server.Store, rconDial RCONDialer) *Service {
+	if rconDial == nil {
+		rconDial = defaultRCONDialer{}
+	}
+	return &Service{store: store, rconDial: rconDial, now: time.Now}
+}
+
+func (s *Service) getLock(serverName string) *sync.Mutex {
+	v, _ := s.locks.LoadOrStore(serverName, &sync.Mutex{})
 	return v.(*sync.Mutex)
 }
 
-func Create(opts Options) (*Info, error) {
-	mu := getLock(opts.ServerName)
+func (s *Service) Create(opts Options) (*Info, error) {
+	mu := s.getLock(opts.ServerName)
 	mu.Lock()
 	defer mu.Unlock()
 
-	if !server.Exists(opts.ServerName) {
+	if !s.store.Exists(opts.ServerName) {
 		return nil, fmt.Errorf("server %q not found", opts.ServerName)
 	}
 
 	if opts.UseRCON {
-		return createWithRCON(opts)
+		return s.createWithRCON(opts)
 	}
-	return createArchive(opts)
+	return s.createArchive(opts)
 }
 
-func createWithRCON(opts Options) (*Info, error) {
-	client, err := rcon.Dial(opts.RCONAddr, opts.RCONPass)
+func (s *Service) createWithRCON(opts Options) (*Info, error) {
+	client, err := s.rconDial.Dial(opts.RCONAddr, opts.RCONPass)
 	if err != nil {
 		return nil, fmt.Errorf("rcon connect: %w", err)
 	}
@@ -87,18 +114,18 @@ func createWithRCON(opts Options) (*Info, error) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	return createArchive(opts)
+	return s.createArchive(opts)
 }
 
-func createArchive(opts Options) (*Info, error) {
-	serverDir := server.ServerDir(opts.ServerName)
-	backupDir := server.BackupsDir(opts.ServerName)
+func (s *Service) createArchive(opts Options) (*Info, error) {
+	serverDir := s.store.ServerDir(opts.ServerName)
+	backupDir := s.store.BackupsDir(opts.ServerName)
 
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		return nil, fmt.Errorf("create backup dir: %w", err)
 	}
 
-	cfg, err := server.LoadConfig(opts.ServerName)
+	cfg, err := s.store.LoadConfig(opts.ServerName)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
@@ -123,7 +150,8 @@ func createArchive(opts Options) (*Info, error) {
 		return nil, fmt.Errorf("unknown backup type: %s", opts.Type)
 	}
 
-	timestamp := time.Now().Format("20060102-150405")
+	now := s.now()
+	timestamp := now.Format("20060102-150405")
 	filename := fmt.Sprintf("%s-%s.tar.gz", opts.Type, timestamp)
 	backupPath := filepath.Join(backupDir, filename)
 
@@ -141,7 +169,7 @@ func createArchive(opts Options) (*Info, error) {
 		Path:      backupPath,
 		Type:      opts.Type,
 		Size:      stat.Size(),
-		CreatedAt: time.Now(),
+		CreatedAt: now,
 		WorldName: cfg.World.Name,
 		Version:   cfg.Version,
 	}
@@ -235,8 +263,8 @@ func createTarGz(dest, baseDir string, sources []string) error {
 	return retErr
 }
 
-func List(serverName string) ([]Info, error) {
-	backupDir := server.BackupsDir(serverName)
+func (s *Service) List(serverName string) ([]Info, error) {
+	backupDir := s.store.BackupsDir(serverName)
 	entries, err := os.ReadDir(backupDir)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -286,22 +314,22 @@ func List(serverName string) ([]Info, error) {
 	return backups, nil
 }
 
-func Restore(serverName, backupName string) error {
-	mu := getLock(serverName)
+func (s *Service) Restore(serverName, backupName string) error {
+	mu := s.getLock(serverName)
 	mu.Lock()
 	defer mu.Unlock()
 
-	backupPath := filepath.Join(server.BackupsDir(serverName), backupName)
+	backupPath := filepath.Join(s.store.BackupsDir(serverName), backupName)
 	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
 		return fmt.Errorf("backup %q not found", backupName)
 	}
 
-	cfg, err := server.LoadConfig(serverName)
+	cfg, err := s.store.LoadConfig(serverName)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	serverDir := server.ServerDir(serverName)
+	serverDir := s.store.ServerDir(serverName)
 	worldDir := filepath.Join(serverDir, cfg.World.Name)
 
 	if err := os.RemoveAll(worldDir); err != nil {
@@ -390,8 +418,8 @@ func extractTarGz(src, dest string) error {
 	return retErr
 }
 
-func Delete(serverName, backupName string) error {
-	backupPath := filepath.Join(server.BackupsDir(serverName), backupName)
+func (s *Service) Delete(serverName, backupName string) error {
+	backupPath := filepath.Join(s.store.BackupsDir(serverName), backupName)
 	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
 		return fmt.Errorf("backup %q not found", backupName)
 	}

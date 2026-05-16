@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/toraaoo/hestia/internal/download"
-	"github.com/toraaoo/hestia/internal/httpc"
 	"github.com/toraaoo/hestia/internal/jar"
 	"github.com/toraaoo/hestia/internal/progress"
 )
@@ -15,10 +14,18 @@ import (
 const minecraftVersionManifestURL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
 type VanillaProvider struct {
+	http       *download.Client
+	downloader *download.Client
 }
 
-func NewVanillaProvider() VanillaProvider {
-	return VanillaProvider{}
+func NewVanillaProvider(httpClient, downloadClient *download.Client) VanillaProvider {
+	if httpClient == nil {
+		httpClient = download.NewClient(nil, "hestia/1.0")
+	}
+	if downloadClient == nil {
+		downloadClient = download.NewClient(nil, "hestia/1.0")
+	}
+	return VanillaProvider{http: httpClient, downloader: downloadClient}
 }
 
 func (VanillaProvider) Name() string { return "vanilla" }
@@ -52,14 +59,14 @@ type minecraftVersionMeta struct {
 }
 
 func (p VanillaProvider) manifest() (*minecraftVersionManifest, error) {
-	resp, err := httpc.Get(minecraftVersionManifestURL)
+	resp, err := p.http.Get(minecraftVersionManifestURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetch Minecraft version manifest: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Minecraft version manifest api: %s", resp.Status)
+		return nil, fmt.Errorf("minecraft version manifest api: %s", resp.Status)
 	}
 
 	var manifest minecraftVersionManifest
@@ -70,14 +77,14 @@ func (p VanillaProvider) manifest() (*minecraftVersionManifest, error) {
 }
 
 func (p VanillaProvider) versionMeta(url string) (*minecraftVersionMeta, error) {
-	resp, err := httpc.Get(url)
+	resp, err := p.http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("fetch Minecraft version meta: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Minecraft version meta api: %s", resp.Status)
+		return nil, fmt.Errorf("minecraft version meta api: %s", resp.Status)
 	}
 
 	var meta minecraftVersionMeta
@@ -173,7 +180,7 @@ func (p VanillaProvider) DownloadServer(version, destPath string, cb progress.Ca
 		}
 	}
 
-	err = download.File(meta.Downloads.Server.URL, destPath, download.Options{
+	err = p.downloader.File(meta.Downloads.Server.URL, destPath, download.Options{
 		SHA1:     meta.Downloads.Server.SHA1,
 		Progress: progressFn,
 	})

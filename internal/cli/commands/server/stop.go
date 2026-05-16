@@ -9,13 +9,13 @@ import (
 	"github.com/toraaoo/hestia/internal/client"
 )
 
-func newStopCmd() *cobra.Command {
+func (sc *Commands) newStopCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "stop <name>",
 		Short: "Stop a server",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withClient(cmd, func(c *client.Client) error {
+			return sc.withClient(cmd, func(c *client.Client) error {
 				name := args[0]
 				spinner := ui.NewSpinner(os.Stdout, fmt.Sprintf("Stopping %s...", name))
 				spinner.Start()

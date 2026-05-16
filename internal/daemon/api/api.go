@@ -4,56 +4,86 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/toraaoo/hestia/internal/backup"
 	"github.com/toraaoo/hestia/internal/daemon/process"
 	"github.com/toraaoo/hestia/internal/jar"
+	"github.com/toraaoo/hestia/internal/jre"
+	"github.com/toraaoo/hestia/internal/server"
 )
 
-var shutdownCh chan struct{}
-var jarRegistry *jar.Registry
-
-func Register(mux *http.ServeMux, shutdown chan struct{}, pm *process.Manager, jars *jar.Registry) {
-	shutdownCh = shutdown
-	SetProcessManager(pm)
-	SetJarRegistry(jars)
-
-	mux.HandleFunc("GET /ping", ping)
-	mux.HandleFunc("POST /shutdown", handleShutdown)
-	mux.HandleFunc("GET /versions", handleVersions)
-
-	mux.HandleFunc("POST /servers", handleCreateServer)
-	mux.HandleFunc("GET /servers", handleListServers)
-	mux.HandleFunc("GET /servers/{name}", handleGetServer)
-	mux.HandleFunc("DELETE /servers/{name}", handleDeleteServer)
-
-	mux.HandleFunc("POST /servers/{name}/start", handleStartServer)
-	mux.HandleFunc("POST /servers/{name}/stop", handleStopServer)
-	mux.HandleFunc("POST /servers/{name}/restart", handleRestartServer)
-	mux.HandleFunc("POST /servers/{name}/upgrade", handleUpgradeServer)
-
-	mux.HandleFunc("GET /servers/{name}/logs", handleLogs)
-	mux.HandleFunc("POST /servers/{name}/console", handleConsole)
-
-	mux.HandleFunc("GET /servers/{name}/config", handleGetConfig)
-	mux.HandleFunc("PUT /servers/{name}/config", handleUpdateConfig)
-
-	mux.HandleFunc("POST /servers/{name}/backup", handleCreateBackup)
-	mux.HandleFunc("GET /servers/{name}/backups", handleListBackups)
-	mux.HandleFunc("POST /servers/{name}/backups/{backup}/restore", handleRestoreBackup)
-	mux.HandleFunc("DELETE /servers/{name}/backups/{backup}", handleDeleteBackup)
-	mux.HandleFunc("POST /servers/{name}/backups/prune", handlePruneBackups)
+type Shutdown interface {
+	Trigger() bool
 }
 
-func SetJarRegistry(registry *jar.Registry) {
-	jarRegistry = registry
+type HandlerDeps struct {
+	Shutdown  Shutdown
+	Servers   *server.Store
+	Processes *process.Manager
+	Jars      *jar.Registry
+	JRE       *jre.Manager
+	Backups   *backup.Service
+	Scheduler *backup.Scheduler
 }
 
-func ping(w http.ResponseWriter, _ *http.Request) {
+type Handler struct {
+	shutdown  Shutdown
+	servers   *server.Store
+	processes *process.Manager
+	jars      *jar.Registry
+	jre       *jre.Manager
+	backups   *backup.Service
+	scheduler *backup.Scheduler
+}
+
+func NewHandler(deps HandlerDeps) *Handler {
+	return &Handler{
+		shutdown:  deps.Shutdown,
+		servers:   deps.Servers,
+		processes: deps.Processes,
+		jars:      deps.Jars,
+		jre:       deps.JRE,
+		backups:   deps.Backups,
+		scheduler: deps.Scheduler,
+	}
+}
+
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /ping", h.ping)
+	mux.HandleFunc("POST /shutdown", h.handleShutdown)
+	mux.HandleFunc("GET /versions", h.handleVersions)
+
+	mux.HandleFunc("POST /servers", h.handleCreateServer)
+	mux.HandleFunc("GET /servers", h.handleListServers)
+	mux.HandleFunc("GET /servers/{name}", h.handleGetServer)
+	mux.HandleFunc("DELETE /servers/{name}", h.handleDeleteServer)
+
+	mux.HandleFunc("POST /servers/{name}/start", h.handleStartServer)
+	mux.HandleFunc("POST /servers/{name}/stop", h.handleStopServer)
+	mux.HandleFunc("POST /servers/{name}/restart", h.handleRestartServer)
+	mux.HandleFunc("POST /servers/{name}/upgrade", h.handleUpgradeServer)
+
+	mux.HandleFunc("GET /servers/{name}/logs", h.handleLogs)
+	mux.HandleFunc("POST /servers/{name}/console", h.handleConsole)
+
+	mux.HandleFunc("GET /servers/{name}/config", h.handleGetConfig)
+	mux.HandleFunc("PUT /servers/{name}/config", h.handleUpdateConfig)
+
+	mux.HandleFunc("POST /servers/{name}/backup", h.handleCreateBackup)
+	mux.HandleFunc("GET /servers/{name}/backups", h.handleListBackups)
+	mux.HandleFunc("POST /servers/{name}/backups/{backup}/restore", h.handleRestoreBackup)
+	mux.HandleFunc("DELETE /servers/{name}/backups/{backup}", h.handleDeleteBackup)
+	mux.HandleFunc("POST /servers/{name}/backups/prune", h.handlePruneBackups)
+}
+
+func (h *Handler) ping(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func handleShutdown(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) handleShutdown(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	close(shutdownCh)
+	if h.shutdown != nil {
+		h.shutdown.Trigger()
+	}
 }
 
 type apiError struct {

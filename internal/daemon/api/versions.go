@@ -15,14 +15,14 @@ type versionsResponse struct {
 	Versions []jar.Version `json:"versions"`
 }
 
-func handleVersions(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleVersions(w http.ResponseWriter, r *http.Request) {
 	snapshots := r.URL.Query().Get("snapshots") == "true"
 	jarName := r.URL.Query().Get("jar")
 	if jarName == "" {
 		jarName = "vanilla"
 	}
 
-	provider, err := jarRegistry.GetProvider(jarName)
+	provider, err := h.jars.GetProvider(jarName)
 	if err != nil {
 		writeError(w, "unsupported jar type: "+jarName, http.StatusBadRequest)
 		return
@@ -35,7 +35,7 @@ func handleVersions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := versionsResponse{Versions: versions}
-	resp.Latest.Release, resp.Latest.Snapshot, err = jarRegistry.ResolveLatestVersions(provider)
+	resp.Latest.Release, resp.Latest.Snapshot, err = h.jars.ResolveLatestVersions(provider)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return

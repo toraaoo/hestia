@@ -17,19 +17,13 @@ type DaemonConfig struct {
 	LogLevel string `toml:"log_level"`
 }
 
-func Load() (*Config, error) {
-	cfg := &Config{
-		Daemon: DaemonConfig{
-			Sock:     DefaultSockPath(),
-			LogLevel: "info",
-		},
-	}
-	path := DefaultConfigPath()
+func LoadFile(path string, defaults Config) (*Config, error) {
+	cfg := defaults
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return cfg, nil
+		return &cfg, nil
 	}
-	_, err := toml.DecodeFile(path, cfg)
-	return cfg, err
+	_, err := toml.DecodeFile(path, &cfg)
+	return &cfg, err
 }
 
 func DefaultDir() string {
@@ -45,12 +39,4 @@ func DefaultDir() string {
 
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".hestia")
-}
-
-func DefaultConfigPath() string {
-	return filepath.Join(DefaultDir(), "config.toml")
-}
-
-func DefaultSockPath() string {
-	return filepath.Join(DefaultDir(), "daemon.sock")
 }

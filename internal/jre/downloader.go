@@ -6,15 +6,41 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
-	"github.com/toraaoo/hestia/internal/httpc"
 	"github.com/toraaoo/hestia/internal/progress"
 )
+
+type HTTPClient interface {
+	Get(url string) (*http.Response, error)
+}
+
+type Downloader struct {
+	http HTTPClient
+}
+
+func NewDownloader(httpClient HTTPClient) *Downloader {
+	if httpClient == nil {
+		httpClient = defaultHTTPClient{}
+	}
+	return &Downloader{http: httpClient}
+}
+
+type defaultHTTPClient struct{}
+
+func (defaultHTTPClient) Get(url string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "hestia/1.0")
+	return http.DefaultClient.Do(req)
+}
 
 func adoptiumArch() string {
 	switch runtime.GOARCH {
@@ -45,14 +71,14 @@ func downloadURL(majorVersion int) string {
 	)
 }
 
-func Download(majorVersion int, cb progress.Callback) error {
+func (d *Downloader) Download(majorVersion int, destDir string, cb progress.Callback) error {
 	url := downloadURL(majorVersion)
 
 	if cb != nil {
 		cb(progress.Event{Type: progress.EventStart, Category: progress.CategoryJRE, Message: "downloading"})
 	}
 
-	resp, err := httpc.GetDownload(url)
+	resp, err := d.http.Get(url)
 	if err != nil {
 		if cb != nil {
 			cb(progress.Event{Type: progress.EventError, Category: progress.CategoryJRE, Error: err.Error()})
@@ -113,7 +139,6 @@ func Download(majorVersion int, cb progress.Callback) error {
 	}
 	defer func() { _ = f.Close() }()
 
-	destDir := versionDir(majorVersion)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return fmt.Errorf("create jre dir: %w", err)
 	}

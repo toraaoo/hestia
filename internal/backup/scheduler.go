@@ -22,17 +22,21 @@ type ServerState interface {
 }
 
 type Scheduler struct {
-	cron  *cron.Cron
-	jobs  map[string]cron.EntryID
-	mu    sync.RWMutex
-	state ServerState
+	cron    *cron.Cron
+	jobs    map[string]cron.EntryID
+	mu      sync.RWMutex
+	state   ServerState
+	store   *server.Store
+	backups *Service
 }
 
-func NewScheduler(state ServerState) *Scheduler {
+func NewScheduler(state ServerState, store *server.Store, backups *Service) *Scheduler {
 	return &Scheduler{
-		cron:  cron.New(),
-		jobs:  make(map[string]cron.EntryID),
-		state: state,
+		cron:    cron.New(),
+		jobs:    make(map[string]cron.EntryID),
+		state:   state,
+		store:   store,
+		backups: backups,
 	}
 }
 
@@ -64,6 +68,7 @@ func (s *Scheduler) UpdateSchedule(serverName string, schedule *Schedule) error 
 		serverName: serverName,
 		schedule:   schedule,
 		state:      s.state,
+		backups:    s.backups,
 	}
 
 	entryID, err := s.cron.AddJob(schedule.Cron, job)
@@ -116,6 +121,7 @@ type backupJob struct {
 	serverName string
 	schedule   *Schedule
 	state      ServerState
+	backups    *Service
 }
 
 func (j *backupJob) Run() {
@@ -138,7 +144,7 @@ func (j *backupJob) Run() {
 		}
 	}
 
-	info, err := Create(opts)
+	info, err := j.backups.Create(opts)
 	if err != nil {
 		log.Error("scheduled backup failed", "server", j.serverName, "error", err)
 		return
@@ -147,7 +153,7 @@ func (j *backupJob) Run() {
 	log.Info("scheduled backup complete", "server", j.serverName, "backup", info.Name)
 
 	if j.schedule.Retention.KeepLast > 0 || j.schedule.Retention.KeepDays > 0 {
-		deleted, err := Prune(j.serverName, j.schedule.Retention)
+		deleted, err := j.backups.Prune(j.serverName, j.schedule.Retention)
 		if err != nil {
 			log.Error("prune failed", "server", j.serverName, "error", err)
 		} else if len(deleted) > 0 {
@@ -156,14 +162,14 @@ func (j *backupJob) Run() {
 	}
 }
 
-func LoadSchedules(scheduler *Scheduler) error {
-	servers, err := server.List()
+func (s *Scheduler) LoadSchedules() error {
+	servers, err := s.store.List()
 	if err != nil {
 		return err
 	}
 
 	for _, name := range servers {
-		cfg, err := server.LoadConfig(name)
+		cfg, err := s.store.LoadConfig(name)
 		if err != nil {
 			continue
 		}
@@ -187,7 +193,7 @@ func LoadSchedules(scheduler *Scheduler) error {
 			},
 		}
 
-		if err := scheduler.UpdateSchedule(name, schedule); err != nil {
+		if err := s.UpdateSchedule(name, schedule); err != nil {
 			log.Error("failed to load backup schedule", "server", name, "error", err)
 		}
 	}

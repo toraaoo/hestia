@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/toraaoo/hestia/internal/backup"
 	"github.com/toraaoo/hestia/internal/daemon/process"
-	"github.com/toraaoo/hestia/internal/server"
 )
 
 type createBackupRequest struct {
@@ -27,10 +25,10 @@ type pruneResponse struct {
 	Names   []string `json:"names"`
 }
 
-func handleCreateBackup(w http.ResponseWriter, r *http.Request) {
-	name := extractBackupServerName(r.URL.Path, "/backup")
+func (h *Handler) handleCreateBackup(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
 
-	cfg, err := server.LoadConfig(name)
+	cfg, err := h.servers.LoadConfig(name)
 	if err != nil {
 		writeError(w, "server not found", http.StatusNotFound)
 		return
@@ -54,7 +52,7 @@ func handleCreateBackup(w http.ResponseWriter, r *http.Request) {
 		ServerName: name,
 	}
 
-	proc := procManager.Get(name)
+	proc := h.processes.Get(name)
 	isRunning := proc != nil && proc.GetState() == process.StateRunning
 
 	if isRunning {
@@ -68,7 +66,7 @@ func handleCreateBackup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	info, err := backup.Create(opts)
+	info, err := h.backups.Create(opts)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -80,22 +78,22 @@ func handleCreateBackup(w http.ResponseWriter, r *http.Request) {
 			KeepDays:   cfg.Backup.Retention.KeepDays,
 			MinBackups: cfg.Backup.Retention.MinBackups,
 		}
-		_, _ = backup.Prune(name, policy)
+		_, _ = h.backups.Prune(name, policy)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(info)
 }
 
-func handleListBackups(w http.ResponseWriter, r *http.Request) {
-	name := extractBackupServerName(r.URL.Path, "/backups")
+func (h *Handler) handleListBackups(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
 
-	if !server.Exists(name) {
+	if !h.servers.Exists(name) {
 		writeError(w, "server not found", http.StatusNotFound)
 		return
 	}
 
-	backups, err := backup.List(name)
+	backups, err := h.backups.List(name)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -109,31 +107,26 @@ func handleListBackups(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(backups)
 }
 
-func handleRestoreBackup(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/servers/"), "/")
-	if len(parts) < 3 {
-		writeError(w, "invalid path", http.StatusBadRequest)
-		return
-	}
-	name := parts[0]
-	backupName := parts[2]
+func (h *Handler) handleRestoreBackup(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	backupName := r.PathValue("backup")
 
-	if !server.Exists(name) {
+	if !h.servers.Exists(name) {
 		writeError(w, "server not found", http.StatusNotFound)
 		return
 	}
 
-	proc := procManager.Get(name)
+	proc := h.processes.Get(name)
 	wasRunning := proc != nil && proc.GetState() == process.StateRunning
 
 	if wasRunning {
-		if err := procManager.Stop(name); err != nil {
+		if err := h.processes.Stop(name); err != nil {
 			writeError(w, "failed to stop server: "+err.Error(), http.StatusConflict)
 			return
 		}
 	}
 
-	if err := backup.Restore(name, backupName); err != nil {
+	if err := h.backups.Restore(name, backupName); err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -147,21 +140,16 @@ func handleRestoreBackup(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-func handleDeleteBackup(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/servers/"), "/")
-	if len(parts) < 2 {
-		writeError(w, "invalid path", http.StatusBadRequest)
-		return
-	}
-	name := parts[0]
-	backupName := parts[2]
+func (h *Handler) handleDeleteBackup(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	backupName := r.PathValue("backup")
 
-	if !server.Exists(name) {
+	if !h.servers.Exists(name) {
 		writeError(w, "server not found", http.StatusNotFound)
 		return
 	}
 
-	if err := backup.Delete(name, backupName); err != nil {
+	if err := h.backups.Delete(name, backupName); err != nil {
 		writeError(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -169,15 +157,15 @@ func handleDeleteBackup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func handlePruneBackups(w http.ResponseWriter, r *http.Request) {
-	name := extractBackupServerName(r.URL.Path, "/backups/prune")
+func (h *Handler) handlePruneBackups(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
 
-	if !server.Exists(name) {
+	if !h.servers.Exists(name) {
 		writeError(w, "server not found", http.StatusNotFound)
 		return
 	}
 
-	cfg, err := server.LoadConfig(name)
+	cfg, err := h.servers.LoadConfig(name)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -206,7 +194,7 @@ func handlePruneBackups(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	deleted, err := backup.Prune(name, policy)
+	deleted, err := h.backups.Prune(name, policy)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -217,10 +205,4 @@ func handlePruneBackups(w http.ResponseWriter, r *http.Request) {
 		Deleted: len(deleted),
 		Names:   deleted,
 	})
-}
-
-func extractBackupServerName(path, suffix string) string {
-	path = strings.TrimPrefix(path, "/servers/")
-	path = strings.TrimSuffix(path, suffix)
-	return path
 }

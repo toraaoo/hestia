@@ -3,7 +3,8 @@
 ## Overview
 
 Hestia is a Minecraft server manager. Docker model: thin CLI client, persistent background daemon that owns all server
-processes.
+processes. Runtime construction is explicit: `internal/app` resolves paths, loads config, and wires services for both
+the CLI and daemon.
 
 ---
 
@@ -68,7 +69,9 @@ hestiad daemon  (~/.hestia/daemon.sock)
     └── manages: minecraft process N
 ```
 
-The CLI is a thin HTTP client. All state lives in the daemon.
+The CLI is a thin HTTP client. Command construction receives an owned client and jar provider registry from the CLI app;
+commands do not load config, build socket clients, or read server files directly. All server runtime state lives behind
+the daemon API.
 
 ### API Endpoints
 
@@ -158,38 +161,60 @@ hestia/
 │   └── hestiad/main.go           Daemon entry — calls daemon.Run()
 ├── internal/
 │   ├── cli/
-│   │   ├── root.go               root cobra command + Execute()
+│   │   ├── root.go               CLI app wrapper + root cobra command
 │   │   └── commands/
 │   │       ├── server/           server lifecycle commands
 │   │       ├── daemon/           daemon subcommands
 │   │       ├── config/           global config subcommands
 │   │       └── versions/         version listing
+│   ├── app/
+│   │   ├── paths.go              data/config/socket path resolution
+│   │   ├── cli.go                CLI dependency graph
+│   │   ├── daemon.go             daemon dependency graph
+│   │   └── shutdown.go           close-once shutdown signaling
 │   ├── daemon/
-│   │   ├── daemon.go             daemon lifecycle (start, stop, signal handling)
-│   │   ├── api/                  HTTP handlers (one file per resource)
-│   │   └── process/              minecraft process management (start, stop, logs)
+│   │   ├── daemon.go             HTTP daemon lifecycle only
+│   │   ├── api/                  handler structs with injected services
+│   │   └── process/              process manager with injected store/JRE/jar services
 │   ├── client/
 │   │   └── client.go             typed HTTP client over unix socket
 │   ├── server/
-│   │   ├── config.go             server config struct + TOML marshal/unmarshal
-│   │   └── storage.go            server storage operations
+│   │   ├── config.go             server config values and pure defaults
+│   │   ├── properties.go         pure server.properties generation
+│   │   └── storage.go            filesystem-backed Store
 │   ├── backup/
-│   │   ├── backup.go             backup creation and restoration
+│   │   ├── backup.go             Service-owned backup creation and restoration
 │   │   ├── retention.go          retention policy logic
-│   │   └── scheduler.go          backup scheduling
+│   │   └── scheduler.go          backup scheduling with injected store/service
 │   ├── jar/
 │   │   ├── registry.go           JAR provider registry
 │   │   └── providers/            vanilla, paper, fabric providers
 │   ├── jre/
-│   │   ├── manager.go            JRE version management
-│   │   └── downloader.go         JRE download logic
+│   │   ├── manager.go            JRE root ownership
+│   │   └── downloader.go         injectable JRE download logic
+│   ├── download/
+│   │   └── download.go           owned download client
+│   ├── httpc/
+│   │   └── client.go             owned HTTP client helper
 │   └── config/
 │       └── config.go             global config (TOML, ~/.hestia/config.toml)
 └── pkg/                          public API surface (empty until needed)
 ```
 
-**Dependency rule**: `cli/commands/*` → `client` → socket → `daemon` → `process`. No layer skips another. CLI never
-touches `daemon` or `process` directly.
+**Dependency rule**: `cli/commands/*` → `client` → socket/pipe → `daemon/api` → `daemon/process`. No layer skips another.
+CLI never touches server storage, daemon internals, or process state directly.
+
+Stateful behavior is owned by concrete structs:
+
+- `server.Store` owns all server filesystem paths and reads/writes.
+- `jre.Manager` owns the JRE root and downloader.
+- `backup.Service` owns backup locks, store access, RCON dialing, and clock.
+- `process.Manager` receives store, JRE, and jar registry collaborators.
+- `api.Handler` receives all daemon services and has no mutable package-level dependencies.
+- `daemon.Daemon` owns the listener/server lifecycle and uses `app.Shutdown` for idempotent shutdown.
+
+Package-level functions remain for pure helpers such as config defaults, property generation, version selection, parsing,
+and formatting.
 
 ---
 
