@@ -112,10 +112,10 @@ All requests/responses: `Content-Type: application/json`.
 └── servers/
     └── <name>/
         ├── hestia.toml   per-server config
+        ├── backups/      jar and world backups
         └── data/         runtime data (server CWD)
             ├── server.jar
             ├── server.properties
-            ├── backups/
             ├── logs/
             │   └── latest.log
             ├── mods/     mods and plugins

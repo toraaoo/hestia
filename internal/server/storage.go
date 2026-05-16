@@ -137,7 +137,7 @@ func (s *Store) JarPath(name string) string {
 }
 
 func (s *Store) BackupsDir(name string) string {
-	return filepath.Join(s.DataDir(name), "backups")
+	return filepath.Join(s.ServerDir(name), "backups")
 }
 
 type BackupInfo struct {

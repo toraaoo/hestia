@@ -219,10 +219,10 @@ The CLI is a thin HTTP client. All state lives in the daemon.
 └── servers/
     └── <name>/
         ├── hestia.toml   # Server config
+        ├── backups/      # Jar and world backups
         └── data/         # Runtime data
             ├── server.jar
             ├── server.properties
-            ├── backups/
             ├── logs/
             ├── mods/
             └── world/
