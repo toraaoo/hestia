@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/toraaoo/hestia/internal/jar"
-	_ "github.com/toraaoo/hestia/internal/jar/providers"
+	"github.com/toraaoo/hestia/internal/jar/loaders"
 )
 
 func TestVanillaProviderName(t *testing.T) {
-	p, err := jar.GetProvider("vanilla")
+	registry := loaders.NewRegistry()
+	p, err := registry.GetProvider("vanilla")
 	if err != nil {
 		t.Fatalf("GetProvider failed: %v", err)
 	}
@@ -24,7 +24,8 @@ func TestListVersions(t *testing.T) {
 		t.Skip("set HESTIA_INTEGRATION_TEST=1 to run")
 	}
 
-	p, _ := jar.GetProvider("vanilla")
+	registry := loaders.NewRegistry()
+	p, _ := registry.GetProvider("vanilla")
 	versions, err := p.ListVersions(false)
 	if err != nil {
 		t.Fatalf("ListVersions failed: %v", err)
@@ -35,7 +36,7 @@ func TestListVersions(t *testing.T) {
 	}
 
 	for _, v := range versions {
-		if v.Type != jar.VersionTypeRelease {
+		if v.Type != "release" {
 			t.Errorf("expected only releases, got %s", v.Type)
 		}
 	}
@@ -46,7 +47,8 @@ func TestListVersionsWithSnapshots(t *testing.T) {
 		t.Skip("set HESTIA_INTEGRATION_TEST=1 to run")
 	}
 
-	p, _ := jar.GetProvider("vanilla")
+	registry := loaders.NewRegistry()
+	p, _ := registry.GetProvider("vanilla")
 	versions, err := p.ListVersions(true)
 	if err != nil {
 		t.Fatalf("ListVersions failed: %v", err)
@@ -54,7 +56,7 @@ func TestListVersionsWithSnapshots(t *testing.T) {
 
 	hasSnapshot := false
 	for _, v := range versions {
-		if v.Type == jar.VersionTypeSnapshot {
+		if v.Type == "snapshot" {
 			hasSnapshot = true
 			break
 		}
@@ -69,7 +71,8 @@ func TestGetJavaVersion(t *testing.T) {
 		t.Skip("set HESTIA_INTEGRATION_TEST=1 to run")
 	}
 
-	p, _ := jar.GetProvider("vanilla")
+	registry := loaders.NewRegistry()
+	p, _ := registry.GetProvider("vanilla")
 	jv, err := p.GetJavaVersion("1.21.4")
 	if err != nil {
 		t.Fatalf("GetJavaVersion failed: %v", err)
@@ -88,7 +91,8 @@ func TestDownloadServer(t *testing.T) {
 	tmpDir := t.TempDir()
 	destPath := filepath.Join(tmpDir, "server.jar")
 
-	p, _ := jar.GetProvider("vanilla")
+	registry := loaders.NewRegistry()
+	p, _ := registry.GetProvider("vanilla")
 	if err := p.DownloadServer("1.21.4", destPath, nil); err != nil {
 		t.Fatalf("DownloadServer failed: %v", err)
 	}
@@ -103,16 +107,25 @@ func TestDownloadServer(t *testing.T) {
 	}
 }
 
-func TestGetLatestRelease(t *testing.T) {
+func TestGetLatestVanillaVersions(t *testing.T) {
 	if os.Getenv("HESTIA_INTEGRATION_TEST") == "" {
 		t.Skip("set HESTIA_INTEGRATION_TEST=1 to run")
 	}
 
-	release, err := jar.GetLatestRelease()
+	registry := loaders.NewRegistry()
+	p, err := registry.GetProvider("vanilla")
 	if err != nil {
-		t.Fatalf("GetLatestRelease failed: %v", err)
+		t.Fatalf("GetProvider failed: %v", err)
+	}
+
+	release, snapshot, err := registry.ResolveLatestVersions(p)
+	if err != nil {
+		t.Fatalf("ResolveLatestVersions failed: %v", err)
 	}
 	if release == "" {
 		t.Error("expected non-empty release")
+	}
+	if snapshot == "" {
+		t.Error("expected non-empty snapshot")
 	}
 }

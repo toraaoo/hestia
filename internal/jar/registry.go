@@ -2,23 +2,31 @@ package jar
 
 import "fmt"
 
-var providerRegistry = map[string]func() JarProvider{}
+type ProviderFactory func() Loader
 
-func Register(name string, factory func() JarProvider) {
-	providerRegistry[name] = factory
+type Registry struct {
+	providers map[string]ProviderFactory
 }
 
-func GetProvider(name string) (JarProvider, error) {
-	f, ok := providerRegistry[name]
+func NewRegistry() *Registry {
+	return &Registry{providers: make(map[string]ProviderFactory)}
+}
+
+func (r *Registry) Register(name string, factory ProviderFactory) {
+	r.providers[name] = factory
+}
+
+func (r *Registry) GetProvider(name string) (Loader, error) {
+	f, ok := r.providers[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown jar provider: %s", name)
 	}
 	return f(), nil
 }
 
-func ListProviders() []string {
-	names := make([]string, 0, len(providerRegistry))
-	for name := range providerRegistry {
+func (r *Registry) ListProviders() []string {
+	names := make([]string, 0, len(r.providers))
+	for name := range r.providers {
 		names = append(names, name)
 	}
 	return names

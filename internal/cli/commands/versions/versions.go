@@ -10,6 +10,7 @@ import (
 	"github.com/toraaoo/hestia/internal/client"
 	"github.com/toraaoo/hestia/internal/config"
 	"github.com/toraaoo/hestia/internal/jar"
+	"github.com/toraaoo/hestia/internal/jar/loaders"
 	"golang.org/x/term"
 )
 
@@ -67,7 +68,8 @@ func fallbackLocal(jarName string, snapshots, latest, jsonOut bool) error {
 	if jarName == "" {
 		jarName = "vanilla"
 	}
-	provider, err := jar.GetProvider(jarName)
+	registry := loaders.NewRegistry()
+	provider, err := registry.GetProvider(jarName)
 	if err != nil {
 		return err
 	}
@@ -76,10 +78,9 @@ func fallbackLocal(jarName string, snapshots, latest, jsonOut bool) error {
 		return err
 	}
 
-	latestRelease, _ := jar.GetLatestRelease()
-	latestSnapshot, _ := jar.GetLatestSnapshot()
-	if jarName != "vanilla" {
-		latestRelease, latestSnapshot = jar.ComputeLatest(versions)
+	latestRelease, latestSnapshot, err := registry.ResolveLatestVersions(provider)
+	if err != nil {
+		return err
 	}
 
 	resp := VersionsResponse{Versions: versions}

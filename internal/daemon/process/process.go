@@ -20,6 +20,7 @@ type Process struct {
 	Config *server.Config
 	State  State
 	PID    int
+	jars   *jar.Registry
 
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
@@ -31,11 +32,15 @@ type Process struct {
 
 type Manager struct {
 	procs map[string]*Process
+	jars  *jar.Registry
 	mu    sync.RWMutex
 }
 
-func NewManager() *Manager {
-	return &Manager{procs: make(map[string]*Process)}
+func NewManager(jars *jar.Registry) *Manager {
+	return &Manager{
+		procs: make(map[string]*Process),
+		jars:  jars,
+	}
 }
 
 func (m *Manager) Get(name string) *Process {
@@ -70,6 +75,7 @@ func (m *Manager) Start(name string) error {
 		Name:   name,
 		Config: cfg,
 		State:  StateStarting,
+		jars:   m.jars,
 		ring:   NewRingBuffer(1000),
 	}
 	m.procs[name] = proc
@@ -165,7 +171,7 @@ func (p *Process) run() {
 		log.Info("server stopped", "server", p.Name)
 	}()
 
-	provider, err := jar.GetProvider(p.Config.Jar)
+	provider, err := p.jars.GetProvider(p.Config.Jar)
 	if err != nil {
 		p.ring.Write(fmt.Sprintf("ERROR: unknown jar provider %q: %v\n", p.Config.Jar, err))
 		return

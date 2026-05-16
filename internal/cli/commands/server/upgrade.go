@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/toraaoo/hestia/internal/cli/ui"
 	"github.com/toraaoo/hestia/internal/client"
-	"github.com/toraaoo/hestia/internal/jar"
 )
 
 func newUpgradeCmd() *cobra.Command {
@@ -35,7 +34,7 @@ func newUpgradeCmd() *cobra.Command {
 					targetVersion = args[1]
 				}
 				if targetVersion == "" {
-					latest, err := jar.GetLatestRelease()
+					latest, err := latestVanillaRelease()
 					if err != nil {
 						return fmt.Errorf("get latest version: %w", err)
 					}

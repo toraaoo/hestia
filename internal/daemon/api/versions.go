@@ -22,7 +22,7 @@ func handleVersions(w http.ResponseWriter, r *http.Request) {
 		jarName = "vanilla"
 	}
 
-	provider, err := jar.GetProvider(jarName)
+	provider, err := jarRegistry.GetProvider(jarName)
 	if err != nil {
 		writeError(w, "unsupported jar type: "+jarName, http.StatusBadRequest)
 		return
@@ -35,11 +35,10 @@ func handleVersions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := versionsResponse{Versions: versions}
-	if jarName == "vanilla" {
-		resp.Latest.Release, _ = jar.GetLatestRelease()
-		resp.Latest.Snapshot, _ = jar.GetLatestSnapshot()
-	} else {
-		resp.Latest.Release, resp.Latest.Snapshot = jar.ComputeLatest(versions)
+	resp.Latest.Release, resp.Latest.Snapshot, err = jarRegistry.ResolveLatestVersions(provider)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")

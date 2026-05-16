@@ -16,9 +16,13 @@ type Version struct {
 	JavaVersion int         `json:"javaVersion,omitempty"`
 }
 
-type JarProvider interface {
+type Loader interface {
 	Name() string
 	ListVersions(includeSnapshots bool) ([]Version, error)
 	DownloadServer(version, destPath string, cb progress.Callback) error
 	GetJavaVersion(version string) (int, error)
+}
+
+type LatestVersionSource interface {
+	LatestVersions() (release, snapshot string, err error)
 }

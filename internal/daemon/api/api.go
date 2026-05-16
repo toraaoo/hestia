@@ -5,13 +5,16 @@ import (
 	"net/http"
 
 	"github.com/toraaoo/hestia/internal/daemon/process"
+	"github.com/toraaoo/hestia/internal/jar"
 )
 
 var shutdownCh chan struct{}
+var jarRegistry *jar.Registry
 
-func Register(mux *http.ServeMux, shutdown chan struct{}, pm *process.Manager) {
+func Register(mux *http.ServeMux, shutdown chan struct{}, pm *process.Manager, jars *jar.Registry) {
 	shutdownCh = shutdown
 	SetProcessManager(pm)
+	SetJarRegistry(jars)
 
 	mux.HandleFunc("GET /ping", ping)
 	mux.HandleFunc("POST /shutdown", handleShutdown)
@@ -38,6 +41,10 @@ func Register(mux *http.ServeMux, shutdown chan struct{}, pm *process.Manager) {
 	mux.HandleFunc("POST /servers/{name}/backups/{backup}/restore", handleRestoreBackup)
 	mux.HandleFunc("DELETE /servers/{name}/backups/{backup}", handleDeleteBackup)
 	mux.HandleFunc("POST /servers/{name}/backups/prune", handlePruneBackups)
+}
+
+func SetJarRegistry(registry *jar.Registry) {
+	jarRegistry = registry
 }
 
 func ping(w http.ResponseWriter, _ *http.Request) {

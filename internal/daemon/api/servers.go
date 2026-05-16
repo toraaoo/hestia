@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/toraaoo/hestia/internal/daemon/process"
-	"github.com/toraaoo/hestia/internal/jar"
 	"github.com/toraaoo/hestia/internal/jre"
 	"github.com/toraaoo/hestia/internal/progress"
 	"github.com/toraaoo/hestia/internal/server"
@@ -120,7 +119,7 @@ func handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	provider, err := jar.GetProvider(cfg.Jar)
+	provider, err := jarRegistry.GetProvider(cfg.Jar)
 	if err != nil {
 		_ = server.Delete(req.Name)
 		writeError(w, "unsupported jar type: "+cfg.Jar, http.StatusBadRequest)
@@ -167,7 +166,7 @@ func handleCreateServerSSE(w http.ResponseWriter, _ *http.Request, req createReq
 		return
 	}
 
-	provider, err := jar.GetProvider(cfg.Jar)
+	provider, err := jarRegistry.GetProvider(cfg.Jar)
 	if err != nil {
 		_ = server.Delete(req.Name)
 		_ = sse.WriteError("unsupported jar type: " + cfg.Jar)
@@ -363,7 +362,7 @@ func handleUpgradeServer(w http.ResponseWriter, r *http.Request) {
 		_ = server.PruneBackups(name, 3)
 	}
 
-	provider, err := jar.GetProvider(cfg.Jar)
+	provider, err := jarRegistry.GetProvider(cfg.Jar)
 	if err != nil {
 		writeError(w, "unsupported jar type: "+cfg.Jar, http.StatusBadRequest)
 		return
@@ -425,7 +424,7 @@ func handleUpgradeServerSSE(w http.ResponseWriter, _ *http.Request, name string,
 		cb(progress.Event{Type: progress.EventComplete, Category: progress.CategoryBackup, Message: backupPath})
 	}
 
-	provider, err := jar.GetProvider(cfg.Jar)
+	provider, err := jarRegistry.GetProvider(cfg.Jar)
 	if err != nil {
 		_ = sse.WriteError("unsupported jar type: " + cfg.Jar)
 		return

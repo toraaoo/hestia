@@ -11,6 +11,7 @@ import (
 	"github.com/toraaoo/hestia/internal/config"
 	"github.com/toraaoo/hestia/internal/daemon/api"
 	"github.com/toraaoo/hestia/internal/daemon/process"
+	"github.com/toraaoo/hestia/internal/jar/loaders"
 	"github.com/toraaoo/hestia/internal/log"
 	"github.com/toraaoo/hestia/internal/server"
 )
@@ -45,7 +46,8 @@ func Run() error {
 		return err
 	}
 
-	pm := process.NewManager()
+	jars := loaders.NewRegistry()
+	pm := process.NewManager(jars)
 
 	backupScheduler := backup.NewScheduler(&processManagerState{pm: pm})
 	if err := backup.LoadSchedules(backupScheduler); err != nil {
@@ -56,7 +58,7 @@ func Run() error {
 
 	mux := http.NewServeMux()
 	shutdownCh := make(chan struct{})
-	api.Register(mux, shutdownCh, pm)
+	api.Register(mux, shutdownCh, pm, jars)
 
 	ln, err := listen(cfg.Daemon.Sock)
 	if err != nil {

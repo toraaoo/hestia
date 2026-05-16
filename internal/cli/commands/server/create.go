@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/toraaoo/hestia/internal/cli/ui"
 	"github.com/toraaoo/hestia/internal/client"
-	"github.com/toraaoo/hestia/internal/jar"
+	"github.com/toraaoo/hestia/internal/jar/loaders"
 )
 
 func newCreateCmd() *cobra.Command {
@@ -19,7 +19,7 @@ func newCreateCmd() *cobra.Command {
 		version string
 		memory  string
 		port    int
-		jarType string
+		loader  string
 
 		// RCON
 		rconEnabled  bool
@@ -48,7 +48,7 @@ func newCreateCmd() *cobra.Command {
 			return withClient(cmd, func(c *client.Client) error {
 				ver := version
 				if ver == "" {
-					latest, err := jar.GetLatestRelease()
+					latest, err := latestVanillaRelease()
 					if err != nil {
 						return fmt.Errorf("get latest version: %w", err)
 					}
@@ -60,7 +60,7 @@ func newCreateCmd() *cobra.Command {
 					Version:      ver,
 					Memory:       memory,
 					Port:         port,
-					Jar:          jarType,
+					Jar:          loader,
 					RCONPassword: rconPassword,
 					RCONPort:     rconPort,
 					WorldName:    worldName,
@@ -124,7 +124,7 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&version, "version", "", "Minecraft version (default: latest)")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation (e.g. 2G)")
 	cmd.Flags().IntVar(&port, "port", 0, "Server port (auto-assigned if 0)")
-	cmd.Flags().StringVar(&jarType, "jar", "", "JAR provider: vanilla, paper, fabric")
+	cmd.Flags().StringVar(&loader, "loader", "", "Mod Loader [none (vanilla), paper, fabric]")
 
 	// RCON flags
 	cmd.Flags().BoolVar(&rconEnabled, "rcon", false, "Enable RCON")
@@ -138,13 +138,26 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&gamemode, "gamemode", "", "Gamemode: survival, creative, adventure, spectator")
 	cmd.Flags().StringVar(&difficulty, "difficulty", "", "Difficulty: peaceful, easy, normal, hard")
 	cmd.Flags().IntVar(&maxPlayers, "max-players", 0, "Maximum players")
-	cmd.Flags().StringVar(&motd, "motd", "", "Server MOTD")
+	cmd.Flags().StringVar(&motd, "motd", "", "Server Message of the Day")
 
 	// Behavior flags
 	cmd.Flags().BoolVarP(&detach, "detach", "d", false, "Detach after starting (don't attach)")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON (no progress)")
 
 	return cmd
+}
+
+func latestVanillaRelease() (string, error) {
+	registry := loaders.NewRegistry()
+	provider, err := registry.GetProvider("vanilla")
+	if err != nil {
+		return "", err
+	}
+	release, _, err := registry.ResolveLatestVersions(provider)
+	if err != nil {
+		return "", err
+	}
+	return release, nil
 }
 
 func waitForRunning(ctx context.Context, c *client.Client, name string) error {
