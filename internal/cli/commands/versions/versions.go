@@ -14,7 +14,7 @@ import (
 
 func NewCmd(c *client.Client, registry *jar.Registry) *cobra.Command {
 	var snapshots, latest, jsonOut bool
-	var jarName string
+	var loader string
 
 	cmd := &cobra.Command{
 		Use:   "versions",
@@ -24,27 +24,36 @@ func NewCmd(c *client.Client, registry *jar.Registry) *cobra.Command {
 			if snapshots {
 				path += "?snapshots=true"
 			}
-			if jarName != "" {
+			if loader != "" {
 				if snapshots {
-					path += "&jar=" + jarName
+					path += "&loader=" + loader
 				} else {
-					path += "?jar=" + jarName
+					path += "?loader=" + loader
 				}
 			}
 
 			var resp VersionsResponse
 			if err := c.Do(cmd.Context(), "GET", path, nil, &resp); err != nil {
-				return fallbackLocal(registry, jarName, snapshots, latest, jsonOut)
+				return fallbackLocal(registry, loader, snapshots, latest, jsonOut)
 			}
 
 			return printVersions(resp.Versions, resp.Latest, latest, jsonOut)
 		},
 	}
 
-	cmd.Flags().BoolVar(&snapshots, "snapshots", false, "Include snapshot versions")
-	cmd.Flags().BoolVar(&latest, "latest", false, "Show only latest versions")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
-	cmd.Flags().StringVar(&jarName, "jar", "", "JAR provider to list versions for: vanilla, paper, fabric")
+	cmd.Flags().BoolVarP(&snapshots, "snapshots", "s", false, "Include snapshot versions")
+	cmd.Flags().BoolVarP(&latest, "latest", "l", false, "Show only latest versions")
+	cmd.Flags().BoolVarP(&jsonOut, "json", "j", false, "Output as JSON")
+	cmd.Flags().StringVarP(&loader, "loader", "L", "", "Loader to list versions for")
+	_ = cmd.RegisterFlagCompletionFunc("loader", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		names := registry.ListLoaders()
+		for i, name := range names {
+			if p, err := registry.GetLoader(name); err == nil {
+				names[i] = name + "\t" + p.Name()
+			}
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	})
 	return cmd
 }
 
@@ -56,11 +65,11 @@ type VersionsResponse struct {
 	Versions []jar.Version `json:"versions"`
 }
 
-func fallbackLocal(registry *jar.Registry, jarName string, snapshots, latest, jsonOut bool) error {
-	if jarName == "" {
-		jarName = "vanilla"
+func fallbackLocal(registry *jar.Registry, loader string, snapshots, latest, jsonOut bool) error {
+	if loader == "" {
+		loader = "vanilla"
 	}
-	provider, err := registry.GetProvider(jarName)
+	provider, err := registry.GetLoader(loader)
 	if err != nil {
 		return err
 	}

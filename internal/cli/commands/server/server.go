@@ -7,12 +7,12 @@ import (
 )
 
 type Commands struct {
-	client    *client.Client
-	providers *jar.Registry
+	client  *client.Client
+	loaders *jar.Registry
 }
 
-func NewCommands(client *client.Client, providers *jar.Registry) *Commands {
-	return &Commands{client: client, providers: providers}
+func NewCommands(client *client.Client, loaders *jar.Registry) *Commands {
+	return &Commands{client: client, loaders: loaders}
 }
 
 func (c *Commands) CreateCmd() *cobra.Command    { return c.newCreateCmd() }

@@ -10,7 +10,7 @@ import (
 
 func TestVanillaProviderName(t *testing.T) {
 	registry := loaders.NewRegistry(nil, nil)
-	p, err := registry.GetProvider("vanilla")
+	p, err := registry.GetLoader("vanilla")
 	if err != nil {
 		t.Fatalf("GetProvider failed: %v", err)
 	}
@@ -25,7 +25,7 @@ func TestListVersions(t *testing.T) {
 	}
 
 	registry := loaders.NewRegistry(nil, nil)
-	p, _ := registry.GetProvider("vanilla")
+	p, _ := registry.GetLoader("vanilla")
 	versions, err := p.ListVersions(false)
 	if err != nil {
 		t.Fatalf("ListVersions failed: %v", err)
@@ -48,7 +48,7 @@ func TestListVersionsWithSnapshots(t *testing.T) {
 	}
 
 	registry := loaders.NewRegistry(nil, nil)
-	p, _ := registry.GetProvider("vanilla")
+	p, _ := registry.GetLoader("vanilla")
 	versions, err := p.ListVersions(true)
 	if err != nil {
 		t.Fatalf("ListVersions failed: %v", err)
@@ -72,7 +72,7 @@ func TestGetJavaVersion(t *testing.T) {
 	}
 
 	registry := loaders.NewRegistry(nil, nil)
-	p, _ := registry.GetProvider("vanilla")
+	p, _ := registry.GetLoader("vanilla")
 	jv, err := p.GetJavaVersion("1.21.4")
 	if err != nil {
 		t.Fatalf("GetJavaVersion failed: %v", err)
@@ -92,7 +92,7 @@ func TestDownloadServer(t *testing.T) {
 	destPath := filepath.Join(tmpDir, "server.jar")
 
 	registry := loaders.NewRegistry(nil, nil)
-	p, _ := registry.GetProvider("vanilla")
+	p, _ := registry.GetLoader("vanilla")
 	if err := p.DownloadServer("1.21.4", destPath, nil); err != nil {
 		t.Fatalf("DownloadServer failed: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestGetLatestVanillaVersions(t *testing.T) {
 	}
 
 	registry := loaders.NewRegistry(nil, nil)
-	p, err := registry.GetProvider("vanilla")
+	p, err := registry.GetLoader("vanilla")
 	if err != nil {
 		t.Fatalf("GetProvider failed: %v", err)
 	}

@@ -1,33 +1,37 @@
 package jar
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
-type ProviderFactory func() Loader
+type LoaderFactory func() Loader
 
 type Registry struct {
-	providers map[string]ProviderFactory
+	loaders map[string]LoaderFactory
 }
 
 func NewRegistry() *Registry {
-	return &Registry{providers: make(map[string]ProviderFactory)}
+	return &Registry{loaders: make(map[string]LoaderFactory)}
 }
 
-func (r *Registry) Register(name string, factory ProviderFactory) {
-	r.providers[name] = factory
+func (r *Registry) Register(name string, factory LoaderFactory) {
+	r.loaders[name] = factory
 }
 
-func (r *Registry) GetProvider(name string) (Loader, error) {
-	f, ok := r.providers[name]
+func (r *Registry) GetLoader(name string) (Loader, error) {
+	f, ok := r.loaders[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown jar provider: %s", name)
+		return nil, fmt.Errorf("unknown loader: %s", name)
 	}
 	return f(), nil
 }
 
-func (r *Registry) ListProviders() []string {
-	names := make([]string, 0, len(r.providers))
-	for name := range r.providers {
+func (r *Registry) ListLoaders() []string {
+	names := make([]string, 0, len(r.loaders))
+	for name := range r.loaders {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }

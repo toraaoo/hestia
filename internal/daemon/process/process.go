@@ -25,18 +25,18 @@ type JREManager interface {
 	Get(majorVersion int, cb progress.Callback) (string, error)
 }
 
-type JarRegistry interface {
-	GetProvider(name string) (jar.Loader, error)
+type LoaderRegistry interface {
+	GetLoader(name string) (jar.Loader, error)
 }
 
 type Process struct {
-	Name   string
-	Config *server.Config
-	State  State
-	PID    int
-	store  ServerStore
-	jre    JREManager
-	jars   JarRegistry
+	Name    string
+	Config  *server.Config
+	State   State
+	PID     int
+	store   ServerStore
+	jre     JREManager
+	loaders LoaderRegistry
 
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
@@ -47,19 +47,19 @@ type Process struct {
 }
 
 type Manager struct {
-	procs map[string]*Process
-	store ServerStore
-	jre   JREManager
-	jars  JarRegistry
-	mu    sync.RWMutex
+	procs   map[string]*Process
+	store   ServerStore
+	jre     JREManager
+	loaders LoaderRegistry
+	mu      sync.RWMutex
 }
 
-func NewManager(store ServerStore, jre JREManager, jars JarRegistry) *Manager {
+func NewManager(store ServerStore, jre JREManager, loaders LoaderRegistry) *Manager {
 	return &Manager{
-		procs: make(map[string]*Process),
-		store: store,
-		jre:   jre,
-		jars:  jars,
+		procs:   make(map[string]*Process),
+		store:   store,
+		jre:     jre,
+		loaders: loaders,
 	}
 }
 
@@ -92,13 +92,13 @@ func (m *Manager) Start(name string) error {
 	}
 
 	proc := &Process{
-		Name:   name,
-		Config: cfg,
-		State:  StateStarting,
-		store:  m.store,
-		jre:    m.jre,
-		jars:   m.jars,
-		ring:   NewRingBuffer(1000),
+		Name:    name,
+		Config:  cfg,
+		State:   StateStarting,
+		store:   m.store,
+		jre:     m.jre,
+		loaders: m.loaders,
+		ring:    NewRingBuffer(1000),
 	}
 	m.procs[name] = proc
 	m.mu.Unlock()
@@ -193,9 +193,9 @@ func (p *Process) run() {
 		log.Info("server stopped", "server", p.Name)
 	}()
 
-	provider, err := p.jars.GetProvider(p.Config.Jar)
+	provider, err := p.loaders.GetLoader(p.Config.Loader)
 	if err != nil {
-		p.ring.Write(fmt.Sprintf("ERROR: unknown jar provider %q: %v\n", p.Config.Jar, err))
+		p.ring.Write(fmt.Sprintf("ERROR: unknown loader %q: %v\n", p.Config.Loader, err))
 		return
 	}
 

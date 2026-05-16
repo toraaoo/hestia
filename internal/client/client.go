@@ -70,7 +70,7 @@ func (c *Client) DoRaw(_ context.Context, req *http.Request) (*http.Response, er
 type ServerInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
-	Jar     string `json:"jar"`
+	Loader  string `json:"loader"`
 	Port    int    `json:"port"`
 	State   string `json:"state"`
 	PID     int    `json:"pid,omitempty"`
@@ -87,7 +87,7 @@ type CreateRequest struct {
 	Version string `json:"version"`
 	Memory  string `json:"memory,omitempty"`
 	Port    int    `json:"port,omitempty"`
-	Jar     string `json:"jar,omitempty"`
+	Loader  string `json:"loader,omitempty"`
 
 	// RCON
 	RCONEnabled  *bool  `json:"rcon_enabled,omitempty"`

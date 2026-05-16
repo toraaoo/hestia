@@ -30,7 +30,7 @@ func (sc *Commands) newAttachCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&useRCON, "rcon", false, "Use RCON for commands (shows responses)")
+	cmd.Flags().BoolVarP(&useRCON, "rcon", "r", false, "Use RCON for commands (shows responses)")
 	cmd.Flags().IntVarP(&lines, "lines", "n", 100, "Number of log lines to show initially")
 	return cmd
 }

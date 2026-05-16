@@ -42,11 +42,11 @@ func (sc *Commands) newPsCmd() *cobra.Command {
 						pid = fmt.Sprintf("%d", s.PID)
 					}
 					status := ui.StateStyle(s.State).Render(s.State)
-					rows[i] = []string{s.Name, s.Jar, s.Version, fmt.Sprintf("%d", s.Port), status, pid}
+					rows[i] = []string{s.Name, s.Loader, s.Version, fmt.Sprintf("%d", s.Port), status, pid}
 				}
 
 				fmt.Println(ui.RenderTable(
-					[]string{"NAME", "TYPE", "VERSION", "PORT", "STATUS", "PID"},
+					[]string{"NAME", "LOADER", "VERSION", "PORT", "STATUS", "PID"},
 					rows,
 					[]int{20, 10, 12, 8, 10, 8},
 				))
@@ -55,6 +55,6 @@ func (sc *Commands) newPsCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().BoolVarP(&jsonOut, "json", "j", false, "Output as JSON")
 	return cmd
 }

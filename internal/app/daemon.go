@@ -27,7 +27,7 @@ type DaemonApp struct {
 	Shutdown  *Shutdown
 	Servers   *server.Store
 	JRE       *jre.Manager
-	Providers *jar.Registry
+	Loaders   *jar.Registry
 }
 
 type processManagerState struct {
@@ -60,10 +60,10 @@ func NewDaemonApp(_ context.Context) (*DaemonApp, error) {
 
 	httpClient := download.NewClient(&http.Client{Timeout: 30 * time.Second}, "hestia/1.0")
 	downloadClient := download.NewClient(&http.Client{Timeout: 10 * time.Minute}, "hestia/1.0")
-	providers := loaders.NewRegistry(httpClient, downloadClient)
+	loadersRegistry := loaders.NewRegistry(httpClient, downloadClient)
 	servers := server.NewStore(paths.ServersDir)
 	jreManager := jre.NewManager(paths.JREDir, jre.NewDownloader(downloadClient))
-	processes := process.NewManager(servers, jreManager, providers)
+	processes := process.NewManager(servers, jreManager, loadersRegistry)
 	backups := backup.NewService(servers, nil)
 	scheduler := backup.NewScheduler(&processManagerState{pm: processes, store: servers}, servers, backups)
 	shutdown := NewShutdown()
@@ -72,7 +72,7 @@ func NewDaemonApp(_ context.Context) (*DaemonApp, error) {
 		Shutdown:  shutdown,
 		Servers:   servers,
 		Processes: processes,
-		Jars:      providers,
+		Loaders:   loadersRegistry,
 		JRE:       jreManager,
 		Backups:   backups,
 		Scheduler: scheduler,
@@ -91,6 +91,6 @@ func NewDaemonApp(_ context.Context) (*DaemonApp, error) {
 		Shutdown:  shutdown,
 		Servers:   servers,
 		JRE:       jreManager,
-		Providers: providers,
+		Loaders:   loadersRegistry,
 	}, nil
 }

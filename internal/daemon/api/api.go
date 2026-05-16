@@ -19,7 +19,7 @@ type HandlerDeps struct {
 	Shutdown  Shutdown
 	Servers   *server.Store
 	Processes *process.Manager
-	Jars      *jar.Registry
+	Loaders   *jar.Registry
 	JRE       *jre.Manager
 	Backups   *backup.Service
 	Scheduler *backup.Scheduler
@@ -29,7 +29,7 @@ type Handler struct {
 	shutdown  Shutdown
 	servers   *server.Store
 	processes *process.Manager
-	jars      *jar.Registry
+	loaders   *jar.Registry
 	jre       *jre.Manager
 	backups   *backup.Service
 	scheduler *backup.Scheduler
@@ -40,7 +40,7 @@ func NewHandler(deps HandlerDeps) *Handler {
 		shutdown:  deps.Shutdown,
 		servers:   deps.Servers,
 		processes: deps.Processes,
-		jars:      deps.Jars,
+		loaders:   deps.Loaders,
 		jre:       deps.JRE,
 		backups:   deps.Backups,
 		scheduler: deps.Scheduler,

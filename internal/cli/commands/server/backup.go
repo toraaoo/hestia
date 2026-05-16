@@ -61,9 +61,9 @@ func (sc *Commands) newBackupCreateCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&full, "full", false, "Full backup (world + config + plugins)")
-	cmd.Flags().BoolVar(&force, "force", false, "Force backup even without RCON (unsafe)")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().BoolVarP(&full, "full", "a", false, "Full backup (world + config + plugins)")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force backup even without RCON (unsafe)")
+	cmd.Flags().BoolVarP(&jsonOut, "json", "j", false, "Output as JSON")
 	return cmd
 }
 
@@ -111,7 +111,7 @@ func (sc *Commands) newBackupListCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().BoolVarP(&jsonOut, "json", "j", false, "Output as JSON")
 	return cmd
 }
 
@@ -201,9 +201,9 @@ func (sc *Commands) newBackupPruneCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&keepLast, "keep-last", 0, "Keep N most recent backups")
-	cmd.Flags().IntVar(&keepDays, "keep-days", 0, "Keep backups newer than N days")
-	cmd.Flags().IntVar(&minBackups, "min-backups", 0, "Always keep at least N backups")
+	cmd.Flags().IntVarP(&keepLast, "keep-last", "k", 0, "Keep N most recent backups")
+	cmd.Flags().IntVarP(&keepDays, "keep-days", "d", 0, "Keep backups newer than N days")
+	cmd.Flags().IntVarP(&minBackups, "min-backups", "m", 0, "Always keep at least N backups")
 	return cmd
 }
 

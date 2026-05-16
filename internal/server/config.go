@@ -10,7 +10,7 @@ import (
 type Config struct {
 	Name    string `toml:"name" json:"name"`
 	Version string `toml:"version" json:"version"`
-	Jar     string `toml:"jar" json:"jar"`
+	Loader  string `toml:"loader" json:"loader"`
 	Memory  string `toml:"memory" json:"memory"`
 	Port    int    `toml:"port" json:"port"`
 
@@ -51,7 +51,7 @@ func DefaultConfig(name, version string) *Config {
 	return &Config{
 		Name:    name,
 		Version: version,
-		Jar:     "vanilla",
+		Loader:  "vanilla",
 		Memory:  "2G",
 		Port:    0,
 		RCON: RCONConfig{

@@ -13,10 +13,10 @@ import (
 )
 
 type CLIApp struct {
-	Paths     Paths
-	Config    *config.Config
-	Client    *client.Client
-	Providers *jar.Registry
+	Paths   Paths
+	Config  *config.Config
+	Client  *client.Client
+	Loaders *jar.Registry
 }
 
 func NewCLIApp(_ context.Context) (*CLIApp, error) {
@@ -31,9 +31,9 @@ func NewCLIApp(_ context.Context) (*CLIApp, error) {
 	httpClient := download.NewClient(&http.Client{Timeout: 30 * time.Second}, "hestia/1.0")
 	downloadClient := download.NewClient(&http.Client{Timeout: 10 * time.Minute}, "hestia/1.0")
 	return &CLIApp{
-		Paths:     paths,
-		Config:    cfg,
-		Client:    client.New(cfg.Daemon.Sock),
-		Providers: loaders.NewRegistry(httpClient, downloadClient),
+		Paths:   paths,
+		Config:  cfg,
+		Client:  client.New(cfg.Daemon.Sock),
+		Loaders: loaders.NewRegistry(httpClient, downloadClient),
 	}, nil
 }

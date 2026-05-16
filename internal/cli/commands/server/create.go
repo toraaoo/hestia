@@ -59,7 +59,7 @@ func (sc *Commands) newCreateCmd() *cobra.Command {
 					Version:      ver,
 					Memory:       memory,
 					Port:         port,
-					Jar:          loader,
+					Loader:       loader,
 					RCONPassword: rconPassword,
 					RCONPort:     rconPort,
 					WorldName:    worldName,
@@ -120,38 +120,49 @@ func (sc *Commands) newCreateCmd() *cobra.Command {
 	}
 
 	// Basic flags
-	cmd.Flags().StringVar(&version, "version", "", "Minecraft version (default: latest)")
-	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation (e.g. 2G)")
-	cmd.Flags().IntVar(&port, "port", 0, "Server port (auto-assigned if 0)")
-	cmd.Flags().StringVar(&loader, "loader", "", "Mod Loader [none (vanilla), paper, fabric]")
+	cmd.Flags().StringVarP(&version, "version", "v", "", "Minecraft version (default: latest)")
+	cmd.Flags().StringVarP(&memory, "memory", "m", "", "Memory allocation (e.g. 2G)")
+	cmd.Flags().IntVarP(&port, "port", "p", 0, "Server port (auto-assigned if 0)")
+	cmd.Flags().StringVarP(&loader, "loader", "l", "", "Mod loader")
+	_ = cmd.RegisterFlagCompletionFunc("loader", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		// Keep completion dynamic so adding a new loader only requires registry registration.
+		names := sc.loaders.ListLoaders()
+		for i, name := range names {
+			// Include a description if available.
+			if p, err := sc.loaders.GetLoader(name); err == nil {
+				names[i] = name + "\t" + p.Name()
+			}
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	// RCON flags
-	cmd.Flags().BoolVar(&rconEnabled, "rcon", false, "Enable RCON")
-	cmd.Flags().BoolVar(&noRCON, "no-rcon", false, "Disable RCON")
-	cmd.Flags().StringVar(&rconPassword, "rcon-password", "", "RCON password")
-	cmd.Flags().IntVar(&rconPort, "rcon-port", 0, "RCON port")
+	cmd.Flags().BoolVarP(&rconEnabled, "rcon", "r", false, "Enable RCON")
+	cmd.Flags().BoolVarP(&noRCON, "no-rcon", "N", false, "Disable RCON")
+	cmd.Flags().StringVarP(&rconPassword, "rcon-password", "P", "", "RCON password")
+	cmd.Flags().IntVarP(&rconPort, "rcon-port", "R", 0, "RCON port")
 
 	// World flags
-	cmd.Flags().StringVar(&worldName, "world", "", "World name")
-	cmd.Flags().StringVar(&seed, "seed", "", "World seed")
-	cmd.Flags().StringVar(&gamemode, "gamemode", "", "Gamemode: survival, creative, adventure, spectator")
-	cmd.Flags().StringVar(&difficulty, "difficulty", "", "Difficulty: peaceful, easy, normal, hard")
-	cmd.Flags().IntVar(&maxPlayers, "max-players", 0, "Maximum players")
-	cmd.Flags().StringVar(&motd, "motd", "", "Server Message of the Day")
+	cmd.Flags().StringVarP(&worldName, "world", "w", "", "World name")
+	cmd.Flags().StringVarP(&seed, "seed", "s", "", "World seed")
+	cmd.Flags().StringVarP(&gamemode, "gamemode", "g", "", "Gamemode: survival, creative, adventure, spectator")
+	cmd.Flags().StringVarP(&difficulty, "difficulty", "D", "", "Difficulty: peaceful, easy, normal, hard")
+	cmd.Flags().IntVarP(&maxPlayers, "max-players", "M", 0, "Maximum players")
+	cmd.Flags().StringVarP(&motd, "motd", "t", "", "Server Message of the Day")
 
 	// Behavior flags
 	cmd.Flags().BoolVarP(&detach, "detach", "d", false, "Detach after starting (don't attach)")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON (no progress)")
+	cmd.Flags().BoolVarP(&jsonOut, "json", "j", false, "Output as JSON (no progress)")
 
 	return cmd
 }
 
 func (sc *Commands) latestVanillaRelease() (string, error) {
-	provider, err := sc.providers.GetProvider("vanilla")
+	provider, err := sc.loaders.GetLoader("vanilla")
 	if err != nil {
 		return "", err
 	}
-	release, _, err := sc.providers.ResolveLatestVersions(provider)
+	release, _, err := sc.loaders.ResolveLatestVersions(provider)
 	if err != nil {
 		return "", err
 	}

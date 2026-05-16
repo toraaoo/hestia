@@ -107,11 +107,11 @@ func (sc *Commands) newUpgradeCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&version, "version", "", "Target version (default: latest)")
-	cmd.Flags().BoolVar(&noBackup, "no-backup", false, "Skip backup of current server.jar")
-	cmd.Flags().BoolVar(&restart, "restart", false, "Restart server after upgrade")
-	cmd.Flags().BoolVar(&force, "force", false, "Skip downgrade confirmation")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().StringVarP(&version, "version", "v", "", "Target version (default: latest)")
+	cmd.Flags().BoolVarP(&noBackup, "no-backup", "n", false, "Skip backup of current server.jar")
+	cmd.Flags().BoolVarP(&restart, "restart", "r", false, "Restart server after upgrade")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Skip downgrade confirmation")
+	cmd.Flags().BoolVarP(&jsonOut, "json", "j", false, "Output as JSON")
 
 	return cmd
 }

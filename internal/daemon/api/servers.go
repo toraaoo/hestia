@@ -14,7 +14,7 @@ type createRequest struct {
 	Version string `json:"version"`
 	Memory  string `json:"memory,omitempty"`
 	Port    int    `json:"port,omitempty"`
-	Jar     string `json:"jar,omitempty"`
+	Loader  string `json:"loader,omitempty"`
 
 	// RCON
 	RCONEnabled  *bool  `json:"rcon_enabled,omitempty"`
@@ -33,15 +33,15 @@ type createRequest struct {
 type serverInfo struct {
 	Name    string        `json:"name"`
 	Version string        `json:"version"`
-	Jar     string        `json:"jar"`
+	Loader  string        `json:"loader"`
 	Port    int           `json:"port"`
 	State   process.State `json:"state"`
 	PID     int           `json:"pid,omitempty"`
 }
 
 func applyRequestToConfig(cfg *server.Config, req createRequest) {
-	if req.Jar != "" {
-		cfg.Jar = req.Jar
+	if req.Loader != "" {
+		cfg.Loader = req.Loader
 	}
 	if req.Memory != "" {
 		cfg.Memory = req.Memory
@@ -111,10 +111,10 @@ func (h *Handler) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	provider, err := h.jars.GetProvider(cfg.Jar)
+	provider, err := h.loaders.GetLoader(cfg.Loader)
 	if err != nil {
 		_ = h.servers.Delete(req.Name)
-		writeError(w, "unsupported jar type: "+cfg.Jar, http.StatusBadRequest)
+		writeError(w, "unsupported loader: "+cfg.Loader, http.StatusBadRequest)
 		return
 	}
 
@@ -158,10 +158,10 @@ func (h *Handler) handleCreateServerSSE(w http.ResponseWriter, _ *http.Request, 
 		return
 	}
 
-	provider, err := h.jars.GetProvider(cfg.Jar)
+	provider, err := h.loaders.GetLoader(cfg.Loader)
 	if err != nil {
 		_ = h.servers.Delete(req.Name)
-		_ = sse.WriteError("unsupported jar type: " + cfg.Jar)
+		_ = sse.WriteError("unsupported loader: " + cfg.Loader)
 		return
 	}
 
@@ -208,7 +208,7 @@ func (h *Handler) handleListServers(w http.ResponseWriter, r *http.Request) {
 		info := serverInfo{
 			Name:    cfg.Name,
 			Version: cfg.Version,
-			Jar:     cfg.Jar,
+			Loader:  cfg.Loader,
 			Port:    cfg.Port,
 			State:   process.StateStopped,
 		}
@@ -347,9 +347,9 @@ func (h *Handler) handleUpgradeServer(w http.ResponseWriter, r *http.Request) {
 		_ = h.servers.PruneJarBackups(name, 3)
 	}
 
-	provider, err := h.jars.GetProvider(cfg.Jar)
+	provider, err := h.loaders.GetLoader(cfg.Loader)
 	if err != nil {
-		writeError(w, "unsupported jar type: "+cfg.Jar, http.StatusBadRequest)
+		writeError(w, "unsupported loader: "+cfg.Loader, http.StatusBadRequest)
 		return
 	}
 
@@ -409,9 +409,9 @@ func (h *Handler) handleUpgradeServerSSE(w http.ResponseWriter, _ *http.Request,
 		cb(progress.Event{Type: progress.EventComplete, Category: progress.CategoryBackup, Message: backupPath})
 	}
 
-	provider, err := h.jars.GetProvider(cfg.Jar)
+	provider, err := h.loaders.GetLoader(cfg.Loader)
 	if err != nil {
-		_ = sse.WriteError("unsupported jar type: " + cfg.Jar)
+		_ = sse.WriteError("unsupported loader: " + cfg.Loader)
 		return
 	}
 
