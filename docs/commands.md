@@ -6,9 +6,10 @@ Complete reference for all Hestia commands.
 
 These flags are available on all commands:
 
-| Flag     | Description           |
-|----------|-----------------------|
-| `--help` | Show help for command |
+| Flag            | Description           |
+|-----------------|-----------------------|
+| `--help`        | Show help for command |
+| `--version, -v` | Show hestia version   |
 
 ## hestia create
 
@@ -353,14 +354,6 @@ hestia versions --latest
 
 # Include snapshots
 hestia versions --snapshots
-```
-
-## hestia version
-
-Show hestia version.
-
-```sh
-hestia version
 ```
 
 ## hestia daemon

@@ -9,17 +9,17 @@ import (
 	cmddaemon "github.com/toraaoo/hestia/internal/cli/commands/daemon"
 	cmdmod "github.com/toraaoo/hestia/internal/cli/commands/mod"
 	cmdserver "github.com/toraaoo/hestia/internal/cli/commands/server"
-	cmdversion "github.com/toraaoo/hestia/internal/cli/commands/version"
 	cmdversions "github.com/toraaoo/hestia/internal/cli/commands/versions"
 	"github.com/toraaoo/hestia/internal/client"
 	"github.com/toraaoo/hestia/internal/config"
 	"github.com/toraaoo/hestia/internal/jar"
+	"github.com/toraaoo/hestia/internal/version"
 )
 
 type App struct {
-	Config    *config.Config
-	Client    *client.Client
-	Providers *jar.Registry
+	Config  *config.Config
+	Client  *client.Client
+	Loaders *jar.Registry
 }
 
 func NewApp(ctx context.Context) (*App, error) {
@@ -28,18 +28,20 @@ func NewApp(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 	return &App{
-		Config:    cliApp.Config,
-		Client:    cliApp.Client,
-		Providers: cliApp.Providers,
+		Config:  cliApp.Config,
+		Client:  cliApp.Client,
+		Loaders: cliApp.Loaders,
 	}, nil
 }
 
 func (a *App) RootCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "hestia",
-		Short: "Hestia - Minecraft server manager",
+		Use:     "hestia",
+		Short:   "Hestia - Minecraft server manager",
+		Version: version.Info(),
 	}
-	serverCommands := cmdserver.NewCommands(a.Client, a.Providers)
+	cmd.SetVersionTemplate("{{.Version}}\n")
+	serverCommands := cmdserver.NewCommands(a.Client, a.Loaders)
 	cmd.AddCommand(
 		serverCommands.CreateCmd(),
 		serverCommands.PsCmd(),
@@ -53,11 +55,10 @@ func (a *App) RootCommand() *cobra.Command {
 		serverCommands.UpgradeCmd(),
 		serverCommands.ConfigureCmd(),
 		serverCommands.BackupCmd(),
-		cmdversion.NewCmd(),
 		cmdmod.NewCmd(),
 		cmddaemon.NewCmd(a.Client),
 		cmdconfig.NewCmd(),
-		cmdversions.NewCmd(a.Client, a.Providers),
+		cmdversions.NewCmd(a.Client, a.Loaders),
 	)
 	return cmd
 }

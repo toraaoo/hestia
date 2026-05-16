@@ -193,6 +193,12 @@ hestia config get <key>
 hestia config set <key> <value>
 ```
 
+### Version
+
+```sh
+hestia --version
+```
+
 ## Architecture
 
 ```
