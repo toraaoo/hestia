@@ -14,7 +14,7 @@ keep running after you close the terminal.
 
 - **Simple CLI** — Create, start, stop servers with single commands
 - **Persistent daemon** — Servers survive terminal exit
-- **Multiple JAR types** — Vanilla, Paper, Fabric
+- **Multiple server loaders** — Vanilla, Fabric
 - **Auto JRE management** — Downloads correct Java version automatically
 - **Mod management** — Install and manage mods/plugins
 - **Backup system** — Create, restore, prune backups with retention policies
@@ -78,7 +78,7 @@ hestia create <name> [flags]
 | Flag            | Description                                         |
 |-----------------|-----------------------------------------------------|
 | `--version`     | Minecraft version (default: latest)                 |
-| `--jar`         | JAR type: vanilla, paper, fabric (default: vanilla) |
+| `--loader, -l`  | Server loader: vanilla, fabric (default: vanilla)   |
 | `--memory`      | Memory allocation (e.g., 2G, 4096M)                 |
 | `--port`        | Server port (auto-assigned if 0)                    |
 | `--detach, -d`  | Don't attach after creating                         |
@@ -94,8 +94,8 @@ hestia create <name> [flags]
 # Vanilla server with defaults
 hestia create myserver
 
-# Paper server with 4GB RAM
-hestia create survival --jar paper --memory 4G --version 1.21.4
+# Fabric server with 4GB RAM
+hestia create survival --loader fabric --memory 4G --version 1.21.4
 
 # Creative server with seed
 hestia create creative --gamemode creative --seed "minecraft" --memory 2G
@@ -172,8 +172,8 @@ hestia backup prune <name> --keep-days 7 --min-backups 3
 
 ```sh
 hestia versions                      # List vanilla releases
-hestia versions --jar paper          # List Paper versions
-hestia versions --jar fabric         # List Fabric versions
+hestia versions --loader vanilla     # List vanilla versions (explicit)
+hestia versions --loader fabric      # List Fabric-compatible versions
 hestia versions --latest             # Show only latest
 hestia versions --snapshots          # Include snapshots
 ```
@@ -219,11 +219,13 @@ The CLI is a thin HTTP client. All state lives in the daemon.
 └── servers/
     └── <name>/
         ├── hestia.toml   # Server config
-        ├── server.jar
-        ├── backups/
-        ├── logs/
-        ├── mods/
-        └── world/
+        └── data/         # Runtime data
+            ├── server.jar
+            ├── server.properties
+            ├── backups/
+            ├── logs/
+            ├── mods/
+            └── world/
 ```
 
 ### Configuration Files
@@ -241,7 +243,7 @@ log_level = "info"
 ```toml
 name = "survival"
 version = "1.21.4"
-jar = "vanilla"
+loader = "vanilla"
 memory = "4G"
 port = 25565
 
@@ -253,13 +255,12 @@ enabled = true
 port = 25575
 ```
 
-## JAR Providers
+## Loaders
 
-| Provider  | Description                   |
-|-----------|-------------------------------|
-| `vanilla` | Official Mojang server        |
-| `paper`   | High-performance Paper server |
-| `fabric`  | Fabric mod loader             |
+| Loader    | Description            |
+|-----------|------------------------|
+| `vanilla` | Official Mojang server |
+| `fabric`  | Fabric mod loader      |
 
 ## Documentation
 

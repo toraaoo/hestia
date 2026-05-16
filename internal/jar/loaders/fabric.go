@@ -204,12 +204,21 @@ func (p FabricLoader) DownloadServer(version, destPath string, cb progress.Callb
 }
 
 func (p FabricLoader) GetJavaVersion(version string) (int, error) {
+	vanilla := NewVanillaProvider(p.http, p.downloader)
+	required, err := vanilla.GetJavaVersion(version)
+	if err != nil {
+		return 0, err
+	}
 	loader, err := p.latestCompatibleLoader(version)
 	if err != nil {
 		return 0, err
 	}
-	if loader.LauncherMeta.MinJavaVersion == 0 {
-		return 8, nil
+	minimum := loader.LauncherMeta.MinJavaVersion
+	if minimum == 0 {
+		minimum = 8
 	}
-	return loader.LauncherMeta.MinJavaVersion, nil
+	if required < minimum {
+		return minimum, nil
+	}
+	return required, nil
 }

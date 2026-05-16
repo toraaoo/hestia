@@ -35,6 +35,11 @@ func (s *Store) Create(name, version string) (*Config, error) {
 		return nil, fmt.Errorf("create server dir: %w", err)
 	}
 
+	if err := os.MkdirAll(s.DataDir(name), 0755); err != nil {
+		_ = os.RemoveAll(dir)
+		return nil, fmt.Errorf("create data dir: %w", err)
+	}
+
 	if err := s.SaveConfig(cfg); err != nil {
 		_ = os.RemoveAll(dir)
 		return nil, err
@@ -107,9 +112,9 @@ func (s *Store) SaveConfig(cfg *Config) error {
 }
 
 func (s *Store) WriteProperties(cfg *Config) error {
-	dir := s.ServerDir(cfg.Name)
+	dir := s.DataDir(cfg.Name)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("create server dir: %w", err)
+		return fmt.Errorf("create data dir: %w", err)
 	}
 	path := filepath.Join(dir, "server.properties")
 	return os.WriteFile(path, []byte(cfg.GenerateProperties()), 0644)
@@ -123,12 +128,16 @@ func (s *Store) ServersDir() string {
 	return s.serversDir
 }
 
+func (s *Store) DataDir(name string) string {
+	return filepath.Join(s.ServerDir(name), "data")
+}
+
 func (s *Store) JarPath(name string) string {
-	return filepath.Join(s.ServerDir(name), "server.jar")
+	return filepath.Join(s.DataDir(name), "server.jar")
 }
 
 func (s *Store) BackupsDir(name string) string {
-	return filepath.Join(s.ServerDir(name), "backups")
+	return filepath.Join(s.DataDir(name), "backups")
 }
 
 type BackupInfo struct {

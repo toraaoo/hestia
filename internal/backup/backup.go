@@ -118,7 +118,7 @@ func (s *Service) createWithRCON(opts Options) (*Info, error) {
 }
 
 func (s *Service) createArchive(opts Options) (*Info, error) {
-	serverDir := s.store.ServerDir(opts.ServerName)
+	dataDir := s.store.DataDir(opts.ServerName)
 	backupDir := s.store.BackupsDir(opts.ServerName)
 
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
@@ -133,15 +133,15 @@ func (s *Service) createArchive(opts Options) (*Info, error) {
 	var sources []string
 	switch opts.Type {
 	case TypeWorld:
-		worldDir := filepath.Join(serverDir, cfg.World.Name)
+		worldDir := filepath.Join(dataDir, cfg.World.Name)
 		if _, err := os.Stat(worldDir); os.IsNotExist(err) {
 			return nil, fmt.Errorf("world directory %q not found", cfg.World.Name)
 		}
 		sources = []string{cfg.World.Name}
 	case TypeFull:
 		sources = []string{cfg.World.Name}
-		for _, name := range []string{"server.properties", "hestia.toml", "plugins", "mods"} {
-			path := filepath.Join(serverDir, name)
+		for _, name := range []string{"server.properties", "plugins", "mods"} {
+			path := filepath.Join(dataDir, name)
 			if _, err := os.Stat(path); err == nil {
 				sources = append(sources, name)
 			}
@@ -155,7 +155,7 @@ func (s *Service) createArchive(opts Options) (*Info, error) {
 	filename := fmt.Sprintf("%s-%s.tar.gz", opts.Type, timestamp)
 	backupPath := filepath.Join(backupDir, filename)
 
-	if err := createTarGz(backupPath, serverDir, sources); err != nil {
+	if err := createTarGz(backupPath, dataDir, sources); err != nil {
 		return nil, fmt.Errorf("create archive: %w", err)
 	}
 
@@ -329,14 +329,14 @@ func (s *Service) Restore(serverName, backupName string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	serverDir := s.store.ServerDir(serverName)
-	worldDir := filepath.Join(serverDir, cfg.World.Name)
+	dataDir := s.store.DataDir(serverName)
+	worldDir := filepath.Join(dataDir, cfg.World.Name)
 
 	if err := os.RemoveAll(worldDir); err != nil {
 		return fmt.Errorf("remove old world: %w", err)
 	}
 
-	if err := extractTarGz(backupPath, serverDir); err != nil {
+	if err := extractTarGz(backupPath, dataDir); err != nil {
 		return fmt.Errorf("extract backup: %w", err)
 	}
 

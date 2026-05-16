@@ -28,7 +28,7 @@ hestia create <name> [flags]
 | Flag           | Type   | Default | Description                            |
 |----------------|--------|---------|----------------------------------------|
 | `--version`    | string | latest  | Minecraft version                      |
-| `--jar`        | string | vanilla | JAR provider: vanilla, paper, fabric   |
+| `--loader, -l` | string |         | Mod loader                             |
 | `--memory`     | string |         | Memory allocation (e.g., 2G, 4096M)    |
 | `--port`       | int    | auto    | Server port                            |
 | `--detach, -d` | bool   | false   | Don't attach to console after creating |
@@ -60,8 +60,8 @@ hestia create <name> [flags]
 # Create with defaults (latest vanilla)
 hestia create myserver
 
-# Paper server with 4GB RAM
-hestia create survival --jar paper --memory 4G --version 1.21.4
+# Vanilla server with 4GB RAM
+hestia create survival --memory 4G --version 1.21.4
 
 # Creative server with seed
 hestia create creative --gamemode creative --seed "minecraft" --memory 2G
@@ -75,8 +75,16 @@ hestia create background-server -d
 Start a stopped server.
 
 ```sh
-hestia start <name>
+hestia start <name> [flags]
 ```
+
+**Flags:**
+
+| Flag          | Type | Default | Description                                                |
+|---------------|------|---------|------------------------------------------------------------|
+| `-a, --attach` | bool | false   | Attach after starting (stream logs + send commands)         |
+| `-r, --rcon`   | bool | false   | Use RCON for commands when attaching (shows responses)      |
+| `-n, --lines`  | int  | 100     | Number of log lines to show initially when attaching        |
 
 ## hestia stop
 
@@ -335,10 +343,10 @@ hestia versions [flags]
 
 | Flag          | Type   | Default | Description                       |
 |---------------|--------|---------|-----------------------------------|
-| `--jar`       | string | vanilla | JAR provider to list versions for |
-| `--snapshots` | bool   | false   | Include snapshot versions         |
-| `--latest`    | bool   | false   | Show only latest release/snapshot |
-| `--json`      | bool   | false   | Output as JSON                    |
+| `--loader, -L` | string | vanilla | Loader to list versions for       |
+| `--snapshots, -s` | bool | false   | Include snapshot versions         |
+| `--latest, -l` | bool   | false   | Show only latest release/snapshot |
+| `--json, -j`   | bool   | false   | Output as JSON                    |
 
 **Examples:**
 
@@ -346,10 +354,10 @@ hestia versions [flags]
 # List vanilla releases
 hestia versions
 
-# List Paper versions
-hestia versions --jar paper
+# List Fabric versions
+hestia versions --loader fabric
 
-# Show only latest
+# Show only latest release/snapshot
 hestia versions --latest
 
 # Include snapshots

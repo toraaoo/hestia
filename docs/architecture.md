@@ -21,8 +21,8 @@ the CLI and daemon.
 
 ```
 hestia
-├── create <name> [--version] [--jar] [--port] [--memory] ...
-├── start <name>
+├── create <name> [--version] [--loader] [--port] [--memory] ...
+├── start <name> [-a|--attach] [-r|--rcon] [-n|--lines]
 ├── stop <name>
 ├── restart <name>
 ├── rm <name>
@@ -43,7 +43,6 @@ hestia
 │   ├── delete <name> <backup>
 │   └── prune <name>
 ├── versions
-├── version
 ├── daemon
 │   ├── start
 │   ├── stop
@@ -60,7 +59,7 @@ hestia
 ```
 hestia CLI
     │
-    │  HTTP/1.1 over Unix socket
+    │  HTTP/1.1 over Unix socket (Windows: named pipe)
     ▼
 hestiad daemon  (~/.hestia/daemon.sock)
     │
@@ -113,12 +112,14 @@ All requests/responses: `Content-Type: application/json`.
 └── servers/
     └── <name>/
         ├── hestia.toml   per-server config
-        ├── server.jar    minecraft jar
-        ├── backups/
-        ├── logs/
-        │   └── latest.log
-        ├── mods/         mods and plugins
-        └── world/
+        └── data/         runtime data (server CWD)
+            ├── server.jar
+            ├── server.properties
+            ├── backups/
+            ├── logs/
+            │   └── latest.log
+            ├── mods/     mods and plugins
+            └── world/
 ```
 
 ---
@@ -138,7 +139,11 @@ log_level = "info"
 ```toml
 name = "survival"
 version = "1.21.4"
-jar = "paper"       # paper | vanilla | fabric
+jar = "vanilla"     # vanilla | fabric
+
+# (naming note)
+# Internally we now refer to the thing that downloads/builds the server jar as a "loader"
+# (e.g. vanilla, fabric). Some persisted fields/configs may still use the historical "jar" name.
 memory = "2G"
 port = 25565
 
@@ -187,8 +192,8 @@ hestia/
 │   │   ├── retention.go          retention policy logic
 │   │   └── scheduler.go          backup scheduling with injected store/service
 │   ├── jar/
-│   │   ├── registry.go           JAR provider registry
-│   │   └── providers/            vanilla, paper, fabric providers
+│   │   ├── registry.go           server jar loader registry
+│   │   └── loaders/              vanilla, fabric loaders
 │   ├── jre/
 │   │   ├── manager.go            JRE root ownership
 │   │   └── downloader.go         injectable JRE download logic

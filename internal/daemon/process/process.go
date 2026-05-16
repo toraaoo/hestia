@@ -18,6 +18,7 @@ import (
 type ServerStore interface {
 	LoadConfig(name string) (*server.Config, error)
 	ServerDir(name string) string
+	DataDir(name string) string
 	JarPath(name string) string
 }
 
@@ -220,8 +221,8 @@ func (p *Process) run() {
 		}
 	}
 
-	serverDir := p.store.ServerDir(p.Name)
-	eulaPath := serverDir + "/eula.txt"
+	dataDir := p.store.DataDir(p.Name)
+	eulaPath := dataDir + "/eula.txt"
 	if err := os.WriteFile(eulaPath, []byte("eula=true\n"), 0644); err != nil {
 		p.ring.Write(fmt.Sprintf("ERROR: write eula: %v\n", err))
 		return
@@ -236,9 +237,9 @@ func (p *Process) run() {
 		"-jar", "server.jar",
 		"nogui",
 	)
-	p.cmd.Dir = serverDir
+	p.cmd.Dir = dataDir
 
-	logw, err := NewLogWriter(serverDir, p.ring)
+	logw, err := NewLogWriter(dataDir, p.ring)
 	if err != nil {
 		p.ring.Write(fmt.Sprintf("ERROR: create log writer: %v\n", err))
 		return

@@ -84,7 +84,7 @@ func TestCreateAndDelete(t *testing.T) {
 		t.Errorf("hestia.toml not found: %v", err)
 	}
 
-	propsPath := filepath.Join(tmpDir, "servers", "testserver", "server.properties")
+	propsPath := filepath.Join(tmpDir, "servers", "testserver", "data", "server.properties")
 	if _, err := os.Stat(propsPath); err != nil {
 		t.Errorf("server.properties not found: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestJarPath(t *testing.T) {
 	store := NewStore(filepath.Join(tmpDir, "servers"))
 
 	path := store.JarPath("myserver")
-	expected := filepath.Join(tmpDir, "servers", "myserver", "server.jar")
+	expected := filepath.Join(tmpDir, "servers", "myserver", "data", "server.jar")
 	if path != expected {
 		t.Errorf("expected %s, got %s", expected, path)
 	}
