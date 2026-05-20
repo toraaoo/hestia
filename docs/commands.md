@@ -262,11 +262,10 @@ hestia backup create <name> [flags]
 
 | Flag      | Type | Default | Description                              |
 |-----------|------|---------|------------------------------------------|
-| `--full`  | bool | false   | Full backup (world + config + plugins)   |
 | `--force` | bool | false   | Force backup without RCON flush (unsafe) |
 | `--json`  | bool | false   | Output as JSON                           |
 
-By default, creates a world-only backup. Uses RCON to flush world data before backup.
+Creates a server backup including the world plus `server.properties`, `plugins/`, and `mods/` when present. Live backups use RCON to flush world data first and skip runtime lockfiles such as `session.lock`.
 
 ### backup list
 

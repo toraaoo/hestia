@@ -158,7 +158,6 @@ hestia mod remove <server> <mod>    # Remove a mod
 ```sh
 # Create backup
 hestia backup create <name>
-hestia backup create <name> --full    # Full backup (world + config + plugins)
 
 # Manage backups
 hestia backup list <name>
@@ -169,6 +168,8 @@ hestia backup delete <name> <backup>
 hestia backup prune <name> --keep-last 5
 hestia backup prune <name> --keep-days 7 --min-backups 3
 ```
+
+Backups always include the world plus `server.properties`, `plugins/`, and `mods/` when present. Live backups skip runtime lockfiles such as `session.lock`.
 
 ```sh
 hestia versions                      # List vanilla releases
@@ -219,7 +220,7 @@ The CLI is a thin HTTP client. All state lives in the daemon.
 └── servers/
     └── <name>/
         ├── hestia.toml   # Server config
-        ├── backups/      # Jar and world backups
+        ├── backups/      # Server backups
         └── data/         # Runtime data
             ├── server.jar
             ├── server.properties
@@ -241,6 +242,7 @@ log_level = "info"
 **Per-server** — `~/.hestia/servers/<name>/hestia.toml`
 
 ```toml
+config_version = 2
 name = "survival"
 version = "1.21.4"
 loader = "vanilla"

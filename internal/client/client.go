@@ -270,7 +270,6 @@ func (c *Client) SendConsoleCommand(ctx context.Context, name, command string) e
 type BackupInfo struct {
 	Name      string    `json:"name"`
 	Path      string    `json:"path"`
-	Type      string    `json:"type"`
 	Size      int64     `json:"size"`
 	CreatedAt time.Time `json:"created_at"`
 	WorldName string    `json:"world_name,omitempty"`
@@ -278,8 +277,7 @@ type BackupInfo struct {
 }
 
 type BackupRequest struct {
-	Type  string `json:"type,omitempty"`
-	Force bool   `json:"force,omitempty"`
+	Force bool `json:"force,omitempty"`
 }
 
 type PruneRequest struct {

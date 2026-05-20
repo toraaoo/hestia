@@ -17,17 +17,9 @@ import (
 	"github.com/toraaoo/hestia/internal/server"
 )
 
-type Type string
-
-const (
-	TypeWorld Type = "world"
-	TypeFull  Type = "full"
-)
-
 type Info struct {
 	Name      string    `json:"name"`
 	Path      string    `json:"path"`
-	Type      Type      `json:"type"`
 	Size      int64     `json:"size"`
 	CreatedAt time.Time `json:"created_at"`
 	WorldName string    `json:"world_name,omitempty"`
@@ -35,7 +27,6 @@ type Info struct {
 }
 
 type Options struct {
-	Type       Type
 	ServerName string
 	UseRCON    bool
 	RCONAddr   string
@@ -63,6 +54,8 @@ type defaultRCONDialer struct{}
 func (defaultRCONDialer) Dial(addr, password string) (RCONClient, error) {
 	return rcon.Dial(addr, password)
 }
+
+var openSourceFile = os.Open
 
 func NewService(store *server.Store, rconDial RCONDialer) *Service {
 	if rconDial == nil {
@@ -130,32 +123,17 @@ func (s *Service) createArchive(opts Options) (*Info, error) {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
 
-	var sources []string
-	switch opts.Type {
-	case TypeWorld:
-		worldDir := filepath.Join(dataDir, cfg.World.Name)
-		if _, err := os.Stat(worldDir); os.IsNotExist(err) {
-			return nil, fmt.Errorf("world directory %q not found", cfg.World.Name)
-		}
-		sources = []string{cfg.World.Name}
-	case TypeFull:
-		sources = []string{cfg.World.Name}
-		for _, name := range []string{"server.properties", "plugins", "mods"} {
-			path := filepath.Join(dataDir, name)
-			if _, err := os.Stat(path); err == nil {
-				sources = append(sources, name)
-			}
-		}
-	default:
-		return nil, fmt.Errorf("unknown backup type: %s", opts.Type)
+	sources, err := backupSources(dataDir, cfg.World.Name)
+	if err != nil {
+		return nil, err
 	}
 
 	now := s.now()
 	timestamp := now.Format("20060102-150405")
-	filename := fmt.Sprintf("%s-%s.tar.gz", opts.Type, timestamp)
+	filename := fmt.Sprintf("backup-%s.tar.gz", timestamp)
 	backupPath := filepath.Join(backupDir, filename)
 
-	if err := createTarGz(backupPath, dataDir, sources); err != nil {
+	if err := createTarGz(backupPath, dataDir, cfg.World.Name, sources); err != nil {
 		return nil, fmt.Errorf("create archive: %w", err)
 	}
 
@@ -167,7 +145,6 @@ func (s *Service) createArchive(opts Options) (*Info, error) {
 	info := &Info{
 		Name:      filename,
 		Path:      backupPath,
-		Type:      opts.Type,
 		Size:      stat.Size(),
 		CreatedAt: now,
 		WorldName: cfg.World.Name,
@@ -181,7 +158,35 @@ func (s *Service) createArchive(opts Options) (*Info, error) {
 	return info, nil
 }
 
-func createTarGz(dest, baseDir string, sources []string) error {
+func backupSources(baseDir, worldName string) ([]string, error) {
+	worldDir := filepath.Join(baseDir, worldName)
+	if _, err := os.Stat(worldDir); os.IsNotExist(err) {
+		return nil, fmt.Errorf("world directory %q not found", worldName)
+	}
+
+	sources := []string{worldName}
+	for _, name := range []string{"server.properties", "plugins", "mods"} {
+		path := filepath.Join(baseDir, name)
+		if _, err := os.Stat(path); err == nil {
+			sources = append(sources, name)
+		}
+	}
+
+	return sources, nil
+}
+
+func shouldSkipBackupPath(relPath, worldName string) bool {
+	relPath = filepath.ToSlash(relPath)
+	worldName = filepath.ToSlash(worldName)
+
+	if filepath.Base(relPath) != "session.lock" {
+		return false
+	}
+
+	return strings.HasPrefix(relPath, worldName+"/")
+}
+
+func createTarGz(dest, baseDir, worldName string, sources []string) error {
 	var retErr error
 
 	f, err := os.Create(dest)
@@ -220,6 +225,10 @@ func createTarGz(dest, baseDir string, sources []string) error {
 				return err
 			}
 
+			if shouldSkipBackupPath(relPath, worldName) {
+				return nil
+			}
+
 			header, err := tar.FileInfoHeader(fi, "")
 			if err != nil {
 				return err
@@ -242,7 +251,7 @@ func createTarGz(dest, baseDir string, sources []string) error {
 				return nil
 			}
 
-			file, err := os.Open(path)
+			file, err := openSourceFile(path)
 			if err != nil {
 				return err
 			}
@@ -293,15 +302,9 @@ func (s *Service) List(serverName string) ([]Info, error) {
 			continue
 		}
 
-		backupType := TypeWorld
-		if strings.HasPrefix(e.Name(), "full-") {
-			backupType = TypeFull
-		}
-
 		backups = append(backups, Info{
 			Name:      e.Name(),
 			Path:      filepath.Join(backupDir, e.Name()),
-			Type:      backupType,
 			Size:      fi.Size(),
 			CreatedAt: fi.ModTime(),
 		})
@@ -330,10 +333,17 @@ func (s *Service) Restore(serverName, backupName string) error {
 	}
 
 	dataDir := s.store.DataDir(serverName)
-	worldDir := filepath.Join(dataDir, cfg.World.Name)
+	restoreTargets := []string{
+		filepath.Join(dataDir, cfg.World.Name),
+		filepath.Join(dataDir, "server.properties"),
+		filepath.Join(dataDir, "plugins"),
+		filepath.Join(dataDir, "mods"),
+	}
 
-	if err := os.RemoveAll(worldDir); err != nil {
-		return fmt.Errorf("remove old world: %w", err)
+	for _, target := range restoreTargets {
+		if err := os.RemoveAll(target); err != nil {
+			return fmt.Errorf("remove old backup target %q: %w", filepath.Base(target), err)
+		}
 	}
 
 	if err := extractTarGz(backupPath, dataDir); err != nil {

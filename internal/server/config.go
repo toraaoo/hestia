@@ -8,11 +8,12 @@ import (
 )
 
 type Config struct {
-	Name    string `toml:"name" json:"name"`
-	Version string `toml:"version" json:"version"`
-	Loader  string `toml:"loader" json:"loader"`
-	Memory  string `toml:"memory" json:"memory"`
-	Port    int    `toml:"port" json:"port"`
+	ConfigVersion int    `toml:"config_version" json:"config_version"`
+	Name          string `toml:"name" json:"name"`
+	Version       string `toml:"version" json:"version"`
+	Loader        string `toml:"loader" json:"loader"`
+	Memory        string `toml:"memory" json:"memory"`
+	Port          int    `toml:"port" json:"port"`
 
 	RCON   RCONConfig   `toml:"rcon" json:"rcon"`
 	World  WorldConfig  `toml:"world" json:"world"`
@@ -37,9 +38,10 @@ type WorldConfig struct {
 type BackupConfig struct {
 	Enabled   bool            `toml:"enabled" json:"enabled"`
 	Schedule  string          `toml:"schedule" json:"schedule"`
-	Type      string          `toml:"type" json:"type"`
 	Retention RetentionConfig `toml:"retention" json:"retention"`
 }
+
+const CurrentConfigVersion = 2
 
 type RetentionConfig struct {
 	KeepLast   int `toml:"keep_last" json:"keep_last"`
@@ -49,11 +51,12 @@ type RetentionConfig struct {
 
 func DefaultConfig(name, version string) *Config {
 	return &Config{
-		Name:    name,
-		Version: version,
-		Loader:  "vanilla",
-		Memory:  "2G",
-		Port:    0,
+		ConfigVersion: CurrentConfigVersion,
+		Name:          name,
+		Version:       version,
+		Loader:        "vanilla",
+		Memory:        "2G",
+		Port:          0,
 		RCON: RCONConfig{
 			Enabled:  true,
 			Password: uuid.New().String(),
@@ -70,7 +73,6 @@ func DefaultConfig(name, version string) *Config {
 		Backup: BackupConfig{
 			Enabled:  false,
 			Schedule: "0 */6 * * *",
-			Type:     "world",
 			Retention: RetentionConfig{
 				KeepLast:   10,
 				KeepDays:   7,

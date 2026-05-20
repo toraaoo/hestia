@@ -112,7 +112,7 @@ All requests/responses: `Content-Type: application/json`.
 └── servers/
     └── <name>/
         ├── hestia.toml   per-server config
-        ├── backups/      jar and world backups
+        ├── backups/      server backups
         └── data/         runtime data (server CWD)
             ├── server.jar
             ├── server.properties
@@ -137,6 +137,7 @@ log_level = "info"
 ### Per-server — `~/.hestia/servers/<name>/hestia.toml`
 
 ```toml
+config_version = 2
 name = "survival"
 version = "1.21.4"
 jar = "vanilla"     # vanilla | fabric

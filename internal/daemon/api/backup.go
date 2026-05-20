@@ -10,8 +10,7 @@ import (
 )
 
 type createBackupRequest struct {
-	Type  string `json:"type,omitempty"`
-	Force bool   `json:"force,omitempty"`
+	Force bool `json:"force,omitempty"`
 }
 
 type pruneRequest struct {
@@ -42,13 +41,7 @@ func (h *Handler) handleCreateBackup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	backupType := backup.TypeWorld
-	if req.Type == "full" {
-		backupType = backup.TypeFull
-	}
-
 	opts := backup.Options{
-		Type:       backupType,
 		ServerName: name,
 	}
 

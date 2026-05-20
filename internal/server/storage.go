@@ -91,10 +91,37 @@ func (s *Store) List() ([]string, error) {
 func (s *Store) LoadConfig(name string) (*Config, error) {
 	path := filepath.Join(s.ServerDir(name), "hestia.toml")
 	var cfg Config
-	if _, err := toml.DecodeFile(path, &cfg); err != nil {
+	md, err := toml.DecodeFile(path, &cfg)
+	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
+
+	if migrated := migrateConfig(&cfg, md); migrated {
+		if err := s.SaveConfig(&cfg); err != nil {
+			return nil, fmt.Errorf("migrate config: %w", err)
+		}
+	}
+
 	return &cfg, nil
+}
+
+func migrateConfig(cfg *Config, md toml.MetaData) bool {
+	version := cfg.ConfigVersion
+	if version == 0 {
+		version = 1
+	}
+
+	migrated := false
+	if version < CurrentConfigVersion {
+		cfg.ConfigVersion = CurrentConfigVersion
+		migrated = true
+	}
+
+	if md.IsDefined("backup", "type") {
+		migrated = true
+	}
+
+	return migrated
 }
 
 func (s *Store) SaveConfig(cfg *Config) error {

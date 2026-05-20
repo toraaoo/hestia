@@ -10,6 +10,9 @@ import (
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig("test", "1.21.4")
 
+	if cfg.ConfigVersion != CurrentConfigVersion {
+		t.Errorf("expected config version %d, got %d", CurrentConfigVersion, cfg.ConfigVersion)
+	}
 	if cfg.Name != "test" {
 		t.Errorf("expected name test, got %s", cfg.Name)
 	}
@@ -141,8 +144,78 @@ func TestLoadConfig(t *testing.T) {
 	if cfg.Name != "loadtest" {
 		t.Errorf("expected name loadtest, got %s", cfg.Name)
 	}
+	if cfg.ConfigVersion != CurrentConfigVersion {
+		t.Errorf("expected config version %d, got %d", CurrentConfigVersion, cfg.ConfigVersion)
+	}
 	if cfg.Version != "1.21.4" {
 		t.Errorf("expected version 1.21.4, got %s", cfg.Version)
+	}
+}
+
+func TestLoadConfigMigratesLegacyBackupType(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(filepath.Join(tmpDir, "servers"))
+
+	serverDir := filepath.Join(tmpDir, "servers", "legacy")
+	if err := os.MkdirAll(serverDir, 0755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+
+	legacyConfig := `name = "legacy"
+version = "1.21.4"
+loader = "vanilla"
+memory = "2G"
+port = 25565
+
+[rcon]
+enabled = true
+password = "secret"
+port = 25575
+
+[world]
+name = "world"
+seed = ""
+gamemode = "survival"
+difficulty = "normal"
+max_players = 20
+motd = "A Minecraft Server"
+
+[backup]
+enabled = false
+schedule = "0 */6 * * *"
+type = "world"
+
+[backup.retention]
+keep_last = 10
+keep_days = 7
+min_backups = 3
+`
+
+	configPath := filepath.Join(serverDir, "hestia.toml")
+	if err := os.WriteFile(configPath, []byte(legacyConfig), 0644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	cfg, err := store.LoadConfig("legacy")
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg.ConfigVersion != CurrentConfigVersion {
+		t.Fatalf("expected config version %d, got %d", CurrentConfigVersion, cfg.ConfigVersion)
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "config_version = 2") {
+		t.Fatalf("expected migrated config_version in file, got:\n%s", content)
+	}
+	if strings.Contains(content, "\ntype = ") {
+		t.Fatalf("expected legacy backup.type to be removed, got:\n%s", content)
 	}
 }
 

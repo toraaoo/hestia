@@ -26,7 +26,6 @@ func (sc *Commands) newBackupCmd() *cobra.Command {
 
 func (sc *Commands) newBackupCreateCmd() *cobra.Command {
 	var (
-		full    bool
 		force   bool
 		jsonOut bool
 	)
@@ -38,11 +37,6 @@ func (sc *Commands) newBackupCreateCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return sc.withClient(cmd, func(c *client.Client) error {
 				req := client.BackupRequest{Force: force}
-				if full {
-					req.Type = "full"
-				} else {
-					req.Type = "world"
-				}
 
 				info, err := c.CreateBackup(cmd.Context(), args[0], req)
 				if err != nil {
@@ -61,7 +55,6 @@ func (sc *Commands) newBackupCreateCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&full, "full", "a", false, "Full backup (world + config + plugins)")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force backup even without RCON (unsafe)")
 	cmd.Flags().BoolVarP(&jsonOut, "json", "j", false, "Output as JSON")
 	return cmd
@@ -92,14 +85,13 @@ func (sc *Commands) newBackupListCmd() *cobra.Command {
 					return err
 				}
 
-				headers := []string{"NAME", "TYPE", "SIZE", "CREATED"}
-				widths := []int{36, 8, 10, 20}
+				headers := []string{"NAME", "SIZE", "CREATED"}
+				widths := []int{36, 10, 20}
 				var rows [][]string
 
 				for _, b := range backups {
 					rows = append(rows, []string{
 						b.Name,
-						b.Type,
 						formatBytes(b.Size),
 						b.CreatedAt.Format("2006-01-02 15:04:05"),
 					})

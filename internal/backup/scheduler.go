@@ -12,7 +12,6 @@ import (
 
 type Schedule struct {
 	Cron      string
-	Type      Type
 	Retention RetentionPolicy
 }
 
@@ -128,7 +127,6 @@ func (j *backupJob) Run() {
 	log.Info("running scheduled backup", "server", j.serverName)
 
 	opts := Options{
-		Type:       j.schedule.Type,
 		ServerName: j.serverName,
 	}
 
@@ -178,14 +176,8 @@ func (s *Scheduler) LoadSchedules() error {
 			continue
 		}
 
-		backupType := TypeWorld
-		if cfg.Backup.Type == "full" {
-			backupType = TypeFull
-		}
-
 		schedule := &Schedule{
 			Cron: cfg.Backup.Schedule,
-			Type: backupType,
 			Retention: RetentionPolicy{
 				KeepLast:   cfg.Backup.Retention.KeepLast,
 				KeepDays:   cfg.Backup.Retention.KeepDays,
