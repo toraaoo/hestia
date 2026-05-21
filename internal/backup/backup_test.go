@@ -108,6 +108,13 @@ func TestRestoreRestoresUnifiedBackupTargets(t *testing.T) {
 	}
 }
 
+func TestArchivePathNormalizesWindowsSeparators(t *testing.T) {
+	got := archivePath(`world\region\r.0.0.mca`)
+	if got != "world/region/r.0.0.mca" {
+		t.Fatalf("expected slash-normalized archive path, got %q", got)
+	}
+}
+
 func TestCreateFailsOnUnexpectedReadError(t *testing.T) {
 	store, cfg := newTestStore(t)
 	worldDir := filepath.Join(store.DataDir(cfg.Name), cfg.World.Name)

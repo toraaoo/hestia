@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -176,14 +177,18 @@ func backupSources(baseDir, worldName string) ([]string, error) {
 }
 
 func shouldSkipBackupPath(relPath, worldName string) bool {
-	relPath = filepath.ToSlash(relPath)
-	worldName = filepath.ToSlash(worldName)
+	relPath = archivePath(relPath)
+	worldName = archivePath(worldName)
 
-	if filepath.Base(relPath) != "session.lock" {
+	if path.Base(relPath) != "session.lock" {
 		return false
 	}
 
 	return strings.HasPrefix(relPath, worldName+"/")
+}
+
+func archivePath(name string) string {
+	return strings.ReplaceAll(filepath.ToSlash(name), "\\", "/")
 }
 
 func createTarGz(dest, baseDir, worldName string, sources []string) error {
@@ -233,7 +238,7 @@ func createTarGz(dest, baseDir, worldName string, sources []string) error {
 			if err != nil {
 				return err
 			}
-			header.Name = relPath
+			header.Name = archivePath(relPath)
 
 			if fi.Mode()&os.ModeSymlink != 0 {
 				link, err := os.Readlink(path)
