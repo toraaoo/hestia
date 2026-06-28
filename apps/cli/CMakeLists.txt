@@ -3,13 +3,20 @@ add_executable(hestia_cli)
 target_sources(hestia_cli
         PRIVATE
         src/main.cc
-        src/tui.cc
+        src/cli.cc
+        src/registry.cc
+        src/commands/tui_command.cc
+        src/commands/greet_command.cc
+        src/commands/config_command.cc
 )
+
+target_include_directories(hestia_cli PRIVATE src)
 
 target_link_libraries(hestia_cli PRIVATE
         hestia_core
+        hestia_tui
         CLI11::CLI11
-        ftxui::component
+        spdlog::spdlog
 )
 
 target_compile_definitions(hestia_cli PRIVATE
