@@ -2,7 +2,11 @@ include(GNUInstallDirs)
 
 add_library(hestia_core STATIC
         include/hestia/logging.h
+        include/hestia/greeting.h
+        include/hestia/config.h
         src/logging.cc
+        src/greeting.cc
+        src/config.cc
 )
 
 set_target_properties(hestia_core PROPERTIES OUTPUT_NAME "hestia")
