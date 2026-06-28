@@ -27,6 +27,7 @@ list(APPEND CMAKE_MODULE_PATH
 
 add_subdirectory(third_party)
 add_subdirectory(libs/core)
+add_subdirectory(libs/tui)
 add_subdirectory(apps/desktop)
 
 option(BUILD_CLI "Build the command-line interface (CLI) application" ON)
