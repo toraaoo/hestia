@@ -27,11 +27,14 @@ shows usage, and `hestia tui` launches the interactive interface.
 
 ```
 hestia-cpp/
-├── libs/core/      hestia_core — shared launcher logic (the engine)
-├── libs/tui/       hestia_tui  — terminal UI library (FTXUI)
-├── apps/desktop/   Hestia      — graphical desktop launcher
-├── apps/cli/       hestia      — CLI + the `tui` subcommand (CLI11)
-└── third_party/    vendored dependencies (git submodules)
+├── libs/core/               hestia_core — shared launcher logic (the engine)
+├── libs/tui/                hestia_tui  — terminal UI library (FTXUI)
+├── apps/desktop/            Hestia      — graphical desktop launcher (CEF + React)
+│   ├── frontend/            Vite + React + TypeScript UI (built with Bun)
+│   └── src/core/            CEF shell — process model, IPC bridge, window, scheme
+├── apps/cli/                hestia      — CLI + the `tui` subcommand (CLI11)
+├── cmake/                   CMake helpers (DownloadCEF, CMakeRC, PruneLocales)
+└── third_party/             vendored C++ dependencies (git submodules)
 ```
 
 The dependency arrow is one-way and enforced by the build: `tui` and `cli` both
@@ -45,10 +48,15 @@ exposes exactly one public symbol, `hestia::tui::run()`. See
 - [spdlog](https://github.com/gabime/spdlog) + [fmt](https://github.com/fmtlib/fmt) — logging and formatting
 - [CLI11](https://github.com/CLIUtils/CLI11) — command-line parsing
 - [FTXUI](https://github.com/ArthurSonzogni/FTXUI) — terminal user interface
+- [CEF](https://bitbucket.org/chromiumembedded/cef) — Chromium Embedded Framework (desktop only)
+- [React](https://react.dev/) + [Vite](https://vitejs.dev/) + [Bun](https://bun.sh/) — desktop frontend
 
-Dependencies are vendored as git submodules under `third_party/`.
+C++ dependencies are vendored as git submodules under `third_party/`. CEF is
+fetched automatically at configure time (~1 GB, gitignored).
 
 ## Building
+
+A single configure builds everything — the CLI/TUI **and** the desktop launcher.
 
 Clone with submodules:
 
@@ -59,9 +67,15 @@ cd hestia-cpp
 git submodule update --init --recursive
 ```
 
-Configure and build:
+**Build ordering matters**: the desktop frontend must be compiled before CMake
+configures (CMakeRC embeds the `dist/` tree at configure time). So build the
+frontend first, then configure and build:
 
 ```bash
+# 1. Build the frontend (produces apps/desktop/frontend/dist)
+(cd apps/desktop/frontend && bun install && bun run build)
+
+# 2. Configure + build (first run downloads ~1 GB of CEF into third_party/cef)
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
@@ -71,11 +85,36 @@ Binaries land in `build/Release/` (or `build/<config>/`):
 - `hestia` — CLI / TUI
 - `Hestia` — desktop launcher
 
+**Release** is sandboxed, stripped, and serves the embedded frontend. On Linux,
+make the sandbox helper SUID root once per build location:
+
+```bash
+sudo chown root:root build/Release/chrome-sandbox
+sudo chmod 4755     build/Release/chrome-sandbox
+./build/Release/Hestia
+```
+
+**Dev mode** (hot-reload against the Vite dev server, sandbox off):
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+# In a second terminal:
+(cd apps/desktop/frontend && bun run dev)
+# Then run with the dev-server URL:
+./build/Debug/Hestia --dev-url=http://localhost:5173
+```
+
+> A `dist/` must exist at configure time even in Debug (CMakeRC needs it). Run
+> one `bun run build` first; the dev server overrides it at runtime anyway.
+
 ### Build options
 
-| Option      | Default | Description                   |
-|-------------|---------|-------------------------------|
-| `BUILD_CLI` | `ON`    | Build the CLI/TUI application |
+| Option               | Default | Description                                            |
+|----------------------|---------|--------------------------------------------------------|
+| `USE_SANDBOX`        | auto    | CEF sandbox — `ON` in Release, `OFF` in Debug          |
+| `CEF_VERSION`        | pinned  | CEF distribution version string (set in desktop CMake) |
+| `APP_DEV_SERVER_URL` | `""`    | Configure-time dev-server URL (Debug only)             |
 
 ## Usage
 
