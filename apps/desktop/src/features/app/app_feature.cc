@@ -8,11 +8,11 @@ namespace desktop::features {
 void AppFeature::RegisterActions(ipc::Actions& on) {
     on("info", [](const ipc::Request&, ipc::Response res) {
         auto d = CefDictionaryValue::Create();
-        d->SetString("name",    HESTIA_APP_NAME);
-        d->SetString("id",      HESTIA_APP_ID);
-        d->SetString("vendor",  HESTIA_APP_VENDOR);
-        d->SetString("version", HESTIA_APP_VERSION);
-        d->SetString("channel", HESTIA_APP_CHANNEL);
+        d->SetString("name",    APP_NAME);
+        d->SetString("id",      APP_ID);
+        d->SetString("vendor",  APP_VENDOR);
+        d->SetString("version", APP_VERSION);
+        d->SetString("channel", APP_CHANNEL);
         d->SetString("scheme",  APP_SCHEME);
         d->SetString("platform", APP_PLATFORM);
         res.Success(ipc::Dict(d));

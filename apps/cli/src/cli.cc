@@ -4,19 +4,16 @@
 
 #include <CLI/CLI.hpp>
 
+#include <hestia/app_info.h>
 #include <hestia/logging.h>
 
 #include "command.h"
 #include "registry.h"
 
-#ifndef HESTIA_VERSION
-#define HESTIA_VERSION "0.0.0"
-#endif
-
 namespace hestia::cli {
     int run(int argc, char **argv) {
         CLI::App app{"Hestia command-line interface", "hestia"};
-        app.set_version_flag("--version", HESTIA_VERSION);
+        app.set_version_flag("--version", APP_VERSION);
 
         // Allow a single optional subcommand, and let global flags appear at any
         // position (e.g. `hestia -v greet` or `hestia greet -v`).

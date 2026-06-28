@@ -13,7 +13,7 @@ void InitSettings(const CefRefPtr<CefCommandLine>& cmd) {
 #if !defined(NDEBUG)
     if (cmd && cmd->HasSwitch("dev-url"))
         g_dev_url = cmd->GetSwitchValue("dev-url").ToString();
-    else if (const char* e = std::getenv("HESTIA_DEV_URL"); e && *e)
+    else if (const char* e = std::getenv("APP_DEV_SERVER_URL"); e && *e)
         g_dev_url = e;
     else
         g_dev_url = APP_DEV_SERVER_URL;

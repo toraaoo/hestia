@@ -19,10 +19,6 @@ target_link_libraries(hestia_cli PRIVATE
         spdlog::spdlog
 )
 
-target_compile_definitions(hestia_cli PRIVATE
-        HESTIA_VERSION="${PROJECT_VERSION}"
-)
-
 set_target_properties(hestia_cli PROPERTIES OUTPUT_NAME "hestia")
 
 install(TARGETS hestia_cli

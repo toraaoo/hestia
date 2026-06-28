@@ -2,7 +2,8 @@
 
 Practical, copy-and-adapt guides for extending Hestia. Read
 [architecture.md](architecture.md) first for the lay of the land. This document
-is the *how*: add a view, a layout, a component, an overlay, or a CLI command.
+is the *how*: add a TUI view, layout, component, or overlay; a CLI command; a
+core module; or a desktop feature (IPC channel + frontend view).
 
 ## Conventions
 
@@ -14,7 +15,11 @@ A few rules hold everywhere; the recipes below assume them.
   where it's added: `make_views()`, `make_layouts()`, `make_commands()`. Adding a
   feature should not touch the shell.
 - **Namespaces follow the target.** Core is `hestia` / `hestia::config` /
-  `hestia::greeting`; the CLI is `hestia::cli`; the TUI is `hestia::tui`.
+  `hestia::greeting`; the CLI is `hestia::cli`; the TUI is `hestia::tui`; the
+  desktop shell is `desktop::` (`desktop::ipc`, `desktop::features`, …).
+- **Identity comes from one header.** Product name/version/etc. are macros in the
+  generated `<hestia/app_info.h>` (`APP_NAME`, `APP_VERSION`, `APP_ID`, …) — use
+  them instead of hard-coding or re-injecting per target.
 - **Include order:** the matching header first, then a blank line, then standard
   library, then third-party (`<ftxui/...>`, `<spdlog/...>`, `<CLI/...>`), then
   Hestia headers. Within `libs/tui`, include private headers by their path
@@ -349,17 +354,126 @@ Frontends then consume it: a CLI command includes the header and links
 
 ---
 
+## Add a desktop feature
+
+A desktop feature is a **C++ feature module** (one IPC channel group) plus the
+**frontend code** that calls it. The shell never changes. Model it on
+`AppFeature` (`apps/desktop/src/features/app/`).
+
+### 1. The C++ side — a feature module
+
+Create `apps/desktop/src/features/instances/instances_feature.{h,cc}`. Implement
+`Feature`: `Name()` is the channel prefix, `RegisterActions` registers handlers
+(pre-scoped to the prefix, so `On("list", …)` → channel `instances.list`).
+
+```cpp
+// instances_feature.h
+#pragma once
+#include "features/feature.h"
+
+namespace desktop::features {
+    class InstancesFeature : public Feature {
+    public:
+        const char *Name() const override { return "instances"; }
+        void RegisterActions(ipc::Actions &on) override;
+    };
+}
+```
+
+```cpp
+// instances_feature.cc
+#include "features/instances/instances_feature.h"
+
+#include "core/ipc/ipc_router.h"
+#include <hestia/...>            // call into the engine here
+
+namespace desktop::features {
+    void InstancesFeature::RegisterActions(ipc::Actions &on) {
+        on("list", [](const ipc::Request &, ipc::Response res) {
+            auto d = CefDictionaryValue::Create();
+            // ... populate from hestia_core ...
+            res.Success(ipc::Dict(d));
+        });
+    }
+}
+```
+
+Handlers may answer synchronously (as above) or capture the copyable `Response`
+and answer later from another thread. Push events to the page with
+`ipc::Emit(browser, "instances.progress", ipc::Int(42))`.
+
+**Register it** in `BuildFeatures()` (`features/feature_registry.cc`):
+
+```cpp
+f.push_back(std::make_unique<InstancesFeature>());
+```
+
+**Add both files** to `DESKTOP_SRCS_COMMON` in `apps/desktop/CMakeLists.txt`.
+
+### 2. The frontend side — a typed call + view
+
+Add a typed wrapper in `frontend/src/lib/api.ts` (one function per channel) and,
+if it's a new screen, a route under `frontend/src/routes/`. Request/response uses
+the `invoke()` helper; native→JS events use `on()` (both in
+`frontend/src/lib/ipc.ts`):
+
+```ts
+// api.ts
+export const listInstances = () =>
+  invoke<Instance[]>("instances.list", null, { fallback: [] })
+```
+
+Pass a `fallback` so the UI still renders outside the CEF shell (plain browser /
+`vite preview`). Then call it from a component — via the TanStack Query hooks in
+`hooks/use-ipc.ts` for caching, or directly.
+
+### 3. See it
+
+Run a Debug build against the dev server for instant frontend reload while you
+iterate (see [Build & run](#build--run)); rebuild the C++ side when you touch a
+feature module.
+
+---
+
 ## Build & run
 
+One configure builds everything (CLI/TUI **and** desktop). The frontend `dist/`
+must exist *before* you configure — CMakeRC embeds it at configure time:
+
 ```bash
+(cd apps/desktop/frontend && bun install && bun run build)   # first time / after FE changes
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
+
 build/Debug/hestia tui          # exercise the TUI
 build/Debug/hestia greet -n you # exercise a CLI command
+build/Debug/Hestia              # exercise the desktop launcher (embedded frontend)
 ```
 
 Iterate with `cmake --build build` (Ninja rebuilds only what changed). There is
 no test target yet; verify by running the binary.
+
+### Desktop hot reload (frontend)
+
+For instant frontend reload, run a **Debug** build against the Vite dev server.
+The dev path is Debug-only (compiled out of Release), and the bridge
+(`window.cefQuery`) is injected on every origin, so IPC works identically against
+the dev server and the embedded build:
+
+```bash
+# terminal 1 — Vite with HMR on :5173
+(cd apps/desktop/frontend && bun run dev)
+
+# terminal 2 — launch the shell pointed at it
+build/Debug/Hestia --dev-url=http://localhost:5173
+```
+
+Edits under `frontend/src/` hot-reload with no rebuild. The **C++ shell does not
+hot-reload** — rebuild and relaunch (`cmake --build build && build/Debug/Hestia
+--dev-url=…`) after backend changes; the Vite server can keep running across
+rebuilds. Alternatives to the flag: `APP_DEV_SERVER_URL=http://localhost:5173`
+(env), or bake a Debug default with `-DAPP_DEV_SERVER_URL=http://localhost:5173`
+at configure time.
 
 ## Recording a decision
 

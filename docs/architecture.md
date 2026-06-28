@@ -4,30 +4,36 @@ This is the reference for Hestia: what exists today, where it lives, and the
 reasoning behind the structure.
 
 > **Status:** early development (`v0.0.1`). The frontend skeletons, build
-> system, logging, and config store are in place. Launcher functionality is not
-> implemented yet.
+> system, logging, and config store are in place — including the desktop CEF
+> shell (process model, IPC bridge, embedded frontend). Launcher functionality
+> is not implemented yet.
 
 ## One core, three frontends
 
 Hestia is a single domain core driven three ways:
 
-| Frontend    | Target           | Binary    | Built by default |
-|-------------|------------------|-----------|------------------|
-| Desktop     | `hestia_desktop` | `Hestia`  | yes              |
-| CLI         | `hestia_cli`     | `hestia`  | yes (`BUILD_CLI`)|
-| TUI         | `hestia_tui`     | *(in `hestia`)* | yes        |
+| Frontend    | Target           | Binary          | Stack                     |
+|-------------|------------------|-----------------|---------------------------|
+| Desktop     | `hestia_desktop` | `Hestia`        | CEF + React/Vite          |
+| CLI         | `hestia_cli`     | `hestia`        | CLI11                     |
+| TUI         | `hestia_tui`     | *(in `hestia`)* | FTXUI                     |
 
 The CLI and TUI ship in **one binary**: `hestia tui` launches the interactive
 terminal UI, every other subcommand is plain CLI. The desktop app is a separate
-`main()` over the same core.
+`main()` over the same core — a thin Chromium Embedded Framework (CEF) shell that
+hosts a React frontend and talks to the core over an IPC bridge.
+
+A single configure builds **all** of them; there are no `BUILD_*` toggles. The
+only cost is that CEF (~1 GB) is fetched at configure time and the desktop
+frontend must be built first (see [Build & dependency conventions](#build--dependency-conventions)).
 
 ## Target graph
 
 ```
-libs/core    → domain logic, zero UI dependencies
+libs/core    → domain logic + shared identity (app_info.h); zero UI dependencies
 libs/tui     → FTXUI app; depends on core ONLY; public surface = hestia::tui::run()
 apps/cli     → CLI11 commands + thin main(); depends on core + tui
-apps/desktop → separate main() over core
+apps/desktop → CEF shell + embedded React frontend; depends on core only
 ```
 
 The dependency arrow is one-way and **enforced by the build, not by discipline**:
@@ -44,23 +50,32 @@ core  ◄────  tui
 This is why `apps/cli` reaches the TUI through a single symbol and never touches
 its internals.
 
+The desktop launcher follows the same one-way rule: `apps/desktop` (namespace
+`desktop::`) depends on `hestia_core` and never the reverse. Its CEF shell knows
+about windows, schemes, and IPC; it contains **no launcher logic** — that lives
+in core and is reached over the IPC bridge. CEF's build flags are confined to the
+`apps/desktop` subdirectory so core, the CLI, and the TUI never inherit them.
+
 ## Directory layout
 
 ```
 hestia-cpp/
-├── CMakeLists.txt              top-level: standard, output dirs, subdirectories
-├── cmake/                      module path (custom CMake modules go here)
-├── third_party/               vendored deps as git submodules (see below)
+├── CMakeLists.txt              top-level: standard, output dirs, APP_* identity, subdirectories
+├── cmake/                      DownloadCEF, CMakeRC (resource compiler), PruneLocales
+├── third_party/               vendored C++ deps as git submodules; cef/ fetched at configure (gitignored)
 ├── libs/
 │   ├── core/                  hestia_core — shared engine
-│   │   ├── include/hestia/    PUBLIC headers (logging.h, config.h, greeting.h)
+│   │   ├── include/hestia/    PUBLIC headers (logging.h, config.h, greeting.h, app_info.h)
+│   │   │                      app_info.h is GENERATED from app_info.h.in (shared identity)
 │   │   └── src/               implementations
 │   └── tui/                   hestia_tui — terminal UI library
 │       ├── include/hestia/tui/run.h   the ONLY public header
 │       └── src/               private internals (see "TUI internals" below)
 ├── apps/
 │   ├── cli/                   hestia_cli — CLI11 commands + main()
-│   └── desktop/               hestia_desktop — graphical launcher (stub)
+│   └── desktop/               hestia_desktop — CEF launcher (see "Desktop launcher" below)
+│       ├── frontend/          Vite + React + TS app (built with Bun) → dist/ embedded
+│       └── src/core/          the CEF shell; src/features/ the IPC feature modules
 └── docs/
     ├── architecture.md        this file
     └── contributing.md        conventions + how-to recipes
@@ -72,10 +87,16 @@ hestia-cpp/
 - [spdlog](https://github.com/gabime/spdlog) + [fmt](https://github.com/fmtlib/fmt) — logging and formatting.
 - [CLI11](https://github.com/CLIUtils/CLI11) — command-line parsing.
 - [FTXUI](https://github.com/ArthurSonzogni/FTXUI) — terminal user interface.
+- [CEF](https://bitbucket.org/chromiumembedded/cef) — Chromium Embedded Framework (desktop).
+- [React](https://react.dev/) + [Vite](https://vitejs.dev/), built with [Bun](https://bun.sh/) — desktop frontend.
 
-All four are vendored as git submodules under `third_party/` and added with
-`add_subdirectory`. Their tests/examples/docs and install rules are turned off in
-`third_party/CMakeLists.txt`.
+The C++ libraries are vendored as git submodules under `third_party/` and added
+with `add_subdirectory`; their tests/examples/docs and install rules are turned
+off in `third_party/CMakeLists.txt`. **CEF is the exception**: it is a ~1 GB
+prebuilt binary distribution fetched at configure time by `cmake/DownloadCEF.cmake`
+into `third_party/cef/` (gitignored, SHA-verified, pinned via `CEF_VERSION`). The
+frontend's `dist/` tree is compiled into the binary by **CMakeRC**
+(`cmake/CMakeRC.cmake`) as an in-memory virtual filesystem.
 
 ### Namespaces
 
@@ -89,6 +110,15 @@ All four are vendored as git submodules under `third_party/` and added with
 | `hestia::tui::keys`     | `libs/tui`      | global key predicates                 |
 | `hestia::tui::layout`   | `libs/tui`      | layout id constants                   |
 | `hestia::tui::overlay`  | `libs/tui`      | overlay id constants                  |
+| `desktop::core`†        | `apps/desktop`  | CEF shell — app/browser/window/scheme |
+| `desktop::ipc`          | `apps/desktop`  | the JS⇄C++ bridge (router + registry) |
+| `desktop::features`     | `apps/desktop`  | IPC feature modules (app, window, …)  |
+
+† the shell sub-namespaces are `desktop::app`, `desktop::browser`,
+`desktop::common`, `desktop::window`. The desktop is deliberately **not** under
+`hestia::` — it is a UI shell over the engine, not part of it. Shared identity
+macros (`APP_NAME`, `APP_VERSION`, …) come from `<hestia/app_info.h>` and are used
+by every frontend.
 
 ## Core library (`libs/core`)
 
@@ -226,15 +256,104 @@ The `tui` command is the seam: its callback calls `hestia::tui::run()` and store
 the result as the exit code. That single call is the *only* CLI→TUI reference in
 the codebase.
 
+## Desktop launcher (`apps/desktop`)
+
+A thin CEF shell hosting the React frontend. The design rule: the shell
+(`desktop::`) owns windows, schemes, and IPC; **all launcher logic stays in
+`hestia_core`** and is reached over the bridge. Two halves: `src/core/` is the
+reusable shell you rarely touch; `src/features/` is where day-to-day work happens.
+
+### Process model (`src/core/app`)
+
+CEF runs the browser, renderer, GPU, and utility roles as **sub-processes of the
+same executable**, distinguished by the `--type` switch. `main_util.cc` maps that
+to a `ProcessType` and `CreateApp()` returns the right `CefApp`:
+
+- `AppBase` — registers the custom scheme in *every* process (schemes must match
+  across all of them).
+- `BrowserApp` — `OnContextInitialized()` is the wiring hub: init settings,
+  register the scheme handler, init the IPC router, register features, then create
+  the browser view + frameless window.
+- `RendererApp` — hosts the renderer side of the message router. It creates the
+  router in **`OnWebKitInitialized()`** (not later) — that is when the router
+  registers the native `window.cefQuery` binding; creating it in `OnContextCreated`
+  misses that window and the bridge silently never appears. It also turns
+  native→JS event messages into DOM `CustomEvent`s.
+- `OtherApp` — gpu/utility processes (scheme registration only).
+
+> **Linux zygote.** On Linux the zygote process forks into the other roles and
+> the fork inherits this process's `CefApp`. Since the eventual role is unknown at
+> fork time, the zygote is given the **renderer** app — otherwise forked renderers
+> get no render-process handler and `cefQuery` is never injected. See
+> `GetProcessType()` in `main_util.cc`.
+
+### IPC bridge (`src/core/ipc`)
+
+Built on CEF's message router (`window.cefQuery`). Wire format is
+`{ "channel": "...", "payload": <any> }`; responses are JSON. A global `Registry`
+maps a channel to a `Handler`; a scoped `Actions` registrar prefixes channels by
+feature name (`Actions("app")("info", …)` → channel `app.info`). Handlers answer
+synchronously, or hold the copyable `Response` and answer later from any thread.
+Push native→JS events with `ipc::Emit(browser, "channel", value)` — they arrive in
+the page as `window.addEventListener(channel, e => e.detail)`. The browser- and
+renderer-side routers share one `RouterConfig()` so their function names match.
+
+### Window & scheme (`src/core/window`, `src/core/common`)
+
+`WindowDelegate` hosts the browser view in a **frameless** top-level window — the
+React app draws its own title bar and drives minimize/maximize/close over the
+`window.*` IPC channels. `app_scheme.cc` registers a standard, secure, fetch-
+enabled scheme (`hestia://app/`) and serves the embedded `dist/` tree from the
+CMakeRC virtual filesystem, with MIME detection and an SPA fallback to
+`index.html`. `app_settings.cc` decides the startup URL.
+
+### Embedded vs. dev server
+
+`GetStartupURL()` returns the dev-server URL when set, else the embedded scheme.
+The dev path is **Debug-only and compiled out of Release** (`#if !defined(NDEBUG)`):
+the `--dev-url` switch, the `APP_DEV_SERVER_URL` env var, and the compile-time
+default are all ignored in Release, so production can only load embedded assets.
+This is what enables frontend hot-reload in development (Vite HMR) while keeping
+the shipped build self-contained.
+
+### Feature modules (`src/features`)
+
+Launcher functionality is added as a **feature module**, never by editing the
+shell. A `Feature` declares its channel-prefix `Name()` and registers its actions;
+`feature_registry.cc` is the one list where features are wired in. The example
+`AppFeature` (`app.info`, `app.ping`, `app.greet`) proves the bridge reaches the
+engine — `app.greet` calls `hestia::greeting::greet()` in core. `WindowFeature`
+drives the frameless window.
+
+### Sandbox & size (Release)
+
+The CEF sandbox is **on in Release, off in Debug** (`USE_SANDBOX`, defaulted by
+build type). On Linux the sandbox lives inside `libcef.so`; the `chrome-sandbox`
+helper must be SUID root once per build location (CMake prints the command).
+Release post-build steps strip `libcef.so` (~1.4 GB → ~200 MB) and prune unused
+locales to `en-US.pak`.
+
 ## Build & dependency conventions
 
+- **Everything builds from one configure** — no `BUILD_*` toggles. The
+  consequence: every configure fetches CEF (~1 GB, first run only) and requires a
+  built `frontend/dist`, so **build the frontend before configuring** (CMakeRC
+  globs `dist/` at configure time; a missing `dist/` is a hard `FATAL_ERROR`):
+  `(cd apps/desktop/frontend && bun run build)` → `cmake … -B build` → `cmake --build`.
 - Each library/app sets `-Wall -Wextra -Wpedantic` (GNU/Clang) or `/W4` (MSVC).
+  CEF discovery is isolated inside `apps/desktop/` so its compiler/linker flags
+  never reach core, the CLI, or the TUI.
+- The root `CMakeLists.txt` defines the `APP_*` identity (name, id, vendor,
+  channel; version from `project(... VERSION)`). `hestia_core` generates
+  `<hestia/app_info.h>` from these and exposes it on its **public** interface, so
+  every frontend shares one source of truth — the CLI's `--version`, the desktop's
+  `app.info`, etc. all read the same `APP_VERSION`.
 - Dependencies that don't appear in a target's public headers are linked
   `PRIVATE` (e.g. core's spdlog/fmt, tui's ftxui/spdlog). They still propagate as
   transitive link deps to the final executable — which is why `apps/cli` no
   longer links ftxui directly.
-- Build artifacts land in `build/<config>/` (e.g. `build/Release/`).
-- `HESTIA_VERSION` is injected into `hestia_cli` from the CMake project version.
+- Build artifacts land in `build/<config>/` (e.g. `build/Release/`); the desktop
+  binary and its CEF runtime files are copied alongside it.
 
 ## See also
 
