@@ -9,7 +9,10 @@ boundary so the rest of the work doesn't churn it.
 > and `app.greet` are served by the daemon, and the CLI drives them over the bridge
 > (auto-spawning the daemon on first use). Process supervision (`process.*`) is
 > implemented: processes are spawned detached, logged to disk, and re-adopted on
-> daemon restart. A live event/log stream and autostart are **planned**.
+> daemon restart. The connection is **multiplexed** — many requests in flight at
+> once, correlated by `id` — and the daemon pushes a **live event stream** (log
+> lines, state changes) to subscribers. **Auto-restart** of crashed processes is
+> enforced by a background supervision loop. Autostart is **planned**.
 
 ## Why a daemon
 
@@ -25,7 +28,7 @@ client over a local socket.
 ## One backend, thin clients
 
 ```
-hestiad ── links ──► hestia_core        (the engine; daemon-internal only)
+hestiad ── links ──► hestia_engine      (the engine; daemon-internal only)
    ▲
    │ local socket (this protocol)
    ├── hestia (CLI / TUI)
@@ -67,6 +70,16 @@ The transport treats the payload as **opaque bytes**. Framing is the transport's
 only job; message semantics live one layer up. Max frame size is capped (16 MiB)
 to fail fast on a desync rather than allocate unboundedly.
 
+### Connection model
+
+The connection is a **full-duplex, multiplexed** frame pipe. A client holds one
+persistent connection and may have many requests in flight at once; each carries
+an `id` and the daemon echoes it on the matching response, so a background reader
+demultiplexes replies to the right caller. The daemon also pushes **events**
+(unsolicited frames, no `id`) down the same connection to subscribers. Server-side,
+each accepted connection is served on its own thread; events are fanned out from
+the supervision loop.
+
 ## Messages
 
 ### Phase 1 (now): bare-channel frames
@@ -106,8 +119,9 @@ The envelope reuses the desktop CEF bridge's shape for consistency:
 { "id": 7, "ok": false, "error": { "code": "not_found", "message": "..." } }
 ```
 
-`id` correlates responses once the connection is multiplexed (Phase 3 event
-stream). Until then it is optional.
+`id` correlates each response to its request over the multiplexed connection. The
+client assigns it; the daemon echoes it back. It is optional only for one-shot
+tools (e.g. `hestiad ping`) that issue a single request.
 
 ### Process control (now)
 
@@ -123,16 +137,58 @@ with stdout/stderr redirected to a per-process log file at the OS level.
 | `process.status` | `{id}`                                        | the record, or error `not_found`|
 | `process.logs`   | `{id, lines?}`                                | `{text}` (last N log lines)     |
 
+The `restart` policy is `{auto: bool, max_retries: int, backoff_ms: int}`, where
+`max_retries: 0` means restart without limit.
+
 A process **record** is `{id, kind: server|instance, pid, start_time, log_path,
-state: starting|running|exited|crashed}`. The table is persisted to
-`<data_home>/processes.json`; on startup `reconcile()` re-adopts any process whose
-pid is still alive **and** whose start time matches (guarding against PID reuse).
+state, program, args, cwd, restart, restarts}`. The launch fields (`program`,
+`args`, `cwd`, `restart`) are persisted so a restarted daemon can relaunch, not
+just observe. `state` is one of:
 
-### Later: events + auto-restart
+| State      | Meaning                                                         |
+|------------|-----------------------------------------------------------------|
+| `starting` | spawned, not yet confirmed running                              |
+| `running`  | alive (pid live and start time matches)                         |
+| `crashed`  | exited **without** an operator stop — eligible for auto-restart |
+| `exited`   | stopped via `process.stop` — terminal, never auto-restarted     |
 
-A live event stream (long-poll or SSE-style frames) for log lines and status
-changes, and periodic auto-restart enforcement of `restart_policy`, require the
-multiplexed connection and are still planned.
+The table is persisted to `<data_home>/processes.json`; on startup `reconcile()`
+re-adopts any process whose pid is still alive **and** whose start time matches
+(guarding against PID reuse), and marks the rest `crashed`.
+
+### Events & subscription
+
+A client opts into the event stream with `events.subscribe`; thereafter the daemon
+pushes event frames down that connection. An optional `id` scopes the stream to a
+single process; omit it for all.
+
+| Channel            | Request payload | Response payload     |
+|--------------------|-----------------|----------------------|
+| `events.subscribe` | `{id?}`         | `{subscribed: true}` |
+
+An **event frame** has no `id` and is shaped `{ "event": <topic>, "payload": … }`:
+
+| Topic           | Payload                          | When                                  |
+|-----------------|----------------------------------|---------------------------------------|
+| `process.state` | the process record               | a process changes state               |
+| `process.log`   | `{id, text}` (a chunk of output) | new bytes are appended to its log file |
+
+```jsonc
+{ "event": "process.state", "payload": { "id": "srv", "state": "crashed", … } }
+{ "event": "process.log",   "payload": { "id": "srv", "text": "Done (4.2s)!\n" } }
+```
+
+Events are produced by the supervision loop, so a state change is visible within
+one poll interval. The history before a subscription is available via
+`process.logs`; the stream carries output from the subscription point onward.
+
+### Auto-restart
+
+The supervision loop polls liveness, streams new log output, and enforces each
+process's `restart` policy: a `crashed` process with `auto: true` is relaunched
+after `backoff_ms`, up to `max_retries` (unlimited when `0`). An operator
+`process.stop` is terminal (`exited`) and is never restarted. Restarts reuse the
+same log file, so the stream is continuous across a restart.
 
 ## Auth
 
