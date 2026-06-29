@@ -14,7 +14,6 @@ target_include_directories(hestia_cli PRIVATE src)
 
 target_link_libraries(hestia_cli PRIVATE
         hestia_shared
-        hestia_engine
         hestia_tui
         CLI11::CLI11
         spdlog::spdlog

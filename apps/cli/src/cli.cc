@@ -1,5 +1,6 @@
 #include "cli.h"
 
+#include <cstdlib>
 #include <iostream>
 
 #include <CLI/CLI.hpp>
@@ -31,9 +32,17 @@ namespace hestia::cli {
                        "(else $HESTIA_HOME, else the platform default)");
 
         // Configure logging once global flags are parsed, before any command
-        // callback runs.
+        // callback runs. In the daemon model the data directory is daemon-global,
+        // so --home is exported as $HESTIA_HOME and only takes effect when this
+        // invocation auto-spawns the daemon; a daemon already running keeps its
+        // own data directory.
         app.parse_complete_callback([&ctx] {
             init_logging(ctx.global.log_level());
+#if !defined(_WIN32)
+            if (!ctx.global.home.empty()) {
+                ::setenv("HESTIA_HOME", ctx.global.home.c_str(), 1);
+            }
+#endif
         });
 
         const auto commands = make_commands();

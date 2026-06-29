@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include <hestia/config.h>
+#include <hestia/client/client.h>
 
 namespace hestia::cli {
     namespace {
@@ -15,13 +15,17 @@ namespace hestia::cli {
                 auto *cmd = parent.add_subcommand("get", "Print the value of a config key");
                 cmd->add_option("key", key_, "Config key")->required();
                 cmd->callback([this, &ctx] {
-                    const auto config = config::Config::load(
-                        config::config_path(ctx.global.home));
-                    if (const auto value = config.get(key_)) {
-                        std::cout << *value << '\n';
-                        ctx.exit_code = 0;
-                    } else {
-                        std::cerr << "key not found: " << key_ << '\n';
+                    try {
+                        auto client = client::Client::connect();
+                        if (const auto value = client.config_get(key_)) {
+                            std::cout << *value << '\n';
+                            ctx.exit_code = 0;
+                        } else {
+                            std::cerr << "key not found: " << key_ << '\n';
+                            ctx.exit_code = 1;
+                        }
+                    } catch (const std::exception &e) {
+                        std::cerr << "hestia: " << e.what() << '\n';
                         ctx.exit_code = 1;
                     }
                 });
@@ -37,14 +41,20 @@ namespace hestia::cli {
             void register_command(CLI::App &parent, AppContext &ctx) override {
                 auto *cmd = parent.add_subcommand("home", "Print the resolved data directory");
                 cmd->callback([&ctx] {
-                    std::cout << config::data_home(ctx.global.home).string() << '\n';
-                    ctx.exit_code = 0;
+                    try {
+                        auto client = client::Client::connect();
+                        std::cout << client.config_home().string() << '\n';
+                        ctx.exit_code = 0;
+                    } catch (const std::exception &e) {
+                        std::cerr << "hestia: " << e.what() << '\n';
+                        ctx.exit_code = 1;
+                    }
                 });
             }
         };
 
         // `hestia config set-home <dir>` — persist the data directory for future
-        // runs (no env var needed). With no argument, reverts to the default.
+        // runs. With no argument, reverts to the default.
         class ConfigSetHomeCommand : public Command {
         public:
             void register_command(CLI::App &parent, AppContext &ctx) override {
@@ -54,13 +64,12 @@ namespace hestia::cli {
                                 "Directory to use (omit to revert to the default)");
                 cmd->callback([this, &ctx] {
                     try {
-                        config::set_persisted_home(dir_);
+                        auto client = client::Client::connect();
+                        const auto home = client.config_set_home(dir_);
                         if (dir_.empty()) {
-                            std::cout << "reverted to default: "
-                                      << config::data_home().string() << '\n';
+                            std::cout << "reverted to default: " << home.string() << '\n';
                         } else {
-                            std::cout << "data directory set to: "
-                                      << config::data_home(dir_).string() << '\n';
+                            std::cout << "data directory set to: " << home.string() << '\n';
                         }
                         ctx.exit_code = 0;
                     } catch (const std::exception &e) {
@@ -82,11 +91,9 @@ namespace hestia::cli {
                 cmd->add_option("key", key_, "Config key")->required();
                 cmd->add_option("value", value_, "Config value")->required();
                 cmd->callback([this, &ctx] {
-                    const auto path = config::config_path(ctx.global.home);
                     try {
-                        auto config = config::Config::load(path);
-                        config.set(key_, value_);
-                        config.save(path);
+                        auto client = client::Client::connect();
+                        client.config_set(key_, value_);
                         ctx.exit_code = 0;
                     } catch (const std::exception &e) {
                         std::cerr << "failed to set config: " << e.what() << '\n';
