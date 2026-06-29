@@ -59,8 +59,10 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
           mkdir -p artifacts
-          (cd build && cpack -G "TGZ;DEB;RPM")
-          mv build/hestia-*.tar.gz build/hestia*.deb build/hestia*.rpm artifacts/
+          cmake -DBUILD_DIR=build -DOUT_DIR="$PWD/artifacts" -DSOURCE_DIR="$PWD" \
+                -P cmake/package_portable.cmake
+          (cd build && cpack -G "DEB;RPM")
+          mv build/hestia*.deb build/hestia*.rpm artifacts/
 
           tools="$RUNNER_TEMP/tools"; mkdir -p "$tools"
           curl -fsSL -o "$tools/linuxdeploy" \
@@ -75,9 +77,10 @@ jobs:
         shell: pwsh
         run: |
           mkdir artifacts
+          cmake -DBUILD_DIR=build -DOUT_DIR="$PWD/artifacts" -DSOURCE_DIR="$PWD" `
+                -P cmake/package_portable.cmake
           cd build
-          cpack -G "ZIP;NSIS;WIX"
-          Move-Item hestia-*.zip ../artifacts/
+          cpack -G "NSIS;WIX"
           Move-Item hestia-*.exe ../artifacts/
           Move-Item hestia-*.msi ../artifacts/
 

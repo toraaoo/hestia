@@ -16,19 +16,24 @@ x86_64 only for now. Builds run on Linux and Windows runners.
 
 ## Components
 
-The install tree is split into CPack components:
+The install tree is split into components:
 
-- **`cli`** — `hestia` (CLI/TUI) + `hestiad` (daemon). The default, required install.
+- **`daemon`** — `hestiad`. The resident core; required, every front-end needs it.
+- **`cli`** — `hestia` (CLI/TUI).
 - **`desktop`** — the desktop launcher, the tray helper, and the bundled CEF
-  runtime. Optional.
+  runtime.
 - **`Development`** — the static libs and headers. Never packaged; build-only.
 
 How a component maps to a package depends on the format:
 
-- **NSIS / WiX** present a **component picker**: `cli` is preselected and required,
-  `desktop` is opt-in. So a default install is CLI-only, as intended.
-- **Archives, `.deb`, `.rpm`** are **monolithic** — one package with `cli` +
-  `desktop`. (`Development` is still excluded.)
+- **NSIS / WiX** present a **component picker**: `daemon` + `cli` are preselected
+  and required, `desktop` is opt-in. So a default install is CLI-only.
+- **`.deb` / `.rpm`** are **monolithic** — one package with all runtime
+  components. (`Development` is excluded.)
+- **Portable archives** bundle everything in a **flat layout** at the archive
+  root (see below), built by
+  [`cmake/package_portable.cmake`](../cmake/package_portable.cmake) rather than
+  CPack.
 
 The `cli` lands in `bin/`, so `hestia` is on `PATH` after install — the NSIS
 installer adds the bin dir to `PATH`; the `.msi` does the same via a WiX patch
@@ -39,8 +44,12 @@ installer adds the bin dir to `PATH`; the `.msi` does the same via a WiX patch
 CEF requires its runtime (`libcef`, `*.pak`, `locales`, blobs, sandbox) to sit
 beside the executable, so the desktop installs as a self-contained unit:
 
-- Linux: `lib/hestia/` (with a `.desktop` entry + icon in `share/`)
-- Windows: a `desktop\` subdir under the install root, plus a Start-menu shortcut
+- Installed packages (`.deb`/`.rpm`/installers): Linux `lib/hestia/` (with a
+  `.desktop` entry + icon in `share/`); Windows a `desktop\` subdir under the
+  install root, plus a Start-menu shortcut.
+- Portable archives: a **flat** layout — every executable (`hestia`, `hestiad`,
+  `hestia-tray`, `HestiaLauncher`) and the CEF runtime sit together at the
+  archive root, so nothing is buried in `lib/`.
 
 The on-disk binary is `HestiaLauncher` (not `Hestia`) so it doesn't collide with
 the `hestia` CLI on case-insensitive Windows. The window/app identity is still

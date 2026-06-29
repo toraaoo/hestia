@@ -94,18 +94,17 @@ if(WIN32)
     set(CPACK_WIX_LICENSE_RTF  "${CMAKE_SOURCE_DIR}/packaging/windows/license.rtf")
     set(CPACK_WIX_PATCH_FILE   "${CMAKE_SOURCE_DIR}/packaging/windows/wix-path-patch.xml")
 
-    # MSI Start-menu shortcut for the desktop launcher. NSIS gets its shortcut via
-    # CPACK_NSIS_MENU_LINKS above; the WiX generator needs this INSTALL-file
-    # property instead. Tied to the desktop component, so it only appears when the
-    # desktop feature is selected.
+    # WiX Start-menu shortcut (NSIS uses CPACK_NSIS_MENU_LINKS above).
     set_property(INSTALL "desktop/${APP_BINARY_NAME}.exe"
                  PROPERTY CPACK_START_MENU_SHORTCUTS "Hestia")
 endif()
 
+# Portable archives are built by cmake/package_portable.cmake; CPack drives the
+# installers and distro packages.
 if(WIN32)
-    set(CPACK_GENERATOR "ZIP;NSIS;WIX")
+    set(CPACK_GENERATOR "NSIS;WIX")
 elseif(UNIX AND NOT APPLE)
-    set(CPACK_GENERATOR "TGZ;DEB;RPM")
+    set(CPACK_GENERATOR "DEB;RPM")
 endif()
 
 include(CPack)
