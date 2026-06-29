@@ -34,11 +34,26 @@ namespace hestia::ipc {
         static Response failure(std::string code, std::string message);
     };
 
+    // An unsolicited push from the daemon to a subscribed client (a log line, a
+    // process state change). It carries no id — it is not a reply to any request.
+    struct Event {
+        std::string topic; // e.g. "process.state", "process.log"
+        nlohmann::json payload = nlohmann::json::object();
+    };
+
     // Encode to / decode from a frame's bytes. The decoders throw std::exception
     // (nlohmann parse_error or out-of-range) on a malformed frame; callers map
     // that to a protocol-level error.
     std::string encode(const Request &request);
     std::string encode(const Response &response);
+    std::string encode(const Event &event);
     Request decode_request(std::string_view frame);
     Response decode_response(std::string_view frame);
+
+    // A client connection receives either a Response (a reply it correlates by
+    // id) or an Event (an unsolicited push). Parse the frame once, classify it,
+    // then decode the matching shape.
+    bool is_event(const nlohmann::json &frame);
+    Response decode_response(const nlohmann::json &frame);
+    Event decode_event(const nlohmann::json &frame);
 }

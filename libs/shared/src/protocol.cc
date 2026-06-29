@@ -25,6 +25,10 @@ namespace hestia::ipc {
         return j.dump();
     }
 
+    std::string encode(const Event &event) {
+        return json{{"event", event.topic}, {"payload", event.payload}}.dump();
+    }
+
     std::string encode(const Response &response) {
         json j;
         j["ok"] = response.ok;
@@ -49,8 +53,7 @@ namespace hestia::ipc {
         return r;
     }
 
-    Response decode_response(std::string_view frame) {
-        const json j = json::parse(frame);
+    Response decode_response(const json &j) {
         Response r;
         r.ok = j.value("ok", false);
         if (r.ok) {
@@ -61,5 +64,20 @@ namespace hestia::ipc {
         }
         if (j.contains("id") && j["id"].is_number_integer()) r.id = j["id"].get<long long>();
         return r;
+    }
+
+    Response decode_response(std::string_view frame) {
+        return decode_response(json::parse(frame));
+    }
+
+    bool is_event(const json &frame) {
+        return frame.contains("event") && frame["event"].is_string();
+    }
+
+    Event decode_event(const json &frame) {
+        Event e;
+        e.topic = frame.value("event", std::string{});
+        if (frame.contains("payload") && !frame["payload"].is_null()) e.payload = frame["payload"];
+        return e;
     }
 }
