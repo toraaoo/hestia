@@ -1,4 +1,5 @@
 #include "tray_backend.h"
+#include "tray_icon_data.h"
 
 #include <mutex>
 #include <utility>
@@ -34,6 +35,7 @@ namespace hestia::tray {
     <property name="Title" type="s" access="read"/>
     <property name="Status" type="s" access="read"/>
     <property name="IconName" type="s" access="read"/>
+    <property name="IconPixmap" type="a(iiay)" access="read"/>
     <property name="Menu" type="o" access="read"/>
     <property name="ItemIsMenu" type="b" access="read"/>
     <property name="ToolTip" type="(sa(iiay)ss)" access="read"/>
@@ -197,7 +199,19 @@ namespace hestia::tray {
                 if (prop == "Id") return g_variant_new_string(APP_ID);
                 if (prop == "Title") return g_variant_new_string(b->app_name_.c_str());
                 if (prop == "Status") return g_variant_new_string("Active");
-                if (prop == "IconName") return g_variant_new_string("applications-system");
+                if (prop == "IconName") return g_variant_new_string("hestia");
+                if (prop == "IconPixmap") {
+                    // Embedded ARGB pixmaps so the icon renders even when the
+                    // app runs uninstalled (no "hestia" icon in the theme path).
+                    GVariantBuilder builder;
+                    g_variant_builder_init(&builder, G_VARIANT_TYPE("a(iiay)"));
+                    for (const auto &px : kTrayIcons) {
+                        GVariant *bytes = g_variant_new_fixed_array(
+                                G_VARIANT_TYPE_BYTE, px.argb, px.len, sizeof(unsigned char));
+                        g_variant_builder_add(&builder, "(ii@ay)", px.size, px.size, bytes);
+                    }
+                    return g_variant_builder_end(&builder);
+                }
                 if (prop == "Menu") return g_variant_new_object_path(kMenuPath);
                 if (prop == "ItemIsMenu") return g_variant_new_boolean(TRUE);
                 if (prop == "ToolTip") {

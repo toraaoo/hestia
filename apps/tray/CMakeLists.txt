@@ -6,8 +6,13 @@ include(GNUInstallDirs)
 # the desktop app, kept here so the CLI stays headless-safe.
 
 set(tray_backend "")
+set(tray_resources "")
 if (WIN32)
     set(tray_backend src/backend_windows.cc)
+    # Embed the tray icon (.ico) as a Win32 resource loaded via LoadImage.
+    set(HESTIA_TRAY_ICON "${CMAKE_SOURCE_DIR}/packaging/icons/hestia.ico")
+    configure_file(src/tray.rc.in "${CMAKE_CURRENT_BINARY_DIR}/tray.rc" @ONLY)
+    set(tray_resources "${CMAKE_CURRENT_BINARY_DIR}/tray.rc")
 elseif (APPLE)
     set(tray_backend src/backend_macos.mm)
 else ()
@@ -32,6 +37,7 @@ add_executable(hestia_tray
         src/tray_app.h
         src/tray_backend.h
         ${tray_backend}
+        ${tray_resources}
 )
 
 target_include_directories(hestia_tray PRIVATE src)
@@ -61,6 +67,7 @@ target_compile_options(hestia_tray PRIVATE
 
 set_target_properties(hestia_tray PROPERTIES OUTPUT_NAME "hestia-tray")
 
+# Tray ships with the optional "desktop" component, not the default CLI install.
 install(TARGETS hestia_tray
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT desktop
 )

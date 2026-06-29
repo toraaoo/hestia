@@ -1,0 +1,2 @@
+#include "tray_resource.h"
+IDI_HESTIA_TRAY ICON "@HESTIA_TRAY_ICON@"

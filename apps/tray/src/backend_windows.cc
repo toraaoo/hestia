@@ -1,4 +1,5 @@
 #include "tray_backend.h"
+#include "tray_resource.h"
 
 #include <mutex>
 #include <utility>
@@ -58,7 +59,11 @@ namespace hestia::tray {
                 nid.uID = kIconId;
                 nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
                 nid.uCallbackMessage = kTrayCallback;
-                nid.hIcon = ::LoadIcon(nullptr, IDI_APPLICATION);
+                nid.hIcon = static_cast<HICON>(::LoadImageW(
+                        ::GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_HESTIA_TRAY),
+                        IMAGE_ICON, ::GetSystemMetrics(SM_CXSMICON),
+                        ::GetSystemMetrics(SM_CYSMICON), 0));
+                if (!nid.hIcon) nid.hIcon = ::LoadIcon(nullptr, IDI_APPLICATION);
                 update_tip(nid);
                 ::Shell_NotifyIconW(NIM_ADD, &nid);
 
