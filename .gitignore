@@ -690,6 +690,7 @@ FodyWeavers.xsd
 # Additional files built by Visual Studio
 
 build
+build-*/
 # CEF binary distribution (~1 GB) — fetched at configure time, never committed.
 /third_party/cef/
 

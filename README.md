@@ -121,9 +121,40 @@ cmake --build build
 
 | Option               | Default | Description                                            |
 |----------------------|---------|--------------------------------------------------------|
+| `BUILD_DESKTOP`      | `ON`    | Build the desktop launcher — pulls in CEF              |
+| `BUILD_CLI`          | `ON`    | Build the `hestia` CLI / TUI front-end                 |
+| `BUILD_TUI`          | `ON`    | Build the TUI library (forced on when `BUILD_CLI` is)  |
+| `USE_CCACHE`         | `ON`    | Route compiles through `ccache` when it is installed   |
 | `USE_SANDBOX`        | auto    | CEF sandbox — `ON` in Release, `OFF` in Debug          |
 | `CEF_VERSION`        | pinned  | CEF distribution version string (set in desktop CMake) |
 | `APP_DEV_SERVER_URL` | `""`    | Configure-time dev-server URL (Debug only)             |
+
+The daemon (`hestiad`) and tray (`hestia-tray`) are the resident core and are
+always built; the front-ends above are opt-out.
+
+### Faster dev builds
+
+The desktop launcher is by far the heaviest target: it triggers the ~1 GB CEF
+download at configure time and a long link. When you're iterating on the
+daemon, CLI, or TUI, configure a separate build that skips it entirely — this
+also skips CEF's download and every dependency only the desktop needs (vendored
+deps build on demand):
+
+```bash
+# A dev configure that never touches CEF
+cmake -S . -B build-dev -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_DESKTOP=OFF
+
+# Tightest loop: build only the target you're working on
+cmake --build build-dev --target hestia_daemon   # or hestia_cli
+```
+
+Installing `ccache` makes rebuilds across configures reuse cached object files;
+it is picked up automatically (disable with `-DUSE_CCACHE=OFF`).
+
+The [`scripts/`](scripts/) helpers wrap all of this so you don't have to remember
+the flags — `scripts/build.sh daemon`, `scripts/run.sh cli`, `scripts/run.sh
+desktop` (with frontend hot-reload), `scripts/build.sh --release`. They double as
+CI steps. See [scripts/README.md](scripts/README.md).
 
 ## Usage
 
