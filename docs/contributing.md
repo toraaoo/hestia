@@ -338,19 +338,25 @@ otherwise prints its own help. Leaf children may be `private` classes inside the
 
 ---
 
-## Add a core module
+## Add an engine module
 
-Domain logic lives in `libs/core`, UI-free.
+Launcher/domain logic lives in `libs/engine`, UI-free and daemon-internal.
+(Cross-cutting code that the daemon *and* clients both need — transport, the
+client SDK, identity, logging — goes in `libs/shared` instead.)
 
-1. Public header in `libs/core/include/hestia/<name>.h` (namespace `hestia` or a
+1. Public header in `libs/engine/include/hestia/<name>.h` (namespace `hestia` or a
    sub-namespace like `hestia::config`).
-2. Implementation in `libs/core/src/<name>.cc`.
-3. Add both to `libs/core/CMakeLists.txt`.
-4. Keep dependencies (spdlog/fmt) out of the public header — link them `PRIVATE`.
+2. Implementation in `libs/engine/src/<name>.cc`.
+3. Add both to `libs/engine/CMakeLists.txt`.
+4. Keep dependencies (fmt) out of the public header — link them `PRIVATE`.
 
-Frontends then consume it: a CLI command includes the header and links
-`hestia_core` (already wired); a view does the same. The `greet` /
-`GreetCommand` pair is the minimal end-to-end example.
+The daemon then consumes it directly; front-ends reach it over the socket via
+`hestia_shared`'s client SDK — they never include the engine header. (The
+desktop app still links `hestia_engine` directly today, a transitional
+exception; the CLI and TUI already go entirely through the client SDK.) The
+`greet` / `GreetCommand` pair is the minimal end-to-end example: `GreetCommand`
+calls `Client::greet()`, which round-trips `app.greet` to the daemon, which runs
+`hestia::greeting::greet()`.
 
 ---
 
@@ -391,7 +397,7 @@ namespace desktop::features {
     void InstancesFeature::RegisterActions(ipc::Actions &on) {
         on("list", [](const ipc::Request &, ipc::Response res) {
             auto d = CefDictionaryValue::Create();
-            // ... populate from hestia_core ...
+            // ... populate from hestia_engine ...
             res.Success(ipc::Dict(d));
         });
     }

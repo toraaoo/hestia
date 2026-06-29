@@ -56,7 +56,7 @@ path/name resolution is centralized in `hestia::ipc`:
 | macOS        | Unix socket under the user's run dir *(planned)*     |
 | Windows      | Named pipe `\\.\pipe\hestia-<user>` *(planned)*      |
 
-The runtime socket dir is deliberately **not** the data dir (`hestia_core`'s
+The runtime socket dir is deliberately **not** the data dir (`hestia_engine`'s
 `data_home`): the data dir holds persistent state, the runtime dir holds the
 ephemeral socket. They have different lifetimes and permissions.
 

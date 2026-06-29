@@ -10,16 +10,19 @@ reasoning behind the structure.
 
 > **Migration in progress (daemon architecture).** Hestia is moving to a
 > daemon + thin-client model: `hestiad` owns process supervision and frontends
-> become clients over a local socket. As part of this, `libs/core` has been
-> split into **`libs/shared`** (IPC transport, app identity, logging — linked by
-> the daemon *and* every client) and **`libs/engine`** (config store, greeting,
-> launcher logic — daemon-internal). Sections below that still say "core" predate
-> the split; see [daemon-protocol.md](daemon-protocol.md) for the new boundary.
-> This document gets its full rewrite in the migration's hardening phase.
+> become clients over a local socket. As part of this, `libs/core` was split
+> into **`libs/shared`** (IPC transport, app identity, logging — linked by the
+> daemon *and* every client) and **`libs/engine`** (config store, greeting,
+> launcher logic — daemon-internal). The structural sections below (target
+> graph, layout, namespaces, library reference) describe the split; the deeper
+> TUI/desktop internals predate it and get their full rewrite in the migration's
+> hardening phase. See [daemon-protocol.md](daemon-protocol.md) for the socket
+> boundary.
 
 ## One core, three frontends
 
-Hestia is a single domain core driven three ways:
+Hestia is a single domain core — `hestia_engine`, owned by the daemon — driven
+three ways:
 
 | Frontend    | Target           | Binary          | Stack                     |
 |-------------|------------------|-----------------|---------------------------|
@@ -39,19 +42,32 @@ frontend must be built first (see [Build & dependency conventions](#build--depen
 ## Target graph
 
 ```
-libs/core    → domain logic + shared identity (app_info.h); zero UI dependencies
-libs/tui     → FTXUI app; depends on core ONLY; public surface = hestia::tui::run()
-apps/cli     → CLI11 commands + thin main(); depends on core + tui
-apps/desktop → CEF shell + embedded React frontend; depends on core only
+libs/shared  → IPC transport + protocol, client SDK, shared identity (app_info.h),
+               logging; linked by the daemon AND every client; zero UI dependencies
+libs/engine  → launcher engine (config, greeting, launcher logic); daemon-internal
+libs/tui     → FTXUI app; depends on shared ONLY; public surface = hestia::tui::run()
+apps/cli     → CLI11 commands + thin main(); depends on shared + tui
+apps/desktop → CEF shell + embedded React frontend; depends on shared
+apps/daemon  → hestiad; the only target that links engine
 ```
 
-The dependency arrow is one-way and **enforced by the build, not by discipline**:
+The dependency arrows are one-way and **enforced by the build, not by
+discipline**. `shared` is the common base every target links; `engine` is
+daemon-only, so a front-end physically cannot reach launcher logic except over
+the socket:
 
 ```
-core  ◄────  tui
+shared ◄──── tui
   ▲          ▲
-  └──── cli ─┘
+  └─── cli ──┘
+
+engine ◄──── daemon   (no front-end links engine)
 ```
+
+> **Transitional:** `apps/desktop` still links `hestia_engine` directly. The
+> CLI and TUI already reach it only over the socket (`hestia greet` round-trips
+> `app.greet` to the daemon). The end-state is engine = daemon-only, with every
+> front-end reaching it over IPC.
 
 `libs/tui` physically cannot `#include` a CLI command — it does not link
 `apps/cli`, so it cannot see it. `libs/tui` exposes exactly one public header,
@@ -60,10 +76,11 @@ This is why `apps/cli` reaches the TUI through a single symbol and never touches
 its internals.
 
 The desktop launcher follows the same one-way rule: `apps/desktop` (namespace
-`desktop::`) depends on `hestia_core` and never the reverse. Its CEF shell knows
+`desktop::`) depends on `hestia_shared` and never the reverse. Its CEF shell knows
 about windows, schemes, and IPC; it contains **no launcher logic** — that lives
-in core and is reached over the IPC bridge. CEF's build flags are confined to the
-`apps/desktop` subdirectory so core, the CLI, and the TUI never inherit them.
+in the engine and is reached over the IPC bridge. CEF's build flags are confined
+to the `apps/desktop` subdirectory so the shared library, the CLI, and the TUI
+never inherit them.
 
 ## Directory layout
 
@@ -73,9 +90,12 @@ hestia-cpp/
 ├── cmake/                      DownloadCEF, CMakeRC (resource compiler), PruneLocales
 ├── third_party/               vendored C++ deps as git submodules; cef/ fetched at configure (gitignored)
 ├── libs/
-│   ├── core/                  hestia_core — shared engine
-│   │   ├── include/hestia/    PUBLIC headers (logging.h, config.h, greeting.h, app_info.h)
+│   ├── shared/                hestia_shared — IPC + client SDK + identity + logging
+│   │   ├── include/hestia/    PUBLIC headers (logging.h, app_info.h, ipc/*, client/*)
 │   │   │                      app_info.h is GENERATED from app_info.h.in (shared identity)
+│   │   └── src/               implementations (transport, protocol, client, logging)
+│   ├── engine/                hestia_engine — launcher engine (daemon-internal)
+│   │   ├── include/hestia/    PUBLIC headers (config.h, greeting.h)
 │   │   └── src/               implementations
 │   └── tui/                   hestia_tui — terminal UI library
 │       ├── include/hestia/tui/run.h   the ONLY public header
@@ -111,9 +131,11 @@ frontend's `dist/` tree is compiled into the binary by **CMakeRC**
 
 | Namespace               | Home            | Contents                              |
 |-------------------------|-----------------|---------------------------------------|
-| `hestia`                | `libs/core`     | cross-cutting (`init_logging`, `LogLevel`) |
-| `hestia::config`        | `libs/core`     | data-dir resolution + `Config` store  |
-| `hestia::greeting`      | `libs/core`     | the demo `greet()` function           |
+| `hestia`                | `libs/shared`   | cross-cutting (`init_logging`, `LogLevel`) |
+| `hestia::ipc`            | `libs/shared`   | transport, endpoint, protocol envelope |
+| `hestia::client`         | `libs/shared`   | typed client SDK (`Client`)           |
+| `hestia::config`        | `libs/engine`   | data-dir resolution + `Config` store  |
+| `hestia::greeting`      | `libs/engine`   | the demo `greet()` function           |
 | `hestia::cli`           | `apps/cli`      | command framework + commands          |
 | `hestia::tui`           | `libs/tui`      | the terminal UI (everything)          |
 | `hestia::tui::keys`     | `libs/tui`      | global key predicates                 |
@@ -129,22 +151,41 @@ frontend's `dist/` tree is compiled into the binary by **CMakeRC**
 macros (`APP_NAME`, `APP_VERSION`, …) come from `<hestia/app_info.h>` and are used
 by every frontend.
 
-## Core library (`libs/core`)
+## Shared library (`libs/shared`)
 
-UI-free domain logic. Three modules today:
+UI-free, cross-cutting code linked by the daemon **and** every client. It carries
+the one public boundary between them — the socket — and nothing launcher-specific.
 
 - **`logging`** — `init_logging(LogLevel)` configures the process-wide spdlog
   logger once at startup. `LogLevel` is Hestia's own enum so callers don't depend
   on spdlog's; `logging.cc` maps it across.
+- **`ipc`** — the platform transport (`transport_posix.cc` / `transport_windows.cc`),
+  endpoint resolution, and the JSON protocol envelope. See
+  [daemon-protocol.md](daemon-protocol.md) for the wire format.
+- **`client`** — the typed client SDK (`hestia::client::Client`) front-ends use to
+  drive the daemon.
+- **identity** — `app_info.h` is generated from `app_info.h.in` and exposed on the
+  **public** interface, so every target shares one source of truth (name, id,
+  vendor, version, channel).
+
+`shared` links spdlog and fmt **privately**; `nlohmann_json` is **public** because
+it appears in the protocol envelope headers.
+
+## Engine library (`libs/engine`)
+
+The launcher engine — daemon-internal domain logic, the equivalent of Tailscale's
+`LocalBackend`. Front-ends reach it over the socket, not by linking it (with the
+transitional exception noted in the target graph). Two modules today:
+
 - **`config`** — data-directory resolution and a flat `key=value` store.
   Resolution precedence (`data_home`): `--home` override → `$HESTIA_HOME` → a
   persisted pointer file under the anchor dir (`~/.hestia` or `%APPDATA%\Hestia`)
   → the platform default. `Config::load` / `get` / `set` / `save` operate on the
   file at `config_path()`. A missing file is an empty config, not an error.
-- **`greeting`** — `greet(name)`; a placeholder exercising the core→CLI seam.
+- **`greeting`** — `greet(name)`; a placeholder exercising the engine→frontend seam.
 
-Core links spdlog and fmt **privately** — they are implementation details and do
-not leak through its public headers.
+`engine` links fmt **privately** — it is an implementation detail and does not leak
+through its public headers.
 
 ## TUI internals (`libs/tui/src`)
 
@@ -269,7 +310,7 @@ the codebase.
 
 A thin CEF shell hosting the React frontend. The design rule: the shell
 (`desktop::`) owns windows, schemes, and IPC; **all launcher logic stays in
-`hestia_core`** and is reached over the bridge. Two halves: `src/core/` is the
+`hestia_engine`** and is reached over the bridge. Two halves: `src/core/` is the
 reusable shell you rarely touch; `src/features/` is where day-to-day work happens.
 
 ### Process model (`src/core/app`)
@@ -331,7 +372,7 @@ Launcher functionality is added as a **feature module**, never by editing the
 shell. A `Feature` declares its channel-prefix `Name()` and registers its actions;
 `feature_registry.cc` is the one list where features are wired in. The example
 `AppFeature` (`app.info`, `app.ping`, `app.greet`) proves the bridge reaches the
-engine — `app.greet` calls `hestia::greeting::greet()` in core. `WindowFeature`
+engine — `app.greet` calls `hestia::greeting::greet()` in the engine. `WindowFeature`
 drives the frameless window.
 
 ### Sandbox & size (Release)
@@ -351,14 +392,14 @@ locales to `en-US.pak`.
   `(cd apps/desktop/frontend && bun run build)` → `cmake … -B build` → `cmake --build`.
 - Each library/app sets `-Wall -Wextra -Wpedantic` (GNU/Clang) or `/W4` (MSVC).
   CEF discovery is isolated inside `apps/desktop/` so its compiler/linker flags
-  never reach core, the CLI, or the TUI.
+  never reach the shared library, the engine, the CLI, or the TUI.
 - The root `CMakeLists.txt` defines the `APP_*` identity (name, id, vendor,
-  channel; version from `project(... VERSION)`). `hestia_core` generates
+  channel; version from `project(... VERSION)`). `hestia_shared` generates
   `<hestia/app_info.h>` from these and exposes it on its **public** interface, so
   every frontend shares one source of truth — the CLI's `--version`, the desktop's
   `app.info`, etc. all read the same `APP_VERSION`.
 - Dependencies that don't appear in a target's public headers are linked
-  `PRIVATE` (e.g. core's spdlog/fmt, tui's ftxui/spdlog). They still propagate as
+  `PRIVATE` (e.g. shared's spdlog/fmt, tui's ftxui/spdlog). They still propagate as
   transitive link deps to the final executable — which is why `apps/cli` no
   longer links ftxui directly.
 - Build artifacts land in `build/<config>/` (e.g. `build/Release/`); the desktop

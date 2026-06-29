@@ -11,7 +11,7 @@ front-ends, so it's just as comfortable from a terminal as from a window.
 
 ## Front-ends
 
-Hestia is one core with several ways to drive it:
+Hestia is one daemon-backed core with several ways to drive it:
 
 - **Desktop** (`Hestia`) — the graphical launcher. The primary, "beautiful UI"
   experience.
@@ -29,7 +29,8 @@ shows usage, and `hestia tui` launches the interactive interface.
 
 ```
 hestia-cpp/
-├── libs/core/               hestia_core — shared launcher logic (the engine)
+├── libs/shared/             hestia_shared — IPC transport + protocol, client SDK, identity, logging
+├── libs/engine/             hestia_engine — launcher engine (config, greeting, …); daemon-internal
 ├── libs/tui/                hestia_tui  — terminal UI library (FTXUI)
 ├── apps/desktop/            Hestia      — graphical desktop launcher (CEF + React)
 │   ├── frontend/            Vite + React + TypeScript UI (built with Bun)
@@ -41,10 +42,14 @@ hestia-cpp/
 └── third_party/             vendored C++ dependencies (git submodules)
 ```
 
-The dependency arrow is one-way and enforced by the build: `tui` and `cli` both
-depend on `core`; `cli` links `tui`; nothing depends back on `cli`. The TUI
-exposes exactly one public symbol, `hestia::tui::run()`. See
-[docs/architecture.md](docs/architecture.md) for the full picture.
+The dependency arrows are one-way and enforced by the build. Every front-end and
+the daemon link `hestia_shared` (transport + client SDK). `hestia_engine` (the
+launcher logic) is daemon-only — front-ends reach it over the socket rather than
+by linking (the desktop app still links it directly today, a transitional
+exception being retired). `tui` and `cli` both depend on `shared`; `cli` links
+`tui`; nothing depends back on `cli`. The TUI exposes exactly one public symbol,
+`hestia::tui::run()`. See [docs/architecture.md](docs/architecture.md) for the
+full picture.
 
 ## Tech stack
 
