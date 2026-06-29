@@ -19,6 +19,13 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Windows: CEF links the static MSVC runtime (/MT), so build the whole project
+# against it. Mixing /MT (CEF, desktop) with the default /MD (spdlog, fmt, …) in
+# one link fails with unresolved __imp__ CRT symbols.
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # The daemon supervises on background threads and the client SDK runs a reader
@@ -78,3 +85,6 @@ endif()
 
 add_subdirectory(apps/daemon)
 add_subdirectory(apps/tray)
+
+# Release artifacts (CPack): portable archives, DEB/RPM, NSIS/WiX installers.
+include(Packaging)

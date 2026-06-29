@@ -8,7 +8,10 @@
 file(GLOB all_paks "${LOCALES_DIR}/*.pak")
 foreach(pak ${all_paks})
     get_filename_component(name "${pak}" NAME)
-    if(NOT name IN_LIST KEEP)
+    # list(FIND) instead of the IN_LIST operator keeps this policy-independent
+    # (no CMP0057 needed) when run standalone via `cmake -P`.
+    list(FIND KEEP "${name}" keep_index)
+    if(keep_index EQUAL -1)
         file(REMOVE "${pak}")
     endif()
 endforeach()

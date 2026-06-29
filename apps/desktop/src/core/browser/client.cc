@@ -2,6 +2,9 @@
 #include "core/browser/client_manager.h"
 #include "core/ipc/ipc_router.h"
 
+#include "include/views/cef_browser_view.h"
+#include "include/views/cef_window.h"
+
 namespace desktop::browser {
 
 bool Client::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
@@ -27,6 +30,16 @@ void Client::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
 
 void Client::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) {
     PlatformTitleChange(browser, title);
+}
+
+void Client::OnDraggableRegionsChanged(CefRefPtr<CefBrowser> browser,
+                                       CefRefPtr<CefFrame> /*frame*/,
+                                       const std::vector<CefDraggableRegion>& regions) {
+    if (auto view = CefBrowserView::GetForBrowser(browser)) {
+        if (CefRefPtr<CefWindow> window = view->GetWindow()) {
+            window->SetDraggableRegions(regions);
+        }
+    }
 }
 
 }  // namespace desktop::browser

@@ -23,5 +23,5 @@ target_link_libraries(hestia_cli PRIVATE
 set_target_properties(hestia_cli PROPERTIES OUTPUT_NAME "hestia")
 
 install(TARGETS hestia_cli
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT cli
 )

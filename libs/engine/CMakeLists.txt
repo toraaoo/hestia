@@ -29,7 +29,8 @@ target_compile_options(hestia_engine PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
+# "Development" component: kept out of end-user packages, which ship runtime only.
 install(TARGETS hestia_engine
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development
 )
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT Development)

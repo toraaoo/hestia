@@ -1,5 +1,6 @@
 #include "include/cef_app.h"
 #include "core/app/main_util.h"
+#include <hestia/config.h>
 #include <hestia/logging.h>
 
 int main(int argc, char* argv[]) {
@@ -23,7 +24,9 @@ int main(int argc, char* argv[]) {
     const std::string exe = desktop::app::GetExecutableDirectory();
     CefString(&settings.resources_dir_path) = exe;
     CefString(&settings.locales_dir_path)   = exe + "/locales";
-    CefString(&settings.root_cache_path)    = exe + "/cache";
+    // Writable per-user cache; the exe dir is read-only (AppImage / system install).
+    CefString(&settings.root_cache_path) =
+        (hestia::config::data_home() / "cache").string();
 
     if (!CefInitialize(main_args, settings, app, nullptr))
         return CefGetExitCode();

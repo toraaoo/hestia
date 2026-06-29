@@ -1,20 +1,18 @@
 #if defined(_WIN32)
 #include "include/cef_app.h"
-#include "include/cef_sandbox_win.h"
 #include "core/app/main_util.h"
+#include <hestia/config.h>
 #include <hestia/logging.h>
 #include <windows.h>
 
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
-    hestia::init_logging();
-
-    void* sandbox_info = nullptr;
-#if defined(CEF_USE_SANDBOX)
-    CefScopedSandboxInfo scoped_sandbox;
-    sandbox_info = scoped_sandbox.sandbox_info();
+#if defined(CEF_USE_BOOTSTRAP)
+#include "include/cef_sandbox_win.h"
 #endif
 
-    CefMainArgs main_args(hInstance);
+namespace {
+int RunMain(CefMainArgs main_args, void* sandbox_info) {
+    hestia::init_logging();
+
     auto cmd = desktop::app::CreateCommandLine(main_args);
     auto app = desktop::app::CreateApp(desktop::app::GetProcessType(cmd));
 
@@ -29,7 +27,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
     const std::string exe = desktop::app::GetExecutableDirectory();
     CefString(&settings.resources_dir_path) = exe;
     CefString(&settings.locales_dir_path)   = exe + "\\locales";
-    CefString(&settings.root_cache_path)    = exe + "\\cache";
+    // Writable per-user cache; Program Files is read-only.
+    CefString(&settings.root_cache_path) =
+        (hestia::config::data_home() / "cache").string();
 
     if (!CefInitialize(main_args, settings, app, sandbox_info))
         return CefGetExitCode();
@@ -38,4 +38,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
     CefShutdown();
     return 0;
 }
+}  // namespace
+
+#if defined(CEF_USE_BOOTSTRAP)
+// Sandbox builds run as a DLL; bootstrap.exe (renamed to the app binary) calls
+// this exported entry point and supplies the sandbox info it owns.
+CEF_BOOTSTRAP_EXPORT int RunWinMain(HINSTANCE hInstance, LPTSTR, int,
+                                    void* sandbox_info, cef_version_info_t*) {
+    return RunMain(CefMainArgs(hInstance), sandbox_info);
+}
+#else
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
+    return RunMain(CefMainArgs(hInstance), nullptr);
+}
+#endif
 #endif

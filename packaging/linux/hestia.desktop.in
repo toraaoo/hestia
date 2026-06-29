@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Hestia
+GenericName=Minecraft Launcher
+Comment=Fast, lightweight Minecraft launcher
+Exec=@HESTIA_DESKTOP_EXEC@ %U
+Icon=hestia
+Terminal=false
+Categories=Game;
+StartupWMClass=Hestia

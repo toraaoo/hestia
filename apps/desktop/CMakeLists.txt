@@ -17,7 +17,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     endif()
 endif()
 
-set(CEF_VERSION "149.0.6+g0d0eeb6+chromium-149.0.7827.201" CACHE STRING "CEF binary distribution version")
+include(cef_version)
 
 include(DownloadCEF)
 DownloadCEF("${CEF_PLATFORM}" "" "${CEF_VERSION}" "${CMAKE_SOURCE_DIR}/third_party/cef")
@@ -57,7 +57,16 @@ elseif(UNIX AND NOT APPLE)
 endif()
 
 # ---- Application identity ---------------------------------------------------
-set(APP_BINARY_NAME "Hestia" CACHE STRING "Output binary / bundle name")
+# On-disk executable name. On case-insensitive filesystems (Windows) a "Hestia"
+# binary would collide with the "hestia" CLI, so off macOS the launcher is named
+# "HestiaLauncher". The window/app *identity* stays "Hestia" via APP_NAME/APP_ID
+# — only the filename differs. macOS keeps the "Hestia.app" bundle name.
+if(APPLE)
+    set(_app_default_binary_name "Hestia")
+else()
+    set(_app_default_binary_name "HestiaLauncher")
+endif()
+set(APP_BINARY_NAME "${_app_default_binary_name}" CACHE STRING "Output binary / bundle name")
 set(APP_SCHEME      "hestia" CACHE STRING "Custom URL scheme serving the frontend")
 set(APP_DEV_SERVER_URL ""    CACHE STRING "Dev-server URL (Debug only; empty = embedded)")
 
@@ -180,8 +189,10 @@ else()
         fmt::fmt spdlog::spdlog)
 
     if(UNIX AND NOT APPLE)
+        # $ORIGIN finds the CEF libs beside the binary; $ORIGIN/.. lets the
+        # AppImage build find libraries bundled one level up in usr/lib.
         set_target_properties(hestia_desktop PROPERTIES
-            INSTALL_RPATH "$ORIGIN"
+            INSTALL_RPATH "$ORIGIN:$ORIGIN/.."
             BUILD_WITH_INSTALL_RPATH TRUE)
     endif()
 
@@ -230,4 +241,62 @@ endif()
 if(NOT MSVC)
     string(APPEND CMAKE_EXE_LINKER_FLAGS_RELEASE    " -s")
     string(APPEND CMAKE_SHARED_LINKER_FLAGS_RELEASE " -s")
+endif()
+
+# ---- Install (desktop component, Linux/Windows) -----------------------------
+# CEF requires its runtime (libcef, *.pak, locales, blobs, sandbox) to sit beside
+# the executable, so the whole desktop runtime installs into one private dir.
+if(NOT APPLE)
+    # Plain "lib/hestia" (not CMAKE_INSTALL_LIBDIR) to dodge Debian multiarch
+    # libdir drift — the postinst and .desktop both assume this fixed path.
+    if(WIN32)
+        set(HESTIA_DESKTOP_LIBDIR "desktop")
+    else()
+        set(HESTIA_DESKTOP_LIBDIR "lib/hestia")
+    endif()
+
+    install(TARGETS hestia_desktop
+            RUNTIME DESTINATION "${HESTIA_DESKTOP_LIBDIR}" COMPONENT desktop
+            LIBRARY DESTINATION "${HESTIA_DESKTOP_LIBDIR}" COMPONENT desktop)
+
+    # Windows sandbox build: the app is a DLL; ship the renamed bootstrap launcher.
+    if(WIN32 AND USE_SANDBOX)
+        install(PROGRAMS "${CEF_TARGET_OUT_DIR}/${APP_BINARY_NAME}.exe"
+                DESTINATION "${HESTIA_DESKTOP_LIBDIR}" COMPONENT desktop)
+    endif()
+
+    # CEF binaries (built copy: stripped in Release). chrome-sandbox must be
+    # executable and SUID; install it executable and let deb/rpm postinst set SUID.
+    foreach(_f IN LISTS CEF_BINARY_FILES)
+        if(_f STREQUAL "chrome-sandbox")
+            install(PROGRAMS "${CEF_TARGET_OUT_DIR}/${_f}"
+                    DESTINATION "${HESTIA_DESKTOP_LIBDIR}" COMPONENT desktop)
+        else()
+            install(FILES "${CEF_TARGET_OUT_DIR}/${_f}"
+                    DESTINATION "${HESTIA_DESKTOP_LIBDIR}" COMPONENT desktop)
+        endif()
+    endforeach()
+
+    foreach(_f IN LISTS CEF_RESOURCE_FILES)
+        if(IS_DIRECTORY "${CEF_RESOURCE_DIR}/${_f}")
+            install(DIRECTORY "${CEF_TARGET_OUT_DIR}/${_f}/"
+                    DESTINATION "${HESTIA_DESKTOP_LIBDIR}/${_f}" COMPONENT desktop)
+        else()
+            install(FILES "${CEF_TARGET_OUT_DIR}/${_f}"
+                    DESTINATION "${HESTIA_DESKTOP_LIBDIR}" COMPONENT desktop)
+        endif()
+    endforeach()
+
+    # Linux desktop-entry + icon so the launcher shows up in the application menu.
+    if(UNIX)
+        set(HESTIA_DESKTOP_EXEC "${CMAKE_INSTALL_PREFIX}/lib/hestia/HestiaLauncher")
+        configure_file(
+            "${CMAKE_SOURCE_DIR}/packaging/linux/hestia.desktop.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/hestia.desktop" @ONLY)
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/hestia.desktop"
+                DESTINATION "${CMAKE_INSTALL_DATADIR}/applications" COMPONENT desktop)
+        install(FILES "${CMAKE_SOURCE_DIR}/packaging/icons/hestia.svg"
+                DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps"
+                COMPONENT desktop)
+    endif()
 endif()

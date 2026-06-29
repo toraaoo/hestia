@@ -43,7 +43,7 @@ binary_for() {
         daemon|hestiad|hestia_daemon) echo hestiad ;;
         cli|hestia|hestia_cli)        echo hestia ;;
         tray|hestia_tray)             echo hestia-tray ;;
-        desktop|Hestia|hestia_desktop) echo Hestia ;;
+        desktop|Hestia|hestia_desktop) echo HestiaLauncher ;;
         *) echo "" ;;
     esac
 }

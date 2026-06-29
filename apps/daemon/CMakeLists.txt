@@ -50,6 +50,8 @@ target_compile_options(hestia_daemon PRIVATE
 
 set_target_properties(hestia_daemon PROPERTIES OUTPUT_NAME "hestiad")
 
+# The daemon is the resident core every front-end needs, so it's its own
+# required component (CLI and desktop both depend on it).
 install(TARGETS hestia_daemon
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT daemon
 )
