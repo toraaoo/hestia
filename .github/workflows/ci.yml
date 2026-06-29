@@ -1,0 +1,36 @@
+name: CI
+
+# Build verification on every PR and push to main. No packaging — that is the
+# release workflow's job. Builds the full tree (CLI/TUI, daemon, tray, desktop)
+# on Linux and Windows so a break in any front-end is caught early.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cache: ccache
+          - os: windows-latest
+            cache: ''
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup
+        with:
+          cache-variant: ${{ matrix.cache }}
+          cache-key: ci
