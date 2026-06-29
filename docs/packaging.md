@@ -35,9 +35,11 @@ How a component maps to a package depends on the format:
   [`cmake/package_portable.cmake`](../cmake/package_portable.cmake) rather than
   CPack.
 
-The `cli` lands in `bin/`, so `hestia` is on `PATH` after install — the NSIS
-installer adds the bin dir to `PATH` with the EnVar plugin (the built-in NSIS
-path macro overflows when the system `PATH` is long).
+The `cli` lands in `bin/`. When it's kept selected in the picker the NSIS
+installer puts that `bin/` on `PATH`, so `hestia` is runnable from anywhere;
+deselect `cli` and the `PATH` entry is skipped. It's written with the EnVar
+plugin because the built-in NSIS path macro overflows when the system `PATH` is
+long.
 
 ## The desktop layout
 
@@ -45,11 +47,13 @@ CEF requires its runtime (`libcef`, `*.pak`, `locales`, blobs, sandbox) to sit
 beside the executable, so the desktop installs as a self-contained unit:
 
 - Installed packages (`.deb`/`.rpm`/installers): Linux `lib/hestia/` (with a
-  `.desktop` entry + icon in `share/`); Windows a `desktop\` subdir under the
-  install root, plus a Start-menu shortcut.
-- Portable archives: a **flat** layout — every executable (`hestia`, `hestiad`,
-  `hestia-tray`, `HestiaLauncher`) and the CEF runtime sit together at the
-  archive root, so nothing is buried in `lib/`.
+  `.desktop` entry + icon in `share/`); Windows installs the launcher + CEF
+  runtime **flat at the install root** (Windows has no FHS to honour). The NSIS
+  installer creates Start-menu and Desktop shortcuts only when the `desktop`
+  component is selected, so a CLI-only install leaves no dangling launcher link.
+- Portable archives: the same layout as the Windows install — the CLI, daemon,
+  and tray in `bin/`, and the launcher + CEF runtime at the archive root, so the
+  app is the obvious thing to double-click and nothing is buried in `lib/`.
 
 The on-disk binary is `HestiaLauncher` (not `Hestia`) so it doesn't collide with
 the `hestia` CLI on case-insensitive Windows. The window/app identity is still

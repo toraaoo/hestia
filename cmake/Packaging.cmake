@@ -86,16 +86,26 @@ if(WIN32)
     set(CPACK_NSIS_MUI_ICON     "${CMAKE_SOURCE_DIR}/packaging/icons/hestia.ico")
     set(CPACK_NSIS_MUI_UNIICON  "${CMAKE_SOURCE_DIR}/packaging/icons/hestia.ico")
     set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\hestia.exe")
-    set(CPACK_NSIS_MENU_LINKS "desktop\\\\${APP_BINARY_NAME}.exe" "Hestia")
 
-    # Put the CLI on PATH via the EnVar plugin. CPACK_NSIS_MODIFY_PATH's built-in
-    # macro overflows NSIS's 1024-char string limit when the system PATH is long;
-    # EnVar reads/writes the registry directly and is duplicate-safe. The plugin
-    # DLL must be in the NSIS plugins dir (the Windows CI job installs it).
-    set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
-        "EnVar::SetHKLM\n  EnVar::AddValueEx 'Path' '$INSTDIR\\\\bin'\n  Pop $0")
-    set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
+    # Steps gated on the picker via each component's section flag (${cli}/${desktop});
+    # via EXTRA_*_COMMANDS rather than CPACK_NSIS_MENU_LINKS, which emits shortcuts
+    # unconditionally and would dangle on a CLI-only install. PATH uses EnVar — the
+    # built-in CPACK_NSIS_MODIFY_PATH macro overflows NSIS's 1024-char limit on a
+    # long PATH; the plugin DLL is installed by CI.
+    set(_nsis_install
+        "SectionGetFlags \${cli} $0\n  IntOp $0 $0 & \${SF_SELECTED}\n  IntCmp $0 0 hestia_skip_path\n    EnVar::SetHKLM\n    EnVar::AddValueEx 'Path' '$INSTDIR\\\\bin'\n    Pop $0\n  hestia_skip_path:")
+    set(_nsis_uninstall
         "EnVar::SetHKLM\n  EnVar::DeleteValue 'Path' '$INSTDIR\\\\bin'\n  Pop $0")
+
+    if(BUILD_DESKTOP)
+        string(APPEND _nsis_install
+            "\n  SectionGetFlags \${desktop} $0\n  IntOp $0 $0 & \${SF_SELECTED}\n  IntCmp $0 0 hestia_skip_icons\n    CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Hestia.lnk' '$INSTDIR\\\\${APP_BINARY_NAME}.exe'\n    CreateShortCut '$DESKTOP\\\\Hestia.lnk' '$INSTDIR\\\\${APP_BINARY_NAME}.exe'\n  hestia_skip_icons:")
+        string(APPEND _nsis_uninstall
+            "\n  Delete '$SMPROGRAMS\\\\$START_MENU\\\\Hestia.lnk'\n  Delete '$DESKTOP\\\\Hestia.lnk'")
+    endif()
+
+    set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${_nsis_install}")
+    set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "${_nsis_uninstall}")
 endif()
 
 # Portable archives are built by cmake/package_portable.cmake; CPack drives the

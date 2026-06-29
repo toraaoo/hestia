@@ -18,6 +18,13 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#else
+#include <windows.h>
+#endif
+
+#if defined(__APPLE__)
+#include <cstdint>
+#include <mach-o/dyld.h>
 #endif
 
 namespace hestia::client {
@@ -60,21 +67,31 @@ namespace hestia::client {
             return res;
         }
 
+        // hestiad sits beside the current binary (CLI/daemon/tray, all in bin/) or
+        // in a bin/ subdirectory (the desktop launcher, a level up); else via PATH.
+        fs::path find_daemon();
+
 #if !defined(_WIN32)
-        // The directory of the current executable, so we can find a sibling
-        // `hestiad` to auto-spawn before falling back to PATH.
+        // The directory of the current executable.
         fs::path self_dir() {
+#if defined(__APPLE__)
+            char buf[4096];
+            std::uint32_t size = sizeof(buf);
+            if (_NSGetExecutablePath(buf, &size) != 0) return {}; // buffer too small
+            std::error_code ec;
+            const fs::path resolved = fs::weakly_canonical(fs::path(buf), ec);
+            return (ec ? fs::path(buf) : resolved).parent_path();
+#else
             char buf[4096];
             const ssize_t n = ::readlink("/proc/self/exe", buf, sizeof(buf) - 1);
             if (n <= 0) return {};
             buf[n] = '\0';
             return fs::path(buf).parent_path();
+#endif
         }
 
         void spawn_daemon() {
-            const fs::path sibling = self_dir() / "hestiad";
-            std::error_code ec;
-            const std::string program = fs::exists(sibling, ec) ? sibling.string() : "hestiad";
+            const std::string program = find_daemon().string();
 
             const pid_t pid = ::fork();
             if (pid < 0) throw std::runtime_error("failed to fork to start hestiad");
@@ -93,10 +110,52 @@ namespace hestia::client {
             // to init. We just wait for its socket below.
         }
 #else
+        // The directory of the current executable.
+        fs::path self_dir() {
+            wchar_t buf[MAX_PATH];
+            const DWORD n = ::GetModuleFileNameW(nullptr, buf, MAX_PATH);
+            if (n == 0 || n == MAX_PATH) return {};
+            return fs::path(std::wstring(buf, n)).parent_path();
+        }
+
         void spawn_daemon() {
-            throw std::runtime_error("auto-spawning hestiad is not yet implemented on Windows");
+            const fs::path program = find_daemon();
+
+            // Quote the program path (it may contain spaces); CreateProcessW
+            // parses this as the command line when lpApplicationName is null, so a
+            // bare "hestiad.exe" is resolved through PATH.
+            std::wstring cmd = L"\"" + program.wstring() + L"\" serve";
+
+            STARTUPINFOW si{};
+            si.cb = sizeof(si);
+            PROCESS_INFORMATION pi{};
+            const std::wstring workdir = self_dir().wstring();
+            // DETACHED_PROCESS: no inherited console, so the daemon outlives the
+            // frontend (mirrors the POSIX setsid + double-fork detachment).
+            const BOOL ok = ::CreateProcessW(
+                nullptr, cmd.data(), nullptr, nullptr, FALSE, DETACHED_PROCESS,
+                nullptr, workdir.empty() ? nullptr : workdir.c_str(), &si, &pi);
+            if (!ok) throw std::runtime_error("failed to start hestiad");
+            ::CloseHandle(pi.hThread);
+            ::CloseHandle(pi.hProcess);
         }
 #endif
+
+        fs::path find_daemon() {
+#if defined(_WIN32)
+            const fs::path exe = L"hestiad.exe";
+#else
+            const fs::path exe = "hestiad";
+#endif
+            const fs::path dir = self_dir();
+            if (!dir.empty()) {
+                std::error_code ec;
+                for (const fs::path &candidate : {dir / exe, dir / "bin" / exe}) {
+                    if (fs::exists(candidate, ec)) return candidate;
+                }
+            }
+            return exe; // resolved through PATH
+        }
 
         std::shared_ptr<ipc::Connection> connect_with_retry(const fs::path &endpoint) {
             // Poll briefly for the freshly-spawned daemon's socket to appear.

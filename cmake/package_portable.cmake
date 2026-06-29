@@ -36,17 +36,21 @@ foreach(_comp daemon cli desktop)
     endif()
 endforeach()
 
-# CLI/daemon/tray stay in bin/; the desktop launcher + CEF runtime go to the
-# archive root so the app is the obvious thing to double-click.
+# CLI/daemon/tray stay in bin/; the launcher + CEF runtime go to the archive root.
+# Windows already installs the desktop flat there; Linux flattens it out of lib/hestia.
 if(EXISTS "${_inst}/bin")
     file(COPY "${_inst}/bin" DESTINATION "${_root}")
 endif()
-foreach(_dir "${_inst}/lib/hestia" "${_inst}/desktop")
-    if(EXISTS "${_dir}")
-        file(GLOB _entries "${_dir}/*")
+if(CMAKE_HOST_WIN32)
+    file(GLOB _entries LIST_DIRECTORIES TRUE "${_inst}/*")
+    list(REMOVE_ITEM _entries "${_inst}/bin")
+    if(_entries)
         file(COPY ${_entries} DESTINATION "${_root}")
     endif()
-endforeach()
+elseif(EXISTS "${_inst}/lib/hestia")
+    file(GLOB _entries "${_inst}/lib/hestia/*")
+    file(COPY ${_entries} DESTINATION "${_root}")
+endif()
 
 file(MAKE_DIRECTORY "${OUT_DIR}")
 if(CMAKE_HOST_WIN32)

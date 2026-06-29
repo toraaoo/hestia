@@ -250,7 +250,8 @@ if(NOT APPLE)
     # Plain "lib/hestia" (not CMAKE_INSTALL_LIBDIR) to dodge Debian multiarch
     # libdir drift — the postinst and .desktop both assume this fixed path.
     if(WIN32)
-        set(HESTIA_DESKTOP_LIBDIR "desktop")
+        # Flat at the install root (no FHS on Windows), matching the portable archive.
+        set(HESTIA_DESKTOP_LIBDIR ".")
     else()
         set(HESTIA_DESKTOP_LIBDIR "lib/hestia")
     endif()
