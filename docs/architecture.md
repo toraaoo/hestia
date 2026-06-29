@@ -8,6 +8,15 @@ reasoning behind the structure.
 > shell (process model, IPC bridge, embedded frontend). Launcher functionality
 > is not implemented yet.
 
+> **Migration in progress (daemon architecture).** Hestia is moving to a
+> daemon + thin-client model: `hestiad` owns process supervision and frontends
+> become clients over a local socket. As part of this, `libs/core` has been
+> split into **`libs/shared`** (IPC transport, app identity, logging — linked by
+> the daemon *and* every client) and **`libs/engine`** (config store, greeting,
+> launcher logic — daemon-internal). Sections below that still say "core" predate
+> the split; see [daemon-protocol.md](daemon-protocol.md) for the new boundary.
+> This document gets its full rewrite in the migration's hardening phase.
+
 ## One core, three frontends
 
 Hestia is a single domain core driven three ways:
