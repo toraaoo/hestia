@@ -10,7 +10,7 @@ builds and publishes them on version tags.
 | Platform | Formats |
 |----------|---------|
 | Linux    | portable `.tar.gz`, `.deb`, `.rpm`, AppImage |
-| Windows  | portable `.zip`, NSIS `.exe`, WiX `.msi` |
+| Windows  | portable `.zip`, NSIS `.exe` |
 
 x86_64 only for now. Builds run on Linux and Windows runners.
 
@@ -26,8 +26,8 @@ The install tree is split into components:
 
 How a component maps to a package depends on the format:
 
-- **NSIS / WiX** present a **component picker**: `daemon` + `cli` are preselected
-  and required, `desktop` is opt-in. So a default install is CLI-only.
+- **NSIS** presents a **component picker**: `daemon` + `cli` are preselected and
+  required, `desktop` is opt-in. So a default install is CLI-only.
 - **`.deb` / `.rpm`** are **monolithic** — one package with all runtime
   components. (`Development` is excluded.)
 - **Portable archives** bundle everything in a **flat layout** at the archive
@@ -36,8 +36,8 @@ How a component maps to a package depends on the format:
   CPack.
 
 The `cli` lands in `bin/`, so `hestia` is on `PATH` after install — the NSIS
-installer adds the bin dir to `PATH`; the `.msi` does the same via a WiX patch
-([`packaging/windows/wix-path-patch.xml`](../packaging/windows/wix-path-patch.xml)).
+installer adds the bin dir to `PATH` with the EnVar plugin (the built-in NSIS
+path macro overflows when the system `PATH` is long).
 
 ## The desktop layout
 

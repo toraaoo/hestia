@@ -1,16 +1,18 @@
-# Packaging.cmake — CPack configuration for Hestia's release artifacts.
+# Packaging.cmake — CPack config for the distro packages and Windows installer.
+# Portable archives are built separately (cmake/package_portable.cmake); AppImage
+# via packaging/appimage/build-appimage.sh.
 #
-# Generators (selected per platform, or via `cpack -G`):
-#   Linux   : TGZ (portable), DEB, RPM   + AppImage (packaging/appimage/build-appimage.sh)
-#   Windows : ZIP (portable), NSIS (.exe), WIX (.msi)
+#   Linux   : DEB, RPM
+#   Windows : NSIS (.exe)
 #
 # Component model:
-#   cli         default, required  — hestia (CLI/TUI) + hestiad (daemon)
+#   daemon      required           — hestiad
+#   cli                            — hestia (CLI/TUI)
 #   desktop     optional           — desktop launcher + tray + CEF runtime
 #   Development  (libs/headers)     — never packaged
 #
-# Archives, DEB and RPM are monolithic (everything in one); NSIS and WiX present
-# the component picker so "CLI only" is the default and desktop is opt-in.
+# DEB/RPM are monolithic (all runtime components in one); NSIS presents the
+# component picker so "CLI only" is the default and desktop is opt-in.
 
 include(GNUInstallDirs)
 
@@ -75,34 +77,31 @@ if(UNIX AND NOT APPLE)
         /usr/share/icons/hicolor/scalable/apps)
 endif()
 
-# ---- Windows: NSIS / WiX ----------------------------------------------------
+# ---- Windows: NSIS ----------------------------------------------------------
 if(WIN32)
     set(CPACK_NSIS_PACKAGE_NAME "Hestia")
     set(CPACK_NSIS_DISPLAY_NAME "Hestia")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-    set(CPACK_NSIS_MODIFY_PATH ON)
-    # DPI-aware installer + uninstaller (otherwise blurry on HiDPI displays).
     set(CPACK_NSIS_MANIFEST_DPI_AWARE TRUE)
     set(CPACK_NSIS_MUI_ICON     "${CMAKE_SOURCE_DIR}/packaging/icons/hestia.ico")
     set(CPACK_NSIS_MUI_UNIICON  "${CMAKE_SOURCE_DIR}/packaging/icons/hestia.ico")
     set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\hestia.exe")
-    set(CPACK_NSIS_MENU_LINKS "desktop\\\\HestiaLauncher.exe" "Hestia")
+    set(CPACK_NSIS_MENU_LINKS "desktop\\\\${APP_BINARY_NAME}.exe" "Hestia")
 
-    set(CPACK_WIX_VERSION 3)
-    set(CPACK_WIX_UPGRADE_GUID "A02B98DA-53D3-4413-92B1-47C984829628")
-    set(CPACK_WIX_PRODUCT_ICON "${CMAKE_SOURCE_DIR}/packaging/icons/hestia.ico")
-    set(CPACK_WIX_LICENSE_RTF  "${CMAKE_SOURCE_DIR}/packaging/windows/license.rtf")
-    set(CPACK_WIX_PATCH_FILE   "${CMAKE_SOURCE_DIR}/packaging/windows/wix-path-patch.xml")
-
-    # WiX Start-menu shortcut (NSIS uses CPACK_NSIS_MENU_LINKS above).
-    set_property(INSTALL "desktop/${APP_BINARY_NAME}.exe"
-                 PROPERTY CPACK_START_MENU_SHORTCUTS "Hestia")
+    # Put the CLI on PATH via the EnVar plugin. CPACK_NSIS_MODIFY_PATH's built-in
+    # macro overflows NSIS's 1024-char string limit when the system PATH is long;
+    # EnVar reads/writes the registry directly and is duplicate-safe. The plugin
+    # DLL must be in the NSIS plugins dir (the Windows CI job installs it).
+    set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
+        "EnVar::SetHKLM\n  EnVar::AddValueEx 'Path' '$INSTDIR\\\\bin'\n  Pop $0")
+    set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
+        "EnVar::SetHKLM\n  EnVar::DeleteValue 'Path' '$INSTDIR\\\\bin'\n  Pop $0")
 endif()
 
 # Portable archives are built by cmake/package_portable.cmake; CPack drives the
 # installers and distro packages.
 if(WIN32)
-    set(CPACK_GENERATOR "NSIS;WIX")
+    set(CPACK_GENERATOR "NSIS")
 elseif(UNIX AND NOT APPLE)
     set(CPACK_GENERATOR "DEB;RPM")
 endif()

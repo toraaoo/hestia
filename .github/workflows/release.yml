@@ -3,9 +3,9 @@ name: Release
 # Builds and packages every front-end on version tags, then publishes the
 # artifacts to a GitHub Release:
 #   Linux   : portable .tar.gz, .deb, .rpm, AppImage
-#   Windows : portable .zip, NSIS .exe, WiX .msi
+#   Windows : portable .zip, NSIS .exe
 # All packages bundle the CLI/daemon; the desktop launcher + tray are an opt-in
-# component in the Windows installers and bundled in every other artifact.
+# component in the NSIS installer and bundled in every other artifact.
 
 on:
   push:
@@ -51,7 +51,16 @@ jobs:
 
       - name: Install Windows packaging tools
         if: runner.os == 'Windows'
-        run: choco install --no-progress -y nsis wixtoolset
+        shell: pwsh
+        run: |
+          choco install --no-progress -y nsis
+          # EnVar plugin: lets the installer add the CLI to PATH without hitting
+          # NSIS's built-in string-length limit. Drop the DLL in the plugins dir.
+          $zip = "$env:RUNNER_TEMP\envar.zip"
+          Invoke-WebRequest -Uri "https://nsis.sourceforge.io/mediawiki/images/7/7f/EnVar_plugin.zip" -OutFile $zip
+          $dst = "C:\Program Files (x86)\NSIS\Plugins"
+          Expand-Archive -Path $zip -DestinationPath "$env:RUNNER_TEMP\envar" -Force
+          Copy-Item "$env:RUNNER_TEMP\envar\Plugins\*" -Destination $dst -Recurse -Force
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
@@ -80,9 +89,8 @@ jobs:
           cmake -DBUILD_DIR=build -DOUT_DIR="$PWD/artifacts" -DSOURCE_DIR="$PWD" `
                 -P cmake/package_portable.cmake
           cd build
-          cpack -G "NSIS;WIX"
+          cpack -G NSIS
           Move-Item hestia-*.exe ../artifacts/
-          Move-Item hestia-*.msi ../artifacts/
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
