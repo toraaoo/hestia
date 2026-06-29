@@ -21,7 +21,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-# ---- Shared application identity (consumed by hestia_core + desktop) --------
+# ---- Shared application identity (consumed by hestia_shared + desktop) ------
 set(APP_NAME    "Hestia"                    CACHE STRING "Human-facing product name")
 set(APP_ID      "tech.lawrenceallen.hestia" CACHE STRING "Reverse-DNS application id")
 set(APP_VENDOR  "toraaoo"                   CACHE STRING "Vendor / maintainer")
@@ -29,7 +29,8 @@ set(APP_CHANNEL "dev"                       CACHE STRING "Release channel")
 # APP_VERSION flows from project(hestia VERSION ...) above.
 
 add_subdirectory(third_party)
-add_subdirectory(libs/core)
+add_subdirectory(libs/shared)
+add_subdirectory(libs/engine)
 add_subdirectory(libs/tui)
 add_subdirectory(apps/cli)
 add_subdirectory(apps/desktop)

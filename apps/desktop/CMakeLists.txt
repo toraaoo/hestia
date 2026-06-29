@@ -114,7 +114,7 @@ if(APPLE)
     target_include_directories(hestia_desktop PRIVATE
         ${CEF_INCLUDE_PATH} src "${CMAKE_CURRENT_BINARY_DIR}/generated")
     target_link_libraries(hestia_desktop PRIVATE
-        hestia_core hestia::frontend
+        hestia_shared hestia_engine hestia::frontend
         libcef_dll_wrapper ${CEF_STANDARD_LIBS}
         fmt::fmt spdlog::spdlog)
     if(USE_SANDBOX)
@@ -175,7 +175,7 @@ else()
     target_include_directories(hestia_desktop PRIVATE
         ${CEF_INCLUDE_PATH} src "${CMAKE_CURRENT_BINARY_DIR}/generated")
     target_link_libraries(hestia_desktop PRIVATE
-        hestia_core hestia::frontend
+        hestia_shared hestia_engine hestia::frontend
         libcef_lib libcef_dll_wrapper ${CEF_STANDARD_LIBS}
         fmt::fmt spdlog::spdlog)
 

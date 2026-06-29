@@ -70,13 +70,14 @@ target_include_directories(hestia_tui
         src
 )
 
-# Dependency rule: tui depends on core ONLY. ftxui/spdlog are
-# implementation details — run.h exposes neither — so they are PRIVATE. As
-# transitive link dependencies of this static library they still propagate to
-# the final executable, which is why apps/cli no longer links ftxui directly.
+# Dependency rule: tui depends on the shared base ONLY (logging/identity), never
+# the engine. ftxui/spdlog are implementation details — run.h exposes neither —
+# so they are PRIVATE. As transitive link dependencies of this static library
+# they still propagate to the final executable, which is why apps/cli no longer
+# links ftxui directly.
 target_link_libraries(hestia_tui
         PRIVATE
-        hestia_core
+        hestia_shared
         ftxui::component
         spdlog::spdlog
 )
