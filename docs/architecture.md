@@ -142,6 +142,7 @@ frontend's `dist/` tree is compiled into the binary by **CMakeRC**
 | `hestia`               | `libs/shared`  | cross-cutting (`init_logging`, `LogLevel`) |
 | `hestia::ipc`          | `libs/shared`  | transport, endpoint, protocol envelope     |
 | `hestia::client`       | `libs/shared`  | typed client SDK (`Client`)                |
+| `hestia::engine`       | `libs/engine`  | `Engine` aggregate root + `ConfigStore`    |
 | `hestia::config`       | `libs/engine`  | data-dir resolution + `Config` store       |
 | `hestia::greeting`     | `libs/engine`  | the demo `greet()` function                |
 | `hestia::cli`          | `apps/cli`     | command framework + commands               |
@@ -182,13 +183,30 @@ it appears in the protocol envelope headers.
 
 The launcher engine — daemon-internal domain logic, the equivalent of Tailscale's
 `LocalBackend`. Front-ends reach it over the socket, not by linking it (with the
-transitional exception noted in the target graph). Two modules today:
+transitional exception noted in the target graph).
 
-- **`config`** — data-directory resolution and a flat `key=value` store.
-  Resolution precedence (`data_home`): `--home` override → `$HESTIA_HOME` → a
-  persisted pointer file under the anchor dir (`~/.hestia` or `%APPDATA%\Hestia`)
+**`hestia::engine::Engine`** (`engine.h`) is the aggregate root: the daemon
+constructs exactly one and threads it through every request handler (see
+`HandlerContext`). It resolves the data directory once at startup and owns each
+domain subsystem as a member, exposed through a getter (`engine.config()`). This
+is the single growth point for launcher logic — adding a domain (instances,
+accounts, versions, …) is a module class constructed in `Engine`'s initializer
+list plus a getter, with no change to the daemon's wiring. `set_data_home()`
+re-resolves the data directory and repoints every subsystem so a `config.set-home`
+takes effect on the running daemon, not just the next start.
+
+The subsystems behind it today:
+
+- **`ConfigStore`** (`config_store.h`) — a thread-safe live view of the flat
+  `key=value` config file. Reads/writes are serialized for concurrent clients and
+  every `set()` is persisted immediately; `reload()` repoints it when the data
+  directory changes. Built on the lower-level `config` module below.
+- **`config`** — data-directory resolution and the flat `key=value` `Config`
+  store. Resolution precedence (`data_home`): `--home` override → `$HESTIA_HOME` →
+  a persisted pointer file under the anchor dir (`~/.hestia` or `%APPDATA%\Hestia`)
   → the platform default. `Config::load` / `get` / `set` / `save` operate on the
-  file at `config_path()`. A missing file is an empty config, not an error.
+  file at `config_path()`. A missing file is an empty config, not an error. The
+  desktop app still links these path helpers directly (the transitional exception).
 - **`greeting`** — `greet(name)`; a placeholder exercising the engine→frontend seam.
 
 `engine` links fmt **privately** — it is an implementation detail and does not leak

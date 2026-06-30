@@ -3,7 +3,6 @@
 #include "hestia/ipc/protocol.h"
 #include "hestia/ipc/transport.h"
 
-#include "config_service.h"
 #include "event_hub.h"
 #include "handler_context.h"
 #include "process_supervisor.h"
@@ -11,6 +10,7 @@
 #include "services/services.h"
 
 #include <hestia/app_info.h>
+#include <hestia/engine/engine.h>
 #include <hestia/client/client.h>
 #include <hestia/logging.h>
 
@@ -45,7 +45,7 @@ namespace {
     // (events.subscribe) are ordinary handlers.
     void serve_connection(std::shared_ptr<hestia::ipc::Connection> conn,
                           const hestia::daemon::Router &router,
-                          hestia::daemon::ConfigService &config,
+                          hestia::engine::Engine &engine,
                           hestia::daemon::ProcessSupervisor &supervisor,
                           hestia::daemon::EventHub &hub) {
         while (auto frame = conn->recv()) {
@@ -58,7 +58,7 @@ namespace {
                     hestia::ipc::Response::failure(hestia::ipc::errors::kBadRequest, e.what())));
                 continue;
             }
-            hestia::daemon::HandlerContext ctx{config, supervisor, hub, conn};
+            hestia::daemon::HandlerContext ctx{engine, supervisor, hub, conn};
             auto res = router.route(req, ctx);
             res.id = req.id;
             conn->send(hestia::ipc::encode(res));
@@ -76,10 +76,10 @@ namespace {
             return 1;
         }
 
-        hestia::daemon::ConfigService config;
+        hestia::engine::Engine engine;
         hestia::daemon::EventHub hub;
 
-        auto supervisor = hestia::daemon::make_process_supervisor(config.home());
+        auto supervisor = hestia::daemon::make_process_supervisor(engine.data_home());
         supervisor->set_event_sink([&hub](const hestia::ipc::Event &e) { hub.publish(e); });
         supervisor->reconcile(); // re-adopt processes that survived a previous daemon
         supervisor->start_supervision(); // poll liveness, stream logs, enforce restarts
@@ -102,7 +102,7 @@ namespace {
         spdlog::info("hestiad listening on {}", endpoint.string());
         listener->serve([&](std::shared_ptr<hestia::ipc::Connection> conn) {
             spdlog::debug("client connected");
-            serve_connection(std::move(conn), router, config, *supervisor, hub);
+            serve_connection(std::move(conn), router, engine, *supervisor, hub);
             spdlog::debug("client disconnected");
         });
         g_listener.store(nullptr);

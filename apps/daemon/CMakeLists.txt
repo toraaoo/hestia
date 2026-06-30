@@ -8,7 +8,6 @@ add_executable(hestia_daemon
         src/router.cc
         src/router.h
         src/handler_context.h
-        src/config_service.h
         src/event_hub.h
         src/process_supervisor.cc
         src/process_supervisor.h

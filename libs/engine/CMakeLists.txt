@@ -6,8 +6,12 @@ include(GNUInstallDirs)
 # commands move behind the daemon in a later phase, the CLI and desktop still
 # link it directly.)
 add_library(hestia_engine STATIC
+        include/hestia/engine/engine.h
+        include/hestia/engine/config_store.h
         include/hestia/greeting.h
         include/hestia/config.h
+        src/engine.cc
+        src/config_store.cc
         src/greeting.cc
         src/config.cc
 )

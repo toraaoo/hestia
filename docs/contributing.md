@@ -342,21 +342,169 @@ otherwise prints its own help. Leaf children may be `private` classes inside the
 
 Launcher/domain logic lives in `libs/engine`, UI-free and daemon-internal.
 (Cross-cutting code that the daemon *and* clients both need — transport, the
-client SDK, identity, logging — goes in `libs/shared` instead.)
+client SDK, identity, logging — goes in `libs/shared` instead.) A domain
+subsystem hangs off the `Engine` aggregate root (`hestia::engine::Engine`), which
+the daemon owns and hands to every request handler.
 
-1. Public header in `libs/engine/include/hestia/<name>.h` (namespace `hestia` or a
-   sub-namespace like `hestia::config`).
-2. Implementation in `libs/engine/src/<name>.cc`.
-3. Add both to `libs/engine/CMakeLists.txt`.
-4. Keep dependencies (fmt) out of the public header — link them `PRIVATE`.
+The worked example below adds an `instances` domain end-to-end. Model the store
+on `ConfigStore` and the service/client on the `config` channels.
 
-The daemon then consumes it directly; front-ends reach it over the socket via
-`hestia_shared`'s client SDK — they never include the engine header. (The
-desktop app still links `hestia_engine` directly today, a transitional
-exception; the CLI and TUI already go entirely through the client SDK.) The
-`greet` / `GreetCommand` pair is the minimal end-to-end example: `GreetCommand`
-calls `Client::greet()`, which round-trips `app.greet` to the daemon, which runs
-`hestia::greeting::greet()`.
+**1. Write the subsystem** as a `hestia::engine::<Thing>` class — public header in
+`libs/engine/include/hestia/engine/<thing>.h`, implementation in
+`libs/engine/src/<thing>.cc`, both added to `libs/engine/CMakeLists.txt`. Take a
+path under the data dir in the constructor, serialize access for concurrent
+clients, and keep deps (fmt) out of the public header (link them `PRIVATE`).
+
+```cpp
+// libs/engine/include/hestia/engine/instance_store.h
+#pragma once
+
+#include <filesystem>
+#include <mutex>
+#include <string>
+#include <vector>
+
+namespace hestia::engine {
+    struct Instance {
+        std::string id;
+        std::string name;
+    };
+
+    // Thread-safe registry of launcher instances, persisted under the data dir.
+    class InstanceStore {
+    public:
+        explicit InstanceStore(std::filesystem::path dir);
+
+        std::vector<Instance> list() const;
+        void add(const Instance &instance);
+
+        void reload(std::filesystem::path dir);   // repoint when the data dir moves
+
+    private:
+        mutable std::mutex mu_;
+        std::filesystem::path dir_;
+        std::vector<Instance> instances_;
+    };
+}
+```
+
+```cpp
+// libs/engine/src/instance_store.cc
+#include <hestia/engine/instance_store.h>
+
+namespace hestia::engine {
+    InstanceStore::InstanceStore(std::filesystem::path dir) : dir_(std::move(dir)) {
+        // ... load instances_ from dir_ ...
+    }
+
+    std::vector<Instance> InstanceStore::list() const {
+        std::lock_guard<std::mutex> lk(mu_);
+        return instances_;
+    }
+
+    void InstanceStore::add(const Instance &instance) {
+        std::lock_guard<std::mutex> lk(mu_);
+        instances_.push_back(instance);
+        // ... persist under dir_ ...
+    }
+
+    void InstanceStore::reload(std::filesystem::path dir) {
+        std::lock_guard<std::mutex> lk(mu_);
+        dir_ = std::move(dir);
+        // ... reload instances_ from dir_ ...
+    }
+}
+```
+
+**2. Hang it off `Engine`** (`engine.h` / `engine.cc`): a member constructed in
+the initializer list against `data_home_`, a getter, and a `reload()` in
+`set_data_home()`. This is the *only* change to the engine's wiring —
+`HandlerContext` already carries the `Engine`.
+
+```cpp
+// engine.h — inside class Engine
+#include <hestia/engine/instance_store.h>
+// ...
+        InstanceStore &instances() { return instances_; }
+// ...
+        ConfigStore config_;
+        InstanceStore instances_;          // declare after config_ — order = init order
+```
+
+```cpp
+// engine.cc
+Engine::Engine(const std::filesystem::path &override_home)
+    : data_home_(config::data_home(override_home)),
+      config_(config::config_path(data_home_)),
+      instances_(data_home_ / "instances") {}        // <-- construct it
+
+std::filesystem::path Engine::set_data_home(const std::string &dir) {
+    config::set_persisted_home(dir);
+    data_home_ = config::data_home();
+    config_.reload(config::config_path(data_home_));
+    instances_.reload(data_home_ / "instances");      // <-- repoint it
+    return data_home_;
+}
+```
+
+**3. Surface it over IPC** — a daemon service plus a client method. Add
+`apps/daemon/src/services/instances_service.cc`, declare it in
+`services/services.h`, call it in `run_daemon` (`main.cc`), and list it in the
+daemon `CMakeLists.txt`:
+
+```cpp
+// apps/daemon/src/services/instances_service.cc
+#include "services/services.h"
+
+#include "handler_context.h"
+#include "router.h"
+
+#include <hestia/engine/engine.h>
+
+namespace hestia::daemon {
+    void register_instances_service(Router &router) {
+        router.on("instances.list", [](const ipc::Request &, HandlerContext &ctx) {
+            auto arr = nlohmann::json::array();
+            for (const auto &it : ctx.engine.instances().list()) {
+                arr.push_back({{"id", it.id}, {"name", it.name}});
+            }
+            return ipc::Response::success({{"instances", arr}});
+        });
+    }
+}
+```
+
+```cpp
+// apps/daemon/src/services/services.h — add the declaration
+void register_instances_service(Router &router);
+
+// apps/daemon/src/main.cc — in run_daemon(), beside the other register_*_service calls
+hestia::daemon::register_instances_service(router);
+```
+
+Then a typed method on `hestia::client::Client` (`libs/shared`) so front-ends
+drive it without knowing the wire format — declare it in `client/client.h`,
+define it in `src/client.cc`:
+
+```cpp
+// client.cc
+std::vector<std::string> Client::instance_names() {
+    const auto res = must(d_->call("instances.list", json::object()));
+    std::vector<std::string> names;
+    for (const auto &it : res.payload.value("instances", json::array())) {
+        names.push_back(it.value("name", std::string{}));
+    }
+    return names;
+}
+```
+
+Front-ends reach the subsystem only over the socket via the client SDK — they
+never include the engine header. (The desktop app still links `hestia_engine`
+directly today, a transitional exception; the CLI and TUI already go entirely
+through the client SDK.) The `config` channels are the shipped end-to-end
+reference: `Client::config_get()` round-trips `config.get` to the daemon, which
+calls `ctx.engine.config().get()`. A stateless helper with no persisted state
+(like `greeting::greet`) can skip step 2 and be called directly from its service.
 
 ---
 
