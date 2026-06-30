@@ -8,6 +8,8 @@
 #include <string_view>
 #include <vector>
 
+#include <hestia/ipc/protocol.h>
+
 // The thin client SDK every frontend (CLI/TUI/desktop/tray) uses to drive the
 // daemon — the single boundary they code against. One persistent, multiplexed
 // connection: typed calls correlated by id, plus pushed events to a subscriber.
@@ -70,6 +72,10 @@ namespace hestia::client {
         Client(Client &&) noexcept;
         Client &operator=(Client &&) noexcept;
         ~Client();
+
+        // Raw request; throws only on transport failure (a daemon-side error is a
+        // Response with ok == false). The typed channels below are built on this.
+        ipc::Response call(const std::string &channel, const nlohmann::json &payload);
 
         // Typed channels. These throw std::runtime_error on a transport failure
         // or a daemon-side error (except config_get, which returns nullopt for a

@@ -285,6 +285,10 @@ namespace hestia::client {
         return client;
     }
 
+    ipc::Response Client::call(const std::string &channel, const json &payload) {
+        return d_->call(channel, payload);
+    }
+
     std::optional<std::string> Client::config_get(std::string_view key) {
         const auto res = d_->call("config.get", {{"key", std::string(key)}});
         if (res.ok) return res.payload.value("value", std::string{});
