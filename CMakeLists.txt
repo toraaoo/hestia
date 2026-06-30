@@ -69,6 +69,13 @@ if(BUILD_CLI AND NOT BUILD_TUI)
     set(BUILD_TUI ON)
 endif()
 
+# ---- Tests -------------------------------------------------------------------
+# Defined before third_party so the vendored GoogleTest is gated on it.
+option(BUILD_TESTING "Build the unit tests" ON)
+if(BUILD_TESTING)
+    enable_testing()
+endif()
+
 add_subdirectory(third_party)
 add_subdirectory(libs/shared)
 add_subdirectory(libs/engine)
@@ -85,6 +92,10 @@ endif()
 
 add_subdirectory(apps/daemon)
 add_subdirectory(apps/tray)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 # Release artifacts (CPack): portable archives, DEB/RPM, NSIS/WiX installers.
 include(Packaging)

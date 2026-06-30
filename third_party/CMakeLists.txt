@@ -22,3 +22,12 @@ add_subdirectory(FTXUI EXCLUDE_FROM_ALL)
 set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
 set(JSON_Install OFF CACHE BOOL "" FORCE)
 add_subdirectory(json EXCLUDE_FROM_ALL)
+
+# GoogleTest, built only when BUILD_TESTING is on. gtest_force_shared_crt stays
+# OFF so gtest matches the project's static MSVC runtime (/MT, set for CEF).
+if(BUILD_TESTING)
+    set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    set(gtest_force_shared_crt OFF CACHE BOOL "" FORCE)
+    add_subdirectory(googletest EXCLUDE_FROM_ALL)
+endif()
