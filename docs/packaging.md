@@ -7,10 +7,10 @@ builds and publishes them on version tags.
 
 ## Artifacts
 
-| Platform | Formats |
-|----------|---------|
+| Platform | Formats                                      |
+|----------|----------------------------------------------|
 | Linux    | portable `.tar.gz`, `.deb`, `.rpm`, AppImage |
-| Windows  | portable `.zip`, NSIS `.exe` |
+| Windows  | portable `.zip`, NSIS `.exe`                 |
 
 x86_64 only for now. Builds run on Linux and Windows runners.
 

@@ -8,34 +8,39 @@ reasoning behind the structure.
 > shell (process model, IPC bridge, embedded frontend). Launcher functionality
 > is not implemented yet.
 
-> **Migration in progress (daemon architecture).** Hestia is moving to a
-> daemon + thin-client model: `hestiad` owns process supervision and frontends
-> become clients over a local socket. As part of this, `libs/core` was split
-> into **`libs/shared`** (IPC transport, app identity, logging — linked by the
-> daemon *and* every client) and **`libs/engine`** (config store, greeting,
-> launcher logic — daemon-internal). The structural sections below (target
-> graph, layout, namespaces, library reference) describe the split; the deeper
-> TUI/desktop internals predate it and get their full rewrite in the migration's
-> hardening phase.
+> **Daemon architecture.** Hestia runs as a daemon + thin-client model:
+> `hestiad` owns the IPC endpoint, a request router, process supervision, and
+> autostart; frontends are clients that drive it over a local socket (a Unix
+> domain socket on POSIX, a named pipe on Windows). `libs/core` was split into
+> **`libs/shared`** (IPC transport, client SDK, app identity, logging — linked
+> by the daemon *and* every client) and **`libs/engine`** (config store,
+> greeting, launcher logic — daemon-internal). The CLI and tray already reach
+> the engine only over the socket; the desktop app still links it directly (a
+> transitional exception being retired — see the target graph).
 
-## One core, three frontends
+## One daemon, many frontends
 
-Hestia is a single domain core — `hestia_engine`, owned by the daemon — driven
-three ways:
+Hestia is a single domain core — `hestia_engine`, owned by the daemon
+(`hestiad`) — driven by several frontends, each a thin client over the socket:
 
-| Frontend    | Target           | Binary          | Stack                     |
-|-------------|------------------|-----------------|---------------------------|
-| Desktop     | `hestia_desktop` | `Hestia`        | CEF + React/Vite          |
-| CLI         | `hestia_cli`     | `hestia`        | CLI11                     |
-| TUI         | `hestia_tui`     | *(in `hestia`)* | FTXUI                     |
+| Frontend | Target           | Binary          | Stack            |
+|----------|------------------|-----------------|------------------|
+| Desktop  | `hestia_desktop` | `HestiaLauncher`| CEF + React/Vite |
+| CLI      | `hestia_cli`     | `hestia`        | CLI11            |
+| TUI      | `hestia_tui`     | *(in `hestia`)* | FTXUI            |
+| Tray     | `hestia_tray`    | `tray`          | GDBus SNI / native |
 
 The CLI and TUI ship in **one binary**: `hestia tui` launches the interactive
 terminal UI, every other subcommand is plain CLI. The desktop app is a separate
-`main()` over the same core — a thin Chromium Embedded Framework (CEF) shell that
-hosts a React frontend and talks to the core over an IPC bridge.
+`main()` — a thin Chromium Embedded Framework (CEF) shell hosting a React
+frontend. The tray is a resident system-tray helper showing daemon status. Each
+talks to the core over IPC.
 
-A single configure builds **all** of them; there are no `BUILD_*` toggles. The
-only cost is that CEF (~1 GB) is fetched at configure time and the desktop
+The daemon (`hestiad`) and tray (`tray`) are the resident core and are
+**always built**. The front-ends are opt-out via `BUILD_DESKTOP`, `BUILD_CLI`,
+and `BUILD_TUI` (all `ON` by default; `BUILD_CLI` forces `BUILD_TUI` on, since
+the CLI links it). Skipping the desktop avoids the heaviest cost: CEF (~1 GB) is
+fetched at configure time only when `BUILD_DESKTOP` is on, and the desktop
 frontend must be built first (see [Build & dependency conventions](#build--dependency-conventions)).
 
 ## Target graph
@@ -46,8 +51,9 @@ libs/shared  → IPC transport + protocol, client SDK, shared identity (app_info
 libs/engine  → launcher engine (config, greeting, launcher logic); daemon-internal
 libs/tui     → FTXUI app; depends on shared ONLY; public surface = hestia::tui::run()
 apps/cli     → CLI11 commands + thin main(); depends on shared + tui
-apps/desktop → CEF shell + embedded React frontend; depends on shared
-apps/daemon  → hestiad; the only target that links engine
+apps/desktop → CEF shell + embedded React frontend; depends on shared (+ engine, transitional)
+apps/tray    → resident system-tray helper; depends on shared ONLY
+apps/daemon  → hestiad; IPC router, supervision, autostart; the only target that links engine
 ```
 
 The dependency arrows are one-way and **enforced by the build, not by
@@ -64,9 +70,9 @@ engine ◄──── daemon   (no front-end links engine)
 ```
 
 > **Transitional:** `apps/desktop` still links `hestia_engine` directly. The
-> CLI and TUI already reach it only over the socket (`hestia greet` round-trips
-> `app.greet` to the daemon). The end-state is engine = daemon-only, with every
-> front-end reaching it over IPC.
+> CLI, TUI, and tray already reach it only over the socket — `hestia greet`,
+> `config`, and `autostart` all round-trip to the daemon via the client SDK. The
+> end-state is engine = daemon-only, with every front-end reaching it over IPC.
 
 `libs/tui` physically cannot `#include` a CLI command — it does not link
 `apps/cli`, so it cannot see it. `libs/tui` exposes exactly one public header,
@@ -101,12 +107,15 @@ hestia-cpp/
 │       └── src/               private internals (see "TUI internals" below)
 ├── apps/
 │   ├── cli/                   hestia_cli — CLI11 commands + main()
+│   ├── daemon/               hestia_daemon (hestiad) — IPC router, services, supervision, autostart
+│   ├── tray/                 hestia_tray — resident system-tray helper (per-platform backends)
 │   └── desktop/               hestia_desktop — CEF launcher (see "Desktop launcher" below)
 │       ├── frontend/          Vite + React + TS app (built with Bun) → dist/ embedded
 │       └── src/core/          the CEF shell; src/features/ the IPC feature modules
 └── docs/
     ├── architecture.md        this file
-    └── contributing.md        conventions + how-to recipes
+    ├── contributing.md        conventions + how-to recipes
+    └── packaging.md           release formats, components, CEF layout, CI caching
 ```
 
 ### Tech stack
@@ -128,21 +137,21 @@ frontend's `dist/` tree is compiled into the binary by **CMakeRC**
 
 ### Namespaces
 
-| Namespace               | Home            | Contents                              |
-|-------------------------|-----------------|---------------------------------------|
-| `hestia`                | `libs/shared`   | cross-cutting (`init_logging`, `LogLevel`) |
-| `hestia::ipc`            | `libs/shared`   | transport, endpoint, protocol envelope |
-| `hestia::client`         | `libs/shared`   | typed client SDK (`Client`)           |
-| `hestia::config`        | `libs/engine`   | data-dir resolution + `Config` store  |
-| `hestia::greeting`      | `libs/engine`   | the demo `greet()` function           |
-| `hestia::cli`           | `apps/cli`      | command framework + commands          |
-| `hestia::tui`           | `libs/tui`      | the terminal UI (everything)          |
-| `hestia::tui::keys`     | `libs/tui`      | global key predicates                 |
-| `hestia::tui::layout`   | `libs/tui`      | layout id constants                   |
-| `hestia::tui::overlay`  | `libs/tui`      | overlay id constants                  |
-| `desktop::core`†        | `apps/desktop`  | CEF shell — app/browser/window/scheme |
-| `desktop::ipc`          | `apps/desktop`  | the JS⇄C++ bridge (router + registry) |
-| `desktop::features`     | `apps/desktop`  | IPC feature modules (app, window, …)  |
+| Namespace              | Home           | Contents                                   |
+|------------------------|----------------|--------------------------------------------|
+| `hestia`               | `libs/shared`  | cross-cutting (`init_logging`, `LogLevel`) |
+| `hestia::ipc`          | `libs/shared`  | transport, endpoint, protocol envelope     |
+| `hestia::client`       | `libs/shared`  | typed client SDK (`Client`)                |
+| `hestia::config`       | `libs/engine`  | data-dir resolution + `Config` store       |
+| `hestia::greeting`     | `libs/engine`  | the demo `greet()` function                |
+| `hestia::cli`          | `apps/cli`     | command framework + commands               |
+| `hestia::tui`          | `libs/tui`     | the terminal UI (everything)               |
+| `hestia::tui::keys`    | `libs/tui`     | global key predicates                      |
+| `hestia::tui::layout`  | `libs/tui`     | layout id constants                        |
+| `hestia::tui::overlay` | `libs/tui`     | overlay id constants                       |
+| `desktop::core`†       | `apps/desktop` | CEF shell — app/browser/window/scheme      |
+| `desktop::ipc`         | `apps/desktop` | the JS⇄C++ bridge (router + registry)      |
+| `desktop::features`    | `apps/desktop` | IPC feature modules (app, window, …)       |
 
 † the shell sub-namespaces are `desktop::app`, `desktop::browser`,
 `desktop::common`, `desktop::window`. The desktop is deliberately **not** under
@@ -184,6 +193,41 @@ transitional exception noted in the target graph). Two modules today:
 
 `engine` links fmt **privately** — it is an implementation detail and does not leak
 through its public headers.
+
+## Daemon (`apps/daemon`)
+
+`hestiad` is the resident core: it owns the IPC endpoint, routes requests to
+services, supervises launched processes, and manages autostart. It is the only
+target that links `hestia_engine` directly.
+
+- **Router** (`router.{h,cc}`) — maps a channel string to a handler
+  (`router.on("config.get", …)`). Each service registers its channels at startup;
+  a `HandlerContext` threads the engine, supervisor, and the calling connection
+  through to handlers. Handlers can answer synchronously or stream.
+- **Services** (`src/services/`) — one file per channel-prefix, wired in once.
+  Today: `health` (`health.ping`), `app` (`app.info`, `app.greet`), `config`
+  (`config.get|set|home|set-home`), `process` (`process.start|stop|list|status|logs`),
+  `autostart` (`autostart.enable|disable|status`), and `events`
+  (`events.subscribe`, a streaming channel that pushes to the calling connection).
+- **Process supervision** (`process_supervisor`, `process_table`, `process_spawner`,
+  `liveness_probe`, `log_streamer`, `restart_policy`) — launches Minecraft (and
+  other) processes as children of the daemon, tracks them in a process table,
+  probes liveness, streams their logs, and applies a restart policy. Reaping the
+  children yields their exit codes.
+- **Autostart** (`autostart.{h,cc}`) — registers/removes the daemon as a
+  login-time service per platform, driven over the `autostart.*` channels.
+
+The daemon links `hestia_shared`, `hestia_engine`, CLI11, nlohmann_json, and
+spdlog — no UI dependencies.
+
+## Tray (`apps/tray`)
+
+The `tray` binary (`hestia_tray` target) is a resident system-tray helper that surfaces daemon status and a
+one-click toggle for starting the daemon at login. It depends on `hestia_shared`
+**only** (no engine link — it talks over the socket) and has a per-platform
+backend: `backend_linux.cc` (GDBus StatusNotifierItem), `backend_windows.cc`
+(Shell_NotifyIcon), and `backend_macos.mm` (Cocoa). A `single_instance` guard
+allows only one tray per session.
 
 ## TUI internals (`libs/tui/src`)
 
@@ -383,11 +427,14 @@ locales to `en-US.pak`.
 
 ## Build & dependency conventions
 
-- **Everything builds from one configure** — no `BUILD_*` toggles. The
-  consequence: every configure fetches CEF (~1 GB, first run only) and requires a
-  built `frontend/dist`, so **build the frontend before configuring** (CMakeRC
-  globs `dist/` at configure time; a missing `dist/` is a hard `FATAL_ERROR`):
-  `(cd apps/desktop/frontend && bun run build)` → `cmake … -B build` → `cmake --build`.
+- **One configure builds everything by default**, gated by the `BUILD_DESKTOP`,
+  `BUILD_CLI`, and `BUILD_TUI` toggles (all `ON`; the daemon and tray are always
+  built). With the desktop on, the configure fetches CEF (~1 GB, first run only)
+  and requires a built `frontend/dist`, so **build the frontend before
+  configuring** (CMakeRC globs `dist/` at configure time; a missing `dist/` is a
+  hard `FATAL_ERROR`): `(cd apps/desktop/frontend && bun run build)` → `cmake …
+  -B build` → `cmake --build`. A `-DBUILD_DESKTOP=OFF` configure skips CEF
+  entirely for a fast daemon/CLI/TUI loop.
 - Each library/app sets `-Wall -Wextra -Wpedantic` (GNU/Clang) or `/W4` (MSVC).
   CEF discovery is isolated inside `apps/desktop/` so its compiler/linker flags
   never reach the shared library, the engine, the CLI, or the TUI.
