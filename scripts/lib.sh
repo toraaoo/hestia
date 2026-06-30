@@ -42,7 +42,7 @@ binary_for() {
     case "$1" in
         daemon|hestiad|hestia_daemon) echo hestiad ;;
         cli|hestia|hestia_cli)        echo hestia ;;
-        tray|hestia_tray)             echo hestia-tray ;;
+        tray|hestia_tray)             echo tray ;;
         desktop|Hestia|hestia_desktop) echo HestiaLauncher ;;
         *) echo "" ;;
     esac

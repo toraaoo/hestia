@@ -99,14 +99,14 @@ namespace hestia::tray {
                 GError *error = nullptr;
                 connection_ = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
                 if (!connection_) {
-                    g_printerr("hestia-tray: no session bus: %s\n", error ? error->message : "?");
+                    g_printerr("tray: no session bus: %s\n", error ? error->message : "?");
                     g_clear_error(&error);
                     return;
                 }
 
                 nodes_ = g_dbus_node_info_new_for_xml(kIntrospectionXml, &error);
                 if (!nodes_) {
-                    g_printerr("hestia-tray: bad introspection: %s\n", error ? error->message : "?");
+                    g_printerr("tray: bad introspection: %s\n", error ? error->message : "?");
                     g_clear_error(&error);
                     return;
                 }

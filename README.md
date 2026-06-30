@@ -19,7 +19,7 @@ Hestia is one daemon-backed core with several ways to drive it:
   power users.
 - **TUI** (`hestia tui`) — a full interactive terminal interface for working
   over SSH or without a desktop session.
-- **Tray** (`hestia-tray`) — a resident system-tray helper showing daemon status
+- **Tray** (`tray`) — a resident system-tray helper showing daemon status
   and a one-click toggle for starting the daemon at login.
 
 The CLI and TUI live in the **same binary**: running `hestia` with no subcommand
@@ -37,7 +37,7 @@ hestia-cpp/
 │   └── src/core/            CEF shell — process model, IPC bridge, window, scheme
 ├── apps/cli/                hestia      — CLI + the `tui` subcommand (CLI11)
 ├── apps/daemon/             hestiad     — the daemon: IPC, supervision, autostart
-├── apps/tray/               hestia-tray — resident system-tray helper (GDBus SNI)
+├── apps/tray/               hestia_tray (tray) — resident system-tray helper (GDBus SNI)
 ├── cmake/                   CMake helpers (DownloadCEF, CMakeRC, PruneLocales)
 └── third_party/             vendored C++ dependencies (git submodules)
 ```
@@ -131,7 +131,7 @@ cmake --build build
 | `CEF_VERSION`        | pinned  | CEF distribution version string (set in desktop CMake) |
 | `APP_DEV_SERVER_URL` | `""`    | Configure-time dev-server URL (Debug only)             |
 
-The daemon (`hestiad`) and tray (`hestia-tray`) are the resident core and are
+The daemon (`hestiad`) and tray (`tray`) are the resident core and are
 always built; the front-ends above are opt-out.
 
 ### Faster dev builds

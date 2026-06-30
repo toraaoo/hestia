@@ -1,6 +1,6 @@
 include(GNUInstallDirs)
 
-# hestia-tray — the resident system-tray helper. A thin client: it links
+# tray — the resident system-tray helper. A thin client: it links
 # hestia_shared (transport + client SDK) and a platform GUI backend, never the
 # engine. The backend is the only GUI-toolkit dependency in the project outside
 # the desktop app, kept here so the CLI stays headless-safe.
@@ -25,7 +25,7 @@ else ()
         pkg_check_modules(GIO QUIET gio-2.0)
     endif ()
     if (NOT GIO_FOUND)
-        message(STATUS "hestia-tray: gio-2.0 not found; skipping tray helper")
+        message(STATUS "tray: gio-2.0 not found; skipping tray helper")
         return ()
     endif ()
     set(tray_backend src/backend_linux.cc)
@@ -67,7 +67,7 @@ target_compile_options(hestia_tray PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
-set_target_properties(hestia_tray PROPERTIES OUTPUT_NAME "hestia-tray")
+set_target_properties(hestia_tray PROPERTIES OUTPUT_NAME "tray")
 
 # Tray ships with the optional "desktop" component, not the default CLI install.
 install(TARGETS hestia_tray
