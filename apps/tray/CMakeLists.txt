@@ -69,7 +69,14 @@ target_compile_options(hestia_tray PRIVATE
 
 set_target_properties(hestia_tray PROPERTIES OUTPUT_NAME "tray")
 
-# Tray ships with the optional "desktop" component, not the default CLI install.
+# Tray ships with the optional "desktop" component and sits beside the launcher
+# (flat at the install root on Windows, lib/hestia on Linux) — deliberately NOT
+# in bin/, so only the daemon and CLI land on PATH.
+if(WIN32)
+    set(_tray_destdir ".")
+else()
+    set(_tray_destdir "lib/hestia")
+endif()
 install(TARGETS hestia_tray
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT desktop
+        RUNTIME DESTINATION "${_tray_destdir}" COMPONENT desktop
 )

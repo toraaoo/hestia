@@ -36,8 +36,9 @@ foreach(_comp daemon cli desktop)
     endif()
 endforeach()
 
-# CLI/daemon/tray stay in bin/; the launcher + CEF runtime go to the archive root.
-# Windows already installs the desktop flat there; Linux flattens it out of lib/hestia.
+# CLI/daemon stay in bin/; the tray, launcher, and CEF runtime go to the archive
+# root. Windows already installs the desktop flat there; Linux flattens it out of
+# lib/hestia.
 if(EXISTS "${_inst}/bin")
     file(COPY "${_inst}/bin" DESTINATION "${_root}")
 endif()
