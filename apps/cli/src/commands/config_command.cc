@@ -15,19 +15,14 @@ namespace hestia::cli {
                 auto *cmd = parent.add_subcommand("get", "Print the value of a config key");
                 cmd->add_option("key", key_, "Config key")->required();
                 cmd->callback([this, &ctx] {
-                    try {
-                        auto client = client::Client::connect();
+                    ctx.with_client([this, &ctx](client::Client &client) {
                         if (const auto value = client.config_get(key_)) {
                             std::cout << *value << '\n';
-                            ctx.exit_code = 0;
                         } else {
                             std::cerr << "key not found: " << key_ << '\n';
                             ctx.exit_code = 1;
                         }
-                    } catch (const std::exception &e) {
-                        std::cerr << "hestia: " << e.what() << '\n';
-                        ctx.exit_code = 1;
-                    }
+                    });
                 });
             }
 
@@ -41,14 +36,9 @@ namespace hestia::cli {
             void register_command(CLI::App &parent, AppContext &ctx) override {
                 auto *cmd = parent.add_subcommand("home", "Print the resolved data directory");
                 cmd->callback([&ctx] {
-                    try {
-                        auto client = client::Client::connect();
+                    ctx.with_client([](client::Client &client) {
                         std::cout << client.config_home().string() << '\n';
-                        ctx.exit_code = 0;
-                    } catch (const std::exception &e) {
-                        std::cerr << "hestia: " << e.what() << '\n';
-                        ctx.exit_code = 1;
-                    }
+                    });
                 });
             }
         };
@@ -63,19 +53,14 @@ namespace hestia::cli {
                 cmd->add_option("dir", dir_,
                                 "Directory to use (omit to revert to the default)");
                 cmd->callback([this, &ctx] {
-                    try {
-                        auto client = client::Client::connect();
+                    ctx.with_client([this](client::Client &client) {
                         const auto home = client.config_set_home(dir_);
                         if (dir_.empty()) {
                             std::cout << "reverted to default: " << home.string() << '\n';
                         } else {
                             std::cout << "data directory set to: " << home.string() << '\n';
                         }
-                        ctx.exit_code = 0;
-                    } catch (const std::exception &e) {
-                        std::cerr << "failed to set home: " << e.what() << '\n';
-                        ctx.exit_code = 1;
-                    }
+                    });
                 });
             }
 
@@ -91,14 +76,9 @@ namespace hestia::cli {
                 cmd->add_option("key", key_, "Config key")->required();
                 cmd->add_option("value", value_, "Config value")->required();
                 cmd->callback([this, &ctx] {
-                    try {
-                        auto client = client::Client::connect();
+                    ctx.with_client([this](client::Client &client) {
                         client.config_set(key_, value_);
-                        ctx.exit_code = 0;
-                    } catch (const std::exception &e) {
-                        std::cerr << "failed to set config: " << e.what() << '\n';
-                        ctx.exit_code = 1;
-                    }
+                    });
                 });
             }
 

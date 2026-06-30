@@ -12,14 +12,9 @@ namespace hestia::cli {
         cmd->add_option("-n,--name", name_, "Name to greet");
         cmd->callback([this, &ctx] {
             spdlog::debug("greet: name='{}'", name_);
-            try {
-                auto client = client::Client::connect();
+            ctx.with_client([this](client::Client &client) {
                 std::cout << client.greet(name_) << '\n';
-                ctx.exit_code = 0;
-            } catch (const std::exception &e) {
-                std::cerr << "hestia: " << e.what() << '\n';
-                ctx.exit_code = 1;
-            }
+            });
         });
     }
 }

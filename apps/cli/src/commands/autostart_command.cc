@@ -13,15 +13,10 @@ namespace hestia::cli {
             void register_command(CLI::App &parent, AppContext &ctx) override {
                 auto *cmd = parent.add_subcommand("enable", "Start the daemon at login");
                 cmd->callback([&ctx] {
-                    try {
-                        auto client = client::Client::connect();
+                    ctx.with_client([](client::Client &client) {
                         client.autostart_enable();
                         std::cout << "autostart enabled\n";
-                        ctx.exit_code = 0;
-                    } catch (const std::exception &e) {
-                        std::cerr << "hestia: " << e.what() << '\n';
-                        ctx.exit_code = 1;
-                    }
+                    });
                 });
             }
         };
@@ -32,15 +27,10 @@ namespace hestia::cli {
             void register_command(CLI::App &parent, AppContext &ctx) override {
                 auto *cmd = parent.add_subcommand("disable", "Do not start the daemon at login");
                 cmd->callback([&ctx] {
-                    try {
-                        auto client = client::Client::connect();
+                    ctx.with_client([](client::Client &client) {
                         client.autostart_disable();
                         std::cout << "autostart disabled\n";
-                        ctx.exit_code = 0;
-                    } catch (const std::exception &e) {
-                        std::cerr << "hestia: " << e.what() << '\n';
-                        ctx.exit_code = 1;
-                    }
+                    });
                 });
             }
         };
@@ -51,14 +41,9 @@ namespace hestia::cli {
             void register_command(CLI::App &parent, AppContext &ctx) override {
                 auto *cmd = parent.add_subcommand("status", "Show whether the daemon starts at login");
                 cmd->callback([&ctx] {
-                    try {
-                        auto client = client::Client::connect();
+                    ctx.with_client([](client::Client &client) {
                         std::cout << (client.autostart_status() ? "enabled" : "disabled") << '\n';
-                        ctx.exit_code = 0;
-                    } catch (const std::exception &e) {
-                        std::cerr << "hestia: " << e.what() << '\n';
-                        ctx.exit_code = 1;
-                    }
+                    });
                 });
             }
         };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -8,6 +9,10 @@
 #include <CLI/CLI.hpp>
 
 #include <hestia/logging.h>
+
+namespace hestia::client {
+    class Client;
+}
 
 namespace hestia::cli {
     // Cross-cutting options bound on the root application and made available to
@@ -39,6 +44,11 @@ namespace hestia::cli {
     struct AppContext {
         GlobalOptions global;
         int exit_code = 0;
+
+        // Connect to the daemon and run `body`; on any exception report it to
+        // stderr and set exit_code to 1. The body sets exit_code itself for an
+        // in-band failure (e.g. a config key that isn't found).
+        void with_client(const std::function<void(client::Client &)> &body);
     };
 
     // A unit of CLI functionality. Implementations register themselves onto a

@@ -4,6 +4,7 @@ target_sources(hestia_cli
         PRIVATE
         src/main.cc
         src/cli.cc
+        src/command.cc
         src/registry.cc
         src/commands/tui_command.cc
         src/commands/greet_command.cc
