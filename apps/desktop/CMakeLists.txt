@@ -101,12 +101,13 @@ set(DESKTOP_SRCS_COMMON
     src/core/browser/client_manager.cc
     src/core/common/app_scheme.cc
     src/core/common/app_settings.cc
+    src/core/daemon/daemon_client.cc
     src/core/ipc/ipc_router.cc
     src/core/window/window_delegate.cc
     src/core/window/window_util.cc
     src/features/feature_registry.cc
     src/features/app/app_feature.cc
-    src/features/window/window_feature.cc)
+    src/features/settings/settings_feature.cc)
 
 # ---- Platform targets -------------------------------------------------------
 if(APPLE)
@@ -123,7 +124,7 @@ if(APPLE)
     target_include_directories(hestia_desktop PRIVATE
         ${CEF_INCLUDE_PATH} src "${CMAKE_CURRENT_BINARY_DIR}/generated")
     target_link_libraries(hestia_desktop PRIVATE
-        hestia_shared hestia_engine hestia::frontend
+        hestia_shared hestia::frontend
         libcef_dll_wrapper ${CEF_STANDARD_LIBS}
         fmt::fmt spdlog::spdlog)
     if(USE_SANDBOX)
@@ -184,7 +185,7 @@ else()
     target_include_directories(hestia_desktop PRIVATE
         ${CEF_INCLUDE_PATH} src "${CMAKE_CURRENT_BINARY_DIR}/generated")
     target_link_libraries(hestia_desktop PRIVATE
-        hestia_shared hestia_engine hestia::frontend
+        hestia_shared hestia::frontend
         libcef_lib libcef_dll_wrapper ${CEF_STANDARD_LIBS}
         fmt::fmt spdlog::spdlog)
 

@@ -1,7 +1,7 @@
 #include "include/cef_app.h"
 #include "core/app/main_util.h"
-#include <hestia/config.h>
 #include <hestia/logging.h>
+#include <hestia/paths.h>
 
 int main(int argc, char* argv[]) {
     hestia::init_logging();
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
     CefString(&settings.locales_dir_path)   = exe + "/locales";
     // Writable per-user cache; the exe dir is read-only (AppImage / system install).
     CefString(&settings.root_cache_path) =
-        (hestia::config::data_home() / "cache").string();
+        (hestia::paths::data_home() / "cache").string();
 
     if (!CefInitialize(main_args, settings, app, nullptr))
         return CefGetExitCode();

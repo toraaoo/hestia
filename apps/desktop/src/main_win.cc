@@ -1,8 +1,8 @@
 #if defined(_WIN32)
 #include "include/cef_app.h"
 #include "core/app/main_util.h"
-#include <hestia/config.h>
 #include <hestia/logging.h>
+#include <hestia/paths.h>
 #include <windows.h>
 
 #if defined(CEF_USE_BOOTSTRAP)
@@ -29,7 +29,7 @@ int RunMain(CefMainArgs main_args, void* sandbox_info) {
     CefString(&settings.locales_dir_path)   = exe + "\\locales";
     // Writable per-user cache; Program Files is read-only.
     CefString(&settings.root_cache_path) =
-        (hestia::config::data_home() / "cache").string();
+        (hestia::paths::data_home() / "cache").string();
 
     if (!CefInitialize(main_args, settings, app, sandbox_info))
         return CefGetExitCode();
