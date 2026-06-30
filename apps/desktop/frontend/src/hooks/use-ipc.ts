@@ -1,62 +1,67 @@
 // React bindings for the IPC bridge: TanStack Query hooks for request/response
 // channels, plus a small effect hook for native -> JS events.
 
-import { useEffect, useRef, useState } from "react"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useEffect, useRef } from "react"
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 
-import { getAppInfo, ping, windowControls, type WindowState } from "@/lib/api"
+import { autostart, config, getAppInfo, greet } from "@/lib/api"
 import { on } from "@/lib/ipc"
 
-/** Centralized query keys so caches can be invalidated consistently. */
 export const ipcKeys = {
   appInfo: ["app", "info"] as const,
+  configHome: ["config", "home"] as const,
+  autostart: ["autostart", "status"] as const,
 }
 
-/** Query the application identity (channel: "app.info"). */
 export function useAppInfo() {
-  return useQuery({
-    queryKey: ipcKeys.appInfo,
-    queryFn: getAppInfo,
-  })
+  return useQuery({ queryKey: ipcKeys.appInfo, queryFn: getAppInfo })
 }
 
-/** Mutation wrapper around the "app.ping" echo channel. */
-export function usePing() {
+export function useGreet() {
+  return useMutation({ mutationFn: (name: string) => greet(name) })
+}
+
+export function useConfigHome() {
+  return useQuery({ queryKey: ipcKeys.configHome, queryFn: config.home })
+}
+
+export function useSetConfigHome() {
+  const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (message?: string) => ping(message),
+    mutationFn: (dir: string) => config.setHome(dir),
+    onSuccess: (path) => queryClient.setQueryData(ipcKeys.configHome, path),
   })
 }
 
-/**
- * Track the native window's maximize state. Seeds from the "window.state"
- * channel on mount, then stays in sync via the pushed "window.state" event
- * (emitted on every bounds change: maximize, restore, snap).
- */
-export function useWindowState() {
-  const [state, setState] = useState<WindowState>({
-    maximized: false,
-    minimized: false,
+export function useSetConfig() {
+  return useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      config.set(key, value),
   })
-
-  useEffect(() => {
-    let active = true
-    windowControls.getState().then((next) => {
-      if (active) setState(next)
-    })
-    return () => {
-      active = false
-    }
-  }, [])
-
-  useIpcEvent<WindowState>("window.state", setState)
-
-  return state
 }
 
-/**
- * Subscribe to a native -> JS event for the lifetime of the component. The
- * handler is kept in a ref so re-renders don't re-subscribe.
- */
+export function useGetConfig() {
+  return useMutation({ mutationFn: (key: string) => config.get(key) })
+}
+
+export function useAutostartStatus() {
+  return useQuery({ queryKey: ipcKeys.autostart, queryFn: autostart.status })
+}
+
+export function useToggleAutostart() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (enable: boolean) =>
+      enable ? autostart.enable() : autostart.disable(),
+    onSuccess: (enabled) =>
+      queryClient.setQueryData(ipcKeys.autostart, enabled),
+  })
+}
+
 export function useIpcEvent<TDetail = unknown>(
   channel: string,
   handler: (detail: TDetail) => void

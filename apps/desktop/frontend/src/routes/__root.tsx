@@ -1,10 +1,11 @@
-import type { ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 import type { QueryClient } from "@tanstack/react-query"
 import { createRootRouteWithContext, Link, Outlet } from "@tanstack/react-router"
 
 import { ConnectionStatus } from "@/components/connection-status"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { TitleBar } from "@/components/title-bar"
+import { initWindowState } from "@/stores/window-store"
 
 // Context is injected by the router (see src/router.tsx) so route loaders can
 // reach the shared QueryClient for prefetching.
@@ -17,6 +18,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 })
 
 function RootLayout() {
+  useEffect(() => initWindowState(), [])
+
   return (
     <div className="flex h-svh flex-col overflow-hidden">
       <TitleBar />
@@ -24,7 +27,7 @@ function RootLayout() {
       <header className="flex h-11 shrink-0 items-stretch border-b border-border bg-background/85 backdrop-blur-sm">
         <nav className="flex items-stretch pl-3">
           <NavLink to="/">overview</NavLink>
-          <NavLink to="/ipc">ipc</NavLink>
+          <NavLink to="/settings">settings</NavLink>
         </nav>
 
         <div className="ml-auto flex items-center gap-3 pr-4 pl-6">

@@ -1,14 +1,14 @@
+import { useState } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 
 import { getAppInfo, type AppInfo } from "@/lib/api"
-import { ipcKeys, useAppInfo } from "@/hooks/use-ipc"
+import { ipcKeys, useAppInfo, useGreet } from "@/hooks/use-ipc"
 import { PageHeader } from "@/components/page-header"
 import { Panel } from "@/components/ui/panel"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 export const Route = createFileRoute("/")({
-  // Prefetch the identity through the shared QueryClient so the component reads
-  // it from cache. getAppInfo falls back to a placeholder when disconnected, so
-  // this is safe to run everywhere.
   loader: ({ context: { queryClient } }) =>
     queryClient.ensureQueryData({
       queryKey: ipcKeys.appInfo,
@@ -19,13 +19,15 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { data, isPending, error } = useAppInfo()
+  const greet = useGreet()
+  const [name, setName] = useState("")
 
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
         eyebrow="overview"
-        title="Frontend shell is ready"
-        description="React, TanStack Router, and TanStack Query talking to the C++ backend over the IPC bridge. This panel reads identity straight off the native channel."
+        title="Connected to the daemon"
+        description="The desktop shell drives hestiad over the local socket — the same engine the CLI and TUI use. Identity is read from the native channel; greet round-trips through the daemon."
       />
 
       <Panel label="app.info">
@@ -51,6 +53,34 @@ function HomePage() {
               )
             )}
           </dl>
+        )}
+      </Panel>
+
+      <Panel label="app.greet">
+        <div className="flex items-center gap-2">
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="name"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !greet.isPending) greet.mutate(name)
+            }}
+          />
+          <Button
+            size="lg"
+            onClick={() => greet.mutate(name)}
+            disabled={greet.isPending}
+          >
+            {greet.isPending ? "…" : "greet"}
+          </Button>
+        </div>
+        {greet.data !== undefined && (
+          <p className="mt-3 font-mono text-sm text-foreground">{greet.data}</p>
+        )}
+        {greet.error && (
+          <p className="mt-3 font-mono text-xs text-destructive">
+            {greet.error.message}
+          </p>
         )}
       </Panel>
     </div>

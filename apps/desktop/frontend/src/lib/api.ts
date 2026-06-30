@@ -1,13 +1,11 @@
-// Typed surface for the backend's IPC channels. Each function wraps a registered
-// C++ channel; add one here whenever you register a new channel so the app gets
-// an end-to-end typed call.
+// Typed surface for the daemon's IPC channels. The desktop shell forwards these
+// to hestiad over the socket (the same channels the CLI drives), except the
+// window controls, which the shell handles locally.
 
-import { invoke } from "@/lib/ipc"
+import { invoke, IpcError } from "@/lib/ipc"
 
-/** Host platform reported by the backend, used to place window controls. */
 export type Platform = "windows" | "macos" | "linux"
 
-/** Identity dictionary returned by the "app.info" channel. */
 export interface AppInfo {
   name: string
   id: string
@@ -18,9 +16,8 @@ export interface AppInfo {
   platform: Platform
 }
 
-/** Placeholder identity used when the native bridge isn't connected. */
 const DISCONNECTED_APP_INFO: AppInfo = {
-  name: "App (disconnected)",
+  name: "Hestia (disconnected)",
   id: "—",
   vendor: "—",
   version: "—",
@@ -29,46 +26,72 @@ const DISCONNECTED_APP_INFO: AppInfo = {
   platform: "linux",
 }
 
-/**
- * Application identity (channel: "app.info"). Falls back to a placeholder when
- * the native backend isn't connected so the UI can still render.
- */
 export function getAppInfo(): Promise<AppInfo> {
   return invoke<AppInfo>("app.info", null, { fallback: DISCONNECTED_APP_INFO })
 }
 
-/**
- * Echo round-trip (channel: "app.ping"). Returns the message, or "pong". When
- * the backend isn't connected, echoes locally instead of failing.
- */
-export function ping(message?: string): Promise<string> {
-  return invoke<string>("app.ping", message ?? null, {
-    fallback: () => message || "pong",
-  })
+export function greet(name: string): Promise<string> {
+  return invoke<{ message: string }>(
+    "app.greet",
+    { name },
+    { fallback: { message: name ? `Hello, ${name}!` : "Hello there!" } }
+  ).then((r) => r.message)
 }
 
-/** Native top-level window state (channel: "window.state"). */
+export const config = {
+  get: (key: string): Promise<string | null> =>
+    invoke<{ value: string }>("settings.config.get", { key })
+      .then((r) => r.value)
+      .catch((error) => {
+        if (error instanceof IpcError) return null
+        throw error
+      }),
+  set: (key: string, value: string): Promise<void> =>
+    invoke("settings.config.set", { key, value }).then(() => undefined),
+  home: (): Promise<string> =>
+    invoke<{ path: string }>("settings.config.home", null, {
+      fallback: { path: "—" },
+    }).then((r) => r.path),
+  setHome: (dir: string): Promise<string> =>
+    invoke<{ path: string }>("settings.config.set-home", { dir }).then(
+      (r) => r.path
+    ),
+}
+
+export const autostart = {
+  status: (): Promise<boolean> =>
+    invoke<{ enabled: boolean }>("settings.autostart.status", null, {
+      fallback: { enabled: false },
+    }).then((r) => r.enabled),
+  enable: (): Promise<boolean> =>
+    invoke<{ enabled: boolean }>("settings.autostart.enable", null).then(
+      (r) => r.enabled
+    ),
+  disable: (): Promise<boolean> =>
+    invoke<{ enabled: boolean }>("settings.autostart.disable", null).then(
+      (r) => r.enabled
+    ),
+}
+
 export interface WindowState {
   maximized: boolean
   minimized: boolean
 }
+
+export const WINDOW_STATE_EVENT = "app.window.state"
 
 const DETACHED_WINDOW_STATE: WindowState = {
   maximized: false,
   minimized: false,
 }
 
-/**
- * Window-management channels driving the frameless native window (the frontend
- * draws its own title bar). Each falls back to a no-op outside the CEF shell so
- * the UI stays inert in a plain browser.
- */
 export const windowControls = {
-  minimize: () => invoke<null>("window.minimize", null, { fallback: null }),
-  toggleMaximize: () => invoke<null>("window.maximize", null, { fallback: null }),
-  close: () => invoke<null>("window.close", null, { fallback: null }),
+  minimize: () => invoke<null>("app.window.minimize", null, { fallback: null }),
+  toggleMaximize: () =>
+    invoke<null>("app.window.maximize", null, { fallback: null }),
+  close: () => invoke<null>("app.window.close", null, { fallback: null }),
   getState: () =>
-    invoke<WindowState>("window.state", null, {
+    invoke<WindowState>("app.window.state", null, {
       fallback: DETACHED_WINDOW_STATE,
     }),
 }

@@ -3,7 +3,8 @@ import type { ComponentProps, MouseEvent, ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import { isCefAvailable } from "@/lib/ipc"
 import { windowControls } from "@/lib/api"
-import { useAppInfo, useWindowState } from "@/hooks/use-ipc"
+import { useAppInfo } from "@/hooks/use-ipc"
+import { useWindowStore } from "@/stores/window-store"
 
 /**
  * Custom title bar for the frameless native window. We intentionally don't
@@ -13,7 +14,7 @@ import { useAppInfo, useWindowState } from "@/hooks/use-ipc"
  */
 export function TitleBar() {
   const inShell = isCefAvailable()
-  const { maximized } = useWindowState()
+  const maximized = useWindowStore((state) => state.maximized)
   const { data } = useAppInfo()
   const isMac = data?.platform === "macos"
 
