@@ -11,6 +11,8 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#elif defined(__APPLE__)
+#include <libproc.h>
 #endif
 
 namespace hestia::daemon {
@@ -41,6 +43,15 @@ namespace hestia::daemon {
                 return 0;
             }
         }
+#elif defined(__APPLE__)
+        std::int64_t macos_start_time(std::int64_t pid) {
+            proc_bsdinfo info{};
+            const int n = ::proc_pidinfo(static_cast<int>(pid), PROC_PIDTBSDINFO, 0,
+                                         &info, sizeof(info));
+            if (n != sizeof(info)) return 0;
+            return static_cast<std::int64_t>(info.pbi_start_tvsec) * 1'000'000 +
+                   info.pbi_start_tvusec;
+        }
 #endif
 
 #if !defined(_WIN32)
@@ -55,9 +66,11 @@ namespace hestia::daemon {
             std::int64_t read_start_time(std::int64_t pid) const override {
 #if defined(__linux__)
                 return linux_start_time(pid);
+#elif defined(__APPLE__)
+                return macos_start_time(pid);
 #else
                 (void) pid;
-                return 0; // start-time disambiguation is a Linux refinement for now
+                return 0; // BSD: no start time yet, so matches() refuses re-adoption
 #endif
             }
         };

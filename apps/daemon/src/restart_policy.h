@@ -10,9 +10,18 @@
 namespace hestia::daemon::restart {
     using Clock = std::chrono::steady_clock;
 
+    // Healthy uptime that refreshes the retry budget, making max_retries a
+    // per-window cap rather than a lifetime one.
+    inline constexpr std::chrono::seconds kStableUptime{60};
+
     // When a crash becomes eligible to retry again: now + the policy's backoff.
     inline Clock::time_point backoff_until(const ProcessRecord &rec, Clock::time_point now) {
         return now + rec.restart.backoff;
+    }
+
+    inline bool should_reset_retries(const ProcessRecord &rec, Clock::duration uptime) {
+        return rec.state == ProcessState::Running && rec.restarts > 0 &&
+               uptime >= kStableUptime;
     }
 
     // Whether a record should be relaunched on this tick. True only when it is

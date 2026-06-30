@@ -78,6 +78,7 @@ namespace hestia::daemon {
                     owned_.insert(spec.id); // our child: reap it for the exit code
                     streamer_.reset(spec.id, log); // stream only new output
                     next_restart_.erase(spec.id);
+                    launched_at_[spec.id] = restart::Clock::now();
                     table_.save();
                 }
                 spdlog::info("started process '{}' (pid {})", rec.id, rec.pid);
@@ -98,6 +99,7 @@ namespace hestia::daemon {
                     // An operator stop is terminal: Exited is never auto-restarted.
                     it->second.state = ProcessState::Exited;
                     next_restart_.erase(id);
+                    launched_at_.erase(id);
                     table_.save();
                     snapshot = it->second;
                 }
@@ -140,6 +142,8 @@ namespace hestia::daemon {
                         next_restart_[id] = now; // eligible on the first tick
                         spdlog::warn("process '{}' died while the daemon was down", id);
                         changed = true;
+                    } else if (rec.state == ProcessState::Running) {
+                        launched_at_[id] = now;
                     }
                 }
                 if (changed) table_.save();
@@ -218,6 +222,12 @@ namespace hestia::daemon {
                             {{"id", id}, {"text", std::move(chunk)}}
                         });
                     }
+                    if (const auto at = launched_at_.find(id);
+                        at != launched_at_.end() &&
+                        restart::should_reset_retries(rec, now - at->second)) {
+                        rec.restarts = 0;
+                        changed = true;
+                    }
                 }
 
                 for (auto &[id, rec]: records) {
@@ -258,6 +268,7 @@ namespace hestia::daemon {
                 rec.restarts += 1;
                 owned_.insert(rec.id); // relaunched: our child again
                 next_restart_.erase(rec.id);
+                launched_at_[rec.id] = restart::Clock::now();
                 // The log appends to the same file, so the streamer's offset carries
                 // over and the relaunched process's output keeps streaming.
             }
@@ -270,6 +281,7 @@ namespace hestia::daemon {
             std::unique_ptr<LivenessProbe> probe_;
             LogStreamer streamer_;
             std::map<std::string, restart::Clock::time_point> next_restart_;
+            std::map<std::string, restart::Clock::time_point> launched_at_;
             // Ids we spawned in this daemon lifetime, so they are our children and
             // are reaped via the spawner (real exit codes). Processes re-adopted by
             // reconcile() are NOT here — they are not our children, so their

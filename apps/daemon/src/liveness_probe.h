@@ -20,12 +20,14 @@ namespace hestia::daemon {
         // reuse. 0 means "unavailable on this platform".
         virtual std::int64_t read_start_time(std::int64_t pid) const = 0;
 
-        // A record is still the process we launched only if its pid is alive AND
-        // its start time matches what we recorded — guarding against a different
-        // process having since reused the pid.
+        // Require a verifiable start time on both sides: is_alive is true even for
+        // another user's process (EPERM), so a bare-pid match could later SIGTERM a
+        // stranger's process group after PID reuse.
         bool matches(const ProcessRecord &rec) const {
-            return is_alive(rec.pid) &&
-                   (rec.start_time == 0 || read_start_time(rec.pid) == rec.start_time);
+            if (!is_alive(rec.pid)) return false;
+            const std::int64_t current = read_start_time(rec.pid);
+            if (rec.start_time == 0 || current == 0) return false;
+            return current == rec.start_time;
         }
     };
 
