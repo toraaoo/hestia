@@ -37,9 +37,12 @@ namespace hestia::daemon {
         // those for liveness via the LivenessProbe instead).
         virtual std::optional<ProcessExit> reap(std::int64_t pid) = 0;
 
-        // Request termination of a launched process. Best-effort: a pid that is
-        // already gone is not an error.
+        // Request graceful termination (SIGTERM on POSIX). Best-effort: a pid that
+        // is already gone is not an error.
         virtual void terminate(std::int64_t pid) = 0;
+
+        // Forcefully kill a process that ignored terminate() (SIGKILL on POSIX).
+        virtual void kill(std::int64_t pid) = 0;
     };
 
     // The platform process spawner.

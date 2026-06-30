@@ -91,6 +91,7 @@ namespace hestia::daemon {
                     owned_.insert(spec.id); // our child: reap it for the exit code
                     streamer_.reset(spec.id, log); // stream only new output
                     next_restart_.erase(spec.id);
+                    terminating_.erase(spec.id);
                     launched_at_[spec.id] = restart::Clock::now();
                     table_.save();
                 }
@@ -108,6 +109,7 @@ namespace hestia::daemon {
                     if (it == records.end()) return;
                     if (probe_->is_alive(it->second.pid)) {
                         spawner_->terminate(it->second.pid);
+                        terminating_[id] = restart::Clock::now() + kTerminateGrace;
                     }
                     // An operator stop is terminal: Exited is never auto-restarted.
                     it->second.state = ProcessState::Exited;
@@ -164,6 +166,7 @@ namespace hestia::daemon {
 
         private:
             static constexpr auto kPollInterval = std::chrono::milliseconds(250);
+            static constexpr auto kTerminateGrace = std::chrono::seconds(5);
 
             void emit(const ipc::Event &event) {
                 if (sink_) sink_(event);
@@ -203,6 +206,7 @@ namespace hestia::daemon {
                         // record is already terminal (e.g. after an operator stop).
                         if (const auto exit = spawner_->reap(rec.pid)) {
                             owned_.erase(id);
+                            terminating_.erase(id);
                             if (was_running) {
                                 if (exit->signaled || exit->code != 0) {
                                     rec.state = ProcessState::Crashed;
@@ -243,6 +247,8 @@ namespace hestia::daemon {
                     }
                 }
 
+                force_kill_unresponsive(now);
+
                 for (auto &[id, rec]: records) {
                     std::optional<restart::Clock::time_point> due;
                     if (const auto it = next_restart_.find(id); it != next_restart_.end()) {
@@ -264,6 +270,25 @@ namespace hestia::daemon {
                 if (changed) table_.save();
             }
 
+            void force_kill_unresponsive(restart::Clock::time_point now) {
+                auto &records = table_.entries();
+                for (auto it = terminating_.begin(); it != terminating_.end();) {
+                    if (now < it->second) {
+                        ++it;
+                        continue;
+                    }
+                    const std::string id = it->first;
+                    if (owned_.count(id)) {
+                        if (const auto rec = records.find(id);
+                            rec != records.end() && probe_->is_alive(rec->second.pid)) {
+                            spdlog::warn("process '{}' ignored SIGTERM; sending SIGKILL", id);
+                            spawner_->kill(rec->second.pid);
+                        }
+                    }
+                    it = terminating_.erase(it);
+                }
+            }
+
             // Relaunch a crashed process in place, reusing its log file. Caller
             // holds mu_; throws if the spawn fails.
             void relaunch_locked(ProcessRecord &rec) {
@@ -282,6 +307,7 @@ namespace hestia::daemon {
                 rec.restarts += 1;
                 owned_.insert(rec.id); // relaunched: our child again
                 next_restart_.erase(rec.id);
+                terminating_.erase(rec.id);
                 launched_at_[rec.id] = restart::Clock::now();
                 // The log appends to the same file, so the streamer's offset carries
                 // over and the relaunched process's output keeps streaming.
@@ -296,6 +322,7 @@ namespace hestia::daemon {
             LogStreamer streamer_;
             std::map<std::string, restart::Clock::time_point> next_restart_;
             std::map<std::string, restart::Clock::time_point> launched_at_;
+            std::map<std::string, restart::Clock::time_point> terminating_;
             // Ids we spawned in this daemon lifetime, so they are our children and
             // are reaped via the spawner (real exit codes). Processes re-adopted by
             // reconcile() are NOT here — they are not our children, so their

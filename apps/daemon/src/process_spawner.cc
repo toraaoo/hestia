@@ -85,12 +85,17 @@ namespace hestia::daemon {
                 return ProcessExit{WIFEXITED(status) ? WEXITSTATUS(status) : -1, false};
             }
 
-            void terminate(std::int64_t pid) override {
+            void terminate(std::int64_t pid) override { signal_group(pid, SIGTERM); }
+
+            void kill(std::int64_t pid) override { signal_group(pid, SIGKILL); }
+
+        private:
+            // pid is also the pgid: signal the whole group, falling back to the
+            // lone pid if the group is already gone.
+            static void signal_group(std::int64_t pid, int sig) {
                 if (pid <= 0) return;
-                // pid is also the pgid: signal the whole group, falling back to the
-                // lone pid if the group is already gone.
-                if (::kill(static_cast<pid_t>(-pid), SIGTERM) != 0) {
-                    ::kill(static_cast<pid_t>(pid), SIGTERM);
+                if (::kill(static_cast<pid_t>(-pid), sig) != 0) {
+                    ::kill(static_cast<pid_t>(pid), sig);
                 }
             }
         };
@@ -258,6 +263,8 @@ namespace hestia::daemon {
                     ::CloseHandle(h);
                 }
             }
+
+            void kill(std::int64_t pid) override { terminate(pid); }
 
         private:
             struct Owned {
