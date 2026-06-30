@@ -50,8 +50,8 @@ add_library(hestia_tui STATIC
         # views
         src/views/home_view.h
         src/views/home_view.cc
-        src/views/about_view.h
-        src/views/about_view.cc
+        src/views/settings_view.h
+        src/views/settings_view.cc
 
         # overlays
         src/overlays/confirm_quit.h

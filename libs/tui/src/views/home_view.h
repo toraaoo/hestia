@@ -7,7 +7,7 @@
 #include "navigation/view.h"
 
 namespace hestia::tui {
-    // Landing view: the daemon's identity and greeting, read live over the SDK.
+    // Overview: the daemon's identity plus an interactive greeting, over the SDK.
     class HomeView : public View {
     public:
         RouteId id() const override;
@@ -18,8 +18,11 @@ namespace hestia::tui {
         void load(AppContext &ctx);
 
         bool connected_ = false;
-        std::string greeting_;
         std::string error_;
         client::AppInfo info_;
+
+        std::string name_;
+        std::string greeting_;
+        std::string greet_error_;
     };
 }
