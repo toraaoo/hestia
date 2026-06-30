@@ -13,9 +13,11 @@
 
 // The ProcessSupervisor seam. The daemon owns every launched process — game
 // servers and game client instances — so they outlive the frontend that started
-// them. Processes are spawned detached (double-fork) with output redirected to a
-// log file at the OS level, so they survive even a daemon crash and can be
-// re-adopted on the next start. All OS divergence lives behind this interface.
+// them. Processes are spawned as children of the daemon (single fork/exec) with
+// output redirected to a log file at the OS level; while the daemon runs it reaps
+// them to learn their exit codes, and if the daemon dies they reparent to init so
+// they survive and can be re-adopted on the next start. All OS divergence lives
+// behind this interface.
 //
 // The process domain types (ProcessKind/State, RestartPolicy, LaunchSpec,
 // ProcessRecord) and their JSON codec live in hestia_shared (ipc/process.h,

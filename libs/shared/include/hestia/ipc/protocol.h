@@ -8,12 +8,11 @@
 
 // The daemon protocol envelope, layered on top of the raw frame transport. Both
 // sides — the daemon's router and the client SDK — encode/decode through here, so
-// the wire format lives in exactly one place. See docs/daemon-protocol.md.
+// the wire format lives in exactly one place.
 namespace hestia::ipc {
     // The protocol major version carried by every envelope. Client and daemon
-    // refuse an incompatible major at connect rather than guessing (see the
-    // "Versioning" section of docs/daemon-protocol.md). Bump on a breaking wire
-    // change; additive fields do not need a bump.
+    // refuse an incompatible major at connect rather than guessing. Bump on a
+    // breaking wire change; additive fields do not need a bump.
     inline constexpr int kProtocolVersion = 1;
 
     // Whether a peer advertising major `version` can talk to us. Same major only;

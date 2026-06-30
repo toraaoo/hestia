@@ -246,7 +246,7 @@ namespace hestia::daemon {
 
         // Windows logon Scheduled Task. Survives in the user session (so GUI
         // client instances launched by the daemon land on the user's desktop) but
-        // not logout — the resolved default in docs/daemon-protocol.md.
+        // not logout.
         class ScheduledTaskAutostart final : public Autostart {
         public:
             void enable() override {

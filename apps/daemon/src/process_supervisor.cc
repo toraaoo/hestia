@@ -12,6 +12,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <thread>
+#include <unordered_set>
 
 #include <hestia/ipc/topics.h>
 
@@ -77,6 +78,7 @@ namespace hestia::daemon {
                     rec.restart = spec.restart;
                     rec.restarts = 0;
                     records[spec.id] = rec;
+                    owned_.insert(spec.id); // our child: reap it for the exit code
                     streamer_.reset(spec.id, log); // stream only new output
                     next_restart_.erase(spec.id);
                     table_.save();
@@ -180,8 +182,33 @@ namespace hestia::daemon {
                 auto &records = table_.entries();
 
                 for (auto &[id, rec]: records) {
-                    if ((rec.state == ProcessState::Running ||
-                         rec.state == ProcessState::Starting) && !probe_->matches(rec)) {
+                    const bool was_running = rec.state == ProcessState::Running ||
+                                             rec.state == ProcessState::Starting;
+                    if (owned_.count(id)) {
+                        // Our child: reap it. This frees the zombie even when the
+                        // record is already terminal (e.g. after an operator stop).
+                        if (const auto exit = spawner_->reap(rec.pid)) {
+                            owned_.erase(id);
+                            if (was_running) {
+                                if (exit->signaled || exit->code != 0) {
+                                    rec.state = ProcessState::Crashed;
+                                    next_restart_[id] = restart::backoff_until(rec, now);
+                                    spdlog::warn("process '{}' crashed (pid {}, {} {})",
+                                                 id, rec.pid,
+                                                 exit->signaled ? "signal" : "exit",
+                                                 exit->code);
+                                } else {
+                                    // Clean exit is terminal: never auto-restarted.
+                                    rec.state = ProcessState::Exited;
+                                    next_restart_.erase(id);
+                                    spdlog::info("process '{}' exited (pid {})", id, rec.pid);
+                                }
+                                events.push_back(state_event(rec));
+                                changed = true;
+                            }
+                        }
+                    } else if (was_running && !probe_->matches(rec)) {
+                        // Re-adopted process (not our child): no exit code available.
                         rec.state = ProcessState::Crashed;
                         next_restart_[id] = restart::backoff_until(rec, now);
                         spdlog::warn("process '{}' crashed (pid {})", id, rec.pid);
@@ -232,6 +259,7 @@ namespace hestia::daemon {
                 rec.start_time = probe_->read_start_time(pid);
                 rec.state = ProcessState::Running;
                 rec.restarts += 1;
+                owned_.insert(rec.id); // relaunched: our child again
                 next_restart_.erase(rec.id);
                 // The log appends to the same file, so the streamer's offset carries
                 // over and the relaunched process's output keeps streaming.
@@ -245,6 +273,11 @@ namespace hestia::daemon {
             std::unique_ptr<LivenessProbe> probe_;
             LogStreamer streamer_;
             std::map<std::string, restart::Clock::time_point> next_restart_;
+            // Ids we spawned in this daemon lifetime, so they are our children and
+            // are reaped via the spawner (real exit codes). Processes re-adopted by
+            // reconcile() are NOT here — they are not our children, so their
+            // liveness is polled through the probe instead. Not persisted.
+            std::unordered_set<std::string> owned_;
 
             EventSink sink_;
             std::thread worker_;

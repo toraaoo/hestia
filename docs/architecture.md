@@ -16,8 +16,7 @@ reasoning behind the structure.
 > launcher logic — daemon-internal). The structural sections below (target
 > graph, layout, namespaces, library reference) describe the split; the deeper
 > TUI/desktop internals predate it and get their full rewrite in the migration's
-> hardening phase. See [daemon-protocol.md](daemon-protocol.md) for the socket
-> boundary.
+> hardening phase.
 
 ## One core, three frontends
 
@@ -160,8 +159,7 @@ the one public boundary between them — the socket — and nothing launcher-spe
   logger once at startup. `LogLevel` is Hestia's own enum so callers don't depend
   on spdlog's; `logging.cc` maps it across.
 - **`ipc`** — the platform transport (`transport_posix.cc` / `transport_windows.cc`),
-  endpoint resolution, and the JSON protocol envelope. See
-  [daemon-protocol.md](daemon-protocol.md) for the wire format.
+  endpoint resolution, and the JSON protocol envelope.
 - **`client`** — the typed client SDK (`hestia::client::Client`) front-ends use to
   drive the daemon.
 - **identity** — `app_info.h` is generated from `app_info.h.in` and exposed on the

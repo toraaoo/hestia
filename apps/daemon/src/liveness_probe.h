@@ -6,9 +6,11 @@
 #include "process_types.h"
 
 // The LivenessProbe seam: "is this pid still ours?". Isolated so the OS-specific
-// mechanism (Linux /proc + kill(0) today; pidfd/kqueue/Job Objects later) can be
-// swapped or faked in tests without touching the supervisor. See P3 of the
-// refactor and the cross-platform seam table in docs/daemon-protocol.md.
+// mechanism (Linux /proc + kill(0) today; pidfd/kqueue later) can be swapped or
+// faked in tests without touching the supervisor. Tree teardown lives in the
+// spawner (process group / Job Object), and reaping our own children lives there
+// too; this seam only answers liveness for processes re-adopted after a restart.
+// See P3 of the refactor.
 namespace hestia::daemon {
     class LivenessProbe {
     public:

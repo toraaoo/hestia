@@ -10,8 +10,7 @@
 // The IpcTransport seam: moves length-prefixed message frames over a
 // single-machine, per-user channel (Unix domain socket on POSIX, named pipe on
 // Windows). Payload bytes are OPAQUE here — framing is the transport's only job;
-// message semantics (the channel/JSON envelope) live one layer up. See
-// docs/daemon-protocol.md.
+// message semantics (the channel/JSON envelope) live one layer up.
 namespace hestia::ipc {
     // A full-duplex frame pipe. Both ends — the daemon (one per accepted
     // connection) and every client — hold one. The connection is multiplexed:
