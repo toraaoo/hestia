@@ -1,0 +1,18 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+NamespaceIndentation: All
+AccessModifierOffset: -4
+PointerAlignment: Right
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+SpaceBeforeRangeBasedForLoopColon: false
+BreakBeforeBraces: Attach
+SpacesBeforeTrailingComments: 1
+...
