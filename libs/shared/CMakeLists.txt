@@ -10,6 +10,7 @@ configure_file(include/hestia/app_info.h.in
 # lives in hestia_engine (daemon-only).
 add_library(hestia_shared STATIC
         include/hestia/logging.h
+        include/hestia/paths.h
         include/hestia/app_info.h.in
         include/hestia/ipc/transport.h
         include/hestia/ipc/endpoint.h
@@ -19,13 +20,16 @@ add_library(hestia_shared STATIC
         include/hestia/ipc/errors.h
         include/hestia/ipc/topics.h
         include/hestia/client/client.h
+        include/hestia/client/bridge.h
         src/logging.cc
+        src/paths.cc
         src/endpoint.cc
         src/transport_posix.cc
         src/transport_windows.cc
         src/protocol.cc
         src/process_codec.cc
         src/client.cc
+        src/bridge.cc
 )
 
 target_include_directories(hestia_shared

@@ -16,6 +16,10 @@ add_library(hestia_engine STATIC
         src/config.cc
 )
 
+# The engine resolves its data directory via hestia::paths (hestia/paths.h), the
+# shared single source of truth for where Hestia's data lives.
+target_link_libraries(hestia_engine PRIVATE hestia_shared)
+
 target_include_directories(hestia_engine
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
