@@ -3,6 +3,8 @@ add_executable(hestia_tests
         shared/protocol_test.cc
         shared/process_codec_test.cc
         shared/paths_test.cc
+        shared/endpoint_test.cc
+        shared/transport_test.cc
         engine/config_test.cc
         engine/config_store_test.cc
         engine/engine_test.cc
