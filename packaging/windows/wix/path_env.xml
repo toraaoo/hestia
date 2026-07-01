@@ -5,7 +5,9 @@
   The fragment is injected into the component that owns hestia.exe, so the PATH
   entry is installed (and removed) exactly when the `cli` feature is selected,
   mirroring the NSIS installer. The component id is CPack's deterministic
-  CM_CP_<install-path-with-dots>; the CLI installs to bin/hestia.exe.
+  CM_CP_<staged-path-with-dots>. With component-based packaging (CPACK_COMPONENTS_ALL)
+  the staged path is prefixed by the CPack component name, so the CLI's
+  bin/hestia.exe stages under cli/ and its id is CM_CP_cli.bin.hestia.exe.
 
   Action="set" Part="last" appends; with a per-machine install the Environment
   element writes the system (HKLM) PATH automatically.
@@ -17,7 +19,7 @@
   plugin, so a long pre-existing system PATH is handled correctly here.
 -->
 <CPackWiXPatch>
-  <CPackWiXFragment Id="CM_CP_bin.hestia.exe">
+  <CPackWiXFragment Id="CM_CP_cli.bin.hestia.exe">
     <Environment Id="HestiaBinPath" Name="PATH" Action="set" Part="last"
                  Permanent="no" Value="[INSTALL_ROOT]bin"/>
   </CPackWiXFragment>
