@@ -60,14 +60,7 @@ set(APP_CHANNEL "dev"                       CACHE STRING "Release channel")
 # long link). Vendored deps are EXCLUDE_FROM_ALL (see third_party/), so skipping
 # a front-end transitively skips its dependencies too.
 option(BUILD_DESKTOP "Build the desktop launcher (CEF)" ON)
-option(BUILD_CLI     "Build the CLI / TUI front-end"    ON)
-option(BUILD_TUI     "Build the TUI library"            ON)
-
-# The CLI links the TUI library and cannot be built without it.
-if(BUILD_CLI AND NOT BUILD_TUI)
-    message(STATUS "BUILD_CLI is ON; enabling BUILD_TUI (the CLI links it).")
-    set(BUILD_TUI ON)
-endif()
+option(BUILD_CLI     "Build the CLI front-end"          ON)
 
 # ---- Tests -------------------------------------------------------------------
 # Defined before third_party so the vendored GoogleTest is gated on it.
@@ -80,9 +73,6 @@ add_subdirectory(third_party)
 add_subdirectory(libs/shared)
 add_subdirectory(libs/engine)
 
-if(BUILD_TUI)
-    add_subdirectory(libs/tui)
-endif()
 if(BUILD_CLI)
     add_subdirectory(apps/cli)
 endif()

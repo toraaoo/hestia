@@ -2,11 +2,11 @@
 
 A Minecraft launcher built in modern C++.
 
-Alongside a beautiful desktop UI, Hestia ships first-class **CLI** and **TUI**
-front-ends, so it's just as comfortable from a terminal as from a window.
+Alongside a beautiful desktop UI, Hestia ships a first-class **CLI**
+front-end, so it's just as comfortable from a terminal as from a window.
 
 > **Status:** early development (`v0.0.1`). The project is being scaffolded —
-> the build system, logging, a config store, and the CLI/TUI skeleton are in
+> the build system, logging, a config store, and the CLI skeleton are in
 > place. Launcher functionality is not implemented yet. Expect things to change.
 
 ## Front-ends
@@ -17,13 +17,8 @@ Hestia is one daemon-backed core with several ways to drive it:
   experience.
 - **CLI** (`hestia`) — scriptable command-line interface for automation and
   power users.
-- **TUI** (`hestia tui`) — a full interactive terminal interface for working
-  over SSH or without a desktop session.
 - **Tray** (`tray`) — a resident system-tray helper showing daemon status
   and a one-click toggle for starting the daemon at login.
-
-The CLI and TUI live in the **same binary**: running `hestia` with no subcommand
-shows usage, and `hestia tui` launches the interactive interface.
 
 ## Project layout
 
@@ -31,11 +26,10 @@ shows usage, and `hestia tui` launches the interactive interface.
 hestia-cpp/
 ├── libs/shared/             hestia_shared — IPC transport + protocol, client SDK, identity, logging
 ├── libs/engine/             hestia_engine — launcher engine (config, greeting, …); daemon-internal
-├── libs/tui/                hestia_tui  — terminal UI library (FTXUI)
 ├── apps/desktop/            Hestia      — graphical desktop launcher (CEF + React)
 │   ├── frontend/            Vite + React + TypeScript UI (built with Bun)
 │   └── src/core/            CEF shell — process model, IPC bridge, window, scheme
-├── apps/cli/                hestia      — CLI + the `tui` subcommand (CLI11)
+├── apps/cli/                hestia      — CLI (CLI11)
 ├── apps/daemon/             hestiad     — the daemon: IPC, supervision, autostart
 ├── apps/tray/               hestia_tray (tray) — resident system-tray helper (GDBus SNI)
 ├── cmake/                   CMake helpers (DownloadCEF, CMakeRC, PruneLocales)
@@ -46,17 +40,14 @@ The dependency arrows are one-way and enforced by the build. Every front-end and
 the daemon link `hestia_shared` (transport + client SDK). `hestia_engine` (the
 launcher logic) is daemon-only — front-ends reach it over the socket rather than
 by linking (the desktop app still links it directly today, a transitional
-exception being retired). `tui` and `cli` both depend on `shared`; `cli` links
-`tui`; nothing depends back on `cli`. The TUI exposes exactly one public symbol,
-`hestia::tui::run()`. See [docs/architecture.md](docs/architecture.md) for the
-full picture.
+exception being retired). See [docs/architecture.md](docs/architecture.md) for
+the full picture.
 
 ## Tech stack
 
 - **C++20**, **CMake** (≥ 3.21), built with Ninja
 - [spdlog](https://github.com/gabime/spdlog) + [fmt](https://github.com/fmtlib/fmt) — logging and formatting
 - [CLI11](https://github.com/CLIUtils/CLI11) — command-line parsing
-- [FTXUI](https://github.com/ArthurSonzogni/FTXUI) — terminal user interface
 - [CEF](https://bitbucket.org/chromiumembedded/cef) — Chromium Embedded Framework (desktop only)
 - [React](https://react.dev/) + [Vite](https://vitejs.dev/) + [Bun](https://bun.sh/) — desktop frontend
 
@@ -65,7 +56,7 @@ fetched automatically at configure time (~1 GB, gitignored).
 
 ## Building
 
-A single configure builds everything — the CLI/TUI **and** the desktop launcher.
+A single configure builds everything — the CLI **and** the desktop launcher.
 
 Clone with submodules:
 
@@ -91,7 +82,7 @@ cmake --build build
 
 Binaries land in `build/Release/` (or `build/<config>/`):
 
-- `hestia` — CLI / TUI
+- `hestia` — CLI
 - `HestiaLauncher` — desktop launcher (named `HestiaLauncher` so it doesn't
   collide with the `hestia` CLI on case-insensitive filesystems; the app still
   presents itself as "Hestia")
@@ -124,8 +115,7 @@ cmake --build build
 | Option               | Default | Description                                            |
 |----------------------|---------|--------------------------------------------------------|
 | `BUILD_DESKTOP`      | `ON`    | Build the desktop launcher — pulls in CEF              |
-| `BUILD_CLI`          | `ON`    | Build the `hestia` CLI / TUI front-end                 |
-| `BUILD_TUI`          | `ON`    | Build the TUI library (forced on when `BUILD_CLI` is)  |
+| `BUILD_CLI`          | `ON`    | Build the `hestia` CLI front-end                       |
 | `USE_CCACHE`         | `ON`    | Route compiles through `ccache` when it is installed   |
 | `USE_SANDBOX`        | auto    | CEF sandbox — `ON` in Release, `OFF` in Debug          |
 | `CEF_VERSION`        | pinned  | CEF distribution version string (set in desktop CMake) |
@@ -138,7 +128,7 @@ always built; the front-ends above are opt-out.
 
 The desktop launcher is by far the heaviest target: it triggers the ~1 GB CEF
 download at configure time and a long link. When you're iterating on the
-daemon, CLI, or TUI, configure a separate build that skips it entirely — this
+daemon or CLI, configure a separate build that skips it entirely — this
 also skips CEF's download and every dependency only the desktop needs (vendored
 deps build on demand):
 
@@ -163,9 +153,6 @@ CI steps. See [scripts/README.md](scripts/README.md).
 ```bash
 # Show help
 hestia
-
-# Launch the interactive terminal UI
-hestia tui
 
 # A friendly greeting (demo command)
 hestia greet --name Ada

@@ -27,20 +27,16 @@ Hestia is a single domain core — `hestia_engine`, owned by the daemon
 |----------|------------------|-----------------|------------------|
 | Desktop  | `hestia_desktop` | `HestiaLauncher`| CEF + React/Vite |
 | CLI      | `hestia_cli`     | `hestia`        | CLI11            |
-| TUI      | `hestia_tui`     | *(in `hestia`)* | FTXUI            |
 | Tray     | `hestia_tray`    | `tray`          | GDBus SNI / native |
 
-The CLI and TUI ship in **one binary**: `hestia tui` launches the interactive
-terminal UI, every other subcommand is plain CLI. The desktop app is a separate
-`main()` — a thin Chromium Embedded Framework (CEF) shell hosting a React
-frontend. The tray is a resident system-tray helper showing daemon status. Each
-talks to the core over IPC.
+The desktop app is a separate `main()` — a thin Chromium Embedded Framework (CEF)
+shell hosting a React frontend. The tray is a resident system-tray helper showing
+daemon status. Each talks to the core over IPC.
 
 The daemon (`hestiad`) and tray (`tray`) are the resident core and are
-**always built**. The front-ends are opt-out via `BUILD_DESKTOP`, `BUILD_CLI`,
-and `BUILD_TUI` (all `ON` by default; `BUILD_CLI` forces `BUILD_TUI` on, since
-the CLI links it). Skipping the desktop avoids the heaviest cost: CEF (~1 GB) is
-fetched at configure time only when `BUILD_DESKTOP` is on, and the desktop
+**always built**. The front-ends are opt-out via `BUILD_DESKTOP` and `BUILD_CLI`
+(both `ON` by default). Skipping the desktop avoids the heaviest cost: CEF (~1 GB)
+is fetched at configure time only when `BUILD_DESKTOP` is on, and the desktop
 frontend must be built first (see [Build & dependency conventions](#build--dependency-conventions)).
 
 ## Target graph
@@ -49,8 +45,7 @@ frontend must be built first (see [Build & dependency conventions](#build--depen
 libs/shared  → IPC transport + protocol, client SDK, shared identity (app_info.h),
                logging; linked by the daemon AND every client; zero UI dependencies
 libs/engine  → launcher engine (config, greeting, launcher logic); daemon-internal
-libs/tui     → FTXUI app; depends on shared ONLY; public surface = hestia::tui::run()
-apps/cli     → CLI11 commands + thin main(); depends on shared + tui
+apps/cli     → CLI11 commands + thin main(); depends on shared
 apps/desktop → CEF shell + embedded React frontend; depends on shared (+ engine, transitional)
 apps/tray    → resident system-tray helper; depends on shared ONLY
 apps/daemon  → hestiad; IPC router, supervision, autostart; the only target that links engine
@@ -62,30 +57,21 @@ daemon-only, so a front-end physically cannot reach launcher logic except over
 the socket:
 
 ```
-shared ◄──── tui
-  ▲          ▲
-  └─── cli ──┘
+shared ◄──── cli
 
 engine ◄──── daemon   (no front-end links engine)
 ```
 
 > **Transitional:** `apps/desktop` still links `hestia_engine` directly. The
-> CLI, TUI, and tray already reach it only over the socket — `hestia greet`,
+> CLI and tray already reach it only over the socket — `hestia greet`,
 > `config`, and `autostart` all round-trip to the daemon via the client SDK. The
 > end-state is engine = daemon-only, with every front-end reaching it over IPC.
-
-`libs/tui` physically cannot `#include` a CLI command — it does not link
-`apps/cli`, so it cannot see it. `libs/tui` exposes exactly one public header,
-`hestia/tui/run.h`; everything under `libs/tui/src/` is private to the library.
-This is why `apps/cli` reaches the TUI through a single symbol and never touches
-its internals.
 
 The desktop launcher follows the same one-way rule: `apps/desktop` (namespace
 `desktop::`) depends on `hestia_shared` and never the reverse. Its CEF shell knows
 about windows, schemes, and IPC; it contains **no launcher logic** — that lives
 in the engine and is reached over the IPC bridge. CEF's build flags are confined
-to the `apps/desktop` subdirectory so the shared library, the CLI, and the TUI
-never inherit them.
+to the `apps/desktop` subdirectory so the shared library and the CLI never inherit them.
 
 ## Directory layout
 
@@ -99,12 +85,9 @@ hestia-cpp/
 │   │   ├── include/hestia/    PUBLIC headers (logging.h, app_info.h, ipc/*, client/*)
 │   │   │                      app_info.h is GENERATED from app_info.h.in (shared identity)
 │   │   └── src/               implementations (transport, protocol, client, logging)
-│   ├── engine/                hestia_engine — launcher engine (daemon-internal)
-│   │   ├── include/hestia/    PUBLIC headers (config.h, greeting.h)
-│   │   └── src/               implementations
-│   └── tui/                   hestia_tui — terminal UI library
-│       ├── include/hestia/tui/run.h   the ONLY public header
-│       └── src/               private internals (see "TUI internals" below)
+│   └── engine/                hestia_engine — launcher engine (daemon-internal)
+│       ├── include/hestia/    PUBLIC headers (config.h, greeting.h)
+│       └── src/               implementations
 ├── apps/
 │   ├── cli/                   hestia_cli — CLI11 commands + main()
 │   ├── daemon/               hestia_daemon (hestiad) — IPC router, services, supervision, autostart
@@ -123,7 +106,6 @@ hestia-cpp/
 - **C++20**, **CMake** (≥ 3.21), built with **Ninja**.
 - [spdlog](https://github.com/gabime/spdlog) + [fmt](https://github.com/fmtlib/fmt) — logging and formatting.
 - [CLI11](https://github.com/CLIUtils/CLI11) — command-line parsing.
-- [FTXUI](https://github.com/ArthurSonzogni/FTXUI) — terminal user interface.
 - [CEF](https://bitbucket.org/chromiumembedded/cef) — Chromium Embedded Framework (desktop).
 - [React](https://react.dev/) + [Vite](https://vitejs.dev/), built with [Bun](https://bun.sh/) — desktop frontend.
 
@@ -146,10 +128,6 @@ frontend's `dist/` tree is compiled into the binary by **CMakeRC**
 | `hestia::config`       | `libs/engine`  | data-dir resolution + `Config` store       |
 | `hestia::greeting`     | `libs/engine`  | the demo `greet()` function                |
 | `hestia::cli`          | `apps/cli`     | command framework + commands               |
-| `hestia::tui`          | `libs/tui`     | the terminal UI (everything)               |
-| `hestia::tui::keys`    | `libs/tui`     | global key predicates                      |
-| `hestia::tui::layout`  | `libs/tui`     | layout id constants                        |
-| `hestia::tui::overlay` | `libs/tui`     | overlay id constants                       |
 | `desktop::core`†       | `apps/desktop` | CEF shell — app/browser/window/scheme      |
 | `desktop::ipc`         | `apps/desktop` | the JS⇄C++ bridge (router + registry)      |
 | `desktop::features`    | `apps/desktop` | IPC feature modules (app, window, …)       |
@@ -247,100 +225,6 @@ backend: `backend_linux.cc` (GDBus StatusNotifierItem), `backend_windows.cc`
 (Shell_NotifyIcon), and `backend_macos.mm` (Cocoa). A `single_instance` guard
 allows only one tray per session.
 
-## TUI internals (`libs/tui/src`)
-
-The TUI is designed component-first, with a deliberate caveat: **FTXUI is not
-reactive.** You build the component tree **once**; a render loop re-runs each
-`Renderer`'s lambda **every frame**, rebuilding the element tree from whatever
-your plain C++ state variables currently hold. There is no `useState`/re-render
-diff. Two trees coexist that a framework like React would fuse into one:
-
-- the **Component tree** — events/focus/handlers, built once;
-- the **Element tree** — `Render()` output, rebuilt per frame.
-
-Holding that distinction in mind prevents most FTXUI confusion. Most React
-intuition still transfers — a `Component` is a reusable node, a `View` is a
-page/route, the `Navigator` is the router, `AppContext` is `<Context.Provider>`,
-and `on_enter`/`on_exit` are mount/unmount. The one thing that does *not* map is
-reactivity: no `useState`, no effect cleanup, no dependency arrays. You own the
-state and the loop re-reads it.
-
-### Subsystems
-
-```
-libs/tui/src/
-  tui_app.cc          run(): builds the shell, owns everything, runs the loop
-  app_context.h       AppContext — services/state passed "props-down" to views
-  navigation/
-    route.h           RouteId (string id for a view)
-    view.h            View — abstract route-level screen
-    navigator.{h,cc}  the router: active selection, lifecycle hooks, overlays
-    view_registry.cc  make_views() — the one place a view is wired in
-  layout/
-    layout.h          Layout interface + LayoutSlots + layout ids
-    layout_registry.{h,cc}  make_layouts() — id → Layout, never fails silently
-    layouts/          sidebar (default), fullscreen, centered
-    header_bar / status_bar / sidebar   reusable slot builders
-  components/         dumb presentational pieces: panel, button, key_hint
-  input/
-    keymap.h          key predicates (quit = 'q', cancel = Esc)
-    global_keys.{h,cc}  with_global_keys(): app-wide bindings, modal-aware
-  overlays/           modal layers: confirm_quit
-  theme/theme.h       semantic styling roles (terminal-honoring, no palette)
-  views/              the actual screens: home, about
-```
-
-### Key abstractions
-
-- **View** (`navigation/view.h`) — a route-level screen. Owns its component
-  subtree (built once in `build(ctx)`), declares its `id()`, `title()`, and which
-  `layout()` arranges it (default `Sidebar`). Optional `on_enter`/`on_exit`
-  lifecycle hooks fire on navigation. Analogous to a React page component:
-  composed *from* `components/`, never the reverse.
-- **Navigator** (`navigation/navigator.h`) — the router. Owns the active-route
-  index (shared by reference with the sidebar `Menu` and the content `Tab` via a
-  single `int`, so moving the menu swaps the view) and the current overlay id.
-  `tick()` runs once per frame to detect a menu-driven selection change and fire
-  the view lifecycle hooks.
-- **Layout** (`layout/layout.h`) — a **pure** `Element`-level arranger:
-  `arrange(LayoutSlots)` decides placement only. Interactive components stay
-  built-once in the shell, so swapping a layout never rebuilds the component tree
-  and focus/event routing stays centralised. Lookup falls back to `Sidebar` with
-  a warning on an unknown id — never undefined behaviour.
-- **Component** (`components/`) — dumb, presentational, props-in via factory
-  args, no navigation or app logic. Reused across views.
-- **Overlay** (`overlays/`) — a transient modal layer stacked above the active
-  view. While one is open, `with_global_keys` steps aside and the overlay owns
-  all input.
-- **Theme** (`theme/theme.h`) — styling expressed as semantic *roles*
-  (`brand`, `emphasis`, `muted`, `selected`, `normal`), each an `ftxui::Decorator`
-  built only from terminal-honoring primitives (`Color::Default`, bold/dim/
-  inverted). **No private palette:** hierarchy comes from attributes, so the UI
-  inherits the user's terminal colors. Components and layouts never hard-code a
-  color — they pull from a role.
-
-### Runtime flow (`run()` in `tui_app.cc`)
-
-1. Create a fullscreen `ScreenInteractive` and a `Theme`.
-2. `make_views()` builds and owns the views; the `Navigator` routes over
-   non-owning pointers.
-3. Populate `AppContext` with the theme, navigator, and the quit closures
-   (`request_quit` opens the confirm-quit overlay; `exit_app` is the loop-exit).
-4. Build **every** interactive component once: a `Container::Tab` of per-view
-   panels (keyed on the navigator's shared selection int), the sidebar menu, and
-   the overlay. A two-entry `Container::Tab` routes focus to exactly one layer —
-   main pane or overlay.
-5. A single `Renderer` lambda runs per frame: `nav.tick()`, route focus, read the
-   active view's `layout()`, fill the `LayoutSlots`, and return
-   `layouts.get(id).arrange(slots)`.
-6. `with_global_keys` wraps the renderer; `nav.start()` fires the first
-   `on_enter`; `screen.Loop(root)` runs.
-
-State is plain variables — no reactive store. State ownership is **binary**:
-shared state lives in `AppContext`; everything else is a component-local member
-field. Nothing ad-hoc-global is threaded through. A reactive global store is
-deliberately deferred; if one is ever needed it would be hand-built, not free.
-
 ## CLI command system (`apps/cli`)
 
 Commands are objects implementing the `Command` interface
@@ -348,7 +232,7 @@ Commands are objects implementing the `Command` interface
 options, and callback onto a parent `CLI::App`. Because the parent can be the
 root app *or* another command's app, commands **nest to any depth**.
 
-- **`Command`** — a leaf unit of functionality (e.g. `greet`, `tui`).
+- **`Command`** — a leaf unit of functionality (e.g. `greet`).
 - **`CommandGroup`** — a `Command` that holds children and registers them onto
   its own subcommand app (e.g. `config get|set|home|set-home`). The same
   mechanism recurses.
@@ -361,10 +245,6 @@ root app *or* another command's app, commands **nest to any depth**.
 logging via a parse-complete callback (so verbosity is set before any command
 callback runs), registers `make_commands()`, parses, and returns the context's
 exit code. No subcommand → print help.
-
-The `tui` command is the seam: its callback calls `hestia::tui::run()` and stores
-the result as the exit code. That single call is the *only* CLI→TUI reference in
-the codebase.
 
 ## Desktop launcher (`apps/desktop`)
 
@@ -445,26 +325,25 @@ locales to `en-US.pak`.
 
 ## Build & dependency conventions
 
-- **One configure builds everything by default**, gated by the `BUILD_DESKTOP`,
-  `BUILD_CLI`, and `BUILD_TUI` toggles (all `ON`; the daemon and tray are always
-  built). With the desktop on, the configure fetches CEF (~1 GB, first run only)
-  and requires a built `frontend/dist`, so **build the frontend before
-  configuring** (CMakeRC globs `dist/` at configure time; a missing `dist/` is a
-  hard `FATAL_ERROR`): `(cd apps/desktop/frontend && bun run build)` → `cmake …
-  -B build` → `cmake --build`. A `-DBUILD_DESKTOP=OFF` configure skips CEF
-  entirely for a fast daemon/CLI/TUI loop.
+- **One configure builds everything by default**, gated by the `BUILD_DESKTOP`
+  and `BUILD_CLI` toggles (both `ON`; the daemon and tray are always built). With
+  the desktop on, the configure fetches CEF (~1 GB, first run only) and requires a
+  built `frontend/dist`, so **build the frontend before configuring** (CMakeRC globs
+  `dist/` at configure time; a missing `dist/` is a hard `FATAL_ERROR`):
+  `(cd apps/desktop/frontend && bun run build)` → `cmake … -B build` →
+  `cmake --build`. A `-DBUILD_DESKTOP=OFF` configure skips CEF entirely for a fast
+  daemon/CLI loop.
 - Each library/app sets `-Wall -Wextra -Wpedantic` (GNU/Clang) or `/W4` (MSVC).
   CEF discovery is isolated inside `apps/desktop/` so its compiler/linker flags
-  never reach the shared library, the engine, the CLI, or the TUI.
+  never reach the shared library, the engine, or the CLI.
 - The root `CMakeLists.txt` defines the `APP_*` identity (name, id, vendor,
   channel; version from `project(... VERSION)`). `hestia_shared` generates
   `<hestia/app_info.h>` from these and exposes it on its **public** interface, so
   every frontend shares one source of truth — the CLI's `--version`, the desktop's
   `app.info`, etc. all read the same `APP_VERSION`.
 - Dependencies that don't appear in a target's public headers are linked
-  `PRIVATE` (e.g. shared's spdlog/fmt, tui's ftxui/spdlog). They still propagate as
-  transitive link deps to the final executable — which is why `apps/cli` no
-  longer links ftxui directly.
+  `PRIVATE` (e.g. shared's spdlog/fmt). They still propagate as transitive link
+  deps to the final executable.
 - Build artifacts land in `build/<config>/` (e.g. `build/Release/`); the desktop
   binary and its CEF runtime files are copied alongside it.
 
