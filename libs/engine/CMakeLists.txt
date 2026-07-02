@@ -8,10 +8,14 @@ include(GNUInstallDirs)
 add_library(hestia_engine STATIC
         include/hestia/engine/engine.h
         include/hestia/engine/config_store.h
+        include/hestia/engine/checksum.h
+        include/hestia/engine/downloader.h
         include/hestia/greeting.h
         include/hestia/config.h
         src/engine.cc
         src/config_store.cc
+        src/checksum.cc
+        src/downloader.cc
         src/greeting.cc
         src/config.cc
 )
@@ -28,8 +32,10 @@ target_include_directories(hestia_engine
         src
 )
 
+# cpr stays PRIVATE: the downloader's public header exposes no cpr types.
 target_link_libraries(hestia_engine PRIVATE
         fmt::fmt
+        cpr::cpr
 )
 
 target_compile_options(hestia_engine PRIVATE

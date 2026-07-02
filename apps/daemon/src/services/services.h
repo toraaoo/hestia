@@ -11,4 +11,5 @@ namespace hestia::daemon {
     void register_process_service(Router &router);
     void register_autostart_service(Router &router);
     void register_events_service(Router &router);
+    void register_downloads_service(Router &router);
 }

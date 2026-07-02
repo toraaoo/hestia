@@ -163,6 +163,10 @@ hestia config get <key>
 hestia config home              # print the resolved data directory
 hestia config set-home <dir>    # persist the data dir for future runs
 
+# Download a file via the daemon, with optional integrity check
+hestia download <url> <dest>
+hestia download <url> <dest> --checksum sha256:<hex>   # or sha1:<hex>
+
 # Autostart (start the background daemon at login)
 hestia autostart enable          # register the daemon to start at login
 hestia autostart disable         # remove the registration

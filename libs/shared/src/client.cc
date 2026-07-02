@@ -7,6 +7,7 @@
 #include "hestia/ipc/topics.h"
 #include "hestia/ipc/transport.h"
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <map>
@@ -190,12 +191,12 @@ namespace hestia::client {
                     continue; // ignore a malformed frame rather than tear down
                 }
                 if (ipc::is_event(j)) {
-                    EventCallback cb;
+                    RawEventCallback cb;
                     {
                         std::lock_guard<std::mutex> lk(mu);
                         cb = on_event;
                     }
-                    if (cb) cb(to_process_event(ipc::decode_event(j)));
+                    if (cb) cb(ipc::decode_event(j));
                     continue;
                 }
                 ipc::Response res = ipc::decode_response(j);
@@ -240,9 +241,18 @@ namespace hestia::client {
             return res;
         }
 
-        void set_event_callback(EventCallback cb) {
+        // Events arrive as raw envelopes; callers layer their own typing on top
+        // (subscribe() its ProcessEvent view, download() its topic matching).
+        using RawEventCallback = std::function<void(const ipc::Event &)>;
+
+        void set_event_callback(RawEventCallback cb) {
             std::lock_guard<std::mutex> lk(mu);
             on_event = std::move(cb);
+        }
+
+        bool is_closed() {
+            std::lock_guard<std::mutex> lk(mu);
+            return closed;
         }
 
         std::shared_ptr<ipc::Connection> conn;
@@ -251,7 +261,7 @@ namespace hestia::client {
         std::condition_variable cv;
         long long next_id = 1;
         std::map<long long, ipc::Response> ready;
-        EventCallback on_event;
+        RawEventCallback on_event;
         bool closed = false;
 
         static constexpr auto kCallTimeout = std::chrono::seconds(10);
@@ -384,9 +394,81 @@ namespace hestia::client {
     }
 
     void Client::subscribe(EventCallback cb, std::string id_filter) {
-        d_->set_event_callback(std::move(cb));
+        d_->set_event_callback([cb = std::move(cb)](const ipc::Event &event) {
+            if (!event.topic.starts_with("process.")) return;
+            cb(to_process_event(event));
+        });
         json payload = json::object();
         if (!id_filter.empty()) payload["id"] = id_filter;
         must(d_->call("events.subscribe", std::move(payload)));
+    }
+
+    void Client::download(const DownloadRequest &request,
+                          const DownloadProgressCallback &on_progress) {
+        // A client-generated id lets us subscribe before starting, so even a
+        // download that finishes instantly cannot slip its terminal event past us.
+        static std::atomic<int> counter{0};
+#if defined(_WIN32)
+        const auto pid = static_cast<long long>(::GetCurrentProcessId());
+#else
+        const auto pid = static_cast<long long>(::getpid());
+#endif
+        const std::string id =
+            "dl-" + std::to_string(pid) + "-" + std::to_string(++counter);
+
+        struct Outcome {
+            std::mutex mu;
+            std::condition_variable cv;
+            bool done = false;
+            bool ok = false;
+            std::string message;
+        };
+        const auto outcome = std::make_shared<Outcome>();
+
+        d_->set_event_callback([outcome, id, on_progress](const ipc::Event &event) {
+            if (event.payload.value("id", std::string{}) != id) return;
+            if (event.topic == ipc::topics::kDownloadProgress) {
+                if (on_progress) {
+                    on_progress(DownloadProgress{
+                        .downloaded = event.payload.value("downloaded", std::uint64_t{0}),
+                        .total = event.payload.value("total", std::uint64_t{0}),
+                    });
+                }
+                return;
+            }
+            if (event.topic != ipc::topics::kDownloadDone &&
+                event.topic != ipc::topics::kDownloadError) {
+                return;
+            }
+            std::lock_guard<std::mutex> lk(outcome->mu);
+            outcome->done = true;
+            outcome->ok = event.topic == ipc::topics::kDownloadDone;
+            outcome->message = event.payload.value("message", std::string{});
+            outcome->cv.notify_all();
+        });
+
+        try {
+            must(d_->call("events.subscribe", {{"id", id}}));
+
+            json payload = {{"url", request.url}, {"dest", request.destination}, {"id", id}};
+            if (!request.checksum_algorithm.empty()) {
+                payload["checksum"] = {{"algorithm", request.checksum_algorithm},
+                                       {"hex", request.checksum_hex}};
+            }
+            must(d_->call("download.start", std::move(payload)));
+
+            std::unique_lock<std::mutex> lk(outcome->mu);
+            while (!outcome->done) {
+                outcome->cv.wait_for(lk, std::chrono::milliseconds(500));
+                if (!outcome->done && d_->is_closed()) {
+                    throw std::runtime_error("daemon connection lost during download");
+                }
+            }
+        } catch (...) {
+            d_->set_event_callback({});
+            throw;
+        }
+        d_->set_event_callback({});
+        if (!outcome->ok) throw std::runtime_error(outcome->message);
     }
 }

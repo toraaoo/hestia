@@ -9,6 +9,8 @@ add_executable(hestia_tests
         engine/config_store_test.cc
         engine/engine_test.cc
         engine/greeting_test.cc
+        engine/checksum_test.cc
+        engine/downloader_test.cc
 )
 
 target_link_libraries(hestia_tests PRIVATE

@@ -11,6 +11,8 @@ add_executable(hestia_daemon
         src/event_hub.h
         src/process_supervisor.cc
         src/process_supervisor.h
+        src/download_manager.cc
+        src/download_manager.h
         src/process_table.cc
         src/process_table.h
         src/process_spawner.cc
@@ -30,6 +32,7 @@ add_executable(hestia_daemon
         src/services/process_service.cc
         src/services/autostart_service.cc
         src/services/events_service.cc
+        src/services/downloads_service.cc
 )
 
 target_include_directories(hestia_daemon PRIVATE src)

@@ -17,11 +17,13 @@ namespace hestia::engine {
 namespace hestia::daemon {
     class ProcessSupervisor;
     class EventHub;
+    class DownloadManager;
 
     struct HandlerContext {
         engine::Engine &engine;
         ProcessSupervisor &supervisor;
         EventHub &hub;
+        DownloadManager &downloads;
         std::shared_ptr<ipc::Connection> connection;
         ipc::Peer peer;
     };

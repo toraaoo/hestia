@@ -3,6 +3,7 @@
 #include "hestia/ipc/protocol.h"
 #include "hestia/ipc/transport.h"
 
+#include "download_manager.h"
 #include "event_hub.h"
 #include "handler_context.h"
 #include "process_supervisor.h"
@@ -43,12 +44,13 @@ namespace {
     // through the router with a per-request context, and write the correlated
     // response. The context carries the connection, so streaming channels
     // (events.subscribe) are ordinary handlers.
-    void serve_connection(std::shared_ptr<hestia::ipc::Connection> conn,
+    void serve_connection(const std::shared_ptr<hestia::ipc::Connection> &conn,
                           const hestia::ipc::Peer &peer,
                           const hestia::daemon::Router &router,
                           hestia::engine::Engine &engine,
                           hestia::daemon::ProcessSupervisor &supervisor,
-                          hestia::daemon::EventHub &hub) {
+                          hestia::daemon::EventHub &hub,
+                          hestia::daemon::DownloadManager &downloads) {
         while (auto frame = conn->recv()) {
             hestia::ipc::Request req;
             try {
@@ -59,7 +61,7 @@ namespace {
                     hestia::ipc::Response::failure(hestia::ipc::errors::kBadRequest, e.what())));
                 continue;
             }
-            hestia::daemon::HandlerContext ctx{engine, supervisor, hub, conn, peer};
+            hestia::daemon::HandlerContext ctx{engine, supervisor, hub, downloads, conn, peer};
             auto res = router.route(req, ctx);
             res.id = req.id;
             conn->send(hestia::ipc::encode(res));
@@ -80,6 +82,11 @@ namespace {
         hestia::engine::Engine engine;
         hestia::daemon::EventHub hub;
 
+        // Declared after hub: downloads is destroyed first, so its workers never
+        // publish into a dead hub during shutdown.
+        hestia::daemon::DownloadManager downloads(
+            [&hub](const hestia::ipc::Event &e) { hub.publish(e); });
+
         auto supervisor = hestia::daemon::make_process_supervisor(engine.data_home());
         supervisor->set_event_sink([&hub](const hestia::ipc::Event &e) { hub.publish(e); });
         supervisor->reconcile(); // re-adopt processes that survived a previous daemon
@@ -92,6 +99,7 @@ namespace {
         hestia::daemon::register_process_service(router);
         hestia::daemon::register_autostart_service(router);
         hestia::daemon::register_events_service(router);
+        hestia::daemon::register_downloads_service(router);
 
         g_listener.store(listener.get());
         std::signal(SIGINT, handle_signal);
@@ -104,7 +112,7 @@ namespace {
         listener->serve([&](std::shared_ptr<hestia::ipc::Connection> conn,
                             const hestia::ipc::Peer &peer) {
             spdlog::debug("client connected (uid {})", peer.uid);
-            serve_connection(std::move(conn), peer, router, engine, *supervisor, hub);
+            serve_connection(conn, peer, router, engine, *supervisor, hub, downloads);
             spdlog::debug("client disconnected");
         });
         g_listener.store(nullptr);

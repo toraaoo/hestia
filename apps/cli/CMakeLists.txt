@@ -9,6 +9,7 @@ target_sources(hestia_cli
         src/commands/greet_command.cc
         src/commands/config_command.cc
         src/commands/autostart_command.cc
+        src/commands/download_command.cc
 )
 
 target_include_directories(hestia_cli PRIVATE src)

@@ -106,6 +106,8 @@ hestia-cpp/
 - **C++20**, **CMake** (≥ 3.21), built with **Ninja**.
 - [spdlog](https://github.com/gabime/spdlog) + [fmt](https://github.com/fmtlib/fmt) — logging and formatting.
 - [CLI11](https://github.com/CLIUtils/CLI11) — command-line parsing.
+- [cpr](https://github.com/libcpr/cpr) — HTTP client for the engine's downloader
+  (builds its bundled curl, fetched at configure time).
 - [CEF](https://bitbucket.org/chromiumembedded/cef) — Chromium Embedded Framework (desktop).
 - [React](https://react.dev/) + [Vite](https://vitejs.dev/), built with [Bun](https://bun.sh/) — desktop frontend.
 
@@ -185,9 +187,15 @@ The subsystems behind it today:
   → the platform default. `Config::load` / `get` / `set` / `save` operate on the
   file at `config_path()`. A missing file is an empty config, not an error. The
   desktop app still links these path helpers directly (the transitional exception).
+- **`Downloader`** (`downloader.h`) — streams a URL to disk through a `.part`
+  temp file (via cpr), hashing incrementally when a checksum is given and
+  renaming into place only on success. Stateless, so it hangs off no aggregate —
+  the daemon's download manager constructs one per download.
+- **`checksum`** (`checksum.h`) — native incremental SHA-1/SHA-256 (`Hasher`),
+  so a download is verified as it streams rather than re-read afterwards.
 - **`greeting`** — `greet(name)`; a placeholder exercising the engine→frontend seam.
 
-`engine` links fmt **privately** — it is an implementation detail and does not leak
+`engine` links fmt and cpr **privately** — implementation details that do not leak
 through its public headers.
 
 ## Daemon (`apps/daemon`)
@@ -203,8 +211,14 @@ target that links `hestia_engine` directly.
 - **Services** (`src/services/`) — one file per channel-prefix, wired in once.
   Today: `health` (`health.ping`), `app` (`app.info`, `app.greet`), `config`
   (`config.get|set|home|set-home`), `process` (`process.start|stop|list|status|logs`),
-  `autostart` (`autostart.enable|disable|status`), and `events`
-  (`events.subscribe`, a streaming channel that pushes to the calling connection).
+  `autostart` (`autostart.enable|disable|status`), `downloads` (`download.start`),
+  and `events` (`events.subscribe`, a streaming channel that pushes to the calling
+  connection).
+- **Downloads** (`download_manager.{h,cc}`) — runs each download on a worker
+  thread so `download.start` answers immediately; progress and the terminal
+  outcome are published through the event hub as `download.progress`,
+  `download.done`, and `download.error` events (throttled progress, filtered by
+  the download's id like process events).
 - **Process supervision** (`process_supervisor`, `process_table`, `process_spawner`,
   `liveness_probe`, `log_streamer`, `restart_policy`) — launches Minecraft (and
   other) processes as children of the daemon, tracks them in a process table,

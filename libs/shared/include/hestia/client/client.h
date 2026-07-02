@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -62,6 +63,22 @@ namespace hestia::client {
 
     using EventCallback = std::function<void(const ProcessEvent &)>;
 
+    // A file to download via the daemon. Empty checksum fields mean no
+    // verification; `checksum_algorithm` is "sha1" or "sha256".
+    struct DownloadRequest {
+        std::string url;
+        std::string destination; // absolute path
+        std::string checksum_algorithm;
+        std::string checksum_hex;
+    };
+
+    struct DownloadProgress {
+        std::uint64_t downloaded = 0;
+        std::uint64_t total = 0; // 0 = unknown
+    };
+
+    using DownloadProgressCallback = std::function<void(const DownloadProgress &)>;
+
     class Client {
     public:
         // Connect to the running daemon. If none is running and `auto_spawn` is
@@ -107,6 +124,14 @@ namespace hestia::client {
         // process, or empty for all. Call before issuing further requests; the
         // history up to now is available via process_logs.
         void subscribe(EventCallback cb, std::string id_filter = {});
+
+        // Download a file via the daemon, blocking until it completes;
+        // `on_progress` is invoked on the reader thread as bytes arrive. Throws
+        // std::runtime_error on failure (bad request, network error, checksum
+        // mismatch). Uses the client's single event-callback slot, so it
+        // replaces any callback installed by subscribe().
+        void download(const DownloadRequest &request,
+                      const DownloadProgressCallback &on_progress = {});
 
     private:
         struct Detail;

@@ -17,6 +17,13 @@ set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
 set(JSON_Install OFF CACHE BOOL "" FORCE)
 add_subdirectory(json EXCLUDE_FROM_ALL)
 
+# cpr: HTTP client for the engine's downloader. Builds its bundled curl
+# (fetched at configure time — the CEF-download precedent); tests stay out of
+# our build.
+set(CPR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(CPR_BUILD_TESTS_SSL OFF CACHE BOOL "" FORCE)
+add_subdirectory(cpr EXCLUDE_FROM_ALL)
+
 # GoogleTest, built only when BUILD_TESTING is on. gtest_force_shared_crt stays
 # OFF so gtest matches the project's static MSVC runtime (/MT, set for CEF).
 if(BUILD_TESTING)
