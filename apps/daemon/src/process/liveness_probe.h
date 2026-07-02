@@ -14,16 +14,16 @@ namespace hestia::daemon {
         virtual ~LivenessProbe() = default;
 
         // Is a process with this pid currently alive?
-        virtual bool is_alive(std::int64_t pid) const = 0;
+        [[nodiscard]] virtual bool is_alive(std::int64_t pid) const = 0;
 
         // An opaque, monotonic-per-process start time used to disambiguate PID
         // reuse. 0 means "unavailable on this platform".
-        virtual std::int64_t read_start_time(std::int64_t pid) const = 0;
+        [[nodiscard]] virtual std::int64_t read_start_time(std::int64_t pid) const = 0;
 
         // Require a verifiable start time on both sides: is_alive is true even for
         // another user's process (EPERM), so a bare-pid match could later SIGTERM a
         // stranger's process group after PID reuse.
-        bool matches(const ProcessRecord &rec) const {
+        [[nodiscard]] bool matches(const ProcessRecord &rec) const {
             if (!is_alive(rec.pid)) return false;
             const std::int64_t current = read_start_time(rec.pid);
             if (rec.start_time == 0 || current == 0) return false;

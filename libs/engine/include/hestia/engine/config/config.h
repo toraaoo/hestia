@@ -13,10 +13,10 @@ namespace hestia::config {
         // Load from `path`. A missing file yields an empty config (not an error).
         static Config load(const std::filesystem::path &path);
 
-        std::optional<std::string> get(std::string_view key) const;
+        [[nodiscard]] std::optional<std::string> get(std::string_view key) const;
         void set(std::string_view key, std::string_view value);
 
-        const std::map<std::string, std::string> &entries() const { return entries_; }
+        [[nodiscard]] const std::map<std::string, std::string> &entries() const { return entries_; }
 
         // Persist to `path`, creating parent directories as needed.
         void save(const std::filesystem::path &path) const;

@@ -134,7 +134,7 @@ namespace hestia::ipc {
                 spdlog::warn("rejecting connection from uid {} (daemon runs as {})", uid, ::getuid());
                 return false;
             }
-            peer = Peer{/*local=*/true, uid};
+            peer = Peer{.local = true, .uid = uid};
             return true;
         }
 
@@ -147,7 +147,7 @@ namespace hestia::ipc {
             ~PosixConnection() override { close(); }
 
             bool send(std::string_view frame) override {
-                std::lock_guard<std::mutex> lk(write_mu_);
+                std::scoped_lock const lk(write_mu_);
                 const int fd = fd_.load();
                 return fd >= 0 && write_frame(fd, frame);
             }
@@ -194,8 +194,8 @@ namespace hestia::ipc {
                 running_ = true;
                 while (running_) {
                     pollfd fds[2] = {
-                        {fd_, POLLIN, 0},
-                        {stop_pipe_[0], POLLIN, 0},
+                        {.fd = fd_, .events = POLLIN, .revents = 0},
+                        {.fd = stop_pipe_[0], .events = POLLIN, .revents = 0},
                     };
                     const int n = ::poll(fds, 2, -1);
                     if (n < 0) {
@@ -218,16 +218,16 @@ namespace hestia::ipc {
                     auto connection = std::make_shared<PosixConnection>(conn);
                     auto done = std::make_shared<std::atomic<bool>>(false);
                     {
-                        std::lock_guard<std::mutex> lk(workers_mu_);
+                        std::scoped_lock const lk(workers_mu_);
                         live_.push_back(connection);
                     }
                     workers_.push_back(Worker{
-                        std::thread([this, connection, peer, done, &on_connection] {
+                        .thread = std::thread([this, connection, peer, done, &on_connection] {
                             on_connection(connection, peer);
                             forget(connection);
                             done->store(true);
                         }),
-                        done,
+                        .done = done,
                     });
                 }
                 shutdown_workers();
@@ -251,7 +251,7 @@ namespace hestia::ipc {
 
             // Drop a connection from the live set once its handler returns.
             void forget(const std::shared_ptr<PosixConnection> &connection) {
-                std::lock_guard<std::mutex> lk(workers_mu_);
+                std::scoped_lock const lk(workers_mu_);
                 std::erase(live_, connection);
             }
 
@@ -272,14 +272,14 @@ namespace hestia::ipc {
             // then join all handler threads before serve() returns.
             void shutdown_workers() {
                 {
-                    std::lock_guard<std::mutex> lk(workers_mu_);
+                    std::scoped_lock const lk(workers_mu_);
                     for (const auto &connection: live_) connection->close();
                 }
                 for (auto &worker: workers_) {
                     if (worker.thread.joinable()) worker.thread.join();
                 }
                 workers_.clear();
-                std::lock_guard<std::mutex> lk(workers_mu_);
+                std::scoped_lock const lk(workers_mu_);
                 live_.clear();
             }
 

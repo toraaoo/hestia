@@ -9,7 +9,7 @@
 // state; it drives the daemon over the client SDK like every other frontend.
 int main() {
     // Only one tray per user session; a second invocation steps aside quietly.
-    hestia::tray::SingleInstance instance;
+    hestia::tray::SingleInstance const instance;
     if (!instance.primary()) {
         std::cerr << "tray: already running\n";
         return 0;

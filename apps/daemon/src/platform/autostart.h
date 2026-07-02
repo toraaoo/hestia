@@ -15,7 +15,7 @@ namespace hestia::daemon {
         virtual void enable() = 0;
         virtual void disable() = 0;
 
-        virtual bool is_enabled() const = 0;
+        [[nodiscard]] virtual bool is_enabled() const = 0;
     };
 
     // Construct the platform autostart manager. The registration points at the

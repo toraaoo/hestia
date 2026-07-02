@@ -15,7 +15,7 @@ namespace hestia::client {
         Client &shared_client() {
             static std::mutex mu;
             static std::optional<Client> client;
-            std::lock_guard<std::mutex> lock(mu);
+            std::scoped_lock const lock(mu);
             if (!client) client = Client::connect();
             return *client;
         }
@@ -29,12 +29,12 @@ namespace hestia::client {
                 if (!parsed.is_null()) payload = std::move(parsed);
             }
             const ipc::Response res = shared_client().call(std::string(channel), payload);
-            if (res.ok) return {true, res.payload.dump(), {}};
-            return {false, {}, res.error ? res.error->message : "daemon error"};
+            if (res.ok) return {.ok = true, .json = res.payload.dump(), .error = {}};
+            return {.ok = false, .json = {}, .error = res.error ? res.error->message : "daemon error"};
         } catch (const std::exception &e) {
-            return {false, {}, e.what()};
+            return {.ok = false, .json = {}, .error = e.what()};
         } catch (...) {
-            return {false, {}, "unknown error"};
+            return {.ok = false, .json = {}, .error = "unknown error"};
         }
     }
 } // namespace hestia::client

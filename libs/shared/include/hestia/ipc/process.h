@@ -11,9 +11,9 @@
 namespace hestia::ipc {
     // What kind of process this is — drives the default restart policy (servers
     // may auto-restart; client instances do not).
-    enum class ProcessKind { Server, Instance };
+    enum class ProcessKind : std::uint8_t { Server, Instance };
 
-    enum class ProcessState { Starting, Running, Exited, Crashed };
+    enum class ProcessState : std::uint8_t { Starting, Running, Exited, Crashed };
 
     // What to do when a supervised process exits unexpectedly. `max_retries` of 0
     // means restart without limit; a positive value caps the attempts.

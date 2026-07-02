@@ -60,7 +60,7 @@ namespace hestia::ipc {
             if (!algorithm) {
                 throw std::runtime_error("unknown checksum algorithm: " + name);
             }
-            spec.checksum = Checksum{*algorithm, c.value("hex", std::string{})};
+            spec.checksum = Checksum{.algorithm = *algorithm, .hex = c.value("hex", std::string{})};
         }
         return spec;
     }

@@ -13,7 +13,7 @@ namespace hestia::tray {
         SingleInstance(const SingleInstance &) = delete;
         SingleInstance &operator=(const SingleInstance &) = delete;
 
-        bool primary() const { return primary_; }
+        [[nodiscard]] bool primary() const { return primary_; }
 
     private:
         bool primary_ = false;

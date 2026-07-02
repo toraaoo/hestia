@@ -24,7 +24,7 @@ namespace hestia::daemon {
         std::int64_t linux_start_time(std::int64_t pid) {
             std::ifstream f("/proc/" + std::to_string(pid) + "/stat");
             if (!f) return 0;
-            std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+            std::string const content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
             // comm (field 2) is parenthesised and may contain spaces — start
             // parsing after the last ')'.
             const auto close = content.rfind(')');
@@ -54,13 +54,13 @@ namespace hestia::daemon {
 #if !defined(_WIN32)
         class PosixLivenessProbe final : public LivenessProbe {
         public:
-            bool is_alive(std::int64_t pid) const override {
+            [[nodiscard]] bool is_alive(std::int64_t pid) const override {
                 if (pid <= 0) return false;
                 if (::kill(static_cast<pid_t>(pid), 0) == 0) return true;
                 return errno == EPERM; // exists but not ours to signal
             }
 
-            std::int64_t read_start_time(std::int64_t pid) const override {
+            [[nodiscard]] std::int64_t read_start_time(std::int64_t pid) const override {
 #if defined(__linux__)
                 return linux_start_time(pid);
 #elif defined(__APPLE__)

@@ -26,7 +26,7 @@ namespace hestia::daemon {
 
         ~EventHub() {
             {
-                std::lock_guard<std::mutex> lk(mu_);
+                std::scoped_lock const lk(mu_);
                 stop_ = true;
             }
             cv_.notify_all();
@@ -36,12 +36,12 @@ namespace hestia::daemon {
         // Subscribe `conn` to events, optionally filtered to a single process id
         // (matched against the event payload's "id"). Empty filter = all events.
         void subscribe(const std::shared_ptr<ipc::Connection> &conn, std::optional<std::string> id_filter) {
-            std::lock_guard<std::mutex> lk(mu_);
-            subs_.push_back({conn, std::move(id_filter)});
+            std::scoped_lock const lk(mu_);
+            subs_.push_back({.conn = conn, .id_filter = std::move(id_filter)});
         }
 
         void unsubscribe(const ipc::Connection *conn) {
-            std::lock_guard<std::mutex> lk(mu_);
+            std::scoped_lock const lk(mu_);
             std::erase_if(subs_, [&](const Sub &s) {
                 const auto c = s.conn.lock();
                 return !c || c.get() == conn;
@@ -49,7 +49,7 @@ namespace hestia::daemon {
         }
 
         void publish(const ipc::Event &event) {
-            std::lock_guard<std::mutex> lk(mu_);
+            std::scoped_lock const lk(mu_);
             if (queue_.size() >= kMaxQueued) queue_.pop_front();
             queue_.push_back(event);
             cv_.notify_one();
@@ -83,7 +83,7 @@ namespace hestia::daemon {
             const std::string id = event.payload.value("id", std::string{});
             std::vector<std::shared_ptr<ipc::Connection>> targets;
             {
-                std::lock_guard<std::mutex> lk(mu_);
+                std::scoped_lock const lk(mu_);
                 for (const auto &sub: subs_) {
                     auto c = sub.conn.lock();
                     if (!c) continue;

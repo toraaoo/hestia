@@ -17,7 +17,7 @@ namespace hestia::cli {
             const std::string algorithm = value.substr(0, sep);
             const std::string hex = value.substr(sep + 1);
             const auto parsed = ipc::parse_hash_algorithm(algorithm);
-            if (!parsed || !ipc::is_valid_checksum(ipc::Checksum{*parsed, hex})) {
+            if (!parsed || !ipc::is_valid_checksum(ipc::Checksum{.algorithm = *parsed, .hex = hex})) {
                 return false;
             }
             request.checksum_algorithm = algorithm;

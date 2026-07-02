@@ -13,7 +13,7 @@ namespace hestia::ipc {
     Response Response::failure(std::string code, std::string message) {
         Response r;
         r.ok = false;
-        r.error = Error{std::move(code), std::move(message)};
+        r.error = Error{.code = std::move(code), .message = std::move(message)};
         return r;
     }
 
@@ -64,7 +64,7 @@ namespace hestia::ipc {
             r.payload = j.value("payload", json::object());
         } else {
             const json e = j.value("error", json::object());
-            r.error = Error{e.value("code", "error"), e.value("message", "")};
+            r.error = Error{.code = e.value("code", "error"), .message = e.value("message", "")};
         }
         if (j.contains("id") && j["id"].is_number_integer()) r.id = j["id"].get<long long>();
         return r;

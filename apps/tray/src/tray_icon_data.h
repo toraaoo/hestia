@@ -707,7 +707,7 @@ namespace hestia::tray {
         255, 27,  27,  31,  255, 27,  27,  31,  255, 27,  27,  31,  255, 27,  27,  31,  255, 27,  27,  31,  254, 27,
         27,  31,  244, 27,  27,  31,  215, 27,  27,  31,  157, 27,  27,  31,  74,  27,  27,  31,  10,  27,  27,  31,
         0,   27,  27,  31,  0,   27,  27,  32,  0,   27,  27,  32,  0,   0,   0,   0,   0,   0,   0,   0};
-    static const TrayIconPixmap kTrayIcons[] = {{22, kTrayIcon22, sizeof(kTrayIcon22)},
-                                                {32, kTrayIcon32, sizeof(kTrayIcon32)},
-                                                {48, kTrayIcon48, sizeof(kTrayIcon48)}};
+    static const TrayIconPixmap kTrayIcons[] = {{.size = 22, .argb = kTrayIcon22, .len = sizeof(kTrayIcon22)},
+                                                {.size = 32, .argb = kTrayIcon32, .len = sizeof(kTrayIcon32)},
+                                                {.size = 48, .argb = kTrayIcon48, .len = sizeof(kTrayIcon48)}};
 } // namespace hestia::tray

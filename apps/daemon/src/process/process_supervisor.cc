@@ -23,7 +23,7 @@ namespace hestia::daemon {
     namespace fs = std::filesystem;
 
     namespace {
-        constexpr std::uintmax_t kMaxLogBytes = 10u * 1024 * 1024;
+        constexpr std::uintmax_t kMaxLogBytes = std::uintmax_t{10} * 1024 * 1024;
 
         // Cap log growth across crash-looping relaunches by rotating to <log>.1.
         void rotate_log_if_large(const fs::path &log) {
@@ -39,7 +39,7 @@ namespace hestia::daemon {
         // streamer, restart policy) under one lock and one background loop.
         class ProcessSupervisorImpl final : public ProcessSupervisor {
         public:
-            explicit ProcessSupervisorImpl(fs::path data_dir)
+            explicit ProcessSupervisorImpl(const fs::path &data_dir)
                 : logs_dir_(data_dir / "logs"), table_(data_dir / "processes.json"), spawner_(make_process_spawner()),
                   probe_(make_liveness_probe()) {}
 
@@ -62,7 +62,7 @@ namespace hestia::daemon {
 
                 ProcessRecord rec;
                 {
-                    std::lock_guard<std::mutex> lk(mu_);
+                    std::scoped_lock const lk(mu_);
                     auto &records = table_.entries();
                     if (auto it = records.find(spec.id); it != records.end() && probe_->matches(it->second)) {
                         throw std::runtime_error("process already running: " + spec.id);
@@ -90,7 +90,7 @@ namespace hestia::daemon {
                     next_restart_.erase(spec.id);
                     terminating_.erase(spec.id);
                     launched_at_[spec.id] = restart::Clock::now();
-                    table_.save();
+                    persist();
                 }
                 spdlog::info("started process '{}' (pid {})", rec.id, rec.pid);
                 emit(state_event(rec));
@@ -100,7 +100,7 @@ namespace hestia::daemon {
             void stop(const std::string &id) override {
                 std::optional<ProcessRecord> snapshot;
                 {
-                    std::lock_guard<std::mutex> lk(mu_);
+                    std::scoped_lock const lk(mu_);
                     auto &records = table_.entries();
                     const auto it = records.find(id);
                     if (it == records.end()) return;
@@ -112,7 +112,7 @@ namespace hestia::daemon {
                     it->second.state = ProcessState::Exited;
                     next_restart_.erase(id);
                     launched_at_.erase(id);
-                    table_.save();
+                    persist();
                     snapshot = it->second;
                 }
                 spdlog::info("stopped process '{}'", id);
@@ -120,19 +120,19 @@ namespace hestia::daemon {
             }
 
             std::vector<ProcessRecord> list() override {
-                std::lock_guard<std::mutex> lk(mu_);
+                std::scoped_lock const lk(mu_);
                 return table_.snapshot();
             }
 
             std::optional<ProcessRecord> status(const std::string &id) override {
-                std::lock_guard<std::mutex> lk(mu_);
+                std::scoped_lock const lk(mu_);
                 return table_.get(id);
             }
 
             std::optional<std::string> tail_log(const std::string &id, int max_lines) override {
                 fs::path log;
                 {
-                    std::lock_guard<std::mutex> lk(mu_);
+                    std::scoped_lock const lk(mu_);
                     const auto rec = table_.get(id);
                     if (!rec) return std::nullopt;
                     log = rec->log_path;
@@ -141,7 +141,7 @@ namespace hestia::daemon {
             }
 
             void reconcile() override {
-                std::lock_guard<std::mutex> lk(mu_);
+                std::scoped_lock const lk(mu_);
                 bool changed = false;
                 const auto now = restart::Clock::now();
                 for (auto &[id, rec]: table_.entries()) {
@@ -158,7 +158,7 @@ namespace hestia::daemon {
                         launched_at_[id] = now;
                     }
                 }
-                if (changed) table_.save();
+                if (changed) persist();
             }
 
         private:
@@ -169,8 +169,12 @@ namespace hestia::daemon {
                 if (sink_) sink_(event);
             }
 
+            void persist() {
+                if (!table_.save()) spdlog::warn("failed to persist process table");
+            }
+
             ipc::Event state_event(const ProcessRecord &rec) const {
-                return ipc::Event{ipc::topics::kProcessState, ipc::to_json(rec)};
+                return ipc::Event{.topic = ipc::topics::kProcessState, .payload = ipc::to_json(rec)};
             }
 
             // The supervision loop: detect deaths, stream new log output, and
@@ -180,7 +184,7 @@ namespace hestia::daemon {
                 while (running_.load()) {
                     std::vector<ipc::Event> events;
                     {
-                        std::lock_guard<std::mutex> lk(mu_);
+                        std::scoped_lock const lk(mu_);
                         tick_locked(events);
                     }
                     for (const auto &event: events) emit(event);
@@ -228,8 +232,8 @@ namespace hestia::daemon {
                         changed = true;
                     }
                     if (std::string chunk = streamer_.read_new(id, rec.log_path); !chunk.empty()) {
-                        events.push_back(
-                            ipc::Event{ipc::topics::kProcessLog, {{"id", id}, {"text", std::move(chunk)}}});
+                        events.push_back(ipc::Event{.topic = ipc::topics::kProcessLog,
+                                                    .payload = {{"id", id}, {"text", std::move(chunk)}}});
                     }
                     if (const auto at = launched_at_.find(id);
                         at != launched_at_.end() && restart::should_reset_retries(rec, now - at->second)) {
@@ -257,7 +261,7 @@ namespace hestia::daemon {
                     }
                 }
 
-                if (changed) table_.save();
+                if (changed) persist();
             }
 
             void force_kill_unresponsive(restart::Clock::time_point now) {

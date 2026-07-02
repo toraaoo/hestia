@@ -1,9 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 
 namespace hestia {
-    enum class LogLevel {
+    enum class LogLevel : std::uint8_t {
         trace,
         debug,
         info,

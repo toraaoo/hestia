@@ -17,7 +17,7 @@ namespace hestia::tray {
     }
 
     void TrayApp::seed_state() {
-        std::lock_guard<std::mutex> lk(mu_);
+        std::scoped_lock const lk(mu_);
         try {
             for (const auto &p: client_.process_list()) states_[p.id] = p.state;
         } catch (const std::exception &) {
@@ -33,7 +33,7 @@ namespace hestia::tray {
     void TrayApp::on_event(const client::ProcessEvent &event) {
         if (event.topic != "process.state" || !event.process) return; // ignore log chunks
         {
-            std::lock_guard<std::mutex> lk(mu_);
+            std::scoped_lock const lk(mu_);
             states_[event.process->id] = event.process->state;
         }
         rebuild_model();
@@ -42,7 +42,7 @@ namespace hestia::tray {
     void TrayApp::rebuild_model() {
         TrayModel model;
         {
-            std::lock_guard<std::mutex> lk(mu_);
+            std::scoped_lock const lk(mu_);
 
             std::size_t running = 0;
             for (const auto &[id, state]: states_) {
@@ -91,7 +91,7 @@ namespace hestia::tray {
     void TrayApp::toggle_autostart() {
         bool target;
         {
-            std::lock_guard<std::mutex> lk(mu_);
+            std::scoped_lock const lk(mu_);
             target = !autostart_enabled_;
         }
         try {
@@ -100,7 +100,7 @@ namespace hestia::tray {
             } else {
                 client_.autostart_disable();
             }
-            std::lock_guard<std::mutex> lk(mu_);
+            std::scoped_lock const lk(mu_);
             autostart_enabled_ = target;
         } catch (const std::exception &) {
             // Leave the cached state unchanged if the daemon rejected the change.

@@ -66,7 +66,7 @@ namespace hestia::daemon {
             const ssize_t n = ::readlink("/proc/self/exe", buf, sizeof(buf) - 1);
             if (n <= 0) throw std::runtime_error("cannot resolve daemon executable path");
             buf[n] = '\0';
-            return fs::path(buf);
+            return {buf};
         }
 
         fs::path systemd_user_dir() {
@@ -115,7 +115,7 @@ namespace hestia::daemon {
                 run_command({"systemctl", "--user", "daemon-reload"});
             }
 
-            bool is_enabled() const override {
+            [[nodiscard]] bool is_enabled() const override {
                 std::error_code ec;
                 const fs::path link = systemd_user_dir() / "default.target.wants" / kUnitName;
                 return fs::exists(link, ec);

@@ -49,7 +49,11 @@ namespace hestia::engine {
         }
 
         std::optional<Hasher> hasher;
-        if (checksum) hasher.emplace(checksum->algorithm);
+        std::string expected;
+        if (checksum) {
+            hasher.emplace(checksum->algorithm);
+            expected = to_lower(checksum->hex);
+        }
 
         const cpr::WriteCallback write_cb([&](std::string_view data, intptr_t) {
             out.write(data.data(), static_cast<std::streamsize>(data.size()));
@@ -80,9 +84,7 @@ namespace hestia::engine {
         }
 
         if (hasher) {
-            const std::string actual = hasher->hex_digest();
-            const std::string expected = to_lower(checksum->hex);
-            if (actual != expected) {
+            if (const std::string actual = hasher->hex_digest(); actual != expected) {
                 remove_quietly(part);
                 throw std::runtime_error(
                     fmt::format("checksum mismatch for {}: expected {}, got {}", url, expected, actual));

@@ -85,7 +85,7 @@ namespace hestia::tray {
 
             void set_model(TrayModel model) override {
                 {
-                    std::lock_guard<std::mutex> lk(mu_);
+                    std::scoped_lock const lk(mu_);
                     model_ = std::move(model);
                     ++revision_;
                 }
@@ -110,10 +110,14 @@ namespace hestia::tray {
                     return;
                 }
 
-                static const GDBusInterfaceVTable item_vtable{
-                    &GDBusTrayBackend::item_method, &GDBusTrayBackend::item_get_property, nullptr, {}};
-                static const GDBusInterfaceVTable menu_vtable{
-                    &GDBusTrayBackend::menu_method, &GDBusTrayBackend::menu_get_property, nullptr, {}};
+                static const GDBusInterfaceVTable item_vtable{.method_call = &GDBusTrayBackend::item_method,
+                                                              .get_property = &GDBusTrayBackend::item_get_property,
+                                                              .set_property = nullptr,
+                                                              .padding = {}};
+                static const GDBusInterfaceVTable menu_vtable{.method_call = &GDBusTrayBackend::menu_method,
+                                                              .get_property = &GDBusTrayBackend::menu_get_property,
+                                                              .set_property = nullptr,
+                                                              .padding = {}};
 
                 g_dbus_connection_register_object(connection_, kItemPath,
                                                   g_dbus_node_info_lookup_interface(nodes_, kItemIface), &item_vtable,
@@ -168,7 +172,7 @@ namespace hestia::tray {
                 if (!b->connection_) return G_SOURCE_REMOVE;
                 guint revision;
                 {
-                    std::lock_guard<std::mutex> lk(b->mu_);
+                    std::scoped_lock const lk(b->mu_);
                     revision = b->revision_;
                 }
                 g_dbus_connection_emit_signal(b->connection_, nullptr, kMenuPath, kMenuIface, "LayoutUpdated",
@@ -193,7 +197,7 @@ namespace hestia::tray {
                     GVariantBuilder builder;
                     g_variant_builder_init(&builder, G_VARIANT_TYPE("a(iiay)"));
                     for (const auto &px: kTrayIcons) {
-                        GVariant *bytes =
+                        GVariant const *bytes =
                             g_variant_new_fixed_array(G_VARIANT_TYPE_BYTE, px.argb, px.len, sizeof(unsigned char));
                         g_variant_builder_add(&builder, "(ii@ay)", px.size, px.size, bytes);
                     }
@@ -204,10 +208,10 @@ namespace hestia::tray {
                 if (prop == "ToolTip") {
                     std::string tip;
                     {
-                        std::lock_guard<std::mutex> lk(b->mu_);
+                        std::scoped_lock const lk(b->mu_);
                         tip = b->model_.tooltip;
                     }
-                    GVariant *pixmaps = g_variant_new_array(G_VARIANT_TYPE("(iiay)"), nullptr, 0);
+                    GVariant const *pixmaps = g_variant_new_array(G_VARIANT_TYPE("(iiay)"), nullptr, 0);
                     return g_variant_new("(s@a(iiay)ss)", "applications-system", pixmaps, tip.c_str(), "");
                 }
                 return nullptr;
@@ -254,7 +258,7 @@ namespace hestia::tray {
             }
 
             GVariant *root_node() {
-                std::lock_guard<std::mutex> lk(mu_);
+                std::scoped_lock const lk(mu_);
                 GVariantBuilder props;
                 g_variant_builder_init(&props, G_VARIANT_TYPE("a{sv}"));
                 g_variant_builder_add(&props, "{sv}", "children-display", g_variant_new_string("submenu"));
@@ -273,7 +277,7 @@ namespace hestia::tray {
                 if (name == "GetLayout") {
                     guint revision;
                     {
-                        std::lock_guard<std::mutex> lk(mu_);
+                        std::scoped_lock const lk(mu_);
                         revision = revision_;
                     }
                     g_dbus_method_invocation_return_value(inv, g_variant_new("(u@(ia{sv}av))", revision, root_node()));
@@ -317,7 +321,7 @@ namespace hestia::tray {
                 while (g_variant_iter_next(&it, "i", &id)) ids.push_back(id);
                 g_variant_unref(ids_v);
 
-                std::lock_guard<std::mutex> lk(mu_);
+                std::scoped_lock const lk(mu_);
                 if (ids.empty()) { // empty request means "all"
                     ids.push_back(0);
                     for (std::size_t i = 0; i < model_.items.size(); ++i) ids.push_back(static_cast<int>(i + 1));
@@ -325,7 +329,7 @@ namespace hestia::tray {
 
                 GVariantBuilder out;
                 g_variant_builder_init(&out, G_VARIANT_TYPE("a(ia{sv})"));
-                for (int wanted: ids) {
+                for (int const wanted: ids) {
                     if (wanted == 0) {
                         GVariantBuilder p;
                         g_variant_builder_init(&p, G_VARIANT_TYPE("a{sv}"));
@@ -368,7 +372,7 @@ namespace hestia::tray {
                 if (!event_id || std::string(event_id) != "clicked") return;
                 std::function<void()> callback;
                 {
-                    std::lock_guard<std::mutex> lk(mu_);
+                    std::scoped_lock const lk(mu_);
                     if (id >= 1 && static_cast<std::size_t>(id) <= model_.items.size()) {
                         callback = model_.items[id - 1].on_click;
                     }

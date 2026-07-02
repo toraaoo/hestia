@@ -123,7 +123,7 @@ namespace hestia::client {
         // thread for each matching event; pass an `id_filter` to scope it to one
         // process, or empty for all. Call before issuing further requests; the
         // history up to now is available via process_logs.
-        void subscribe(EventCallback cb, std::string id_filter = {});
+        void subscribe(EventCallback cb, const std::string &id_filter = {});
 
         // Download a file via the daemon, blocking until it completes;
         // `on_progress` is invoked on the reader thread as bytes arrive. Throws

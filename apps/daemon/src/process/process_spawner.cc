@@ -80,9 +80,9 @@ namespace hestia::daemon {
                     return std::nullopt;
                 }
                 if (WIFSIGNALED(status)) {
-                    return ProcessExit{WTERMSIG(status), true};
+                    return ProcessExit{.code = WTERMSIG(status), .signaled = true};
                 }
-                return ProcessExit{WIFEXITED(status) ? WEXITSTATUS(status) : -1, false};
+                return ProcessExit{.code = WIFEXITED(status) ? WEXITSTATUS(status) : -1, .signaled = false};
             }
 
             void terminate(std::int64_t pid) override { signal_group(pid, SIGTERM); }

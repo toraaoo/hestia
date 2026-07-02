@@ -14,7 +14,7 @@ namespace hestia::daemon {
     DownloadManager::~DownloadManager() {
         std::vector<Worker> workers;
         {
-            std::lock_guard<std::mutex> lk(mu_);
+            std::scoped_lock const lk(mu_);
             workers = std::move(workers_);
         }
         for (auto &worker: workers) {
@@ -31,7 +31,7 @@ namespace hestia::daemon {
             run(id, url, destination, checksum);
             done->store(true);
         });
-        std::lock_guard<std::mutex> lk(mu_);
+        std::scoped_lock const lk(mu_);
         prune_finished();
         workers_.push_back(Worker{.thread = std::move(thread), .done = std::move(done)});
         return id;

@@ -42,7 +42,7 @@ namespace hestia::daemon {
                     conn->send(ipc::encode(ipc::Response::failure(ipc::errors::kBadRequest, e.what())));
                     continue;
                 }
-                HandlerContext ctx{runtime, conn, peer};
+                HandlerContext ctx{.runtime = runtime, .connection = conn, .peer = peer};
                 auto res = router.route(req, ctx);
                 res.id = req.id;
                 conn->send(ipc::encode(res));
@@ -74,7 +74,7 @@ namespace hestia::daemon {
 #endif
 
         spdlog::info("hestiad listening on {}", endpoint.string());
-        listener->serve([&](std::shared_ptr<ipc::Connection> conn, const ipc::Peer &peer) {
+        listener->serve([&](const std::shared_ptr<ipc::Connection> &conn, const ipc::Peer &peer) {
             spdlog::debug("client connected (uid {})", peer.uid);
             serve_connection(conn, peer, router, runtime);
             spdlog::debug("client disconnected");

@@ -26,7 +26,7 @@ namespace hestia::cli {
         std::string home;
 
         // Minimum log level implied by the verbose/quiet flags.
-        LogLevel log_level() const {
+        [[nodiscard]] LogLevel log_level() const {
             if (verbose) {
                 return LogLevel::debug;
             }

@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iterator>
+#include <utility>
 #include <vector>
 
 namespace hestia::daemon {
@@ -30,8 +31,8 @@ namespace hestia::daemon {
         const std::streamoff size = f.tellg();
         if (size < 0) return {};
         auto &offset = offsets_[id];
-        if (static_cast<std::uint64_t>(size) < offset) offset = 0; // truncated/rotated
-        if (static_cast<std::uint64_t>(size) == offset) return {}; // nothing new
+        if (std::cmp_less(size, offset)) offset = 0; // truncated/rotated
+        if (std::cmp_equal(size, offset)) return {}; // nothing new
         f.seekg(static_cast<std::streamoff>(offset));
         std::string chunk((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
         offset += chunk.size();

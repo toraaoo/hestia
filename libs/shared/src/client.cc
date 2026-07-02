@@ -40,8 +40,12 @@ namespace hestia::client {
         ProcessInfo process_from_json(const json &p) {
             const auto rec = ipc::record_from_json(p);
             return ProcessInfo{
-                rec.id,  ipc::to_string(rec.kind), ipc::to_string(rec.state),
-                rec.pid, rec.start_time,           rec.log_path.string(),
+                .id = rec.id,
+                .kind = ipc::to_string(rec.kind),
+                .state = ipc::to_string(rec.state),
+                .pid = rec.pid,
+                .start_time = rec.start_time,
+                .log_path = rec.log_path.string(),
             };
         }
 
@@ -138,9 +142,9 @@ namespace hestia::client {
 
         fs::path find_daemon() {
 #if defined(_WIN32)
-            const fs::path exe = L"hestiad.exe";
+            fs::path exe = L"hestiad.exe";
 #else
-            const fs::path exe = "hestiad";
+            fs::path exe = "hestiad";
 #endif
             const fs::path dir = self_dir();
             if (!dir.empty()) {
@@ -188,7 +192,7 @@ namespace hestia::client {
                 if (ipc::is_event(j)) {
                     RawEventCallback cb;
                     {
-                        std::lock_guard<std::mutex> lk(mu);
+                        std::scoped_lock const lk(mu);
                         cb = on_event;
                     }
                     if (cb) cb(ipc::decode_event(j));
@@ -196,13 +200,13 @@ namespace hestia::client {
                 }
                 ipc::Response res = ipc::decode_response(j);
                 const long long id = res.id.value_or(0);
-                std::lock_guard<std::mutex> lk(mu);
+                std::scoped_lock const lk(mu);
                 ready[id] = std::move(res);
                 cv.notify_all();
             }
             // The connection closed: wake every waiter so they fail instead of
             // blocking forever.
-            std::lock_guard<std::mutex> lk(mu);
+            std::scoped_lock const lk(mu);
             closed = true;
             cv.notify_all();
         }
@@ -210,7 +214,7 @@ namespace hestia::client {
         ipc::Response call(const std::string &channel, json payload) {
             long long id;
             {
-                std::lock_guard<std::mutex> lk(mu);
+                std::scoped_lock const lk(mu);
                 if (closed) throw std::runtime_error("daemon connection lost");
                 id = next_id++;
             }
@@ -240,12 +244,12 @@ namespace hestia::client {
         using RawEventCallback = std::function<void(const ipc::Event &)>;
 
         void set_event_callback(RawEventCallback cb) {
-            std::lock_guard<std::mutex> lk(mu);
+            std::scoped_lock const lk(mu);
             on_event = std::move(cb);
         }
 
         bool is_closed() {
-            std::lock_guard<std::mutex> lk(mu);
+            std::scoped_lock const lk(mu);
             return closed;
         }
 
@@ -305,14 +309,14 @@ namespace hestia::client {
 
     fs::path Client::config_home() {
         const auto res = must(d_->call("config.home", json::object()));
-        return fs::path(res.payload.at("path").get<std::string>());
+        return {res.payload.at("path").get<std::string>()};
     }
 
     fs::path Client::config_set_home(std::string_view dir) {
         json payload = json::object();
         if (!dir.empty()) payload["dir"] = std::string(dir);
         const auto res = must(d_->call("config.set-home", std::move(payload)));
-        return fs::path(res.payload.at("path").get<std::string>());
+        return {res.payload.at("path").get<std::string>()};
     }
 
     std::string Client::greet(std::string_view name) {
@@ -324,8 +328,11 @@ namespace hestia::client {
         const auto res = must(d_->call("app.info", json::object()));
         const auto &p = res.payload;
         return AppInfo{
-            p.value("name", std::string{}),   p.value("version", std::string{}), p.value("id", std::string{}),
-            p.value("vendor", std::string{}), p.value("channel", std::string{}),
+            .name = p.value("name", std::string{}),
+            .version = p.value("version", std::string{}),
+            .id = p.value("id", std::string{}),
+            .vendor = p.value("vendor", std::string{}),
+            .channel = p.value("channel", std::string{}),
         };
     }
 
@@ -349,8 +356,9 @@ namespace hestia::client {
         launch.program = spec.program;
         launch.args = spec.args;
         launch.working_dir = spec.cwd;
-        launch.restart = {spec.restart.auto_restart, spec.restart.max_retries,
-                          std::chrono::milliseconds(spec.restart.backoff_ms)};
+        launch.restart = {.auto_restart = spec.restart.auto_restart,
+                          .max_retries = spec.restart.max_retries,
+                          .backoff = std::chrono::milliseconds(spec.restart.backoff_ms)};
         return process_from_json(must(d_->call("process.start", ipc::to_json(launch))).payload);
     }
 
@@ -379,7 +387,7 @@ namespace hestia::client {
         return res.payload.value("text", std::string{});
     }
 
-    void Client::subscribe(EventCallback cb, std::string id_filter) {
+    void Client::subscribe(EventCallback cb, const std::string &id_filter) {
         d_->set_event_callback([cb = std::move(cb)](const ipc::Event &event) {
             if (!event.topic.starts_with("process.")) return;
             cb(to_process_event(event));
@@ -400,7 +408,7 @@ namespace hestia::client {
             if (!algorithm) {
                 throw std::runtime_error("unknown checksum algorithm: " + request.checksum_algorithm);
             }
-            ipc::Checksum checksum{*algorithm, request.checksum_hex};
+            ipc::Checksum checksum{.algorithm = *algorithm, .hex = request.checksum_hex};
             if (!ipc::is_valid_checksum(checksum)) {
                 throw std::runtime_error(request.checksum_algorithm + " checksum must be " +
                                          std::to_string(ipc::hex_digest_length(*algorithm)) + " hex characters");
@@ -440,7 +448,7 @@ namespace hestia::client {
             if (event.topic != ipc::topics::kDownloadDone && event.topic != ipc::topics::kDownloadError) {
                 return;
             }
-            std::lock_guard<std::mutex> lk(outcome->mu);
+            std::scoped_lock const lk(outcome->mu);
             outcome->done = true;
             outcome->ok = event.topic == ipc::topics::kDownloadDone;
             outcome->message = event.payload.value("message", std::string{});
