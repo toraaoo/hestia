@@ -86,11 +86,14 @@ hestia-cpp/
 │   │   │                      app_info.h is GENERATED from app_info.h.in (shared identity)
 │   │   └── src/               implementations (transport, protocol, client, logging)
 │   └── engine/                hestia_engine — launcher engine (daemon-internal)
-│       ├── include/hestia/    PUBLIC headers (config.h, greeting.h)
-│       └── src/               implementations
+│       ├── include/hestia/engine/  PUBLIC headers, one folder per domain:
+│       │                      engine.h (aggregate root), config/, download/,
+│       │                      greeting/, support/ (cross-domain helpers)
+│       └── src/               implementations, mirroring include/'s domain folders
 ├── apps/
 │   ├── cli/                   hestia_cli — CLI11 commands + main()
-│   ├── daemon/               hestia_daemon (hestiad) — IPC router, services, supervision, autostart
+│   ├── daemon/               hestia_daemon (hestiad) — bootstrap main.cc over
+│   │                          src/{runtime,process,downloads,platform,services}/
 │   ├── tray/                 hestia_tray — resident system-tray helper (per-platform backends)
 │   └── desktop/               hestia_desktop — CEF launcher (see "Desktop launcher" below)
 │       ├── frontend/          Vite + React + TS app (built with Bun) → dist/ embedded
@@ -149,7 +152,11 @@ the one public boundary between them — the socket — and nothing launcher-spe
   logger once at startup. `LogLevel` is Hestia's own enum so callers don't depend
   on spdlog's; `logging.cc` maps it across.
 - **`ipc`** — the platform transport (`transport_posix.cc` / `transport_windows.cc`),
-  endpoint resolution, and the JSON protocol envelope.
+  endpoint resolution, and the JSON protocol envelope. It also carries the wire
+  **vocabulary** for domains that cross the socket — `process.h`/`process_codec.h`
+  and `download.h`/`download_codec.h` pair the domain types with their one
+  JSON codec, so the daemon and every client (de)serialize through the same
+  definitions and cannot drift.
 - **`client`** — the typed client SDK (`hestia::client::Client`) front-ends use to
   drive the daemon.
 - **identity** — `app_info.h` is generated from `app_info.h.in` and exposed on the
@@ -175,28 +182,35 @@ list plus a getter, with no change to the daemon's wiring. `set_data_home()`
 re-resolves the data directory and repoints every subsystem so a `config.set-home`
 takes effect on the running daemon, not just the next start.
 
-The subsystems behind it today:
+Headers live under `include/hestia/engine/<domain>/`, one folder per domain, with
+`src/` mirroring the same layout — a new domain gets a folder, not a longer flat
+list. The subsystems behind the aggregate today:
 
-- **`ConfigStore`** (`config_store.h`) — a thread-safe live view of the flat
-  `key=value` config file. Reads/writes are serialized for concurrent clients and
-  every `set()` is persisted immediately; `reload()` repoints it when the data
+- **`ConfigStore`** (`config/config_store.h`) — a thread-safe live view of the
+  flat `key=value` config file. Reads/writes are serialized for concurrent clients
+  and every `set()` is persisted immediately; `reload()` repoints it when the data
   directory changes. Built on the lower-level `config` module below.
-- **`config`** — data-directory resolution and the flat `key=value` `Config`
-  store. Resolution precedence (`data_home`): `--home` override → `$HESTIA_HOME` →
-  a persisted pointer file under the anchor dir (`~/.hestia` or `%APPDATA%\Hestia`)
-  → the platform default. `Config::load` / `get` / `set` / `save` operate on the
-  file at `config_path()`. A missing file is an empty config, not an error. The
-  desktop app still links these path helpers directly (the transitional exception).
-- **`Downloader`** (`downloader.h`) — streams a URL to disk through a `.part`
-  temp file (via cpr), hashing incrementally when a checksum is given and
+- **`config`** (`config/config.h`) — data-directory resolution and the flat
+  `key=value` `Config` store. Resolution precedence (`data_home`): `--home`
+  override → `$HESTIA_HOME` → a persisted pointer file under the anchor dir
+  (`~/.hestia` or `%APPDATA%\Hestia`) → the platform default. `Config::load` /
+  `get` / `set` / `save` operate on the file at `config_path()`. A missing file is
+  an empty config, not an error.
+- **`Downloader`** (`download/downloader.h`) — streams a URL to disk through a
+  `.part` temp file (via cpr), hashing incrementally when a checksum is given and
   renaming into place only on success. Stateless, so it hangs off no aggregate —
-  the daemon's download manager constructs one per download.
-- **`checksum`** (`checksum.h`) — native incremental SHA-1/SHA-256 (`Hasher`),
-  so a download is verified as it streams rather than re-read afterwards.
-- **`greeting`** — `greet(name)`; a placeholder exercising the engine→frontend seam.
+  the daemon's download manager constructs one per download. Its checksum
+  vocabulary (`ipc::Checksum`, `ipc::HashAlgorithm`) comes from
+  `<hestia/ipc/download.h>`, the same types the wire uses.
+- **`support/checksum`** — native incremental SHA-1/SHA-256 (`Hasher`), so a
+  download is verified as it streams rather than re-read afterwards.
+- **`greeting`** (`greeting/greeting.h`) — `greet(name)`; a placeholder
+  exercising the engine→frontend seam.
 
 `engine` links fmt and cpr **privately** — implementation details that do not leak
-through its public headers.
+through its public headers. `hestia_shared` is linked **publicly**: the engine's
+headers expose shared download types, and it resolves paths through
+`hestia::paths`.
 
 ## Daemon (`apps/daemon`)
 
@@ -204,28 +218,47 @@ through its public headers.
 services, supervises launched processes, and manages autostart. It is the only
 target that links `hestia_engine` directly.
 
-- **Router** (`router.{h,cc}`) — maps a channel string to a handler
-  (`router.on("config.get", …)`). Each service registers its channels at startup;
-  a `HandlerContext` threads the engine, supervisor, and the calling connection
-  through to handlers. Handlers can answer synchronously or stream.
-- **Services** (`src/services/`) — one file per channel-prefix, wired in once.
-  Today: `health` (`health.ping`), `app` (`app.info`, `app.greet`), `config`
-  (`config.get|set|home|set-home`), `process` (`process.start|stop|list|status|logs`),
-  `autostart` (`autostart.enable|disable|status`), `downloads` (`download.start`),
-  and `events` (`events.subscribe`, a streaming channel that pushes to the calling
+`src/` is split into a thin bootstrap plus one folder per concern; local includes
+are subdir-qualified (`"runtime/router.h"`):
+
+- **`main.cc`** — bootstrap only: CLI11 parsing, logging init, `hestiad ping`,
+  and a delegation to `runtime::run_daemon()`.
+- **`runtime/`** — the serving machinery. `server.{h,cc}` binds the endpoint,
+  builds the `Runtime`, registers the services, and serves connections until
+  signalled; `router.{h,cc}` maps a channel string to a handler
+  (`router.on("config.get", …)`); `event_hub.h` fans daemon events out to
+  subscribed connections.
+  - **`Runtime`** (`runtime.h`) — the one place the daemon's long-lived
+    collaborators live: the engine, the event hub, the download manager, and the
+    process supervisor, constructed in dependency order (the hub before anything
+    that publishes into it, so reverse-order destruction tears the publishers
+    down first). Adding a subsystem is a member plus an accessor here — the serve
+    loop and every existing service are untouched.
+  - **`HandlerContext`** (`handler_context.h`) — what every handler receives:
+    `{Runtime &runtime, connection, peer}`. Handlers reach collaborators through
+    accessors (`ctx.runtime.engine()`, `ctx.runtime.supervisor()`, …); the
+    per-request connection is what lets streaming channels (`events.subscribe`)
+    be ordinary handlers.
+- **`services/`** — one file per channel-prefix, wired in once via
+  `register_all_services()` in `services.h`. Today: `health` (`health.ping`),
+  `app` (`app.info`, `app.greet`), `config` (`config.get|set|home|set-home`),
+  `process` (`process.start|stop|list|status|logs`), `autostart`
+  (`autostart.enable|disable|status`), `downloads` (`download.start`), and
+  `events` (`events.subscribe`, a streaming channel that pushes to the calling
   connection).
-- **Downloads** (`download_manager.{h,cc}`) — runs each download on a worker
+- **`downloads/`** (`download_manager.{h,cc}`) — runs each download on a worker
   thread so `download.start` answers immediately; progress and the terminal
   outcome are published through the event hub as `download.progress`,
   `download.done`, and `download.error` events (throttled progress, filtered by
   the download's id like process events).
-- **Process supervision** (`process_supervisor`, `process_table`, `process_spawner`,
+- **`process/`** (`process_supervisor`, `process_table`, `process_spawner`,
   `liveness_probe`, `log_streamer`, `restart_policy`) — launches Minecraft (and
   other) processes as children of the daemon, tracks them in a process table,
   probes liveness, streams their logs, and applies a restart policy. Reaping the
   children yields their exit codes.
-- **Autostart** (`autostart.{h,cc}`) — registers/removes the daemon as a
-  login-time service per platform, driven over the `autostart.*` channels.
+- **`platform/`** (`autostart.{h,cc}`, `win_util.h`) — registers/removes the
+  daemon as a login-time service per platform, driven over the `autostart.*`
+  channels, plus Windows-specific helpers.
 
 The daemon links `hestia_shared`, `hestia_engine`, CLI11, nlohmann_json, and
 spdlog — no UI dependencies.

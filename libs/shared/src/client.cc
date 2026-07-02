@@ -1,5 +1,7 @@
 #include "hestia/client/client.h"
 
+#include "hestia/ipc/download.h"
+#include "hestia/ipc/download_codec.h"
 #include "hestia/ipc/endpoint.h"
 #include "hestia/ipc/errors.h"
 #include "hestia/ipc/process_codec.h"
@@ -405,6 +407,26 @@ namespace hestia::client {
 
     void Client::download(const DownloadRequest &request,
                           const DownloadProgressCallback &on_progress) {
+        // Map the client-facing request onto the shared wire type, validating the
+        // checksum here so a malformed one fails clearly without a round-trip.
+        ipc::DownloadSpec spec;
+        spec.url = request.url;
+        spec.destination = request.destination;
+        if (!request.checksum_algorithm.empty()) {
+            const auto algorithm = ipc::parse_hash_algorithm(request.checksum_algorithm);
+            if (!algorithm) {
+                throw std::runtime_error("unknown checksum algorithm: " +
+                                         request.checksum_algorithm);
+            }
+            ipc::Checksum checksum{*algorithm, request.checksum_hex};
+            if (!ipc::is_valid_checksum(checksum)) {
+                throw std::runtime_error(
+                    request.checksum_algorithm + " checksum must be " +
+                    std::to_string(ipc::hex_digest_length(*algorithm)) + " hex characters");
+            }
+            spec.checksum = std::move(checksum);
+        }
+
         // A client-generated id lets us subscribe before starting, so even a
         // download that finishes instantly cannot slip its terminal event past us.
         static std::atomic<int> counter{0};
@@ -415,6 +437,7 @@ namespace hestia::client {
 #endif
         const std::string id =
             "dl-" + std::to_string(pid) + "-" + std::to_string(++counter);
+        spec.id = id;
 
         struct Outcome {
             std::mutex mu;
@@ -429,10 +452,8 @@ namespace hestia::client {
             if (event.payload.value("id", std::string{}) != id) return;
             if (event.topic == ipc::topics::kDownloadProgress) {
                 if (on_progress) {
-                    on_progress(DownloadProgress{
-                        .downloaded = event.payload.value("downloaded", std::uint64_t{0}),
-                        .total = event.payload.value("total", std::uint64_t{0}),
-                    });
+                    const auto p = ipc::progress_from_json(event.payload);
+                    on_progress(DownloadProgress{.downloaded = p.downloaded, .total = p.total});
                 }
                 return;
             }
@@ -449,13 +470,7 @@ namespace hestia::client {
 
         try {
             must(d_->call("events.subscribe", {{"id", id}}));
-
-            json payload = {{"url", request.url}, {"dest", request.destination}, {"id", id}};
-            if (!request.checksum_algorithm.empty()) {
-                payload["checksum"] = {{"algorithm", request.checksum_algorithm},
-                                       {"hex", request.checksum_hex}};
-            }
-            must(d_->call("download.start", std::move(payload)));
+            must(d_->call("download.start", ipc::to_json(spec)));
 
             std::unique_lock<std::mutex> lk(outcome->mu);
             while (!outcome->done) {

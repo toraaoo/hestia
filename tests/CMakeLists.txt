@@ -2,6 +2,7 @@
 add_executable(hestia_tests
         shared/protocol_test.cc
         shared/process_codec_test.cc
+        shared/download_codec_test.cc
         shared/paths_test.cc
         shared/endpoint_test.cc
         shared/transport_test.cc

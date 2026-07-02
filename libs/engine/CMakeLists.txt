@@ -7,22 +7,24 @@ include(GNUInstallDirs)
 # link it directly.)
 add_library(hestia_engine STATIC
         include/hestia/engine/engine.h
-        include/hestia/engine/config_store.h
-        include/hestia/engine/checksum.h
-        include/hestia/engine/downloader.h
-        include/hestia/greeting.h
-        include/hestia/config.h
+        include/hestia/engine/config/config.h
+        include/hestia/engine/config/config_store.h
+        include/hestia/engine/download/downloader.h
+        include/hestia/engine/greeting/greeting.h
+        include/hestia/engine/support/checksum.h
         src/engine.cc
-        src/config_store.cc
-        src/checksum.cc
-        src/downloader.cc
-        src/greeting.cc
-        src/config.cc
+        src/config/config.cc
+        src/config/config_store.cc
+        src/download/downloader.cc
+        src/greeting/greeting.cc
+        src/support/checksum.cc
 )
 
-# The engine resolves its data directory via hestia::paths (hestia/paths.h), the
-# shared single source of truth for where Hestia's data lives.
-target_link_libraries(hestia_engine PRIVATE hestia_shared)
+# hestia_shared is PUBLIC: the engine resolves its data directory via
+# hestia::paths, and its public headers now expose shared download types
+# (ipc::Checksum in downloader.h, ipc::HashAlgorithm in checksum.h), so
+# consumers of the engine need shared's headers too.
+target_link_libraries(hestia_engine PUBLIC hestia_shared)
 
 target_include_directories(hestia_engine
         PUBLIC

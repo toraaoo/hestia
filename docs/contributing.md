@@ -105,13 +105,14 @@ The worked example below adds an `instances` domain end-to-end. Model the store
 on `ConfigStore` and the service/client on the `config` channels.
 
 **1. Write the subsystem** as a `hestia::engine::<Thing>` class — public header in
-`libs/engine/include/hestia/engine/<thing>.h`, implementation in
-`libs/engine/src/<thing>.cc`, both added to `libs/engine/CMakeLists.txt`. Take a
-path under the data dir in the constructor, serialize access for concurrent
-clients, and keep deps (fmt) out of the public header (link them `PRIVATE`).
+`libs/engine/include/hestia/engine/<domain>/<thing>.h` (one folder per domain,
+`src/` mirroring it), implementation in `libs/engine/src/<domain>/<thing>.cc`,
+both added to `libs/engine/CMakeLists.txt`. Take a path under the data dir in the
+constructor, serialize access for concurrent clients, and keep deps (fmt) out of
+the public header (link them `PRIVATE`).
 
 ```cpp
-// libs/engine/include/hestia/engine/instance_store.h
+// libs/engine/include/hestia/engine/instances/instance_store.h
 #pragma once
 
 #include <filesystem>
@@ -143,8 +144,8 @@ namespace hestia::engine {
 ```
 
 ```cpp
-// libs/engine/src/instance_store.cc
-#include <hestia/engine/instance_store.h>
+// libs/engine/src/instances/instance_store.cc
+#include <hestia/engine/instances/instance_store.h>
 
 namespace hestia::engine {
     InstanceStore::InstanceStore(std::filesystem::path dir) : dir_(std::move(dir)) {
@@ -177,7 +178,7 @@ the initializer list against `data_home_`, a getter, and a `reload()` in
 
 ```cpp
 // engine.h — inside class Engine
-#include <hestia/engine/instance_store.h>
+#include <hestia/engine/instances/instance_store.h>
 // ...
         InstanceStore &instances() { return instances_; }
 // ...
@@ -203,15 +204,18 @@ std::filesystem::path Engine::set_data_home(const std::string &dir) {
 
 **3. Surface it over IPC** — a daemon service plus a client method. Add
 `apps/daemon/src/services/instances_service.cc`, declare it in
-`services/services.h`, call it in `run_daemon` (`main.cc`), and list it in the
-daemon `CMakeLists.txt`:
+`services/services.h`, add it to `register_all_services()` in the same header,
+and list it in the daemon `CMakeLists.txt`. Handlers receive a `HandlerContext`
+of `{Runtime &runtime, connection, peer}` and reach the daemon's long-lived
+collaborators through the runtime's accessors:
 
 ```cpp
 // apps/daemon/src/services/instances_service.cc
 #include "services/services.h"
 
-#include "handler_context.h"
-#include "router.h"
+#include "runtime/handler_context.h"
+#include "runtime/router.h"
+#include "runtime/runtime.h"
 
 #include <hestia/engine/engine.h>
 
@@ -219,7 +223,7 @@ namespace hestia::daemon {
     void register_instances_service(Router &router) {
         router.on("instances.list", [](const ipc::Request &, HandlerContext &ctx) {
             auto arr = nlohmann::json::array();
-            for (const auto &it : ctx.engine.instances().list()) {
+            for (const auto &it : ctx.runtime.engine().instances().list()) {
                 arr.push_back({{"id", it.id}, {"name", it.name}});
             }
             return ipc::Response::success({{"instances", arr}});
@@ -229,11 +233,9 @@ namespace hestia::daemon {
 ```
 
 ```cpp
-// apps/daemon/src/services/services.h — add the declaration
+// apps/daemon/src/services/services.h — the declaration, plus one line in
+// register_all_services() beside the other register_*_service calls
 void register_instances_service(Router &router);
-
-// apps/daemon/src/main.cc — in run_daemon(), beside the other register_*_service calls
-hestia::daemon::register_instances_service(router);
 ```
 
 Then a typed method on `hestia::client::Client` (`libs/shared`) so front-ends

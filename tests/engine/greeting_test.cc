@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <hestia/greeting.h>
+#include <hestia/engine/greeting/greeting.h>
 
 using hestia::greeting::greet;
 

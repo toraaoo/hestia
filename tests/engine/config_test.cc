@@ -4,7 +4,7 @@
 #include <fstream>
 #include <stdexcept>
 
-#include <hestia/config.h>
+#include <hestia/engine/config/config.h>
 
 namespace fs = std::filesystem;
 using hestia::config::Config;

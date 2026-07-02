@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string>
 
-#include <hestia/engine/config_store.h>
+#include <hestia/engine/config/config_store.h>
 
 namespace hestia::engine {
     // The launcher engine: the daemon-internal aggregate root that owns every

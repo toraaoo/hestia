@@ -17,6 +17,8 @@ add_library(hestia_shared STATIC
         include/hestia/ipc/protocol.h
         include/hestia/ipc/process.h
         include/hestia/ipc/process_codec.h
+        include/hestia/ipc/download.h
+        include/hestia/ipc/download_codec.h
         include/hestia/ipc/errors.h
         include/hestia/ipc/topics.h
         include/hestia/client/client.h
@@ -28,6 +30,7 @@ add_library(hestia_shared STATIC
         src/transport_windows.cc
         src/protocol.cc
         src/process_codec.cc
+        src/download_codec.cc
         src/client.cc
         src/bridge.cc
 )

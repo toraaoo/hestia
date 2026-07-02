@@ -1,8 +1,9 @@
 #include "services/services.h"
 
-#include "event_hub.h"
-#include "handler_context.h"
-#include "router.h"
+#include "runtime/event_hub.h"
+#include "runtime/handler_context.h"
+#include "runtime/router.h"
+#include "runtime/runtime.h"
 
 #include <optional>
 #include <string>
@@ -17,7 +18,7 @@ namespace hestia::daemon {
             if (req.payload.contains("id") && req.payload["id"].is_string()) {
                 filter = req.payload["id"].get<std::string>();
             }
-            ctx.hub.subscribe(ctx.connection, std::move(filter));
+            ctx.runtime.hub().subscribe(ctx.connection, std::move(filter));
             return ipc::Response::success({{"subscribed", true}});
         });
     }

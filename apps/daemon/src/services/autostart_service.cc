@@ -1,8 +1,8 @@
 #include "services/services.h"
 
-#include "autostart.h"
-#include "handler_context.h"
-#include "router.h"
+#include "platform/autostart.h"
+#include "runtime/handler_context.h"
+#include "runtime/router.h"
 
 namespace hestia::daemon {
     void register_autostart_service(Router &router) {

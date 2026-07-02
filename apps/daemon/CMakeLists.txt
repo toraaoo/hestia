@@ -5,26 +5,30 @@ include(GNUInstallDirs)
 # hestia_engine: the daemon is the only thing that links the engine directly.
 add_executable(hestia_daemon
         src/main.cc
-        src/router.cc
-        src/router.h
-        src/handler_context.h
-        src/event_hub.h
-        src/process_supervisor.cc
-        src/process_supervisor.h
-        src/download_manager.cc
-        src/download_manager.h
-        src/process_table.cc
-        src/process_table.h
-        src/process_spawner.cc
-        src/process_spawner.h
-        src/liveness_probe.cc
-        src/liveness_probe.h
-        src/log_streamer.cc
-        src/log_streamer.h
-        src/restart_policy.h
-        src/autostart.cc
-        src/autostart.h
-        src/win_util.h
+        src/runtime/server.cc
+        src/runtime/server.h
+        src/runtime/runtime.h
+        src/runtime/router.cc
+        src/runtime/router.h
+        src/runtime/handler_context.h
+        src/runtime/event_hub.h
+        src/process/process_supervisor.cc
+        src/process/process_supervisor.h
+        src/process/process_table.cc
+        src/process/process_table.h
+        src/process/process_spawner.cc
+        src/process/process_spawner.h
+        src/process/liveness_probe.cc
+        src/process/liveness_probe.h
+        src/process/log_streamer.cc
+        src/process/log_streamer.h
+        src/process/restart_policy.h
+        src/process/process_types.h
+        src/downloads/download_manager.cc
+        src/downloads/download_manager.h
+        src/platform/autostart.cc
+        src/platform/autostart.h
+        src/platform/win_util.h
         src/services/services.h
         src/services/health_service.cc
         src/services/app_service.cc

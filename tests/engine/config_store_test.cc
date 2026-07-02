@@ -5,7 +5,7 @@
 #include <thread>
 #include <vector>
 
-#include <hestia/engine/config_store.h>
+#include <hestia/engine/config/config_store.h>
 
 namespace fs = std::filesystem;
 using hestia::engine::ConfigStore;

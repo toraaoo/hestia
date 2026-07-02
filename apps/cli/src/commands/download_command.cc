@@ -1,21 +1,14 @@
 #include "commands/download_command.h"
 
-#include <cctype>
 #include <filesystem>
 #include <iostream>
 #include <string>
 
 #include <hestia/client/client.h>
+#include <hestia/ipc/download.h>
 
 namespace hestia::cli {
     namespace {
-        bool is_hex(const std::string &s) {
-            for (const char c : s) {
-                if (!std::isxdigit(static_cast<unsigned char>(c))) return false;
-            }
-            return true;
-        }
-
         // "<algorithm>:<hex>" → the request's checksum fields; empty return =
         // malformed (the daemon never sees a request we can reject here).
         bool parse_checksum(const std::string &value, client::DownloadRequest &request) {
@@ -23,9 +16,8 @@ namespace hestia::cli {
             if (sep == std::string::npos) return false;
             const std::string algorithm = value.substr(0, sep);
             const std::string hex = value.substr(sep + 1);
-            const std::size_t expected_len =
-                algorithm == "sha1" ? 40 : algorithm == "sha256" ? 64 : 0;
-            if (expected_len == 0 || hex.size() != expected_len || !is_hex(hex)) {
+            const auto parsed = ipc::parse_hash_algorithm(algorithm);
+            if (!parsed || !ipc::is_valid_checksum(ipc::Checksum{*parsed, hex})) {
                 return false;
             }
             request.checksum_algorithm = algorithm;

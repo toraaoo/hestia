@@ -3,11 +3,12 @@
 #include <filesystem>
 #include <stdexcept>
 
-#include <hestia/engine/downloader.h>
+#include <hestia/engine/download/downloader.h>
+#include <hestia/ipc/download.h>
 
-using hestia::engine::Checksum;
 using hestia::engine::Downloader;
-using hestia::engine::HashAlgorithm;
+using hestia::ipc::Checksum;
+using hestia::ipc::HashAlgorithm;
 
 namespace fs = std::filesystem;
 

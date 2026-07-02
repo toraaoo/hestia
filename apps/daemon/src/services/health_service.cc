@@ -1,7 +1,7 @@
 #include "services/services.h"
 
-#include "handler_context.h"
-#include "router.h"
+#include "runtime/handler_context.h"
+#include "runtime/router.h"
 
 #if !defined(_WIN32)
 #include <unistd.h>

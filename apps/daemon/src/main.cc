@@ -1,27 +1,14 @@
-#include "hestia/ipc/endpoint.h"
-#include "hestia/ipc/errors.h"
-#include "hestia/ipc/protocol.h"
-#include "hestia/ipc/transport.h"
-
-#include "download_manager.h"
-#include "event_hub.h"
-#include "handler_context.h"
-#include "process_supervisor.h"
-#include "router.h"
-#include "services/services.h"
+#include "runtime/server.h"
 
 #include <hestia/app_info.h>
-#include <hestia/engine/engine.h>
 #include <hestia/client/client.h>
+#include <hestia/ipc/endpoint.h>
 #include <hestia/logging.h>
 
 #include <CLI/CLI.hpp>
-#include <spdlog/spdlog.h>
 
-#include <atomic>
-#include <csignal>
+#include <exception>
 #include <iostream>
-#include <memory>
 #include <string>
 
 // hestiad — the Hestia daemon.
@@ -29,97 +16,10 @@
 //   hestiad [serve]    run the daemon: bind the endpoint, serve until signalled
 //   hestiad ping       connect to a running daemon, report its identity
 //
-// main() only does bootstrap, signal handling, and the serve loop — every channel
-// lives in a service under src/services/, registered onto the router.
+// main() only does bootstrap: CLI parsing, logging init, and dispatch. The serve
+// loop and the daemon's Runtime live in runtime/server.cc; every channel lives in
+// a service under src/services/.
 namespace {
-    // The serving listener, so the signal handler can unblock serve(). Only
-    // stop() (async-signal-safe) is ever called from the handler.
-    std::atomic<hestia::ipc::Listener *> g_listener{nullptr};
-
-    void handle_signal(int) {
-        if (auto *l = g_listener.load()) l->stop();
-    }
-
-    // Serve one client connection: loop reading request frames, dispatch each
-    // through the router with a per-request context, and write the correlated
-    // response. The context carries the connection, so streaming channels
-    // (events.subscribe) are ordinary handlers.
-    void serve_connection(const std::shared_ptr<hestia::ipc::Connection> &conn,
-                          const hestia::ipc::Peer &peer,
-                          const hestia::daemon::Router &router,
-                          hestia::engine::Engine &engine,
-                          hestia::daemon::ProcessSupervisor &supervisor,
-                          hestia::daemon::EventHub &hub,
-                          hestia::daemon::DownloadManager &downloads) {
-        while (auto frame = conn->recv()) {
-            hestia::ipc::Request req;
-            try {
-                req = hestia::ipc::decode_request(*frame);
-            } catch (const std::exception &e) {
-                spdlog::warn("dropping malformed frame: {}", e.what());
-                conn->send(hestia::ipc::encode(
-                    hestia::ipc::Response::failure(hestia::ipc::errors::kBadRequest, e.what())));
-                continue;
-            }
-            hestia::daemon::HandlerContext ctx{engine, supervisor, hub, downloads, conn, peer};
-            auto res = router.route(req, ctx);
-            res.id = req.id;
-            conn->send(hestia::ipc::encode(res));
-        }
-        hub.unsubscribe(conn.get());
-    }
-
-    int run_daemon() {
-        const auto endpoint = hestia::ipc::default_endpoint();
-        std::unique_ptr<hestia::ipc::Listener> listener;
-        try {
-            listener = hestia::ipc::bind_listener(endpoint);
-        } catch (const std::exception &e) {
-            spdlog::error("cannot start: {}", e.what());
-            return 1;
-        }
-
-        hestia::engine::Engine engine;
-        hestia::daemon::EventHub hub;
-
-        // Declared after hub: downloads is destroyed first, so its workers never
-        // publish into a dead hub during shutdown.
-        hestia::daemon::DownloadManager downloads(
-            [&hub](const hestia::ipc::Event &e) { hub.publish(e); });
-
-        auto supervisor = hestia::daemon::make_process_supervisor(engine.data_home());
-        supervisor->set_event_sink([&hub](const hestia::ipc::Event &e) { hub.publish(e); });
-        supervisor->reconcile(); // re-adopt processes that survived a previous daemon
-        supervisor->start_supervision(); // poll liveness, stream logs, enforce restarts
-
-        hestia::daemon::Router router;
-        hestia::daemon::register_health_service(router);
-        hestia::daemon::register_app_service(router);
-        hestia::daemon::register_config_service(router);
-        hestia::daemon::register_process_service(router);
-        hestia::daemon::register_autostart_service(router);
-        hestia::daemon::register_events_service(router);
-        hestia::daemon::register_downloads_service(router);
-
-        g_listener.store(listener.get());
-        std::signal(SIGINT, handle_signal);
-        std::signal(SIGTERM, handle_signal);
-#if !defined(_WIN32)
-        std::signal(SIGPIPE, SIG_IGN); // a client vanishing mid-write must not kill us
-#endif
-
-        spdlog::info("hestiad listening on {}", endpoint.string());
-        listener->serve([&](std::shared_ptr<hestia::ipc::Connection> conn,
-                            const hestia::ipc::Peer &peer) {
-            spdlog::debug("client connected (uid {})", peer.uid);
-            serve_connection(conn, peer, router, engine, *supervisor, hub, downloads);
-            spdlog::debug("client disconnected");
-        });
-        g_listener.store(nullptr);
-        spdlog::info("hestiad stopped");
-        return 0;
-    }
-
     // `hestiad ping` reuses the client SDK's transport rather than reimplementing
     // connect/encode/recv: connecting performs the version handshake, so a clean
     // round-trip proves the daemon is reachable and compatible.
@@ -163,5 +63,5 @@ int main(int argc, char **argv) {
         return run_ping();
     }
     hestia::init_logging(level, hestia::ipc::runtime_dir() / "hestiad.log");
-    return run_daemon();
+    return hestia::daemon::run_daemon();
 }

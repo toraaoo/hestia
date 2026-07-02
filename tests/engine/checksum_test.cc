@@ -4,12 +4,13 @@
 #include <cstddef>
 #include <string>
 
-#include <hestia/engine/checksum.h>
+#include <hestia/engine/support/checksum.h>
+#include <hestia/ipc/download.h>
 
-using hestia::engine::HashAlgorithm;
 using hestia::engine::Hasher;
-using hestia::engine::hex_digest_length;
-using hestia::engine::parse_hash_algorithm;
+using hestia::ipc::HashAlgorithm;
+using hestia::ipc::hex_digest_length;
+using hestia::ipc::parse_hash_algorithm;
 
 namespace {
     std::string digest(HashAlgorithm algorithm, const std::string &input) {
