@@ -19,9 +19,23 @@ add_subdirectory(json EXCLUDE_FROM_ALL)
 
 # cpr: HTTP client for the engine's downloader. Builds its bundled curl
 # (fetched at configure time — the CEF-download precedent); tests stay out of
-# our build.
+# our build. BUILD_EXAMPLES is curl's own option (defaults ON) — without this
+# curl configures ~150 example executables that each emit a runtime-search-path
+# warning against our build dir. The Downloader only does plain HTTP/HTTPS
+# file downloads (no cookies), so curl's opportunistic system-lib features are
+# pinned off: left auto-detected, they vary per machine, and a static build
+# under-links libidn2 (missing its own libunistring dependency), breaking the
+# link on systems that have libidn2 installed. PSL (cookie-domain security) is
+# pinned off too — it drags in a libpsl meson fetch with the same libidn2
+# auto-detection.
 set(CPR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(CPR_BUILD_TESTS_SSL OFF CACHE BOOL "" FORCE)
+set(CPR_CURL_USE_LIBPSL OFF CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(USE_LIBIDN2 OFF CACHE BOOL "" FORCE)
+set(CURL_USE_LIBSSH2 OFF CACHE BOOL "" FORCE)
+set(CURL_BROTLI OFF CACHE STRING "" FORCE)
+set(CURL_ZSTD OFF CACHE STRING "" FORCE)
 add_subdirectory(cpr EXCLUDE_FROM_ALL)
 
 # GoogleTest, built only when BUILD_TESTING is on. gtest_force_shared_crt stays
