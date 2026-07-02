@@ -23,4 +23,4 @@ namespace hestia::daemon {
             return ipc::Response::success({{"enabled", make_autostart()->is_enabled()}});
         });
     }
-}
+} // namespace hestia::daemon

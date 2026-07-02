@@ -25,4 +25,4 @@ namespace hestia::daemon {
             return ipc::Response::success({{"message", hestia::greeting::greet(name)}});
         });
     }
-}
+} // namespace hestia::daemon

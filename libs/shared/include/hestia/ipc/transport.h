@@ -41,8 +41,7 @@ namespace hestia::ipc {
 
     // Invoked once per accepted connection, on its own thread, with the verified
     // peer identity. Returns when the connection should be torn down.
-    using ConnectionHandler =
-        std::function<void(std::shared_ptr<Connection>, const Peer &)>;
+    using ConnectionHandler = std::function<void(std::shared_ptr<Connection>, const Peer &)>;
 
     // Server side, owned by the daemon. One instance per endpoint.
     class Listener {
@@ -67,4 +66,4 @@ namespace hestia::ipc {
     // Open a persistent connection to a daemon listening on `endpoint`. Throws
     // std::system_error if no daemon is reachable.
     std::shared_ptr<Connection> connect(const std::filesystem::path &endpoint);
-}
+} // namespace hestia::ipc

@@ -15,15 +15,14 @@ namespace hestia::engine {
 
     namespace {
         std::string to_lower(std::string s) {
-            for (auto &c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            for (auto &c: s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
             return s;
         }
 
         void validate(const ipc::Checksum &checksum) {
             if (!ipc::is_valid_checksum(checksum)) {
-                throw std::runtime_error(fmt::format(
-                    "invalid checksum '{}': expected {} hex characters", checksum.hex,
-                    ipc::hex_digest_length(checksum.algorithm)));
+                throw std::runtime_error(fmt::format("invalid checksum '{}': expected {} hex characters", checksum.hex,
+                                                     ipc::hex_digest_length(checksum.algorithm)));
             }
         }
 
@@ -31,7 +30,7 @@ namespace hestia::engine {
             std::error_code ec;
             fs::remove(path, ec);
         }
-    }
+    } // namespace
 
     void Downloader::fetch(const std::string &url, const fs::path &destination,
                            const std::optional<ipc::Checksum> &checksum,
@@ -46,8 +45,7 @@ namespace hestia::engine {
         const fs::path part = destination.string() + ".part";
         std::ofstream out(part, std::ios::binary | std::ios::trunc);
         if (!out) {
-            throw std::runtime_error(
-                fmt::format("cannot open {} for writing", part.string()));
+            throw std::runtime_error(fmt::format("cannot open {} for writing", part.string()));
         }
 
         std::optional<Hasher> hasher;
@@ -58,32 +56,27 @@ namespace hestia::engine {
             if (hasher) hasher->update(data.data(), data.size());
             return out.good();
         });
-        const cpr::ProgressCallback progress_cb(
-            [&](cpr::cpr_pf_arg_t download_total, cpr::cpr_pf_arg_t download_now,
-                cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t) {
-                if (on_progress) {
-                    on_progress(ipc::DownloadProgress{
-                        .downloaded =
-                            download_now > 0 ? static_cast<std::uint64_t>(download_now) : 0,
-                        .total =
-                            download_total > 0 ? static_cast<std::uint64_t>(download_total) : 0,
-                    });
-                }
-                return true;
-            });
+        const cpr::ProgressCallback progress_cb([&](cpr::cpr_pf_arg_t download_total, cpr::cpr_pf_arg_t download_now,
+                                                    cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t) {
+            if (on_progress) {
+                on_progress(ipc::DownloadProgress{
+                    .downloaded = download_now > 0 ? static_cast<std::uint64_t>(download_now) : 0,
+                    .total = download_total > 0 ? static_cast<std::uint64_t>(download_total) : 0,
+                });
+            }
+            return true;
+        });
 
         const cpr::Response response = cpr::Get(cpr::Url{url}, write_cb, progress_cb);
         out.close();
 
         if (response.error) {
             remove_quietly(part);
-            throw std::runtime_error(
-                fmt::format("download of {} failed: {}", url, response.error.message));
+            throw std::runtime_error(fmt::format("download of {} failed: {}", url, response.error.message));
         }
         if (response.status_code < 200 || response.status_code >= 300) {
             remove_quietly(part);
-            throw std::runtime_error(
-                fmt::format("download of {} failed: HTTP {}", url, response.status_code));
+            throw std::runtime_error(fmt::format("download of {} failed: HTTP {}", url, response.status_code));
         }
 
         if (hasher) {
@@ -91,8 +84,8 @@ namespace hestia::engine {
             const std::string expected = to_lower(checksum->hex);
             if (actual != expected) {
                 remove_quietly(part);
-                throw std::runtime_error(fmt::format(
-                    "checksum mismatch for {}: expected {}, got {}", url, expected, actual));
+                throw std::runtime_error(
+                    fmt::format("checksum mismatch for {}: expected {}, got {}", url, expected, actual));
             }
         }
 
@@ -100,8 +93,8 @@ namespace hestia::engine {
         fs::rename(part, destination, ec);
         if (ec) {
             remove_quietly(part);
-            throw std::runtime_error(fmt::format("cannot move {} to {}: {}", part.string(),
-                                                 destination.string(), ec.message()));
+            throw std::runtime_error(
+                fmt::format("cannot move {} to {}: {}", part.string(), destination.string(), ec.message()));
         }
     }
-}
+} // namespace hestia::engine

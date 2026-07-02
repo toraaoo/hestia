@@ -4,13 +4,13 @@
 
 namespace desktop::app {
 
-class BrowserApp : public AppBase, public CefBrowserProcessHandler {
-public:
-    CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override { return this; }
-    void OnContextInitialized() override;
+    class BrowserApp : public AppBase, public CefBrowserProcessHandler {
+    public:
+        CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override { return this; }
+        void OnContextInitialized() override;
 
-private:
-    IMPLEMENT_REFCOUNTING(BrowserApp);
-};
+    private:
+        IMPLEMENT_REFCOUNTING(BrowserApp);
+    };
 
-}  // namespace desktop::app
+} // namespace desktop::app

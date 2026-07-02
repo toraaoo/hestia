@@ -19,7 +19,7 @@ namespace hestia::client {
             if (!client) client = Client::connect();
             return *client;
         }
-    }
+    } // namespace
 
     BridgeReply call_daemon(std::string_view channel, std::string_view payload_json) noexcept {
         try {
@@ -37,4 +37,4 @@ namespace hestia::client {
             return {false, {}, "unknown error"};
         }
     }
-}
+} // namespace hestia::client

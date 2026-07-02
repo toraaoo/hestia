@@ -20,4 +20,4 @@ namespace hestia::paths {
 
     // The config file within the resolved data directory.
     std::filesystem::path config_path(const std::filesystem::path &override_dir = {});
-}
+} // namespace hestia::paths

@@ -22,4 +22,4 @@ namespace hestia::ipc {
 
     nlohmann::json to_json(const LaunchSpec &spec);
     LaunchSpec launch_spec_from_json(const nlohmann::json &payload);
-}
+} // namespace hestia::ipc

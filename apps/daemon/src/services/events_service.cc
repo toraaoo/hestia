@@ -22,4 +22,4 @@ namespace hestia::daemon {
             return ipc::Response::success({{"subscribed", true}});
         });
     }
-}
+} // namespace hestia::daemon

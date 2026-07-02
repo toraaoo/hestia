@@ -35,8 +35,7 @@ namespace hestia::daemon {
 
         // Subscribe `conn` to events, optionally filtered to a single process id
         // (matched against the event payload's "id"). Empty filter = all events.
-        void subscribe(const std::shared_ptr<ipc::Connection> &conn,
-                       std::optional<std::string> id_filter) {
+        void subscribe(const std::shared_ptr<ipc::Connection> &conn, std::optional<std::string> id_filter) {
             std::lock_guard<std::mutex> lk(mu_);
             subs_.push_back({conn, std::move(id_filter)});
         }
@@ -103,4 +102,4 @@ namespace hestia::daemon {
         bool stop_ = false;
         std::thread worker_;
     };
-}
+} // namespace hestia::daemon

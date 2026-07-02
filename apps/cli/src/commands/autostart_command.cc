@@ -47,12 +47,11 @@ namespace hestia::cli {
                 });
             }
         };
-    }
+    } // namespace
 
-    AutostartCommand::AutostartCommand()
-        : CommandGroup("autostart", "Manage starting the daemon at login") {
+    AutostartCommand::AutostartCommand() : CommandGroup("autostart", "Manage starting the daemon at login") {
         add(std::make_unique<AutostartEnableCommand>());
         add(std::make_unique<AutostartDisableCommand>());
         add(std::make_unique<AutostartStatusCommand>());
     }
-}
+} // namespace hestia::cli

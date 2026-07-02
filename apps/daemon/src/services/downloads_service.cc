@@ -30,21 +30,18 @@ namespace hestia::daemon {
                 return ipc::Response::failure(ipc::errors::kBadRequest, "dest is required");
             }
             if (!spec.destination.is_absolute()) {
-                return ipc::Response::failure(ipc::errors::kBadRequest,
-                                              "dest must be an absolute path");
+                return ipc::Response::failure(ipc::errors::kBadRequest, "dest must be an absolute path");
             }
             if (spec.checksum && !ipc::is_valid_checksum(*spec.checksum)) {
                 return ipc::Response::failure(
                     ipc::errors::kBadRequest,
-                    std::string(ipc::to_string(spec.checksum->algorithm)) +
-                        " checksum must be " +
-                        std::to_string(ipc::hex_digest_length(spec.checksum->algorithm)) +
-                        " hex characters");
+                    std::string(ipc::to_string(spec.checksum->algorithm)) + " checksum must be " +
+                        std::to_string(ipc::hex_digest_length(spec.checksum->algorithm)) + " hex characters");
             }
 
-            const auto id = ctx.runtime.downloads().start(spec.url, spec.destination,
-                                                std::move(spec.checksum), spec.id);
+            const auto id =
+                ctx.runtime.downloads().start(spec.url, spec.destination, std::move(spec.checksum), spec.id);
             return ipc::Response::success({{"id", id}});
         });
     }
-}
+} // namespace hestia::daemon

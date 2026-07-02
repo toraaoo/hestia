@@ -18,11 +18,11 @@ namespace hestia::daemon {
             return static_cast<int>(::GetCurrentProcessId());
 #endif
         }
-    }
+    } // namespace
 
     void register_health_service(Router &router) {
         router.on("health.ping", [](const ipc::Request &, HandlerContext &) {
             return ipc::Response::success({{"status", "alive"}, {"pid", current_pid()}});
         });
     }
-}
+} // namespace hestia::daemon

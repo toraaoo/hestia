@@ -17,4 +17,4 @@ namespace hestia::daemon {
         std::shared_ptr<ipc::Connection> connection;
         ipc::Peer peer;
     };
-}
+} // namespace hestia::daemon

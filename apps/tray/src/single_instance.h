@@ -19,4 +19,4 @@ namespace hestia::tray {
         bool primary_ = false;
         std::intptr_t handle_ = -1; // fd (POSIX) / HANDLE (Windows)
     };
-}
+} // namespace hestia::tray

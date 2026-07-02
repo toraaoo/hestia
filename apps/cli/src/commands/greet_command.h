@@ -13,4 +13,4 @@ namespace hestia::cli {
     private:
         std::string name_;
     };
-}
+} // namespace hestia::cli

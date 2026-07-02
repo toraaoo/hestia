@@ -1,8 +1,7 @@
 #include <hestia/engine/config/config_store.h>
 
 namespace hestia::engine {
-    ConfigStore::ConfigStore(std::filesystem::path path)
-        : path_(std::move(path)), cfg_(config::Config::load(path_)) {}
+    ConfigStore::ConfigStore(std::filesystem::path path) : path_(std::move(path)), cfg_(config::Config::load(path_)) {}
 
     std::optional<std::string> ConfigStore::get(const std::string &key) const {
         std::lock_guard<std::mutex> lk(mu_);
@@ -20,4 +19,4 @@ namespace hestia::engine {
         path_ = std::move(path);
         cfg_ = config::Config::load(path_);
     }
-}
+} // namespace hestia::engine

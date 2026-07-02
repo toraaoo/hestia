@@ -55,8 +55,8 @@ namespace hestia::config {
         if (!out) {
             throw std::runtime_error("failed to open config file for writing: " + path.string());
         }
-        for (const auto &[key, value] : entries_) {
+        for (const auto &[key, value]: entries_) {
             out << key << '=' << value << '\n';
         }
     }
-}
+} // namespace hestia::config

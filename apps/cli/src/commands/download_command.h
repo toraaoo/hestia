@@ -15,4 +15,4 @@ namespace hestia::cli {
         std::string dest_;
         std::string checksum_;
     };
-}
+} // namespace hestia::cli

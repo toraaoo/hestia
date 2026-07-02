@@ -8,4 +8,4 @@ namespace hestia::ipc::errors {
     inline constexpr const char *kHandlerError = "handler_error";
     inline constexpr const char *kUnknownChannel = "unknown_channel";
     inline constexpr const char *kVersionMismatch = "version_mismatch";
-}
+} // namespace hestia::ipc::errors

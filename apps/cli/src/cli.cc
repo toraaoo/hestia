@@ -22,11 +22,8 @@ namespace hestia::cli {
         app.fallthrough();
 
         AppContext ctx;
-        auto *verbose = app.add_flag("-v,--verbose", ctx.global.verbose,
-                                     "Enable verbose (debug) logging");
-        app.add_flag("-q,--quiet", ctx.global.quiet,
-                     "Only show warnings and errors")
-            ->excludes(verbose);
+        auto *verbose = app.add_flag("-v,--verbose", ctx.global.verbose, "Enable verbose (debug) logging");
+        app.add_flag("-q,--quiet", ctx.global.quiet, "Only show warnings and errors")->excludes(verbose);
         app.add_option("--home", ctx.global.home,
                        "Override Hestia's data directory "
                        "(else $HESTIA_HOME, else the platform default)");
@@ -46,7 +43,7 @@ namespace hestia::cli {
         });
 
         const auto commands = make_commands();
-        for (const auto &command : commands) {
+        for (const auto &command: commands) {
             command->register_command(app, ctx);
         }
 
@@ -64,4 +61,4 @@ namespace hestia::cli {
 
         return ctx.exit_code;
     }
-}
+} // namespace hestia::cli

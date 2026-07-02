@@ -6,9 +6,7 @@
 #include <hestia/app_info.h>
 
 namespace hestia::tray {
-    TrayApp::TrayApp()
-        : client_(client::Client::connect()),
-          backend_(make_tray_backend(APP_NAME)) {}
+    TrayApp::TrayApp() : client_(client::Client::connect()), backend_(make_tray_backend(APP_NAME)) {}
 
     int TrayApp::run() {
         seed_state();
@@ -109,4 +107,4 @@ namespace hestia::tray {
         }
         rebuild_model();
     }
-}
+} // namespace hestia::tray

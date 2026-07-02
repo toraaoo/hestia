@@ -84,4 +84,4 @@ namespace hestia::ipc {
         if (frame.contains("payload") && !frame["payload"].is_null()) e.payload = frame["payload"];
         return e;
     }
-}
+} // namespace hestia::ipc

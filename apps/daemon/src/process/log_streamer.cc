@@ -13,7 +13,7 @@ namespace hestia::daemon {
             const auto size = fs::file_size(path, ec);
             return ec ? 0 : static_cast<std::uint64_t>(size);
         }
-    }
+    } // namespace
 
     void LogStreamer::reset(const std::string &id, const fs::path &path) {
         offsets_[id] = current_size(path);
@@ -33,8 +33,7 @@ namespace hestia::daemon {
         if (static_cast<std::uint64_t>(size) < offset) offset = 0; // truncated/rotated
         if (static_cast<std::uint64_t>(size) == offset) return {}; // nothing new
         f.seekg(static_cast<std::streamoff>(offset));
-        std::string chunk((std::istreambuf_iterator<char>(f)),
-                          std::istreambuf_iterator<char>());
+        std::string chunk((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
         offset += chunk.size();
         return chunk;
     }
@@ -54,4 +53,4 @@ namespace hestia::daemon {
         }
         return out;
     }
-}
+} // namespace hestia::daemon

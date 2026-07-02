@@ -25,4 +25,4 @@ namespace hestia::daemon {
         register_events_service(router);
         register_downloads_service(router);
     }
-}
+} // namespace hestia::daemon

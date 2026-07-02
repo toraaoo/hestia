@@ -8,12 +8,12 @@ namespace hestia::ipc {
 
     namespace {
         bool is_hex(std::string_view s) {
-            for (const char c : s) {
+            for (const char c: s) {
                 if (!std::isxdigit(static_cast<unsigned char>(c))) return false;
             }
             return true;
         }
-    }
+    } // namespace
 
     std::optional<HashAlgorithm> parse_hash_algorithm(std::string_view name) {
         if (name == "sha1") return HashAlgorithm::sha1;
@@ -30,8 +30,7 @@ namespace hestia::ipc {
     }
 
     bool is_valid_checksum(const Checksum &checksum) {
-        return checksum.hex.size() == hex_digest_length(checksum.algorithm) &&
-               is_hex(checksum.hex);
+        return checksum.hex.size() == hex_digest_length(checksum.algorithm) && is_hex(checksum.hex);
     }
 
     json to_json(const DownloadSpec &s) {
@@ -79,4 +78,4 @@ namespace hestia::ipc {
         p.total = j.value("total", std::uint64_t{0});
         return p;
     }
-}
+} // namespace hestia::ipc

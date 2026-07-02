@@ -5,30 +5,26 @@
 
 namespace desktop::app {
 
-class RendererApp : public AppBase, public CefRenderProcessHandler {
-public:
-    CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override { return this; }
+    class RendererApp : public AppBase, public CefRenderProcessHandler {
+    public:
+        CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override { return this; }
 
-    // The renderer-side router MUST be created here: this is when the message
-    // router registers the native window.cefQuery binding with V8. Creating it
-    // later (e.g. in OnContextCreated) misses that window and cefQuery is never
-    // injected — the frontend then reports the bridge as "detached".
-    void OnWebKitInitialized() override;
+        // The renderer-side router MUST be created here: this is when the message
+        // router registers the native window.cefQuery binding with V8. Creating it
+        // later (e.g. in OnContextCreated) misses that window and cefQuery is never
+        // injected — the frontend then reports the bridge as "detached".
+        void OnWebKitInitialized() override;
 
-    void OnContextCreated(CefRefPtr<CefBrowser> browser,
-                          CefRefPtr<CefFrame> frame,
-                          CefRefPtr<CefV8Context> context) override;
-    void OnContextReleased(CefRefPtr<CefBrowser> browser,
-                           CefRefPtr<CefFrame> frame,
-                           CefRefPtr<CefV8Context> context) override;
-    bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
-                                  CefRefPtr<CefFrame> frame,
-                                  CefProcessId source_process,
-                                  CefRefPtr<CefProcessMessage> message) override;
+        void OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
+                              CefRefPtr<CefV8Context> context) override;
+        void OnContextReleased(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
+                               CefRefPtr<CefV8Context> context) override;
+        bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
+                                      CefProcessId source_process, CefRefPtr<CefProcessMessage> message) override;
 
-private:
-    CefRefPtr<CefMessageRouterRendererSide> message_router_;
-    IMPLEMENT_REFCOUNTING(RendererApp);
-};
+    private:
+        CefRefPtr<CefMessageRouterRendererSide> message_router_;
+        IMPLEMENT_REFCOUNTING(RendererApp);
+    };
 
-}  // namespace desktop::app
+} // namespace desktop::app

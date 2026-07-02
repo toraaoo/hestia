@@ -52,9 +52,7 @@ namespace hestia::daemon {
                         ::dup2(in, 0);
                         if (in > 2) ::close(in);
                     }
-                    if (const int out = ::open(log_path.c_str(),
-                                               O_CREAT | O_WRONLY | O_APPEND, 0644);
-                        out >= 0) {
+                    if (const int out = ::open(log_path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0644); out >= 0) {
                         ::dup2(out, 1);
                         ::dup2(out, 2);
                         if (out > 2) ::close(out);
@@ -115,7 +113,10 @@ namespace hestia::daemon {
             cmd.push_back(L'"');
             for (auto it = arg.begin();; ++it) {
                 unsigned slashes = 0;
-                while (it != arg.end() && *it == L'\\') { ++it; ++slashes; }
+                while (it != arg.end() && *it == L'\\') {
+                    ++it;
+                    ++slashes;
+                }
                 if (it == arg.end()) {
                     cmd.append(slashes * 2, L'\\');
                     break;
@@ -156,13 +157,11 @@ namespace hestia::daemon {
                 sa.nLength = sizeof(sa);
                 sa.bInheritHandle = TRUE;
 
-                HANDLE log_handle = ::CreateFileW(
-                    log.wstring().c_str(), FILE_APPEND_DATA,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_ALWAYS,
-                    FILE_ATTRIBUTE_NORMAL, nullptr);
-                HANDLE nul_handle = ::CreateFileW(
-                    L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
-                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+                HANDLE log_handle =
+                    ::CreateFileW(log.wstring().c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
+                                  OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+                HANDLE nul_handle = ::CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
+                                                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 
                 STARTUPINFOW si{};
                 si.cb = sizeof(si);
@@ -178,10 +177,9 @@ namespace hestia::daemon {
                 const std::wstring workdir = spec.working_dir.wstring();
                 std::wstring mutable_cmd = cmd; // CreateProcessW may modify it
                 PROCESS_INFORMATION pi{};
-                const BOOL ok = ::CreateProcessW(
-                    nullptr, mutable_cmd.data(), nullptr, nullptr, /*inherit=*/TRUE,
-                    DETACHED_PROCESS | CREATE_SUSPENDED, nullptr,
-                    workdir.empty() ? nullptr : workdir.c_str(), &si, &pi);
+                const BOOL ok = ::CreateProcessW(nullptr, mutable_cmd.data(), nullptr, nullptr, /*inherit=*/TRUE,
+                                                 DETACHED_PROCESS | CREATE_SUSPENDED, nullptr,
+                                                 workdir.empty() ? nullptr : workdir.c_str(), &si, &pi);
 
                 if (log_handle != INVALID_HANDLE_VALUE) ::CloseHandle(log_handle);
                 if (nul_handle != INVALID_HANDLE_VALUE) ::CloseHandle(nul_handle);
@@ -231,8 +229,7 @@ namespace hestia::daemon {
                 bool found = false;
                 {
                     std::lock_guard<std::mutex> lk(mu_);
-                    if (const auto it = procs_.find(static_cast<DWORD>(pid));
-                        it != procs_.end()) {
+                    if (const auto it = procs_.find(static_cast<DWORD>(pid)); it != procs_.end()) {
                         owned = it->second;
                         found = true;
                         procs_.erase(it);
@@ -249,8 +246,7 @@ namespace hestia::daemon {
                     return;
                 }
                 // Not ours (re-adopted after a restart): kill the pid by handle.
-                if (HANDLE h = ::OpenProcess(PROCESS_TERMINATE, FALSE,
-                                             static_cast<DWORD>(pid))) {
+                if (HANDLE h = ::OpenProcess(PROCESS_TERMINATE, FALSE, static_cast<DWORD>(pid))) {
                     ::TerminateProcess(h, 1);
                     ::CloseHandle(h);
                 }
@@ -268,7 +264,7 @@ namespace hestia::daemon {
             std::unordered_map<DWORD, Owned> procs_;
         };
 #endif
-    }
+    } // namespace
 
     std::unique_ptr<ProcessSpawner> make_process_spawner() {
 #if !defined(_WIN32)
@@ -277,4 +273,4 @@ namespace hestia::daemon {
         return std::make_unique<WindowsProcessSpawner>();
 #endif
     }
-}
+} // namespace hestia::daemon

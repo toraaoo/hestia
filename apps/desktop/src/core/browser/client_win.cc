@@ -5,10 +5,10 @@
 
 namespace desktop::browser {
 
-void PlatformTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) {
-    (void)browser;
-    (void)title;
-}
+    void PlatformTitleChange(CefRefPtr<CefBrowser> browser, const CefString &title) {
+        (void)browser;
+        (void)title;
+    }
 
-}  // namespace desktop::browser
+} // namespace desktop::browser
 #endif

@@ -73,19 +73,17 @@ namespace hestia::cli {
         void register_command(CLI::App &parent, AppContext &ctx) override {
             auto *group = parent.add_subcommand(name_, description_);
             group->require_subcommand();
-            for (auto &child : children_) {
+            for (auto &child: children_) {
                 child->register_command(*group, ctx);
             }
         }
 
     protected:
-        void add(std::unique_ptr<Command> child) {
-            children_.push_back(std::move(child));
-        }
+        void add(std::unique_ptr<Command> child) { children_.push_back(std::move(child)); }
 
     private:
         std::string name_;
         std::string description_;
         std::vector<std::unique_ptr<Command>> children_;
     };
-}
+} // namespace hestia::cli

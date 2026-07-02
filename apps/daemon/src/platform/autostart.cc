@@ -125,15 +125,10 @@ namespace hestia::daemon {
             static constexpr const char *kUnitName = "hestiad.service";
 
             static std::string unit_contents() {
-                return std::string{"[Unit]\n"}
-                       + "Description=" + APP_NAME + " launcher daemon\n"
-                       + "After=default.target\n\n"
-                       + "[Service]\n"
-                       + "Type=simple\n"
-                       + "ExecStart=" + self_executable().string() + " serve\n"
-                       + "Restart=on-failure\n\n"
-                       + "[Install]\n"
-                       + "WantedBy=default.target\n";
+                return std::string{"[Unit]\n"} + "Description=" + APP_NAME + " launcher daemon\n" +
+                       "After=default.target\n\n" + "[Service]\n" + "Type=simple\n" +
+                       "ExecStart=" + self_executable().string() + " serve\n" + "Restart=on-failure\n\n" +
+                       "[Install]\n" + "WantedBy=default.target\n";
             }
         };
 #endif // __linux__
@@ -190,25 +185,17 @@ namespace hestia::daemon {
             }
 
         private:
-            static fs::path plist_path() {
-                return launch_agents_dir() / (std::string{APP_ID} + ".plist");
-            }
+            static fs::path plist_path() { return launch_agents_dir() / (std::string{APP_ID} + ".plist"); }
 
             static std::string plist_contents() {
                 const std::string exec = self_executable().string();
-                return std::string{"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"}
-                       + "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
-                         "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-                       + "<plist version=\"1.0\">\n"
-                       + "<dict>\n"
-                       + "  <key>Label</key>\n  <string>" + APP_ID + "</string>\n"
-                       + "  <key>ProgramArguments</key>\n  <array>\n"
-                       + "    <string>" + exec + "</string>\n"
-                       + "    <string>serve</string>\n"
-                       + "  </array>\n"
-                       + "  <key>RunAtLoad</key>\n  <true/>\n"
-                       + "</dict>\n"
-                       + "</plist>\n";
+                return std::string{"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"} +
+                       "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
+                       "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n" +
+                       "<plist version=\"1.0\">\n" + "<dict>\n" + "  <key>Label</key>\n  <string>" + APP_ID +
+                       "</string>\n" + "  <key>ProgramArguments</key>\n  <array>\n" + "    <string>" + exec +
+                       "</string>\n" + "    <string>serve</string>\n" + "  </array>\n" +
+                       "  <key>RunAtLoad</key>\n  <true/>\n" + "</dict>\n" + "</plist>\n";
             }
         };
 #endif // __APPLE__
@@ -232,8 +219,8 @@ namespace hestia::daemon {
             STARTUPINFOW si{};
             si.cb = sizeof(si);
             PROCESS_INFORMATION pi{};
-            if (!::CreateProcessW(nullptr, mutable_cmd.data(), nullptr, nullptr, FALSE,
-                                  CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+            if (!::CreateProcessW(nullptr, mutable_cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
+                                  nullptr, &si, &pi)) {
                 return -1;
             }
             ::WaitForSingleObject(pi.hProcess, INFINITE);
@@ -255,25 +242,21 @@ namespace hestia::daemon {
                 // for the command-line tokenizer.
                 const std::wstring exec = self_executable().wstring();
                 const std::wstring tr = L"\\\"" + exec + L"\\\" serve";
-                const std::wstring cmd = L"schtasks /Create /F /SC ONLOGON /TN \""
-                                         + task_name() + L"\" /TR \"" + tr + L"\"";
+                const std::wstring cmd =
+                    L"schtasks /Create /F /SC ONLOGON /TN \"" + task_name() + L"\" /TR \"" + tr + L"\"";
                 if (run_schtasks(cmd) != 0) {
                     throw std::runtime_error("schtasks failed to create the autostart task");
                 }
             }
 
-            void disable() override {
-                run_schtasks(L"schtasks /Delete /F /TN \"" + task_name() + L"\"");
-            }
+            void disable() override { run_schtasks(L"schtasks /Delete /F /TN \"" + task_name() + L"\""); }
 
             bool is_enabled() const override {
                 return run_schtasks(L"schtasks /Query /TN \"" + task_name() + L"\"") == 0;
             }
 
         private:
-            static std::wstring task_name() {
-                return widen(std::string{APP_NAME} + " Daemon");
-            }
+            static std::wstring task_name() { return widen(std::string{APP_NAME} + " Daemon"); }
         };
 #endif // _WIN32
     } // namespace
@@ -289,4 +272,4 @@ namespace hestia::daemon {
         throw std::runtime_error("autostart is not supported on this platform");
 #endif
     }
-}
+} // namespace hestia::daemon

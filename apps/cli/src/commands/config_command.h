@@ -8,4 +8,4 @@ namespace hestia::cli {
     public:
         ConfigCommand();
     };
-}
+} // namespace hestia::cli

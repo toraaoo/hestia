@@ -51,4 +51,4 @@ namespace hestia::ipc {
         RestartPolicy restart{};
         int restarts = 0;
     };
-}
+} // namespace hestia::ipc

@@ -45,8 +45,7 @@ namespace hestia::paths {
             std::string line;
             while (std::getline(in, line)) {
                 while (!line.empty() &&
-                       (line.back() == '\r' || line.back() == '\n' ||
-                        line.back() == ' ' || line.back() == '\t')) {
+                       (line.back() == '\r' || line.back() == '\n' || line.back() == ' ' || line.back() == '\t')) {
                     line.pop_back();
                 }
                 if (!line.empty()) {
@@ -55,7 +54,7 @@ namespace hestia::paths {
             }
             return std::nullopt;
         }
-    }
+    } // namespace
 
     std::filesystem::path anchor_dir() {
         return platform_data_home();
@@ -94,4 +93,4 @@ namespace hestia::paths {
     std::filesystem::path config_path(const std::filesystem::path &override_dir) {
         return data_home(override_dir) / "config";
     }
-}
+} // namespace hestia::paths

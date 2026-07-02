@@ -50,6 +50,5 @@ namespace hestia::daemon {
     };
 
     // Construct the platform supervisor, persisting its table under `data_dir`.
-    std::unique_ptr<ProcessSupervisor> make_process_supervisor(
-        const std::filesystem::path &data_dir);
-}
+    std::unique_ptr<ProcessSupervisor> make_process_supervisor(const std::filesystem::path &data_dir);
+} // namespace hestia::daemon

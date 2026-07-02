@@ -14,4 +14,4 @@ namespace hestia::cli {
             exit_code = 1;
         }
     }
-}
+} // namespace hestia::cli

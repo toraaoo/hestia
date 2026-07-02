@@ -22,4 +22,4 @@ namespace hestia::engine {
                    const std::optional<ipc::Checksum> &checksum = std::nullopt,
                    const DownloadProgressCallback &on_progress = {}) const;
     };
-}
+} // namespace hestia::engine

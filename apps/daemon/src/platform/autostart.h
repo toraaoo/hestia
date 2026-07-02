@@ -22,4 +22,4 @@ namespace hestia::daemon {
     // running daemon's own executable, resolved from the OS, so it survives moves
     // of the build tree. Throws on an unsupported platform.
     std::unique_ptr<Autostart> make_autostart();
-}
+} // namespace hestia::daemon

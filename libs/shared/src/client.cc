@@ -40,12 +40,8 @@ namespace hestia::client {
         ProcessInfo process_from_json(const json &p) {
             const auto rec = ipc::record_from_json(p);
             return ProcessInfo{
-                rec.id,
-                ipc::to_string(rec.kind),
-                ipc::to_string(rec.state),
-                rec.pid,
-                rec.start_time,
-                rec.log_path.string(),
+                rec.id,  ipc::to_string(rec.kind), ipc::to_string(rec.state),
+                rec.pid, rec.start_time,           rec.log_path.string(),
             };
         }
 
@@ -64,8 +60,7 @@ namespace hestia::client {
         // Throw on a daemon-side error; otherwise hand the response back.
         ipc::Response must(ipc::Response res) {
             if (!res.ok) {
-                throw std::runtime_error(res.error ? res.error->code + ": " + res.error->message
-                                                   : "daemon error");
+                throw std::runtime_error(res.error ? res.error->code + ": " + res.error->message : "daemon error");
             }
             return res;
         }
@@ -133,9 +128,8 @@ namespace hestia::client {
             const std::wstring workdir = self_dir().wstring();
             // DETACHED_PROCESS: no inherited console, so the daemon outlives the
             // frontend (mirrors the POSIX setsid + double-fork detachment).
-            const BOOL ok = ::CreateProcessW(
-                nullptr, cmd.data(), nullptr, nullptr, FALSE, DETACHED_PROCESS,
-                nullptr, workdir.empty() ? nullptr : workdir.c_str(), &si, &pi);
+            const BOOL ok = ::CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, DETACHED_PROCESS, nullptr,
+                                             workdir.empty() ? nullptr : workdir.c_str(), &si, &pi);
             if (!ok) throw std::runtime_error("failed to start hestiad");
             ::CloseHandle(pi.hThread);
             ::CloseHandle(pi.hProcess);
@@ -151,7 +145,7 @@ namespace hestia::client {
             const fs::path dir = self_dir();
             if (!dir.empty()) {
                 std::error_code ec;
-                for (const fs::path &candidate : {dir / exe, dir / "bin" / exe}) {
+                for (const fs::path &candidate: {dir / exe, dir / "bin" / exe}) {
                     if (fs::exists(candidate, ec)) return candidate;
                 }
             }
@@ -174,8 +168,7 @@ namespace hestia::client {
     // Drives one persistent connection: a reader thread demuxes inbound frames,
     // fulfilling pending requests by id and delivering events to the callback.
     struct Client::Detail {
-        explicit Detail(std::shared_ptr<ipc::Connection> connection)
-            : conn(std::move(connection)) {
+        explicit Detail(std::shared_ptr<ipc::Connection> connection) : conn(std::move(connection)) {
             reader = std::thread([this] { read_loop(); });
         }
 
@@ -233,8 +226,7 @@ namespace hestia::client {
             // Bound the wait so a wedged handler can't hang the caller forever.
             if (!cv.wait_for(lk, kCallTimeout, [&] { return closed || ready.count(id) > 0; })) {
                 ready.erase(id);
-                throw std::runtime_error("timed out waiting for daemon response on '" +
-                                         channel + "'");
+                throw std::runtime_error("timed out waiting for daemon response on '" + channel + "'");
             }
             const auto it = ready.find(id);
             if (it == ready.end()) throw std::runtime_error("daemon closed the connection");
@@ -290,9 +282,8 @@ namespace hestia::client {
         // fails fast and clearly rather than mis-parsing later messages.
         const auto health = client.d_->call("health.ping", json::object());
         if (!ipc::compatible(health.version)) {
-            throw std::runtime_error(
-                "hestiad speaks protocol v" + std::to_string(health.version) +
-                ", this client speaks v" + std::to_string(ipc::kProtocolVersion));
+            throw std::runtime_error("hestiad speaks protocol v" + std::to_string(health.version) +
+                                     ", this client speaks v" + std::to_string(ipc::kProtocolVersion));
         }
         return client;
     }
@@ -305,13 +296,11 @@ namespace hestia::client {
         const auto res = d_->call("config.get", {{"key", std::string(key)}});
         if (res.ok) return res.payload.value("value", std::string{});
         if (res.error && res.error->code == ipc::errors::kNotFound) return std::nullopt;
-        throw std::runtime_error(res.error ? res.error->code + ": " + res.error->message
-                                           : "config.get failed");
+        throw std::runtime_error(res.error ? res.error->code + ": " + res.error->message : "config.get failed");
     }
 
     void Client::config_set(std::string_view key, std::string_view value) {
-        must(d_->call("config.set",
-                      {{"key", std::string(key)}, {"value", std::string(value)}}));
+        must(d_->call("config.set", {{"key", std::string(key)}, {"value", std::string(value)}}));
     }
 
     fs::path Client::config_home() {
@@ -335,11 +324,8 @@ namespace hestia::client {
         const auto res = must(d_->call("app.info", json::object()));
         const auto &p = res.payload;
         return AppInfo{
-            p.value("name", std::string{}),
-            p.value("version", std::string{}),
-            p.value("id", std::string{}),
-            p.value("vendor", std::string{}),
-            p.value("channel", std::string{}),
+            p.value("name", std::string{}),   p.value("version", std::string{}), p.value("id", std::string{}),
+            p.value("vendor", std::string{}), p.value("channel", std::string{}),
         };
     }
 
@@ -375,7 +361,7 @@ namespace hestia::client {
     std::vector<ProcessInfo> Client::process_list() {
         const auto res = must(d_->call("process.list", json::object()));
         std::vector<ProcessInfo> out;
-        for (const auto &entry : res.payload.value("processes", json::array())) {
+        for (const auto &entry: res.payload.value("processes", json::array())) {
             out.push_back(process_from_json(entry));
         }
         return out;
@@ -385,13 +371,11 @@ namespace hestia::client {
         const auto res = d_->call("process.status", {{"id", std::string(id)}});
         if (res.ok) return process_from_json(res.payload);
         if (res.error && res.error->code == ipc::errors::kNotFound) return std::nullopt;
-        throw std::runtime_error(res.error ? res.error->code + ": " + res.error->message
-                                           : "process.status failed");
+        throw std::runtime_error(res.error ? res.error->code + ": " + res.error->message : "process.status failed");
     }
 
     std::string Client::process_logs(std::string_view id, int lines) {
-        const auto res = must(d_->call("process.logs",
-                                       {{"id", std::string(id)}, {"lines", lines}}));
+        const auto res = must(d_->call("process.logs", {{"id", std::string(id)}, {"lines", lines}}));
         return res.payload.value("text", std::string{});
     }
 
@@ -405,8 +389,7 @@ namespace hestia::client {
         must(d_->call("events.subscribe", std::move(payload)));
     }
 
-    void Client::download(const DownloadRequest &request,
-                          const DownloadProgressCallback &on_progress) {
+    void Client::download(const DownloadRequest &request, const DownloadProgressCallback &on_progress) {
         // Map the client-facing request onto the shared wire type, validating the
         // checksum here so a malformed one fails clearly without a round-trip.
         ipc::DownloadSpec spec;
@@ -415,14 +398,12 @@ namespace hestia::client {
         if (!request.checksum_algorithm.empty()) {
             const auto algorithm = ipc::parse_hash_algorithm(request.checksum_algorithm);
             if (!algorithm) {
-                throw std::runtime_error("unknown checksum algorithm: " +
-                                         request.checksum_algorithm);
+                throw std::runtime_error("unknown checksum algorithm: " + request.checksum_algorithm);
             }
             ipc::Checksum checksum{*algorithm, request.checksum_hex};
             if (!ipc::is_valid_checksum(checksum)) {
-                throw std::runtime_error(
-                    request.checksum_algorithm + " checksum must be " +
-                    std::to_string(ipc::hex_digest_length(*algorithm)) + " hex characters");
+                throw std::runtime_error(request.checksum_algorithm + " checksum must be " +
+                                         std::to_string(ipc::hex_digest_length(*algorithm)) + " hex characters");
             }
             spec.checksum = std::move(checksum);
         }
@@ -435,8 +416,7 @@ namespace hestia::client {
 #else
         const auto pid = static_cast<long long>(::getpid());
 #endif
-        const std::string id =
-            "dl-" + std::to_string(pid) + "-" + std::to_string(++counter);
+        const std::string id = "dl-" + std::to_string(pid) + "-" + std::to_string(++counter);
         spec.id = id;
 
         struct Outcome {
@@ -457,8 +437,7 @@ namespace hestia::client {
                 }
                 return;
             }
-            if (event.topic != ipc::topics::kDownloadDone &&
-                event.topic != ipc::topics::kDownloadError) {
+            if (event.topic != ipc::topics::kDownloadDone && event.topic != ipc::topics::kDownloadError) {
                 return;
             }
             std::lock_guard<std::mutex> lk(outcome->mu);
@@ -486,4 +465,4 @@ namespace hestia::client {
         d_->set_event_callback({});
         if (!outcome->ok) throw std::runtime_error(outcome->message);
     }
-}
+} // namespace hestia::client

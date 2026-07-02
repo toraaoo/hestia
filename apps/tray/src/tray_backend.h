@@ -50,4 +50,4 @@ namespace hestia::tray {
 
     // Construct the platform tray backend, labelled with the application name.
     std::unique_ptr<TrayBackend> make_tray_backend(std::string app_name);
-}
+} // namespace hestia::tray

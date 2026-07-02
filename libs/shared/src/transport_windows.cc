@@ -38,10 +38,8 @@ namespace hestia::ipc {
         }
 
         std::uint32_t get_be32(const unsigned char *p) {
-            return (static_cast<std::uint32_t>(p[0]) << 24) |
-                   (static_cast<std::uint32_t>(p[1]) << 16) |
-                   (static_cast<std::uint32_t>(p[2]) << 8) |
-                   static_cast<std::uint32_t>(p[3]);
+            return (static_cast<std::uint32_t>(p[0]) << 24) | (static_cast<std::uint32_t>(p[1]) << 16) |
+                   (static_cast<std::uint32_t>(p[2]) << 8) | static_cast<std::uint32_t>(p[3]);
         }
 
         std::wstring current_user_sid() {
@@ -74,14 +72,16 @@ namespace hestia::ipc {
                 if (const std::wstring sid = current_user_sid(); !sid.empty()) {
                     sddl += L"(A;;FA;;;" + sid + L")";
                 }
-                if (::ConvertStringSecurityDescriptorToSecurityDescriptorW(
-                        sddl.c_str(), SDDL_REVISION_1, &sd_, nullptr)) {
+                if (::ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &sd_,
+                                                                           nullptr)) {
                     sa_.nLength = sizeof(sa_);
                     sa_.lpSecurityDescriptor = sd_;
                     sa_.bInheritHandle = FALSE;
                 }
             }
-            ~PipeSecurity() { if (sd_) ::LocalFree(sd_); }
+            ~PipeSecurity() {
+                if (sd_) ::LocalFree(sd_);
+            }
             PipeSecurity(const PipeSecurity &) = delete;
             PipeSecurity &operator=(const PipeSecurity &) = delete;
 
@@ -96,11 +96,9 @@ namespace hestia::ipc {
             DWORD open_mode = PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED;
             if (first) open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
             PipeSecurity sec;
-            return ::CreateNamedPipeW(
-                name.c_str(), open_mode,
-                PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT |
-                    PIPE_REJECT_REMOTE_CLIENTS,
-                PIPE_UNLIMITED_INSTANCES, kPipeBuffer, kPipeBuffer, 0, sec.get());
+            return ::CreateNamedPipeW(name.c_str(), open_mode,
+                                      PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+                                      PIPE_UNLIMITED_INSTANCES, kPipeBuffer, kPipeBuffer, 0, sec.get());
         }
 
         // A connected pipe handle as a full-duplex frame pipe. recv() and send()
@@ -156,12 +154,9 @@ namespace hestia::ipc {
             bool io(bool reading, const void *buf, std::size_t n) {
                 auto *p = static_cast<const unsigned char *>(buf);
                 for (std::size_t done = 0; done < n;) {
-                    const DWORD chunk = static_cast<DWORD>(
-                        std::min<std::size_t>(n - done, 1u << 20));
+                    const DWORD chunk = static_cast<DWORD>(std::min<std::size_t>(n - done, 1u << 20));
                     DWORD moved = 0;
-                    if (!io_once(reading, const_cast<unsigned char *>(p) + done,
-                                 chunk, moved) ||
-                        moved == 0) {
+                    if (!io_once(reading, const_cast<unsigned char *>(p) + done, chunk, moved) || moved == 0) {
                         return false;
                     }
                     done += moved;
@@ -176,14 +171,12 @@ namespace hestia::ipc {
                 ov.hEvent = event;
                 ::ResetEvent(event);
 
-                const BOOL ok = reading
-                    ? ::ReadFile(pipe_, buf, n, nullptr, &ov)
-                    : ::WriteFile(pipe_, buf, n, nullptr, &ov);
+                const BOOL ok =
+                    reading ? ::ReadFile(pipe_, buf, n, nullptr, &ov) : ::WriteFile(pipe_, buf, n, nullptr, &ov);
                 if (!ok) {
                     if (::GetLastError() != ERROR_IO_PENDING) return false;
                     const HANDLE waits[2] = {close_event_, event};
-                    const DWORD w =
-                        ::WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+                    const DWORD w = ::WaitForMultipleObjects(2, waits, FALSE, INFINITE);
                     if (w == WAIT_OBJECT_0) { // close() fired
                         ::CancelIoEx(pipe_, &ov);
                         ::GetOverlappedResult(pipe_, &ov, &moved, TRUE);
@@ -208,8 +201,7 @@ namespace hestia::ipc {
 
         class WinListener final : public Listener {
         public:
-            WinListener(std::wstring name, HANDLE first)
-                : name_(std::move(name)), first_pipe_(first) {
+            WinListener(std::wstring name, HANDLE first) : name_(std::move(name)), first_pipe_(first) {
                 stop_event_ = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
                 connect_event_ = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
             }
@@ -283,17 +275,13 @@ namespace hestia::ipc {
 
                 if (::ConnectNamedPipe(pipe, &ov)) return 1;
                 switch (::GetLastError()) {
-                    case ERROR_PIPE_CONNECTED:
-                        return 1; // client beat us to it
-                    case ERROR_IO_PENDING:
-                        break;
-                    default:
-                        return 0;
+                case ERROR_PIPE_CONNECTED: return 1; // client beat us to it
+                case ERROR_IO_PENDING: break;
+                default: return 0;
                 }
 
                 const HANDLE waits[2] = {stop_event_, connect_event_};
-                if (::WaitForMultipleObjects(2, waits, FALSE, INFINITE) ==
-                    WAIT_OBJECT_0) {
+                if (::WaitForMultipleObjects(2, waits, FALSE, INFINITE) == WAIT_OBJECT_0) {
                     ::CancelIoEx(pipe, &ov);
                     return -1;
                 }
@@ -320,9 +308,9 @@ namespace hestia::ipc {
             void shutdown_workers() {
                 {
                     std::lock_guard<std::mutex> lk(workers_mu_);
-                    for (const auto &connection : live_) connection->close();
+                    for (const auto &connection: live_) connection->close();
                 }
-                for (auto &worker : workers_) {
+                for (auto &worker: workers_) {
                     if (worker.thread.joinable()) worker.thread.join();
                 }
                 workers_.clear();
@@ -351,12 +339,9 @@ namespace hestia::ipc {
         if (first == INVALID_HANDLE_VALUE) {
             const DWORD err = ::GetLastError();
             if (err == ERROR_ACCESS_DENIED || err == ERROR_PIPE_BUSY) {
-                throw std::system_error(static_cast<int>(err),
-                                        std::system_category(),
-                                        "hestiad is already running");
+                throw std::system_error(static_cast<int>(err), std::system_category(), "hestiad is already running");
             }
-            throw std::system_error(static_cast<int>(err), std::system_category(),
-                                    "CreateNamedPipe");
+            throw std::system_error(static_cast<int>(err), std::system_category(), "CreateNamedPipe");
         }
         return std::make_unique<WinListener>(name, first);
     }
@@ -364,9 +349,8 @@ namespace hestia::ipc {
     std::shared_ptr<Connection> connect(const fs::path &endpoint) {
         const std::wstring name = endpoint.wstring();
         for (;;) {
-            const HANDLE pipe = ::CreateFileW(
-                name.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
-                OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+            const HANDLE pipe = ::CreateFileW(name.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
+                                              FILE_FLAG_OVERLAPPED, nullptr);
             if (pipe != INVALID_HANDLE_VALUE) {
                 DWORD mode = PIPE_READMODE_BYTE;
                 ::SetNamedPipeHandleState(pipe, &mode, nullptr, nullptr);
@@ -377,10 +361,9 @@ namespace hestia::ipc {
             if (err == ERROR_PIPE_BUSY && ::WaitNamedPipeW(name.c_str(), 2000)) {
                 continue;
             }
-            throw std::system_error(static_cast<int>(err), std::system_category(),
-                                    "no daemon at " + endpoint.string());
+            throw std::system_error(static_cast<int>(err), std::system_category(), "no daemon at " + endpoint.string());
         }
     }
-}
+} // namespace hestia::ipc
 
 #endif // _WIN32

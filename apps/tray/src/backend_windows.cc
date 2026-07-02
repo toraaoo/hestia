@@ -5,8 +5,8 @@
 #include <utility>
 #include <vector>
 
-#include <windows.h>
 #include <shellapi.h>
+#include <windows.h>
 
 // Windows tray backend: a notification-area icon via Shell_NotifyIcon, driven by
 // a message-only window. The Win32 message loop is the UI thread; set_model()/
@@ -19,18 +19,15 @@ namespace hestia::tray {
 
         std::wstring widen(const std::string &s) {
             if (s.empty()) return {};
-            const int n = ::MultiByteToWideChar(CP_UTF8, 0, s.c_str(),
-                                                static_cast<int>(s.size()), nullptr, 0);
+            const int n = ::MultiByteToWideChar(CP_UTF8, 0, s.c_str(), static_cast<int>(s.size()), nullptr, 0);
             std::wstring out(static_cast<std::size_t>(n), L'\0');
-            ::MultiByteToWideChar(CP_UTF8, 0, s.c_str(), static_cast<int>(s.size()),
-                                  out.data(), n);
+            ::MultiByteToWideChar(CP_UTF8, 0, s.c_str(), static_cast<int>(s.size()), out.data(), n);
             return out;
         }
 
         class ShellNotifyBackend final : public TrayBackend {
         public:
-            explicit ShellNotifyBackend(std::string app_name)
-                : app_name_(std::move(app_name)) {}
+            explicit ShellNotifyBackend(std::string app_name) : app_name_(std::move(app_name)) {}
 
             void set_model(TrayModel model) override {
                 {
@@ -49,8 +46,8 @@ namespace hestia::tray {
                 wc.lpszClassName = L"HestiaTrayWindow";
                 ::RegisterClassExW(&wc);
 
-                hwnd_ = ::CreateWindowExW(0, wc.lpszClassName, L"", 0, 0, 0, 0, 0,
-                                          HWND_MESSAGE, nullptr, instance, this);
+                hwnd_ =
+                    ::CreateWindowExW(0, wc.lpszClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance, this);
 
                 NOTIFYICONDATAW nid{};
                 nid.cbSize = sizeof(nid);
@@ -58,10 +55,9 @@ namespace hestia::tray {
                 nid.uID = kIconId;
                 nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
                 nid.uCallbackMessage = kTrayCallback;
-                nid.hIcon = static_cast<HICON>(::LoadImageW(
-                        ::GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_HESTIA_TRAY),
-                        IMAGE_ICON, ::GetSystemMetrics(SM_CXSMICON),
-                        ::GetSystemMetrics(SM_CYSMICON), 0));
+                nid.hIcon = static_cast<HICON>(
+                    ::LoadImageW(::GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_HESTIA_TRAY), IMAGE_ICON,
+                                 ::GetSystemMetrics(SM_CXSMICON), ::GetSystemMetrics(SM_CYSMICON), 0));
                 if (!nid.hIcon) nid.hIcon = ::LoadIcon(nullptr, IDI_APPLICATION);
                 update_tip(nid);
                 ::Shell_NotifyIconW(NIM_ADD, &nid);
@@ -118,9 +114,8 @@ namespace hestia::tray {
                 POINT pt;
                 ::GetCursorPos(&pt);
                 ::SetForegroundWindow(hwnd_); // so the menu dismisses on focus loss
-                const int chosen = ::TrackPopupMenu(
-                    menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON,
-                    pt.x, pt.y, 0, hwnd_, nullptr);
+                const int chosen = ::TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, pt.x, pt.y, 0,
+                                                    hwnd_, nullptr);
                 ::DestroyMenu(menu);
 
                 if (chosen >= static_cast<int>(kFirstCommandId)) {
@@ -131,43 +126,40 @@ namespace hestia::tray {
 
             static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
                 if (msg == WM_NCCREATE) {
-                    auto *self = static_cast<ShellNotifyBackend *>(
-                        reinterpret_cast<CREATESTRUCTW *>(lparam)->lpCreateParams);
-                    ::SetWindowLongPtrW(hwnd, GWLP_USERDATA,
-                                        reinterpret_cast<LONG_PTR>(self));
+                    auto *self =
+                        static_cast<ShellNotifyBackend *>(reinterpret_cast<CREATESTRUCTW *>(lparam)->lpCreateParams);
+                    ::SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
                     return ::DefWindowProcW(hwnd, msg, wparam, lparam);
                 }
-                auto *self = reinterpret_cast<ShellNotifyBackend *>(
-                    ::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+                auto *self = reinterpret_cast<ShellNotifyBackend *>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
                 if (!self) return ::DefWindowProcW(hwnd, msg, wparam, lparam);
 
                 switch (msg) {
-                    case kTrayCallback:
-                        if (LOWORD(lparam) == WM_RBUTTONUP || LOWORD(lparam) == WM_LBUTTONUP) {
-                            self->show_menu();
-                        }
-                        return 0;
-                    case kRefreshTip: {
-                        NOTIFYICONDATAW nid{};
-                        nid.cbSize = sizeof(nid);
-                        nid.hWnd = hwnd;
-                        nid.uID = kIconId;
-                        nid.uFlags = NIF_TIP;
-                        self->update_tip(nid);
-                        ::Shell_NotifyIconW(NIM_MODIFY, &nid);
-                        return 0;
+                case kTrayCallback:
+                    if (LOWORD(lparam) == WM_RBUTTONUP || LOWORD(lparam) == WM_LBUTTONUP) {
+                        self->show_menu();
                     }
-                    case WM_DESTROY: {
-                        NOTIFYICONDATAW nid{};
-                        nid.cbSize = sizeof(nid);
-                        nid.hWnd = hwnd;
-                        nid.uID = kIconId;
-                        ::Shell_NotifyIconW(NIM_DELETE, &nid);
-                        ::PostQuitMessage(0);
-                        return 0;
-                    }
-                    default:
-                        return ::DefWindowProcW(hwnd, msg, wparam, lparam);
+                    return 0;
+                case kRefreshTip: {
+                    NOTIFYICONDATAW nid{};
+                    nid.cbSize = sizeof(nid);
+                    nid.hWnd = hwnd;
+                    nid.uID = kIconId;
+                    nid.uFlags = NIF_TIP;
+                    self->update_tip(nid);
+                    ::Shell_NotifyIconW(NIM_MODIFY, &nid);
+                    return 0;
+                }
+                case WM_DESTROY: {
+                    NOTIFYICONDATAW nid{};
+                    nid.cbSize = sizeof(nid);
+                    nid.hWnd = hwnd;
+                    nid.uID = kIconId;
+                    ::Shell_NotifyIconW(NIM_DELETE, &nid);
+                    ::PostQuitMessage(0);
+                    return 0;
+                }
+                default: return ::DefWindowProcW(hwnd, msg, wparam, lparam);
                 }
             }
 
@@ -182,4 +174,4 @@ namespace hestia::tray {
     std::unique_ptr<TrayBackend> make_tray_backend(std::string app_name) {
         return std::make_unique<ShellNotifyBackend>(std::move(app_name));
     }
-}
+} // namespace hestia::tray

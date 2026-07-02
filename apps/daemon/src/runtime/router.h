@@ -23,4 +23,4 @@ namespace hestia::daemon {
     private:
         std::map<std::string, Handler> handlers_;
     };
-}
+} // namespace hestia::daemon

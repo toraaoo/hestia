@@ -24,8 +24,7 @@ namespace hestia::daemon {
         std::int64_t linux_start_time(std::int64_t pid) {
             std::ifstream f("/proc/" + std::to_string(pid) + "/stat");
             if (!f) return 0;
-            std::string content((std::istreambuf_iterator<char>(f)),
-                                std::istreambuf_iterator<char>());
+            std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
             // comm (field 2) is parenthesised and may contain spaces — start
             // parsing after the last ')'.
             const auto close = content.rfind(')');
@@ -46,11 +45,9 @@ namespace hestia::daemon {
 #elif defined(__APPLE__)
         std::int64_t macos_start_time(std::int64_t pid) {
             proc_bsdinfo info{};
-            const int n = ::proc_pidinfo(static_cast<int>(pid), PROC_PIDTBSDINFO, 0,
-                                         &info, sizeof(info));
+            const int n = ::proc_pidinfo(static_cast<int>(pid), PROC_PIDTBSDINFO, 0, &info, sizeof(info));
             if (n != sizeof(info)) return 0;
-            return static_cast<std::int64_t>(info.pbi_start_tvsec) * 1'000'000 +
-                   info.pbi_start_tvusec;
+            return static_cast<std::int64_t>(info.pbi_start_tvsec) * 1'000'000 + info.pbi_start_tvusec;
         }
 #endif
 
@@ -69,7 +66,7 @@ namespace hestia::daemon {
 #elif defined(__APPLE__)
                 return macos_start_time(pid);
 #else
-                (void) pid;
+                (void)pid;
                 return 0; // BSD: no start time yet, so matches() refuses re-adoption
 #endif
             }
@@ -81,8 +78,7 @@ namespace hestia::daemon {
         public:
             bool is_alive(std::int64_t pid) const override {
                 if (pid <= 0) return false;
-                HANDLE h = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
-                                         static_cast<DWORD>(pid));
+                HANDLE h = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
                 if (!h) return false;
                 DWORD code = 0;
                 const bool ok = ::GetExitCodeProcess(h, &code) != 0;
@@ -94,21 +90,19 @@ namespace hestia::daemon {
             // the same pid has a different creation time).
             std::int64_t read_start_time(std::int64_t pid) const override {
                 if (pid <= 0) return 0;
-                HANDLE h = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
-                                         static_cast<DWORD>(pid));
+                HANDLE h = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
                 if (!h) return 0;
                 FILETIME create{}, exit{}, kernel{}, user{};
                 std::int64_t result = 0;
                 if (::GetProcessTimes(h, &create, &exit, &kernel, &user)) {
-                    result = (static_cast<std::int64_t>(create.dwHighDateTime) << 32) |
-                             create.dwLowDateTime;
+                    result = (static_cast<std::int64_t>(create.dwHighDateTime) << 32) | create.dwLowDateTime;
                 }
                 ::CloseHandle(h);
                 return result;
             }
         };
 #endif
-    }
+    } // namespace
 
     std::unique_ptr<LivenessProbe> make_liveness_probe() {
 #if !defined(_WIN32)
@@ -117,4 +111,4 @@ namespace hestia::daemon {
         return std::make_unique<WindowsLivenessProbe>();
 #endif
     }
-}
+} // namespace hestia::daemon

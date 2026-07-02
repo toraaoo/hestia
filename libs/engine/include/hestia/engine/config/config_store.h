@@ -26,4 +26,4 @@ namespace hestia::engine {
         std::filesystem::path path_;
         config::Config cfg_;
     };
-}
+} // namespace hestia::engine

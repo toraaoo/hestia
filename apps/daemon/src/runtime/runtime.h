@@ -24,8 +24,7 @@ namespace hestia::daemon {
         // first, so their worker threads never publish into a dead hub during
         // shutdown.
         explicit Runtime(const std::filesystem::path &override_home = {})
-            : engine_(override_home),
-              downloads_([this](const ipc::Event &e) { hub_.publish(e); }),
+            : engine_(override_home), downloads_([this](const ipc::Event &e) { hub_.publish(e); }),
               supervisor_(make_process_supervisor(engine_.data_home())) {
             supervisor_->set_event_sink([this](const ipc::Event &e) { hub_.publish(e); });
             supervisor_->reconcile();         // re-adopt processes that survived a previous daemon
@@ -43,4 +42,4 @@ namespace hestia::daemon {
         DownloadManager downloads_;
         std::unique_ptr<ProcessSupervisor> supervisor_;
     };
-}
+} // namespace hestia::daemon

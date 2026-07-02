@@ -28,21 +28,20 @@ namespace hestia::cli {
         void print_progress(const client::DownloadProgress &progress) {
             std::cerr << "\rdownloading ";
             if (progress.total > 0) {
-                std::cerr << progress.downloaded * 100 / progress.total << "% ("
-                          << progress.downloaded << "/" << progress.total << " bytes)";
+                std::cerr << progress.downloaded * 100 / progress.total << "% (" << progress.downloaded << "/"
+                          << progress.total << " bytes)";
             } else {
                 std::cerr << progress.downloaded << " bytes";
             }
             std::cerr << std::flush;
         }
-    }
+    } // namespace
 
     void DownloadCommand::register_command(CLI::App &parent, AppContext &ctx) {
         auto *cmd = parent.add_subcommand("download", "Download a file via the daemon");
         cmd->add_option("url", url_, "URL to download")->required();
         cmd->add_option("dest", dest_, "Destination file path")->required();
-        cmd->add_option("--checksum", checksum_,
-                        "Expected checksum as <algorithm>:<hex> (sha1 or sha256)");
+        cmd->add_option("--checksum", checksum_, "Expected checksum as <algorithm>:<hex> (sha1 or sha256)");
         cmd->callback([this, &ctx] {
             client::DownloadRequest request;
             request.url = url_;
@@ -69,4 +68,4 @@ namespace hestia::cli {
             });
         });
     }
-}
+} // namespace hestia::cli

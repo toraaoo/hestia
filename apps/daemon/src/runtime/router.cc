@@ -10,8 +10,7 @@ namespace hestia::daemon {
     ipc::Response Router::route(const ipc::Request &request, HandlerContext &ctx) const {
         const auto it = handlers_.find(request.channel);
         if (it == handlers_.end()) {
-            return ipc::Response::failure(ipc::errors::kUnknownChannel,
-                                          "unknown channel: " + request.channel);
+            return ipc::Response::failure(ipc::errors::kUnknownChannel, "unknown channel: " + request.channel);
         }
         try {
             return it->second(request, ctx);
@@ -21,4 +20,4 @@ namespace hestia::daemon {
             return ipc::Response::failure(ipc::errors::kHandlerError, e.what());
         }
     }
-}
+} // namespace hestia::daemon

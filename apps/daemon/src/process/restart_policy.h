@@ -29,8 +29,7 @@ namespace hestia::daemon::restart {
     }
 
     inline bool should_reset_retries(const ProcessRecord &rec, Clock::duration uptime) {
-        return rec.state == ProcessState::Running && rec.restarts > 0 &&
-               uptime >= kStableUptime;
+        return rec.state == ProcessState::Running && rec.restarts > 0 && uptime >= kStableUptime;
     }
 
     // Whether a record should be relaunched on this tick. Only servers auto-restart
@@ -45,4 +44,4 @@ namespace hestia::daemon::restart {
         if (next_due && now < *next_due) return false; // still backing off
         return true;
     }
-}
+} // namespace hestia::daemon::restart

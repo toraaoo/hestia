@@ -34,7 +34,7 @@ namespace {
             return 1;
         }
     }
-}
+} // namespace
 
 int main(int argc, char **argv) {
     CLI::App app{"hestiad — the Hestia daemon"};
@@ -52,9 +52,7 @@ int main(int argc, char **argv) {
 
     CLI11_PARSE(app, argc, argv);
 
-    const auto level = verbose  ? hestia::LogLevel::debug
-                       : quiet  ? hestia::LogLevel::warn
-                                : hestia::LogLevel::info;
+    const auto level = verbose ? hestia::LogLevel::debug : quiet ? hestia::LogLevel::warn : hestia::LogLevel::info;
 
     // ping is a one-shot foreground tool — stderr only. The long-lived daemon
     // also logs to a rotated file, since the client detaches its stderr.

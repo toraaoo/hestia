@@ -6,9 +6,8 @@
 
 namespace desktop {
 
-void ForwardToDaemon(std::string channel, std::string payload_json, ipc::Response res);
+    void ForwardToDaemon(std::string channel, std::string payload_json, ipc::Response res);
 
-void RegisterForward(ipc::Actions& on, const std::string& action,
-                     const std::string& daemon_channel);
+    void RegisterForward(ipc::Actions &on, const std::string &action, const std::string &daemon_channel);
 
-}  // namespace desktop
+} // namespace desktop

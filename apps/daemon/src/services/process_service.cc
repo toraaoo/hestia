@@ -1,7 +1,7 @@
 #include "services/services.h"
 
-#include "runtime/handler_context.h"
 #include "process/process_supervisor.h"
+#include "runtime/handler_context.h"
 #include "runtime/router.h"
 #include "runtime/runtime.h"
 
@@ -45,4 +45,4 @@ namespace hestia::daemon {
             return ipc::Response::failure(ipc::errors::kNotFound, "no such process: " + id);
         });
     }
-}
+} // namespace hestia::daemon

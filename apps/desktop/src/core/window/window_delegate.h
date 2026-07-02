@@ -6,33 +6,31 @@
 
 namespace desktop::window {
 
-// Hosts the BrowserView in a frameless top-level window.
-class WindowDelegate : public CefWindowDelegate {
-public:
-    explicit WindowDelegate(CefRefPtr<CefBrowserView> view);
+    // Hosts the BrowserView in a frameless top-level window.
+    class WindowDelegate : public CefWindowDelegate {
+    public:
+        explicit WindowDelegate(CefRefPtr<CefBrowserView> view);
 
-    void OnWindowCreated(CefRefPtr<CefWindow> window) override;
-    void OnWindowDestroyed(CefRefPtr<CefWindow> window) override;
-    bool IsFrameless(CefRefPtr<CefWindow>) override { return true; }
-    bool CanResize(CefRefPtr<CefWindow>)   override { return true; }
-    bool CanClose(CefRefPtr<CefWindow>)    override { return true; }
-    CefSize GetMinimumSize(CefRefPtr<CefView>) override { return {800, 600}; }
+        void OnWindowCreated(CefRefPtr<CefWindow> window) override;
+        void OnWindowDestroyed(CefRefPtr<CefWindow> window) override;
+        bool IsFrameless(CefRefPtr<CefWindow>) override { return true; }
+        bool CanResize(CefRefPtr<CefWindow>) override { return true; }
+        bool CanClose(CefRefPtr<CefWindow>) override { return true; }
+        CefSize GetMinimumSize(CefRefPtr<CefView>) override { return {800, 600}; }
 
-private:
-    CefRefPtr<CefBrowserView> view_;
-    IMPLEMENT_REFCOUNTING(WindowDelegate);
-};
+    private:
+        CefRefPtr<CefBrowserView> view_;
+        IMPLEMENT_REFCOUNTING(WindowDelegate);
+    };
 
-// Minimal BrowserView delegate — required by CefBrowserView::CreateBrowserView.
-class BrowserViewDelegate : public CefBrowserViewDelegate {
-public:
-    void OnBrowserCreated(CefRefPtr<CefBrowserView>,
-                          CefRefPtr<CefBrowser>) override {}
-    void OnBrowserDestroyed(CefRefPtr<CefBrowserView>,
-                            CefRefPtr<CefBrowser>) override {}
+    // Minimal BrowserView delegate — required by CefBrowserView::CreateBrowserView.
+    class BrowserViewDelegate : public CefBrowserViewDelegate {
+    public:
+        void OnBrowserCreated(CefRefPtr<CefBrowserView>, CefRefPtr<CefBrowser>) override {}
+        void OnBrowserDestroyed(CefRefPtr<CefBrowserView>, CefRefPtr<CefBrowser>) override {}
 
-private:
-    IMPLEMENT_REFCOUNTING(BrowserViewDelegate);
-};
+    private:
+        IMPLEMENT_REFCOUNTING(BrowserViewDelegate);
+    };
 
-}  // namespace desktop::window
+} // namespace desktop::window

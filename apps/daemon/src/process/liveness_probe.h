@@ -33,4 +33,4 @@ namespace hestia::daemon {
 
     // The platform liveness probe.
     std::unique_ptr<LivenessProbe> make_liveness_probe();
-}
+} // namespace hestia::daemon

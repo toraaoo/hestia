@@ -40,9 +40,7 @@ namespace hestia::daemon {
         class ProcessSupervisorImpl final : public ProcessSupervisor {
         public:
             explicit ProcessSupervisorImpl(fs::path data_dir)
-                : logs_dir_(data_dir / "logs"),
-                  table_(data_dir / "processes.json"),
-                  spawner_(make_process_spawner()),
+                : logs_dir_(data_dir / "logs"), table_(data_dir / "processes.json"), spawner_(make_process_spawner()),
                   probe_(make_liveness_probe()) {}
 
             ~ProcessSupervisorImpl() override {
@@ -66,8 +64,7 @@ namespace hestia::daemon {
                 {
                     std::lock_guard<std::mutex> lk(mu_);
                     auto &records = table_.entries();
-                    if (auto it = records.find(spec.id);
-                        it != records.end() && probe_->matches(it->second)) {
+                    if (auto it = records.find(spec.id); it != records.end() && probe_->matches(it->second)) {
                         throw std::runtime_error("process already running: " + spec.id);
                     }
 
@@ -88,7 +85,7 @@ namespace hestia::daemon {
                     rec.restart = spec.restart;
                     rec.restarts = 0;
                     records[spec.id] = rec;
-                    owned_.insert(spec.id); // our child: reap it for the exit code
+                    owned_.insert(spec.id);        // our child: reap it for the exit code
                     streamer_.reset(spec.id, log); // stream only new output
                     next_restart_.erase(spec.id);
                     terminating_.erase(spec.id);
@@ -151,10 +148,10 @@ namespace hestia::daemon {
                     // Stream only output produced from now on; history is available
                     // via tail_log.
                     streamer_.reset(id, rec.log_path);
-                    if ((rec.state == ProcessState::Running ||
-                         rec.state == ProcessState::Starting) && !probe_->matches(rec)) {
+                    if ((rec.state == ProcessState::Running || rec.state == ProcessState::Starting) &&
+                        !probe_->matches(rec)) {
                         rec.state = ProcessState::Crashed; // died while we were down
-                        next_restart_[id] = now; // eligible on the first tick
+                        next_restart_[id] = now;           // eligible on the first tick
                         spdlog::warn("process '{}' died while the daemon was down", id);
                         changed = true;
                     } else if (rec.state == ProcessState::Running) {
@@ -199,8 +196,7 @@ namespace hestia::daemon {
                 auto &records = table_.entries();
 
                 for (auto &[id, rec]: records) {
-                    const bool was_running = rec.state == ProcessState::Running ||
-                                             rec.state == ProcessState::Starting;
+                    const bool was_running = rec.state == ProcessState::Running || rec.state == ProcessState::Starting;
                     if (owned_.count(id)) {
                         // Our child: reap it. This frees the zombie even when the
                         // record is already terminal (e.g. after an operator stop).
@@ -211,10 +207,8 @@ namespace hestia::daemon {
                                 if (exit->signaled || exit->code != 0) {
                                     rec.state = ProcessState::Crashed;
                                     next_restart_[id] = restart::backoff_until(rec, now);
-                                    spdlog::warn("process '{}' crashed (pid {}, {} {})",
-                                                 id, rec.pid,
-                                                 exit->signaled ? "signal" : "exit",
-                                                 exit->code);
+                                    spdlog::warn("process '{}' crashed (pid {}, {} {})", id, rec.pid,
+                                                 exit->signaled ? "signal" : "exit", exit->code);
                                 } else {
                                     // Clean exit is terminal: never auto-restarted.
                                     rec.state = ProcessState::Exited;
@@ -234,14 +228,11 @@ namespace hestia::daemon {
                         changed = true;
                     }
                     if (std::string chunk = streamer_.read_new(id, rec.log_path); !chunk.empty()) {
-                        events.push_back(ipc::Event{
-                            ipc::topics::kProcessLog,
-                            {{"id", id}, {"text", std::move(chunk)}}
-                        });
+                        events.push_back(
+                            ipc::Event{ipc::topics::kProcessLog, {{"id", id}, {"text", std::move(chunk)}}});
                     }
                     if (const auto at = launched_at_.find(id);
-                        at != launched_at_.end() &&
-                        restart::should_reset_retries(rec, now - at->second)) {
+                        at != launched_at_.end() && restart::should_reset_retries(rec, now - at->second)) {
                         rec.restarts = 0;
                         changed = true;
                     }
@@ -257,8 +248,7 @@ namespace hestia::daemon {
                     if (!restart::should_restart(rec, now, due)) continue;
                     try {
                         relaunch_locked(rec);
-                        spdlog::info("restarted process '{}' (attempt {}, pid {})",
-                                     id, rec.restarts, rec.pid);
+                        spdlog::info("restarted process '{}' (attempt {}, pid {})", id, rec.restarts, rec.pid);
                         events.push_back(state_event(rec));
                         changed = true;
                     } catch (...) {
@@ -340,4 +330,4 @@ namespace hestia::daemon {
     std::unique_ptr<ProcessSupervisor> make_process_supervisor(const fs::path &data_dir) {
         return std::make_unique<ProcessSupervisorImpl>(data_dir);
     }
-}
+} // namespace hestia::daemon

@@ -3,8 +3,8 @@
 
 namespace desktop::app {
 
-void AppBase::OnRegisterCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar) {
-    common::RegisterCustomSchemes(registrar);
-}
+    void AppBase::OnRegisterCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar) {
+        common::RegisterCustomSchemes(registrar);
+    }
 
-}  // namespace desktop::app
+} // namespace desktop::app

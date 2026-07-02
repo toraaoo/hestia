@@ -42,4 +42,4 @@ namespace hestia::ipc {
         std::uint64_t downloaded = 0;
         std::uint64_t total = 0; // 0 = unknown
     };
-}
+} // namespace hestia::ipc

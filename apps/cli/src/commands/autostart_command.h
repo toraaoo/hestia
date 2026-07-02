@@ -9,4 +9,4 @@ namespace hestia::cli {
     public:
         AutostartCommand();
     };
-}
+} // namespace hestia::cli

@@ -39,4 +39,4 @@ namespace hestia::engine {
         std::filesystem::path data_home_;
         ConfigStore config_;
     };
-}
+} // namespace hestia::engine

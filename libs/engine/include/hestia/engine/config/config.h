@@ -24,4 +24,4 @@ namespace hestia::config {
     private:
         std::map<std::string, std::string> entries_;
     };
-}
+} // namespace hestia::config

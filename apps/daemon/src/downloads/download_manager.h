@@ -29,8 +29,8 @@ namespace hestia::daemon {
         // Start a download and return its id — the caller-supplied `id` when
         // non-empty, else a generated one. The outcome arrives as a
         // download.done or download.error event carrying that id.
-        std::string start(std::string url, std::filesystem::path destination,
-                          std::optional<ipc::Checksum> checksum, std::string id);
+        std::string start(std::string url, std::filesystem::path destination, std::optional<ipc::Checksum> checksum,
+                          std::string id);
 
     private:
         struct Worker {
@@ -38,8 +38,7 @@ namespace hestia::daemon {
             std::shared_ptr<std::atomic<bool>> done;
         };
 
-        void run(const std::string &id, const std::string &url,
-                 const std::filesystem::path &destination,
+        void run(const std::string &id, const std::string &url, const std::filesystem::path &destination,
                  const std::optional<ipc::Checksum> &checksum) const;
         void prune_finished();
 
@@ -48,4 +47,4 @@ namespace hestia::daemon {
         std::vector<Worker> workers_;
         std::atomic<int> next_id_{1};
     };
-}
+} // namespace hestia::daemon

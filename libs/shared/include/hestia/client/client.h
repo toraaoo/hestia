@@ -130,8 +130,7 @@ namespace hestia::client {
         // std::runtime_error on failure (bad request, network error, checksum
         // mismatch). Uses the client's single event-callback slot, so it
         // replaces any callback installed by subscribe().
-        void download(const DownloadRequest &request,
-                      const DownloadProgressCallback &on_progress = {});
+        void download(const DownloadRequest &request, const DownloadProgressCallback &on_progress = {});
 
     private:
         struct Detail;
@@ -139,4 +138,4 @@ namespace hestia::client {
 
         std::unique_ptr<Detail> d_;
     };
-}
+} // namespace hestia::client

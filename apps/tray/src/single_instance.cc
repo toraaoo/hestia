@@ -35,7 +35,7 @@ namespace hestia::tray {
             }
             return "/tmp/hestia-tray-" + std::to_string(::getuid()) + ".lock";
         }
-    }
+    } // namespace
 
     SingleInstance::SingleInstance() {
         const std::string path = lock_path();
@@ -60,4 +60,4 @@ namespace hestia::tray {
         }
     }
 #endif
-}
+} // namespace hestia::tray

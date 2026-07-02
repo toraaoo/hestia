@@ -2,6 +2,6 @@
 
 namespace desktop::features {
 
-void RegisterAll();
+    void RegisterAll();
 
-}  // namespace desktop::features
+} // namespace desktop::features

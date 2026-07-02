@@ -28,4 +28,4 @@ namespace hestia::engine {
         std::uint8_t buffer_[64];
         std::size_t buffer_len_ = 0;
     };
-}
+} // namespace hestia::engine

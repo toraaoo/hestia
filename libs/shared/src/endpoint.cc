@@ -21,7 +21,7 @@ namespace hestia::ipc {
     fs::path default_endpoint() {
         return runtime_dir() / "hestiad.sock";
     }
-}
+} // namespace hestia::ipc
 #else
 // Windows named-pipe endpoint resolution lands with the Windows transport.
 namespace hestia::ipc {
@@ -31,5 +31,5 @@ namespace hestia::ipc {
     std::filesystem::path default_endpoint() {
         return R"(\\.\pipe\hestia-hestiad)";
     }
-}
+} // namespace hestia::ipc
 #endif

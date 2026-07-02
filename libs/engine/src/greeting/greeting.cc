@@ -9,4 +9,4 @@ namespace hestia::greeting {
         }
         return fmt::format("Hello, {}!", name);
     }
-}
+} // namespace hestia::greeting

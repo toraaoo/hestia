@@ -36,9 +36,7 @@ namespace hestia::cli {
             void register_command(CLI::App &parent, AppContext &ctx) override {
                 auto *cmd = parent.add_subcommand("home", "Print the resolved data directory");
                 cmd->callback([&ctx] {
-                    ctx.with_client([](client::Client &client) {
-                        std::cout << client.config_home().string() << '\n';
-                    });
+                    ctx.with_client([](client::Client &client) { std::cout << client.config_home().string() << '\n'; });
                 });
             }
         };
@@ -48,10 +46,8 @@ namespace hestia::cli {
         class ConfigSetHomeCommand : public Command {
         public:
             void register_command(CLI::App &parent, AppContext &ctx) override {
-                auto *cmd = parent.add_subcommand(
-                    "set-home", "Persist the data directory used by future runs");
-                cmd->add_option("dir", dir_,
-                                "Directory to use (omit to revert to the default)");
+                auto *cmd = parent.add_subcommand("set-home", "Persist the data directory used by future runs");
+                cmd->add_option("dir", dir_, "Directory to use (omit to revert to the default)");
                 cmd->callback([this, &ctx] {
                     ctx.with_client([this](client::Client &client) {
                         const auto home = client.config_set_home(dir_);
@@ -76,9 +72,7 @@ namespace hestia::cli {
                 cmd->add_option("key", key_, "Config key")->required();
                 cmd->add_option("value", value_, "Config value")->required();
                 cmd->callback([this, &ctx] {
-                    ctx.with_client([this](client::Client &client) {
-                        client.config_set(key_, value_);
-                    });
+                    ctx.with_client([this](client::Client &client) { client.config_set(key_, value_); });
                 });
             }
 
@@ -86,13 +80,12 @@ namespace hestia::cli {
             std::string key_;
             std::string value_;
         };
-    }
+    } // namespace
 
-    ConfigCommand::ConfigCommand()
-        : CommandGroup("config", "Read and write configuration") {
+    ConfigCommand::ConfigCommand() : CommandGroup("config", "Read and write configuration") {
         add(std::make_unique<ConfigGetCommand>());
         add(std::make_unique<ConfigSetCommand>());
         add(std::make_unique<ConfigHomeCommand>());
         add(std::make_unique<ConfigSetHomeCommand>());
     }
-}
+} // namespace hestia::cli

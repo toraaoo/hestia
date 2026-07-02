@@ -8,4 +8,4 @@ namespace hestia::ipc::topics {
     inline constexpr const char *kDownloadProgress = "download.progress";
     inline constexpr const char *kDownloadDone = "download.done";
     inline constexpr const char *kDownloadError = "download.error";
-}
+} // namespace hestia::ipc::topics

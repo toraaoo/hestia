@@ -17,7 +17,9 @@ namespace hestia::ipc {
 
     // Whether a peer advertising major `version` can talk to us. Same major only;
     // additive changes within a major stay compatible.
-    inline constexpr bool compatible(int version) { return version == kProtocolVersion; }
+    inline constexpr bool compatible(int version) {
+        return version == kProtocolVersion;
+    }
 
     // A request: a channel name, a JSON payload, and an optional correlation id.
     struct Request {
@@ -67,4 +69,4 @@ namespace hestia::ipc {
     bool is_event(const nlohmann::json &frame);
     Response decode_response(const nlohmann::json &frame);
     Event decode_event(const nlohmann::json &frame);
-}
+} // namespace hestia::ipc

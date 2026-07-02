@@ -9,10 +9,10 @@ namespace hestia::ipc {
 
     const char *to_string(ProcessState state) {
         switch (state) {
-            case ProcessState::Starting: return "starting";
-            case ProcessState::Running: return "running";
-            case ProcessState::Exited: return "exited";
-            case ProcessState::Crashed: return "crashed";
+        case ProcessState::Starting: return "starting";
+        case ProcessState::Running: return "running";
+        case ProcessState::Exited: return "exited";
+        case ProcessState::Crashed: return "crashed";
         }
         return "unknown";
     }
@@ -40,8 +40,7 @@ namespace hestia::ipc {
         RestartPolicy policy;
         policy.auto_restart = j.value("auto", false);
         policy.max_retries = j.value("max_retries", 0);
-        policy.backoff = std::chrono::milliseconds(
-            j.value("backoff_ms", static_cast<std::int64_t>(1000)));
+        policy.backoff = std::chrono::milliseconds(j.value("backoff_ms", static_cast<std::int64_t>(1000)));
         return policy;
     }
 
@@ -81,11 +80,8 @@ namespace hestia::ipc {
 
     json to_json(const LaunchSpec &s) {
         json j{
-            {"id", s.id},
-            {"kind", to_string(s.kind)},
-            {"program", s.program.string()},
-            {"args", s.args},
-            {"restart", to_json(s.restart)},
+            {"id", s.id},     {"kind", to_string(s.kind)},     {"program", s.program.string()},
+            {"args", s.args}, {"restart", to_json(s.restart)},
         };
         if (!s.working_dir.empty()) j["cwd"] = s.working_dir.string();
         return j;
@@ -103,4 +99,4 @@ namespace hestia::ipc {
         if (payload.contains("restart")) spec.restart = restart_from_json(payload.at("restart"));
         return spec;
     }
-}
+} // namespace hestia::ipc

@@ -30,4 +30,4 @@ namespace hestia::daemon {
     private:
         std::map<std::string, std::uint64_t> offsets_;
     };
-}
+} // namespace hestia::daemon

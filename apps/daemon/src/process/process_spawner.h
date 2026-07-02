@@ -27,8 +27,7 @@ namespace hestia::daemon {
         // Spawn `spec`'s program as a child of the daemon, appending its output to
         // `log`. Returns the new process's pid. Throws std::runtime_error if the
         // launch fails.
-        virtual std::int64_t spawn(const LaunchSpec &spec,
-                                   const std::filesystem::path &log) = 0;
+        virtual std::int64_t spawn(const LaunchSpec &spec, const std::filesystem::path &log) = 0;
 
         // Reap a child launched by THIS spawner instance, without blocking.
         // Returns its exit outcome if it has exited — consuming the zombie so the
@@ -47,4 +46,4 @@ namespace hestia::daemon {
 
     // The platform process spawner.
     std::unique_ptr<ProcessSpawner> make_process_spawner();
-}
+} // namespace hestia::daemon

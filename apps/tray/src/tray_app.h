@@ -43,4 +43,4 @@ namespace hestia::tray {
         std::map<std::string, std::string> states_; // process id -> state
         bool autostart_enabled_ = false;
     };
-}
+} // namespace hestia::tray

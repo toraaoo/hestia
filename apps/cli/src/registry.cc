@@ -14,4 +14,4 @@ namespace hestia::cli {
         commands.push_back(std::make_unique<DownloadCommand>());
         return commands;
     }
-}
+} // namespace hestia::cli

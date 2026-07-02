@@ -11,4 +11,4 @@ namespace hestia::daemon {
     using ipc::ProcessRecord;
     using ipc::ProcessState;
     using ipc::RestartPolicy;
-}
+} // namespace hestia::daemon

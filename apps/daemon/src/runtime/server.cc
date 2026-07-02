@@ -31,8 +31,7 @@ namespace hestia::daemon {
         // through the router with a per-request context, and write the correlated
         // response. The context carries the connection, so streaming channels
         // (events.subscribe) are ordinary handlers.
-        void serve_connection(const std::shared_ptr<ipc::Connection> &conn,
-                              const ipc::Peer &peer, const Router &router,
+        void serve_connection(const std::shared_ptr<ipc::Connection> &conn, const ipc::Peer &peer, const Router &router,
                               Runtime &runtime) {
             while (auto frame = conn->recv()) {
                 ipc::Request req;
@@ -40,8 +39,7 @@ namespace hestia::daemon {
                     req = ipc::decode_request(*frame);
                 } catch (const std::exception &e) {
                     spdlog::warn("dropping malformed frame: {}", e.what());
-                    conn->send(ipc::encode(
-                        ipc::Response::failure(ipc::errors::kBadRequest, e.what())));
+                    conn->send(ipc::encode(ipc::Response::failure(ipc::errors::kBadRequest, e.what())));
                     continue;
                 }
                 HandlerContext ctx{runtime, conn, peer};
@@ -51,7 +49,7 @@ namespace hestia::daemon {
             }
             runtime.hub().unsubscribe(conn.get());
         }
-    }
+    } // namespace
 
     int run_daemon() {
         const auto endpoint = ipc::default_endpoint();
@@ -76,8 +74,7 @@ namespace hestia::daemon {
 #endif
 
         spdlog::info("hestiad listening on {}", endpoint.string());
-        listener->serve([&](std::shared_ptr<ipc::Connection> conn,
-                            const ipc::Peer &peer) {
+        listener->serve([&](std::shared_ptr<ipc::Connection> conn, const ipc::Peer &peer) {
             spdlog::debug("client connected (uid {})", peer.uid);
             serve_connection(conn, peer, router, runtime);
             spdlog::debug("client disconnected");
@@ -86,4 +83,4 @@ namespace hestia::daemon {
         spdlog::info("hestiad stopped");
         return 0;
     }
-}
+} // namespace hestia::daemon

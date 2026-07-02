@@ -15,4 +15,4 @@ namespace hestia::ipc {
     // the daemon (bind) and clients (connect) resolve the same path here, so the
     // location lives in exactly one place.
     std::filesystem::path default_endpoint();
-}
+} // namespace hestia::ipc

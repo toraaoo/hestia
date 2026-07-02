@@ -41,7 +41,10 @@ namespace hestia::ipc {
             auto *p = static_cast<char *>(buf);
             for (std::size_t got = 0; got < n;) {
                 const ssize_t r = ::read(fd, p + got, n - got);
-                if (r > 0) { got += static_cast<std::size_t>(r); continue; }
+                if (r > 0) {
+                    got += static_cast<std::size_t>(r);
+                    continue;
+                }
                 if (r < 0 && errno == EINTR) continue;
                 return false; // EOF or error
             }
@@ -52,7 +55,10 @@ namespace hestia::ipc {
             const auto *p = static_cast<const char *>(buf);
             for (std::size_t sent = 0; sent < n;) {
                 const ssize_t r = ::write(fd, p + sent, n - sent);
-                if (r >= 0) { sent += static_cast<std::size_t>(r); continue; }
+                if (r >= 0) {
+                    sent += static_cast<std::size_t>(r);
+                    continue;
+                }
                 if (errno == EINTR) continue;
                 return false;
             }
@@ -78,8 +84,7 @@ namespace hestia::ipc {
         // sun_path buffer (~108 bytes — the classic Unix-socket trap).
         void fill_addr(sockaddr_un &addr, const std::string &path) {
             if (path.size() >= sizeof(addr.sun_path)) {
-                throw std::system_error(ENAMETOOLONG, std::generic_category(),
-                                        "socket path too long: " + path);
+                throw std::system_error(ENAMETOOLONG, std::generic_category(), "socket path too long: " + path);
             }
             addr.sun_family = AF_UNIX;
             std::memcpy(addr.sun_path, path.c_str(), path.size() + 1);
@@ -91,7 +96,12 @@ namespace hestia::ipc {
             const int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
             if (fd < 0) return false;
             sockaddr_un addr{};
-            try { fill_addr(addr, path); } catch (...) { ::close(fd); return false; }
+            try {
+                fill_addr(addr, path);
+            } catch (...) {
+                ::close(fd);
+                return false;
+            }
             const bool ok = ::connect(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == 0;
             ::close(fd);
             return ok;
@@ -121,8 +131,7 @@ namespace hestia::ipc {
                 return false;
             }
             if (uid != static_cast<std::uint32_t>(::getuid())) {
-                spdlog::warn("rejecting connection from uid {} (daemon runs as {})",
-                             uid, ::getuid());
+                spdlog::warn("rejecting connection from uid {} (daemon runs as {})", uid, ::getuid());
                 return false;
             }
             peer = Peer{/*local=*/true, uid};
@@ -231,7 +240,7 @@ namespace hestia::ipc {
                 // write() is async-signal-safe; this is the only thing the signal
                 // handler touches.
                 const ssize_t ignored = ::write(stop_pipe_[1], &byte, 1);
-                (void) ignored;
+                (void)ignored;
             }
 
         private:
@@ -264,9 +273,9 @@ namespace hestia::ipc {
             void shutdown_workers() {
                 {
                     std::lock_guard<std::mutex> lk(workers_mu_);
-                    for (const auto &connection : live_) connection->close();
+                    for (const auto &connection: live_) connection->close();
                 }
-                for (auto &worker : workers_) {
+                for (auto &worker: workers_) {
                     if (worker.thread.joinable()) worker.thread.join();
                 }
                 workers_.clear();
@@ -301,9 +310,7 @@ namespace hestia::ipc {
             throw;
         }
 
-        auto try_bind = [&] {
-            return ::bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == 0;
-        };
+        auto try_bind = [&] { return ::bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == 0; };
 
         if (!try_bind()) {
             if (errno != EADDRINUSE) {
@@ -313,8 +320,7 @@ namespace hestia::ipc {
             // Address in use: a live daemon, or a stale socket from a crash?
             if (endpoint_alive(path)) {
                 ::close(fd);
-                throw std::system_error(EADDRINUSE, std::generic_category(),
-                                        "hestiad is already running");
+                throw std::system_error(EADDRINUSE, std::generic_category(), "hestiad is already running");
             }
             ::unlink(path.c_str()); // reclaim the stale socket
             if (!try_bind()) {
@@ -345,11 +351,10 @@ namespace hestia::ipc {
         if (::connect(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) != 0) {
             const int err = errno;
             ::close(fd);
-            throw std::system_error(err, std::generic_category(),
-                                    "no daemon at " + endpoint.string());
+            throw std::system_error(err, std::generic_category(), "no daemon at " + endpoint.string());
         }
         return std::make_shared<PosixConnection>(fd);
     }
-}
+} // namespace hestia::ipc
 
 #endif // !_WIN32

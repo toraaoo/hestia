@@ -35,4 +35,4 @@ namespace hestia::daemon {
         std::filesystem::path path_;
         std::map<std::string, ProcessRecord> records_;
     };
-}
+} // namespace hestia::daemon

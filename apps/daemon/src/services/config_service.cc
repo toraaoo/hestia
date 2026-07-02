@@ -21,7 +21,7 @@ namespace hestia::daemon {
 
         router.on("config.set", [](const ipc::Request &req, HandlerContext &ctx) {
             ctx.runtime.engine().config().set(req.payload.at("key").get<std::string>(),
-                                    req.payload.at("value").get<std::string>());
+                                              req.payload.at("value").get<std::string>());
             return ipc::Response::success();
         });
 
@@ -34,4 +34,4 @@ namespace hestia::daemon {
             return ipc::Response::success({{"path", ctx.runtime.engine().set_data_home(dir).string()}});
         });
     }
-}
+} // namespace hestia::daemon

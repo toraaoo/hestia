@@ -66,4 +66,4 @@ namespace hestia::daemon {
             records_.clear();
         }
     }
-}
+} // namespace hestia::daemon

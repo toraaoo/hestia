@@ -12,4 +12,4 @@ namespace hestia::ipc {
 
     nlohmann::json to_json(const DownloadProgress &progress);
     DownloadProgress progress_from_json(const nlohmann::json &j);
-}
+} // namespace hestia::ipc

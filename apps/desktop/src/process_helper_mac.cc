@@ -6,7 +6,7 @@
 #include "include/cef_sandbox_mac.h"
 #endif
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 #if defined(CEF_USE_SANDBOX)
     CefScopedSandboxContext sandbox_ctx;
     if (!sandbox_ctx.Initialize(argc, argv)) return 1;
