@@ -102,6 +102,17 @@ cmrc_add_resource_library(
     WHENCE    "${FRONTEND_DIST}"
     ${FRONTEND_ASSETS})
 
+set(APP_ICON_DIR "${CMAKE_SOURCE_DIR}/packaging/icons")
+cmrc_add_resource_library(
+    hestia_icons
+    ALIAS     hestia::icons
+    NAMESPACE hestia_icons
+    WHENCE    "${APP_ICON_DIR}"
+    "${APP_ICON_DIR}/hestia-16.png"
+    "${APP_ICON_DIR}/hestia-32.png"
+    "${APP_ICON_DIR}/hestia-128.png"
+    "${APP_ICON_DIR}/hestia-256.png")
+
 # ---- Common sources (every platform) ----------------------------------------
 set(DESKTOP_SRCS_COMMON
     src/core/app/app_base.cc
@@ -136,7 +147,7 @@ if(APPLE)
     target_include_directories(hestia_desktop PRIVATE
         ${CEF_INCLUDE_PATH} src "${CMAKE_CURRENT_BINARY_DIR}/generated")
     target_link_libraries(hestia_desktop PRIVATE
-        hestia_shared hestia::frontend
+        hestia_shared hestia::frontend hestia::icons
         libcef_dll_wrapper ${CEF_STANDARD_LIBS}
         fmt::fmt spdlog::spdlog)
     if(USE_SANDBOX)
@@ -209,7 +220,7 @@ else()
     target_include_directories(hestia_desktop PRIVATE
         ${CEF_INCLUDE_PATH} src "${CMAKE_CURRENT_BINARY_DIR}/generated")
     target_link_libraries(hestia_desktop PRIVATE
-        hestia_shared hestia::frontend
+        hestia_shared hestia::frontend hestia::icons
         libcef_lib libcef_dll_wrapper ${CEF_STANDARD_LIBS}
         fmt::fmt spdlog::spdlog)
 

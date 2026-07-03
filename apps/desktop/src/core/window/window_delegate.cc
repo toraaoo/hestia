@@ -9,6 +9,7 @@ namespace desktop::window {
     void WindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
         SetActiveWindow(window);
         window->SetTitle(APP_NAME);
+        ApplyWindowIcons(window);
         window->AddChildView(view_);
         window->Show();
         view_->RequestFocus();

@@ -11,4 +11,8 @@ namespace desktop::window {
     void SetMinimized(bool minimized);
     bool IsMinimized();
 
+    // Window + taskbar/app-switcher icons from the embedded PNGs (WM_SETICON on
+    // Windows, _NET_WM_ICON on X11; Wayland resolves icons via the .desktop file).
+    void ApplyWindowIcons(CefRefPtr<CefWindow> win);
+
 } // namespace desktop::window
