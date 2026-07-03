@@ -37,6 +37,15 @@ runs:
       if: runner.os == 'Windows'
       uses: seanmiddleditch/gha-setup-ninja@v6
 
+    - name: Install rcedit (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        mkdir -p "$RUNNER_TEMP/rcedit"
+        curl -fsSL -o "$RUNNER_TEMP/rcedit/rcedit.exe" \
+          https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe
+        echo "$RUNNER_TEMP/rcedit" >> "$GITHUB_PATH"
+
     - name: Compiler cache
       if: inputs.cache-variant != ''
       uses: hendrikmuhs/ccache-action@v1.2

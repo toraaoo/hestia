@@ -370,6 +370,18 @@ helper must be SUID root once per build location (CMake prints the command).
 Release post-build steps strip `libcef.so` (~1.4 GB → ~200 MB) and prune unused
 locales to `en-US.pak`.
 
+On Windows the sandbox uses CEF's bootstrap model: the app builds as a DLL and
+CEF's prebuilt `bootstrap.exe` is copied to `HestiaLauncher.exe`, which loads
+the same-named DLL. The stock bootstrap ships CEF's own version resources
+("CEF bootstrap application"), so a post-build step rewrites its VERSIONINFO
+and icon from the shared `APP_*` identity using [rcedit](https://github.com/electron/rcedit)
+— the resource-editing approach CEF recommends (chromiumembedded/cef#3824).
+rcedit is a build-machine-only requirement (dev/CI, enforced at configure
+time); it never ships. Non-sandbox Windows builds compile the metadata straight
+into the exe via `src/resources/windows/app.rc.in`. Any release code signing
+must happen after the rewrite, since editing resources invalidates a prior
+signature.
+
 ## Build & dependency conventions
 
 - **One configure builds everything by default**, gated by the `BUILD_DESKTOP`

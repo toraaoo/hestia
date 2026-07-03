@@ -194,6 +194,18 @@ else()
     endif()
 
     set_target_properties(hestia_desktop PROPERTIES OUTPUT_NAME "${APP_BINARY_NAME}")
+
+    # Windows executable metadata: icon + VERSIONINFO from the shared APP_*
+    # identity, compiled into our module (the exe without the sandbox, the app
+    # DLL with it; the sandbox launcher itself is rebranded by rcedit below).
+    if(WIN32)
+        set(HESTIA_DESKTOP_ICON "${CMAKE_SOURCE_DIR}/packaging/icons/hestia.ico")
+        configure_file(src/resources/windows/app.rc.in
+                       "${CMAKE_CURRENT_BINARY_DIR}/generated/app.rc" @ONLY)
+        target_sources(hestia_desktop PRIVATE
+                       "${CMAKE_CURRENT_BINARY_DIR}/generated/app.rc")
+    endif()
+
     target_include_directories(hestia_desktop PRIVATE
         ${CEF_INCLUDE_PATH} src "${CMAKE_CURRENT_BINARY_DIR}/generated")
     target_link_libraries(hestia_desktop PRIVATE
@@ -213,10 +225,32 @@ else()
     COPY_FILES(hestia_desktop "${CEF_BINARY_FILES}"   "${CEF_BINARY_DIR}"   "${CEF_TARGET_OUT_DIR}")
     COPY_FILES(hestia_desktop "${CEF_RESOURCE_FILES}" "${CEF_RESOURCE_DIR}" "${CEF_TARGET_OUT_DIR}")
 
-    # Windows sandbox bootstrap.
+    # Windows sandbox bootstrap. CEF's stock bootstrap.exe carries its own
+    # version resources ("CEF bootstrap application"), so after the copy rcedit
+    # rewrites its VERSIONINFO/icon from the shared APP_* identity — the
+    # resource-editing approach CEF recommends (chromiumembedded/cef#3824).
     if(WIN32 AND USE_SANDBOX)
+        find_program(RCEDIT_EXECUTABLE NAMES rcedit rcedit-x64 rcedit-arm64)
+        if(NOT RCEDIT_EXECUTABLE)
+            message(FATAL_ERROR
+                "rcedit is required to rebrand the CEF bootstrap launcher.\n"
+                "Install it from https://github.com/electron/rcedit/releases and "
+                "add it to PATH, or pass -DRCEDIT_EXECUTABLE=<path>.")
+        endif()
         COPY_SINGLE_FILE(hestia_desktop "${CEF_BINARY_DIR}/bootstrap.exe"
                          "${CEF_TARGET_OUT_DIR}/${APP_BINARY_NAME}.exe")
+        add_custom_command(TARGET hestia_desktop POST_BUILD
+            COMMAND "${RCEDIT_EXECUTABLE}" "${CEF_TARGET_OUT_DIR}/${APP_BINARY_NAME}.exe"
+                    --set-icon "${HESTIA_DESKTOP_ICON}"
+                    --set-file-version "${PROJECT_VERSION}"
+                    --set-product-version "${PROJECT_VERSION}"
+                    --set-version-string FileDescription "${APP_NAME}"
+                    --set-version-string ProductName "${APP_NAME}"
+                    --set-version-string CompanyName "${APP_VENDOR}"
+                    --set-version-string InternalName "${APP_BINARY_NAME}"
+                    --set-version-string OriginalFilename "${APP_BINARY_NAME}.exe"
+                    --set-version-string LegalCopyright "Copyright (C) 2026 ${APP_VENDOR}"
+            COMMENT "Rebranding ${APP_BINARY_NAME}.exe resources" VERBATIM)
         SET_LPAC_ACLS(hestia_desktop)
     endif()
 
