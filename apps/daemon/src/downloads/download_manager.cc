@@ -9,7 +9,8 @@
 #include <hestia/ipc/topics.h>
 
 namespace hestia::daemon {
-    DownloadManager::DownloadManager(EventSink sink) : sink_(std::move(sink)) {}
+    DownloadManager::DownloadManager(engine::Engine &engine, EventSink sink)
+        : engine_(engine), sink_(std::move(sink)) {}
 
     DownloadManager::~DownloadManager() {
         std::vector<Worker> workers;
@@ -51,7 +52,7 @@ namespace hestia::daemon {
             sink_(ipc::Event{.topic = ipc::topics::kDownloadProgress, .payload = std::move(payload)});
         };
         try {
-            engine::Downloader{}.fetch(url, destination, checksum, on_progress);
+            engine::Downloader{&engine_.cache()}.fetch(url, destination, checksum, on_progress);
             sink_(ipc::Event{.topic = ipc::topics::kDownloadDone,
                              .payload = {{"id", id}, {"path", destination.string()}}});
         } catch (const std::exception &e) {

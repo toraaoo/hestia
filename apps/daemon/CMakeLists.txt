@@ -26,17 +26,22 @@ add_executable(hestia_daemon
         src/process/process_types.h
         src/downloads/download_manager.cc
         src/downloads/download_manager.h
+        src/java/install_manager.cc
+        src/java/install_manager.h
         src/platform/autostart.cc
         src/platform/autostart.h
         src/platform/win_util.h
         src/services/services.h
         src/services/health_service.cc
         src/services/app_service.cc
+        src/services/daemon_service.cc
         src/services/config_service.cc
         src/services/process_service.cc
         src/services/autostart_service.cc
         src/services/events_service.cc
         src/services/downloads_service.cc
+        src/services/java_service.cc
+        src/services/cache_service.cc
 )
 
 target_include_directories(hestia_daemon PRIVATE src)

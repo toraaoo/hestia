@@ -15,8 +15,12 @@ namespace hestia::paths {
             return std::nullopt;
         }
 
+        // Debug builds anchor everything at <repo>/.hestia so development never
+        // populates the real per-user directory; compiled out of Release.
         std::filesystem::path platform_data_home() {
-#if defined(_WIN32)
+#if defined(HESTIA_DEV_HOME)
+            return std::filesystem::path{HESTIA_DEV_HOME};
+#elif defined(_WIN32)
             if (const auto appdata = env_path("APPDATA")) {
                 return *appdata / "Hestia";
             }

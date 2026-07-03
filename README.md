@@ -6,8 +6,9 @@ Alongside a beautiful desktop UI, Hestia ships a first-class **CLI**
 front-end, so it's just as comfortable from a terminal as from a window.
 
 > **Status:** early development (`v0.0.1`). The project is being scaffolded —
-> the build system, logging, a config store, and the CLI skeleton are in
-> place. Launcher functionality is not implemented yet. Expect things to change.
+> the build system, logging, a config store, the CLI, and Java runtime
+> management (install/list/uninstall via the Adoptium API) are in place.
+> Launching Minecraft itself is not implemented yet. Expect things to change.
 
 ## Front-ends
 
@@ -25,7 +26,7 @@ Hestia is one daemon-backed core with several ways to drive it:
 ```
 hestia-cpp/
 ├── libs/shared/             hestia_shared — IPC transport + protocol, client SDK, identity, logging
-├── libs/engine/             hestia_engine — launcher engine (config, greeting, …); daemon-internal
+├── libs/engine/             hestia_engine — launcher engine (config, java, …); daemon-internal
 ├── apps/desktop/            Hestia      — graphical desktop launcher (CEF + React)
 │   ├── frontend/            Vite + React + TypeScript UI (built with Bun)
 │   └── src/core/            CEF shell — process model, IPC bridge, window, scheme
@@ -48,6 +49,7 @@ the full picture.
 - **C++20**, **CMake** (≥ 3.21), built with Ninja
 - [spdlog](https://github.com/gabime/spdlog) + [fmt](https://github.com/fmtlib/fmt) — logging and formatting
 - [CLI11](https://github.com/CLIUtils/CLI11) — command-line parsing
+- [FTXUI](https://github.com/ArthurSonzogni/FTXUI) — terminal UI elements (CLI progress)
 - [CEF](https://bitbucket.org/chromiumembedded/cef) — Chromium Embedded Framework (desktop only)
 - [React](https://react.dev/) + [Vite](https://vitejs.dev/) + [Bun](https://bun.sh/) — desktop frontend
 
@@ -154,8 +156,16 @@ CI steps. See [scripts/README.md](scripts/README.md).
 # Show help
 hestia
 
-# A friendly greeting (demo command)
-hestia greet --name Ada
+# Java runtimes (Eclipse Temurin via the Adoptium API)
+hestia java available            # release lines the provider ships
+hestia java install 21           # resolve, download, verify, extract, register
+hestia java list                 # installed runtimes
+hestia java uninstall 21
+
+# Download cache (checksummed downloads are stored once and reused)
+hestia cache info                # location, entry count, size
+hestia cache list                # cached blobs by checksum
+hestia cache clear               # remove everything, report what was freed
 
 # Configuration (flat key=value store)
 hestia config set <key> <value>
@@ -163,9 +173,11 @@ hestia config get <key>
 hestia config home              # print the resolved data directory
 hestia config set-home <dir>    # persist the data dir for future runs
 
-# Download a file via the daemon, with optional integrity check
-hestia download <url> <dest>
-hestia download <url> <dest> --checksum sha256:<hex>   # or sha1:<hex>
+# Daemon lifecycle
+hestia daemon status             # running (pid, uptime, home, log) or stopped
+hestia daemon restart            # stop + start; picks up a newly built hestiad
+hestia daemon start
+hestia daemon stop
 
 # Autostart (start the background daemon at login)
 hestia autostart enable          # register the daemon to start at login
@@ -173,8 +185,8 @@ hestia autostart disable         # remove the registration
 hestia autostart status          # print "enabled" or "disabled"
 
 # Logging verbosity (global flags, accepted at any position)
-hestia -v greet   # verbose / debug logging
-hestia -q greet   # warnings and errors only
+hestia -v java list   # verbose / debug logging
+hestia -q java list   # warnings and errors only
 
 # Override the data directory for one run
 hestia --home /path/to/dir config home
@@ -185,7 +197,9 @@ hestia --version
 
 The data directory is resolved as: `--home` → `$HESTIA_HOME` → a persisted
 pointer (`config set-home`) → the platform default (`~/.hestia`, or
-`%APPDATA%\Hestia` on Windows).
+`%APPDATA%\Hestia` on Windows). **Debug builds** use `<repo>/.hestia` as the
+platform default instead, so development never populates the real per-user
+directory (compiled out of Release).
 
 ## Documentation
 

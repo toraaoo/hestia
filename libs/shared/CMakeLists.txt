@@ -19,6 +19,8 @@ add_library(hestia_shared STATIC
         include/hestia/ipc/process_codec.h
         include/hestia/ipc/download.h
         include/hestia/ipc/download_codec.h
+        include/hestia/ipc/java.h
+        include/hestia/ipc/java_codec.h
         include/hestia/ipc/errors.h
         include/hestia/ipc/topics.h
         include/hestia/client/client.h
@@ -31,6 +33,7 @@ add_library(hestia_shared STATIC
         src/protocol.cc
         src/process_codec.cc
         src/download_codec.cc
+        src/java_codec.cc
         src/client.cc
         src/bridge.cc
 )
@@ -58,6 +61,11 @@ target_link_libraries(hestia_shared
 target_compile_options(hestia_shared PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
         $<$<CXX_COMPILER_ID:MSVC>:/W4>
+)
+
+# Debug builds keep all data inside the checkout (see paths.cc).
+target_compile_definitions(hestia_shared PRIVATE
+        $<$<CONFIG:Debug>:HESTIA_DEV_HOME="${CMAKE_SOURCE_DIR}/.hestia">
 )
 
 # "Development" component: kept out of end-user packages, which ship runtime only.

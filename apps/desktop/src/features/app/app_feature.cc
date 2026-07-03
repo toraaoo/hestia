@@ -1,7 +1,6 @@
 #include "features/app/app_feature.h"
 #include "core/browser/client_manager.h"
 #include "core/build_config.h"
-#include "core/daemon/daemon_client.h"
 #include "core/ipc/ipc_router.h"
 #include "core/window/window_util.h"
 
@@ -45,8 +44,6 @@ namespace desktop::features {
             const auto msg = req.PayloadString();
             res.Success(ipc::Str(msg.empty() ? "pong" : msg));
         });
-
-        RegisterForward(on, "greet", "app.greet");
 
         on("window.state",
            [](const ipc::Request &, ipc::Response res) { res.Success(WindowStateJson(window::GetActiveWindow())); });

@@ -8,6 +8,8 @@
 #include <cpr/cpr.h>
 #include <fmt/format.h>
 
+#include <hestia/engine/cache.h>
+
 #include "download/checksum.h"
 
 namespace hestia::engine {
@@ -30,7 +32,52 @@ namespace hestia::engine {
             std::error_code ec;
             fs::remove(path, ec);
         }
+
+        // Copies a cached blob to `destination`, re-hashing on the way out.
+        // A blob that no longer matches its key is evicted, and the caller
+        // falls back to the network.
+        bool serve_from_cache(Cache &cache, const fs::path &destination, const ipc::Checksum &checksum,
+                              const DownloadProgressCallback &on_progress) {
+            const auto blob = cache.lookup(checksum);
+            if (!blob) return false;
+            std::error_code ec;
+            const auto total = fs::file_size(*blob, ec);
+            if (ec) return false;
+            std::ifstream in(*blob, std::ios::binary);
+            if (!in) return false;
+
+            const fs::path part = destination.string() + ".part";
+            std::ofstream out(part, std::ios::binary | std::ios::trunc);
+            if (!out) return false;
+
+            Hasher hasher(checksum.algorithm);
+            std::uint64_t copied = 0;
+            char buf[64 * 1024];
+            while (in.read(buf, sizeof buf) || in.gcount() > 0) {
+                const auto n = in.gcount();
+                out.write(buf, n);
+                hasher.update(buf, static_cast<std::size_t>(n));
+                copied += static_cast<std::uint64_t>(n);
+                if (on_progress) on_progress(ipc::DownloadProgress{.downloaded = copied, .total = total});
+                if (in.eof()) break;
+            }
+            out.close();
+
+            if (!out || hasher.hex_digest() != to_lower(checksum.hex)) {
+                cache.evict(checksum);
+                remove_quietly(part);
+                return false;
+            }
+            fs::rename(part, destination, ec);
+            if (ec) {
+                remove_quietly(part);
+                return false;
+            }
+            return true;
+        }
     } // namespace
+
+    Downloader::Downloader(Cache *cache) : cache_(cache) {}
 
     void Downloader::fetch(const std::string &url, const fs::path &destination,
                            const std::optional<ipc::Checksum> &checksum,
@@ -40,6 +87,10 @@ namespace hestia::engine {
 
         if (const auto parent = destination.parent_path(); !parent.empty()) {
             fs::create_directories(parent);
+        }
+
+        if (checksum && cache_ && serve_from_cache(*cache_, destination, *checksum, on_progress)) {
+            return;
         }
 
         const fs::path part = destination.string() + ".part";
@@ -98,5 +149,7 @@ namespace hestia::engine {
             throw std::runtime_error(
                 fmt::format("cannot move {} to {}: {}", part.string(), destination.string(), ec.message()));
         }
+
+        if (checksum && cache_) cache_->store(destination, *checksum);
     }
 } // namespace hestia::engine

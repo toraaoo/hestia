@@ -4,6 +4,7 @@
 #include "hestia/ipc/download_codec.h"
 #include "hestia/ipc/endpoint.h"
 #include "hestia/ipc/errors.h"
+#include "hestia/ipc/java_codec.h"
 #include "hestia/ipc/process_codec.h"
 #include "hestia/ipc/protocol.h"
 #include "hestia/ipc/topics.h"
@@ -67,6 +68,29 @@ namespace hestia::client {
                 throw std::runtime_error(res.error ? res.error->code + ": " + res.error->message : "daemon error");
             }
             return res;
+        }
+
+        JavaRuntime java_runtime_from(const json &j) {
+            const auto runtime = ipc::java_runtime_from_json(j);
+            return JavaRuntime{
+                .vendor = runtime.vendor,
+                .major = runtime.major,
+                .release_name = runtime.release_name,
+                .home = runtime.home.string(),
+                .executable = runtime.executable.string(),
+            };
+        }
+
+        // A client-generated id lets callers subscribe before starting a job, so
+        // even one that finishes instantly cannot slip its terminal event past us.
+        std::string job_id(const char *prefix) {
+            static std::atomic<int> counter{0};
+#if defined(_WIN32)
+            const auto pid = static_cast<long long>(::GetCurrentProcessId());
+#else
+            const auto pid = static_cast<long long>(::getpid());
+#endif
+            return std::string(prefix) + "-" + std::to_string(pid) + "-" + std::to_string(++counter);
         }
 
         // hestiad sits beside the current binary (CLI/daemon/tray, all in bin/) or
@@ -319,11 +343,6 @@ namespace hestia::client {
         return {res.payload.at("path").get<std::string>()};
     }
 
-    std::string Client::greet(std::string_view name) {
-        const auto res = must(d_->call("app.greet", {{"name", std::string(name)}}));
-        return res.payload.value("message", std::string{});
-    }
-
     AppInfo Client::app_info() {
         const auto res = must(d_->call("app.info", json::object()));
         const auto &p = res.payload;
@@ -397,6 +416,57 @@ namespace hestia::client {
         must(d_->call("events.subscribe", std::move(payload)));
     }
 
+    // Subscribe to `id`'s events, invoke `start`, and block until the done or
+    // error topic arrives, handing every other matching event to `on_event`.
+    // Returns the done event's payload; throws the error event's message.
+    json Client::run_job(const std::string &id, const char *done_topic, const char *error_topic,
+                         const std::function<void(const ipc::Event &)> &on_event,
+                         const std::function<void()> &start) {
+        struct Outcome {
+            std::mutex mu;
+            std::condition_variable cv;
+            bool done = false;
+            bool ok = false;
+            std::string message;
+            json payload;
+        };
+        const auto outcome = std::make_shared<Outcome>();
+
+        d_->set_event_callback(
+            [outcome, id, done_topic, error_topic, on_event](const ipc::Event &event) {
+                if (event.payload.value("id", std::string{}) != id) return;
+                if (event.topic != done_topic && event.topic != error_topic) {
+                    if (on_event) on_event(event);
+                    return;
+                }
+                std::scoped_lock const lk(outcome->mu);
+                outcome->done = true;
+                outcome->ok = event.topic == done_topic;
+                outcome->message = event.payload.value("message", std::string{});
+                outcome->payload = event.payload;
+                outcome->cv.notify_all();
+            });
+
+        try {
+            must(d_->call("events.subscribe", {{"id", id}}));
+            start();
+
+            std::unique_lock<std::mutex> lk(outcome->mu);
+            while (!outcome->done) {
+                outcome->cv.wait_for(lk, std::chrono::milliseconds(500));
+                if (!outcome->done && d_->is_closed()) {
+                    throw std::runtime_error("daemon connection lost");
+                }
+            }
+        } catch (...) {
+            d_->set_event_callback({});
+            throw;
+        }
+        d_->set_event_callback({});
+        if (!outcome->ok) throw std::runtime_error(outcome->message);
+        return outcome->payload;
+    }
+
     void Client::download(const DownloadRequest &request, const DownloadProgressCallback &on_progress) {
         // Map the client-facing request onto the shared wire type, validating the
         // checksum here so a malformed one fails clearly without a round-trip.
@@ -415,62 +485,98 @@ namespace hestia::client {
             }
             spec.checksum = std::move(checksum);
         }
+        spec.id = job_id("dl");
 
-        // A client-generated id lets us subscribe before starting, so even a
-        // download that finishes instantly cannot slip its terminal event past us.
-        static std::atomic<int> counter{0};
-#if defined(_WIN32)
-        const auto pid = static_cast<long long>(::GetCurrentProcessId());
-#else
-        const auto pid = static_cast<long long>(::getpid());
-#endif
-        const std::string id = "dl-" + std::to_string(pid) + "-" + std::to_string(++counter);
-        spec.id = id;
+        run_job(
+            spec.id, ipc::topics::kDownloadDone, ipc::topics::kDownloadError,
+            [&on_progress](const ipc::Event &event) {
+                if (event.topic != ipc::topics::kDownloadProgress || !on_progress) return;
+                const auto p = ipc::progress_from_json(event.payload);
+                on_progress(DownloadProgress{.downloaded = p.downloaded, .total = p.total});
+            },
+            [&] { must(d_->call("download.start", ipc::to_json(spec))); });
+    }
 
-        struct Outcome {
-            std::mutex mu;
-            std::condition_variable cv;
-            bool done = false;
-            bool ok = false;
-            std::string message;
-        };
-        const auto outcome = std::make_shared<Outcome>();
-
-        d_->set_event_callback([outcome, id, on_progress](const ipc::Event &event) {
-            if (event.payload.value("id", std::string{}) != id) return;
-            if (event.topic == ipc::topics::kDownloadProgress) {
-                if (on_progress) {
-                    const auto p = ipc::progress_from_json(event.payload);
-                    on_progress(DownloadProgress{.downloaded = p.downloaded, .total = p.total});
-                }
-                return;
-            }
-            if (event.topic != ipc::topics::kDownloadDone && event.topic != ipc::topics::kDownloadError) {
-                return;
-            }
-            std::scoped_lock const lk(outcome->mu);
-            outcome->done = true;
-            outcome->ok = event.topic == ipc::topics::kDownloadDone;
-            outcome->message = event.payload.value("message", std::string{});
-            outcome->cv.notify_all();
-        });
-
-        try {
-            must(d_->call("events.subscribe", {{"id", id}}));
-            must(d_->call("download.start", ipc::to_json(spec)));
-
-            std::unique_lock<std::mutex> lk(outcome->mu);
-            while (!outcome->done) {
-                outcome->cv.wait_for(lk, std::chrono::milliseconds(500));
-                if (!outcome->done && d_->is_closed()) {
-                    throw std::runtime_error("daemon connection lost during download");
-                }
-            }
-        } catch (...) {
-            d_->set_event_callback({});
-            throw;
+    std::vector<JavaRelease> Client::java_releases() {
+        const auto res = must(d_->call("java.releases", json::object()));
+        std::vector<JavaRelease> releases;
+        for (const auto &entry: res.payload.value("releases", json::array())) {
+            const auto release = ipc::java_release_from_json(entry);
+            releases.push_back(JavaRelease{.major = release.major, .lts = release.lts});
         }
-        d_->set_event_callback({});
-        if (!outcome->ok) throw std::runtime_error(outcome->message);
+        return releases;
+    }
+
+    std::vector<JavaRuntime> Client::java_list() {
+        const auto res = must(d_->call("java.list", json::object()));
+        std::vector<JavaRuntime> runtimes;
+        for (const auto &entry: res.payload.value("runtimes", json::array())) {
+            runtimes.push_back(java_runtime_from(entry));
+        }
+        return runtimes;
+    }
+
+    JavaRuntime Client::java_install(int major, const JavaInstallProgressCallback &on_progress) {
+        const std::string id = job_id("java");
+        const auto done = run_job(
+            id, ipc::topics::kJavaInstallDone, ipc::topics::kJavaInstallError,
+            [&on_progress](const ipc::Event &event) {
+                if (event.topic != ipc::topics::kJavaInstallProgress || !on_progress) return;
+                const auto p = ipc::java_install_progress_from_json(event.payload);
+                on_progress(JavaInstallProgress{
+                    .phase = ipc::to_string(p.phase), .current = p.current, .total = p.total});
+            },
+            [&] { must(d_->call("java.install", {{"major", major}, {"id", id}})); });
+        return java_runtime_from(done.value("runtime", json::object()));
+    }
+
+    void Client::java_uninstall(int major) {
+        must(d_->call("java.uninstall", {{"major", major}}));
+    }
+
+    CacheStats Client::cache_info() {
+        const auto res = must(d_->call("cache.info", json::object()));
+        return CacheStats{
+            .path = res.payload.value("path", std::string{}),
+            .entries = res.payload.value("entries", std::uint64_t{0}),
+            .bytes = res.payload.value("bytes", std::uint64_t{0}),
+        };
+    }
+
+    std::vector<CacheEntry> Client::cache_list() {
+        const auto res = must(d_->call("cache.list", json::object()));
+        std::vector<CacheEntry> entries;
+        for (const auto &entry: res.payload.value("entries", json::array())) {
+            entries.push_back(CacheEntry{
+                .algorithm = entry.value("algorithm", std::string{}),
+                .hex = entry.value("hex", std::string{}),
+                .size = entry.value("size", std::uint64_t{0}),
+            });
+        }
+        return entries;
+    }
+
+    DaemonStatus Client::daemon_status() {
+        const auto res = must(d_->call("daemon.status", json::object()));
+        return DaemonStatus{
+            .pid = res.payload.value("pid", 0LL),
+            .version = res.payload.value("version", std::string{}),
+            .uptime_seconds = res.payload.value("uptime_seconds", 0LL),
+            .home = res.payload.value("home", std::string{}),
+            .log = res.payload.value("log", std::string{}),
+        };
+    }
+
+    void Client::daemon_stop() {
+        must(d_->call("daemon.stop", json::object()));
+    }
+
+    CacheStats Client::cache_clear() {
+        const auto res = must(d_->call("cache.clear", json::object()));
+        return CacheStats{
+            .path = {},
+            .entries = res.payload.value("entries", std::uint64_t{0}),
+            .bytes = res.payload.value("bytes", std::uint64_t{0}),
+        };
     }
 } // namespace hestia::client

@@ -79,6 +79,47 @@ namespace hestia::client {
 
     using DownloadProgressCallback = std::function<void(const DownloadProgress &)>;
 
+    struct JavaRelease {
+        int major = 0;
+        bool lts = false;
+    };
+
+    struct JavaRuntime {
+        std::string vendor;
+        int major = 0;
+        std::string release_name;
+        std::string home;
+        std::string executable;
+    };
+
+    struct JavaInstallProgress {
+        std::string phase;         // "resolving" | "downloading" | "extracting"
+        std::uint64_t current = 0; // bytes while downloading, entries while extracting
+        std::uint64_t total = 0;   // 0 = unknown
+    };
+
+    using JavaInstallProgressCallback = std::function<void(const JavaInstallProgress &)>;
+
+    struct CacheEntry {
+        std::string algorithm;
+        std::string hex;
+        std::uint64_t size = 0;
+    };
+
+    struct CacheStats {
+        std::string path;
+        std::uint64_t entries = 0;
+        std::uint64_t bytes = 0;
+    };
+
+    struct DaemonStatus {
+        long long pid = 0;
+        std::string version;
+        long long uptime_seconds = 0;
+        std::string home;
+        std::string log;
+    };
+
     class Client {
     public:
         // Connect to the running daemon. If none is running and `auto_spawn` is
@@ -101,7 +142,6 @@ namespace hestia::client {
         void config_set(std::string_view key, std::string_view value);
         std::filesystem::path config_home();
         std::filesystem::path config_set_home(std::string_view dir);
-        std::string greet(std::string_view name);
         AppInfo app_info();
 
         // Autostart: register/unregister the daemon to start with the user
@@ -132,9 +172,32 @@ namespace hestia::client {
         // replaces any callback installed by subscribe().
         void download(const DownloadRequest &request, const DownloadProgressCallback &on_progress = {});
 
+        // Java runtimes, managed by the daemon. java_install blocks until the
+        // runtime is registered, reporting progress on the reader thread; like
+        // download(), it uses the client's single event-callback slot.
+        std::vector<JavaRelease> java_releases();
+        std::vector<JavaRuntime> java_list();
+        JavaRuntime java_install(int major, const JavaInstallProgressCallback &on_progress = {});
+        void java_uninstall(int major);
+
+        // The daemon's content-addressed download cache. cache_clear reports
+        // what was removed (its path field is the cache location).
+        CacheStats cache_info();
+        std::vector<CacheEntry> cache_list();
+        CacheStats cache_clear();
+
+        // Daemon lifecycle. daemon_stop asks the daemon to shut itself down;
+        // it answers before exiting, so poll the endpoint to observe the exit.
+        DaemonStatus daemon_status();
+        void daemon_stop();
+
     private:
         struct Detail;
         explicit Client(std::unique_ptr<Detail> detail);
+
+        nlohmann::json run_job(const std::string &id, const char *done_topic, const char *error_topic,
+                               const std::function<void(const ipc::Event &)> &on_event,
+                               const std::function<void()> &start);
 
         std::unique_ptr<Detail> d_;
     };

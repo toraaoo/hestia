@@ -30,14 +30,6 @@ export function getAppInfo(): Promise<AppInfo> {
   return invoke<AppInfo>("app.info", null, { fallback: DISCONNECTED_APP_INFO })
 }
 
-export function greet(name: string): Promise<string> {
-  return invoke<{ message: string }>(
-    "app.greet",
-    { name },
-    { fallback: { message: name ? `Hello, ${name}!` : "Hello there!" } }
-  ).then((r) => r.message)
-}
-
 export const config = {
   get: (key: string): Promise<string | null> =>
     invoke<{ value: string }>("settings.config.get", { key })

@@ -4,15 +4,23 @@ include(GNUInstallDirs)
 # IPC, never by linking it (the desktop still links it, a transitional exception).
 add_library(hestia_engine STATIC
         include/hestia/engine/engine.h
+        include/hestia/engine/cache.h
         include/hestia/engine/config.h
         include/hestia/engine/downloader.h
-        include/hestia/engine/greeting.h
+        include/hestia/engine/java.h
         src/engine.cc
+        src/cache/cache.cc
         src/config.cc
         src/download/checksum.h
         src/download/checksum.cc
         src/download/downloader.cc
-        src/greeting/greeting.cc
+        src/java/java.cc
+        src/java/adoptium_provider.h
+        src/java/adoptium_provider.cc
+        src/java/extract.h
+        src/java/extract.cc
+        src/java/platform.h
+        src/java/platform.cc
 )
 
 # PUBLIC: shared types (ipc::Checksum) appear in the engine's public headers.

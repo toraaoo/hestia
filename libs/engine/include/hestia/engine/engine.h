@@ -3,7 +3,9 @@
 #include <filesystem>
 #include <string>
 
+#include <hestia/engine/cache.h>
 #include <hestia/engine/config.h>
+#include <hestia/engine/java.h>
 
 namespace hestia::engine {
     // The daemon-internal aggregate root; frontends reach it only over IPC.
@@ -22,8 +24,16 @@ namespace hestia::engine {
         Config &config() { return config_; }
         const Config &config() const { return config_; }
 
+        Cache &cache() { return cache_; }
+        const Cache &cache() const { return cache_; }
+
+        Java &java() { return java_; }
+        const Java &java() const { return java_; }
+
     private:
         std::filesystem::path data_home_;
         Config config_;
+        Cache cache_;
+        Java java_;
     };
 } // namespace hestia::engine

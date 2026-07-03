@@ -14,7 +14,7 @@ reasoning behind the structure.
 > domain socket on POSIX, a named pipe on Windows). `libs/core` was split into
 > **`libs/shared`** (IPC transport, client SDK, app identity, logging — linked
 > by the daemon *and* every client) and **`libs/engine`** (config store,
-> greeting, launcher logic — daemon-internal). The CLI and tray already reach
+> java runtimes, launcher logic — daemon-internal). The CLI and tray already reach
 > the engine only over the socket; the desktop app still links it directly (a
 > transitional exception being retired — see the target graph).
 
@@ -44,7 +44,7 @@ frontend must be built first (see [Build & dependency conventions](#build--depen
 ```
 libs/shared  → IPC transport + protocol, client SDK, shared identity (app_info.h),
                logging; linked by the daemon AND every client; zero UI dependencies
-libs/engine  → launcher engine (config, greeting, launcher logic); daemon-internal
+libs/engine  → launcher engine (config, java runtimes, launcher logic); daemon-internal
 apps/cli     → CLI11 commands + thin main(); depends on shared
 apps/desktop → CEF shell + embedded React frontend; depends on shared (+ engine, transitional)
 apps/tray    → resident system-tray helper; depends on shared ONLY
@@ -63,7 +63,7 @@ engine ◄──── daemon   (no front-end links engine)
 ```
 
 > **Transitional:** `apps/desktop` still links `hestia_engine` directly. The
-> CLI and tray already reach it only over the socket — `hestia greet`,
+> CLI and tray already reach it only over the socket — `hestia java`,
 > `config`, and `autostart` all round-trip to the daemon via the client SDK. The
 > end-state is engine = daemon-only, with every front-end reaching it over IPC.
 
@@ -87,9 +87,9 @@ hestia-cpp/
 │   │   └── src/               implementations (transport, protocol, client, logging)
 │   └── engine/                hestia_engine — launcher engine (daemon-internal)
 │       ├── include/hestia/engine/  PUBLIC API — flat, one header per domain:
-│       │                      engine.h (aggregate root), config.h, downloader.h, greeting.h
+│       │                      engine.h (aggregate root), config.h, downloader.h, java.h
 │       └── src/               internals grouped by domain folder (config/, download/,
-│                              greeting/), including private headers (checksum.h)
+│                              java/), including private headers (checksum.h)
 ├── apps/
 │   ├── cli/                   hestia_cli — CLI11 commands + main()
 │   ├── daemon/               hestia_daemon (hestiad) — bootstrap main.cc over
@@ -109,6 +109,8 @@ hestia-cpp/
 - **C++20**, **CMake** (≥ 3.21), built with **Ninja**.
 - [spdlog](https://github.com/gabime/spdlog) + [fmt](https://github.com/fmtlib/fmt) — logging and formatting.
 - [CLI11](https://github.com/CLIUtils/CLI11) — command-line parsing.
+- [FTXUI](https://github.com/ArthurSonzogni/FTXUI) — terminal UI elements (the
+  CLI's progress gauges; the future TUI).
 - [cpr](https://github.com/libcpr/cpr) — HTTP client for the engine's downloader
   (builds its bundled curl, fetched at configure time).
 - [CEF](https://bitbucket.org/chromiumembedded/cef) — Chromium Embedded Framework (desktop).
@@ -129,7 +131,7 @@ frontend's `dist/` tree is compiled into the binary by **CMakeRC**
 | `hestia`            | `libs/shared`  | cross-cutting (`init_logging`, `LogLevel`)       |
 | `hestia::ipc`       | `libs/shared`  | transport, endpoint, protocol envelope           |
 | `hestia::client`    | `libs/shared`  | typed client SDK (`Client`)                      |
-| `hestia::engine`    | `libs/engine`  | `Engine` root, `Config`, `Downloader`, `greet()` |
+| `hestia::engine`    | `libs/engine`  | `Engine` root, `Config`, `Downloader`, `Java`    |
 | `hestia::cli`       | `apps/cli`     | command framework + commands                     |
 | `desktop::core`†    | `apps/desktop` | CEF shell — app/browser/window/scheme            |
 | `desktop::ipc`      | `apps/desktop` | the JS⇄C++ bridge (router + registry)            |
@@ -151,10 +153,10 @@ the one public boundary between them — the socket — and nothing launcher-spe
   on spdlog's; `logging.cc` maps it across.
 - **`ipc`** — the platform transport (`transport_posix.cc` / `transport_windows.cc`),
   endpoint resolution, and the JSON protocol envelope. It also carries the wire
-  **vocabulary** for domains that cross the socket — `process.h`/`process_codec.h`
-  and `download.h`/`download_codec.h` pair the domain types with their one
-  JSON codec, so the daemon and every client (de)serialize through the same
-  definitions and cannot drift.
+  **vocabulary** for domains that cross the socket — `process.h`/`process_codec.h`,
+  `download.h`/`download_codec.h`, and `java.h`/`java_codec.h` pair the domain
+  types with their one JSON codec, so the daemon and every client (de)serialize
+  through the same definitions and cannot drift.
 - **`client`** — the typed client SDK (`hestia::client::Client`) front-ends use to
   drive the daemon.
 - **identity** — `app_info.h` is generated from `app_info.h.in` and exposed on the
@@ -181,7 +183,7 @@ re-resolves the data directory and repoints every subsystem so a `config.set-hom
 takes effect on the running daemon, not just the next start.
 
 The public API in `include/hestia/engine/` is **flat — one header per domain**
-(`config.h`, `downloader.h`, `greeting.h`), so includes never exceed two levels
+(`config.h`, `downloader.h`, `java.h`), so includes never exceed two levels
 (`<hestia/engine/config.h>`, matching `<hestia/ipc/transport.h>`). Implementation
 complexity grows privately instead: `src/<domain>/` holds the `.cc` files and any
 internal helpers as private headers (`src` is a PRIVATE include dir). A new domain
@@ -194,7 +196,8 @@ The subsystems behind the aggregate today:
   directory changes. The on-disk line format (load/save/validation) is file-local
   in `src/config/config.cc`. Data-directory resolution (`--home` →
   `$HESTIA_HOME` → persisted pointer → platform default) lives in shared's
-  `hestia::paths`.
+  `hestia::paths`; Debug builds anchor the platform default at `<repo>/.hestia`
+  so development never populates the real per-user directory.
 - **`Downloader`** (`downloader.h`) — streams a URL to disk through a
   `.part` temp file (via cpr), hashing incrementally when a checksum is given and
   renaming into place only on success. Stateless, so it hangs off no aggregate —
@@ -202,8 +205,26 @@ The subsystems behind the aggregate today:
   vocabulary (`ipc::Checksum`, `ipc::HashAlgorithm`) comes from
   `<hestia/ipc/download.h>`, the same types the wire uses. The native incremental
   SHA-1/SHA-256 `Hasher` is the private `src/download/checksum.{h,cc}`.
-- **`greeting`** (`greeting.h`) — `greet(name)`; a placeholder
-  exercising the engine→frontend seam.
+- **`Cache`** (`cache.h`) — a content-addressed store of verified downloads
+  under `<data_home>/cache/<algorithm>/<hex[0:2]>/<hex>`, keyed by checksum so
+  a file fetched once (a JDK, a mod) is reused regardless of URL. Given a
+  cache, `Downloader` serves checksummed fetches from it and feeds it after a
+  successful download; hits are **re-hashed on the way out**, so a damaged
+  blob is evicted and the fetch falls back to the network — the cache can
+  speed things up but never corrupt them. Managed over the `cache.*` channels
+  (`hestia cache info|list|clear`).
+- **`Java`** (`java.h`) — installs and tracks Java runtimes under
+  `<data_home>/java`. **`JavaProvider`** is the abstract catalogue seam: an
+  implementation resolves release lines and the latest GA build for a
+  `JavaTarget` (os/arch in Adoptium's vocabulary); `AdoptiumProvider`
+  (Eclipse Temurin, cpr + nlohmann::json) is the default and private to
+  `src/java/`. `install()` runs the blocking pipeline — resolve → download
+  (SHA-256-verified, via `Downloader`) → extract (system tar; bsdtar reads the
+  `.zip` on Windows) → register — staging into `<vendor>-<major>.staging` and
+  renaming into place so a failure leaves nothing behind. Each install carries a
+  `runtime.json` record and `installed()` scans the directory: the disk is the
+  registry. The async wrapper and `java.install.*` progress events live in the
+  daemon's `JavaInstallManager`, not here.
 
 `engine` links fmt and cpr **privately** — implementation details that do not leak
 through its public headers. `hestia_shared` is linked **publicly**: the engine's
@@ -227,10 +248,10 @@ are subdir-qualified (`"runtime/router.h"`):
   (`router.on("config.get", …)`); `event_hub.h` fans daemon events out to
   subscribed connections.
     - **`Runtime`** (`runtime.h`) — the one place the daemon's long-lived
-      collaborators live: the engine, the event hub, the download manager, and the
-      process supervisor, constructed in dependency order (the hub before anything
-      that publishes into it, so reverse-order destruction tears the publishers
-      down first). Adding a subsystem is a member plus an accessor here — the serve
+      collaborators live: the engine, the event hub, the download manager, the
+      java install manager, and the process supervisor, constructed in dependency
+      order (the hub before anything that publishes into it, so reverse-order
+      destruction tears the publishers down first). Adding a subsystem is a member plus an accessor here — the serve
       loop and every existing service are untouched.
     - **`HandlerContext`** (`handler_context.h`) — what every handler receives:
       `{Runtime &runtime, connection, peer}`. Handlers reach collaborators through
@@ -239,9 +260,13 @@ are subdir-qualified (`"runtime/router.h"`):
       be ordinary handlers.
 - **`services/`** — one file per channel-prefix, wired in once via
   `register_all_services()` in `services.h`. Today: `health` (`health.ping`),
-  `app` (`app.info`, `app.greet`), `config` (`config.get|set|home|set-home`),
+  `app` (`app.info`), `daemon` (`daemon.status|stop` — stop answers, then shuts
+  the serve loop down, so `hestia daemon restart` can hand over to a fresh
+  binary), `config` (`config.get|set|home|set-home`),
   `process` (`process.start|stop|list|status|logs`), `autostart`
-  (`autostart.enable|disable|status`), `downloads` (`download.start`), and
+  (`autostart.enable|disable|status`), `downloads` (`download.start`),
+  `java` (`java.releases|install|list|uninstall`), `cache`
+  (`cache.info|list|clear`), and
   `events` (`events.subscribe`, a streaming channel that pushes to the calling
   connection).
 - **`downloads/`** (`download_manager.{h,cc}`) — runs each download on a worker
@@ -249,6 +274,11 @@ are subdir-qualified (`"runtime/router.h"`):
   outcome are published through the event hub as `download.progress`,
   `download.done`, and `download.error` events (throttled progress, filtered by
   the download's id like process events).
+- **`java/`** (`install_manager.{h,cc}`) — the same worker-thread pattern for
+  `java.install`: the engine's blocking `Java::install()` runs off-thread, one
+  install per release line at a time, publishing `java.install.progress`,
+  `java.install.done` (carrying the registered runtime), and
+  `java.install.error`.
 - **`process/`** (`process_supervisor`, `process_table`, `process_spawner`,
   `liveness_probe`, `log_streamer`, `restart_policy`) — launches Minecraft (and
   other) processes as children of the daemon, tracks them in a process table,
@@ -277,7 +307,7 @@ Commands are objects implementing the `Command` interface
 options, and callback onto a parent `CLI::App`. Because the parent can be the
 root app *or* another command's app, commands **nest to any depth**.
 
-- **`Command`** — a leaf unit of functionality (e.g. `greet`).
+- **`Command`** — a leaf unit of functionality (e.g. `java install`).
 - **`CommandGroup`** — a `Command` that holds children and registers them onto
   its own subcommand app (e.g. `config get|set|home|set-home`). The same
   mechanism recurses.
@@ -355,10 +385,9 @@ the shipped build self-contained.
 
 Launcher functionality is added as a **feature module**, never by editing the
 shell. A `Feature` declares its channel-prefix `Name()` and registers its actions;
-`feature_registry.cc` is the one list where features are wired in. The example
-`AppFeature` (`app.info`, `app.ping`, `app.greet`) proves the bridge reaches the
-engine — `app.greet` calls `hestia::engine::greet()` in the engine. `WindowFeature`
-drives the frameless window.
+`feature_registry.cc` is the one list where features are wired in. `AppFeature`
+(`app.info`, `app.ping`) exposes identity and forwards daemon channels over the
+socket via `RegisterForward`. `WindowFeature` drives the frameless window.
 
 ### Sandbox & size (Release)
 

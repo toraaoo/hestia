@@ -8,7 +8,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query"
 
-import { autostart, config, getAppInfo, greet } from "@/lib/api"
+import { autostart, config, getAppInfo } from "@/lib/api"
 import { on } from "@/lib/ipc"
 
 export const ipcKeys = {
@@ -19,10 +19,6 @@ export const ipcKeys = {
 
 export function useAppInfo() {
   return useQuery({ queryKey: ipcKeys.appInfo, queryFn: getAppInfo })
-}
-
-export function useGreet() {
-  return useMutation({ mutationFn: (name: string) => greet(name) })
 }
 
 export function useConfigHome() {

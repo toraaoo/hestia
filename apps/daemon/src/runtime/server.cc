@@ -62,6 +62,7 @@ namespace hestia::daemon {
         }
 
         Runtime runtime;
+        runtime.set_stop_handler([&listener] { listener->stop(); });
 
         Router router;
         register_all_services(router);

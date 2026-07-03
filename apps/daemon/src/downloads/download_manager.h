@@ -10,6 +10,7 @@
 #include <thread>
 #include <vector>
 
+#include <hestia/engine/engine.h>
 #include <hestia/ipc/download.h>
 #include <hestia/ipc/protocol.h>
 
@@ -23,7 +24,7 @@ namespace hestia::daemon {
     public:
         using EventSink = std::function<void(const ipc::Event &)>;
 
-        explicit DownloadManager(EventSink sink);
+        DownloadManager(engine::Engine &engine, EventSink sink);
         ~DownloadManager();
 
         // Start a download and return its id — the caller-supplied `id` when
@@ -42,6 +43,7 @@ namespace hestia::daemon {
                  const std::optional<ipc::Checksum> &checksum) const;
         void prune_finished();
 
+        engine::Engine &engine_;
         EventSink sink_;
         std::mutex mu_;
         std::vector<Worker> workers_;

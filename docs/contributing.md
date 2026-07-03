@@ -60,7 +60,7 @@ namespace hestia::cli {
     void VersionCommand::register_command(CLI::App &parent, AppContext &ctx) {
         auto *cmd = parent.add_subcommand("version", "Print the version");
         // Bind options/flags onto cmd here, e.g.:
-        //   cmd->add_option("-n,--name", name_, "Name to greet");
+        //   cmd->add_option("major", major_, "Major version to install");
         cmd->callback([&ctx] {
             std::cout << "hestia\n";
             ctx.exit_code = 0;
@@ -70,7 +70,7 @@ namespace hestia::cli {
 ```
 
 Option values that the callback reads are **member fields** on the command (see
-`GreetCommand::name_`), bound with `cmd->add_option(...)` and captured via
+`JavaInstallCommand::major_`), bound with `cmd->add_option(...)` and captured via
 `[this, &ctx]`. Read global flags and the data dir from `ctx.global` (e.g.
 `config::config_path(ctx.global.home)`).
 
@@ -262,8 +262,8 @@ never include the engine header. (The desktop app still links `hestia_engine`
 directly today, a transitional exception; the CLI already goes entirely through
 the client SDK.) The `config` channels are the shipped end-to-end reference:
 `Client::config_get()` round-trips `config.get` to the daemon, which calls
-`ctx.engine.config().get()`. A stateless helper with no persisted state (like
-`greeting::greet`) can skip step 2 and be called directly from its service.
+`ctx.engine.config().get()`. A stateless helper with no persisted state can
+skip step 2 and be called directly from its service.
 
 ---
 
@@ -358,7 +358,7 @@ must exist *before* you configure — CMakeRC embeds it at configure time:
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 
-build/Debug/hestia greet -n you # exercise a CLI command
+build/Debug/hestia java list    # exercise a CLI command
 build/Debug/Hestia              # exercise the desktop launcher (embedded frontend)
 ```
 

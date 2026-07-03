@@ -6,11 +6,13 @@ add_executable(hestia_tests
         shared/paths_test.cc
         shared/endpoint_test.cc
         shared/transport_test.cc
+        shared/java_codec_test.cc
+        engine/cache_test.cc
         engine/config_test.cc
         engine/engine_test.cc
-        engine/greeting_test.cc
         engine/checksum_test.cc
         engine/downloader_test.cc
+        engine/java_test.cc
 )
 
 target_link_libraries(hestia_tests PRIVATE

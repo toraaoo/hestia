@@ -17,7 +17,7 @@ namespace hestia::cli {
         app.set_version_flag("--version", APP_VERSION);
 
         // Allow a single optional subcommand, and let global flags appear at any
-        // position (e.g. `hestia -v greet` or `hestia greet -v`).
+        // position (e.g. `hestia -v java list` or `hestia java list -v`).
         app.require_subcommand(0, 1);
         app.fallthrough();
 

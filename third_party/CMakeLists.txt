@@ -41,6 +41,13 @@ set(CURL_BROTLI OFF CACHE STRING "" FORCE)
 set(CURL_ZSTD OFF CACHE STRING "" FORCE)
 add_subdirectory(cpr EXCLUDE_FROM_ALL)
 
+# FTXUI: terminal UI elements (progress gauges for the CLI, the future TUI).
+set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(FTXUI_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(FTXUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(FTXUI_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory(ftxui EXCLUDE_FROM_ALL)
+
 # GoogleTest, built only when BUILD_TESTING is on. gtest_force_shared_crt stays
 # OFF so gtest matches the project's static MSVC runtime (/MT, set for CEF).
 if(BUILD_TESTING)
