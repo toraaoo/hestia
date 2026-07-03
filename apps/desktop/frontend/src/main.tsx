@@ -8,6 +8,14 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { queryClient } from "@/lib/query-client"
 import { router } from "@/router"
 
+window.addEventListener(
+  "wheel",
+  (e) => {
+    if (e.ctrlKey) e.preventDefault()
+  },
+  { passive: false }
+)
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
