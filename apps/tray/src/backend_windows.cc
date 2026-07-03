@@ -5,8 +5,9 @@
 #include <utility>
 #include <vector>
 
-#include <shellapi.h>
 #include <windows.h>
+
+#include <shellapi.h>
 
 // Windows tray backend: a notification-area icon via Shell_NotifyIcon, driven by
 // a message-only window. The Win32 message loop is the UI thread; set_model()/
