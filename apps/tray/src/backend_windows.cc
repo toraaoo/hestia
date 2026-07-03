@@ -1,6 +1,7 @@
 #include "tray_backend.h"
-#include "tray_resource.h"
+#include "tray_icon_data.h"
 
+#include <cstddef>
 #include <mutex>
 #include <utility>
 #include <vector>
@@ -17,6 +18,48 @@ namespace hestia::tray {
         constexpr UINT kTrayCallback = WM_APP + 1; // icon mouse events
         constexpr UINT kIconId = 1;
         constexpr UINT kFirstCommandId = 1000; // popup menu command id base
+
+        const TrayIconPixmap &pick_pixmap(int desired) {
+            for (const auto &pm: kTrayIcons) {
+                if (pm.size >= desired) return pm;
+            }
+            return kTrayIcons[sizeof(kTrayIcons) / sizeof(kTrayIcons[0]) - 1];
+        }
+
+        // The tray icon is built from the shared ARGB pixmaps (tray_icon_data.h)
+        // instead of an embedded .ico resource, so the executable itself carries
+        // no application icon.
+        HICON create_tray_icon(int desired) {
+            const TrayIconPixmap &pm = pick_pixmap(desired);
+            BITMAPINFO bmi{};
+            bmi.bmiHeader.biSize = sizeof(bmi.bmiHeader);
+            bmi.bmiHeader.biWidth = pm.size;
+            bmi.bmiHeader.biHeight = -pm.size;
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB;
+            void *bits = nullptr;
+            HBITMAP color = ::CreateDIBSection(nullptr, &bmi, DIB_RGB_COLORS, &bits, nullptr, 0);
+            if (!color) return nullptr;
+            auto *dst = static_cast<unsigned char *>(bits);
+            for (std::size_t i = 0; i < pm.len; i += 4) {
+                dst[i] = pm.argb[i + 3];
+                dst[i + 1] = pm.argb[i + 2];
+                dst[i + 2] = pm.argb[i + 1];
+                dst[i + 3] = pm.argb[i];
+            }
+            const std::vector<unsigned char> mask_bits(
+                static_cast<std::size_t>((pm.size + 15) / 16) * 2 * static_cast<std::size_t>(pm.size), 0);
+            HBITMAP mask = ::CreateBitmap(pm.size, pm.size, 1, 1, mask_bits.data());
+            ICONINFO info{};
+            info.fIcon = TRUE;
+            info.hbmColor = color;
+            info.hbmMask = mask;
+            HICON icon = ::CreateIconIndirect(&info);
+            ::DeleteObject(color);
+            ::DeleteObject(mask);
+            return icon;
+        }
 
         std::wstring widen(const std::string &s) {
             if (s.empty()) return {};
@@ -56,9 +99,7 @@ namespace hestia::tray {
                 nid.uID = kIconId;
                 nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
                 nid.uCallbackMessage = kTrayCallback;
-                nid.hIcon = static_cast<HICON>(
-                    ::LoadImageW(::GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_HESTIA_TRAY), IMAGE_ICON,
-                                 ::GetSystemMetrics(SM_CXSMICON), ::GetSystemMetrics(SM_CYSMICON), 0));
+                nid.hIcon = create_tray_icon(::GetSystemMetrics(SM_CXSMICON));
                 if (!nid.hIcon) nid.hIcon = ::LoadIcon(nullptr, IDI_APPLICATION);
                 update_tip(nid);
                 ::Shell_NotifyIconW(NIM_ADD, &nid);
