@@ -3,40 +3,27 @@
 #include <filesystem>
 #include <string>
 
-#include <hestia/engine/config/config_store.h>
+#include <hestia/engine/config.h>
 
 namespace hestia::engine {
-    // The launcher engine: the daemon-internal aggregate root that owns every
-    // domain subsystem — Hestia's equivalent of Tailscale's LocalBackend. The
-    // daemon constructs exactly one and threads it through request handlers;
-    // frontends never link it, reaching it only over IPC.
-    //
-    // Adding a domain (instances, accounts, versions, …) is mechanical: give it a
-    // module class under hestia/engine/, construct it in the initializer list
-    // against the resolved data directory, and expose it with a getter. Daemon
-    // services then call through engine.<module>(). See docs/contributing.md.
+    // The daemon-internal aggregate root; frontends reach it only over IPC.
+    // Adding a domain = a public header, a src/<domain>/ folder, and a member +
+    // getter here. See docs/contributing.md.
     class Engine {
     public:
-        // Resolve the data directory once ($HESTIA_HOME → persisted pointer →
-        // platform default) and construct the subsystems against it. A non-empty
-        // `override_home` wins over resolution (a --home flag, or tests).
         explicit Engine(const std::filesystem::path &override_home = {});
 
-        // The resolved data directory every subsystem persists under.
         const std::filesystem::path &data_home() const { return data_home_; }
 
-        // Persist `dir` as the data directory, re-resolve, and repoint every
-        // subsystem so the change takes effect for this running daemon — not just
-        // the next start. An empty `dir` reverts to the resolved default. Returns
-        // the newly resolved directory.
+        // Persists `dir` (empty reverts to the default), re-resolves, and
+        // repoints every subsystem on the running daemon.
         std::filesystem::path set_data_home(const std::string &dir);
 
-        // Domain subsystems.
-        ConfigStore &config() { return config_; }
-        const ConfigStore &config() const { return config_; }
+        Config &config() { return config_; }
+        const Config &config() const { return config_; }
 
     private:
         std::filesystem::path data_home_;
-        ConfigStore config_;
+        Config config_;
     };
 } // namespace hestia::engine

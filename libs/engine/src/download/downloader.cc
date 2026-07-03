@@ -1,4 +1,4 @@
-#include <hestia/engine/download/downloader.h>
+#include <hestia/engine/downloader.h>
 
 #include <cctype>
 #include <fstream>
@@ -8,7 +8,7 @@
 #include <cpr/cpr.h>
 #include <fmt/format.h>
 
-#include <hestia/engine/support/checksum.h>
+#include "download/checksum.h"
 
 namespace hestia::engine {
     namespace fs = std::filesystem;

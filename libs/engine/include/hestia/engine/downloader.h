@@ -11,9 +11,7 @@ namespace hestia::engine {
     using DownloadProgressCallback = std::function<void(const ipc::DownloadProgress &)>;
 
     // Streams a URL to disk through a `.part` temp file, hashing incrementally
-    // when a checksum is given, and renames into place only on success — the
-    // destination never holds a partial or corrupt download. Stateless, like
-    // greeting.
+    // when a checksum is given; renames into place only on success.
     class Downloader {
     public:
         // Throws std::runtime_error on a network error, a non-2xx status, or a

@@ -13,9 +13,9 @@ A few rules hold everywhere; the recipes below assume them.
   there's no implementation).
 - **Wire-in is one line.** Each kind of thing has exactly one registry function
   where it's added: `make_commands()`. Adding a feature should not touch the shell.
-- **Namespaces follow the target.** Core is `hestia` / `hestia::config` /
-  `hestia::greeting`; the CLI is `hestia::cli`; the desktop shell is `desktop::`
-  (`desktop::ipc`, `desktop::features`, …).
+- **Namespaces follow the target.** Shared is `hestia` / `hestia::ipc` /
+  `hestia::client`; the engine is `hestia::engine`; the CLI is `hestia::cli`; the
+  desktop shell is `desktop::` (`desktop::ipc`, `desktop::features`, …).
 - **Identity comes from one header.** Product name/version/etc. are macros in the
   generated `<hestia/app_info.h>` (`APP_NAME`, `APP_VERSION`, `APP_ID`, …) — use
   them instead of hard-coding or re-injecting per target.
@@ -102,17 +102,20 @@ subsystem hangs off the `Engine` aggregate root (`hestia::engine::Engine`), whic
 the daemon owns and hands to every request handler.
 
 The worked example below adds an `instances` domain end-to-end. Model the store
-on `ConfigStore` and the service/client on the `config` channels.
+on `Config` and the service/client on the `config` channels.
 
-**1. Write the subsystem** as a `hestia::engine::<Thing>` class — public header in
-`libs/engine/include/hestia/engine/<domain>/<thing>.h` (one folder per domain,
-`src/` mirroring it), implementation in `libs/engine/src/<domain>/<thing>.cc`,
-both added to `libs/engine/CMakeLists.txt`. Take a path under the data dir in the
-constructor, serialize access for concurrent clients, and keep deps (fmt) out of
-the public header (link them `PRIVATE`).
+**1. Write the subsystem** as a `hestia::engine::<Thing>` class — **one flat
+public header per domain** in `libs/engine/include/hestia/engine/<domain>.h`
+(includes stay two levels: `<hestia/engine/instances.h>`), implementation in
+`libs/engine/src/<domain>/`, both added to `libs/engine/CMakeLists.txt`. Internal
+helpers are private headers inside `src/<domain>/` (`src` is a PRIVATE include
+dir — see `checksum.h`), so the domain can grow without widening
+the public API. Take a path under the data dir in the constructor, serialize
+access for concurrent clients, and keep deps (fmt) out of the public header (link
+them `PRIVATE`).
 
 ```cpp
-// libs/engine/include/hestia/engine/instances/instance_store.h
+// libs/engine/include/hestia/engine/instances.h
 #pragma once
 
 #include <filesystem>
@@ -145,7 +148,7 @@ namespace hestia::engine {
 
 ```cpp
 // libs/engine/src/instances/instance_store.cc
-#include <hestia/engine/instances/instance_store.h>
+#include <hestia/engine/instances.h>
 
 namespace hestia::engine {
     InstanceStore::InstanceStore(std::filesystem::path dir) : dir_(std::move(dir)) {
@@ -178,25 +181,25 @@ the initializer list against `data_home_`, a getter, and a `reload()` in
 
 ```cpp
 // engine.h — inside class Engine
-#include <hestia/engine/instances/instance_store.h>
+#include <hestia/engine/instances.h>
 // ...
         InstanceStore &instances() { return instances_; }
 // ...
-        ConfigStore config_;
+        Config config_;
         InstanceStore instances_;          // declare after config_ — order = init order
 ```
 
 ```cpp
 // engine.cc
 Engine::Engine(const std::filesystem::path &override_home)
-    : data_home_(config::data_home(override_home)),
-      config_(config::config_path(data_home_)),
+    : data_home_(paths::data_home(override_home)),
+      config_(paths::config_path(data_home_)),
       instances_(data_home_ / "instances") {}
 
 std::filesystem::path Engine::set_data_home(const std::string &dir) {
-    config::set_persisted_home(dir);
-    data_home_ = config::data_home();
-    config_.reload(config::config_path(data_home_));
+    paths::set_persisted_home(dir);
+    data_home_ = paths::data_home();
+    config_.reload(paths::config_path(data_home_));
     instances_.reload(data_home_ / "instances");
     return data_home_;
 }
@@ -359,8 +362,9 @@ build/Debug/hestia greet -n you # exercise a CLI command
 build/Debug/Hestia              # exercise the desktop launcher (embedded frontend)
 ```
 
-Iterate with `cmake --build build` (Ninja rebuilds only what changed). There is
-no test target yet; verify by running the binary.
+Iterate with `cmake --build build` (Ninja rebuilds only what changed). Unit
+tests live in `tests/` (`hestia_tests`, GoogleTest) — run them with
+`ctest --test-dir build`; also verify by running the binary.
 
 ### Desktop hot reload (frontend)
 

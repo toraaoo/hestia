@@ -4,7 +4,7 @@
 #include "runtime/router.h"
 
 #include <hestia/app_info.h>
-#include <hestia/engine/greeting/greeting.h>
+#include <hestia/engine/greeting.h>
 
 #include <string>
 
@@ -22,7 +22,7 @@ namespace hestia::daemon {
 
         router.on("app.greet", [](const ipc::Request &req, HandlerContext &) {
             const auto name = req.payload.value("name", std::string{});
-            return ipc::Response::success({{"message", hestia::greeting::greet(name)}});
+            return ipc::Response::success({{"message", hestia::engine::greet(name)}});
         });
     }
 } // namespace hestia::daemon

@@ -7,11 +7,7 @@
 #include <hestia/ipc/download.h>
 
 namespace hestia::engine {
-    // Incremental SHA-1/SHA-256, so a download can be hashed as it streams
-    // instead of re-reading the file. hex_digest() finalizes: the hasher must
-    // not be updated afterwards. The algorithm vocabulary (HashAlgorithm,
-    // hex_digest_length, …) lives in <hestia/ipc/download.h>, shared with the
-    // wire codec.
+    // Incremental SHA-1/SHA-256; hex_digest() finalizes — no update() after it.
     class Hasher {
     public:
         explicit Hasher(ipc::HashAlgorithm algorithm);

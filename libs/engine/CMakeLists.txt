@@ -1,29 +1,21 @@
 include(GNUInstallDirs)
 
-# hestia_engine — the launcher engine (config store, greeting, and the launcher
-# logic to come). DAEMON-INTERNAL: only hestiad links this. Frontends reach this
-# logic over the IPC bridge, never by linking it. (Until the CLI's config/greet
-# commands move behind the daemon in a later phase, the CLI and desktop still
-# link it directly.)
+# hestia_engine — the launcher engine. Daemon-internal: frontends reach it over
+# IPC, never by linking it (the desktop still links it, a transitional exception).
 add_library(hestia_engine STATIC
         include/hestia/engine/engine.h
-        include/hestia/engine/config/config.h
-        include/hestia/engine/config/config_store.h
-        include/hestia/engine/download/downloader.h
-        include/hestia/engine/greeting/greeting.h
-        include/hestia/engine/support/checksum.h
+        include/hestia/engine/config.h
+        include/hestia/engine/downloader.h
+        include/hestia/engine/greeting.h
         src/engine.cc
-        src/config/config.cc
-        src/config/config_store.cc
+        src/config.cc
+        src/download/checksum.h
+        src/download/checksum.cc
         src/download/downloader.cc
         src/greeting/greeting.cc
-        src/support/checksum.cc
 )
 
-# hestia_shared is PUBLIC: the engine resolves its data directory via
-# hestia::paths, and its public headers now expose shared download types
-# (ipc::Checksum in downloader.h, ipc::HashAlgorithm in checksum.h), so
-# consumers of the engine need shared's headers too.
+# PUBLIC: shared types (ipc::Checksum) appear in the engine's public headers.
 target_link_libraries(hestia_engine PUBLIC hestia_shared)
 
 target_include_directories(hestia_engine

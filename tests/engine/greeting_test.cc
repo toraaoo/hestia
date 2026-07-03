@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <hestia/engine/greeting/greeting.h>
+#include <hestia/engine/greeting.h>
 
-using hestia::greeting::greet;
+using hestia::engine::greet;
 
 TEST(Greeting, UsesTheName) {
     EXPECT_EQ(greet("Ada"), "Hello, Ada!");

@@ -7,7 +7,6 @@ add_executable(hestia_tests
         shared/endpoint_test.cc
         shared/transport_test.cc
         engine/config_test.cc
-        engine/config_store_test.cc
         engine/engine_test.cc
         engine/greeting_test.cc
         engine/checksum_test.cc
@@ -19,6 +18,8 @@ target_link_libraries(hestia_tests PRIVATE
         hestia_engine
         GTest::gtest_main
 )
+
+target_include_directories(hestia_tests PRIVATE ${CMAKE_SOURCE_DIR}/libs/engine/src)
 
 target_compile_options(hestia_tests PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>

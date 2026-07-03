@@ -23,11 +23,11 @@ reasoning behind the structure.
 Hestia is a single domain core — `hestia_engine`, owned by the daemon
 (`hestiad`) — driven by several frontends, each a thin client over the socket:
 
-| Frontend | Target           | Binary          | Stack            |
-|----------|------------------|-----------------|------------------|
-| Desktop  | `hestia_desktop` | `HestiaLauncher`| CEF + React/Vite |
-| CLI      | `hestia_cli`     | `hestia`        | CLI11            |
-| Tray     | `hestia_tray`    | `tray`          | GDBus SNI / native |
+| Frontend | Target           | Binary           | Stack              |
+|----------|------------------|------------------|--------------------|
+| Desktop  | `hestia_desktop` | `HestiaLauncher` | CEF + React/Vite   |
+| CLI      | `hestia_cli`     | `hestia`         | CLI11              |
+| Tray     | `hestia_tray`    | `tray`           | GDBus SNI / native |
 
 The desktop app is a separate `main()` — a thin Chromium Embedded Framework (CEF)
 shell hosting a React frontend. The tray is a resident system-tray helper showing
@@ -86,10 +86,10 @@ hestia-cpp/
 │   │   │                      app_info.h is GENERATED from app_info.h.in (shared identity)
 │   │   └── src/               implementations (transport, protocol, client, logging)
 │   └── engine/                hestia_engine — launcher engine (daemon-internal)
-│       ├── include/hestia/engine/  PUBLIC headers, one folder per domain:
-│       │                      engine.h (aggregate root), config/, download/,
-│       │                      greeting/, support/ (cross-domain helpers)
-│       └── src/               implementations, mirroring include/'s domain folders
+│       ├── include/hestia/engine/  PUBLIC API — flat, one header per domain:
+│       │                      engine.h (aggregate root), config.h, downloader.h, greeting.h
+│       └── src/               internals grouped by domain folder (config/, download/,
+│                              greeting/), including private headers (checksum.h)
 ├── apps/
 │   ├── cli/                   hestia_cli — CLI11 commands + main()
 │   ├── daemon/               hestia_daemon (hestiad) — bootstrap main.cc over
@@ -124,18 +124,16 @@ frontend's `dist/` tree is compiled into the binary by **CMakeRC**
 
 ### Namespaces
 
-| Namespace              | Home           | Contents                                   |
-|------------------------|----------------|--------------------------------------------|
-| `hestia`               | `libs/shared`  | cross-cutting (`init_logging`, `LogLevel`) |
-| `hestia::ipc`          | `libs/shared`  | transport, endpoint, protocol envelope     |
-| `hestia::client`       | `libs/shared`  | typed client SDK (`Client`)                |
-| `hestia::engine`       | `libs/engine`  | `Engine` aggregate root + `ConfigStore`    |
-| `hestia::config`       | `libs/engine`  | data-dir resolution + `Config` store       |
-| `hestia::greeting`     | `libs/engine`  | the demo `greet()` function                |
-| `hestia::cli`          | `apps/cli`     | command framework + commands               |
-| `desktop::core`†       | `apps/desktop` | CEF shell — app/browser/window/scheme      |
-| `desktop::ipc`         | `apps/desktop` | the JS⇄C++ bridge (router + registry)      |
-| `desktop::features`    | `apps/desktop` | IPC feature modules (app, window, …)       |
+| Namespace           | Home           | Contents                                         |
+|---------------------|----------------|--------------------------------------------------|
+| `hestia`            | `libs/shared`  | cross-cutting (`init_logging`, `LogLevel`)       |
+| `hestia::ipc`       | `libs/shared`  | transport, endpoint, protocol envelope           |
+| `hestia::client`    | `libs/shared`  | typed client SDK (`Client`)                      |
+| `hestia::engine`    | `libs/engine`  | `Engine` root, `Config`, `Downloader`, `greet()` |
+| `hestia::cli`       | `apps/cli`     | command framework + commands                     |
+| `desktop::core`†    | `apps/desktop` | CEF shell — app/browser/window/scheme            |
+| `desktop::ipc`      | `apps/desktop` | the JS⇄C++ bridge (router + registry)            |
+| `desktop::features` | `apps/desktop` | IPC feature modules (app, window, …)             |
 
 † the shell sub-namespaces are `desktop::app`, `desktop::browser`,
 `desktop::common`, `desktop::window`. The desktop is deliberately **not** under
@@ -182,29 +180,29 @@ list plus a getter, with no change to the daemon's wiring. `set_data_home()`
 re-resolves the data directory and repoints every subsystem so a `config.set-home`
 takes effect on the running daemon, not just the next start.
 
-Headers live under `include/hestia/engine/<domain>/`, one folder per domain, with
-`src/` mirroring the same layout — a new domain gets a folder, not a longer flat
-list. The subsystems behind the aggregate today:
+The public API in `include/hestia/engine/` is **flat — one header per domain**
+(`config.h`, `downloader.h`, `greeting.h`), so includes never exceed two levels
+(`<hestia/engine/config.h>`, matching `<hestia/ipc/transport.h>`). Implementation
+complexity grows privately instead: `src/<domain>/` holds the `.cc` files and any
+internal helpers as private headers (`src` is a PRIVATE include dir). A new domain
+is one public header plus a `src/<domain>/` folder, however large it gets inside.
+The subsystems behind the aggregate today:
 
-- **`ConfigStore`** (`config/config_store.h`) — a thread-safe live view of the
-  flat `key=value` config file. Reads/writes are serialized for concurrent clients
+- **`Config`** (`config.h`) — a thread-safe live view of the flat
+  `key=value` config file. Reads/writes are serialized for concurrent clients
   and every `set()` is persisted immediately; `reload()` repoints it when the data
-  directory changes. Built on the lower-level `config` module below.
-- **`config`** (`config/config.h`) — data-directory resolution and the flat
-  `key=value` `Config` store. Resolution precedence (`data_home`): `--home`
-  override → `$HESTIA_HOME` → a persisted pointer file under the anchor dir
-  (`~/.hestia` or `%APPDATA%\Hestia`) → the platform default. `Config::load` /
-  `get` / `set` / `save` operate on the file at `config_path()`. A missing file is
-  an empty config, not an error.
-- **`Downloader`** (`download/downloader.h`) — streams a URL to disk through a
+  directory changes. The on-disk line format (load/save/validation) is file-local
+  in `src/config/config.cc`. Data-directory resolution (`--home` →
+  `$HESTIA_HOME` → persisted pointer → platform default) lives in shared's
+  `hestia::paths`.
+- **`Downloader`** (`downloader.h`) — streams a URL to disk through a
   `.part` temp file (via cpr), hashing incrementally when a checksum is given and
   renaming into place only on success. Stateless, so it hangs off no aggregate —
   the daemon's download manager constructs one per download. Its checksum
   vocabulary (`ipc::Checksum`, `ipc::HashAlgorithm`) comes from
-  `<hestia/ipc/download.h>`, the same types the wire uses.
-- **`support/checksum`** — native incremental SHA-1/SHA-256 (`Hasher`), so a
-  download is verified as it streams rather than re-read afterwards.
-- **`greeting`** (`greeting/greeting.h`) — `greet(name)`; a placeholder
+  `<hestia/ipc/download.h>`, the same types the wire uses. The native incremental
+  SHA-1/SHA-256 `Hasher` is the private `src/download/checksum.{h,cc}`.
+- **`greeting`** (`greeting.h`) — `greet(name)`; a placeholder
   exercising the engine→frontend seam.
 
 `engine` links fmt and cpr **privately** — implementation details that do not leak
@@ -228,17 +226,17 @@ are subdir-qualified (`"runtime/router.h"`):
   signalled; `router.{h,cc}` maps a channel string to a handler
   (`router.on("config.get", …)`); `event_hub.h` fans daemon events out to
   subscribed connections.
-  - **`Runtime`** (`runtime.h`) — the one place the daemon's long-lived
-    collaborators live: the engine, the event hub, the download manager, and the
-    process supervisor, constructed in dependency order (the hub before anything
-    that publishes into it, so reverse-order destruction tears the publishers
-    down first). Adding a subsystem is a member plus an accessor here — the serve
-    loop and every existing service are untouched.
-  - **`HandlerContext`** (`handler_context.h`) — what every handler receives:
-    `{Runtime &runtime, connection, peer}`. Handlers reach collaborators through
-    accessors (`ctx.runtime.engine()`, `ctx.runtime.supervisor()`, …); the
-    per-request connection is what lets streaming channels (`events.subscribe`)
-    be ordinary handlers.
+    - **`Runtime`** (`runtime.h`) — the one place the daemon's long-lived
+      collaborators live: the engine, the event hub, the download manager, and the
+      process supervisor, constructed in dependency order (the hub before anything
+      that publishes into it, so reverse-order destruction tears the publishers
+      down first). Adding a subsystem is a member plus an accessor here — the serve
+      loop and every existing service are untouched.
+    - **`HandlerContext`** (`handler_context.h`) — what every handler receives:
+      `{Runtime &runtime, connection, peer}`. Handlers reach collaborators through
+      accessors (`ctx.runtime.engine()`, `ctx.runtime.supervisor()`, …); the
+      per-request connection is what lets streaming channels (`events.subscribe`)
+      be ordinary handlers.
 - **`services/`** — one file per channel-prefix, wired in once via
   `register_all_services()` in `services.h`. Today: `health` (`health.ping`),
   `app` (`app.info`, `app.greet`), `config` (`config.get|set|home|set-home`),
@@ -359,7 +357,7 @@ Launcher functionality is added as a **feature module**, never by editing the
 shell. A `Feature` declares its channel-prefix `Name()` and registers its actions;
 `feature_registry.cc` is the one list where features are wired in. The example
 `AppFeature` (`app.info`, `app.ping`, `app.greet`) proves the bridge reaches the
-engine — `app.greet` calls `hestia::greeting::greet()` in the engine. `WindowFeature`
+engine — `app.greet` calls `hestia::engine::greet()` in the engine. `WindowFeature`
 drives the frameless window.
 
 ### Sandbox & size (Release)

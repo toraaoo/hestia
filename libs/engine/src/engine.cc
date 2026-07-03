@@ -10,7 +10,6 @@ namespace hestia::engine {
         paths::set_persisted_home(dir);
         data_home_ = paths::data_home();
         config_.reload(paths::config_path(data_home_));
-        // Future subsystems repoint here too.
         return data_home_;
     }
 } // namespace hestia::engine

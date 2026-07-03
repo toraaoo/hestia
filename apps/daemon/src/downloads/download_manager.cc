@@ -4,7 +4,7 @@
 #include <exception>
 #include <utility>
 
-#include <hestia/engine/download/downloader.h>
+#include <hestia/engine/downloader.h>
 #include <hestia/ipc/download_codec.h>
 #include <hestia/ipc/topics.h>
 
