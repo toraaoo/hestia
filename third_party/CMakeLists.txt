@@ -27,7 +27,10 @@ add_subdirectory(json EXCLUDE_FROM_ALL)
 # under-links libidn2 (missing its own libunistring dependency), breaking the
 # link on systems that have libidn2 installed. PSL (cookie-domain security) is
 # pinned off too — it drags in a libpsl meson fetch with the same libidn2
-# auto-detection.
+# auto-detection. cpr defaults BUILD_SHARED_LIBS on; pinned OFF so cpr and its
+# curl link statically — otherwise every binary needs the curl DLL/so on its
+# search path (0xc0000135 at gtest discovery on Windows).
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(CPR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(CPR_BUILD_TESTS_SSL OFF CACHE BOOL "" FORCE)
 set(CPR_CURL_USE_LIBPSL OFF CACHE BOOL "" FORCE)
