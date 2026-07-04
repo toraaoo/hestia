@@ -1,8 +1,13 @@
 #include "accounts/microsoft.h"
 
+#include <array>
 #include <cctype>
 #include <chrono>
+#include <cstdint>
+#include <cstdio>
+#include <optional>
 #include <stdexcept>
+#include <string_view>
 
 #include <cpr/cpr.h>
 #include <fmt/format.h>
@@ -39,8 +44,12 @@ namespace hestia::engine {
             }
             const auto body = json::parse(response.text, nullptr, false);
             if (body.is_discarded()) {
-                throw std::runtime_error(
-                    fmt::format("{} returned malformed JSON (HTTP {})", what, response.status_code));
+                const char *shape = response.text.empty() ? "empty body" : "non-JSON body";
+                auto message = fmt::format("{}: HTTP {} ({})", what, response.status_code, shape);
+                if (response.status_code == 403) {
+                    message += "; this usually means the system clock is wrong — check the date and time settings";
+                }
+                throw std::runtime_error(message);
             }
             return body;
         }
@@ -93,10 +102,58 @@ namespace hestia::engine {
                 .count();
         }
 
+        std::int64_t days_from_civil(std::int64_t year, unsigned month, unsigned day) {
+            year -= month <= 2;
+            const std::int64_t era = (year >= 0 ? year : year - 399) / 400;
+            const auto yoe = static_cast<unsigned>(year - era * 400);
+            const unsigned doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+            const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+            return era * 146097 + static_cast<std::int64_t>(doe) - 719468;
+        }
+
+        std::optional<std::int64_t> parse_http_date(const std::string &value) {
+            std::array<char, 4> month_name{};
+            int day = 0;
+            int year = 0;
+            int hour = 0;
+            int minute = 0;
+            int second = 0;
+            if (std::sscanf(value.c_str(), "%*[^,], %d %3s %d %d:%d:%d", &day, month_name.data(), &year, &hour,
+                            &minute, &second) != 6) {
+                return std::nullopt;
+            }
+            constexpr std::array<const char *, 12> months{"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+            unsigned month = 0;
+            for (unsigned i = 0; i < months.size(); ++i) {
+                if (std::string_view(month_name.data()) == months[i]) {
+                    month = i + 1;
+                    break;
+                }
+            }
+            if (month == 0) return std::nullopt;
+            return days_from_civil(year, month, static_cast<unsigned>(day)) * 86400 +
+                   static_cast<std::int64_t>(hour) * 3600 + minute * 60 + second;
+        }
+
+        std::int64_t server_clock_offset(const cpr::Response &response) {
+            const auto it = response.header.find("Date");
+            if (it == response.header.end()) return 0;
+            const auto server_time = parse_http_date(it->second);
+            if (!server_time) return 0;
+            const auto offset = *server_time - now_seconds();
+            if (offset > 60 || offset < -60) {
+                spdlog::warn("system clock is off by {}s from Xbox server time; correcting request signatures",
+                             offset);
+            }
+            return offset;
+        }
+
         cpr::Response signed_post(const char *url, const char *url_path, const json &body, const ProofKey &key,
-                                  bool contract_version) {
+                                  bool contract_version, std::int64_t clock_offset) {
             const auto payload = body.dump();
-            const auto signature = xbox_signature_header(key, url_path, "", payload, now_seconds());
+            const auto signature =
+                xbox_signature_header(key, url_path, "", payload, now_seconds() + clock_offset);
             spdlog::debug("xbox signed POST {} ({} byte body) signature={}", url, payload.size(), signature);
             cpr::Header header{{"Content-Type", "application/json; charset=utf-8"},
                                {"Accept", "application/json"},
@@ -106,7 +163,7 @@ namespace hestia::engine {
         }
     } // namespace
 
-    std::string request_device_token(const ProofKey &key) {
+    DeviceToken request_device_token(const ProofKey &key) {
         const json body = {{"Properties",
                             {{"AuthMethod", "ProofOfPossession"},
                              {"Id", fmt::format("{{{}}}", to_upper(key.id()))},
@@ -115,12 +172,15 @@ namespace hestia::engine {
                              {"ProofKey", proof_jwk(key)}}},
                            {"RelyingParty", "http://auth.xboxlive.com"},
                            {"TokenType", "JWT"}};
-        const auto response = signed_post(kDeviceAuthUrl, "/device/authenticate", body, key, true);
-        return require_string(parse_body(response, "Xbox device token"), "Token", "Xbox device token");
+        const auto response = signed_post(kDeviceAuthUrl, "/device/authenticate", body, key, true, 0);
+        const auto doc = parse_body(response, "Xbox device token");
+        return DeviceToken{.token = require_string(doc, "Token", "Xbox device token"),
+                           .clock_offset = server_clock_offset(response)};
     }
 
     SisuAuthentication sisu_authenticate(const std::string &device_token, const std::string &challenge,
-                                         const std::string &state, const ProofKey &key) {
+                                         const std::string &state, const ProofKey &key,
+                                         std::int64_t clock_offset) {
         const json body = {{"AppId", kClientId},
                            {"DeviceToken", device_token},
                            {"Offers", json::array({kScope})},
@@ -133,7 +193,7 @@ namespace hestia::engine {
                            {"Sandbox", "RETAIL"},
                            {"TokenType", "code"},
                            {"TitleId", kTitleId}};
-        const auto response = signed_post(kSisuAuthenticateUrl, "/authenticate", body, key, true);
+        const auto response = signed_post(kSisuAuthenticateUrl, "/authenticate", body, key, true, clock_offset);
         const auto doc = parse_body(response, "Xbox sign-in request");
 
         const auto session = response.header.find("X-SessionId");
@@ -224,7 +284,8 @@ namespace hestia::engine {
     }
 
     SisuAuthorization sisu_authorize(const std::string &session_id, const std::string &access_token,
-                                     const std::string &device_token, const ProofKey &key) {
+                                     const std::string &device_token, const ProofKey &key,
+                                     std::int64_t clock_offset) {
         const json body = {{"AccessToken", "t=" + access_token},
                            {"AppId", kClientId},
                            {"DeviceToken", device_token},
@@ -234,14 +295,14 @@ namespace hestia::engine {
                            {"SiteName", "user.auth.xboxlive.com"},
                            {"RelyingParty", "http://xboxlive.com"},
                            {"UseModernGamertag", true}};
-        const auto response = signed_post(kSisuAuthorizeUrl, "/authorize", body, key, false);
+        const auto response = signed_post(kSisuAuthorizeUrl, "/authorize", body, key, false, clock_offset);
         const auto doc = parse_body(response, "Xbox authorization");
         return SisuAuthorization{.user_token = nested_token(doc, "UserToken", "Xbox authorization"),
                                  .title_token = nested_token(doc, "TitleToken", "Xbox authorization")};
     }
 
     XstsToken xsts_authorize(const SisuAuthorization &authorization, const std::string &device_token,
-                             const ProofKey &key) {
+                             const ProofKey &key, std::int64_t clock_offset) {
         const json body = {{"RelyingParty", "rp://api.minecraftservices.com/"},
                            {"TokenType", "JWT"},
                            {"Properties",
@@ -249,7 +310,7 @@ namespace hestia::engine {
                              {"UserTokens", json::array({authorization.user_token})},
                              {"DeviceToken", device_token},
                              {"TitleToken", authorization.title_token}}}};
-        const auto response = signed_post(kXstsUrl, "/xsts/authorize", body, key, true);
+        const auto response = signed_post(kXstsUrl, "/xsts/authorize", body, key, true, clock_offset);
         if (response.status_code == 401) {
             const auto doc = json::parse(response.text, nullptr, false);
             throw std::runtime_error(xsts_error_message(doc.is_object() ? doc.value("XErr", 0LL) : 0LL));

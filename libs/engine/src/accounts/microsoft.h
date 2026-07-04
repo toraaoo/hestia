@@ -1,11 +1,17 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
 #include "accounts/signing.h"
 
 namespace hestia::engine {
+    struct DeviceToken {
+        std::string token;
+        std::int64_t clock_offset = 0;
+    };
+
     struct SisuAuthentication {
         std::string session_id;
         std::string url;
@@ -40,10 +46,11 @@ namespace hestia::engine {
         std::string name;
     };
 
-    std::string request_device_token(const ProofKey &key);
+    DeviceToken request_device_token(const ProofKey &key);
 
     SisuAuthentication sisu_authenticate(const std::string &device_token, const std::string &challenge,
-                                         const std::string &state, const ProofKey &key);
+                                         const std::string &state, const ProofKey &key,
+                                         std::int64_t clock_offset);
 
     DeviceCodeChallenge request_device_code();
 
@@ -54,10 +61,11 @@ namespace hestia::engine {
     OAuthTokens refresh_oauth(const std::string &refresh_token);
 
     SisuAuthorization sisu_authorize(const std::string &session_id, const std::string &access_token,
-                                     const std::string &device_token, const ProofKey &key);
+                                     const std::string &device_token, const ProofKey &key,
+                                     std::int64_t clock_offset);
 
     XstsToken xsts_authorize(const SisuAuthorization &authorization, const std::string &device_token,
-                             const ProofKey &key);
+                             const ProofKey &key, std::int64_t clock_offset);
 
     std::string launcher_login(const XstsToken &xsts);
 

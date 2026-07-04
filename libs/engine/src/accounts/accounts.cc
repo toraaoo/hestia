@@ -25,6 +25,7 @@ namespace hestia::engine {
         std::string device_code;
         long long interval_seconds = 5;
         long long expires_at = 0;
+        long long clock_offset = 0;
     };
 
     namespace {
@@ -134,9 +135,10 @@ namespace hestia::engine {
             spdlog::debug("refreshing minecraft token for account {}", account.uuid);
             const auto oauth = refresh_oauth(account.refresh_token);
             auto key = ProofKey::generate();
-            const auto device_token = request_device_token(key);
-            const auto authorization = sisu_authorize("", oauth.access_token, device_token, key);
-            const auto xsts = xsts_authorize(authorization, device_token, key);
+            const auto device = request_device_token(key);
+            const auto authorization =
+                sisu_authorize("", oauth.access_token, device.token, key, device.clock_offset);
+            const auto xsts = xsts_authorize(authorization, device.token, key, device.clock_offset);
 
             account.access_token = launcher_login(xsts);
             if (!oauth.refresh_token.empty()) account.refresh_token = oauth.refresh_token;
@@ -180,18 +182,19 @@ namespace hestia::engine {
         }
 
         auto key = ProofKey::generate();
-        auto device_token = request_device_token(key);
+        auto device = request_device_token(key);
         auto verifier = to_hex(random_bytes(64));
         const auto challenge = base64url_nopad(sha256_bytes(verifier));
         const auto state = to_hex(random_bytes(16));
-        const auto auth = sisu_authenticate(device_token, challenge, state, key);
+        const auto auth = sisu_authenticate(device.token, challenge, state, key, device.clock_offset);
 
         auto session = std::make_unique<LoginSession>();
         session->method = method;
         session->key = std::move(key);
-        session->device_token = std::move(device_token);
+        session->device_token = std::move(device.token);
         session->verifier = std::move(verifier);
         session->session_id = auth.session_id;
+        session->clock_offset = device.clock_offset;
 
         std::scoped_lock const lk(mu_);
         pending_[id] = std::move(session);
@@ -216,14 +219,16 @@ namespace hestia::engine {
         if (session->method == proto::LoginMethod::device_code) {
             oauth = await_device_tokens(*session);
             auto key = ProofKey::generate();
-            const auto device_token = request_device_token(key);
-            const auto authorization = sisu_authorize("", oauth.access_token, device_token, key);
-            xsts = xsts_authorize(authorization, device_token, key);
+            const auto device = request_device_token(key);
+            const auto authorization =
+                sisu_authorize("", oauth.access_token, device.token, key, device.clock_offset);
+            xsts = xsts_authorize(authorization, device.token, key, device.clock_offset);
         } else {
             oauth = redeem_code(code, session->verifier);
-            const auto authorization =
-                sisu_authorize(session->session_id, oauth.access_token, session->device_token, *session->key);
-            xsts = xsts_authorize(authorization, session->device_token, *session->key);
+            const auto authorization = sisu_authorize(session->session_id, oauth.access_token,
+                                                      session->device_token, *session->key,
+                                                      session->clock_offset);
+            xsts = xsts_authorize(authorization, session->device_token, *session->key, session->clock_offset);
         }
         const auto minecraft_token = launcher_login(xsts);
         const auto profile = minecraft_profile(minecraft_token);
