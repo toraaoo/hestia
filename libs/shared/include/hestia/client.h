@@ -5,6 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <hestia/client/accounts.h>
 #include <hestia/client/app.h>
 #include <hestia/client/cache.h>
 #include <hestia/client/config.h>
@@ -42,6 +43,7 @@ namespace hestia::client {
         Download &download() { return download_; }
         Java &java() { return java_; }
         Cache &cache() { return cache_; }
+        Accounts &accounts() { return accounts_; }
 
     private:
         explicit Client(std::shared_ptr<Session> session);
@@ -54,5 +56,6 @@ namespace hestia::client {
         Download download_;
         Java java_;
         Cache cache_;
+        Accounts accounts_;
     };
 } // namespace hestia::client

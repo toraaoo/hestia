@@ -4,11 +4,15 @@ include(GNUInstallDirs)
 # IPC, never by linking it (the desktop still links it, a transitional exception).
 add_library(hestia_engine STATIC
         include/hestia/engine/engine.h
+        include/hestia/engine/accounts.h
         include/hestia/engine/cache.h
         include/hestia/engine/config.h
         include/hestia/engine/downloader.h
         include/hestia/engine/java.h
         src/engine.cc
+        src/accounts/accounts.cc
+        src/accounts/microsoft.h
+        src/accounts/microsoft.cc
         src/cache/cache.cc
         src/config.cc
         src/download/checksum.h

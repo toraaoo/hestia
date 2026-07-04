@@ -29,6 +29,8 @@ add_executable(hestia_daemon
         src/downloads/download_manager.h
         src/java/install_manager.cc
         src/java/install_manager.h
+        src/accounts/login_manager.cc
+        src/accounts/login_manager.h
         src/platform/autostart.cc
         src/platform/autostart.h
         src/platform/win_util.h
@@ -53,6 +55,8 @@ add_executable(hestia_daemon
         src/services/java_service.h
         src/services/cache_service.cc
         src/services/cache_service.h
+        src/services/accounts_service.cc
+        src/services/accounts_service.h
 )
 
 target_include_directories(hestia_daemon PRIVATE src)

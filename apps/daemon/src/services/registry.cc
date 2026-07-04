@@ -1,5 +1,6 @@
 #include "services/registry.h"
 
+#include "services/accounts_service.h"
 #include "services/app_service.h"
 #include "services/cache_service.h"
 #include "services/config_service.h"
@@ -22,6 +23,7 @@ namespace hestia::daemon {
         services.push_back(std::make_unique<DownloadsService>());
         services.push_back(std::make_unique<JavaService>());
         services.push_back(std::make_unique<CacheService>());
+        services.push_back(std::make_unique<AccountsService>());
         return services;
     }
 } // namespace hestia::daemon

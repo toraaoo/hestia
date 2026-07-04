@@ -26,6 +26,7 @@ add_library(hestia_shared STATIC
         include/hestia/proto/download.h
         include/hestia/proto/java.h
         include/hestia/proto/cache.h
+        include/hestia/proto/accounts.h
         include/hestia/client.h
         include/hestia/client/facade.h
         include/hestia/client/app.h
@@ -35,6 +36,7 @@ add_library(hestia_shared STATIC
         include/hestia/client/download.h
         include/hestia/client/java.h
         include/hestia/client/cache.h
+        include/hestia/client/accounts.h
         include/hestia/client/bridge.h
         src/logging.cc
         src/paths.cc
@@ -57,6 +59,7 @@ add_library(hestia_shared STATIC
         src/client/download.cc
         src/client/java.cc
         src/client/cache.cc
+        src/client/accounts.cc
         src/client/bridge.cc
 )
 

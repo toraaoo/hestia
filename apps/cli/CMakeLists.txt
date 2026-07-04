@@ -7,6 +7,7 @@ target_sources(hestia_cli
         src/command.cc
         src/output.cc
         src/registry.cc
+        src/commands/auth_command.cc
         src/commands/java_command.cc
         src/commands/cache_command.cc
         src/commands/config_command.cc

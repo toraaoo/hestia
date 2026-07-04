@@ -6,9 +6,10 @@ Alongside a beautiful desktop UI, Hestia ships a first-class **CLI**
 front-end, so it's just as comfortable from a terminal as from a window.
 
 > **Status:** early development (`v0.0.1`). The project is being scaffolded —
-> the build system, logging, a config store, the CLI, and Java runtime
-> management (install/list/uninstall via the Adoptium API) are in place.
-> Launching Minecraft itself is not implemented yet. Expect things to change.
+> the build system, logging, a config store, the CLI, Java runtime
+> management (install/list/uninstall via the Adoptium API), and Microsoft
+> account sign-in are in place. Launching Minecraft itself is not implemented
+> yet. Expect things to change.
 
 ## Front-ends
 
@@ -155,6 +156,14 @@ CI steps. See [scripts/README.md](scripts/README.md).
 ```bash
 # Show help
 hestia
+
+# Minecraft accounts (Microsoft sign-in, device-code flow)
+hestia auth login                # print a code, sign in at microsoft.com/link
+hestia auth list                 # signed-in accounts
+hestia auth logout <name|uuid>   # sign out and forget the stored tokens
+# Sign-in needs a Microsoft (Azure) application id that is approved for the
+# Minecraft APIs — set it once with:
+#   hestia config set auth.msa_client_id <client-id>
 
 # Java runtimes (Eclipse Temurin via the Adoptium API)
 hestia java available            # release lines the provider ships

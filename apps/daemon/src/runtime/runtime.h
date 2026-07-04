@@ -9,6 +9,7 @@
 #include <hestia/engine/engine.h>
 #include <hestia/ipc/protocol.h>
 
+#include "accounts/login_manager.h"
 #include "downloads/download_manager.h"
 #include "java/install_manager.h"
 #include "process/process_supervisor.h"
@@ -30,6 +31,7 @@ namespace hestia::daemon {
         explicit Runtime(const std::filesystem::path &override_home = {})
             : engine_(override_home), downloads_(engine_, [this](const ipc::Event &e) { hub_.publish(e); }),
               java_installs_(engine_, [this](const ipc::Event &e) { hub_.publish(e); }),
+              logins_(engine_, [this](const ipc::Event &e) { hub_.publish(e); }),
               supervisor_(make_process_supervisor(engine_.data_home())) {
             supervisor_->set_event_sink([this](const ipc::Event &e) { hub_.publish(e); });
             supervisor_->reconcile();         // re-adopt processes that survived a previous daemon
@@ -40,6 +42,7 @@ namespace hestia::daemon {
         EventHub &hub() { return hub_; }
         DownloadManager &downloads() { return downloads_; }
         JavaInstallManager &java_installs() { return java_installs_; }
+        LoginManager &logins() { return logins_; }
         ProcessSupervisor &supervisor() { return *supervisor_; }
 
         [[nodiscard]] long long uptime_seconds() const {
@@ -61,6 +64,7 @@ namespace hestia::daemon {
         EventHub hub_;
         DownloadManager downloads_;
         JavaInstallManager java_installs_;
+        LoginManager logins_;
         std::unique_ptr<ProcessSupervisor> supervisor_;
     };
 } // namespace hestia::daemon

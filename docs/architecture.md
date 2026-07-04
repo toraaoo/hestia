@@ -91,13 +91,13 @@ hestia-cpp/
 │   │   └── src/               implementations (transport, protocol, proto/, client/)
 │   └── engine/                hestia_engine — launcher engine (daemon-internal)
 │       ├── include/hestia/engine/  PUBLIC API — flat, one header per domain:
-│       │                      engine.h (aggregate root), config.h, downloader.h, java.h
-│       └── src/               internals grouped by domain folder (config/, download/,
-│                              java/), including private headers (checksum.h)
+│       │                      engine.h (aggregate root), accounts.h, config.h, downloader.h, java.h
+│       └── src/               internals grouped by domain folder (accounts/, config/,
+│                              download/, java/), including private headers (checksum.h)
 ├── apps/
 │   ├── cli/                   hestia_cli — CLI11 commands + main()
 │   ├── daemon/               hestia_daemon (hestiad) — bootstrap main.cc over
-│   │                          src/{runtime,process,downloads,java,platform,services}/
+│   │                          src/{runtime,process,downloads,java,accounts,platform,services}/
 │   ├── tray/                 hestia_tray — resident system-tray helper (per-platform backends)
 │   └── desktop/               hestia_desktop — CEF launcher (see "Desktop launcher" below)
 │       ├── frontend/          Vite + React + TS app (built with Bun) → dist/ embedded
@@ -237,6 +237,16 @@ The subsystems behind the aggregate today:
   blob is evicted and the fetch falls back to the network — the cache can
   speed things up but never corrupt them. Managed over the `cache.*` channels
   (`hestia cache info|list|clear`).
+- **`Accounts`** (`accounts.h`) — Minecraft accounts signed in through
+  Microsoft, persisted with their tokens in `<data_home>/accounts.json`
+  (owner-only on POSIX). `login()` runs the blocking device-code chain the
+  established launchers use — request a code from the consumers tenant, poll
+  the token endpoint until the user approves in a browser, then Xbox Live →
+  XSTS → `login_with_xbox` → profile — and upserts the account by uuid. The
+  HTTP steps live in the private `src/accounts/microsoft.{h,cc}`; the Azure
+  client id comes from the `auth.msa_client_id` setting (each distribution
+  registers its own, Mojang-approved application). The async wrapper and the
+  `account.login.*` events live in the daemon's `LoginManager`, not here.
 - **`Java`** (`java.h`) — installs and tracks Java runtimes under
   `<data_home>/java`. **`JavaProvider`** is the abstract catalogue seam: an
   implementation resolves release lines and the latest GA build for a
@@ -297,7 +307,7 @@ are subdir-qualified (`"runtime/router.h"`):
   registration respectively),
   `process` (`process.start|stop|list|status|logs`), `downloads` (`download.start`),
   `java` (`java.releases|install|list|uninstall`), `cache`
-  (`cache.info|list|clear`), and
+  (`cache.info|list|clear`), `accounts` (`account.login|list|remove`), and
   `events` (`events.subscribe`, a streaming channel that pushes to the calling
   connection).
 - **`downloads/`** (`download_manager.{h,cc}`) — runs each download on a worker
@@ -310,6 +320,13 @@ are subdir-qualified (`"runtime/router.h"`):
   install per release line at a time, publishing `java.install.progress`,
   `java.install.done` (carrying the registered runtime), and
   `java.install.error`.
+- **`accounts/`** (`login_manager.{h,cc}`) — the same pattern for
+  `account.login`, one sign-in at a time (the flow is interactive): the
+  engine's blocking `Accounts::login()` runs off-thread, publishing
+  `account.login.code` (the code the user enters in a browser),
+  `account.login.done` (carrying the account), and `account.login.error`. A
+  cancel flag is polled between token polls so daemon shutdown never waits
+  out the code's lifetime.
 - **`process/`** (`process_supervisor`, `process_table`, `process_spawner`,
   `liveness_probe`, `log_streamer`, `restart_policy`) — launches Minecraft (and
   other) processes as children of the daemon, tracks them in a process table,

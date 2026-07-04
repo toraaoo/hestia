@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string>
 
+#include <hestia/engine/accounts.h>
 #include <hestia/engine/cache.h>
 #include <hestia/engine/config.h>
 #include <hestia/engine/java.h>
@@ -30,10 +31,14 @@ namespace hestia::engine {
         Java &java() { return java_; }
         const Java &java() const { return java_; }
 
+        Accounts &accounts() { return accounts_; }
+        const Accounts &accounts() const { return accounts_; }
+
     private:
         std::filesystem::path data_home_;
         Config config_;
         Cache cache_;
         Java java_;
+        Accounts accounts_;
     };
 } // namespace hestia::engine
