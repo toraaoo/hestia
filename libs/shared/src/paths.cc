@@ -96,4 +96,8 @@ namespace hestia::paths {
     std::filesystem::path config_path(const std::filesystem::path &override_dir) {
         return data_home(override_dir) / "config";
     }
+
+    std::filesystem::path log_dir(const std::filesystem::path &override_dir) {
+        return data_home(override_dir) / "logs";
+    }
 } // namespace hestia::paths

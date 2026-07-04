@@ -52,7 +52,7 @@ namespace hestia::daemon {
         }
     } // namespace
 
-    int run_daemon() {
+    int run_daemon(std::filesystem::path log_path) {
         const auto endpoint = ipc::default_endpoint();
         std::unique_ptr<ipc::Listener> listener;
         try {
@@ -62,7 +62,7 @@ namespace hestia::daemon {
             return 1;
         }
 
-        Runtime runtime;
+        Runtime runtime{std::move(log_path)};
         runtime.set_stop_handler([&listener] { listener->stop(); });
 
         Router router;

@@ -27,8 +27,9 @@ namespace hestia::daemon {
         // supervisor and download manager — declared after the hub — are torn down
         // first, so their worker threads never publish into a dead hub during
         // shutdown.
-        explicit Runtime(const std::filesystem::path &override_home = {})
-            : engine_(override_home), downloads_(engine_, [this](const ipc::Event &e) { hub_.publish(e); }),
+        explicit Runtime(std::filesystem::path log_path = {}, const std::filesystem::path &override_home = {})
+            : log_path_(std::move(log_path)), engine_(override_home),
+              downloads_(engine_, [this](const ipc::Event &e) { hub_.publish(e); }),
               java_installs_(engine_, [this](const ipc::Event &e) { hub_.publish(e); }),
               supervisor_(make_process_supervisor(engine_.data_home())) {
             supervisor_->set_event_sink([this](const ipc::Event &e) { hub_.publish(e); });
@@ -37,6 +38,7 @@ namespace hestia::daemon {
         }
 
         engine::Engine &engine() { return engine_; }
+        [[nodiscard]] const std::filesystem::path &log_path() const { return log_path_; }
         EventHub &hub() { return hub_; }
         DownloadManager &downloads() { return downloads_; }
         JavaInstallManager &java_installs() { return java_installs_; }
@@ -56,6 +58,7 @@ namespace hestia::daemon {
 
     private:
         std::chrono::steady_clock::time_point started_ = std::chrono::steady_clock::now();
+        std::filesystem::path log_path_;
         std::function<void()> stop_;
         engine::Engine engine_;
         EventHub hub_;

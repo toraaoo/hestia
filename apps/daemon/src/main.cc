@@ -2,8 +2,8 @@
 
 #include <hestia/app_info.h>
 #include <hestia/client.h>
-#include <hestia/ipc/endpoint.h>
 #include <hestia/logging.h>
+#include <hestia/paths.h>
 
 #include <CLI/CLI.hpp>
 
@@ -60,6 +60,7 @@ int main(int argc, char **argv) {
         hestia::init_logging(level);
         return run_ping();
     }
-    hestia::init_logging(level, hestia::ipc::runtime_dir() / "hestiad.log");
-    return hestia::daemon::run_daemon();
+    const auto log_path = hestia::paths::log_dir() / "hestiad.log";
+    hestia::init_logging(level, log_path);
+    return hestia::daemon::run_daemon(log_path);
 }

@@ -8,7 +8,6 @@
 
 #include <hestia/app_info.h>
 #include <hestia/engine/engine.h>
-#include <hestia/ipc/endpoint.h>
 #include <hestia/proto/daemon.h>
 
 #if defined(_WIN32)
@@ -35,7 +34,7 @@ namespace hestia::daemon {
                 .version = APP_VERSION,
                 .uptime_seconds = ctx.runtime.uptime_seconds(),
                 .home = ctx.runtime.engine().data_home(),
-                .log = ipc::runtime_dir() / "hestiad.log",
+                .log = ctx.runtime.log_path(),
             };
         });
 
