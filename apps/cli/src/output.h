@@ -30,6 +30,7 @@ namespace hestia::cli {
     class ProgressBar {
     public:
         explicit ProgressBar(std::string status, bool bytes = true);
+        ~ProgressBar();
 
         void update(std::uint64_t current, std::uint64_t total);
         void finish();

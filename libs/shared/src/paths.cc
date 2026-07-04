@@ -65,16 +65,15 @@ namespace hestia::paths {
     }
 
     std::filesystem::path data_home(const std::filesystem::path &override_dir) {
-        if (!override_dir.empty()) {
-            return override_dir;
-        }
-        if (const auto env = env_path("HESTIA_HOME")) {
-            return *env;
-        }
-        if (const auto pointer = read_pointer()) {
-            return *pointer;
-        }
-        return platform_data_home();
+        std::filesystem::path home = [&] {
+            if (!override_dir.empty()) return override_dir;
+            if (const auto env = env_path("HESTIA_HOME")) return *env;
+            if (const auto pointer = read_pointer()) return *pointer;
+            return platform_data_home();
+        }();
+        // Sources such as HESTIA_DEV_HOME carry '/'; normalize so derived paths
+        // don't mix separators with operator/'s native ones on Windows.
+        return home.make_preferred();
     }
 
     void set_persisted_home(const std::filesystem::path &dir) {

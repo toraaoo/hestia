@@ -8,6 +8,11 @@
 #include <ftxui/screen/screen.hpp>
 
 namespace hestia::cli {
+    namespace {
+        constexpr const char *kHideCursor = "\033[?25l";
+        constexpr const char *kShowCursor = "\033[?25h";
+    } // namespace
+
     std::string human_size(std::uint64_t bytes) {
         constexpr const char *units[] = {"B", "kB", "MB", "GB", "TB"};
         auto value = static_cast<double>(bytes);
@@ -50,6 +55,7 @@ namespace hestia::cli {
         thread_ = std::thread([this] {
             constexpr int kBrailleCharset = 15;
             std::size_t step = 0;
+            std::cerr << kHideCursor << std::flush;
             while (!stop_) {
                 auto element = ftxui::hbox({ftxui::spinner(kBrailleCharset, step++), ftxui::text(" " + label_)});
                 auto screen = ftxui::Screen::Create(ftxui::Dimension::Fit(element));
@@ -57,7 +63,7 @@ namespace hestia::cli {
                 std::cerr << '\r' << screen.ToString() << std::flush;
                 std::this_thread::sleep_for(std::chrono::milliseconds(80));
             }
-            std::cerr << '\r' << std::string(label_.size() + 2, ' ') << '\r' << std::flush;
+            std::cerr << '\r' << std::string(label_.size() + 2, ' ') << '\r' << kShowCursor << std::flush;
         });
     }
 
@@ -74,7 +80,12 @@ namespace hestia::cli {
 
     ProgressBar::ProgressBar(std::string status, bool bytes) : status_(std::move(status)), bytes_(bytes) {}
 
+    ProgressBar::~ProgressBar() {
+        finish();
+    }
+
     void ProgressBar::update(std::uint64_t current, std::uint64_t total) {
+        if (!rendered_) std::cerr << kHideCursor;
         const auto now = std::chrono::steady_clock::now();
         if (rendered_) {
             const std::chrono::duration<double> elapsed = now - last_time_;
@@ -112,7 +123,7 @@ namespace hestia::cli {
 
     void ProgressBar::finish() {
         if (rendered_) {
-            std::cerr << '\n';
+            std::cerr << kShowCursor << '\n';
             rendered_ = false;
         }
     }
