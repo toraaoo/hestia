@@ -7,7 +7,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "hestia/client/client.h"
+#include "hestia/client.h"
 #include "hestia/ipc/protocol.h"
 
 namespace hestia::client {

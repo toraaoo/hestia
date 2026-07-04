@@ -5,9 +5,9 @@ configure_file(include/hestia/app_info.h.in
                "${CMAKE_CURRENT_BINARY_DIR}/include/hestia/app_info.h" @ONLY)
 
 # hestia_shared — cross-cutting code linked by BOTH the daemon and every client
-# (CLI/TUI/desktop): the IPC transport + protocol, the typed client SDK,
-# application identity, and logging. It holds no launcher/engine logic — that
-# lives in hestia_engine (daemon-only).
+# (CLI/TUI/desktop): the IPC transport + protocol machinery, the typed wire
+# contracts (hestia::proto), the client SDK, application identity, and logging.
+# It holds no launcher/engine logic — that lives in hestia_engine (daemon-only).
 add_library(hestia_shared STATIC
         include/hestia/logging.h
         include/hestia/paths.h
@@ -15,15 +15,28 @@ add_library(hestia_shared STATIC
         include/hestia/ipc/transport.h
         include/hestia/ipc/endpoint.h
         include/hestia/ipc/protocol.h
-        include/hestia/ipc/process.h
-        include/hestia/ipc/process_codec.h
-        include/hestia/ipc/download.h
-        include/hestia/ipc/download_codec.h
-        include/hestia/ipc/java.h
-        include/hestia/ipc/java_codec.h
         include/hestia/ipc/errors.h
-        include/hestia/ipc/topics.h
-        include/hestia/client/client.h
+        include/hestia/proto/contract.h
+        include/hestia/proto/health.h
+        include/hestia/proto/app.h
+        include/hestia/proto/daemon.h
+        include/hestia/proto/config.h
+        include/hestia/proto/autostart.h
+        include/hestia/proto/events.h
+        include/hestia/proto/process.h
+        include/hestia/proto/download.h
+        include/hestia/proto/java.h
+        include/hestia/proto/cache.h
+        include/hestia/client.h
+        include/hestia/client/facade.h
+        include/hestia/client/app.h
+        include/hestia/client/daemon.h
+        include/hestia/client/config.h
+        include/hestia/client/autostart.h
+        include/hestia/client/process.h
+        include/hestia/client/download.h
+        include/hestia/client/java.h
+        include/hestia/client/cache.h
         include/hestia/client/bridge.h
         src/logging.cc
         src/paths.cc
@@ -31,11 +44,23 @@ add_library(hestia_shared STATIC
         src/transport_posix.cc
         src/transport_windows.cc
         src/protocol.cc
-        src/process_codec.cc
-        src/download_codec.cc
-        src/java_codec.cc
-        src/client.cc
-        src/bridge.cc
+        src/proto/process.cc
+        src/proto/download.cc
+        src/proto/java.cc
+        src/client/session.h
+        src/client/session.cc
+        src/client/spawn.h
+        src/client/spawn.cc
+        src/client/client.cc
+        src/client/app.cc
+        src/client/daemon.cc
+        src/client/config.cc
+        src/client/autostart.cc
+        src/client/process.cc
+        src/client/download.cc
+        src/client/java.cc
+        src/client/cache.cc
+        src/client/bridge.cc
 )
 
 target_include_directories(hestia_shared
@@ -45,9 +70,9 @@ target_include_directories(hestia_shared
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-# nlohmann/json is PUBLIC: it appears in protocol.h, so consumers that include
-# the protocol envelope need its headers. spdlog/fmt back logging only and do
-# not leak through the public headers, so they stay PRIVATE.
+# nlohmann/json is PUBLIC: it appears in the protocol envelope and the proto
+# contract headers, so consumers need its headers. spdlog/fmt back logging only
+# and do not leak through the public headers, so they stay PRIVATE.
 target_link_libraries(hestia_shared
         PUBLIC
         nlohmann_json::nlohmann_json
