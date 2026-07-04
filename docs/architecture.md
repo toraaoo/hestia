@@ -12,8 +12,8 @@ reasoning behind the structure.
 > `hestiad` owns the IPC endpoint, a request router, process supervision, and
 > autostart; frontends are clients that drive it over a local socket (a Unix
 > domain socket on POSIX, a named pipe on Windows). `libs/core` was split into
-> **`libs/shared`** (IPC transport, client SDK, app identity, logging — linked
-> by the daemon *and* every client) and **`libs/engine`** (config store,
+> **`libs/shared`** (IPC transport, the typed wire contracts, client SDK, app
+> identity, logging — linked by the daemon *and* every client) and **`libs/engine`** (config store,
 > java runtimes, launcher logic — daemon-internal). The CLI and tray already reach
 > the engine only over the socket; the desktop app still links it directly (a
 > transitional exception being retired — see the target graph).
@@ -42,8 +42,9 @@ frontend must be built first (see [Build & dependency conventions](#build--depen
 ## Target graph
 
 ```
-libs/shared  → IPC transport + protocol, client SDK, shared identity (app_info.h),
-               logging; linked by the daemon AND every client; zero UI dependencies
+libs/shared  → IPC transport + protocol, typed wire contracts (hestia::proto),
+               client SDK, shared identity (app_info.h), logging; linked by the
+               daemon AND every client; zero UI dependencies
 libs/engine  → launcher engine (config, java runtimes, launcher logic); daemon-internal
 apps/cli     → CLI11 commands + thin main(); depends on shared
 apps/desktop → CEF shell + embedded React frontend; depends on shared (+ engine, transitional)
@@ -81,10 +82,12 @@ hestia-cpp/
 ├── cmake/                      DownloadCEF, CMakeRC (resource compiler), PruneLocales
 ├── third_party/               vendored C++ deps as git submodules; cef/ fetched at configure (gitignored)
 ├── libs/
-│   ├── shared/                hestia_shared — IPC + client SDK + identity + logging
-│   │   ├── include/hestia/    PUBLIC headers (logging.h, app_info.h, ipc/*, client/*)
-│   │   │                      app_info.h is GENERATED from app_info.h.in (shared identity)
-│   │   └── src/               implementations (transport, protocol, client, logging)
+│   ├── shared/                hestia_shared — IPC + wire contracts + client SDK + identity + logging
+│   │   ├── include/hestia/    PUBLIC headers: logging.h, app_info.h (GENERATED from
+│   │   │                      app_info.h.in), ipc/* (transport machinery), proto/*
+│   │   │                      (one contract header per domain), client/* (one facade
+│   │   │                      per domain over the Session core)
+│   │   └── src/               implementations (transport, protocol, proto/, client/)
 │   └── engine/                hestia_engine — launcher engine (daemon-internal)
 │       ├── include/hestia/engine/  PUBLIC API — flat, one header per domain:
 │       │                      engine.h (aggregate root), config.h, downloader.h, java.h
@@ -93,7 +96,7 @@ hestia-cpp/
 ├── apps/
 │   ├── cli/                   hestia_cli — CLI11 commands + main()
 │   ├── daemon/               hestia_daemon (hestiad) — bootstrap main.cc over
-│   │                          src/{runtime,process,downloads,platform,services}/
+│   │                          src/{runtime,process,downloads,java,platform,services}/
 │   ├── tray/                 hestia_tray — resident system-tray helper (per-platform backends)
 │   └── desktop/               hestia_desktop — CEF launcher (see "Desktop launcher" below)
 │       ├── frontend/          Vite + React + TS app (built with Bun) → dist/ embedded
@@ -130,6 +133,7 @@ frontend's `dist/` tree is compiled into the binary by **CMakeRC**
 |---------------------|----------------|--------------------------------------------------|
 | `hestia`            | `libs/shared`  | cross-cutting (`init_logging`, `LogLevel`)       |
 | `hestia::ipc`       | `libs/shared`  | transport, endpoint, protocol envelope           |
+| `hestia::proto`     | `libs/shared`  | typed wire contracts + domain types              |
 | `hestia::client`    | `libs/shared`  | typed client SDK (`Client`)                      |
 | `hestia::engine`    | `libs/engine`  | `Engine` root, `Config`, `Downloader`, `Java`    |
 | `hestia::cli`       | `apps/cli`     | command framework + commands                     |
@@ -151,14 +155,26 @@ the one public boundary between them — the socket — and nothing launcher-spe
 - **`logging`** — `init_logging(LogLevel)` configures the process-wide spdlog
   logger once at startup. `LogLevel` is Hestia's own enum so callers don't depend
   on spdlog's; `logging.cc` maps it across.
-- **`ipc`** — the platform transport (`transport_posix.cc` / `transport_windows.cc`),
-  endpoint resolution, and the JSON protocol envelope. It also carries the wire
-  **vocabulary** for domains that cross the socket — `process.h`/`process_codec.h`,
-  `download.h`/`download_codec.h`, and `java.h`/`java_codec.h` pair the domain
-  types with their one JSON codec, so the daemon and every client (de)serialize
-  through the same definitions and cannot drift.
-- **`client`** — the typed client SDK (`hestia::client::Client`) front-ends use to
-  drive the daemon.
+- **`ipc`** — the transport machinery only: the platform transport
+  (`transport_posix.cc` / `transport_windows.cc`), endpoint resolution, the JSON
+  protocol envelope, and the error-code vocabulary. Nothing domain-specific.
+- **`proto`** — the typed wire contracts, one header per domain (`config.h`,
+  `process.h`, `download.h`, `java.h`, `cache.h`, …). A call contract names its
+  channel exactly once and pairs it with the `Params`/`Result` payload shapes
+  (`JavaInstall::kChannel`); an event contract names its topic and is its own
+  payload. A payload struct declares its wire format once as a `kFields` table;
+  the generic codec in `contract.h` consumes it (field flags cover required
+  keys, omit-when-empty, and flattened payloads; paths, durations, enums, and
+  optionals are bridged in one place). Both sides of the socket marshal through
+  the contract, so the daemon and every client cannot drift — a disagreement is
+  a compile error, not a runtime surprise.
+- **`client`** — the typed client SDK. `Client` owns the connection core
+  (`Session`, private to the library: request/response correlation, the event
+  callback, blocking jobs) and exposes one `Facade` per domain, reached through
+  accessors — `client.java().install(21)`, `client.config().get(key)` —
+  mirroring the engine's `engine.java()` on the other side of the socket.
+  Facade methods are one-liners over `Session::call<Contract>()` and return
+  `proto` types directly.
 - **identity** — `app_info.h` is generated from `app_info.h.in` and exposed on the
   **public** interface, so every target shares one source of truth (name, id,
   vendor, version, channel).
@@ -202,8 +218,8 @@ The subsystems behind the aggregate today:
   `.part` temp file (via cpr), hashing incrementally when a checksum is given and
   renaming into place only on success. Stateless, so it hangs off no aggregate —
   the daemon's download manager constructs one per download. Its checksum
-  vocabulary (`ipc::Checksum`, `ipc::HashAlgorithm`) comes from
-  `<hestia/ipc/download.h>`, the same types the wire uses. The native incremental
+  vocabulary (`proto::Checksum`, `proto::HashAlgorithm`) comes from
+  `<hestia/proto/download.h>`, the same types the wire uses. The native incremental
   SHA-1/SHA-256 `Hasher` is the private `src/download/checksum.{h,cc}`.
 - **`Cache`** (`cache.h`) — a content-addressed store of verified downloads
   under `<data_home>/cache/<algorithm>/<hex[0:2]>/<hex>`, keyed by checksum so
@@ -258,8 +274,14 @@ are subdir-qualified (`"runtime/router.h"`):
       accessors (`ctx.runtime.engine()`, `ctx.runtime.supervisor()`, …); the
       per-request connection is what lets streaming channels (`events.subscribe`)
       be ordinary handlers.
-- **`services/`** — one file per channel-prefix, wired in once via
-  `register_all_services()` in `services.h`. Today: `health` (`health.ping`),
+- **`services/`** — one `Service` class per channel-prefix (mirroring the CLI's
+  `Command` and the desktop's `Feature`), registering typed handlers through the
+  `Channels` registrar: `on.handle<proto::JavaInstall>(…)` decodes `Params`
+  (a malformed payload answers `bad_request`), encodes the returned `Result`,
+  and maps a thrown `ServiceError` to its protocol error code — the channel
+  name and payload shapes come from the contract, so a service physically
+  cannot drift from the client SDK. Wired in once via `make_services()`
+  (`services/registry.cc`). Today: `health` (`health.ping`),
   `app` (`app.info`), `daemon` (`daemon.status|stop` — stop answers, then shuts
   the serve loop down, so `hestia daemon restart` can hand over to a fresh
   binary), `config` (`config.get|set|home|set-home`),

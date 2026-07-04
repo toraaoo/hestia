@@ -25,7 +25,7 @@ Hestia is one daemon-backed core with several ways to drive it:
 
 ```
 hestia-cpp/
-├── libs/shared/             hestia_shared — IPC transport + protocol, client SDK, identity, logging
+├── libs/shared/             hestia_shared — IPC transport + protocol, typed wire contracts, client SDK, identity, logging
 ├── libs/engine/             hestia_engine — launcher engine (config, java, …); daemon-internal
 ├── apps/desktop/            Hestia      — graphical desktop launcher (CEF + React)
 │   ├── frontend/            Vite + React + TypeScript UI (built with Bun)

@@ -12,7 +12,8 @@ A few rules hold everywhere; the recipes below assume them.
 - **One thing per file.** A command is its own `.{h,cc}` pair (header-only when
   there's no implementation).
 - **Wire-in is one line.** Each kind of thing has exactly one registry function
-  where it's added: `make_commands()`. Adding a feature should not touch the shell.
+  where it's added: `make_commands()` (CLI), `make_services()` (daemon),
+  `BuildFeatures()` (desktop). Adding a feature should not touch the shell.
 - **Namespaces follow the target.** Shared is `hestia` / `hestia::ipc` /
   `hestia::client`; the engine is `hestia::engine`; the CLI is `hestia::cli`; the
   desktop shell is `desktop::` (`desktop::ipc`, `desktop::features`, …).
@@ -205,65 +206,135 @@ std::filesystem::path Engine::set_data_home(const std::string &dir) {
 }
 ```
 
-**3. Surface it over IPC** — a daemon service plus a client method. Add
-`apps/daemon/src/services/instances_service.cc`, declare it in
-`services/services.h`, add it to `register_all_services()` in the same header,
-and list it in the daemon `CMakeLists.txt`. Handlers receive a `HandlerContext`
-of `{Runtime &runtime, connection, peer}` and reach the daemon's long-lived
-collaborators through the runtime's accessors:
+**3. Define the wire contract** in
+`libs/shared/include/hestia/proto/instances.h` — the single definition both
+sides marshal through. A call contract names its channel once and pairs it with
+the `Params`/`Result` payload shapes; each payload struct declares its wire
+format as a `kFields` table (see `contract.h` for the field flags: `kRequired`,
+`kOmitIfEmpty`, `kFlatten`). Add the header (and a `src/proto/instances.cc`
+only if the domain has enum/string helpers) to the shared `CMakeLists.txt`:
+
+```cpp
+// libs/shared/include/hestia/proto/instances.h
+#pragma once
+
+#include <string>
+#include <vector>
+
+#include <hestia/proto/contract.h>
+
+namespace hestia::proto {
+    struct Instance {
+        std::string id;
+        std::string name;
+
+        static constexpr auto kFields = fields(field("id", &Instance::id), field("name", &Instance::name));
+    };
+
+    struct InstancesList {
+        static constexpr const char *kChannel = "instances.list";
+        using Params = Empty;
+        struct Result {
+            std::vector<Instance> instances;
+
+            static constexpr auto kFields = fields(field("instances", &Result::instances));
+        };
+    };
+}
+```
+
+**4. Serve it** — a `Service` class, the daemon's flavor of the CLI's `Command`
+and the desktop's `Feature`. Add `services/instances_service.{h,cc}`, one line
+in `make_services()` (`services/registry.cc`), and both files to the daemon
+`CMakeLists.txt`. `Channels::handle<C>` decodes `C::Params` (a malformed
+payload answers `bad_request`) and encodes the returned `C::Result`; handlers
+reach the daemon's long-lived collaborators through `HandlerContext` and throw
+`ServiceError` for a typed failure:
+
+```cpp
+// apps/daemon/src/services/instances_service.h
+#pragma once
+
+#include "services/service.h"
+
+namespace hestia::daemon {
+    class InstancesService : public Service {
+    public:
+        void register_channels(Channels &on) override;
+    };
+}
+```
 
 ```cpp
 // apps/daemon/src/services/instances_service.cc
-#include "services/services.h"
+#include "services/instances_service.h"
 
-#include "runtime/handler_context.h"
-#include "runtime/router.h"
+#include "runtime/channels.h"
 #include "runtime/runtime.h"
 
 #include <hestia/engine/engine.h>
+#include <hestia/proto/instances.h>
 
 namespace hestia::daemon {
-    void register_instances_service(Router &router) {
-        router.on("instances.list", [](const ipc::Request &, HandlerContext &ctx) {
-            auto arr = nlohmann::json::array();
-            for (const auto &it : ctx.runtime.engine().instances().list()) {
-                arr.push_back({{"id", it.id}, {"name", it.name}});
+    void InstancesService::register_channels(Channels &on) {
+        on.handle<proto::InstancesList>([](const proto::Empty &, HandlerContext &ctx) {
+            proto::InstancesList::Result out;
+            for (const auto &it: ctx.runtime.engine().instances().list()) {
+                out.instances.push_back(proto::Instance{.id = it.id, .name = it.name});
             }
-            return ipc::Response::success({{"instances", arr}});
+            return out;
         });
     }
 }
 ```
 
-```cpp
-// apps/daemon/src/services/services.h — the declaration, plus one line in
-// register_all_services() beside the other register_*_service calls
-void register_instances_service(Router &router);
-```
-
-Then a typed method on `hestia::client::Client` (`libs/shared`) so front-ends
-drive it without knowing the wire format — declare it in `client/client.h`,
-define it in `src/client.cc`:
+**5. Expose it on the client SDK** — a `Facade` in
+`libs/shared/include/hestia/client/instances.h` plus an accessor on `Client`
+(`client/client.h`: a member, an accessor, one entry in the constructor's
+initializer list; both new files in the shared `CMakeLists.txt`). Facade
+methods are one-liners over the typed session call and return `proto` types
+directly:
 
 ```cpp
-// client.cc
-std::vector<std::string> Client::instance_names() {
-    const auto res = must(d_->call("instances.list", json::object()));
-    std::vector<std::string> names;
-    for (const auto &it : res.payload.value("instances", json::array())) {
-        names.push_back(it.value("name", std::string{}));
-    }
-    return names;
+// libs/shared/include/hestia/client/instances.h
+#pragma once
+
+#include <vector>
+
+#include <hestia/client/facade.h>
+#include <hestia/proto/instances.h>
+
+namespace hestia::client {
+    class Instances : public Facade {
+    public:
+        using Facade::Facade;
+
+        std::vector<proto::Instance> list();
+    };
 }
 ```
 
-Front-ends reach the subsystem only over the socket via the client SDK — they
-never include the engine header. (The desktop app still links `hestia_engine`
-directly today, a transitional exception; the CLI already goes entirely through
-the client SDK.) The `config` channels are the shipped end-to-end reference:
-`Client::config_get()` round-trips `config.get` to the daemon, which calls
-`ctx.engine.config().get()`. A stateless helper with no persisted state can
-skip step 2 and be called directly from its service.
+```cpp
+// libs/shared/src/client/instances.cc
+#include "hestia/client/instances.h"
+
+#include "session.h"
+
+namespace hestia::client {
+    std::vector<proto::Instance> Instances::list() {
+        return session_->call<proto::InstancesList>().instances;
+    }
+}
+```
+
+Front-ends reach the subsystem only over the socket via the client SDK
+(`client.instances().list()`) — they never include the engine header. (The
+desktop app still links `hestia_engine` directly today, a transitional
+exception; the CLI already goes entirely through the client SDK.) The `config`
+channels are the shipped end-to-end reference: `client.config().get(key)`
+round-trips `config.get` to the daemon's `ConfigService`, which calls
+`ctx.runtime.engine().config().get()`. A stateless helper with no persisted
+state can skip step 2 and be called directly from its service.
 
 ---
 
