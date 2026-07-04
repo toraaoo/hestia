@@ -6,11 +6,11 @@
 #include <optional>
 #include <vector>
 
-#include <hestia/ipc/download.h>
+#include <hestia/proto/download.h>
 
 namespace hestia::engine {
     struct CacheEntry {
-        ipc::Checksum checksum;
+        proto::Checksum checksum;
         std::uint64_t size = 0;
     };
 
@@ -28,12 +28,12 @@ namespace hestia::engine {
 
         [[nodiscard]] std::filesystem::path dir() const;
 
-        [[nodiscard]] std::optional<std::filesystem::path> lookup(const ipc::Checksum &checksum) const;
+        [[nodiscard]] std::optional<std::filesystem::path> lookup(const proto::Checksum &checksum) const;
 
         // Best effort: a failure to cache never fails the download that fed it.
-        void store(const std::filesystem::path &file, const ipc::Checksum &checksum);
+        void store(const std::filesystem::path &file, const proto::Checksum &checksum);
 
-        void evict(const ipc::Checksum &checksum);
+        void evict(const proto::Checksum &checksum);
 
         [[nodiscard]] std::vector<CacheEntry> entries() const;
         [[nodiscard]] CacheUsage usage() const;

@@ -44,7 +44,7 @@ namespace hestia::engine {
             }
         }
 
-        std::optional<ipc::JavaRuntime> read_runtime(const fs::path &install_dir) {
+        std::optional<proto::JavaRuntime> read_runtime(const fs::path &install_dir) {
             std::ifstream in(install_dir / kRuntimeRecord);
             if (!in) return std::nullopt;
             json record;
@@ -53,7 +53,7 @@ namespace hestia::engine {
             } catch (const json::exception &) {
                 return std::nullopt;
             }
-            ipc::JavaRuntime runtime;
+            proto::JavaRuntime runtime;
             runtime.vendor = record.value("vendor", std::string{});
             runtime.major = record.value("major", 0);
             runtime.release_name = record.value("release_name", std::string{});
@@ -95,12 +95,12 @@ namespace hestia::engine {
         dir_ = std::move(dir);
     }
 
-    std::vector<ipc::JavaRelease> Java::releases() const {
+    std::vector<proto::JavaRelease> Java::releases() const {
         return provider().releases();
     }
 
-    std::vector<ipc::JavaRuntime> Java::installed() const {
-        std::vector<ipc::JavaRuntime> runtimes;
+    std::vector<proto::JavaRuntime> Java::installed() const {
+        std::vector<proto::JavaRuntime> runtimes;
         std::error_code ec;
         for (const auto &entry: fs::directory_iterator(dir(), ec)) {
             if (!entry.is_directory(ec)) continue;
@@ -108,19 +108,19 @@ namespace hestia::engine {
                 runtimes.push_back(std::move(*runtime));
             }
         }
-        std::ranges::sort(runtimes, {}, &ipc::JavaRuntime::major);
+        std::ranges::sort(runtimes, {}, &proto::JavaRuntime::major);
         return runtimes;
     }
 
-    ipc::JavaRuntime Java::install(int major, const JavaInstallProgressCallback &on_progress) {
+    proto::JavaRuntime Java::install(int major, const JavaInstallProgressCallback &on_progress) {
         if (major <= 0) {
             throw std::runtime_error(fmt::format("invalid java major version: {}", major));
         }
-        const auto report = [&](ipc::JavaInstallPhase phase) {
-            if (on_progress) on_progress(ipc::JavaInstallProgress{.phase = phase});
+        const auto report = [&](proto::JavaInstallPhase phase) {
+            if (on_progress) on_progress(proto::JavaInstallProgress{.phase = phase});
         };
 
-        report(ipc::JavaInstallPhase::resolving);
+        report(proto::JavaInstallPhase::resolving);
         const JavaPackage package = provider().resolve(major, host_target());
         validate_archive_name(package.archive_name);
 
@@ -131,19 +131,19 @@ namespace hestia::engine {
 
         remove_quietly(staging);
         try {
-            Downloader{cache_}.fetch(package.url, archive, package.checksum, [&](const ipc::DownloadProgress &progress) {
+            Downloader{cache_}.fetch(package.url, archive, package.checksum, [&](const proto::DownloadProgress &progress) {
                 if (on_progress) {
-                    on_progress(ipc::JavaInstallProgress{.phase = ipc::JavaInstallPhase::downloading,
+                    on_progress(proto::JavaInstallProgress{.phase = proto::JavaInstallPhase::downloading,
                                                          .current = progress.downloaded,
                                                          .total = progress.total});
                 }
             });
 
-            report(ipc::JavaInstallPhase::extracting);
+            report(proto::JavaInstallPhase::extracting);
             extract_archive(archive, staging, [&](std::uint64_t done, std::uint64_t total) {
                 if (on_progress) {
-                    on_progress(ipc::JavaInstallProgress{
-                        .phase = ipc::JavaInstallPhase::extracting, .current = done, .total = total});
+                    on_progress(proto::JavaInstallProgress{
+                        .phase = proto::JavaInstallPhase::extracting, .current = done, .total = total});
                 }
             });
 

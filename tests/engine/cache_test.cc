@@ -11,8 +11,8 @@
 #include "download/checksum.h"
 
 using namespace hestia::engine;
-using hestia::ipc::Checksum;
-using hestia::ipc::HashAlgorithm;
+using hestia::proto::Checksum;
+using hestia::proto::HashAlgorithm;
 namespace fs = std::filesystem;
 
 namespace {
@@ -98,7 +98,7 @@ TEST(Downloader, ServesFromCacheWithoutNetwork) {
     const fs::path dest = base / "out" / "archive";
     bool progressed = false;
     Downloader{&cache}.fetch("http://localhost:1/unreachable", dest, checksum,
-                             [&](const hestia::ipc::DownloadProgress &p) {
+                             [&](const hestia::proto::DownloadProgress &p) {
                                  progressed = true;
                                  EXPECT_EQ(p.total, content.size());
                              });

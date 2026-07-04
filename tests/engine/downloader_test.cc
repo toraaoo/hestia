@@ -4,11 +4,11 @@
 #include <stdexcept>
 
 #include <hestia/engine/downloader.h>
-#include <hestia/ipc/download.h>
+#include <hestia/proto/download.h>
 
 using hestia::engine::Downloader;
-using hestia::ipc::Checksum;
-using hestia::ipc::HashAlgorithm;
+using hestia::proto::Checksum;
+using hestia::proto::HashAlgorithm;
 
 namespace fs = std::filesystem;
 

@@ -29,8 +29,8 @@ namespace hestia::engine {
         }
     } // namespace
 
-    Hasher::Hasher(ipc::HashAlgorithm algorithm) : algorithm_(algorithm) {
-        if (algorithm_ == ipc::HashAlgorithm::sha1) {
+    Hasher::Hasher(proto::HashAlgorithm algorithm) : algorithm_(algorithm) {
+        if (algorithm_ == proto::HashAlgorithm::sha1) {
             const std::uint32_t init[8] = {0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0, 0, 0, 0};
             std::memcpy(state_, init, sizeof(state_));
         } else {
@@ -77,7 +77,7 @@ namespace hestia::engine {
         }
         update(length_be, sizeof(length_be));
 
-        const std::size_t words = algorithm_ == ipc::HashAlgorithm::sha1 ? 5 : 8;
+        const std::size_t words = algorithm_ == proto::HashAlgorithm::sha1 ? 5 : 8;
         static constexpr char kHex[] = "0123456789abcdef";
         std::string out;
         out.reserve(words * 8);
@@ -90,7 +90,7 @@ namespace hestia::engine {
     }
 
     void Hasher::process_block(const std::uint8_t *block) {
-        if (algorithm_ == ipc::HashAlgorithm::sha1) {
+        if (algorithm_ == proto::HashAlgorithm::sha1) {
             std::uint32_t w[80];
             for (std::size_t i = 0; i < 16; ++i) w[i] = load_be32(block + 4u * i);
             for (int i = 16; i < 80; ++i) {

@@ -1,12 +1,12 @@
 # Unit tests mirroring the source tree, linking only the shipped libraries.
 add_executable(hestia_tests
         shared/protocol_test.cc
-        shared/process_codec_test.cc
-        shared/download_codec_test.cc
+        shared/process_proto_test.cc
+        shared/download_proto_test.cc
         shared/paths_test.cc
         shared/endpoint_test.cc
         shared/transport_test.cc
-        shared/java_codec_test.cc
+        shared/java_proto_test.cc
         engine/cache_test.cc
         engine/config_test.cc
         engine/engine_test.cc

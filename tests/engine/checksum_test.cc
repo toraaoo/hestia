@@ -5,12 +5,12 @@
 #include <string>
 
 #include "download/checksum.h"
-#include <hestia/ipc/download.h>
+#include <hestia/proto/download.h>
 
 using hestia::engine::Hasher;
-using hestia::ipc::HashAlgorithm;
-using hestia::ipc::hex_digest_length;
-using hestia::ipc::parse_hash_algorithm;
+using hestia::proto::HashAlgorithm;
+using hestia::proto::hex_digest_length;
+using hestia::proto::parse_hash_algorithm;
 
 namespace {
     std::string digest(HashAlgorithm algorithm, const std::string &input) {

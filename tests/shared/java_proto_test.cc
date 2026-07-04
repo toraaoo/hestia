@@ -1,10 +1,17 @@
 #include <gtest/gtest.h>
 
-#include <hestia/ipc/java_codec.h>
+#include <hestia/proto/java.h>
 
-using namespace hestia::ipc;
+using namespace hestia::proto;
 
-TEST(JavaCodec, RuntimeRoundTrips) {
+namespace {
+    template <typename T>
+    T round_trip(const T &value) {
+        return nlohmann::json(value).get<T>();
+    }
+} // namespace
+
+TEST(JavaProto, RuntimeRoundTrips) {
     JavaRuntime runtime;
     runtime.vendor = "temurin";
     runtime.major = 21;
@@ -12,7 +19,7 @@ TEST(JavaCodec, RuntimeRoundTrips) {
     runtime.home = "/data/java/temurin-21/jdk-21.0.7+6";
     runtime.executable = "/data/java/temurin-21/jdk-21.0.7+6/bin/java";
 
-    const auto decoded = java_runtime_from_json(to_json(runtime));
+    const auto decoded = round_trip(runtime);
     EXPECT_EQ(decoded.vendor, runtime.vendor);
     EXPECT_EQ(decoded.major, runtime.major);
     EXPECT_EQ(decoded.release_name, runtime.release_name);
@@ -20,24 +27,38 @@ TEST(JavaCodec, RuntimeRoundTrips) {
     EXPECT_EQ(decoded.executable, runtime.executable);
 }
 
-TEST(JavaCodec, ReleaseRoundTrips) {
-    const auto decoded = java_release_from_json(to_json(JavaRelease{.major = 21, .lts = true}));
+TEST(JavaProto, ReleaseRoundTrips) {
+    const auto decoded = round_trip(JavaRelease{.major = 21, .lts = true});
     EXPECT_EQ(decoded.major, 21);
     EXPECT_TRUE(decoded.lts);
 }
 
-TEST(JavaCodec, ProgressRoundTrips) {
+TEST(JavaProto, ProgressRoundTrips) {
     const JavaInstallProgress progress{.phase = JavaInstallPhase::downloading, .current = 1024, .total = 4096};
-    const auto decoded = java_install_progress_from_json(to_json(progress));
+    const auto decoded = round_trip(progress);
     EXPECT_EQ(decoded.phase, JavaInstallPhase::downloading);
     EXPECT_EQ(decoded.current, 1024U);
     EXPECT_EQ(decoded.total, 4096U);
 }
 
-TEST(JavaCodec, PhaseNamesRoundTrip) {
+TEST(JavaProto, PhaseNamesRoundTrip) {
     for (const auto phase:
          {JavaInstallPhase::resolving, JavaInstallPhase::downloading, JavaInstallPhase::extracting}) {
         EXPECT_EQ(parse_java_install_phase(to_string(phase)), phase);
     }
     EXPECT_FALSE(parse_java_install_phase("verifying").has_value());
+}
+
+TEST(JavaProto, InstallDoneEventNestsRuntime) {
+    JavaRuntime runtime;
+    runtime.vendor = "temurin";
+    runtime.major = 21;
+
+    const nlohmann::json j = JavaInstallDoneEvent{.id = "java-1", .runtime = runtime};
+    EXPECT_EQ(j.at("id"), "java-1");
+    EXPECT_EQ(j.at("runtime").at("major"), 21);
+
+    const auto back = j.get<JavaInstallDoneEvent>();
+    EXPECT_EQ(back.id, "java-1");
+    EXPECT_EQ(back.runtime.vendor, "temurin");
 }

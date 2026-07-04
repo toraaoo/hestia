@@ -2,11 +2,18 @@
 
 #include <chrono>
 
-#include <hestia/ipc/process_codec.h>
+#include <hestia/proto/process.h>
 
-using namespace hestia::ipc;
+using namespace hestia::proto;
 
-TEST(ProcessCodec, KindAndStateRoundTrip) {
+namespace {
+    template <typename T>
+    T round_trip(const T &value) {
+        return nlohmann::json(value).get<T>();
+    }
+} // namespace
+
+TEST(ProcessProto, KindAndStateRoundTrip) {
     EXPECT_EQ(parse_kind(to_string(ProcessKind::Server)), ProcessKind::Server);
     EXPECT_EQ(parse_kind(to_string(ProcessKind::Instance)), ProcessKind::Instance);
     EXPECT_EQ(parse_kind("nonsense"), ProcessKind::Server); // unknown defaults to server
@@ -18,19 +25,19 @@ TEST(ProcessCodec, KindAndStateRoundTrip) {
     EXPECT_EQ(parse_state("nonsense"), ProcessState::Starting); // unknown defaults to starting
 }
 
-TEST(ProcessCodec, RestartPolicyRoundTrip) {
+TEST(ProcessProto, RestartPolicyRoundTrip) {
     RestartPolicy policy;
     policy.auto_restart = true;
     policy.max_retries = 7;
     policy.backoff = std::chrono::milliseconds(2500);
 
-    const RestartPolicy back = restart_from_json(to_json(policy));
+    const RestartPolicy back = round_trip(policy);
     EXPECT_TRUE(back.auto_restart);
     EXPECT_EQ(back.max_retries, 7);
     EXPECT_EQ(back.backoff, std::chrono::milliseconds(2500));
 }
 
-TEST(ProcessCodec, RecordRoundTrip) {
+TEST(ProcessProto, RecordRoundTrip) {
     ProcessRecord rec;
     rec.id = "srv";
     rec.kind = ProcessKind::Instance;
@@ -45,7 +52,7 @@ TEST(ProcessCodec, RecordRoundTrip) {
     rec.restart.max_retries = 3;
     rec.restarts = 1;
 
-    const ProcessRecord back = record_from_json(to_json(rec));
+    const ProcessRecord back = round_trip(rec);
     EXPECT_EQ(back.id, "srv");
     EXPECT_EQ(back.kind, ProcessKind::Instance);
     EXPECT_EQ(back.pid, 4321);
@@ -60,7 +67,7 @@ TEST(ProcessCodec, RecordRoundTrip) {
     EXPECT_EQ(back.restarts, 1);
 }
 
-TEST(ProcessCodec, LaunchSpecRoundTrip) {
+TEST(ProcessProto, LaunchSpecRoundTrip) {
     LaunchSpec spec;
     spec.id = "mc";
     spec.kind = ProcessKind::Server;
@@ -70,11 +77,27 @@ TEST(ProcessCodec, LaunchSpecRoundTrip) {
     spec.restart.auto_restart = true;
     spec.restart.max_retries = 2;
 
-    const LaunchSpec back = launch_spec_from_json(to_json(spec));
+    const LaunchSpec back = round_trip(spec);
     EXPECT_EQ(back.id, "mc");
     EXPECT_EQ(back.program, spec.program);
     ASSERT_EQ(back.args.size(), 2u);
     EXPECT_EQ(back.working_dir, spec.working_dir);
     EXPECT_TRUE(back.restart.auto_restart);
     EXPECT_EQ(back.restart.max_retries, 2);
+}
+
+TEST(ProcessProto, StateEventCarriesRecordFlat) {
+    ProcessRecord rec;
+    rec.id = "srv";
+    rec.state = ProcessState::Running;
+
+    const nlohmann::json j = ProcessStateEvent{.record = rec};
+    // The event's payload IS the record (id at the top level), which is what
+    // the hub's id-filtering matches against.
+    EXPECT_EQ(j.at("id"), "srv");
+    EXPECT_EQ(j.at("state"), "running");
+
+    const auto back = j.get<ProcessStateEvent>();
+    EXPECT_EQ(back.record.id, "srv");
+    EXPECT_EQ(back.record.state, ProcessState::Running);
 }

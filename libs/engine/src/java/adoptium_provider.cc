@@ -28,20 +28,20 @@ namespace hestia::engine {
         }
     } // namespace
 
-    std::vector<ipc::JavaRelease> adoptium_releases_from_json(const json &j) {
+    std::vector<proto::JavaRelease> adoptium_releases_from_json(const json &j) {
         if (!j.contains("available_releases") || !j["available_releases"].is_array()) {
             throw std::runtime_error("adoptium response is missing available_releases");
         }
         const auto lts = j.value("available_lts_releases", json::array());
-        std::vector<ipc::JavaRelease> releases;
+        std::vector<proto::JavaRelease> releases;
         for (const auto &major: j["available_releases"]) {
             if (!major.is_number_integer()) continue;
-            releases.push_back(ipc::JavaRelease{
+            releases.push_back(proto::JavaRelease{
                 .major = major.get<int>(),
                 .lts = std::ranges::find(lts, major) != lts.end(),
             });
         }
-        std::ranges::sort(releases, {}, &ipc::JavaRelease::major);
+        std::ranges::sort(releases, {}, &proto::JavaRelease::major);
         return releases;
     }
 
@@ -62,11 +62,11 @@ namespace hestia::engine {
                 .release_name = asset.value("release_name", std::string{}),
                 .url = package.value("link", std::string{}),
                 .archive_name = package.value("name", std::string{}),
-                .checksum = ipc::Checksum{.algorithm = ipc::HashAlgorithm::sha256,
+                .checksum = proto::Checksum{.algorithm = proto::HashAlgorithm::sha256,
                                           .hex = package.value("checksum", std::string{})},
             };
             if (resolved.url.empty() || resolved.archive_name.empty() ||
-                !ipc::is_valid_checksum(resolved.checksum)) {
+                !proto::is_valid_checksum(resolved.checksum)) {
                 throw std::runtime_error(
                     fmt::format("adoptium build for temurin {} is missing its download link or checksum", major));
             }
@@ -76,7 +76,7 @@ namespace hestia::engine {
             fmt::format("no temurin {} jdk build is published for {}/{}", major, target.os, target.arch));
     }
 
-    std::vector<ipc::JavaRelease> AdoptiumProvider::releases() const {
+    std::vector<proto::JavaRelease> AdoptiumProvider::releases() const {
         return adoptium_releases_from_json(fetch_json(fmt::format("{}/v3/info/available_releases", kApiBase)));
     }
 

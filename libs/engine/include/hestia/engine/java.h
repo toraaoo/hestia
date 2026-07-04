@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-#include <hestia/ipc/download.h>
-#include <hestia/ipc/java.h>
+#include <hestia/proto/download.h>
+#include <hestia/proto/java.h>
 
 namespace hestia::engine {
     // Adoptium's platform vocabulary: "linux"/"mac"/"windows", "x64"/"aarch64".
@@ -25,7 +25,7 @@ namespace hestia::engine {
         std::string release_name;
         std::string url;
         std::string archive_name;
-        ipc::Checksum checksum;
+        proto::Checksum checksum;
     };
 
     // One vendor's release catalogue. Implementations fetch metadata only —
@@ -36,13 +36,13 @@ namespace hestia::engine {
 
         [[nodiscard]] virtual std::string vendor() const = 0;
 
-        [[nodiscard]] virtual std::vector<ipc::JavaRelease> releases() const = 0;
+        [[nodiscard]] virtual std::vector<proto::JavaRelease> releases() const = 0;
 
         // The latest GA build of `major` for `target`; throws when there is none.
         [[nodiscard]] virtual JavaPackage resolve(int major, const JavaTarget &target) const = 0;
     };
 
-    using JavaInstallProgressCallback = std::function<void(const ipc::JavaInstallProgress &)>;
+    using JavaInstallProgressCallback = std::function<void(const proto::JavaInstallProgress &)>;
 
     // Installs and tracks Java runtimes: each install lives at
     // <dir>/<vendor>-<major>/ beside a runtime.json record, and listing scans
@@ -55,13 +55,13 @@ namespace hestia::engine {
 
         Java(std::filesystem::path dir, std::vector<std::unique_ptr<JavaProvider>> providers, Cache *cache = nullptr);
 
-        [[nodiscard]] std::vector<ipc::JavaRelease> releases() const;
+        [[nodiscard]] std::vector<proto::JavaRelease> releases() const;
 
-        [[nodiscard]] std::vector<ipc::JavaRuntime> installed() const;
+        [[nodiscard]] std::vector<proto::JavaRuntime> installed() const;
 
         // Blocking resolve → download → extract → register, replacing any
         // existing install of the line; a failed install leaves nothing behind.
-        ipc::JavaRuntime install(int major, const JavaInstallProgressCallback &on_progress = {});
+        proto::JavaRuntime install(int major, const JavaInstallProgressCallback &on_progress = {});
 
         bool uninstall(int major);
 

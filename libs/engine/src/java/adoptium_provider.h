@@ -12,11 +12,11 @@ namespace hestia::engine {
     class AdoptiumProvider : public JavaProvider {
     public:
         [[nodiscard]] std::string vendor() const override { return "temurin"; }
-        [[nodiscard]] std::vector<ipc::JavaRelease> releases() const override;
+        [[nodiscard]] std::vector<proto::JavaRelease> releases() const override;
         [[nodiscard]] JavaPackage resolve(int major, const JavaTarget &target) const override;
     };
 
     // Separate from the HTTP fetch so they are unit-testable.
-    std::vector<ipc::JavaRelease> adoptium_releases_from_json(const nlohmann::json &j);
+    std::vector<proto::JavaRelease> adoptium_releases_from_json(const nlohmann::json &j);
     JavaPackage adoptium_package_from_json(const nlohmann::json &assets, int major, const JavaTarget &target);
 } // namespace hestia::engine

@@ -21,10 +21,10 @@ namespace hestia::engine {
             return s;
         }
 
-        void validate(const ipc::Checksum &checksum) {
-            if (!ipc::is_valid_checksum(checksum)) {
+        void validate(const proto::Checksum &checksum) {
+            if (!proto::is_valid_checksum(checksum)) {
                 throw std::runtime_error(fmt::format("invalid checksum '{}': expected {} hex characters", checksum.hex,
-                                                     ipc::hex_digest_length(checksum.algorithm)));
+                                                     proto::hex_digest_length(checksum.algorithm)));
             }
         }
 
@@ -36,7 +36,7 @@ namespace hestia::engine {
         // Copies a cached blob to `destination`, re-hashing on the way out.
         // A blob that no longer matches its key is evicted, and the caller
         // falls back to the network.
-        bool serve_from_cache(Cache &cache, const fs::path &destination, const ipc::Checksum &checksum,
+        bool serve_from_cache(Cache &cache, const fs::path &destination, const proto::Checksum &checksum,
                               const DownloadProgressCallback &on_progress) {
             const auto blob = cache.lookup(checksum);
             if (!blob) return false;
@@ -58,7 +58,7 @@ namespace hestia::engine {
                 out.write(buf, n);
                 hasher.update(buf, static_cast<std::size_t>(n));
                 copied += static_cast<std::uint64_t>(n);
-                if (on_progress) on_progress(ipc::DownloadProgress{.downloaded = copied, .total = total});
+                if (on_progress) on_progress(proto::DownloadProgress{.downloaded = copied, .total = total});
                 if (in.eof()) break;
             }
             out.close();
@@ -80,7 +80,7 @@ namespace hestia::engine {
     Downloader::Downloader(Cache *cache) : cache_(cache) {}
 
     void Downloader::fetch(const std::string &url, const fs::path &destination,
-                           const std::optional<ipc::Checksum> &checksum,
+                           const std::optional<proto::Checksum> &checksum,
                            const DownloadProgressCallback &on_progress) const {
         if (url.empty()) throw std::runtime_error("download url is empty");
         if (checksum) validate(*checksum);
@@ -114,7 +114,7 @@ namespace hestia::engine {
         const cpr::ProgressCallback progress_cb([&](cpr::cpr_pf_arg_t download_total, cpr::cpr_pf_arg_t download_now,
                                                     cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t) {
             if (on_progress) {
-                on_progress(ipc::DownloadProgress{
+                on_progress(proto::DownloadProgress{
                     .downloaded = download_now > 0 ? static_cast<std::uint64_t>(download_now) : 0,
                     .total = download_total > 0 ? static_cast<std::uint64_t>(download_total) : 0,
                 });

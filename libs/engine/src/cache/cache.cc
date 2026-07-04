@@ -16,9 +16,9 @@ namespace hestia::engine {
             return out;
         }
 
-        fs::path blob_path(const fs::path &dir, const ipc::Checksum &checksum) {
+        fs::path blob_path(const fs::path &dir, const proto::Checksum &checksum) {
             const std::string hex = lower_hex(checksum.hex);
-            return dir / ipc::to_string(checksum.algorithm) / hex.substr(0, 2) / hex;
+            return dir / proto::to_string(checksum.algorithm) / hex.substr(0, 2) / hex;
         }
 
         void remove_quietly(const fs::path &path) {
@@ -39,16 +39,16 @@ namespace hestia::engine {
         dir_ = std::move(dir);
     }
 
-    std::optional<fs::path> Cache::lookup(const ipc::Checksum &checksum) const {
-        if (!ipc::is_valid_checksum(checksum)) return std::nullopt;
+    std::optional<fs::path> Cache::lookup(const proto::Checksum &checksum) const {
+        if (!proto::is_valid_checksum(checksum)) return std::nullopt;
         fs::path blob = blob_path(dir(), checksum);
         std::error_code ec;
         if (!fs::is_regular_file(blob, ec)) return std::nullopt;
         return blob;
     }
 
-    void Cache::store(const fs::path &file, const ipc::Checksum &checksum) {
-        if (!ipc::is_valid_checksum(checksum)) return;
+    void Cache::store(const fs::path &file, const proto::Checksum &checksum) {
+        if (!proto::is_valid_checksum(checksum)) return;
         const fs::path blob = blob_path(dir(), checksum);
         std::error_code ec;
         if (fs::exists(blob, ec)) return;
@@ -66,8 +66,8 @@ namespace hestia::engine {
         if (ec) remove_quietly(tmp);
     }
 
-    void Cache::evict(const ipc::Checksum &checksum) {
-        if (!ipc::is_valid_checksum(checksum)) return;
+    void Cache::evict(const proto::Checksum &checksum) {
+        if (!proto::is_valid_checksum(checksum)) return;
         remove_quietly(blob_path(dir(), checksum));
     }
 
@@ -75,12 +75,12 @@ namespace hestia::engine {
         std::vector<CacheEntry> out;
         const fs::path base = dir();
         std::error_code ec;
-        for (const auto algorithm: {ipc::HashAlgorithm::sha1, ipc::HashAlgorithm::sha256}) {
-            const fs::path root = base / ipc::to_string(algorithm);
+        for (const auto algorithm: {proto::HashAlgorithm::sha1, proto::HashAlgorithm::sha256}) {
+            const fs::path root = base / proto::to_string(algorithm);
             for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec)) {
                 if (!it->is_regular_file(ec)) continue;
-                const ipc::Checksum checksum{.algorithm = algorithm, .hex = it->path().filename().string()};
-                if (!ipc::is_valid_checksum(checksum)) continue;
+                const proto::Checksum checksum{.algorithm = algorithm, .hex = it->path().filename().string()};
+                if (!proto::is_valid_checksum(checksum)) continue;
                 std::error_code size_ec;
                 const auto size = it->file_size(size_ec);
                 if (size_ec) continue;
@@ -103,8 +103,8 @@ namespace hestia::engine {
     CacheUsage Cache::clear() {
         const CacheUsage freed = usage();
         std::error_code ec;
-        for (const auto algorithm: {ipc::HashAlgorithm::sha1, ipc::HashAlgorithm::sha256}) {
-            fs::remove_all(dir() / ipc::to_string(algorithm), ec);
+        for (const auto algorithm: {proto::HashAlgorithm::sha1, proto::HashAlgorithm::sha256}) {
+            fs::remove_all(dir() / proto::to_string(algorithm), ec);
         }
         return freed;
     }
