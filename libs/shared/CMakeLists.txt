@@ -21,7 +21,6 @@ add_library(hestia_shared STATIC
         include/hestia/proto/app.h
         include/hestia/proto/daemon.h
         include/hestia/proto/config.h
-        include/hestia/proto/autostart.h
         include/hestia/proto/events.h
         include/hestia/proto/process.h
         include/hestia/proto/download.h
@@ -32,7 +31,6 @@ add_library(hestia_shared STATIC
         include/hestia/client/app.h
         include/hestia/client/daemon.h
         include/hestia/client/config.h
-        include/hestia/client/autostart.h
         include/hestia/client/process.h
         include/hestia/client/download.h
         include/hestia/client/java.h
@@ -55,7 +53,6 @@ add_library(hestia_shared STATIC
         src/client/app.cc
         src/client/daemon.cc
         src/client/config.cc
-        src/client/autostart.cc
         src/client/process.cc
         src/client/download.cc
         src/client/java.cc

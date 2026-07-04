@@ -1,11 +1,39 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
 #include <string>
+#include <tuple>
+#include <type_traits>
 
 #include <hestia/proto/contract.h>
 
 namespace hestia::proto {
+    struct Config {
+        std::filesystem::path home;
+        bool autostart = false;
+
+        static constexpr auto kFields =
+            fields(field("home", &Config::home), field("autostart", &Config::autostart));
+    };
+
+    template <auto Member>
+    constexpr const char *config_key() {
+        const char *key = nullptr;
+        std::apply(
+            [&](auto... f) {
+                (
+                    [&] {
+                        if constexpr (std::is_same_v<decltype(f.member), decltype(Member)>) {
+                            if (f.member == Member) key = f.key;
+                        }
+                    }(),
+                    ...);
+            },
+            Config::kFields);
+        return key;
+    }
+
     struct ConfigGet {
         static constexpr const char *kChannel = "config.get";
         struct Params {
@@ -32,23 +60,13 @@ namespace hestia::proto {
         using Result = Empty;
     };
 
-    struct ConfigHome {
-        static constexpr const char *kChannel = "config.home";
+    struct ConfigList {
+        static constexpr const char *kChannel = "config.list";
         using Params = Empty;
         struct Result {
-            std::filesystem::path path;
+            std::map<std::string, std::string> entries;
 
-            static constexpr auto kFields = fields(field("path", &Result::path, kRequired));
+            static constexpr auto kFields = fields(field("entries", &Result::entries));
         };
-    };
-
-    struct ConfigSetHome {
-        static constexpr const char *kChannel = "config.set-home";
-        struct Params {
-            std::string dir; // empty reverts to the platform default
-
-            static constexpr auto kFields = fields(field("dir", &Params::dir, kOmitIfEmpty));
-        };
-        using Result = ConfigHome::Result;
     };
 } // namespace hestia::proto

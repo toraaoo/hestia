@@ -87,7 +87,7 @@ commands.push_back(std::make_unique<VersionCommand>());
 
 For `hestia foo bar`-style nesting, subclass `CommandGroup` and `add()` children
 in the constructor — exactly like `ConfigCommand` (`commands/config_command.cc`),
-which groups `get`, `set`, `home`, and `set-home`. Children are themselves
+which groups `get`, `set`, and `list`. Children are themselves
 `Command`s, so groups nest to any depth. A bare group requires a subcommand and
 otherwise prints its own help. Leaf children may be `private` classes inside the
 `.cc` (as the config leaves are) when nothing else needs them.

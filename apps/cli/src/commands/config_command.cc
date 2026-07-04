@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 #include <hestia/client.h>
 
 namespace hestia::cli {
@@ -30,38 +32,17 @@ namespace hestia::cli {
             std::string key_;
         };
 
-        // `hestia config home` — print the resolved data directory.
-        class ConfigHomeCommand : public Command {
+        // `hestia config list` — print the whole store as formatted JSON.
+        class ConfigListCommand : public Command {
         public:
             void register_command(CLI::App &parent, AppContext &ctx) override {
-                auto *cmd = parent.add_subcommand("home", "Print the resolved data directory");
+                auto *cmd = parent.add_subcommand("list", "Print all config entries as JSON");
                 cmd->callback([&ctx] {
-                    ctx.with_client([](client::Client &client) { std::cout << client.config().home().string() << '\n'; });
-                });
-            }
-        };
-
-        // `hestia config set-home <dir>` — persist the data directory for future
-        // runs. With no argument, reverts to the default.
-        class ConfigSetHomeCommand : public Command {
-        public:
-            void register_command(CLI::App &parent, AppContext &ctx) override {
-                auto *cmd = parent.add_subcommand("set-home", "Persist the data directory used by future runs");
-                cmd->add_option("dir", dir_, "Directory to use (omit to revert to the default)");
-                cmd->callback([this, &ctx] {
-                    ctx.with_client([this](client::Client &client) {
-                        const auto home = client.config().set_home(dir_);
-                        if (dir_.empty()) {
-                            std::cout << "reverted to default: " << home.string() << '\n';
-                        } else {
-                            std::cout << "data directory set to: " << home.string() << '\n';
-                        }
+                    ctx.with_client([](client::Client &client) {
+                        std::cout << nlohmann::json(client.config().list()).dump(2) << '\n';
                     });
                 });
             }
-
-        private:
-            std::string dir_;
         };
 
         // `hestia config set <key> <value>`
@@ -85,7 +66,6 @@ namespace hestia::cli {
     ConfigCommand::ConfigCommand() : CommandGroup("config", "Read and write configuration") {
         add(std::make_unique<ConfigGetCommand>());
         add(std::make_unique<ConfigSetCommand>());
-        add(std::make_unique<ConfigHomeCommand>());
-        add(std::make_unique<ConfigSetHomeCommand>());
+        add(std::make_unique<ConfigListCommand>());
     }
 } // namespace hestia::cli

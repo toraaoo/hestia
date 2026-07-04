@@ -24,7 +24,7 @@ function SettingsPage() {
       <PageHeader
         eyebrow="settings"
         title="Configuration & autostart"
-        description="The same config store and login-autostart the CLI manages (config get/set, config home, autostart), driven through the daemon."
+        description="The same config store the CLI manages (config get/set), driven through the daemon. Data directory and login-autostart are the reserved keys home and autostart."
       />
       <ConfigPanel />
       <DataHomePanel />
@@ -91,7 +91,7 @@ function DataHomePanel() {
   const [dir, setDir] = useState("")
 
   return (
-    <Panel label="settings.config.home">
+    <Panel label='config "home"'>
       <p className="font-mono text-xs text-foreground">
         {home.isPending ? "loading…" : home.data}
       </p>
@@ -123,7 +123,7 @@ function AutostartPanel() {
   const enabled = status.data ?? false
 
   return (
-    <Panel label="settings.autostart">
+    <Panel label='config "autostart"'>
       <div className="flex items-center justify-between">
         <span className="font-mono text-xs text-foreground">
           start the daemon at login —{" "}

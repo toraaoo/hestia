@@ -64,8 +64,9 @@ engine ◄──── daemon   (no front-end links engine)
 ```
 
 > **Transitional:** `apps/desktop` still links `hestia_engine` directly. The
-> CLI and tray already reach it only over the socket — `hestia java`,
-> `config`, and `autostart` all round-trip to the daemon via the client SDK. The
+> CLI and tray already reach it only over the socket — `hestia java` and
+> `config` (including the reserved `home` and `autostart` keys) all round-trip to
+> the daemon via the client SDK. The
 > end-state is engine = daemon-only, with every front-end reaching it over IPC.
 
 The desktop launcher follows the same one-way rule: `apps/desktop` (namespace
@@ -195,7 +196,7 @@ domain subsystem as a member, exposed through a getter (`engine.config()`). This
 is the single growth point for launcher logic — adding a domain (instances,
 accounts, versions, …) is a module class constructed in `Engine`'s initializer
 list plus a getter, with no change to the daemon's wiring. `set_data_home()`
-re-resolves the data directory and repoints every subsystem so a `config.set-home`
+re-resolves the data directory and repoints every subsystem so a `config set home`
 takes effect on the running daemon, not just the next start.
 
 The public API in `include/hestia/engine/` is **flat — one header per domain**
@@ -206,11 +207,12 @@ internal helpers as private headers (`src` is a PRIVATE include dir). A new doma
 is one public header plus a `src/<domain>/` folder, however large it gets inside.
 The subsystems behind the aggregate today:
 
-- **`Config`** (`config.h`) — a thread-safe live view of the flat
-  `key=value` config file. Reads/writes are serialized for concurrent clients
-  and every `set()` is persisted immediately; `reload()` repoints it when the data
-  directory changes. The on-disk line format (load/save/validation) is file-local
-  in `src/config/config.cc`. Data-directory resolution (`--home` →
+- **`Config`** (`config.h`) — a thread-safe live view of the config store, a
+  JSON object of key/value strings. Reads/writes are serialized for concurrent
+  clients and every `set()` is persisted immediately; `reload()` repoints it when
+  the data directory changes; `all()` returns the whole store (served over
+  `config.list`). The on-disk JSON format (load/save/validation) is file-local
+  in `src/config.cc`. Data-directory resolution (`--home` →
   `$HESTIA_HOME` → persisted pointer → platform default) lives in shared's
   `hestia::paths`; Debug builds anchor the platform default at `<repo>/.hestia`
   so development never populates the real per-user directory.
@@ -284,9 +286,10 @@ are subdir-qualified (`"runtime/router.h"`):
   (`services/registry.cc`). Today: `health` (`health.ping`),
   `app` (`app.info`), `daemon` (`daemon.status|stop` — stop answers, then shuts
   the serve loop down, so `hestia daemon restart` can hand over to a fresh
-  binary), `config` (`config.get|set|home|set-home`),
-  `process` (`process.start|stop|list|status|logs`), `autostart`
-  (`autostart.enable|disable|status`), `downloads` (`download.start`),
+  binary), `config` (`config.get|set|list` — the reserved keys `home` and
+  `autostart` are routed to the data-directory pointer and the platform login
+  registration respectively),
+  `process` (`process.start|stop|list|status|logs`), `downloads` (`download.start`),
   `java` (`java.releases|install|list|uninstall`), `cache`
   (`cache.info|list|clear`), and
   `events` (`events.subscribe`, a streaming channel that pushes to the calling
@@ -307,8 +310,8 @@ are subdir-qualified (`"runtime/router.h"`):
   probes liveness, streams their logs, and applies a restart policy. Reaping the
   children yields their exit codes.
 - **`platform/`** (`autostart.{h,cc}`, `win_util.h`) — registers/removes the
-  daemon as a login-time service per platform, driven over the `autostart.*`
-  channels, plus Windows-specific helpers.
+  daemon as a login-time service per platform, driven by the `ConfigService`
+  when the reserved `autostart` key is set, plus Windows-specific helpers.
 
 The daemon links `hestia_shared`, `hestia_engine`, CLI11, nlohmann_json, and
 spdlog — no UI dependencies.
@@ -331,7 +334,7 @@ root app *or* another command's app, commands **nest to any depth**.
 
 - **`Command`** — a leaf unit of functionality (e.g. `java install`).
 - **`CommandGroup`** — a `Command` that holds children and registers them onto
-  its own subcommand app (e.g. `config get|set|home|set-home`). The same
+  its own subcommand app (e.g. `config get|set|list`). The same
   mechanism recurses.
 - **`AppContext`** — parsed `GlobalOptions` (`--verbose`/`--quiet`/`--home`) plus
   the collected `exit_code`, passed by reference to every command.

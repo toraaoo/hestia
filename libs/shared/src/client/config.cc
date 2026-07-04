@@ -9,15 +9,11 @@ namespace hestia::client {
         return res->value;
     }
 
+    std::map<std::string, std::string> Config::list() {
+        return session_->call<proto::ConfigList>().entries;
+    }
+
     void Config::set(std::string_view key, std::string_view value) {
         session_->call<proto::ConfigSet>({.key = std::string(key), .value = std::string(value)});
-    }
-
-    std::filesystem::path Config::home() {
-        return session_->call<proto::ConfigHome>().path;
-    }
-
-    std::filesystem::path Config::set_home(std::string_view dir) {
-        return session_->call<proto::ConfigSetHome>({.dir = std::string(dir)}).path;
     }
 } // namespace hestia::client

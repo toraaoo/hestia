@@ -6,7 +6,6 @@
 #include <nlohmann/json.hpp>
 
 #include <hestia/client/app.h>
-#include <hestia/client/autostart.h>
 #include <hestia/client/cache.h>
 #include <hestia/client/config.h>
 #include <hestia/client/daemon.h>
@@ -39,7 +38,6 @@ namespace hestia::client {
         App &app() { return app_; }
         Daemon &daemon() { return daemon_; }
         Config &config() { return config_; }
-        Autostart &autostart() { return autostart_; }
         Process &process() { return process_; }
         Download &download() { return download_; }
         Java &java() { return java_; }
@@ -52,7 +50,6 @@ namespace hestia::client {
         App app_;
         Daemon daemon_;
         Config config_;
-        Autostart autostart_;
         Process process_;
         Download download_;
         Java java_;

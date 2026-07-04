@@ -1,7 +1,6 @@
 #include "services/registry.h"
 
 #include "services/app_service.h"
-#include "services/autostart_service.h"
 #include "services/cache_service.h"
 #include "services/config_service.h"
 #include "services/daemon_service.h"
@@ -19,7 +18,6 @@ namespace hestia::daemon {
         services.push_back(std::make_unique<DaemonService>());
         services.push_back(std::make_unique<ConfigService>());
         services.push_back(std::make_unique<ProcessService>());
-        services.push_back(std::make_unique<AutostartService>());
         services.push_back(std::make_unique<EventsService>());
         services.push_back(std::make_unique<DownloadsService>());
         services.push_back(std::make_unique<JavaService>());

@@ -11,7 +11,6 @@ target_sources(hestia_cli
         src/commands/cache_command.cc
         src/commands/config_command.cc
         src/commands/daemon_command.cc
-        src/commands/autostart_command.cc
 )
 
 target_include_directories(hestia_cli PRIVATE src)

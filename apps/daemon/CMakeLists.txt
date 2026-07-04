@@ -45,8 +45,6 @@ add_executable(hestia_daemon
         src/services/config_service.h
         src/services/process_service.cc
         src/services/process_service.h
-        src/services/autostart_service.cc
-        src/services/autostart_service.h
         src/services/events_service.cc
         src/services/events_service.h
         src/services/downloads_service.cc

@@ -167,11 +167,15 @@ hestia cache info                # location, entry count, size
 hestia cache list                # cached blobs by checksum
 hestia cache clear               # remove everything, report what was freed
 
-# Configuration (flat key=value store)
+# Configuration (JSON key/value store)
 hestia config set <key> <value>
 hestia config get <key>
-hestia config home              # print the resolved data directory
-hestia config set-home <dir>    # persist the data dir for future runs
+hestia config list               # print the whole store as formatted JSON
+# Reserved keys routed to their own subsystem:
+hestia config get home           # resolved data directory
+hestia config set home <dir>     # persist the data dir (empty reverts to default)
+hestia config get autostart      # "true" if the daemon starts at login
+hestia config set autostart true # register the daemon to start at login (false removes it)
 
 # Daemon lifecycle
 hestia daemon status             # running (pid, uptime, home, log) or stopped
@@ -179,24 +183,19 @@ hestia daemon restart            # stop + start; picks up a newly built hestiad
 hestia daemon start
 hestia daemon stop
 
-# Autostart (start the background daemon at login)
-hestia autostart enable          # register the daemon to start at login
-hestia autostart disable         # remove the registration
-hestia autostart status          # print "enabled" or "disabled"
-
 # Logging verbosity (global flags, accepted at any position)
 hestia -v java list   # verbose / debug logging
 hestia -q java list   # warnings and errors only
 
 # Override the data directory for one run
-hestia --home /path/to/dir config home
+hestia --home /path/to/dir config get home
 
 # Version
 hestia --version
 ```
 
 The data directory is resolved as: `--home` → `$HESTIA_HOME` → a persisted
-pointer (`config set-home`) → the platform default (`~/.hestia`, or
+pointer (`config set home`) → the platform default (`~/.hestia`, or
 `%APPDATA%\Hestia` on Windows). **Debug builds** use `<repo>/.hestia` as the
 platform default instead, so development never populates the real per-user
 directory (compiled out of Release).

@@ -1,6 +1,5 @@
 #include "registry.h"
 
-#include "commands/autostart_command.h"
 #include "commands/cache_command.h"
 #include "commands/config_command.h"
 #include "commands/daemon_command.h"
@@ -12,7 +11,6 @@ namespace hestia::cli {
         commands.push_back(std::make_unique<JavaCommand>());
         commands.push_back(std::make_unique<CacheCommand>());
         commands.push_back(std::make_unique<ConfigCommand>());
-        commands.push_back(std::make_unique<AutostartCommand>());
         commands.push_back(std::make_unique<DaemonCommand>());
         return commands;
     }

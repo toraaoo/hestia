@@ -30,6 +30,11 @@ export function getAppInfo(): Promise<AppInfo> {
   return invoke<AppInfo>("app.info", null, { fallback: DISCONNECTED_APP_INFO })
 }
 
+export const CONFIG_KEYS = {
+  home: "home",
+  autostart: "autostart",
+} as const
+
 export const config = {
   get: (key: string): Promise<string | null> =>
     invoke<{ value: string }>("settings.config.get", { key })
@@ -40,29 +45,6 @@ export const config = {
       }),
   set: (key: string, value: string): Promise<void> =>
     invoke("settings.config.set", { key, value }).then(() => undefined),
-  home: (): Promise<string> =>
-    invoke<{ path: string }>("settings.config.home", null, {
-      fallback: { path: "—" },
-    }).then((r) => r.path),
-  setHome: (dir: string): Promise<string> =>
-    invoke<{ path: string }>("settings.config.set-home", { dir }).then(
-      (r) => r.path
-    ),
-}
-
-export const autostart = {
-  status: (): Promise<boolean> =>
-    invoke<{ enabled: boolean }>("settings.autostart.status", null, {
-      fallback: { enabled: false },
-    }).then((r) => r.enabled),
-  enable: (): Promise<boolean> =>
-    invoke<{ enabled: boolean }>("settings.autostart.enable", null).then(
-      (r) => r.enabled
-    ),
-  disable: (): Promise<boolean> =>
-    invoke<{ enabled: boolean }>("settings.autostart.disable", null).then(
-      (r) => r.enabled
-    ),
 }
 
 export interface WindowState {

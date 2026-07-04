@@ -8,13 +8,13 @@ import {
   useQueryClient,
 } from "@tanstack/react-query"
 
-import { autostart, config, getAppInfo } from "@/lib/api"
+import { config, CONFIG_KEYS, getAppInfo } from "@/lib/api"
 import { on } from "@/lib/ipc"
 
 export const ipcKeys = {
   appInfo: ["app", "info"] as const,
-  configHome: ["config", "home"] as const,
-  autostart: ["autostart", "status"] as const,
+  configHome: ["config", CONFIG_KEYS.home] as const,
+  autostart: ["config", CONFIG_KEYS.autostart] as const,
 }
 
 export function useAppInfo() {
@@ -22,13 +22,19 @@ export function useAppInfo() {
 }
 
 export function useConfigHome() {
-  return useQuery({ queryKey: ipcKeys.configHome, queryFn: config.home })
+  return useQuery({
+    queryKey: ipcKeys.configHome,
+    queryFn: () => config.get(CONFIG_KEYS.home),
+  })
 }
 
 export function useSetConfigHome() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (dir: string) => config.setHome(dir),
+    mutationFn: async (dir: string) => {
+      await config.set(CONFIG_KEYS.home, dir)
+      return config.get(CONFIG_KEYS.home)
+    },
     onSuccess: (path) => queryClient.setQueryData(ipcKeys.configHome, path),
   })
 }
@@ -45,14 +51,19 @@ export function useGetConfig() {
 }
 
 export function useAutostartStatus() {
-  return useQuery({ queryKey: ipcKeys.autostart, queryFn: autostart.status })
+  return useQuery({
+    queryKey: ipcKeys.autostart,
+    queryFn: () => config.get(CONFIG_KEYS.autostart).then((v) => v === "true"),
+  })
 }
 
 export function useToggleAutostart() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (enable: boolean) =>
-      enable ? autostart.enable() : autostart.disable(),
+    mutationFn: async (enable: boolean) => {
+      await config.set(CONFIG_KEYS.autostart, enable ? "true" : "false")
+      return enable
+    },
     onSuccess: (enabled) =>
       queryClient.setQueryData(ipcKeys.autostart, enabled),
   })

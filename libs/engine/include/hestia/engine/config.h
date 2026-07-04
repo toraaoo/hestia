@@ -14,6 +14,7 @@ namespace hestia::engine {
         explicit Config(std::filesystem::path path);
 
         std::optional<std::string> get(const std::string &key) const;
+        std::map<std::string, std::string> all() const;
         void set(const std::string &key, const std::string &value);
 
         void reload(std::filesystem::path path);

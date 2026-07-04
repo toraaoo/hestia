@@ -4,6 +4,7 @@
 #include <utility>
 
 #include <hestia/app_info.h>
+#include <hestia/proto/config.h>
 
 namespace hestia::tray {
     TrayApp::TrayApp() : client_(client::Client::connect()), backend_(make_tray_backend(APP_NAME)) {}
@@ -25,7 +26,7 @@ namespace hestia::tray {
             // the event stream fill in the rest.
         }
         try {
-            autostart_enabled_ = client_.autostart().status();
+            autostart_enabled_ = client_.config().get(proto::config_key<&proto::Config::autostart>()) == "true";
         } catch (const std::exception &) {
         }
     }
@@ -95,11 +96,7 @@ namespace hestia::tray {
             target = !autostart_enabled_;
         }
         try {
-            if (target) {
-                client_.autostart().enable();
-            } else {
-                client_.autostart().disable();
-            }
+            client_.config().set(proto::config_key<&proto::Config::autostart>(), target ? "true" : "false");
             std::scoped_lock const lk(mu_);
             autostart_enabled_ = target;
         } catch (const std::exception &) {

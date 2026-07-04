@@ -12,8 +12,8 @@
 
 namespace hestia::client {
     Client::Client(std::shared_ptr<Session> session)
-        : session_(std::move(session)), app_(*session_), daemon_(*session_), config_(*session_),
-          autostart_(*session_), process_(*session_), download_(*session_), java_(*session_), cache_(*session_) {}
+        : session_(std::move(session)), app_(*session_), daemon_(*session_), config_(*session_), process_(*session_),
+          download_(*session_), java_(*session_), cache_(*session_) {}
 
     Client::Client(Client &&) noexcept = default;
     Client &Client::operator=(Client &&) noexcept = default;
