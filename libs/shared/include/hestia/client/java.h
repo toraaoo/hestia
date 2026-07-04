@@ -18,8 +18,9 @@ namespace hestia::client {
         std::vector<proto::JavaRuntime> list();
         // Blocks until the runtime is registered, reporting progress on the
         // reader thread; like Download::fetch(), it uses the session's single
-        // event-callback slot.
-        proto::JavaRuntime install(int major, const JavaInstallProgressCallback &on_progress = {});
+        // event-callback slot. A non-positive `major` installs the latest
+        // release line.
+        proto::JavaRuntime install(int major = 0, const JavaInstallProgressCallback &on_progress = {});
         void uninstall(int major);
     };
 } // namespace hestia::client

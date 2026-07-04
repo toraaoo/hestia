@@ -34,11 +34,12 @@ namespace hestia::cli {
         public:
             void register_command(CLI::App &parent, AppContext &ctx) override {
                 auto *cmd = parent.add_subcommand("install", "Install a Java runtime via the daemon");
-                cmd->add_option("major", major_, "Major version to install (e.g. 21)")->required();
+                cmd->add_option("major", major_, "Major version to install (e.g. 21); omit for the latest release");
                 cmd->callback([this, &ctx] {
                     ctx.with_client([this](client::Client &client) {
                         std::optional<Spinner> spinner;
-                        spinner.emplace("Resolving temurin " + std::to_string(major_));
+                        spinner.emplace(major_ > 0 ? "Resolving temurin " + std::to_string(major_)
+                                                   : "Resolving the latest temurin");
                         ProgressBar download_bar("Downloading");
                         ProgressBar extract_bar("Extracting", false);
                         const auto on_progress = [&](const proto::JavaInstallProgress &p) {

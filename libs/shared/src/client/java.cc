@@ -1,5 +1,7 @@
 #include "hestia/client/java.h"
 
+#include <stdexcept>
+
 #include "session.h"
 
 namespace hestia::client {
@@ -12,6 +14,13 @@ namespace hestia::client {
     }
 
     proto::JavaRuntime Java::install(int major, const JavaInstallProgressCallback &on_progress) {
+        if (major <= 0) {
+            const auto releases = session_->call<proto::JavaReleases>().releases;
+            if (releases.empty()) {
+                throw std::runtime_error("no java releases are available to install");
+            }
+            major = releases.back().major; // releases arrive sorted ascending
+        }
         const auto id = job_id("java");
         const auto done = session_->run_job(
             id, proto::JavaInstallDoneEvent::kTopic, proto::JavaInstallErrorEvent::kTopic,
