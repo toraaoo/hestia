@@ -1,0 +1,56 @@
+//! `hestia daemon …` — daemon lifecycle.
+
+use anyhow::Result;
+use clap::Subcommand;
+
+#[derive(Subcommand)]
+pub enum DaemonCmd {
+    /// Running (pid, uptime, home, log) or stopped
+    Status,
+    /// Start the daemon
+    Start,
+    /// Stop the daemon
+    Stop,
+    /// Stop then start; picks up a newly built hestiad
+    Restart,
+}
+
+pub async fn run(cmd: DaemonCmd) -> Result<()> {
+    match cmd {
+        DaemonCmd::Status => match super::connect_running().await {
+            Ok(client) => {
+                let s = client.daemon().status().await?;
+                println!("running");
+                println!("  pid:    {}", s.pid);
+                println!("  uptime: {}s", s.uptime_seconds);
+                println!("  home:   {}", s.home.display());
+                println!("  log:    {}", s.log.display());
+            }
+            Err(_) => println!("stopped"),
+        },
+        DaemonCmd::Start => {
+            let client = super::connect().await?;
+            let info = client.app().info().await?;
+            println!("hestiad running ({} {})", info.name, info.version);
+        }
+        DaemonCmd::Stop => match super::connect_running().await {
+            Ok(client) => {
+                client.daemon().stop().await?;
+                println!("hestiad stopping");
+            }
+            Err(_) => println!("hestiad is not running"),
+        },
+        DaemonCmd::Restart => {
+            if let Ok(client) = super::connect_running().await {
+                let _ = client.daemon().stop().await;
+                drop(client);
+                // Give the old daemon a moment to release the endpoint.
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+            let client = super::connect().await?;
+            let info = client.app().info().await?;
+            println!("hestiad restarted ({} {})", info.name, info.version);
+        }
+    }
+    Ok(())
+}
