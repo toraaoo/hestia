@@ -1,8 +1,8 @@
 #include "output.h"
 
-#include <algorithm>
 #include <cstdio>
 #include <iostream>
+#include <sstream>
 
 #include <ftxui/dom/elements.hpp>
 #include <ftxui/screen/screen.hpp>
@@ -31,24 +31,34 @@ namespace hestia::cli {
     }
 
     void print_table(const std::vector<std::string> &headers, const std::vector<std::vector<std::string>> &rows) {
-        std::vector<std::size_t> widths(headers.size());
-        for (std::size_t i = 0; i < headers.size(); ++i) {
-            widths[i] = headers[i].size();
-            for (const auto &row: rows) {
-                if (i < row.size()) widths[i] = std::max(widths[i], row[i].size());
-            }
-        }
-        const auto print_row = [&](const std::vector<std::string> &cells) {
+        // gridbox aligns each column to its widest cell; a trailing gap on every
+        // cell but the last keeps the borderless three-space column style.
+        const auto to_line = [](const std::vector<std::string> &cells) {
+            ftxui::Elements line;
+            line.reserve(cells.size());
             for (std::size_t i = 0; i < cells.size(); ++i) {
-                std::cout << cells[i];
-                if (i + 1 < cells.size()) {
-                    std::cout << std::string(widths[i] - cells[i].size() + 3, ' ');
-                }
+                line.push_back(ftxui::text(i + 1 < cells.size() ? cells[i] + "   " : cells[i]));
             }
-            std::cout << '\n';
+            return line;
         };
-        print_row(headers);
-        for (const auto &row: rows) print_row(row);
+
+        std::vector<ftxui::Elements> lines;
+        lines.reserve(rows.size() + 1);
+        lines.push_back(to_line(headers));
+        for (const auto &row: rows) lines.push_back(to_line(row));
+
+        auto element = ftxui::gridbox(lines);
+        auto screen = ftxui::Screen::Create(ftxui::Dimension::Fit(element));
+        ftxui::Render(screen, element);
+
+        // FTXUI renders a fixed canvas (CRLF rows, right-padded to full width);
+        // trim each line so the borderless output stays clean when piped.
+        std::istringstream in(screen.ToString());
+        std::string line;
+        while (std::getline(in, line)) {
+            while (!line.empty() && (line.back() == ' ' || line.back() == '\r')) line.pop_back();
+            std::cout << line << '\n';
+        }
     }
 
     Spinner::Spinner(std::string label) : label_(std::move(label)) {
