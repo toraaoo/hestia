@@ -7,6 +7,7 @@
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 
 #include <hestia/engine/downloader.h>
 
@@ -119,6 +120,7 @@ namespace hestia::engine {
         if (!force) {
             for (auto &runtime: installed()) {
                 if (runtime.major == major) {
+                    spdlog::debug("java {} already installed ({}), skipping", major, runtime.release_name);
                     return {.runtime = std::move(runtime), .already_installed = true};
                 }
             }
@@ -127,9 +129,11 @@ namespace hestia::engine {
             if (on_progress) on_progress(proto::JavaInstallProgress{.phase = phase});
         };
 
+        spdlog::info("installing java {}{}", major, force ? " (forced)" : "");
         report(proto::JavaInstallPhase::resolving);
         const JavaPackage package = provider().resolve(major, host_target());
         validate_archive_name(package.archive_name);
+        spdlog::debug("resolved java {} to {} ({})", major, package.release_name, package.url);
 
         const fs::path base = dir();
         const fs::path install_dir = base / fmt::format("{}-{}", package.vendor, package.major);
@@ -146,6 +150,7 @@ namespace hestia::engine {
                 }
             });
 
+            spdlog::debug("extracting {} into {}", package.archive_name, staging.string());
             report(proto::JavaInstallPhase::extracting);
             extract_archive(archive, staging, [&](std::uint64_t done, std::uint64_t total) {
                 if (on_progress) {
@@ -175,6 +180,7 @@ namespace hestia::engine {
             throw std::runtime_error(fmt::format("install of {} did not produce a usable runtime",
                                                  package.release_name));
         }
+        spdlog::info("installed java {} ({}) at {}", major, package.release_name, install_dir.string());
         return {.runtime = std::move(*runtime), .already_installed = false};
     }
 
@@ -188,6 +194,11 @@ namespace hestia::engine {
                 fs::remove_all(entry.path());
                 removed = true;
             }
+        }
+        if (removed) {
+            spdlog::info("uninstalled java {}", major);
+        } else {
+            spdlog::debug("uninstall java {}: nothing installed", major);
         }
         return removed;
     }

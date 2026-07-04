@@ -5,6 +5,7 @@
 
 #include <cpr/cpr.h>
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
 
 namespace hestia::engine {
     using nlohmann::json;
@@ -13,6 +14,7 @@ namespace hestia::engine {
         constexpr const char *kApiBase = "https://api.adoptium.net";
 
         json fetch_json(const std::string &url, cpr::Parameters parameters = {}) {
+            spdlog::debug("adoptium GET {}", url);
             const cpr::Response response = cpr::Get(cpr::Url{url}, std::move(parameters));
             if (response.error) {
                 throw std::runtime_error(fmt::format("adoptium request failed: {}", response.error.message));

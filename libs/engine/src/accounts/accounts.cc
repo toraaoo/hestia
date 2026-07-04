@@ -9,6 +9,8 @@
 #include <utility>
 #include <vector>
 
+#include <spdlog/spdlog.h>
+
 #include "accounts/microsoft.h"
 #include "accounts/signing.h"
 #include "download/checksum.h"
@@ -129,6 +131,7 @@ namespace hestia::engine {
             if (account.refresh_token.empty()) {
                 throw std::runtime_error("this account has no refresh token; sign in again");
             }
+            spdlog::debug("refreshing minecraft token for account {}", account.uuid);
             const auto oauth = refresh_oauth(account.refresh_token);
             auto key = ProofKey::generate();
             const auto device_token = request_device_token(key);
@@ -155,6 +158,8 @@ namespace hestia::engine {
 
     LoginChallenge Accounts::begin_login(proto::LoginMethod method) {
         auto id = format_uuid_v4(random_bytes(16));
+        spdlog::info("starting sign-in ({})",
+                     method == proto::LoginMethod::device_code ? "device code" : "sisu");
 
         if (method == proto::LoginMethod::device_code) {
             const auto device = request_device_code();
@@ -237,6 +242,7 @@ namespace hestia::engine {
         std::erase_if(file.accounts, [&](const StoredAccount &a) { return a.uuid == record.uuid; });
         file.accounts.push_back(std::move(record));
         save(path_, file);
+        spdlog::info("signed in as {} ({})", profile.name, profile.uuid);
         return proto::Account{.uuid = profile.uuid, .name = profile.name};
     }
 
@@ -262,6 +268,7 @@ namespace hestia::engine {
             std::erase_if(file.accounts, [&](const StoredAccount &a) { return a.uuid == ref || a.name == ref; });
         if (removed == 0) return false;
         save(path_, file);
+        spdlog::info("signed out account '{}'", ref);
         return true;
     }
 

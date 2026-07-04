@@ -4,6 +4,8 @@
 #include <exception>
 #include <utility>
 
+#include <spdlog/spdlog.h>
+
 #include <hestia/engine/downloader.h>
 
 namespace hestia::daemon {
@@ -47,10 +49,13 @@ namespace hestia::daemon {
             last_emit = now;
             sink_(proto::make_event(proto::DownloadProgressEvent{.id = id, .progress = progress}));
         };
+        spdlog::info("download {} started: {}", id, url);
         try {
             engine::Downloader{&engine_.cache()}.fetch(url, destination, checksum, on_progress);
+            spdlog::info("download {} done: {}", id, destination.string());
             sink_(proto::make_event(proto::DownloadDoneEvent{.id = id, .path = destination}));
         } catch (const std::exception &e) {
+            spdlog::warn("download {} failed: {}", id, e.what());
             sink_(proto::make_event(proto::DownloadErrorEvent{.id = id, .message = e.what()}));
         }
     }

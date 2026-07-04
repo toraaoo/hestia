@@ -6,6 +6,8 @@
 #include <system_error>
 #include <utility>
 
+#include <spdlog/spdlog.h>
+
 namespace hestia::engine {
     namespace fs = std::filesystem;
 
@@ -63,11 +65,16 @@ namespace hestia::engine {
             return;
         }
         fs::rename(tmp, blob, ec);
-        if (ec) remove_quietly(tmp);
+        if (ec) {
+            remove_quietly(tmp);
+            return;
+        }
+        spdlog::debug("cached {} ({})", checksum.hex, proto::to_string(checksum.algorithm));
     }
 
     void Cache::evict(const proto::Checksum &checksum) {
         if (!proto::is_valid_checksum(checksum)) return;
+        spdlog::debug("evicting cache blob {}", checksum.hex);
         remove_quietly(blob_path(dir(), checksum));
     }
 
@@ -106,6 +113,7 @@ namespace hestia::engine {
         for (const auto algorithm: {proto::HashAlgorithm::sha1, proto::HashAlgorithm::sha256}) {
             fs::remove_all(dir() / proto::to_string(algorithm), ec);
         }
+        spdlog::info("cleared cache: {} entries, {} bytes freed", freed.entries, freed.bytes);
         return freed;
     }
 } // namespace hestia::engine

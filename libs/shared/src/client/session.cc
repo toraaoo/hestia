@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include <spdlog/spdlog.h>
+
 #include <hestia/proto/events.h>
 
 #if !defined(_WIN32)
@@ -83,6 +85,7 @@ namespace hestia::client {
         req.channel = channel;
         req.payload = std::move(payload);
         req.id = id;
+        spdlog::debug("call {} (id {})", channel, id);
         if (!conn_->send(ipc::encode(req))) {
             throw std::runtime_error("daemon connection lost");
         }
@@ -91,12 +94,14 @@ namespace hestia::client {
         // Bound the wait so a wedged handler can't hang the caller forever.
         if (!cv_.wait_for(lk, timeout, [&] { return closed_ || ready_.count(id) > 0; })) {
             ready_.erase(id);
+            spdlog::warn("call {} (id {}) timed out", channel, id);
             throw std::runtime_error("timed out waiting for daemon response on '" + channel + "'");
         }
         const auto it = ready_.find(id);
         if (it == ready_.end()) throw std::runtime_error("daemon closed the connection");
         ipc::Response res = std::move(it->second);
         ready_.erase(it);
+        spdlog::debug("call {} (id {}) -> {}", channel, id, res.ok ? "ok" : "error");
         return res;
     }
 

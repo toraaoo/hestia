@@ -4,6 +4,8 @@
 #include <exception>
 #include <utility>
 
+#include <spdlog/spdlog.h>
+
 #include <hestia/engine/java.h>
 #include <hestia/proto/java.h>
 
@@ -26,7 +28,10 @@ namespace hestia::daemon {
         if (id.empty()) id = "java-" + std::to_string(next_id_++);
         auto done = std::make_shared<std::atomic<bool>>(false);
         std::scoped_lock const lk(mu_);
-        if (!active_majors_.insert(major).second) return std::nullopt;
+        if (!active_majors_.insert(major).second) {
+            spdlog::debug("java {} install already in progress; ignoring duplicate request", major);
+            return std::nullopt;
+        }
         prune_finished();
         std::thread thread([this, id, major, force, done] {
             run(id, major, force);
@@ -51,9 +56,11 @@ namespace hestia::daemon {
         };
         try {
             const auto outcome = engine_.java().install(major, force, on_progress);
+            spdlog::info("java {} install {}", major, outcome.already_installed ? "already present" : "done");
             sink_(proto::make_event(proto::JavaInstallDoneEvent{
                 .id = id, .runtime = outcome.runtime, .already_installed = outcome.already_installed}));
         } catch (const std::exception &e) {
+            spdlog::warn("java {} install failed: {}", major, e.what());
             sink_(proto::make_event(proto::JavaInstallErrorEvent{.id = id, .message = e.what()}));
         }
         std::scoped_lock const lk(mu_);

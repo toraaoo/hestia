@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <spdlog/spdlog.h>
+
 namespace hestia::engine {
     namespace {
         Settings load_settings(const std::filesystem::path &path) {
@@ -102,6 +104,7 @@ namespace hestia::engine {
             throw std::invalid_argument("invalid value for " + key + ": " + e.what());
         }
         save_settings(path_, settings_);
+        spdlog::info("config set {} = {}", key, value.dump());
     }
 
     nlohmann::json Config::all() const {

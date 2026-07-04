@@ -7,6 +7,7 @@
 
 #include <cpr/cpr.h>
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
 
 #include <hestia/engine/cache.h>
 
@@ -64,6 +65,7 @@ namespace hestia::engine {
             out.close();
 
             if (!out || hasher.hex_digest() != to_lower(checksum.hex)) {
+                spdlog::warn("cache blob {} is corrupt; evicting and refetching", checksum.hex);
                 cache.evict(checksum);
                 remove_quietly(part);
                 return false;
@@ -90,9 +92,11 @@ namespace hestia::engine {
         }
 
         if (checksum && cache_ && serve_from_cache(*cache_, destination, *checksum, on_progress)) {
+            spdlog::debug("cache hit for {}, served to {}", checksum->hex, destination.string());
             return;
         }
 
+        spdlog::debug("downloading {} -> {}", url, destination.string());
         const fs::path part = destination.string() + ".part";
         std::ofstream out(part, std::ios::binary | std::ios::trunc);
         if (!out) {
@@ -126,16 +130,19 @@ namespace hestia::engine {
         out.close();
 
         if (response.error) {
+            spdlog::warn("download of {} failed: {}", url, response.error.message);
             remove_quietly(part);
             throw std::runtime_error(fmt::format("download of {} failed: {}", url, response.error.message));
         }
         if (response.status_code < 200 || response.status_code >= 300) {
+            spdlog::warn("download of {} failed: HTTP {}", url, response.status_code);
             remove_quietly(part);
             throw std::runtime_error(fmt::format("download of {} failed: HTTP {}", url, response.status_code));
         }
 
         if (hasher) {
             if (const std::string actual = hasher->hex_digest(); actual != expected) {
+                spdlog::warn("checksum mismatch for {}: expected {}, got {}", url, expected, actual);
                 remove_quietly(part);
                 throw std::runtime_error(
                     fmt::format("checksum mismatch for {}: expected {}, got {}", url, expected, actual));
@@ -150,6 +157,8 @@ namespace hestia::engine {
                 fmt::format("cannot move {} to {}: {}", part.string(), destination.string(), ec.message()));
         }
 
+        spdlog::debug("downloaded {} ({} bytes)", destination.string(),
+                      static_cast<std::uint64_t>(response.downloaded_bytes));
         if (checksum && cache_) cache_->store(destination, *checksum);
     }
 } // namespace hestia::engine
