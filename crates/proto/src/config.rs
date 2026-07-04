@@ -1,0 +1,53 @@
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::contract::{Contract, Empty};
+
+/// Reserved keys the daemon routes to their own subsystem instead of the settings
+/// store: the data-directory pointer and the login registration.
+pub const HOME_KEY: &str = "home";
+pub const AUTOSTART_KEY: &str = "autostart";
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConfigGetParams {
+    pub key: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ConfigGetResult {
+    pub value: Value,
+}
+
+pub struct ConfigGet;
+impl Contract for ConfigGet {
+    const CHANNEL: &'static str = "config.get";
+    type Params = ConfigGetParams;
+    type Result = ConfigGetResult;
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConfigSetParams {
+    pub key: String,
+    pub value: Value,
+}
+
+pub struct ConfigSet;
+impl Contract for ConfigSet {
+    const CHANNEL: &'static str = "config.set";
+    type Params = ConfigSetParams;
+    type Result = Empty;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ConfigListResult {
+    pub entries: Value,
+}
+
+pub struct ConfigList;
+impl Contract for ConfigList {
+    const CHANNEL: &'static str = "config.list";
+    type Params = Empty;
+    type Result = ConfigListResult;
+}
