@@ -1,5 +1,11 @@
 include(GNUInstallDirs)
 
+if(WIN32)
+    set(HESTIA_SIGNING_BACKEND src/accounts/signing_windows.cc)
+else()
+    set(HESTIA_SIGNING_BACKEND src/accounts/signing_openssl.cc)
+endif()
+
 # hestia_engine — the launcher engine. Daemon-internal: frontends reach it over
 # IPC, never by linking it (the desktop still links it, a transitional exception).
 add_library(hestia_engine STATIC
@@ -13,6 +19,9 @@ add_library(hestia_engine STATIC
         src/accounts/accounts.cc
         src/accounts/microsoft.h
         src/accounts/microsoft.cc
+        src/accounts/signing.h
+        src/accounts/signing.cc
+        ${HESTIA_SIGNING_BACKEND}
         src/cache/cache.cc
         src/config.cc
         src/download/checksum.h
@@ -43,6 +52,14 @@ target_link_libraries(hestia_engine PRIVATE
         fmt::fmt
         cpr::cpr
 )
+
+# Xbox request signing: ECDSA P-256 + CSPRNG from the platform crypto library.
+if(WIN32)
+    target_link_libraries(hestia_engine PRIVATE bcrypt)
+else()
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(hestia_engine PRIVATE OpenSSL::Crypto)
+endif()
 
 target_compile_options(hestia_engine PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>

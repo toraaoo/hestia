@@ -29,8 +29,6 @@ add_executable(hestia_daemon
         src/downloads/download_manager.h
         src/java/install_manager.cc
         src/java/install_manager.h
-        src/accounts/login_manager.cc
-        src/accounts/login_manager.h
         src/platform/autostart.cc
         src/platform/autostart.h
         src/platform/win_util.h

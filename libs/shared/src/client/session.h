@@ -35,15 +35,20 @@ namespace hestia::client {
         explicit Session(std::shared_ptr<ipc::Connection> connection);
         ~Session();
 
+        static constexpr auto kCallTimeout = std::chrono::seconds(10);
+
         // Raw request; throws only on transport failure (a daemon-side error is a
         // Response with ok == false). The typed calls below are built on this.
-        ipc::Response call_raw(const std::string &channel, nlohmann::json payload);
+        ipc::Response call_raw(const std::string &channel, nlohmann::json payload,
+                               std::chrono::milliseconds timeout = kCallTimeout);
 
         // Send C::Params over C::kChannel and decode C::Result, throwing
-        // std::runtime_error on a transport failure or a daemon-side error.
+        // std::runtime_error on a transport failure or a daemon-side error. An
+        // interactive or long-running channel may pass a longer timeout.
         template <typename C>
-        typename C::Result call(const typename C::Params &params = {}) {
-            return must(call_raw(C::kChannel, params)).payload.template get<typename C::Result>();
+        typename C::Result call(const typename C::Params &params = {},
+                                std::chrono::milliseconds timeout = kCallTimeout) {
+            return must(call_raw(C::kChannel, params, timeout)).payload.template get<typename C::Result>();
         }
 
         // Like call(), but a not_found error becomes nullopt instead of a throw.
@@ -78,7 +83,5 @@ namespace hestia::client {
         std::map<long long, ipc::Response> ready_;
         EventCallback on_event_;
         bool closed_ = false;
-
-        static constexpr auto kCallTimeout = std::chrono::seconds(10);
     };
 } // namespace hestia::client

@@ -7,8 +7,41 @@
 #include <vector>
 
 #include "accounts/microsoft.h"
+#include "accounts/signing.h"
+#include "download/checksum.h"
 
 namespace hestia::engine {
+    struct LoginSession {
+        ProofKey key;
+        std::string device_token;
+        std::string verifier;
+        std::string session_id;
+    };
+
+    namespace {
+        std::string to_hex(const std::vector<std::uint8_t> &bytes) {
+            constexpr char digits[] = "0123456789abcdef";
+            std::string out;
+            out.reserve(bytes.size() * 2);
+            for (const auto byte: bytes) {
+                out.push_back(digits[byte >> 4]);
+                out.push_back(digits[byte & 0x0F]);
+            }
+            return out;
+        }
+
+        std::vector<std::uint8_t> sha256_bytes(const std::string &text) {
+            Hasher hasher(proto::HashAlgorithm::sha256);
+            hasher.update(text.data(), text.size());
+            const auto hex = hasher.hex_digest();
+            std::vector<std::uint8_t> out(hex.size() / 2);
+            for (std::size_t i = 0; i < out.size(); ++i) {
+                out[i] = static_cast<std::uint8_t>(std::stoul(hex.substr(i * 2, 2), nullptr, 16));
+            }
+            return out;
+        }
+    } // namespace
+
     namespace {
         // The ADL hooks nlohmann needs for the reflected types below.
         using proto::from_json; // NOLINT(misc-unused-using-decls)
@@ -66,6 +99,7 @@ namespace hestia::engine {
     } // namespace
 
     Accounts::Accounts(std::filesystem::path path) : path_(std::move(path)) {}
+    Accounts::~Accounts() = default;
 
     std::vector<proto::Account> Accounts::list() const {
         std::scoped_lock const lk(mu_);
@@ -76,22 +110,53 @@ namespace hestia::engine {
         return accounts;
     }
 
-    proto::Account Accounts::login(const std::string &client_id, const DeviceCodeCallback &on_code,
-                                   const std::function<bool()> &cancelled) {
-        const auto authorization = msa_request_device_code(client_id);
-        if (on_code) on_code(authorization.code);
-        const auto msa = msa_poll_for_tokens(client_id, authorization, cancelled);
-        const auto minecraft = minecraft_login(msa.access_token);
-        const auto profile = minecraft_profile(minecraft.access_token);
+    LoginChallenge Accounts::begin_login() {
+        auto key = ProofKey::generate();
+        auto device_token = request_device_token(key);
+        auto verifier = to_hex(random_bytes(64));
+
+        const auto challenge = base64url_nopad(sha256_bytes(verifier));
+        const auto state = to_hex(random_bytes(16));
+        const auto auth = sisu_authenticate(device_token, challenge, state, key);
+
+        auto session = std::unique_ptr<LoginSession>(new LoginSession{.key = std::move(key),
+                                                                      .device_token = std::move(device_token),
+                                                                      .verifier = std::move(verifier),
+                                                                      .session_id = auth.session_id});
+
+        auto id = format_uuid_v4(random_bytes(16));
+        std::scoped_lock const lk(mu_);
+        pending_[id] = std::move(session);
+        return LoginChallenge{.id = id, .url = auth.url};
+    }
+
+    proto::Account Accounts::complete_login(const std::string &id, const std::string &code) {
+        std::unique_ptr<LoginSession> session;
+        {
+            std::scoped_lock const lk(mu_);
+            const auto it = pending_.find(id);
+            if (it == pending_.end()) {
+                throw std::runtime_error("no sign-in is in progress for this request");
+            }
+            session = std::move(it->second);
+            pending_.erase(it);
+        }
+
+        const auto oauth = redeem_code(code, session->verifier);
+        const auto authorization =
+            sisu_authorize(session->session_id, oauth.access_token, session->device_token, session->key);
+        const auto xsts = xsts_authorize(authorization, session->device_token, session->key);
+        const auto minecraft_token = launcher_login(xsts);
+        const auto profile = minecraft_profile(minecraft_token);
 
         const auto now = std::chrono::duration_cast<std::chrono::seconds>(
                              std::chrono::system_clock::now().time_since_epoch())
                              .count();
         StoredAccount record{.uuid = profile.uuid,
                              .name = profile.name,
-                             .refresh_token = msa.refresh_token,
-                             .access_token = minecraft.access_token,
-                             .expires_at = now + minecraft.expires_in};
+                             .refresh_token = oauth.refresh_token,
+                             .access_token = minecraft_token,
+                             .expires_at = now + oauth.expires_in};
 
         std::scoped_lock const lk(mu_);
         auto file = load(path_);

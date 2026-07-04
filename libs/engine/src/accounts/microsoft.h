@@ -1,28 +1,29 @@
 #pragma once
 
-#include <functional>
 #include <string>
 
-#include <hestia/proto/accounts.h>
+#include "accounts/signing.h"
 
-// The Microsoft -> Xbox Live -> XSTS -> Minecraft services chain (the flow
-// Prism Launcher ships): a device-code OAuth grant against the consumers
-// tenant, exchanged step by step for a Minecraft access token and profile.
 namespace hestia::engine {
-    struct DeviceAuthorization {
-        proto::AccountLoginCode code;
-        std::string device_code;
-        int interval = 5; // seconds between token polls
+    struct SisuAuthentication {
+        std::string session_id;
+        std::string url;
     };
 
-    struct MsaTokens {
+    struct OAuthTokens {
         std::string access_token;
         std::string refresh_token;
+        long long expires_in = 0;
     };
 
-    struct MinecraftToken {
-        std::string access_token;
-        long long expires_in = 0; // seconds
+    struct SisuAuthorization {
+        std::string user_token;
+        std::string title_token;
+    };
+
+    struct XstsToken {
+        std::string token;
+        std::string user_hash;
     };
 
     struct MinecraftProfile {
@@ -30,15 +31,20 @@ namespace hestia::engine {
         std::string name;
     };
 
-    DeviceAuthorization msa_request_device_code(const std::string &client_id);
+    std::string request_device_token(const ProofKey &key);
 
-    // Polls the token endpoint until the user approves, the code expires, or
-    // `cancelled` returns true (which throws).
-    MsaTokens msa_poll_for_tokens(const std::string &client_id, const DeviceAuthorization &authorization,
-                                  const std::function<bool()> &cancelled);
+    SisuAuthentication sisu_authenticate(const std::string &device_token, const std::string &challenge,
+                                         const std::string &state, const ProofKey &key);
 
-    // Xbox Live user token -> XSTS token -> login_with_xbox.
-    MinecraftToken minecraft_login(const std::string &msa_access_token);
+    OAuthTokens redeem_code(const std::string &code, const std::string &verifier);
+
+    SisuAuthorization sisu_authorize(const std::string &session_id, const std::string &access_token,
+                                     const std::string &device_token, const ProofKey &key);
+
+    XstsToken xsts_authorize(const SisuAuthorization &authorization, const std::string &device_token,
+                             const ProofKey &key);
+
+    std::string launcher_login(const XstsToken &xsts);
 
     MinecraftProfile minecraft_profile(const std::string &minecraft_access_token);
 } // namespace hestia::engine

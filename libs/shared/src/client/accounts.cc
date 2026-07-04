@@ -1,18 +1,17 @@
 #include "hestia/client/accounts.h"
 
+#include <chrono>
+
 #include "session.h"
 
 namespace hestia::client {
-    proto::Account Accounts::login(const AccountLoginCodeCallback &on_code) {
-        const auto id = job_id("login");
-        const auto done = session_->run_job(
-            id, proto::AccountLoginDoneEvent::kTopic, proto::AccountLoginErrorEvent::kTopic,
-            [&on_code](const ipc::Event &event) {
-                if (event.topic != proto::AccountLoginCodeEvent::kTopic || !on_code) return;
-                on_code(event.payload.get<proto::AccountLoginCodeEvent>().code);
-            },
-            [&] { session_->call<proto::AccountLogin>({.id = id}); });
-        return done.get<proto::AccountLoginDoneEvent>().account;
+    proto::AccountLoginBegin::Result Accounts::begin_login() {
+        return session_->call<proto::AccountLoginBegin>({}, std::chrono::seconds(60));
+    }
+
+    proto::Account Accounts::complete_login(const std::string &id, const std::string &code) {
+        return session_->call<proto::AccountLoginComplete>({.id = id, .code = code}, std::chrono::seconds(120))
+            .account;
     }
 
     std::vector<proto::Account> Accounts::list() {

@@ -1,6 +1,5 @@
 #include "services/accounts_service.h"
 
-#include "accounts/login_manager.h"
 #include "runtime/channels.h"
 #include "runtime/runtime.h"
 
@@ -9,12 +8,14 @@
 
 namespace hestia::daemon {
     void AccountsService::register_channels(Channels &on) {
-        on.handle<proto::AccountLogin>([](const proto::AccountLogin::Params &p, HandlerContext &ctx) {
-            const auto id = ctx.runtime.logins().start(p.id);
-            if (!id) {
-                throw ServiceError(ipc::errors::kBadRequest, "a sign-in is already in progress");
-            }
-            return proto::AccountLogin::Result{.id = *id};
+        on.handle<proto::AccountLoginBegin>([](const proto::Empty &, HandlerContext &ctx) {
+            const auto challenge = ctx.runtime.engine().accounts().begin_login();
+            return proto::AccountLoginBegin::Result{.id = challenge.id, .url = challenge.url};
+        });
+
+        on.handle<proto::AccountLoginComplete>([](const proto::AccountLoginComplete::Params &p, HandlerContext &ctx) {
+            return proto::AccountLoginComplete::Result{
+                .account = ctx.runtime.engine().accounts().complete_login(p.id, p.code)};
         });
 
         on.handle<proto::AccountList>([](const proto::Empty &, HandlerContext &ctx) {

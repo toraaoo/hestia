@@ -72,7 +72,7 @@ namespace hestia::client {
         cv_.notify_all();
     }
 
-    ipc::Response Session::call_raw(const std::string &channel, json payload) {
+    ipc::Response Session::call_raw(const std::string &channel, json payload, std::chrono::milliseconds timeout) {
         long long id;
         {
             std::scoped_lock const lk(mu_);
@@ -89,7 +89,7 @@ namespace hestia::client {
 
         std::unique_lock<std::mutex> lk(mu_);
         // Bound the wait so a wedged handler can't hang the caller forever.
-        if (!cv_.wait_for(lk, kCallTimeout, [&] { return closed_ || ready_.count(id) > 0; })) {
+        if (!cv_.wait_for(lk, timeout, [&] { return closed_ || ready_.count(id) > 0; })) {
             ready_.erase(id);
             throw std::runtime_error("timed out waiting for daemon response on '" + channel + "'");
         }

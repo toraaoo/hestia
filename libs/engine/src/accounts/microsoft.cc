@@ -1,8 +1,8 @@
 #include "accounts/microsoft.h"
 
+#include <cctype>
 #include <chrono>
 #include <stdexcept>
-#include <thread>
 
 #include <cpr/cpr.h>
 #include <fmt/format.h>
@@ -12,12 +12,18 @@ namespace hestia::engine {
     using nlohmann::json;
 
     namespace {
-        constexpr const char *kDeviceCodeUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
-        constexpr const char *kTokenUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
-        constexpr const char *kScope = "XboxLive.signin offline_access";
-        constexpr const char *kXboxUserAuthUrl = "https://user.auth.xboxlive.com/user/authenticate";
-        constexpr const char *kXstsAuthUrl = "https://xsts.auth.xboxlive.com/xsts/authorize";
-        constexpr const char *kMinecraftLoginUrl = "https://api.minecraftservices.com/authentication/login_with_xbox";
+        constexpr const char *kClientId = "00000000402b5328";
+        constexpr const char *kReplyUrl = "https://login.live.com/oauth20_desktop.srf";
+        constexpr const char *kScope = "service::user.auth.xboxlive.com::MBI_SSL";
+        constexpr const char *kTitleId = "1794566092";
+        constexpr const char *kUserAgent = "Hestia/1.0 (+https://github.com/toraaoo/hestia)";
+
+        constexpr const char *kDeviceAuthUrl = "https://device.auth.xboxlive.com/device/authenticate";
+        constexpr const char *kSisuAuthenticateUrl = "https://sisu.xboxlive.com/authenticate";
+        constexpr const char *kOauthTokenUrl = "https://login.live.com/oauth20_token.srf";
+        constexpr const char *kSisuAuthorizeUrl = "https://sisu.xboxlive.com/authorize";
+        constexpr const char *kXstsUrl = "https://xsts.auth.xboxlive.com/xsts/authorize";
+        constexpr const char *kLauncherLoginUrl = "https://api.minecraftservices.com/launcher/login";
         constexpr const char *kProfileUrl = "https://api.minecraftservices.com/minecraft/profile";
 
         json parse_body(const cpr::Response &response, const char *what) {
@@ -26,23 +32,10 @@ namespace hestia::engine {
             }
             const auto body = json::parse(response.text, nullptr, false);
             if (body.is_discarded()) {
-                throw std::runtime_error(fmt::format("{} returned malformed JSON (HTTP {})", what,
-                                                     response.status_code));
+                throw std::runtime_error(
+                    fmt::format("{} returned malformed JSON (HTTP {})", what, response.status_code));
             }
             return body;
-        }
-
-        json post_form(const char *url, cpr::Payload payload, const char *what) {
-            return parse_body(cpr::Post(cpr::Url{url}, std::move(payload),
-                                        cpr::Header{{"Accept", "application/json"}}),
-                              what);
-        }
-
-        std::pair<long, json> post_json(const char *url, const json &body, const char *what) {
-            const auto response = cpr::Post(cpr::Url{url}, cpr::Body{body.dump()},
-                                            cpr::Header{{"Content-Type", "application/json"},
-                                                        {"Accept", "application/json"}});
-            return {response.status_code, parse_body(response, what)};
         }
 
         std::string require_string(const json &body, const char *key, const char *what) {
@@ -53,8 +46,14 @@ namespace hestia::engine {
             return it->get<std::string>();
         }
 
-        // The XErr values Xbox uses to refuse an XSTS token, mapped to messages
-        // a user can act on (the same set every launcher special-cases).
+        std::string nested_token(const json &body, const char *key, const char *what) {
+            const auto it = body.find(key);
+            if (it == body.end() || !it->is_object()) {
+                throw std::runtime_error(fmt::format("{} response is missing {}", what, key));
+            }
+            return require_string(*it, "Token", what);
+        }
+
         std::string xsts_error_message(long long xerr) {
             switch (xerr) {
                 case 2148916233:
@@ -71,120 +70,153 @@ namespace hestia::engine {
             }
         }
 
-        void sleep_unless_cancelled(std::chrono::seconds duration, const std::function<bool()> &cancelled) {
-            const auto deadline = std::chrono::steady_clock::now() + duration;
-            while (std::chrono::steady_clock::now() < deadline) {
-                if (cancelled && cancelled()) {
-                    throw std::runtime_error("the sign-in was cancelled");
-                }
-                std::this_thread::sleep_for(std::chrono::milliseconds(250));
-            }
+        std::string to_upper(std::string value) {
+            for (auto &c: value) c = static_cast<char>(::toupper(static_cast<unsigned char>(c)));
+            return value;
+        }
+
+        json proof_jwk(const ProofKey &key) {
+            return json{{"kty", "EC"}, {"x", key.x()}, {"y", key.y()},
+                        {"crv", "P-256"}, {"alg", "ES256"}, {"use", "sig"}};
+        }
+
+        std::int64_t now_seconds() {
+            return std::chrono::duration_cast<std::chrono::seconds>(
+                       std::chrono::system_clock::now().time_since_epoch())
+                .count();
+        }
+
+        cpr::Response signed_post(const char *url, const char *url_path, const json &body, const ProofKey &key,
+                                  bool contract_version) {
+            const auto payload = body.dump();
+            const auto signature = xbox_signature_header(key, url_path, "", payload, now_seconds());
+            cpr::Header header{{"Content-Type", "application/json; charset=utf-8"},
+                               {"Accept", "application/json"},
+                               {"Signature", signature}};
+            if (contract_version) header["x-xbl-contract-version"] = "1";
+            return cpr::Post(cpr::Url{url}, cpr::Body{payload}, header);
         }
     } // namespace
 
-    DeviceAuthorization msa_request_device_code(const std::string &client_id) {
-        const auto body = post_form(kDeviceCodeUrl, {{"client_id", client_id}, {"scope", kScope}},
-                                    "Microsoft device-code request");
-        if (body.contains("error")) {
+    std::string request_device_token(const ProofKey &key) {
+        const json body = {{"Properties",
+                            {{"AuthMethod", "ProofOfPossession"},
+                             {"Id", fmt::format("{{{}}}", to_upper(key.id()))},
+                             {"DeviceType", "Win32"},
+                             {"Version", "10.16.0"},
+                             {"ProofKey", proof_jwk(key)}}},
+                           {"RelyingParty", "http://auth.xboxlive.com"},
+                           {"TokenType", "JWT"}};
+        const auto response = signed_post(kDeviceAuthUrl, "/device/authenticate", body, key, true);
+        return require_string(parse_body(response, "Xbox device token"), "Token", "Xbox device token");
+    }
+
+    SisuAuthentication sisu_authenticate(const std::string &device_token, const std::string &challenge,
+                                         const std::string &state, const ProofKey &key) {
+        const json body = {{"AppId", kClientId},
+                           {"DeviceToken", device_token},
+                           {"Offers", json::array({kScope})},
+                           {"Query",
+                            {{"code_challenge", challenge},
+                             {"code_challenge_method", "S256"},
+                             {"state", state},
+                             {"prompt", "select_account"}}},
+                           {"RedirectUri", kReplyUrl},
+                           {"Sandbox", "RETAIL"},
+                           {"TokenType", "code"},
+                           {"TitleId", kTitleId}};
+        const auto response = signed_post(kSisuAuthenticateUrl, "/authenticate", body, key, true);
+        const auto doc = parse_body(response, "Xbox sign-in request");
+
+        const auto session = response.header.find("X-SessionId");
+        if (session == response.header.end() || session->second.empty()) {
+            throw std::runtime_error("Xbox sign-in request did not return a session id");
+        }
+        return SisuAuthentication{.session_id = session->second,
+                                  .url = require_string(doc, "MsaOauthRedirect", "Xbox sign-in request")};
+    }
+
+    OAuthTokens redeem_code(const std::string &code, const std::string &verifier) {
+        const auto response = cpr::Post(cpr::Url{kOauthTokenUrl},
+                                        cpr::Payload{{"client_id", kClientId},
+                                                     {"code", code},
+                                                     {"code_verifier", verifier},
+                                                     {"grant_type", "authorization_code"},
+                                                     {"redirect_uri", kReplyUrl},
+                                                     {"scope", kScope}},
+                                        cpr::Header{{"Accept", "application/json"}});
+        const auto doc = parse_body(response, "Microsoft token exchange");
+        if (doc.contains("error")) {
             throw std::runtime_error(fmt::format(
-                "Microsoft rejected the device-code request: {}",
-                body.value("error_description", body.value("error", std::string{"unknown error"}))));
+                "Microsoft rejected the sign-in code: {}",
+                doc.value("error_description", doc.value("error", std::string{"unknown error"}))));
         }
-        DeviceAuthorization authorization;
-        authorization.device_code = require_string(body, "device_code", "Microsoft device-code");
-        authorization.code.user_code = require_string(body, "user_code", "Microsoft device-code");
-        authorization.code.verification_uri = require_string(body, "verification_uri", "Microsoft device-code");
-        authorization.code.expires_in = body.value("expires_in", 900);
-        authorization.interval = body.value("interval", 5);
-        return authorization;
+        return OAuthTokens{.access_token = require_string(doc, "access_token", "Microsoft token exchange"),
+                           .refresh_token = doc.value("refresh_token", std::string{}),
+                           .expires_in = doc.value("expires_in", 0LL)};
     }
 
-    MsaTokens msa_poll_for_tokens(const std::string &client_id, const DeviceAuthorization &authorization,
-                                  const std::function<bool()> &cancelled) {
-        auto interval = std::chrono::seconds(authorization.interval > 0 ? authorization.interval : 5);
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(authorization.code.expires_in);
-        while (std::chrono::steady_clock::now() < deadline) {
-            sleep_unless_cancelled(interval, cancelled);
-            json body;
-            try {
-                body = post_form(kTokenUrl,
-                                 {{"client_id", client_id},
-                                  {"grant_type", "urn:ietf:params:oauth:grant-type:device_code"},
-                                  {"device_code", authorization.device_code}},
-                                 "Microsoft token poll");
-            } catch (const std::exception &) {
-                continue; // transient network failure; the deadline still bounds us
-            }
-            if (!body.contains("error")) {
-                return MsaTokens{.access_token = require_string(body, "access_token", "Microsoft token"),
-                                 .refresh_token = body.value("refresh_token", std::string{})};
-            }
-            const auto error = body["error"].get<std::string>();
-            if (error == "authorization_pending") continue;
-            if (error == "slow_down") {
-                interval += std::chrono::seconds(5);
-                continue;
-            }
-            if (error == "authorization_declined") {
-                throw std::runtime_error("the sign-in was declined");
-            }
-            if (error == "expired_token") break;
-            throw std::runtime_error(fmt::format("Microsoft sign-in failed: {}",
-                                                 body.value("error_description", error)));
-        }
-        throw std::runtime_error("the sign-in code expired before the sign-in completed; try again");
+    SisuAuthorization sisu_authorize(const std::string &session_id, const std::string &access_token,
+                                     const std::string &device_token, const ProofKey &key) {
+        const json body = {{"AccessToken", "t=" + access_token},
+                           {"AppId", kClientId},
+                           {"DeviceToken", device_token},
+                           {"ProofKey", proof_jwk(key)},
+                           {"Sandbox", "RETAIL"},
+                           {"SessionId", session_id},
+                           {"SiteName", "user.auth.xboxlive.com"},
+                           {"RelyingParty", "http://xboxlive.com"},
+                           {"UseModernGamertag", true}};
+        const auto response = signed_post(kSisuAuthorizeUrl, "/authorize", body, key, false);
+        const auto doc = parse_body(response, "Xbox authorization");
+        return SisuAuthorization{.user_token = nested_token(doc, "UserToken", "Xbox authorization"),
+                                 .title_token = nested_token(doc, "TitleToken", "Xbox authorization")};
     }
 
-    MinecraftToken minecraft_login(const std::string &msa_access_token) {
-        const auto [xbl_status, xbl] = post_json(kXboxUserAuthUrl,
-                                                 {{"Properties",
-                                                   {{"AuthMethod", "RPS"},
-                                                    {"SiteName", "user.auth.xboxlive.com"},
-                                                    {"RpsTicket", "d=" + msa_access_token}}},
-                                                  {"RelyingParty", "http://auth.xboxlive.com"},
-                                                  {"TokenType", "JWT"}},
-                                                 "Xbox Live sign-in");
-        if (xbl_status != 200) {
-            throw std::runtime_error(fmt::format("Xbox Live sign-in failed (HTTP {})", xbl_status));
+    XstsToken xsts_authorize(const SisuAuthorization &authorization, const std::string &device_token,
+                             const ProofKey &key) {
+        const json body = {{"RelyingParty", "rp://api.minecraftservices.com/"},
+                           {"TokenType", "JWT"},
+                           {"Properties",
+                            {{"SandboxId", "RETAIL"},
+                             {"UserTokens", json::array({authorization.user_token})},
+                             {"DeviceToken", device_token},
+                             {"TitleToken", authorization.title_token}}}};
+        const auto response = signed_post(kXstsUrl, "/xsts/authorize", body, key, true);
+        if (response.status_code == 401) {
+            const auto doc = json::parse(response.text, nullptr, false);
+            throw std::runtime_error(xsts_error_message(doc.is_object() ? doc.value("XErr", 0LL) : 0LL));
         }
-        const auto xbl_token = require_string(xbl, "Token", "Xbox Live");
-
-        const auto [xsts_status, xsts] = post_json(kXstsAuthUrl,
-                                                   {{"Properties",
-                                                     {{"SandboxId", "RETAIL"},
-                                                      {"UserTokens", json::array({xbl_token})}}},
-                                                    {"RelyingParty", "rp://api.minecraftservices.com/"},
-                                                    {"TokenType", "JWT"}},
-                                                   "Xbox XSTS authorization");
-        if (xsts_status == 401) {
-            throw std::runtime_error(xsts_error_message(xsts.value("XErr", 0LL)));
-        }
-        if (xsts_status != 200) {
-            throw std::runtime_error(fmt::format("Xbox XSTS authorization failed (HTTP {})", xsts_status));
-        }
-        const auto xsts_token = require_string(xsts, "Token", "Xbox XSTS");
+        const auto doc = parse_body(response, "Xbox XSTS authorization");
         std::string user_hash;
         try {
-            user_hash = xsts.at("DisplayClaims").at("xui").at(0).at("uhs").get<std::string>();
+            user_hash = doc.at("DisplayClaims").at("xui").at(0).at("uhs").get<std::string>();
         } catch (const json::exception &) {
             throw std::runtime_error("Xbox XSTS response is missing the user hash");
         }
+        return XstsToken{.token = require_string(doc, "Token", "Xbox XSTS authorization"),
+                         .user_hash = user_hash};
+    }
 
-        const auto [mc_status, mc] = post_json(kMinecraftLoginUrl,
-                                               {{"identityToken",
-                                                 fmt::format("XBL3.0 x={};{}", user_hash, xsts_token)}},
-                                               "Minecraft services sign-in");
-        if (mc_status != 200) {
-            throw std::runtime_error(fmt::format("Minecraft services sign-in failed (HTTP {})", mc_status));
+    std::string launcher_login(const XstsToken &xsts) {
+        const json body = {{"platform", "PC_LAUNCHER"},
+                           {"xtoken", fmt::format("XBL3.0 x={};{}", xsts.user_hash, xsts.token)}};
+        const auto response = cpr::Post(cpr::Url{kLauncherLoginUrl}, cpr::Body{body.dump()},
+                                        cpr::Header{{"Content-Type", "application/json"},
+                                                    {"Accept", "application/json"},
+                                                    {"User-Agent", kUserAgent}});
+        if (response.status_code != 200) {
+            throw std::runtime_error(fmt::format("Minecraft services sign-in failed (HTTP {})",
+                                                 response.status_code));
         }
-        return MinecraftToken{.access_token = require_string(mc, "access_token", "Minecraft services"),
-                              .expires_in = mc.value("expires_in", 0LL)};
+        return require_string(parse_body(response, "Minecraft services"), "access_token", "Minecraft services");
     }
 
     MinecraftProfile minecraft_profile(const std::string &minecraft_access_token) {
         const auto response = cpr::Get(cpr::Url{kProfileUrl},
                                        cpr::Header{{"Authorization", "Bearer " + minecraft_access_token},
-                                                   {"Accept", "application/json"}});
+                                                   {"Accept", "application/json"},
+                                                   {"User-Agent", kUserAgent}});
         if (response.status_code == 404) {
             throw std::runtime_error("this Microsoft account owns no Minecraft profile; buy Minecraft: Java "
                                      "Edition or create the profile in the official launcher first");

@@ -157,13 +157,12 @@ CI steps. See [scripts/README.md](scripts/README.md).
 # Show help
 hestia
 
-# Minecraft accounts (Microsoft sign-in, device-code flow)
-hestia auth login                # print a code, sign in at microsoft.com/link
+# Minecraft accounts (Microsoft sign-in)
+hestia auth login                # open the printed URL, sign in, paste the redirect back
 hestia auth list                 # signed-in accounts
 hestia auth logout <name|uuid>   # sign out and forget the stored tokens
-# Sign-in needs a Microsoft (Azure) application id that is approved for the
-# Minecraft APIs — set it once with:
-#   hestia config set auth.msa_client_id <client-id>
+# Uses the launcher (sisu) flow with the well-known Minecraft client id, so no
+# Azure application registration or configuration is needed.
 
 # Java runtimes (Eclipse Temurin via the Adoptium API)
 hestia java available            # release lines the provider ships

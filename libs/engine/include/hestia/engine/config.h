@@ -15,16 +15,10 @@ namespace hestia::engine {
 
     // The config schema: a setting is a typed field with its default plus a
     // kFields entry; a nested struct with its own kFields becomes a sub-object.
-    struct AuthSettings {
-        std::string msa_client_id;
-
-        static constexpr auto kFields = proto::fields(proto::field("msa_client_id", &AuthSettings::msa_client_id));
-    };
-
+    // The reserved keys (home, autostart) are routed by the daemon's config
+    // service, not stored here.
     struct Settings {
-        AuthSettings auth;
-
-        static constexpr auto kFields = proto::fields(proto::field("auth", &Settings::auth));
+        static constexpr auto kFields = proto::fields();
     };
 
     // Thread-safe owner of the persisted Settings: every write saves

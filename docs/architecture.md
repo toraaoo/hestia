@@ -239,14 +239,20 @@ The subsystems behind the aggregate today:
   (`hestia cache info|list|clear`).
 - **`Accounts`** (`accounts.h`) — Minecraft accounts signed in through
   Microsoft, persisted with their tokens in `<data_home>/accounts.json`
-  (owner-only on POSIX). `login()` runs the blocking device-code chain the
-  established launchers use — request a code from the consumers tenant, poll
-  the token endpoint until the user approves in a browser, then Xbox Live →
-  XSTS → `login_with_xbox` → profile — and upserts the account by uuid. The
-  HTTP steps live in the private `src/accounts/microsoft.{h,cc}`; the Azure
-  client id comes from the `auth.msa_client_id` setting (each distribution
-  registers its own, Mojang-approved application). The async wrapper and the
-  `account.login.*` events live in the daemon's `LoginManager`, not here.
+  (owner-only on POSIX). Sign-in is the **launcher (sisu) flow** the official
+  launcher and Modrinth App use, so no per-distribution Azure application is
+  needed — it uses the well-known Minecraft client id `00000000402b5328`. It is
+  two blocking steps: `begin_login()` mints a per-login ECDSA P-256 proof key,
+  gets a proof-of-possession device token, runs PKCE sisu `/authenticate`, and
+  returns the Microsoft sign-in URL (holding the proof key and verifier in an
+  in-memory pending map keyed by login id); `complete_login()` redeems the
+  pasted OAuth code → sisu `/authorize` → XSTS → `launcher/login` → profile and
+  upserts the account by uuid. The HTTP steps live in the private
+  `src/accounts/microsoft.{h,cc}`; Xbox request signing (the proof key and the
+  FILETIME-stamped `Signature` header) is `src/accounts/signing.{h,cc}` with
+  platform backends `signing_openssl.cc` (POSIX, OpenSSL) and
+  `signing_windows.cc` (Windows, CNG). Both steps are synchronous request/
+  response channels, so there is no daemon-side login worker.
 - **`Java`** (`java.h`) — installs and tracks Java runtimes under
   `<data_home>/java`. **`JavaProvider`** is the abstract catalogue seam: an
   implementation resolves release lines and the latest GA build for a
@@ -307,7 +313,8 @@ are subdir-qualified (`"runtime/router.h"`):
   registration respectively),
   `process` (`process.start|stop|list|status|logs`), `downloads` (`download.start`),
   `java` (`java.releases|install|list|uninstall`), `cache`
-  (`cache.info|list|clear`), `accounts` (`account.login|list|remove`), and
+  (`cache.info|list|clear`), `accounts`
+  (`account.login.begin|login.complete|list|remove`), and
   `events` (`events.subscribe`, a streaming channel that pushes to the calling
   connection).
 - **`downloads/`** (`download_manager.{h,cc}`) — runs each download on a worker
@@ -320,13 +327,6 @@ are subdir-qualified (`"runtime/router.h"`):
   install per release line at a time, publishing `java.install.progress`,
   `java.install.done` (carrying the registered runtime), and
   `java.install.error`.
-- **`accounts/`** (`login_manager.{h,cc}`) — the same pattern for
-  `account.login`, one sign-in at a time (the flow is interactive): the
-  engine's blocking `Accounts::login()` runs off-thread, publishing
-  `account.login.code` (the code the user enters in a browser),
-  `account.login.done` (carrying the account), and `account.login.error`. A
-  cancel flag is polled between token polls so daemon shutdown never waits
-  out the code's lifetime.
 - **`process/`** (`process_supervisor`, `process_table`, `process_spawner`,
   `liveness_probe`, `log_streamer`, `restart_policy`) — launches Minecraft (and
   other) processes as children of the daemon, tracks them in a process table,

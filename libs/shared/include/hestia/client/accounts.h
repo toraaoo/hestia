@@ -1,6 +1,5 @@
 #pragma once
 
-#include <functional>
 #include <string>
 #include <vector>
 
@@ -8,23 +7,18 @@
 #include <hestia/proto/accounts.h>
 
 namespace hestia::client {
-    using AccountLoginCodeCallback = std::function<void(const proto::AccountLoginCode &)>;
-
-    // Minecraft accounts, signed in through Microsoft by the daemon.
+    // Minecraft accounts, signed in through Microsoft by the daemon. Sign-in is
+    // two calls: begin_login() returns the URL the user opens; after they sign in
+    // and are redirected, complete_login() redeems the code from that redirect.
     class Accounts : public Facade {
     public:
         using Facade::Facade;
 
-        // Blocks until the sign-in completes: `on_code` receives the code the
-        // user must enter at the verification URL (reported on the reader
-        // thread); like Java::install(), it uses the session's single
-        // event-callback slot.
-        proto::Account login(const AccountLoginCodeCallback &on_code);
+        proto::AccountLoginBegin::Result begin_login();
+        proto::Account complete_login(const std::string &id, const std::string &code);
 
         std::vector<proto::Account> list();
 
-        // Removes the account whose name or uuid matches `ref`; throws when
-        // nothing matches.
         void remove(const std::string &ref);
     };
 } // namespace hestia::client
