@@ -1,7 +1,0 @@
-#pragma once
-
-#define APP_NAME    "@APP_NAME@"
-#define APP_ID      "@APP_ID@"
-#define APP_VENDOR  "@APP_VENDOR@"
-#define APP_VERSION "@PROJECT_VERSION@"
-#define APP_CHANNEL "@APP_CHANNEL@"

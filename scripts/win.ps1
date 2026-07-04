@@ -1,41 +1,33 @@
-# win.ps1 — the scripts/ dev flow on Windows.
+# win.ps1 — the scripts/ dev flow on Windows (cargo).
 #
-#   scripts\win.ps1 build [--release] [target...]
-#   scripts\win.ps1 run <daemon|cli|tray|desktop> [args...]
-#   scripts\win.ps1 configure [--release] [-- <extra cmake args>]
-#   scripts\win.ps1 clean [dev|release|all]
-#   scripts\win.ps1 package [args...]
-#
-# Enters the Visual Studio x64 developer environment (MSVC + CMake + Ninja),
-# then delegates to the matching bash script via Git Bash — the same recipe CI
-# uses (ilammy/msvc-dev-cmd + bash steps).
-
+#   scripts\win.ps1 build [cli|daemon|desktop|all] [-- <cargo flags>]
+#   scripts\win.ps1 run   <cli|daemon> [args...]
+#   scripts\win.ps1 clean
 param(
-    [Parameter(Mandatory, Position = 0)]
-    [ValidateSet("build", "run", "configure", "clean", "package")]
-    [string]$Command,
-
-    [Parameter(ValueFromRemainingArguments)]
-    [string[]]$Rest
+  [Parameter(Position = 0)][string]$Command = "build",
+  [Parameter(Position = 1)][string]$Target = "all",
+  [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest
 )
 
 $ErrorActionPreference = "Stop"
+Set-Location (Join-Path $PSScriptRoot "..")
 
-if (-not $env:VSCMD_VER) {
-    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-    if (-not (Test-Path $vswhere)) { throw "Visual Studio not found ($vswhere missing)" }
-    $vsRoot = & $vswhere -latest -products * `
-        -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-        -property installationPath
-    if (-not $vsRoot) { throw "No Visual Studio installation with the C++ toolset found" }
-    Import-Module (Join-Path $vsRoot "Common7\Tools\Microsoft.VisualStudio.DevShell.dll")
-    Enter-VsDevShell -VsInstallPath $vsRoot -SkipAutomaticLocation -DevCmdArguments "-arch=x64" | Out-Null
+switch ($Command) {
+  "build" {
+    switch ($Target) {
+      "cli"     { cargo build -p cli @Rest }
+      "daemon"  { cargo build -p daemon @Rest }
+      "desktop" { Push-Location crates\desktop; cargo tauri build @Rest; Pop-Location }
+      default   { cargo build --workspace @Rest }
+    }
+  }
+  "run" {
+    switch ($Target) {
+      "cli"    { cargo run -p cli -- @Rest }
+      "daemon" { cargo run -p daemon -- @Rest }
+      default  { Write-Error "usage: win.ps1 run <cli|daemon> [args]" }
+    }
+  }
+  "clean" { cargo clean @Rest }
+  default { Write-Error "usage: win.ps1 <build|run|clean> ..." }
 }
-
-$gitRoot = Split-Path (Split-Path (Get-Command git -ErrorAction Stop).Source)
-$bash = Join-Path $gitRoot "bin\bash.exe"
-if (-not (Test-Path $bash)) { throw "Git Bash not found at $bash" }
-
-$script = (Join-Path $PSScriptRoot "$Command.sh") -replace '\\', '/'
-& $bash $script @Rest
-exit $LASTEXITCODE

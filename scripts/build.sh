@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-#
-# build.sh — build targets, configuring the build dir lazily on first use.
-#
-#   build.sh [--release] [target...]
-#
-# No flag uses the fast dev build (Debug, desktop off). --release uses the full
-# build/ (Release, desktop included). No target builds everything in that build.
-# Targets accept friendly names (daemon, cli, tui, tray, desktop) or raw CMake
-# target names. Safe to call from CI.
+# Thin cargo wrapper. Usage:
+#   scripts/build.sh [cli|daemon|desktop|all] [extra cargo flags...]
+# Examples:
+#   scripts/build.sh cli --release
+#   scripts/build.sh all
+set -euo pipefail
+cd "$(dirname "$0")/.."
 
-source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+target="${1:-all}"
+shift || true
 
-case "${1:-}" in
-    --release) shift; build_full Release "$@" ;;
-    --dev)     shift; build_dev "$@" ;;
-    *)         build_dev "$@" ;;
+case "$target" in
+  cli)     cargo build -p cli "$@" ;;
+  daemon)  cargo build -p daemon "$@" ;;
+  desktop) (cd crates/desktop && cargo tauri build "$@") ;;
+  all)     cargo build --workspace "$@" ;;
+  *) echo "usage: $0 [cli|daemon|desktop|all] [cargo flags]" >&2; exit 1 ;;
 esac

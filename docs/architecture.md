@@ -3,10 +3,34 @@
 This is the reference for Hestia: what exists today, where it lives, and the
 reasoning behind the structure.
 
-> **Status:** early development (`v0.0.1`). The frontend skeletons, build
-> system, logging, and config store are in place — including the desktop CEF
-> shell (process model, IPC bridge, embedded frontend). Launcher functionality
-> is not implemented yet.
+> **As-built (Rust).** Hestia is now an all-Rust cargo workspace. The C++ tree
+> has been removed. The daemon + thin-client model, the wire protocol, the
+> data-directory resolution, and the command surface are preserved verbatim —
+> only the language and the desktop shell changed. The crate graph:
+>
+> ```
+> proto   → wire contracts + domain types (serde)                      leaf
+> ipc     → transport (unix socket / named pipe) + envelope (tokio)    leaf
+> common  → logging (tracing) + app identity + paths                   leaf
+> client  → typed client SDK (facades over a Session)   → proto, ipc, common
+> engine  → config·cache·download·java·accounts         → proto, common   (daemon-only)
+> cli     → bin hestia          (clap)                  → client, common
+> daemon  → bin hestiad         (router, services)      → engine, proto, ipc, common
+> desktop → bin hestia-desktop  (Tauri v2)              → client, common   (+ frontend/)
+> tray    → bin tray            (placeholder)
+> ```
+>
+> The one-way arrows are enforced by cargo: only `daemon` depends on `engine`, so
+> a front-end physically cannot reach launcher logic except over the socket
+> (`cargo tree -i engine` shows only `daemon`). Collapses from the C++: the
+> `kFields` codec became `serde` derive; Xbox signing lost its OpenSSL/CNG split
+> for one cross-platform `p256` impl; archive extraction stopped shelling out
+> (the `tar`+`flate2`/`zip` crates). Accounts, config, cache, download, and java
+> are ported; the process supervisor and a functional tray are not yet.
+>
+> **The prose and target names below (`libs/…`, `apps/…`, `hestia_shared`, CEF)
+> describe the historical C++ design and are retained for the reasoning; map them
+> to the crates above.**
 
 > **Daemon architecture.** Hestia runs as a daemon + thin-client model:
 > `hestiad` owns the IPC endpoint, a request router, process supervision, and

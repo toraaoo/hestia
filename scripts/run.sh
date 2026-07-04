@@ -1,29 +1,17 @@
 #!/usr/bin/env bash
-#
-# run.sh — build a binary, then run it.
-#
-#   run.sh <daemon|cli|tray> [args...]   build from the dev profile, then run
-#   run.sh desktop [args...]             build the desktop app, then run it
-#
-# The desktop runs against its embedded frontend (no dev server). For frontend
-# hot-reload (HMR) use `dev.sh --desktop`.
+# Build then run a binary. Usage:
+#   scripts/run.sh cli [args...]         # the hestia CLI
+#   scripts/run.sh daemon [args...]      # hestiad
+#   scripts/run.sh desktop               # the Tauri shell against the Vite dev server
+set -euo pipefail
+cd "$(dirname "$0")/.."
 
-source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+target="${1:-cli}"
+shift || true
 
-[ "$#" -ge 1 ] || die "usage: run.sh <daemon|cli|tray|desktop> [args...]"
-name="$1"; shift
-
-case "$name" in
-    desktop|Hestia|hestia_desktop)
-        build_full Debug desktop
-        path="$FULL_DIR/Debug/$(binary_for desktop)"
-        log "Running $path $*"
-        exec "$path" "$@" ;;
-    *)
-        bin="$(binary_for "$name")"
-        [ -n "$bin" ] || die "run: unknown target '$name' (daemon, cli, tray, desktop)"
-        build_dev "$name"
-        path="$DEV_DIR/Debug/$bin"
-        log "Running $path $*"
-        exec "$path" "$@" ;;
+case "$target" in
+  cli)     cargo run -p cli -- "$@" ;;
+  daemon)  cargo run -p daemon -- "$@" ;;
+  desktop) (cd crates/desktop && cargo tauri dev) ;;
+  *) echo "usage: $0 [cli|daemon|desktop] [args]" >&2; exit 1 ;;
 esac

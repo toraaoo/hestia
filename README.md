@@ -1,171 +1,96 @@
 # Hestia
 
-A Minecraft launcher built in modern C++.
+A Minecraft launcher built in Rust.
 
-Alongside a beautiful desktop UI, Hestia ships a first-class **CLI**
-front-end, so it's just as comfortable from a terminal as from a window.
+Alongside a desktop UI (Tauri), Hestia ships a first-class **CLI** front-end, so
+it's just as comfortable from a terminal as from a window.
 
-> **Status:** early development (`v0.0.1`). The project is being scaffolded —
-> the build system, logging, a config store, the CLI, Java runtime
-> management (install/list/uninstall via the Adoptium API), and Microsoft
-> account sign-in are in place. Launching Minecraft itself is not implemented
-> yet. Expect things to change.
+> **Status:** early development (`v0.0.1`). Hestia runs as a daemon (`hestiad`)
+> with thin clients over a local socket. In place today: the build/workspace,
+> logging, a config store, the CLI, Java runtime management (install/list/
+> uninstall via the Adoptium API), Microsoft account sign-in, and a scaffolded
+> Tauri desktop shell. Launching Minecraft itself is not implemented yet.
 
 ## Front-ends
 
 Hestia is one daemon-backed core with several ways to drive it:
 
-- **Desktop** (`Hestia`) — the graphical launcher. The primary, "beautiful UI"
-  experience.
-- **CLI** (`hestia`) — scriptable command-line interface for automation and
-  power users.
-- **Tray** (`tray`) — a resident system-tray helper showing daemon status
-  and a one-click toggle for starting the daemon at login.
+- **CLI** (`hestia`) — scriptable command-line interface for automation and power
+  users.
+- **Desktop** (`hestia-desktop`) — a Tauri shell hosting a web UI. Scaffolded; the
+  frontend is a stock template not yet wired to the daemon.
+- **Tray** — a resident system-tray helper (placeholder; not yet ported).
 
 ## Project layout
 
-```
-hestia-cpp/
-├── libs/shared/             hestia_shared — IPC transport + protocol, typed wire contracts, client SDK, identity, logging
-├── libs/engine/             hestia_engine — launcher engine (config, java, …); daemon-internal
-├── apps/desktop/            Hestia      — graphical desktop launcher (CEF + React)
-│   ├── frontend/            Vite + React + TypeScript UI (built with Bun)
-│   └── src/core/            CEF shell — process model, IPC bridge, window, scheme
-├── apps/cli/                hestia      — CLI (CLI11)
-├── apps/daemon/             hestiad     — the daemon: IPC, supervision, autostart
-├── apps/tray/               hestia_tray (tray) — resident system-tray helper (GDBus SNI)
-├── cmake/                   CMake helpers (DownloadCEF, CMakeRC, PruneLocales)
-└── third_party/             vendored C++ dependencies (git submodules)
-```
+A single cargo workspace. The one-way dependency arrows are enforced by cargo:
+a crate that does not list `engine` as a dependency **cannot** reach launcher
+logic — only over the socket via `client`.
 
-The dependency arrows are one-way and enforced by the build. Every front-end and
-the daemon link `hestia_shared` (transport + client SDK). `hestia_engine` (the
-launcher logic) is daemon-only — front-ends reach it over the socket rather than
-by linking (the desktop app still links it directly today, a transitional
-exception being retired). See [docs/architecture.md](docs/architecture.md) for
-the full picture.
+```
+hestia/
+├── Cargo.toml                 [workspace] members = ["crates/*"]
+├── rust-toolchain.toml        pinned toolchain + clippy/rustfmt
+├── deny.toml                  cargo-deny: licenses, bans, advisories
+├── dist-workspace.toml        cargo-dist config (cli/daemon installers)
+├── crates/
+│   ├── proto/                 wire contracts + domain types (serde)
+│   ├── ipc/                   transport (unix socket / named pipe) + envelope (tokio)
+│   ├── common/                logging (tracing) + app identity + paths
+│   ├── client/                typed client SDK (facades over a Session)
+│   ├── engine/                config·cache·download·java·accounts   (daemon-only)
+│   ├── cli/                   bin: hestia   (clap)
+│   ├── daemon/                bin: hestiad  (router, services, supervisor)
+│   ├── tray/                  bin: tray     (placeholder)
+│   └── desktop/               bin: hestia-desktop (Tauri v2 shell)
+├── frontend/                  desktop UI (React + Vite + TS) — self-contained
+└── docs/                      architecture, contributing
+```
 
 ## Tech stack
 
-- **C++20**, **CMake** (≥ 3.21), built with Ninja
-- [spdlog](https://github.com/gabime/spdlog) + [fmt](https://github.com/fmtlib/fmt) — logging and formatting
-- [CLI11](https://github.com/CLIUtils/CLI11) — command-line parsing
-- [FTXUI](https://github.com/ArthurSonzogni/FTXUI) — terminal UI elements (CLI progress)
-- [CEF](https://bitbucket.org/chromiumembedded/cef) — Chromium Embedded Framework (desktop only)
-- [React](https://react.dev/) + [Vite](https://vitejs.dev/) + [Bun](https://bun.sh/) — desktop frontend
-
-C++ dependencies are vendored as git submodules under `third_party/`. CEF is
-fetched automatically at configure time (~1 GB, gitignored).
+- **Rust** (edition 2021), **cargo** workspace
+- [tokio](https://tokio.rs/) — async runtime (client + daemon)
+- [tracing](https://github.com/tokio-rs/tracing) — structured logging
+- [clap](https://github.com/clap-rs/clap) — command-line parsing
+- [reqwest](https://github.com/seanmonstar/reqwest) — HTTP (engine downloader, auth)
+- [serde](https://serde.rs/) — the wire/marshalling layer
+- [p256](https://github.com/RustCrypto/elliptic-curves) — Xbox proof-key ECDSA
+- [Tauri v2](https://tauri.app/) + [React](https://react.dev/) + [Vite](https://vitejs.dev/) — desktop
 
 ## Building
 
-A single configure builds everything — the CLI **and** the desktop launcher.
-
-Clone with submodules:
-
 ```bash
-git clone --recurse-submodules <repo-url>
-cd hestia-cpp
-# already cloned? fetch the submodules:
-git submodule update --init --recursive
+# Clone and build the daemon + CLI (fast — no desktop/webview deps)
+git clone <repo-url> && cd hestia
+cargo build -p cli -p daemon
 ```
 
-**Build ordering matters**: the desktop frontend must be compiled before CMake
-configures (CMakeRC embeds the `dist/` tree at configure time). So build the
-frontend first, then configure and build:
+The `cli`, `daemon`, and `tray` binaries build with plain `cargo` and
+cross-compile cleanly. The **desktop** app needs the system webview libraries
+(WebKitGTK on Linux, WebView2 on Windows) and the Bun-built frontend; it does
+not cross-compile and is built per-OS:
 
 ```bash
-# 1. Build the frontend (produces apps/desktop/frontend/dist)
-(cd apps/desktop/frontend && bun install && bun run build)
-
-# 2. Configure + build (first run downloads ~1 GB of CEF into third_party/cef)
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+# Desktop: Tauri drives the frontend build from crates/desktop/tauri.conf.json
+cargo install tauri-cli --version '^2'
+(cd frontend && bun install)
+(cd crates/desktop && cargo tauri build)     # or `cargo tauri dev` for HMR
 ```
 
-Binaries land in `build/Release/` (or `build/<config>/`):
-
-- `hestia` — CLI
-- `HestiaLauncher` — desktop launcher (named `HestiaLauncher` so it doesn't
-  collide with the `hestia` CLI on case-insensitive filesystems; the app still
-  presents itself as "Hestia")
-
-**Release** is sandboxed, stripped, and serves the embedded frontend. On Linux,
-make the sandbox helper SUID root once per build location:
-
-```bash
-sudo chown root:root build/Release/chrome-sandbox
-sudo chmod 4755     build/Release/chrome-sandbox
-./build/Release/HestiaLauncher
-```
-
-**Dev mode** (hot-reload against the Vite dev server, sandbox off):
-
-```bash
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-# In a second terminal:
-(cd apps/desktop/frontend && bun run dev)
-# Then run with the dev-server URL:
-./build/Debug/HestiaLauncher --dev-url=http://localhost:5173
-```
-
-> A `dist/` must exist at configure time even in Debug (CMakeRC needs it). Run
-> one `bun run build` first; the dev server overrides it at runtime anyway.
-
-### Build options
-
-| Option               | Default | Description                                            |
-|----------------------|---------|--------------------------------------------------------|
-| `BUILD_DESKTOP`      | `ON`    | Build the desktop launcher — pulls in CEF              |
-| `BUILD_CLI`          | `ON`    | Build the `hestia` CLI front-end                       |
-| `USE_CCACHE`         | `ON`    | Route compiles through `ccache` when it is installed   |
-| `USE_SANDBOX`        | auto    | CEF sandbox — `ON` in Release, `OFF` in Debug          |
-| `CEF_VERSION`        | pinned  | CEF distribution version string (set in desktop CMake) |
-| `APP_DEV_SERVER_URL` | `""`    | Configure-time dev-server URL (Debug only)             |
-
-The daemon (`hestiad`) and tray (`tray`) are the resident core and are
-always built; the front-ends above are opt-out.
-
-### Faster dev builds
-
-The desktop launcher is by far the heaviest target: it triggers the ~1 GB CEF
-download at configure time and a long link. When you're iterating on the
-daemon or CLI, configure a separate build that skips it entirely — this
-also skips CEF's download and every dependency only the desktop needs (vendored
-deps build on demand):
-
-```bash
-# A dev configure that never touches CEF
-cmake -S . -B build-dev -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_DESKTOP=OFF
-
-# Tightest loop: build only the target you're working on
-cmake --build build-dev --target hestia_daemon   # or hestia_cli
-```
-
-Installing `ccache` makes rebuilds across configures reuse cached object files;
-it is picked up automatically (disable with `-DUSE_CCACHE=OFF`).
-
-The [`scripts/`](scripts/) helpers wrap all of this so you don't have to remember
-the flags — `scripts/build.sh daemon`, `scripts/run.sh cli`, `scripts/run.sh
-desktop` (with frontend hot-reload), `scripts/build.sh --release`. They double as
-CI steps. See [scripts/README.md](scripts/README.md).
+The [`scripts/`](scripts/) helpers wrap all of this: `scripts/build.sh cli`,
+`scripts/run.sh daemon serve`, `scripts/run.sh desktop`, `scripts/package.sh cli`.
 
 ## Usage
 
 ```bash
-# Show help
-hestia
+hestia                           # help
 
 # Minecraft accounts (Microsoft sign-in)
-hestia auth login                # enter the shown code at microsoft.com/link — nothing to paste
-hestia auth login --sisu         # browser-redirect flow: open the URL, sign in, paste the redirect back
+hestia auth login                # device-code flow — enter the shown code in a browser
+hestia auth login --sisu         # browser-redirect flow: sign in, paste the redirect back
 hestia auth list                 # signed-in accounts
 hestia auth logout <name|uuid>   # sign out and forget the stored tokens
-# Both flows use the well-known Minecraft client id, so no Azure application
-# registration or configuration is needed. The default is the device-code grant
-# (the daemon polls while you approve in a browser); --sisu is the launcher
-# (sisu) flow, suited to a front-end with an embedded browser.
 
 # Java runtimes (Eclipse Temurin via the Adoptium API)
 hestia java available            # release lines the provider ships
@@ -173,53 +98,36 @@ hestia java install 21           # resolve, download, verify, extract, register
 hestia java list                 # installed runtimes
 hestia java uninstall 21
 
-# Download cache (checksummed downloads are stored once and reused)
-hestia cache info                # location, entry count, size
-hestia cache list                # cached blobs by checksum
-hestia cache clear               # remove everything, report what was freed
+# Download cache
+hestia cache info | list | clear
 
 # Configuration (typed settings, stored as JSON)
-hestia config set <key> <value>  # keys are declared settings — unknown keys and
-                                 # type-mismatched values are rejected
-hestia config get <key>
-hestia config list               # print the effective settings as a table
-# Reserved keys routed to their own subsystem:
+hestia config get <key> | set <key> <value> | list
 hestia config get home           # resolved data directory
 hestia config set home <dir>     # persist the data dir (empty reverts to default)
 hestia config get autostart      # true if the daemon starts at login
-hestia config set autostart true # register the daemon to start at login (false removes it)
+hestia config set autostart true # register the daemon to start at login
 
 # Daemon lifecycle
-hestia daemon status             # running (pid, uptime, home, log) or stopped
-hestia daemon restart            # stop + start; picks up a newly built hestiad
-hestia daemon start
-hestia daemon stop
+hestia daemon status | start | stop | restart
 
-# Logging verbosity (global flags, accepted at any position)
-hestia -v java list   # verbose / debug logging
-hestia -q java list   # warnings and errors only
-
-# Override the data directory for one run
+# Global flags (any position)
+hestia -v java list              # verbose / debug logging
+hestia -q java list              # warnings and errors only
 hestia --home /path/to/dir config get home
-
-# Version
 hestia --version
 ```
 
 The data directory is resolved as: `--home` → `$HESTIA_HOME` → a persisted
 pointer (`config set home`) → the platform default (`~/.hestia`, or
-`%APPDATA%\Hestia` on Windows). **Debug builds** use `<repo>/.hestia` as the
-platform default instead, so development never populates the real per-user
-directory (compiled out of Release).
+`%APPDATA%\Hestia` on Windows). **Debug builds** anchor the default at
+`<workspace>/.hestia` so development never populates the real per-user directory.
 
 ## Documentation
 
-- **[docs/architecture.md](docs/architecture.md)** — the as-built map: target
-  graph, core/TUI/CLI boundaries, and the TUI's component model.
-- **[docs/contributing.md](docs/contributing.md)** — conventions and step-by-step
-  recipes for adding a view, layout, component, overlay, or CLI command.
-- **[docs/packaging.md](docs/packaging.md)** — how releases are built: formats,
-  the component model, the desktop/CEF layout, and CI caching.
+- **[docs/architecture.md](docs/architecture.md)** — the target graph and the
+  daemon/engine boundary.
+- **[docs/contributing.md](docs/contributing.md)** — conventions and recipes.
 
 ## License
 

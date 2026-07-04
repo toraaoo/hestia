@@ -1,9 +1,30 @@
 # Contributing — conventions & recipes
 
 Practical, copy-and-adapt guides for extending Hestia. Read
-[architecture.md](architecture.md) first for the lay of the land. This document
-is the *how*: add a CLI command; a core module; or a desktop feature (IPC channel
-+ frontend view).
+[architecture.md](architecture.md) first for the lay of the land.
+
+> **As-built (Rust).** The project is an all-Rust cargo workspace. The wire-in
+> points map one-to-one from the C++ recipes below:
+> - **Add a wire contract:** a struct + `impl Contract` in `crates/proto/src/<domain>.rs`
+>   (serde derive is the codec).
+> - **Add a CLI command:** a `clap` `Subcommand` variant in
+>   `crates/cli/src/commands/<domain>.rs`, wired in `main.rs`'s `Command` enum.
+> - **Add a daemon channel:** one `on.handle::<C>(…)` in
+>   `crates/daemon/src/services.rs`; handlers reach the engine through
+>   `ctx.runtime.engine()` and return `ServiceError` for typed failures.
+> - **Add a client facade method:** a one-liner over `Session::call::<C>()` in
+>   `crates/client/src/facades.rs`.
+> - **Add an engine domain:** a module under `crates/engine/src/`, hung off the
+>   `Engine` aggregate (`engine.rs`).
+> - **Add a Tauri command:** a `#[tauri::command]` in `crates/desktop/src/api.rs`,
+>   registered in `generate_handler!` in `lib.rs`.
+>
+> Conventions: `rustfmt` + `clippy -D warnings`; `thiserror` in libraries mapped
+> to `ipc::ErrorCode` at the service boundary; `tracing` for structured logs,
+> never logging tokens; single-word module names.
+>
+> **The C++ recipes below (`.{h,cc}`, `hestia::`, CMake) are historical; apply
+> the mapping above.**
 
 ## Conventions
 
