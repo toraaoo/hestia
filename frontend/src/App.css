@@ -1,0 +1,29 @@
+:root {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #e8e8e8;
+  background: #1a1a1a;
+}
+
+body {
+  margin: 0;
+}
+
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+}
+
+h1 {
+  font-size: 3rem;
+  margin: 0 0 0.5rem;
+}
+
+p {
+  color: #a0a0a0;
+  max-width: 32rem;
+}
