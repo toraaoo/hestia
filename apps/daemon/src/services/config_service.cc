@@ -1,37 +1,31 @@
-#include "services/services.h"
+#include "services/config_service.h"
 
-#include "runtime/handler_context.h"
-#include "runtime/router.h"
+#include "runtime/channels.h"
 #include "runtime/runtime.h"
 
 #include <hestia/engine/engine.h>
-#include <hestia/ipc/errors.h>
-
-#include <string>
+#include <hestia/proto/config.h>
 
 namespace hestia::daemon {
-    void register_config_service(Router &router) {
-        router.on("config.get", [](const ipc::Request &req, HandlerContext &ctx) {
-            const auto key = req.payload.at("key").get<std::string>();
-            if (const auto value = ctx.runtime.engine().config().get(key)) {
-                return ipc::Response::success({{"value", *value}});
+    void ConfigService::register_channels(Channels &on) {
+        on.handle<proto::ConfigGet>([](const proto::ConfigGet::Params &p, HandlerContext &ctx) {
+            if (const auto value = ctx.runtime.engine().config().get(p.key)) {
+                return proto::ConfigGet::Result{.value = *value};
             }
-            return ipc::Response::failure(ipc::errors::kNotFound, "key not found: " + key);
+            throw ServiceError(ipc::errors::kNotFound, "key not found: " + p.key);
         });
 
-        router.on("config.set", [](const ipc::Request &req, HandlerContext &ctx) {
-            ctx.runtime.engine().config().set(req.payload.at("key").get<std::string>(),
-                                              req.payload.at("value").get<std::string>());
-            return ipc::Response::success();
+        on.handle<proto::ConfigSet>([](const proto::ConfigSet::Params &p, HandlerContext &ctx) {
+            ctx.runtime.engine().config().set(p.key, p.value);
+            return proto::Empty{};
         });
 
-        router.on("config.home", [](const ipc::Request &, HandlerContext &ctx) {
-            return ipc::Response::success({{"path", ctx.runtime.engine().data_home().string()}});
+        on.handle<proto::ConfigHome>([](const proto::Empty &, HandlerContext &ctx) {
+            return proto::ConfigHome::Result{.path = ctx.runtime.engine().data_home()};
         });
 
-        router.on("config.set-home", [](const ipc::Request &req, HandlerContext &ctx) {
-            const auto dir = req.payload.value("dir", std::string{});
-            return ipc::Response::success({{"path", ctx.runtime.engine().set_data_home(dir).string()}});
+        on.handle<proto::ConfigSetHome>([](const proto::ConfigSetHome::Params &p, HandlerContext &ctx) {
+            return proto::ConfigHome::Result{.path = ctx.runtime.engine().set_data_home(p.dir)};
         });
     }
 } // namespace hestia::daemon

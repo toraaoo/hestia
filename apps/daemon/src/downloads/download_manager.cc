@@ -5,8 +5,6 @@
 #include <utility>
 
 #include <hestia/engine/downloader.h>
-#include <hestia/ipc/download_codec.h>
-#include <hestia/ipc/topics.h>
 
 namespace hestia::daemon {
     DownloadManager::DownloadManager(engine::Engine &engine, EventSink sink)
@@ -24,7 +22,7 @@ namespace hestia::daemon {
     }
 
     std::string DownloadManager::start(std::string url, std::filesystem::path destination,
-                                       std::optional<ipc::Checksum> checksum, std::string id) {
+                                       std::optional<proto::Checksum> checksum, std::string id) {
         if (id.empty()) id = "dl-" + std::to_string(next_id_++);
         auto done = std::make_shared<std::atomic<bool>>(false);
         std::thread thread([this, id, url = std::move(url), destination = std::move(destination),
@@ -39,24 +37,21 @@ namespace hestia::daemon {
     }
 
     void DownloadManager::run(const std::string &id, const std::string &url, const std::filesystem::path &destination,
-                              const std::optional<ipc::Checksum> &checksum) const {
+                              const std::optional<proto::Checksum> &checksum) const {
         using clock = std::chrono::steady_clock;
         auto last_emit = clock::time_point{};
-        const auto on_progress = [&](const ipc::DownloadProgress &progress) {
+        const auto on_progress = [&](const proto::DownloadProgress &progress) {
             const auto now = clock::now();
             const bool final_report = progress.total > 0 && progress.downloaded >= progress.total;
             if (!final_report && now - last_emit < std::chrono::milliseconds(100)) return;
             last_emit = now;
-            auto payload = ipc::to_json(progress);
-            payload["id"] = id;
-            sink_(ipc::Event{.topic = ipc::topics::kDownloadProgress, .payload = std::move(payload)});
+            sink_(proto::make_event(proto::DownloadProgressEvent{.id = id, .progress = progress}));
         };
         try {
             engine::Downloader{&engine_.cache()}.fetch(url, destination, checksum, on_progress);
-            sink_(ipc::Event{.topic = ipc::topics::kDownloadDone,
-                             .payload = {{"id", id}, {"path", destination.string()}}});
+            sink_(proto::make_event(proto::DownloadDoneEvent{.id = id, .path = destination}));
         } catch (const std::exception &e) {
-            sink_(ipc::Event{.topic = ipc::topics::kDownloadError, .payload = {{"id", id}, {"message", e.what()}}});
+            sink_(proto::make_event(proto::DownloadErrorEvent{.id = id, .message = e.what()}));
         }
     }
 

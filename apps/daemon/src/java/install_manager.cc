@@ -5,8 +5,7 @@
 #include <utility>
 
 #include <hestia/engine/java.h>
-#include <hestia/ipc/java_codec.h>
-#include <hestia/ipc/topics.h>
+#include <hestia/proto/java.h>
 
 namespace hestia::daemon {
     JavaInstallManager::JavaInstallManager(engine::Engine &engine, EventSink sink)
@@ -40,24 +39,21 @@ namespace hestia::daemon {
     void JavaInstallManager::run(const std::string &id, int major) {
         using clock = std::chrono::steady_clock;
         auto last_emit = clock::time_point{};
-        auto last_phase = std::optional<ipc::JavaInstallPhase>{};
-        const auto on_progress = [&](const ipc::JavaInstallProgress &progress) {
+        auto last_phase = std::optional<proto::JavaInstallPhase>{};
+        const auto on_progress = [&](const proto::JavaInstallProgress &progress) {
             const auto now = clock::now();
             const bool phase_change = last_phase != progress.phase;
             const bool final_report = progress.total > 0 && progress.current >= progress.total;
             if (!phase_change && !final_report && now - last_emit < std::chrono::milliseconds(100)) return;
             last_emit = now;
             last_phase = progress.phase;
-            auto payload = ipc::to_json(progress);
-            payload["id"] = id;
-            sink_(ipc::Event{.topic = ipc::topics::kJavaInstallProgress, .payload = std::move(payload)});
+            sink_(proto::make_event(proto::JavaInstallProgressEvent{.id = id, .progress = progress}));
         };
         try {
             const auto runtime = engine_.java().install(major, on_progress);
-            sink_(ipc::Event{.topic = ipc::topics::kJavaInstallDone,
-                             .payload = {{"id", id}, {"runtime", ipc::to_json(runtime)}}});
+            sink_(proto::make_event(proto::JavaInstallDoneEvent{.id = id, .runtime = runtime}));
         } catch (const std::exception &e) {
-            sink_(ipc::Event{.topic = ipc::topics::kJavaInstallError, .payload = {{"id", id}, {"message", e.what()}}});
+            sink_(proto::make_event(proto::JavaInstallErrorEvent{.id = id, .message = e.what()}));
         }
         std::scoped_lock const lk(mu_);
         active_majors_.erase(major);

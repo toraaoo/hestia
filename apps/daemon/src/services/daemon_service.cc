@@ -1,7 +1,6 @@
-#include "services/services.h"
+#include "services/daemon_service.h"
 
-#include "runtime/handler_context.h"
-#include "runtime/router.h"
+#include "runtime/channels.h"
 #include "runtime/runtime.h"
 
 #include <chrono>
@@ -10,6 +9,7 @@
 #include <hestia/app_info.h>
 #include <hestia/engine/engine.h>
 #include <hestia/ipc/endpoint.h>
+#include <hestia/proto/daemon.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -28,25 +28,25 @@ namespace hestia::daemon {
         }
     } // namespace
 
-    void register_daemon_service(Router &router) {
-        router.on("daemon.status", [](const ipc::Request &, HandlerContext &ctx) {
-            return ipc::Response::success({
-                {"pid", current_pid()},
-                {"version", APP_VERSION},
-                {"uptime_seconds", ctx.runtime.uptime_seconds()},
-                {"home", ctx.runtime.engine().data_home().string()},
-                {"log", (ipc::runtime_dir() / "hestiad.log").string()},
-            });
+    void DaemonService::register_channels(Channels &on) {
+        on.handle<proto::DaemonStatus>([](const proto::Empty &, HandlerContext &ctx) {
+            return proto::DaemonStatus::Result{
+                .pid = current_pid(),
+                .version = APP_VERSION,
+                .uptime_seconds = ctx.runtime.uptime_seconds(),
+                .home = ctx.runtime.engine().data_home(),
+                .log = ipc::runtime_dir() / "hestiad.log",
+            };
         });
 
-        router.on("daemon.stop", [](const ipc::Request &, HandlerContext &ctx) {
+        on.handle<proto::DaemonStop>([](const proto::Empty &, HandlerContext &ctx) {
             // Shut down on a short delay so this response reaches the client
             // before the serve loop closes its connection.
             std::thread([&runtime = ctx.runtime] {
                 std::this_thread::sleep_for(std::chrono::milliseconds(200));
                 runtime.request_stop();
             }).detach();
-            return ipc::Response::success({{"stopping", true}});
+            return proto::DaemonStop::Result{.stopping = true};
         });
     }
 } // namespace hestia::daemon

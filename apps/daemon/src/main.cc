@@ -1,7 +1,7 @@
 #include "runtime/server.h"
 
 #include <hestia/app_info.h>
-#include <hestia/client/client.h>
+#include <hestia/client.h>
 #include <hestia/ipc/endpoint.h>
 #include <hestia/logging.h>
 
@@ -26,7 +26,7 @@ namespace {
     int run_ping() {
         try {
             auto client = hestia::client::Client::connect(/*auto_spawn=*/false);
-            const auto info = client.app_info();
+            const auto info = client.app().info();
             std::cout << info.name << ' ' << info.version << " — alive\n";
             return 0;
         } catch (const std::exception &e) {

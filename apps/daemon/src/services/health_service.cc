@@ -1,7 +1,8 @@
-#include "services/services.h"
+#include "services/health_service.h"
 
-#include "runtime/handler_context.h"
-#include "runtime/router.h"
+#include "runtime/channels.h"
+
+#include <hestia/proto/health.h>
 
 #if !defined(_WIN32)
 #include <unistd.h>
@@ -20,9 +21,9 @@ namespace hestia::daemon {
         }
     } // namespace
 
-    void register_health_service(Router &router) {
-        router.on("health.ping", [](const ipc::Request &, HandlerContext &) {
-            return ipc::Response::success({{"status", "alive"}, {"pid", current_pid()}});
+    void HealthService::register_channels(Channels &on) {
+        on.handle<proto::Ping>([](const proto::Empty &, HandlerContext &) {
+            return proto::Ping::Result{.status = "alive", .pid = current_pid()};
         });
     }
 } // namespace hestia::daemon

@@ -14,6 +14,8 @@ namespace hestia::daemon {
         }
         try {
             return it->second(request, ctx);
+        } catch (const ServiceError &e) {
+            return ipc::Response::failure(e.code(), e.what());
         } catch (const std::exception &e) {
             // A handler that throws (e.g. a missing payload field) becomes a clean
             // error rather than taking down the daemon.

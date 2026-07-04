@@ -11,8 +11,8 @@
 #include <vector>
 
 #include <hestia/engine/engine.h>
-#include <hestia/ipc/download.h>
 #include <hestia/ipc/protocol.h>
+#include <hestia/proto/download.h>
 
 // Runs downloads on background worker threads — one per active download — so
 // `download.start` answers immediately; progress and the terminal outcome are
@@ -30,7 +30,7 @@ namespace hestia::daemon {
         // Start a download and return its id — the caller-supplied `id` when
         // non-empty, else a generated one. The outcome arrives as a
         // download.done or download.error event carrying that id.
-        std::string start(std::string url, std::filesystem::path destination, std::optional<ipc::Checksum> checksum,
+        std::string start(std::string url, std::filesystem::path destination, std::optional<proto::Checksum> checksum,
                           std::string id);
 
     private:
@@ -40,7 +40,7 @@ namespace hestia::daemon {
         };
 
         void run(const std::string &id, const std::string &url, const std::filesystem::path &destination,
-                 const std::optional<ipc::Checksum> &checksum) const;
+                 const std::optional<proto::Checksum> &checksum) const;
         void prune_finished();
 
         engine::Engine &engine_;

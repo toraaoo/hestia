@@ -3,7 +3,8 @@
 #include "runtime/handler_context.h"
 #include "runtime/router.h"
 #include "runtime/runtime.h"
-#include "services/services.h"
+#include "runtime/channels.h"
+#include "services/registry.h"
 
 #include <hestia/ipc/endpoint.h>
 #include <hestia/ipc/errors.h>
@@ -65,7 +66,9 @@ namespace hestia::daemon {
         runtime.set_stop_handler([&listener] { listener->stop(); });
 
         Router router;
-        register_all_services(router);
+        Channels channels(router);
+        const auto services = make_services();
+        for (const auto &service: services) service->register_channels(channels);
 
         g_listener.store(listener.get());
         std::signal(SIGINT, handle_signal);

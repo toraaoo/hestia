@@ -1,25 +1,24 @@
-#include "services/services.h"
+#include "services/events_service.h"
 
+#include "runtime/channels.h"
 #include "runtime/event_hub.h"
-#include "runtime/handler_context.h"
-#include "runtime/router.h"
 #include "runtime/runtime.h"
 
 #include <optional>
 #include <string>
 
+#include <hestia/proto/events.h>
+
 namespace hestia::daemon {
-    void register_events_service(Router &router) {
+    void EventsService::register_channels(Channels &on) {
         // A streaming channel: it needs the calling connection to push to, which it
         // gets from the context — so it is an ordinary handler, not a special case
-        // in the serve loop (A2). Closing the connection prunes the subscription.
-        router.on("events.subscribe", [](const ipc::Request &req, HandlerContext &ctx) {
+        // in the serve loop. Closing the connection prunes the subscription.
+        on.handle<proto::EventsSubscribe>([](const proto::EventsSubscribe::Params &p, HandlerContext &ctx) {
             std::optional<std::string> filter;
-            if (req.payload.contains("id") && req.payload["id"].is_string()) {
-                filter = req.payload["id"].get<std::string>();
-            }
+            if (!p.id.empty()) filter = p.id;
             ctx.runtime.hub().subscribe(ctx.connection, std::move(filter));
-            return ipc::Response::success({{"subscribed", true}});
+            return proto::EventsSubscribe::Result{.subscribed = true};
         });
     }
 } // namespace hestia::daemon

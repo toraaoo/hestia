@@ -1,14 +1,13 @@
 #pragma once
 
-#include <hestia/ipc/process.h>
-#include <hestia/ipc/process_codec.h>
+#include <hestia/proto/process.h>
 
-// Re-exports the shared process domain types into the daemon namespace so
-// daemon-internal code reads `ProcessRecord`, not `ipc::ProcessRecord`.
+// The process domain vocabulary comes from the shared wire contracts, so the
+// daemon-internal code reads `ProcessRecord`, not `proto::ProcessRecord`.
 namespace hestia::daemon {
-    using ipc::LaunchSpec;
-    using ipc::ProcessKind;
-    using ipc::ProcessRecord;
-    using ipc::ProcessState;
-    using ipc::RestartPolicy;
+    using proto::LaunchSpec;
+    using proto::ProcessKind;
+    using proto::ProcessRecord;
+    using proto::ProcessState;
+    using proto::RestartPolicy;
 } // namespace hestia::daemon

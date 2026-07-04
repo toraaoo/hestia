@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-#include <hestia/ipc/process_codec.h>
+#include <hestia/proto/process.h>
 
 namespace hestia::daemon {
     namespace fs = std::filesystem;
@@ -30,7 +30,7 @@ namespace hestia::daemon {
         fs::create_directories(path_.parent_path(), ec);
 
         json j = json::array();
-        for (const auto &[id, rec]: records_) j.push_back(ipc::to_json(rec));
+        for (const auto &[id, rec]: records_) j.push_back(rec);
 
         // Atomic replace: write a sibling temp file, flush it, then rename over
         // the target. A crash leaves either the old table or the new one intact,
@@ -58,7 +58,7 @@ namespace hestia::daemon {
             json j;
             f >> j;
             for (const auto &entry: j) {
-                auto rec = ipc::record_from_json(entry);
+                auto rec = entry.get<ProcessRecord>();
                 records_[rec.id] = rec;
             }
         } catch (...) {

@@ -10,6 +10,7 @@ add_executable(hestia_daemon
         src/runtime/runtime.h
         src/runtime/router.cc
         src/runtime/router.h
+        src/runtime/channels.h
         src/runtime/handler_context.h
         src/runtime/event_hub.h
         src/process/process_supervisor.cc
@@ -31,17 +32,29 @@ add_executable(hestia_daemon
         src/platform/autostart.cc
         src/platform/autostart.h
         src/platform/win_util.h
-        src/services/services.h
+        src/services/service.h
+        src/services/registry.cc
+        src/services/registry.h
         src/services/health_service.cc
+        src/services/health_service.h
         src/services/app_service.cc
+        src/services/app_service.h
         src/services/daemon_service.cc
+        src/services/daemon_service.h
         src/services/config_service.cc
+        src/services/config_service.h
         src/services/process_service.cc
+        src/services/process_service.h
         src/services/autostart_service.cc
+        src/services/autostart_service.h
         src/services/events_service.cc
+        src/services/events_service.h
         src/services/downloads_service.cc
+        src/services/downloads_service.h
         src/services/java_service.cc
+        src/services/java_service.h
         src/services/cache_service.cc
+        src/services/cache_service.h
 )
 
 target_include_directories(hestia_daemon PRIVATE src)

@@ -1,38 +1,33 @@
-#include "services/services.h"
+#include "services/cache_service.h"
 
-#include "runtime/handler_context.h"
-#include "runtime/router.h"
+#include "runtime/channels.h"
 #include "runtime/runtime.h"
 
 #include <hestia/engine/engine.h>
+#include <hestia/proto/cache.h>
 
 namespace hestia::daemon {
-    void register_cache_service(Router &router) {
-        router.on("cache.info", [](const ipc::Request &, HandlerContext &ctx) {
+    void CacheService::register_channels(Channels &on) {
+        on.handle<proto::CacheInfo>([](const proto::Empty &, HandlerContext &ctx) {
             auto &cache = ctx.runtime.engine().cache();
             const auto usage = cache.usage();
-            return ipc::Response::success({
-                {"path", cache.dir().string()},
-                {"entries", usage.entries},
-                {"bytes", usage.bytes},
-            });
+            return proto::CacheInfo::Result{
+                .path = cache.dir(),
+                .usage = {.entries = usage.entries, .bytes = usage.bytes},
+            };
         });
 
-        router.on("cache.list", [](const ipc::Request &, HandlerContext &ctx) {
-            auto entries = nlohmann::json::array();
+        on.handle<proto::CacheList>([](const proto::Empty &, HandlerContext &ctx) {
+            proto::CacheList::Result out;
             for (const auto &entry: ctx.runtime.engine().cache().entries()) {
-                entries.push_back({
-                    {"algorithm", ipc::to_string(entry.checksum.algorithm)},
-                    {"hex", entry.checksum.hex},
-                    {"size", entry.size},
-                });
+                out.entries.push_back(proto::CacheEntry{.checksum = entry.checksum, .size = entry.size});
             }
-            return ipc::Response::success({{"entries", std::move(entries)}});
+            return out;
         });
 
-        router.on("cache.clear", [](const ipc::Request &, HandlerContext &ctx) {
+        on.handle<proto::CacheClear>([](const proto::Empty &, HandlerContext &ctx) {
             const auto freed = ctx.runtime.engine().cache().clear();
-            return ipc::Response::success({{"entries", freed.entries}, {"bytes", freed.bytes}});
+            return proto::CacheUsage{.entries = freed.entries, .bytes = freed.bytes};
         });
     }
 } // namespace hestia::daemon

@@ -1,26 +1,27 @@
-#include "services/services.h"
+#include "services/autostart_service.h"
 
 #include "platform/autostart.h"
-#include "runtime/handler_context.h"
-#include "runtime/router.h"
+#include "runtime/channels.h"
+
+#include <hestia/proto/autostart.h>
 
 namespace hestia::daemon {
-    void register_autostart_service(Router &router) {
+    void AutostartService::register_channels(Channels &on) {
         // Autostart is constructed per call so an unsupported platform fails the
         // one request rather than the whole daemon, and so the registration always
         // resolves the daemon's current executable path.
-        router.on("autostart.enable", [](const ipc::Request &, HandlerContext &) {
+        on.handle<proto::AutostartEnable>([](const proto::Empty &, HandlerContext &) {
             make_autostart()->enable();
-            return ipc::Response::success({{"enabled", true}});
+            return proto::AutostartState{.enabled = true};
         });
 
-        router.on("autostart.disable", [](const ipc::Request &, HandlerContext &) {
+        on.handle<proto::AutostartDisable>([](const proto::Empty &, HandlerContext &) {
             make_autostart()->disable();
-            return ipc::Response::success({{"enabled", false}});
+            return proto::AutostartState{.enabled = false};
         });
 
-        router.on("autostart.status", [](const ipc::Request &, HandlerContext &) {
-            return ipc::Response::success({{"enabled", make_autostart()->is_enabled()}});
+        on.handle<proto::AutostartStatus>([](const proto::Empty &, HandlerContext &) {
+            return proto::AutostartState{.enabled = make_autostart()->is_enabled()};
         });
     }
 } // namespace hestia::daemon

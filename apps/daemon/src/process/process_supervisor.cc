@@ -15,7 +15,7 @@
 #include <thread>
 #include <unordered_set>
 
-#include <hestia/ipc/topics.h>
+#include <hestia/proto/process.h>
 
 #include <spdlog/spdlog.h>
 
@@ -174,7 +174,7 @@ namespace hestia::daemon {
             }
 
             ipc::Event state_event(const ProcessRecord &rec) const {
-                return ipc::Event{.topic = ipc::topics::kProcessState, .payload = ipc::to_json(rec)};
+                return proto::make_event(proto::ProcessStateEvent{.record = rec});
             }
 
             // The supervision loop: detect deaths, stream new log output, and
@@ -232,8 +232,8 @@ namespace hestia::daemon {
                         changed = true;
                     }
                     if (std::string chunk = streamer_.read_new(id, rec.log_path); !chunk.empty()) {
-                        events.push_back(ipc::Event{.topic = ipc::topics::kProcessLog,
-                                                    .payload = {{"id", id}, {"text", std::move(chunk)}}});
+                        events.push_back(
+                            proto::make_event(proto::ProcessLogEvent{.id = id, .text = std::move(chunk)}));
                     }
                     if (const auto at = launched_at_.find(id);
                         at != launched_at_.end() && restart::should_reset_retries(rec, now - at->second)) {
