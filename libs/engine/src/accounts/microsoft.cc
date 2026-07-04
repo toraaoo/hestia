@@ -20,6 +20,7 @@ namespace hestia::engine {
 
         constexpr const char *kDeviceAuthUrl = "https://device.auth.xboxlive.com/device/authenticate";
         constexpr const char *kSisuAuthenticateUrl = "https://sisu.xboxlive.com/authenticate";
+        constexpr const char *kDeviceCodeUrl = "https://login.live.com/oauth20_connect.srf";
         constexpr const char *kOauthTokenUrl = "https://login.live.com/oauth20_token.srf";
         constexpr const char *kSisuAuthorizeUrl = "https://sisu.xboxlive.com/authorize";
         constexpr const char *kXstsUrl = "https://xsts.auth.xboxlive.com/xsts/authorize";
@@ -151,6 +152,50 @@ namespace hestia::engine {
                                .expires_in = doc.value("expires_in", 0LL)};
         }
     } // namespace
+
+    DeviceCodeChallenge request_device_code() {
+        const auto response = cpr::Post(cpr::Url{kDeviceCodeUrl},
+                                        cpr::Payload{{"client_id", kClientId},
+                                                     {"scope", kScope},
+                                                     {"response_type", "device_code"}},
+                                        cpr::Header{{"Accept", "application/json"}});
+        const auto doc = parse_body(response, "device sign-in request");
+        if (doc.contains("error")) {
+            throw std::runtime_error(fmt::format(
+                "Microsoft declined the device sign-in request: {}",
+                doc.value("error_description", doc.value("error", std::string{"unknown error"}))));
+        }
+        return DeviceCodeChallenge{
+            .user_code = require_string(doc, "user_code", "device sign-in request"),
+            .verification_uri = require_string(doc, "verification_uri", "device sign-in request"),
+            .device_code = require_string(doc, "device_code", "device sign-in request"),
+            .interval_seconds = doc.value("interval", 5LL),
+            .expires_in_seconds = doc.value("expires_in", 900LL)};
+    }
+
+    std::optional<OAuthTokens> poll_device_code(const std::string &device_code) {
+        const auto response = cpr::Post(cpr::Url{kOauthTokenUrl},
+                                        cpr::Payload{{"client_id", kClientId},
+                                                     {"grant_type", "urn:ietf:params:oauth:grant-type:device_code"},
+                                                     {"device_code", device_code}},
+                                        cpr::Header{{"Accept", "application/json"}});
+        const auto doc = parse_body(response, "device sign-in poll");
+        const auto error = doc.value("error", std::string{});
+        if (error.empty()) {
+            return OAuthTokens{.access_token = require_string(doc, "access_token", "device sign-in poll"),
+                               .refresh_token = doc.value("refresh_token", std::string{}),
+                               .expires_in = doc.value("expires_in", 0LL)};
+        }
+        if (error == "authorization_pending" || error == "slow_down") return std::nullopt;
+        if (error == "authorization_declined") {
+            throw std::runtime_error("the sign-in was declined; run 'hestia auth login' again");
+        }
+        if (error == "expired_token") {
+            throw std::runtime_error("the sign-in request expired; run 'hestia auth login' again");
+        }
+        throw std::runtime_error(
+            fmt::format("Microsoft rejected the sign-in: {}", doc.value("error_description", error)));
+    }
 
     OAuthTokens redeem_code(const std::string &code, const std::string &verifier) {
         return exchange_oauth(cpr::Payload{{"client_id", kClientId},

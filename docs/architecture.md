@@ -239,20 +239,31 @@ The subsystems behind the aggregate today:
   (`hestia cache info|list|clear`).
 - **`Accounts`** (`accounts.h`) — Minecraft accounts signed in through
   Microsoft, persisted with their tokens in `<data_home>/accounts.json`
-  (owner-only on POSIX). Sign-in is the **launcher (sisu) flow** the official
-  launcher and Modrinth App use, so no per-distribution Azure application is
-  needed — it uses the well-known Minecraft client id `00000000402b5328`. It is
-  two blocking steps: `begin_login()` mints a per-login ECDSA P-256 proof key,
-  gets a proof-of-possession device token, runs PKCE sisu `/authenticate`, and
-  returns the Microsoft sign-in URL (holding the proof key and verifier in an
-  in-memory pending map keyed by login id); `complete_login()` redeems the
-  pasted OAuth code → sisu `/authorize` → XSTS → `launcher/login` → profile and
-  upserts the account by uuid. The HTTP steps live in the private
-  `src/accounts/microsoft.{h,cc}`; Xbox request signing (the proof key and the
-  FILETIME-stamped `Signature` header) is `src/accounts/signing.{h,cc}` with
-  platform backends `signing_openssl.cc` (POSIX, OpenSSL) and
-  `signing_windows.cc` (Windows, CNG). Both steps are synchronous request/
-  response channels, so there is no daemon-side login worker.
+  (owner-only on POSIX). Both sign-in methods use the well-known Minecraft
+  client id `00000000402b5328`, so no per-distribution Azure application is
+  needed; the client picks one via `begin_login(LoginMethod)`. Sign-in is two
+  blocking steps — `begin_login()` returns what the user must act on and holds
+  per-login state in an in-memory pending map keyed by login id;
+  `complete_login()` drives it to a stored account, upserting by uuid. Both
+  converge on the same signed tail — Xbox device token → sisu `/authorize`
+  (no session) → XSTS → `launcher/login` → profile — the path `access_token()`'s
+  token rotation also runs:
+    - **device_code** (the CLI default, no paste): `begin_login()` requests a
+      device code and returns the `user_code` + `verification_uri`;
+      `complete_login()` polls the device-code grant until the user approves in
+      a browser (or the code expires), then runs the signed tail with a fresh
+      proof key. Per-connection daemon threads make the long poll safe.
+    - **sisu** (the launcher flow the official launcher and Modrinth App use,
+      suited to a front-end with an embedded browser): `begin_login()` mints an
+      ECDSA P-256 proof key, gets a proof-of-possession device token, runs PKCE
+      sisu `/authenticate`, and returns the Microsoft sign-in URL;
+      `complete_login()` redeems the redirect's OAuth code through the sisu
+      session before the shared tail. The CLI reaches it with `auth login --sisu`.
+  The HTTP steps live in the private `src/accounts/microsoft.{h,cc}`; Xbox
+  request signing (the proof key and the FILETIME-stamped `Signature` header) is
+  `src/accounts/signing.{h,cc}` with platform backends `signing_openssl.cc`
+  (POSIX, OpenSSL) and `signing_windows.cc` (Windows, CNG). Both steps are
+  synchronous request/response channels, so there is no daemon-side login worker.
 - **`Java`** (`java.h`) — installs and tracks Java runtimes under
   `<data_home>/java`. **`JavaProvider`** is the abstract catalogue seam: an
   implementation resolves release lines and the latest GA build for a

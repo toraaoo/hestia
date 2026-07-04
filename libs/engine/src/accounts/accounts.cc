@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <chrono>
 #include <fstream>
+#include <optional>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -13,10 +15,14 @@
 
 namespace hestia::engine {
     struct LoginSession {
-        ProofKey key;
+        proto::LoginMethod method = proto::LoginMethod::device_code;
+        std::optional<ProofKey> key;
         std::string device_token;
         std::string verifier;
         std::string session_id;
+        std::string device_code;
+        long long interval_seconds = 5;
+        long long expires_at = 0;
     };
 
     namespace {
@@ -106,6 +112,19 @@ namespace hestia::engine {
                 .count();
         }
 
+        OAuthTokens await_device_tokens(const LoginSession &session) {
+            const auto interval =
+                std::chrono::seconds(session.interval_seconds > 0 ? session.interval_seconds : 5);
+            while (now_seconds() < session.expires_at) {
+                if (auto tokens = poll_device_code(session.device_code)) {
+                    return *tokens;
+                }
+                std::this_thread::sleep_for(interval);
+            }
+            throw std::runtime_error("the sign-in request expired before it was approved; run 'hestia auth login' "
+                                     "again");
+        }
+
         void rotate_tokens(StoredAccount &account) {
             if (account.refresh_token.empty()) {
                 throw std::runtime_error("this account has no refresh token; sign in again");
@@ -134,24 +153,45 @@ namespace hestia::engine {
         return accounts;
     }
 
-    LoginChallenge Accounts::begin_login() {
+    LoginChallenge Accounts::begin_login(proto::LoginMethod method) {
+        auto id = format_uuid_v4(random_bytes(16));
+
+        if (method == proto::LoginMethod::device_code) {
+            const auto device = request_device_code();
+
+            auto session = std::make_unique<LoginSession>();
+            session->method = method;
+            session->device_code = device.device_code;
+            session->interval_seconds = device.interval_seconds;
+            session->expires_at = now_seconds() + device.expires_in_seconds;
+
+            std::scoped_lock const lk(mu_);
+            pending_[id] = std::move(session);
+            return LoginChallenge{.id = id,
+                                  .method = method,
+                                  .url = {},
+                                  .user_code = device.user_code,
+                                  .verification_uri = device.verification_uri};
+        }
+
         auto key = ProofKey::generate();
         auto device_token = request_device_token(key);
         auto verifier = to_hex(random_bytes(64));
-
         const auto challenge = base64url_nopad(sha256_bytes(verifier));
         const auto state = to_hex(random_bytes(16));
         const auto auth = sisu_authenticate(device_token, challenge, state, key);
 
-        auto session = std::unique_ptr<LoginSession>(new LoginSession{.key = std::move(key),
-                                                                      .device_token = std::move(device_token),
-                                                                      .verifier = std::move(verifier),
-                                                                      .session_id = auth.session_id});
+        auto session = std::make_unique<LoginSession>();
+        session->method = method;
+        session->key = std::move(key);
+        session->device_token = std::move(device_token);
+        session->verifier = std::move(verifier);
+        session->session_id = auth.session_id;
 
-        auto id = format_uuid_v4(random_bytes(16));
         std::scoped_lock const lk(mu_);
         pending_[id] = std::move(session);
-        return LoginChallenge{.id = id, .url = auth.url};
+        return LoginChallenge{
+            .id = id, .method = method, .url = auth.url, .user_code = {}, .verification_uri = {}};
     }
 
     proto::Account Accounts::complete_login(const std::string &id, const std::string &code) {
@@ -166,10 +206,20 @@ namespace hestia::engine {
             pending_.erase(it);
         }
 
-        const auto oauth = redeem_code(code, session->verifier);
-        const auto authorization =
-            sisu_authorize(session->session_id, oauth.access_token, session->device_token, session->key);
-        const auto xsts = xsts_authorize(authorization, session->device_token, session->key);
+        OAuthTokens oauth;
+        XstsToken xsts;
+        if (session->method == proto::LoginMethod::device_code) {
+            oauth = await_device_tokens(*session);
+            auto key = ProofKey::generate();
+            const auto device_token = request_device_token(key);
+            const auto authorization = sisu_authorize("", oauth.access_token, device_token, key);
+            xsts = xsts_authorize(authorization, device_token, key);
+        } else {
+            oauth = redeem_code(code, session->verifier);
+            const auto authorization =
+                sisu_authorize(session->session_id, oauth.access_token, session->device_token, *session->key);
+            xsts = xsts_authorize(authorization, session->device_token, *session->key);
+        }
         const auto minecraft_token = launcher_login(xsts);
         const auto profile = minecraft_profile(minecraft_token);
 

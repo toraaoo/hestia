@@ -8,9 +8,13 @@
 
 namespace hestia::daemon {
     void AccountsService::register_channels(Channels &on) {
-        on.handle<proto::AccountLoginBegin>([](const proto::Empty &, HandlerContext &ctx) {
-            const auto challenge = ctx.runtime.engine().accounts().begin_login();
-            return proto::AccountLoginBegin::Result{.id = challenge.id, .url = challenge.url};
+        on.handle<proto::AccountLoginBegin>([](const proto::AccountLoginBegin::Params &p, HandlerContext &ctx) {
+            const auto challenge = ctx.runtime.engine().accounts().begin_login(p.method);
+            return proto::AccountLoginBegin::Result{.id = challenge.id,
+                                                    .method = challenge.method,
+                                                    .url = challenge.url,
+                                                    .user_code = challenge.user_code,
+                                                    .verification_uri = challenge.verification_uri};
         });
 
         on.handle<proto::AccountLoginComplete>([](const proto::AccountLoginComplete::Params &p, HandlerContext &ctx) {

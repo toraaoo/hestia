@@ -158,11 +158,14 @@ CI steps. See [scripts/README.md](scripts/README.md).
 hestia
 
 # Minecraft accounts (Microsoft sign-in)
-hestia auth login                # open the printed URL, sign in, paste the redirect back
+hestia auth login                # enter the shown code at microsoft.com/link — nothing to paste
+hestia auth login --sisu         # browser-redirect flow: open the URL, sign in, paste the redirect back
 hestia auth list                 # signed-in accounts
 hestia auth logout <name|uuid>   # sign out and forget the stored tokens
-# Uses the launcher (sisu) flow with the well-known Minecraft client id, so no
-# Azure application registration or configuration is needed.
+# Both flows use the well-known Minecraft client id, so no Azure application
+# registration or configuration is needed. The default is the device-code grant
+# (the daemon polls while you approve in a browser); --sisu is the launcher
+# (sisu) flow, suited to a front-end with an embedded browser.
 
 # Java runtimes (Eclipse Temurin via the Adoptium API)
 hestia java available            # release lines the provider ships

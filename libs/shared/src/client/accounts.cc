@@ -5,12 +5,12 @@
 #include "session.h"
 
 namespace hestia::client {
-    proto::AccountLoginBegin::Result Accounts::begin_login() {
-        return session_->call<proto::AccountLoginBegin>({}, std::chrono::seconds(60));
+    proto::AccountLoginBegin::Result Accounts::begin_login(proto::LoginMethod method) {
+        return session_->call<proto::AccountLoginBegin>({.method = method}, std::chrono::seconds(60));
     }
 
     proto::Account Accounts::complete_login(const std::string &id, const std::string &code) {
-        return session_->call<proto::AccountLoginComplete>({.id = id, .code = code}, std::chrono::seconds(120))
+        return session_->call<proto::AccountLoginComplete>({.id = id, .code = code}, std::chrono::minutes(16))
             .account;
     }
 

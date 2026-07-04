@@ -47,6 +47,7 @@ add_library(hestia_shared STATIC
         src/proto/process.cc
         src/proto/download.cc
         src/proto/java.cc
+        src/proto/accounts.cc
         src/client/session.h
         src/client/session.cc
         src/client/spawn.h

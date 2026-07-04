@@ -1,6 +1,7 @@
 #include "commands/auth_command.h"
 
 #include <cctype>
+#include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -9,8 +10,23 @@
 
 #include "output.h"
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 namespace hestia::cli {
     namespace {
+        void open_browser(const std::string &url) {
+            if (!url.starts_with("https://") || url.find_first_of("\"'") != std::string::npos) return;
+#if defined(_WIN32)
+            ::ShellExecuteA(nullptr, "open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+#elif defined(__APPLE__)
+            std::system(("open '" + url + "' >/dev/null 2>&1").c_str());
+#else
+            std::system(("xdg-open '" + url + "' >/dev/null 2>&1 &").c_str());
+#endif
+        }
+
         std::string url_decode(const std::string &value) {
             std::string out;
             out.reserve(value.size());
@@ -35,7 +51,6 @@ namespace hestia::cli {
             return value.substr(begin, end - begin + 1);
         }
 
-        // Accepts either the full redirect URL the browser lands on or a bare code.
         std::string extract_code(const std::string &pasted) {
             auto input = trim(pasted);
             const auto marker = input.find("code=");
@@ -45,38 +60,67 @@ namespace hestia::cli {
             return url_decode(input.substr(begin, end == std::string::npos ? std::string::npos : end - begin));
         }
 
+        void wait_for_enter(const std::string &prompt) {
+            std::cout << prompt << std::flush;
+            std::string discard;
+            std::getline(std::cin, discard);
+        }
+
+        proto::Account device_code_login(client::Client &client) {
+            proto::AccountLoginBegin::Result flow;
+            {
+                Spinner const spinner("Requesting a sign-in code");
+                flow = client.accounts().begin_login(proto::LoginMethod::device_code);
+            }
+            std::cout << "\nTo sign in, open\n\n  " << flow.verification_uri << "\n\nand enter the code\n\n  "
+                      << flow.user_code << "\n\n";
+            wait_for_enter("Press Enter to open your browser... ");
+            open_browser(flow.verification_uri);
+
+            Spinner const spinner("Waiting for you to finish in the browser");
+            return client.accounts().complete_login(flow.id);
+        }
+
+        proto::Account sisu_login(client::Client &client) {
+            proto::AccountLoginBegin::Result flow;
+            {
+                Spinner const spinner("Preparing the Microsoft sign-in");
+                flow = client.accounts().begin_login(proto::LoginMethod::sisu);
+            }
+            std::cout << "Open this URL in your browser and sign in:\n\n  " << flow.url << "\n\n";
+            wait_for_enter("Press Enter to open your browser... ");
+            open_browser(flow.url);
+            std::cout << "You'll land on a blank page — paste its full address (or just the\n"
+                         "code) here, then press Enter:\n> "
+                      << std::flush;
+
+            std::string input;
+            std::getline(std::cin, input);
+            const auto code = extract_code(input);
+            if (code.empty()) {
+                throw std::runtime_error("no authorization code was pasted");
+            }
+
+            Spinner const spinner("Completing the sign-in");
+            return client.accounts().complete_login(flow.id, code);
+        }
+
         class AuthLoginCommand : public Command {
         public:
             void register_command(CLI::App &parent, AppContext &ctx) override {
                 auto *cmd = parent.add_subcommand("login", "Sign in to a Microsoft account");
-                cmd->callback([&ctx] {
-                    ctx.with_client([](client::Client &client) {
-                        proto::AccountLoginBegin::Result flow;
-                        {
-                            Spinner const spinner("Preparing the Microsoft sign-in");
-                            flow = client.accounts().begin_login();
-                        }
-                        std::cout << "Open this URL in your browser and sign in:\n\n  " << flow.url << "\n\n"
-                                  << "You'll land on a blank page — paste its full address (or just the\n"
-                                     "code) here, then press Enter:\n> "
-                                  << std::flush;
-
-                        std::string input;
-                        std::getline(std::cin, input);
-                        const auto code = extract_code(input);
-                        if (code.empty()) {
-                            throw std::runtime_error("no authorization code was pasted");
-                        }
-
-                        proto::Account account;
-                        {
-                            Spinner const spinner("Completing the sign-in");
-                            account = client.accounts().complete_login(flow.id, code);
-                        }
+                cmd->add_flag("--sisu", sisu_,
+                              "Sign in through the browser-redirect (sisu) flow instead of a device code");
+                cmd->callback([this, &ctx] {
+                    ctx.with_client([this](client::Client &client) {
+                        const auto account = sisu_ ? sisu_login(client) : device_code_login(client);
                         std::cout << "Signed in as " << account.name << " (" << account.uuid << ")\n";
                     });
                 });
             }
+
+        private:
+            bool sisu_ = false;
         };
 
         class AuthListCommand : public Command {

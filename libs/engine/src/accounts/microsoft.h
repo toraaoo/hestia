@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "accounts/signing.h"
@@ -8,6 +9,14 @@ namespace hestia::engine {
     struct SisuAuthentication {
         std::string session_id;
         std::string url;
+    };
+
+    struct DeviceCodeChallenge {
+        std::string user_code;
+        std::string verification_uri;
+        std::string device_code;
+        long long interval_seconds = 5;
+        long long expires_in_seconds = 900;
     };
 
     struct OAuthTokens {
@@ -35,6 +44,10 @@ namespace hestia::engine {
 
     SisuAuthentication sisu_authenticate(const std::string &device_token, const std::string &challenge,
                                          const std::string &state, const ProofKey &key);
+
+    DeviceCodeChallenge request_device_code();
+
+    std::optional<OAuthTokens> poll_device_code(const std::string &device_code);
 
     OAuthTokens redeem_code(const std::string &code, const std::string &verifier);
 

@@ -12,7 +12,10 @@
 namespace hestia::engine {
     struct LoginChallenge {
         std::string id;
+        proto::LoginMethod method = proto::LoginMethod::device_code;
         std::string url;
+        std::string user_code;
+        std::string verification_uri;
     };
 
     struct LoginSession;
@@ -24,7 +27,7 @@ namespace hestia::engine {
 
         [[nodiscard]] std::vector<proto::Account> list() const;
 
-        LoginChallenge begin_login();
+        LoginChallenge begin_login(proto::LoginMethod method);
         proto::Account complete_login(const std::string &id, const std::string &code);
 
         // A currently-valid Minecraft access token for the account named by `ref`
