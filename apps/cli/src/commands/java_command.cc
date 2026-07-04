@@ -35,6 +35,8 @@ namespace hestia::cli {
             void register_command(CLI::App &parent, AppContext &ctx) override {
                 auto *cmd = parent.add_subcommand("install", "Install a Java runtime via the daemon");
                 cmd->add_option("major", major_, "Major version to install (e.g. 21); omit for the latest release");
+                cmd->add_flag("-f,--force,--redownload", force_,
+                              "Reinstall even when the release line is already present");
                 cmd->callback([this, &ctx] {
                     ctx.with_client([this](client::Client &client) {
                         std::optional<Spinner> spinner;
@@ -56,9 +58,9 @@ namespace hestia::cli {
                                 }
                             }
                         };
-                        proto::JavaRuntime runtime;
+                        client::JavaInstallResult result;
                         try {
-                            runtime = client.java().install(major_, on_progress);
+                            result = client.java().install(major_, force_, on_progress);
                         } catch (...) {
                             spinner.reset();
                             download_bar.finish();
@@ -68,14 +70,22 @@ namespace hestia::cli {
                         spinner.reset();
                         download_bar.finish();
                         extract_bar.finish();
-                        std::cout << "Installed " << runtime.vendor << ' ' << runtime.release_name << " at "
-                                  << runtime.home.string() << '\n';
+                        const auto &runtime = result.runtime;
+                        if (result.already_installed) {
+                            std::cout << runtime.vendor << ' ' << runtime.release_name
+                                      << " is already installed at " << runtime.home.string()
+                                      << " (use --force to reinstall)\n";
+                        } else {
+                            std::cout << "Installed " << runtime.vendor << ' ' << runtime.release_name << " at "
+                                      << runtime.home.string() << '\n';
+                        }
                     });
                 });
             }
 
         private:
             int major_ = 0;
+            bool force_ = false;
         };
 
         class JavaListCommand : public Command {

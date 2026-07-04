@@ -13,7 +13,7 @@ namespace hestia::client {
         return session_->call<proto::JavaList>().runtimes;
     }
 
-    proto::JavaRuntime Java::install(int major, const JavaInstallProgressCallback &on_progress) {
+    JavaInstallResult Java::install(int major, bool force, const JavaInstallProgressCallback &on_progress) {
         if (major <= 0) {
             const auto releases = session_->call<proto::JavaReleases>().releases;
             if (releases.empty()) {
@@ -28,8 +28,9 @@ namespace hestia::client {
                 if (event.topic != proto::JavaInstallProgressEvent::kTopic || !on_progress) return;
                 on_progress(event.payload.get<proto::JavaInstallProgressEvent>().progress);
             },
-            [&] { session_->call<proto::JavaInstall>({.major = major, .id = id}); });
-        return done.get<proto::JavaInstallDoneEvent>().runtime;
+            [&] { session_->call<proto::JavaInstall>({.major = major, .id = id, .force = force}); });
+        const auto event = done.get<proto::JavaInstallDoneEvent>();
+        return {.runtime = event.runtime, .already_installed = event.already_installed};
     }
 
     void Java::uninstall(int major) {

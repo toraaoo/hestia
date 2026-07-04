@@ -9,6 +9,11 @@
 namespace hestia::client {
     using JavaInstallProgressCallback = std::function<void(const proto::JavaInstallProgress &)>;
 
+    struct JavaInstallResult {
+        proto::JavaRuntime runtime;
+        bool already_installed = false;
+    };
+
     // Java runtimes, managed by the daemon.
     class Java : public Facade {
     public:
@@ -19,8 +24,10 @@ namespace hestia::client {
         // Blocks until the runtime is registered, reporting progress on the
         // reader thread; like Download::fetch(), it uses the session's single
         // event-callback slot. A non-positive `major` installs the latest
-        // release line.
-        proto::JavaRuntime install(int major = 0, const JavaInstallProgressCallback &on_progress = {});
+        // release line. An already-installed line is returned untouched unless
+        // `force`.
+        JavaInstallResult install(int major = 0, bool force = false,
+                                  const JavaInstallProgressCallback &on_progress = {});
         void uninstall(int major);
     };
 } // namespace hestia::client

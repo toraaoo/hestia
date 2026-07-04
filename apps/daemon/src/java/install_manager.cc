@@ -22,21 +22,21 @@ namespace hestia::daemon {
         }
     }
 
-    std::optional<std::string> JavaInstallManager::start(int major, std::string id) {
+    std::optional<std::string> JavaInstallManager::start(int major, std::string id, bool force) {
         if (id.empty()) id = "java-" + std::to_string(next_id_++);
         auto done = std::make_shared<std::atomic<bool>>(false);
         std::scoped_lock const lk(mu_);
         if (!active_majors_.insert(major).second) return std::nullopt;
         prune_finished();
-        std::thread thread([this, id, major, done] {
-            run(id, major);
+        std::thread thread([this, id, major, force, done] {
+            run(id, major, force);
             done->store(true);
         });
         workers_.push_back(Worker{.thread = std::move(thread), .done = std::move(done)});
         return id;
     }
 
-    void JavaInstallManager::run(const std::string &id, int major) {
+    void JavaInstallManager::run(const std::string &id, int major, bool force) {
         using clock = std::chrono::steady_clock;
         auto last_emit = clock::time_point{};
         auto last_phase = std::optional<proto::JavaInstallPhase>{};
@@ -50,8 +50,9 @@ namespace hestia::daemon {
             sink_(proto::make_event(proto::JavaInstallProgressEvent{.id = id, .progress = progress}));
         };
         try {
-            const auto runtime = engine_.java().install(major, on_progress);
-            sink_(proto::make_event(proto::JavaInstallDoneEvent{.id = id, .runtime = runtime}));
+            const auto outcome = engine_.java().install(major, force, on_progress);
+            sink_(proto::make_event(proto::JavaInstallDoneEvent{
+                .id = id, .runtime = outcome.runtime, .already_installed = outcome.already_installed}));
         } catch (const std::exception &e) {
             sink_(proto::make_event(proto::JavaInstallErrorEvent{.id = id, .message = e.what()}));
         }

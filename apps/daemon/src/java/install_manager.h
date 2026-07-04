@@ -26,7 +26,7 @@ namespace hestia::daemon {
 
         // The outcome arrives as a java.install.done or java.install.error event
         // carrying the returned id; nullopt when `major` is already installing.
-        std::optional<std::string> start(int major, std::string id);
+        std::optional<std::string> start(int major, std::string id, bool force);
 
     private:
         struct Worker {
@@ -34,7 +34,7 @@ namespace hestia::daemon {
             std::shared_ptr<std::atomic<bool>> done;
         };
 
-        void run(const std::string &id, int major);
+        void run(const std::string &id, int major, bool force);
         void prune_finished();
 
         engine::Engine &engine_;

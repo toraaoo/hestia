@@ -44,6 +44,11 @@ namespace hestia::engine {
 
     using JavaInstallProgressCallback = std::function<void(const proto::JavaInstallProgress &)>;
 
+    struct JavaInstallOutcome {
+        proto::JavaRuntime runtime;
+        bool already_installed = false;
+    };
+
     // Installs and tracks Java runtimes: each install lives at
     // <dir>/<vendor>-<major>/ beside a runtime.json record, and listing scans
     // that directory — the disk is the registry.
@@ -59,9 +64,10 @@ namespace hestia::engine {
 
         [[nodiscard]] std::vector<proto::JavaRuntime> installed() const;
 
-        // Blocking resolve → download → extract → register, replacing any
-        // existing install of the line; a failed install leaves nothing behind.
-        proto::JavaRuntime install(int major, const JavaInstallProgressCallback &on_progress = {});
+        // Blocking resolve → download → extract → register; a failed install
+        // leaves nothing behind. An already-installed line is returned as-is
+        // unless `force`, which reinstalls over it.
+        JavaInstallOutcome install(int major, bool force = false, const JavaInstallProgressCallback &on_progress = {});
 
         bool uninstall(int major);
 

@@ -77,8 +77,10 @@ namespace hestia::proto {
         struct Params {
             int major = 0;
             std::string id; // caller-assigned job id; empty lets the daemon generate one
+            bool force = false;
 
-            static constexpr auto kFields = fields(field("major", &Params::major), field("id", &Params::id));
+            static constexpr auto kFields = fields(field("major", &Params::major), field("id", &Params::id),
+                                                   field("force", &Params::force));
         };
         struct Result {
             std::string id;
@@ -110,9 +112,11 @@ namespace hestia::proto {
         static constexpr const char *kTopic = "java.install.done";
         std::string id;
         JavaRuntime runtime;
+        bool already_installed = false;
 
         static constexpr auto kFields =
-            fields(field("id", &JavaInstallDoneEvent::id), field("runtime", &JavaInstallDoneEvent::runtime));
+            fields(field("id", &JavaInstallDoneEvent::id), field("runtime", &JavaInstallDoneEvent::runtime),
+                   field("already_installed", &JavaInstallDoneEvent::already_installed));
     };
 
     struct JavaInstallErrorEvent {

@@ -112,9 +112,16 @@ namespace hestia::engine {
         return runtimes;
     }
 
-    proto::JavaRuntime Java::install(int major, const JavaInstallProgressCallback &on_progress) {
+    JavaInstallOutcome Java::install(int major, bool force, const JavaInstallProgressCallback &on_progress) {
         if (major <= 0) {
             throw std::runtime_error(fmt::format("invalid java major version: {}", major));
+        }
+        if (!force) {
+            for (auto &runtime: installed()) {
+                if (runtime.major == major) {
+                    return {.runtime = std::move(runtime), .already_installed = true};
+                }
+            }
         }
         const auto report = [&](proto::JavaInstallPhase phase) {
             if (on_progress) on_progress(proto::JavaInstallProgress{.phase = phase});
@@ -168,7 +175,7 @@ namespace hestia::engine {
             throw std::runtime_error(fmt::format("install of {} did not produce a usable runtime",
                                                  package.release_name));
         }
-        return *runtime;
+        return {.runtime = std::move(*runtime), .already_installed = false};
     }
 
     bool Java::uninstall(int major) {

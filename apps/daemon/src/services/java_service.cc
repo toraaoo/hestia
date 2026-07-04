@@ -23,7 +23,7 @@ namespace hestia::daemon {
             if (p.major <= 0) {
                 throw ServiceError(ipc::errors::kBadRequest, "major must be a positive integer");
             }
-            const auto id = ctx.runtime.java_installs().start(p.major, p.id);
+            const auto id = ctx.runtime.java_installs().start(p.major, p.id, p.force);
             if (!id) {
                 throw ServiceError(ipc::errors::kBadRequest,
                                    "java " + std::to_string(p.major) + " is already being installed");
