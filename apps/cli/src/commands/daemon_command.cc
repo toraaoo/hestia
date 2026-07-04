@@ -8,7 +8,7 @@
 #include <string>
 #include <thread>
 
-#include <hestia/client/client.h>
+#include <hestia/client.h>
 #include <hestia/ipc/endpoint.h>
 #include <hestia/ipc/transport.h>
 
@@ -57,13 +57,13 @@ namespace hestia::cli {
             return out;
         }
 
-        void print_status(const client::DaemonStatus &status) {
+        void print_status(const proto::DaemonStatus::Result &status) {
             std::cout << "State:    running\n"
                       << "PID:      " << status.pid << '\n'
                       << "Version:  " << status.version << '\n'
                       << "Uptime:   " << human_duration(status.uptime_seconds) << '\n'
-                      << "Home:     " << status.home << '\n'
-                      << "Log:      " << status.log << '\n';
+                      << "Home:     " << status.home.string() << '\n'
+                      << "Log:      " << status.log.string() << '\n';
         }
 
         bool stop_running_daemon(AppContext &ctx) {
@@ -73,7 +73,7 @@ namespace hestia::cli {
                 return false;
             }
             Spinner spinner("Stopping daemon");
-            client->daemon_stop();
+            client->daemon().stop();
             if (!wait_stopped()) {
                 spinner.stop();
                 std::cerr << "hestia: daemon did not stop within 5 seconds\n";
@@ -85,11 +85,11 @@ namespace hestia::cli {
 
         void start_daemon(AppContext &ctx, const char *done_verb) {
             try {
-                std::optional<client::DaemonStatus> status;
+                std::optional<proto::DaemonStatus::Result> status;
                 {
                     Spinner const spinner("Starting daemon");
                     auto client = client::Client::connect(/*auto_spawn=*/true);
-                    status = client.daemon_status();
+                    status = client.daemon().status();
                 }
                 std::cout << done_verb << " (version " << status->version << ", pid " << status->pid << ")\n";
             } catch (const std::exception &e) {
@@ -105,7 +105,7 @@ namespace hestia::cli {
                 cmd->callback([&ctx] {
                     guarded(ctx, [] {
                         if (auto client = connect_running()) {
-                            print_status(client->daemon_status());
+                            print_status(client->daemon().status());
                         } else {
                             std::cout << "State:    stopped\n";
                         }
@@ -121,7 +121,7 @@ namespace hestia::cli {
                 cmd->callback([&ctx] {
                     guarded(ctx, [&ctx] {
                         if (auto client = connect_running()) {
-                            const auto status = client->daemon_status();
+                            const auto status = client->daemon().status();
                             std::cout << "Already running (version " << status.version << ", pid " << status.pid
                                       << ")\n";
                             return;

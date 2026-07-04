@@ -3,7 +3,7 @@
 #include <iostream>
 #include <memory>
 
-#include <hestia/client/client.h>
+#include <hestia/client.h>
 
 namespace hestia::cli {
     namespace {
@@ -14,7 +14,7 @@ namespace hestia::cli {
                 auto *cmd = parent.add_subcommand("enable", "Start the daemon at login");
                 cmd->callback([&ctx] {
                     ctx.with_client([](client::Client &client) {
-                        client.autostart_enable();
+                        client.autostart().enable();
                         std::cout << "autostart enabled\n";
                     });
                 });
@@ -28,7 +28,7 @@ namespace hestia::cli {
                 auto *cmd = parent.add_subcommand("disable", "Do not start the daemon at login");
                 cmd->callback([&ctx] {
                     ctx.with_client([](client::Client &client) {
-                        client.autostart_disable();
+                        client.autostart().disable();
                         std::cout << "autostart disabled\n";
                     });
                 });
@@ -42,7 +42,7 @@ namespace hestia::cli {
                 auto *cmd = parent.add_subcommand("status", "Show whether the daemon starts at login");
                 cmd->callback([&ctx] {
                     ctx.with_client([](client::Client &client) {
-                        std::cout << (client.autostart_status() ? "enabled" : "disabled") << '\n';
+                        std::cout << (client.autostart().status() ? "enabled" : "disabled") << '\n';
                     });
                 });
             }

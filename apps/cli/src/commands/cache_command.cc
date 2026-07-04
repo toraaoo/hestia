@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include <hestia/client/client.h>
+#include <hestia/client.h>
 
 #include "output.h"
 
@@ -16,14 +16,14 @@ namespace hestia::cli {
                 auto *cmd = parent.add_subcommand("info", "Show download-cache location and usage");
                 cmd->callback([&ctx] {
                     ctx.with_client([](client::Client &client) {
-                        client::CacheStats stats;
+                        proto::CacheInfo::Result stats;
                         {
                             Spinner const spinner("Fetching cache usage");
-                            stats = client.cache_info();
+                            stats = client.cache().info();
                         }
-                        std::cout << "Location: " << stats.path << '\n'
-                                  << "Entries:  " << stats.entries << '\n'
-                                  << "Size:     " << human_size(stats.bytes) << '\n';
+                        std::cout << "Location: " << stats.path.string() << '\n'
+                                  << "Entries:  " << stats.usage.entries << '\n'
+                                  << "Size:     " << human_size(stats.usage.bytes) << '\n';
                     });
                 });
             }
@@ -38,8 +38,9 @@ namespace hestia::cli {
                         std::vector<std::vector<std::string>> rows;
                         {
                             Spinner const spinner("Fetching cache entries");
-                            for (const auto &entry: client.cache_list()) {
-                                rows.push_back({entry.algorithm, entry.hex.substr(0, 12), human_size(entry.size)});
+                            for (const auto &entry: client.cache().list()) {
+                                rows.push_back({proto::to_string(entry.checksum.algorithm), entry.checksum.hex.substr(0, 12),
+                                                human_size(entry.size)});
                             }
                         }
                         print_table({"ALGORITHM", "CHECKSUM", "SIZE"}, rows);
@@ -54,10 +55,10 @@ namespace hestia::cli {
                 auto *cmd = parent.add_subcommand("clear", "Remove every cached download");
                 cmd->callback([&ctx] {
                     ctx.with_client([](client::Client &client) {
-                        client::CacheStats freed;
+                        proto::CacheUsage freed;
                         {
                             Spinner const spinner("Clearing cache");
-                            freed = client.cache_clear();
+                            freed = client.cache().clear();
                         }
                         std::cout << "Freed " << human_size(freed.bytes) << " (" << freed.entries << " entries)\n";
                     });

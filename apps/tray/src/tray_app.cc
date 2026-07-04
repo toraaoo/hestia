@@ -11,7 +11,7 @@ namespace hestia::tray {
     int TrayApp::run() {
         seed_state();
         rebuild_model();
-        client_.subscribe([this](const client::ProcessEvent &event) { on_event(event); });
+        client_.process().subscribe([this](const client::ProcessEvent &event) { on_event(event); });
         backend_->run();
         return 0;
     }
@@ -19,22 +19,22 @@ namespace hestia::tray {
     void TrayApp::seed_state() {
         std::scoped_lock const lk(mu_);
         try {
-            for (const auto &p: client_.process_list()) states_[p.id] = p.state;
+            for (const auto &p: client_.process().list()) states_[p.id] = proto::to_string(p.state);
         } catch (const std::exception &) {
             // A daemon hiccup at startup is not fatal: render what we have and let
             // the event stream fill in the rest.
         }
         try {
-            autostart_enabled_ = client_.autostart_status();
+            autostart_enabled_ = client_.autostart().status();
         } catch (const std::exception &) {
         }
     }
 
     void TrayApp::on_event(const client::ProcessEvent &event) {
-        if (event.topic != "process.state" || !event.process) return; // ignore log chunks
+        if (event.topic != proto::ProcessStateEvent::kTopic || !event.record) return; // ignore log chunks
         {
             std::scoped_lock const lk(mu_);
-            states_[event.process->id] = event.process->state;
+            states_[event.record->id] = proto::to_string(event.record->state);
         }
         rebuild_model();
     }
@@ -96,9 +96,9 @@ namespace hestia::tray {
         }
         try {
             if (target) {
-                client_.autostart_enable();
+                client_.autostart().enable();
             } else {
-                client_.autostart_disable();
+                client_.autostart().disable();
             }
             std::scoped_lock const lk(mu_);
             autostart_enabled_ = target;

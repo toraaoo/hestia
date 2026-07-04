@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include <hestia/client/client.h>
+#include <hestia/client.h>
 
 namespace hestia::cli {
     namespace {
@@ -16,7 +16,7 @@ namespace hestia::cli {
                 cmd->add_option("key", key_, "Config key")->required();
                 cmd->callback([this, &ctx] {
                     ctx.with_client([this, &ctx](client::Client &client) {
-                        if (const auto value = client.config_get(key_)) {
+                        if (const auto value = client.config().get(key_)) {
                             std::cout << *value << '\n';
                         } else {
                             std::cerr << "key not found: " << key_ << '\n';
@@ -36,7 +36,7 @@ namespace hestia::cli {
             void register_command(CLI::App &parent, AppContext &ctx) override {
                 auto *cmd = parent.add_subcommand("home", "Print the resolved data directory");
                 cmd->callback([&ctx] {
-                    ctx.with_client([](client::Client &client) { std::cout << client.config_home().string() << '\n'; });
+                    ctx.with_client([](client::Client &client) { std::cout << client.config().home().string() << '\n'; });
                 });
             }
         };
@@ -50,7 +50,7 @@ namespace hestia::cli {
                 cmd->add_option("dir", dir_, "Directory to use (omit to revert to the default)");
                 cmd->callback([this, &ctx] {
                     ctx.with_client([this](client::Client &client) {
-                        const auto home = client.config_set_home(dir_);
+                        const auto home = client.config().set_home(dir_);
                         if (dir_.empty()) {
                             std::cout << "reverted to default: " << home.string() << '\n';
                         } else {
@@ -72,7 +72,7 @@ namespace hestia::cli {
                 cmd->add_option("key", key_, "Config key")->required();
                 cmd->add_option("value", value_, "Config value")->required();
                 cmd->callback([this, &ctx] {
-                    ctx.with_client([this](client::Client &client) { client.config_set(key_, value_); });
+                    ctx.with_client([this](client::Client &client) { client.config().set(key_, value_); });
                 });
             }
 

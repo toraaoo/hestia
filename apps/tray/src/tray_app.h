@@ -5,7 +5,7 @@
 #include <mutex>
 #include <string>
 
-#include <hestia/client/client.h>
+#include <hestia/client.h>
 
 #include "tray_backend.h"
 

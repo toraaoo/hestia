@@ -5,7 +5,7 @@
 #include <optional>
 #include <string>
 
-#include <hestia/client/client.h>
+#include <hestia/client.h>
 
 #include "output.h"
 
@@ -20,7 +20,7 @@ namespace hestia::cli {
                         std::vector<std::vector<std::string>> rows;
                         {
                             Spinner const spinner("Fetching available releases");
-                            for (const auto &release: client.java_releases()) {
+                            for (const auto &release: client.java().releases()) {
                                 rows.push_back({std::to_string(release.major), release.lts ? "yes" : ""});
                             }
                         }
@@ -41,11 +41,11 @@ namespace hestia::cli {
                         spinner.emplace("Resolving temurin " + std::to_string(major_));
                         ProgressBar download_bar("Downloading");
                         ProgressBar extract_bar("Extracting", false);
-                        const auto on_progress = [&](const client::JavaInstallProgress &p) {
-                            if (p.phase == "downloading") {
+                        const auto on_progress = [&](const proto::JavaInstallProgress &p) {
+                            if (p.phase == proto::JavaInstallPhase::downloading) {
                                 spinner.reset();
                                 download_bar.update(p.current, p.total);
-                            } else if (p.phase == "extracting") {
+                            } else if (p.phase == proto::JavaInstallPhase::extracting) {
                                 download_bar.finish();
                                 if (p.total > 0) {
                                     spinner.reset();
@@ -55,9 +55,9 @@ namespace hestia::cli {
                                 }
                             }
                         };
-                        client::JavaRuntime runtime;
+                        proto::JavaRuntime runtime;
                         try {
-                            runtime = client.java_install(major_, on_progress);
+                            runtime = client.java().install(major_, on_progress);
                         } catch (...) {
                             spinner.reset();
                             download_bar.finish();
@@ -68,7 +68,7 @@ namespace hestia::cli {
                         download_bar.finish();
                         extract_bar.finish();
                         std::cout << "Installed " << runtime.vendor << ' ' << runtime.release_name << " at "
-                                  << runtime.home << '\n';
+                                  << runtime.home.string() << '\n';
                     });
                 });
             }
@@ -86,9 +86,9 @@ namespace hestia::cli {
                         std::vector<std::vector<std::string>> rows;
                         {
                             Spinner const spinner("Fetching installed runtimes");
-                            for (const auto &runtime: client.java_list()) {
+                            for (const auto &runtime: client.java().list()) {
                                 rows.push_back({runtime.vendor, std::to_string(runtime.major), runtime.release_name,
-                                                runtime.home});
+                                                runtime.home.string()});
                             }
                         }
                         print_table({"VENDOR", "VERSION", "RELEASE", "PATH"}, rows);
@@ -106,7 +106,7 @@ namespace hestia::cli {
                     ctx.with_client([this](client::Client &client) {
                         {
                             Spinner const spinner("Uninstalling java " + std::to_string(major_));
-                            client.java_uninstall(major_);
+                            client.java().uninstall(major_);
                         }
                         std::cout << "Uninstalled java " << major_ << '\n';
                     });
