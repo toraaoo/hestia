@@ -24,7 +24,7 @@ export function useAppInfo() {
 export function useConfigHome() {
   return useQuery({
     queryKey: ipcKeys.configHome,
-    queryFn: () => config.get(CONFIG_KEYS.home),
+    queryFn: () => config.get<string>(CONFIG_KEYS.home),
   })
 }
 
@@ -33,7 +33,7 @@ export function useSetConfigHome() {
   return useMutation({
     mutationFn: async (dir: string) => {
       await config.set(CONFIG_KEYS.home, dir)
-      return config.get(CONFIG_KEYS.home)
+      return config.get<string>(CONFIG_KEYS.home)
     },
     onSuccess: (path) => queryClient.setQueryData(ipcKeys.configHome, path),
   })
@@ -41,7 +41,7 @@ export function useSetConfigHome() {
 
 export function useSetConfig() {
   return useMutation({
-    mutationFn: ({ key, value }: { key: string; value: string }) =>
+    mutationFn: ({ key, value }: { key: string; value: unknown }) =>
       config.set(key, value),
   })
 }
@@ -53,7 +53,8 @@ export function useGetConfig() {
 export function useAutostartStatus() {
   return useQuery({
     queryKey: ipcKeys.autostart,
-    queryFn: () => config.get(CONFIG_KEYS.autostart).then((v) => v === "true"),
+    queryFn: () =>
+      config.get<boolean>(CONFIG_KEYS.autostart).then((v) => v === true),
   })
 }
 
@@ -61,7 +62,7 @@ export function useToggleAutostart() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (enable: boolean) => {
-      await config.set(CONFIG_KEYS.autostart, enable ? "true" : "false")
+      await config.set(CONFIG_KEYS.autostart, enable)
       return enable
     },
     onSuccess: (enabled) =>

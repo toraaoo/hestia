@@ -26,7 +26,8 @@ namespace hestia::tray {
             // the event stream fill in the rest.
         }
         try {
-            autostart_enabled_ = client_.config().get(proto::config_key<&proto::Config::autostart>()) == "true";
+            const auto autostart = client_.config().get(proto::kAutostartKey);
+            autostart_enabled_ = autostart && autostart->is_boolean() && autostart->get<bool>();
         } catch (const std::exception &) {
         }
     }
@@ -96,7 +97,7 @@ namespace hestia::tray {
             target = !autostart_enabled_;
         }
         try {
-            client_.config().set(proto::config_key<&proto::Config::autostart>(), target ? "true" : "false");
+            client_.config().set(proto::kAutostartKey, target);
             std::scoped_lock const lk(mu_);
             autostart_enabled_ = target;
         } catch (const std::exception &) {

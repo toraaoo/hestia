@@ -36,14 +36,14 @@ export const CONFIG_KEYS = {
 } as const
 
 export const config = {
-  get: (key: string): Promise<string | null> =>
-    invoke<{ value: string }>("settings.config.get", { key })
+  get: <T = unknown>(key: string): Promise<T | null> =>
+    invoke<{ value: T }>("settings.config.get", { key })
       .then((r) => r.value)
       .catch((error) => {
         if (error instanceof IpcError) return null
         throw error
       }),
-  set: (key: string, value: string): Promise<void> =>
+  set: (key: string, value: unknown): Promise<void> =>
     invoke("settings.config.set", { key, value }).then(() => undefined),
 }
 

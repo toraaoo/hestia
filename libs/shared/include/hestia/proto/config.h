@@ -1,38 +1,16 @@
 #pragma once
 
-#include <filesystem>
-#include <map>
 #include <string>
-#include <tuple>
-#include <type_traits>
+
+#include <nlohmann/json.hpp>
 
 #include <hestia/proto/contract.h>
 
 namespace hestia::proto {
-    struct Config {
-        std::filesystem::path home;
-        bool autostart = false;
-
-        static constexpr auto kFields =
-            fields(field("home", &Config::home), field("autostart", &Config::autostart));
-    };
-
-    template <auto Member>
-    constexpr const char *config_key() {
-        const char *key = nullptr;
-        std::apply(
-            [&](auto... f) {
-                (
-                    [&] {
-                        if constexpr (std::is_same_v<decltype(f.member), decltype(Member)>) {
-                            if (f.member == Member) key = f.key;
-                        }
-                    }(),
-                    ...);
-            },
-            Config::kFields);
-        return key;
-    }
+    // Reserved keys the daemon routes to their own subsystem instead of the
+    // settings store: the data-directory pointer and the login registration.
+    inline constexpr const char *kHomeKey = "home";
+    inline constexpr const char *kAutostartKey = "autostart";
 
     struct ConfigGet {
         static constexpr const char *kChannel = "config.get";
@@ -42,7 +20,7 @@ namespace hestia::proto {
             static constexpr auto kFields = fields(field("key", &Params::key, kRequired));
         };
         struct Result {
-            std::string value;
+            nlohmann::json value;
 
             static constexpr auto kFields = fields(field("value", &Result::value));
         };
@@ -52,7 +30,7 @@ namespace hestia::proto {
         static constexpr const char *kChannel = "config.set";
         struct Params {
             std::string key;
-            std::string value;
+            nlohmann::json value;
 
             static constexpr auto kFields =
                 fields(field("key", &Params::key, kRequired), field("value", &Params::value, kRequired));
@@ -64,7 +42,7 @@ namespace hestia::proto {
         static constexpr const char *kChannel = "config.list";
         using Params = Empty;
         struct Result {
-            std::map<std::string, std::string> entries;
+            nlohmann::json entries;
 
             static constexpr auto kFields = fields(field("entries", &Result::entries));
         };

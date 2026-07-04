@@ -207,12 +207,18 @@ internal helpers as private headers (`src` is a PRIVATE include dir). A new doma
 is one public header plus a `src/<domain>/` folder, however large it gets inside.
 The subsystems behind the aggregate today:
 
-- **`Config`** (`config.h`) — a thread-safe live view of the config store, a
-  JSON object of key/value strings. Reads/writes are serialized for concurrent
-  clients and every `set()` is persisted immediately; `reload()` repoints it when
-  the data directory changes; `all()` returns the whole store (served over
-  `config.list`). The on-disk JSON format (load/save/validation) is file-local
-  in `src/config.cc`. Data-directory resolution (`--home` →
+- **`Config`** (`config.h`) — the typed settings store. The schema is one
+  struct, `Settings`: a setting is a field with its default plus a `kFields`
+  entry (a nested struct with its own `kFields` becomes a sub-object), persisted
+  as JSON through the same generic codec the wire contracts use — a setting is
+  declared exactly once. Internal code reads a `settings()` snapshot and writes
+  through `update()`, which saves immediately; the dotted-path `get`/`set`
+  (`"launcher.memory"`) serve the `config.*` channels, derive the key space
+  from the struct's serialized form, and reject unknown keys and
+  type-mismatched values — the schema is the validation. Reads/writes are
+  serialized for concurrent clients; `reload()` repoints it when the data
+  directory changes; `all()` returns the effective settings (served over
+  `config.list`). Data-directory resolution (`--home` →
   `$HESTIA_HOME` → persisted pointer → platform default) lives in shared's
   `hestia::paths`; Debug builds anchor the platform default at `<repo>/.hestia`
   so development never populates the real per-user directory.

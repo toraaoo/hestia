@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <stdexcept>
 
 #include <hestia/engine/engine.h>
 
@@ -19,7 +20,7 @@ TEST(Engine, ExposesConfigSubsystem) {
     const fs::path dir = fs::temp_directory_path() / "hestia_test_engine_cfg";
     fs::remove_all(dir);
     Engine engine{dir};
-    engine.config().set("theme", "dark");
-    EXPECT_EQ(engine.config().get("theme").value_or(""), "dark");
+    EXPECT_TRUE(engine.config().all().is_object());
+    EXPECT_THROW(engine.config().set("unknown", "v"), std::invalid_argument);
     fs::remove_all(dir);
 }

@@ -2,13 +2,11 @@
 
 #include <fstream>
 #include <stdexcept>
-#include <string_view>
-
-#include <nlohmann/json.hpp>
+#include <string>
 
 namespace hestia::engine {
     namespace {
-        std::map<std::string, std::string> load_entries(const std::filesystem::path &path) {
+        Settings load_settings(const std::filesystem::path &path) {
             std::ifstream in(path);
             if (!in) {
                 return {};
@@ -17,16 +15,14 @@ namespace hestia::engine {
             if (!doc.is_object()) {
                 return {};
             }
-            std::map<std::string, std::string> entries;
-            for (const auto &[key, value]: doc.items()) {
-                if (value.is_string()) {
-                    entries.insert_or_assign(key, value.get<std::string>());
-                }
+            try {
+                return doc.get<Settings>();
+            } catch (const std::exception &) {
+                return {};
             }
-            return entries;
         }
 
-        void save_entries(const std::filesystem::path &path, const std::map<std::string, std::string> &entries) {
+        void save_settings(const std::filesystem::path &path, const Settings &settings) {
             if (path.has_parent_path()) {
                 std::filesystem::create_directories(path.parent_path());
             }
@@ -34,41 +30,89 @@ namespace hestia::engine {
             if (!out) {
                 throw std::runtime_error("failed to open config file for writing: " + path.string());
             }
-            out << nlohmann::json(entries).dump(2) << '\n';
+            out << nlohmann::json(settings).dump(2) << '\n';
         }
 
-        void validate_key(std::string_view key) {
-            if (key.empty()) {
-                throw std::invalid_argument("config key must not be empty");
+        const nlohmann::json *find_node(const nlohmann::json &root, const std::string &key) {
+            const nlohmann::json *node = &root;
+            std::size_t begin = 0;
+            while (true) {
+                const auto end = key.find('.', begin);
+                const auto segment = key.substr(begin, end - begin);
+                if (segment.empty() || !node->is_object()) {
+                    return nullptr;
+                }
+                const auto it = node->find(segment);
+                if (it == node->end()) {
+                    return nullptr;
+                }
+                node = &*it;
+                if (end == std::string::npos) {
+                    return node;
+                }
+                begin = end + 1;
             }
+        }
+
+        bool same_json_kind(const nlohmann::json &a, const nlohmann::json &b) {
+            if (a.is_number() && b.is_number()) {
+                return true;
+            }
+            return a.type() == b.type();
         }
     } // namespace
 
-    Config::Config(std::filesystem::path path) : path_(std::move(path)), entries_(load_entries(path_)) {}
+    Config::Config(std::filesystem::path path) : path_(std::move(path)), settings_(load_settings(path_)) {}
 
-    std::optional<std::string> Config::get(const std::string &key) const {
+    Settings Config::settings() const {
         std::scoped_lock const lk(mu_);
-        if (const auto it = entries_.find(key); it != entries_.end()) {
-            return it->second;
+        return settings_;
+    }
+
+    void Config::update(const std::function<void(Settings &)> &mutate) {
+        std::scoped_lock const lk(mu_);
+        mutate(settings_);
+        save_settings(path_, settings_);
+    }
+
+    nlohmann::json Config::get(const std::string &key) const {
+        std::scoped_lock const lk(mu_);
+        const nlohmann::json doc(settings_);
+        const auto *node = find_node(doc, key);
+        if (node == nullptr) {
+            throw std::invalid_argument("unknown config key: " + key);
         }
-        return std::nullopt;
+        return *node;
     }
 
-    std::map<std::string, std::string> Config::all() const {
+    void Config::set(const std::string &key, const nlohmann::json &value) {
         std::scoped_lock const lk(mu_);
-        return entries_;
+        nlohmann::json doc(settings_);
+        const auto *node = find_node(doc, key);
+        if (node == nullptr) {
+            throw std::invalid_argument("unknown config key: " + key);
+        }
+        if (!same_json_kind(*node, value)) {
+            throw std::invalid_argument(key + " expects a " + node->type_name());
+        }
+        *const_cast<nlohmann::json *>(node) = value;
+        try {
+            settings_ = doc.get<Settings>();
+        } catch (const std::exception &e) {
+            throw std::invalid_argument("invalid value for " + key + ": " + e.what());
+        }
+        save_settings(path_, settings_);
     }
 
-    void Config::set(const std::string &key, const std::string &value) {
+    nlohmann::json Config::all() const {
         std::scoped_lock const lk(mu_);
-        validate_key(key);
-        entries_.insert_or_assign(key, value);
-        save_entries(path_, entries_);
+        nlohmann::json doc(settings_);
+        return doc;
     }
 
     void Config::reload(std::filesystem::path path) {
         std::scoped_lock const lk(mu_);
         path_ = std::move(path);
-        entries_ = load_entries(path_);
+        settings_ = load_settings(path_);
     }
 } // namespace hestia::engine

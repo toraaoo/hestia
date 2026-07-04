@@ -50,7 +50,16 @@ function ConfigPanel() {
           />
           <Button
             onClick={() =>
-              get.mutate(key, { onSuccess: (v) => setValue(v ?? "") })
+              get.mutate(key, {
+                onSuccess: (v) =>
+                  setValue(
+                    v === null
+                      ? ""
+                      : typeof v === "string"
+                        ? v
+                        : JSON.stringify(v)
+                  ),
+              })
             }
             disabled={!key || get.isPending}
           >
@@ -73,7 +82,7 @@ function ConfigPanel() {
       </div>
       {get.data === null && (
         <p className="mt-3 font-mono text-xs text-muted-foreground">
-          key not set
+          unknown key
         </p>
       )}
       {(get.error || set.error) && (

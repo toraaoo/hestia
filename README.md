@@ -167,14 +167,15 @@ hestia cache info                # location, entry count, size
 hestia cache list                # cached blobs by checksum
 hestia cache clear               # remove everything, report what was freed
 
-# Configuration (JSON key/value store)
-hestia config set <key> <value>
+# Configuration (typed settings, stored as JSON)
+hestia config set <key> <value>  # keys are declared settings — unknown keys and
+                                 # type-mismatched values are rejected
 hestia config get <key>
-hestia config list               # print the whole store as formatted JSON
+hestia config list               # print the effective settings as a table
 # Reserved keys routed to their own subsystem:
 hestia config get home           # resolved data directory
 hestia config set home <dir>     # persist the data dir (empty reverts to default)
-hestia config get autostart      # "true" if the daemon starts at login
+hestia config get autostart      # true if the daemon starts at login
 hestia config set autostart true # register the daemon to start at login (false removes it)
 
 # Daemon lifecycle

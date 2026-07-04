@@ -1,9 +1,9 @@
 #pragma once
 
-#include <map>
 #include <optional>
-#include <string>
 #include <string_view>
+
+#include <nlohmann/json.hpp>
 
 #include <hestia/client/facade.h>
 #include <hestia/proto/config.h>
@@ -13,9 +13,9 @@ namespace hestia::client {
     public:
         using Facade::Facade;
 
-        // nullopt when the key is not set.
-        std::optional<std::string> get(std::string_view key);
-        std::map<std::string, std::string> list();
-        void set(std::string_view key, std::string_view value);
+        // nullopt when the key is unknown.
+        std::optional<nlohmann::json> get(std::string_view key);
+        nlohmann::json list();
+        void set(std::string_view key, nlohmann::json value);
     };
 } // namespace hestia::client
