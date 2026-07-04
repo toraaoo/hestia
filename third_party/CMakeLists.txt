@@ -1,6 +1,10 @@
 # EXCLUDE_FROM_ALL: vendored deps build only when a first-party target links
 # them, not as part of the default `all` target.
 add_subdirectory(fmt EXCLUDE_FROM_ALL)
+
+# Point spdlog at the vendored fmt above instead of its bundled copy, so a target
+# linking both spdlog and fmt gets one fmt (no duplicate-symbol link errors).
+set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
 add_subdirectory(spdlog EXCLUDE_FROM_ALL)
 
 # CLI11: header-only command-line parser. Keep its tests/examples/docs and

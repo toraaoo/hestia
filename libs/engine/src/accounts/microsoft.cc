@@ -7,6 +7,7 @@
 #include <cpr/cpr.h>
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 
 namespace hestia::engine {
     using nlohmann::json;
@@ -28,8 +29,13 @@ namespace hestia::engine {
         constexpr const char *kProfileUrl = "https://api.minecraftservices.com/minecraft/profile";
 
         json parse_body(const cpr::Response &response, const char *what) {
+            spdlog::debug("{}: HTTP {} ({} bytes)", what, response.status_code, response.text.size());
             if (response.error) {
+                spdlog::warn("{}: transport error: {}", what, response.error.message);
                 throw std::runtime_error(fmt::format("{} failed: {}", what, response.error.message));
+            }
+            if (response.status_code >= 400) {
+                spdlog::warn("{}: HTTP {} body: {}", what, response.status_code, response.text.substr(0, 1024));
             }
             const auto body = json::parse(response.text, nullptr, false);
             if (body.is_discarded()) {
@@ -91,6 +97,7 @@ namespace hestia::engine {
                                   bool contract_version) {
             const auto payload = body.dump();
             const auto signature = xbox_signature_header(key, url_path, "", payload, now_seconds());
+            spdlog::debug("xbox signed POST {} ({} byte body) signature={}", url, payload.size(), signature);
             cpr::Header header{{"Content-Type", "application/json; charset=utf-8"},
                                {"Accept", "application/json"},
                                {"Signature", signature}};

@@ -51,6 +51,7 @@ target_include_directories(hestia_engine
 target_link_libraries(hestia_engine PRIVATE
         fmt::fmt
         cpr::cpr
+        spdlog::spdlog
 )
 
 # Xbox request signing: ECDSA P-256 + CSPRNG from the platform crypto library.
