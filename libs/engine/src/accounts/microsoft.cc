@@ -136,24 +136,39 @@ namespace hestia::engine {
                                   .url = require_string(doc, "MsaOauthRedirect", "Xbox sign-in request")};
     }
 
-    OAuthTokens redeem_code(const std::string &code, const std::string &verifier) {
-        const auto response = cpr::Post(cpr::Url{kOauthTokenUrl},
-                                        cpr::Payload{{"client_id", kClientId},
-                                                     {"code", code},
-                                                     {"code_verifier", verifier},
-                                                     {"grant_type", "authorization_code"},
-                                                     {"redirect_uri", kReplyUrl},
-                                                     {"scope", kScope}},
-                                        cpr::Header{{"Accept", "application/json"}});
-        const auto doc = parse_body(response, "Microsoft token exchange");
-        if (doc.contains("error")) {
-            throw std::runtime_error(fmt::format(
-                "Microsoft rejected the sign-in code: {}",
-                doc.value("error_description", doc.value("error", std::string{"unknown error"}))));
+    namespace {
+        OAuthTokens exchange_oauth(cpr::Payload payload, const char *what, const char *rejection) {
+            const auto response =
+                cpr::Post(cpr::Url{kOauthTokenUrl}, std::move(payload), cpr::Header{{"Accept", "application/json"}});
+            const auto doc = parse_body(response, what);
+            if (doc.contains("error")) {
+                throw std::runtime_error(fmt::format(
+                    "{}: {}", rejection,
+                    doc.value("error_description", doc.value("error", std::string{"unknown error"}))));
+            }
+            return OAuthTokens{.access_token = require_string(doc, "access_token", what),
+                               .refresh_token = doc.value("refresh_token", std::string{}),
+                               .expires_in = doc.value("expires_in", 0LL)};
         }
-        return OAuthTokens{.access_token = require_string(doc, "access_token", "Microsoft token exchange"),
-                           .refresh_token = doc.value("refresh_token", std::string{}),
-                           .expires_in = doc.value("expires_in", 0LL)};
+    } // namespace
+
+    OAuthTokens redeem_code(const std::string &code, const std::string &verifier) {
+        return exchange_oauth(cpr::Payload{{"client_id", kClientId},
+                                           {"code", code},
+                                           {"code_verifier", verifier},
+                                           {"grant_type", "authorization_code"},
+                                           {"redirect_uri", kReplyUrl},
+                                           {"scope", kScope}},
+                              "Microsoft token exchange", "Microsoft rejected the sign-in code");
+    }
+
+    OAuthTokens refresh_oauth(const std::string &refresh_token) {
+        return exchange_oauth(cpr::Payload{{"client_id", kClientId},
+                                           {"refresh_token", refresh_token},
+                                           {"grant_type", "refresh_token"},
+                                           {"redirect_uri", kReplyUrl},
+                                           {"scope", kScope}},
+                              "Microsoft token refresh", "Microsoft rejected the token refresh");
     }
 
     SisuAuthorization sisu_authorize(const std::string &session_id, const std::string &access_token,
@@ -163,7 +178,7 @@ namespace hestia::engine {
                            {"DeviceToken", device_token},
                            {"ProofKey", proof_jwk(key)},
                            {"Sandbox", "RETAIL"},
-                           {"SessionId", session_id},
+                           {"SessionId", session_id.empty() ? json(nullptr) : json(session_id)},
                            {"SiteName", "user.auth.xboxlive.com"},
                            {"RelyingParty", "http://xboxlive.com"},
                            {"UseModernGamertag", true}};

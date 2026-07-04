@@ -1,5 +1,6 @@
 #include <hestia/engine/accounts.h>
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <stdexcept>
@@ -96,6 +97,29 @@ namespace hestia::engine {
                                          std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
                                          std::filesystem::perm_options::replace, ec);
         }
+
+        constexpr long long kRefreshMarginSeconds = 300;
+
+        long long now_seconds() {
+            return std::chrono::duration_cast<std::chrono::seconds>(
+                       std::chrono::system_clock::now().time_since_epoch())
+                .count();
+        }
+
+        void rotate_tokens(StoredAccount &account) {
+            if (account.refresh_token.empty()) {
+                throw std::runtime_error("this account has no refresh token; sign in again");
+            }
+            const auto oauth = refresh_oauth(account.refresh_token);
+            auto key = ProofKey::generate();
+            const auto device_token = request_device_token(key);
+            const auto authorization = sisu_authorize("", oauth.access_token, device_token, key);
+            const auto xsts = xsts_authorize(authorization, device_token, key);
+
+            account.access_token = launcher_login(xsts);
+            if (!oauth.refresh_token.empty()) account.refresh_token = oauth.refresh_token;
+            account.expires_at = now_seconds() + oauth.expires_in;
+        }
     } // namespace
 
     Accounts::Accounts(std::filesystem::path path) : path_(std::move(path)) {}
@@ -164,6 +188,21 @@ namespace hestia::engine {
         file.accounts.push_back(std::move(record));
         save(path_, file);
         return proto::Account{.uuid = profile.uuid, .name = profile.name};
+    }
+
+    std::string Accounts::access_token(const std::string &ref) {
+        std::scoped_lock const lk(mu_);
+        auto file = load(path_);
+        const auto it = std::find_if(file.accounts.begin(), file.accounts.end(),
+                                     [&](const StoredAccount &a) { return a.uuid == ref || a.name == ref; });
+        if (it == file.accounts.end()) {
+            throw std::runtime_error("no account matches '" + ref + "'");
+        }
+        if (it->expires_at - now_seconds() <= kRefreshMarginSeconds) {
+            rotate_tokens(*it);
+            save(path_, file);
+        }
+        return it->access_token;
     }
 
     bool Accounts::remove(const std::string &ref) {

@@ -38,6 +38,8 @@ namespace hestia::engine {
 
     OAuthTokens redeem_code(const std::string &code, const std::string &verifier);
 
+    OAuthTokens refresh_oauth(const std::string &refresh_token);
+
     SisuAuthorization sisu_authorize(const std::string &session_id, const std::string &access_token,
                                      const std::string &device_token, const ProofKey &key);
 

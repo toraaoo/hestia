@@ -27,6 +27,11 @@ namespace hestia::engine {
         LoginChallenge begin_login();
         proto::Account complete_login(const std::string &id, const std::string &code);
 
+        // A currently-valid Minecraft access token for the account named by `ref`
+        // (uuid or name), rotating the stored tokens through Microsoft when they
+        // are at or near expiry. Throws if nothing matches or the refresh fails.
+        std::string access_token(const std::string &ref);
+
         bool remove(const std::string &ref);
 
         void reload(std::filesystem::path path);
