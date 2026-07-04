@@ -2,6 +2,7 @@
 //! logic; front-ends reach it over the socket, not by linking it. Accounts +
 //! crypto are not implemented yet.
 
+mod accounts;
 mod cache;
 mod checksum;
 mod config;
@@ -9,6 +10,7 @@ mod download;
 mod engine;
 mod java;
 
+pub use accounts::{Accounts, LoginChallenge};
 pub use cache::{Cache, CacheEntry, CacheUsage};
 pub use config::{Config, ConfigError, Settings};
 pub use download::Downloader;

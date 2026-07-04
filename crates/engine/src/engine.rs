@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use crate::accounts::Accounts;
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::java::Java;
@@ -13,6 +14,7 @@ pub struct Engine {
     config: Config,
     cache: Cache,
     java: Java,
+    accounts: Accounts,
 }
 
 impl Engine {
@@ -22,11 +24,13 @@ impl Engine {
         let config = Config::new(common::paths::config_path(Some(&data_home)));
         let cache = Cache::new(data_home.join("cache"));
         let java = Java::new(data_home.join("java"));
+        let accounts = Accounts::new(data_home.join("accounts.json"));
         Engine {
             data_home: Mutex::new(data_home),
             config,
             cache,
             java,
+            accounts,
         }
     }
 
@@ -43,6 +47,7 @@ impl Engine {
             .reload(common::paths::config_path(Some(&resolved)));
         self.cache.reload(resolved.join("cache"));
         self.java.reload(resolved.join("java"));
+        self.accounts.reload(resolved.join("accounts.json"));
         *self.data_home.lock().unwrap() = resolved.clone();
         tracing::info!(home = %resolved.display(), "engine data home changed");
         Ok(resolved)
@@ -58,5 +63,9 @@ impl Engine {
 
     pub fn java(&self) -> &Java {
         &self.java
+    }
+
+    pub fn accounts(&self) -> &Accounts {
+        &self.accounts
     }
 }

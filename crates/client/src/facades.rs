@@ -3,8 +3,14 @@
 //! directly — mirroring the engine's domain modules on the other side of the
 //! socket.
 
+use std::time::Duration;
+
 use ipc::errors::IpcError;
 use ipc::protocol::Event;
+use proto::accounts::{
+    Account, AccountList, AccountLoginBegin, AccountLoginBeginParams, AccountLoginBeginResult,
+    AccountLoginComplete, AccountLoginCompleteParams, AccountRemove, AccountRemoveParams, LoginMethod,
+};
 use serde_json::Value;
 
 use crate::session::{job_id, Session};
@@ -185,5 +191,43 @@ impl Java<'_> {
             .and_then(Value::as_bool)
             .unwrap_or(false);
         Ok((runtime, already))
+    }
+}
+
+pub struct Accounts<'a> {
+    pub(crate) session: &'a Session,
+}
+
+impl Accounts<'_> {
+    /// Begin a sign-in; returns what the user must act on (a device code or a
+    /// browser URL). The daemon holds per-login state keyed by the returned id.
+    pub async fn begin_login(&self, method: LoginMethod) -> Result<AccountLoginBeginResult, IpcError> {
+        self.session
+            .call_with_timeout::<AccountLoginBegin>(
+                &AccountLoginBeginParams { method },
+                Duration::from_secs(60),
+            )
+            .await
+    }
+
+    /// Drive a begun sign-in to a stored account. Long-running (the device-code
+    /// flow polls until the user approves), so it carries a generous timeout.
+    pub async fn complete_login(&self, id: &str, code: &str) -> Result<Account, IpcError> {
+        let params = AccountLoginCompleteParams { id: id.to_string(), code: code.to_string() };
+        Ok(self
+            .session
+            .call_with_timeout::<AccountLoginComplete>(&params, Duration::from_secs(16 * 60))
+            .await?
+            .account)
+    }
+
+    pub async fn list(&self) -> Result<Vec<Account>, IpcError> {
+        Ok(self.session.call::<AccountList>(&proto::Empty {}).await?.accounts)
+    }
+
+    pub async fn remove(&self, reference: &str) -> Result<(), IpcError> {
+        let params = AccountRemoveParams { account: reference.to_string() };
+        self.session.call::<AccountRemove>(&params).await?;
+        Ok(())
     }
 }

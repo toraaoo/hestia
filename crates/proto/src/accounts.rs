@@ -1,0 +1,93 @@
+//! The accounts domain: Minecraft accounts signed in through Microsoft. Tokens
+//! never cross the wire — the daemon keeps them; clients see uuid and name.
+
+use serde::{Deserialize, Serialize};
+
+use crate::contract::{Contract, Empty};
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LoginMethod {
+    #[default]
+    DeviceCode,
+    Sisu,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct Account {
+    pub uuid: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct AccountLoginBeginParams {
+    pub method: LoginMethod,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct AccountLoginBeginResult {
+    pub id: String,
+    pub method: LoginMethod,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub url: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub user_code: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub verification_uri: String,
+}
+
+pub struct AccountLoginBegin;
+impl Contract for AccountLoginBegin {
+    const CHANNEL: &'static str = "account.login.begin";
+    type Params = AccountLoginBeginParams;
+    type Result = AccountLoginBeginResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+pub struct AccountLoginCompleteParams {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub code: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct AccountLoginCompleteResult {
+    pub account: Account,
+}
+
+pub struct AccountLoginComplete;
+impl Contract for AccountLoginComplete {
+    const CHANNEL: &'static str = "account.login.complete";
+    type Params = AccountLoginCompleteParams;
+    type Result = AccountLoginCompleteResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct AccountListResult {
+    pub accounts: Vec<Account>,
+}
+
+pub struct AccountList;
+impl Contract for AccountList {
+    const CHANNEL: &'static str = "account.list";
+    type Params = Empty;
+    type Result = AccountListResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+pub struct AccountRemoveParams {
+    /// Name or uuid.
+    pub account: String,
+}
+
+pub struct AccountRemove;
+impl Contract for AccountRemove {
+    const CHANNEL: &'static str = "account.remove";
+    type Params = AccountRemoveParams;
+    type Result = Empty;
+}

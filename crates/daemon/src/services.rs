@@ -3,6 +3,10 @@
 //! and return `ServiceError` for a typed failure.
 
 use engine::ConfigError;
+use proto::accounts::{
+    AccountList, AccountListResult, AccountLoginBegin, AccountLoginBeginResult, AccountLoginComplete,
+    AccountLoginCompleteResult, AccountRemove,
+};
 use proto::app::{AppInfo, AppInfoResult};
 use proto::cache::{
     CacheClear, CacheEntry, CacheInfo, CacheInfoResult, CacheList, CacheListResult, CacheUsage,
@@ -213,6 +217,46 @@ pub fn make_router() -> Router {
         }
         let id = ctx.runtime.downloads().start(spec);
         Ok(proto::download::DownloadStartResult { id })
+    });
+
+    on.handle::<AccountLoginBegin, _, _>(|p, ctx| async move {
+        let challenge = ctx
+            .runtime
+            .engine()
+            .accounts()
+            .begin_login(p.method)
+            .await
+            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+        Ok(AccountLoginBeginResult {
+            id: challenge.id,
+            method: challenge.method,
+            url: challenge.url,
+            user_code: challenge.user_code,
+            verification_uri: challenge.verification_uri,
+        })
+    });
+
+    on.handle::<AccountLoginComplete, _, _>(|p, ctx| async move {
+        let account = ctx
+            .runtime
+            .engine()
+            .accounts()
+            .complete_login(&p.id, &p.code)
+            .await
+            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+        Ok(AccountLoginCompleteResult { account })
+    });
+
+    on.handle::<AccountList, _, _>(|_: Empty, ctx| async move {
+        Ok(AccountListResult { accounts: ctx.runtime.engine().accounts().list() })
+    });
+
+    on.handle::<AccountRemove, _, _>(|p, ctx| async move {
+        match ctx.runtime.engine().accounts().remove(&p.account) {
+            Ok(true) => Ok(Empty {}),
+            Ok(false) => Err(ServiceError::not_found(format!("no account matches '{}'", p.account))),
+            Err(e) => Err(ServiceError::handler_error(e.to_string())),
+        }
     });
 
     on.handle::<EventsSubscribe, _, _>(|p, ctx| async move {
