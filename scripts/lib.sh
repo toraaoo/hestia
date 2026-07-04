@@ -97,3 +97,30 @@ _run_build() {
 build_dev() { ensure_dev; _run_build "$DEV_DIR" dev "$@"; }
 # build_full <Debug|Release> [target...]
 build_full() { local type="$1"; shift; ensure_full "$type"; _run_build "$FULL_DIR" "$type" "$@"; }
+
+# Build the desktop app (Debug), start the Vite dev server, and launch the app
+# pointed at it so frontend edits hot-reload. Override the URL with DEV_URL
+# (default http://localhost:5173). Stopping the app also stops the dev server.
+run_desktop_hmr() {
+    build_full Debug desktop
+    local bin="$FULL_DIR/Debug/$(binary_for desktop)"
+    local url="${DEV_URL:-http://localhost:5173}"
+
+    log "Starting Vite dev server (HMR)"
+    ( cd "$ROOT/apps/desktop/frontend" && bun install && bun run dev ) &
+    local vite_pid=$!
+    trap 'kill "$vite_pid" 2>/dev/null || true' EXIT INT TERM
+
+    if command -v curl >/dev/null 2>&1; then
+        log "Waiting for $url ..."
+        for _ in $(seq 1 60); do
+            curl -fsS -o /dev/null "$url" 2>/dev/null && break
+            sleep 0.5
+        done
+    else
+        sleep 3
+    fi
+
+    log "Launching $bin --dev-url=$url"
+    "$bin" --dev-url="$url" "$@"
+}
