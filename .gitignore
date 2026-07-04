@@ -695,3 +695,6 @@ build-*/
 /third_party/cef/
 
 .hestia
+# Rust / cargo (rust-rewrite)
+/target
+**/target
