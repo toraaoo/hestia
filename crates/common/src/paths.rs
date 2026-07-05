@@ -1,6 +1,7 @@
 //! Per-user data-directory resolution — the single source of truth for "where
 //! Hestia's data lives", linked by the daemon (via the engine) and every client.
 
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -11,12 +12,25 @@ fn env_path(name: &str) -> Option<PathBuf> {
     }
 }
 
+/// Debug-only: resolve `<workspace>/.hestia` from the running binary's location.
+/// A dev binary sits at `<workspace>/target/<profile>/<bin>` (tests under
+/// `target/<profile>/deps/`), so the workspace root is the parent of `target`.
+/// Resolved at runtime so relocating the repo never needs a rebuild.
+#[cfg(debug_assertions)]
+fn dev_data_home() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let target = exe.ancestors().find(|p| p.file_name() == Some(OsStr::new("target")))?;
+    Some(target.parent()?.join(".hestia"))
+}
+
 /// The platform default data directory. Debug builds anchor at `<workspace>/.hestia`
-/// (via `HESTIA_DEV_HOME`, set in build.rs) so development never touches the real
-/// per-user directory.
+/// so development never touches the real per-user directory.
 fn platform_data_home() -> PathBuf {
-    if cfg!(debug_assertions) {
-        return PathBuf::from(env!("HESTIA_DEV_HOME"));
+    #[cfg(debug_assertions)]
+    {
+        if let Some(dir) = dev_data_home() {
+            return dir;
+        }
     }
     #[cfg(windows)]
     {
