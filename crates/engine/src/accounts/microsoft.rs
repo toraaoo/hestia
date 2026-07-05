@@ -66,7 +66,10 @@ pub struct MinecraftProfile {
 }
 
 fn now_seconds() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 fn http() -> reqwest::Client {
@@ -81,12 +84,19 @@ struct Parsed {
 async fn read(response: reqwest::Response, what: &str) -> Result<Parsed> {
     let status = response.status().as_u16();
     let headers = response.headers().clone();
-    let text = response.text().await.with_context(|| format!("{what} failed"))?;
+    let text = response
+        .text()
+        .await
+        .with_context(|| format!("{what} failed"))?;
     tracing::debug!(what, status, bytes = text.len(), "response");
     let body: Value = match serde_json::from_str(&text) {
         Ok(v) => v,
         Err(_) => {
-            let shape = if text.is_empty() { "empty body" } else { "non-JSON body" };
+            let shape = if text.is_empty() {
+                "empty body"
+            } else {
+                "non-JSON body"
+            };
             let mut message = format!("{what}: HTTP {status} ({shape})");
             if status == 403 {
                 message.push_str(
@@ -107,7 +117,10 @@ fn require_string(body: &Value, key: &str, what: &str) -> Result<String> {
 }
 
 fn nested_token(body: &Value, key: &str, what: &str) -> Result<String> {
-    let node = body.get(key).filter(|v| v.is_object()).ok_or_else(|| anyhow!("{what} response is missing {key}"))?;
+    let node = body
+        .get(key)
+        .filter(|v| v.is_object())
+        .ok_or_else(|| anyhow!("{what} response is missing {key}"))?;
     require_string(node, "Token", what)
 }
 
@@ -119,7 +132,8 @@ fn days_from_civil(mut year: i64, month: u32, day: u32) -> i64 {
     year -= (month <= 2) as i64;
     let era = (if year >= 0 { year } else { year - 399 }) / 400;
     let yoe = year - era * 400;
-    let doy = (153 * (if month > 2 { month - 3 } else { month + 9 }) as i64 + 2) / 5 + day as i64 - 1;
+    let doy =
+        (153 * (if month > 2 { month - 3 } else { month + 9 }) as i64 + 2) / 5 + day as i64 - 1;
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
     era * 146097 + doe - 719468
 }
@@ -132,8 +146,9 @@ fn parse_http_date(value: &str) -> Option<i64> {
         return None;
     }
     let day: u32 = parts[0].parse().ok()?;
-    const MONTHS: [&str; 12] =
-        ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
     let month = MONTHS.iter().position(|m| *m == parts[1])? as u32 + 1;
     let year: i64 = parts[2].parse().ok()?;
     let time: Vec<&str> = parts[3].split(':').collect();
@@ -155,7 +170,10 @@ fn server_clock_offset(headers: &HeaderMap) -> i64 {
     };
     let offset = server_time - now_seconds();
     if offset.abs() > 60 {
-        tracing::warn!(offset, "system clock differs from Xbox server time; correcting signatures");
+        tracing::warn!(
+            offset,
+            "system clock differs from Xbox server time; correcting signatures"
+        );
     }
     offset
 }
@@ -169,7 +187,8 @@ async fn signed_post(
     clock_offset: i64,
 ) -> Result<reqwest::Response> {
     let payload = body.to_string();
-    let signature = xbox_signature_header(key, url_path, "", &payload, now_seconds() + clock_offset);
+    let signature =
+        xbox_signature_header(key, url_path, "", &payload, now_seconds() + clock_offset);
     let mut request = http()
         .post(url)
         .header("Content-Type", "application/json; charset=utf-8")
@@ -178,7 +197,11 @@ async fn signed_post(
     if contract_version {
         request = request.header("x-xbl-contract-version", "1");
     }
-    request.body(payload).send().await.with_context(|| format!("request to {url} failed"))
+    request
+        .body(payload)
+        .send()
+        .await
+        .with_context(|| format!("request to {url} failed"))
 }
 
 pub async fn request_device_token(key: &ProofKey) -> Result<DeviceToken> {
@@ -193,7 +216,8 @@ pub async fn request_device_token(key: &ProofKey) -> Result<DeviceToken> {
         "RelyingParty": "http://auth.xboxlive.com",
         "TokenType": "JWT",
     });
-    let response = signed_post(DEVICE_AUTH_URL, "/device/authenticate", &body, key, true, 0).await?;
+    let response =
+        signed_post(DEVICE_AUTH_URL, "/device/authenticate", &body, key, true, 0).await?;
     let parsed = read(response, "Xbox device token").await?;
     Ok(DeviceToken {
         token: require_string(&parsed.body, "Token", "Xbox device token")?,
@@ -223,7 +247,15 @@ pub async fn sisu_authenticate(
         "TokenType": "code",
         "TitleId": TITLE_ID,
     });
-    let response = signed_post(SISU_AUTHENTICATE_URL, "/authenticate", &body, key, true, clock_offset).await?;
+    let response = signed_post(
+        SISU_AUTHENTICATE_URL,
+        "/authenticate",
+        &body,
+        key,
+        true,
+        clock_offset,
+    )
+    .await?;
     let parsed = read(response, "Xbox sign-in request").await?;
     let session_id = parsed
         .headers
@@ -257,8 +289,17 @@ async fn exchange_oauth(form: &[(&str, &str)], what: &str, rejection: &str) -> R
     }
     Ok(OAuthTokens {
         access_token: require_string(&parsed.body, "access_token", what)?,
-        refresh_token: parsed.body.get("refresh_token").and_then(Value::as_str).unwrap_or_default().to_string(),
-        expires_in: parsed.body.get("expires_in").and_then(Value::as_i64).unwrap_or(0),
+        refresh_token: parsed
+            .body
+            .get("refresh_token")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        expires_in: parsed
+            .body
+            .get("expires_in")
+            .and_then(Value::as_i64)
+            .unwrap_or(0),
     })
 }
 
@@ -266,21 +307,41 @@ pub async fn request_device_code() -> Result<DeviceCodeChallenge> {
     let response = http()
         .post(DEVICE_CODE_URL)
         .header("Accept", "application/json")
-        .form(&[("client_id", CLIENT_ID), ("scope", SCOPE), ("response_type", "device_code")])
+        .form(&[
+            ("client_id", CLIENT_ID),
+            ("scope", SCOPE),
+            ("response_type", "device_code"),
+        ])
         .send()
         .await
         .context("device sign-in request failed")?;
     let parsed = read(response, "device sign-in request").await?;
     if let Some(error) = parsed.body.get("error").and_then(Value::as_str) {
-        let description = parsed.body.get("error_description").and_then(Value::as_str).unwrap_or(error);
+        let description = parsed
+            .body
+            .get("error_description")
+            .and_then(Value::as_str)
+            .unwrap_or(error);
         bail!("Microsoft declined the device sign-in request: {description}");
     }
     Ok(DeviceCodeChallenge {
         user_code: require_string(&parsed.body, "user_code", "device sign-in request")?,
-        verification_uri: require_string(&parsed.body, "verification_uri", "device sign-in request")?,
+        verification_uri: require_string(
+            &parsed.body,
+            "verification_uri",
+            "device sign-in request",
+        )?,
         device_code: require_string(&parsed.body, "device_code", "device sign-in request")?,
-        interval_seconds: parsed.body.get("interval").and_then(Value::as_i64).unwrap_or(5),
-        expires_in_seconds: parsed.body.get("expires_in").and_then(Value::as_i64).unwrap_or(900),
+        interval_seconds: parsed
+            .body
+            .get("interval")
+            .and_then(Value::as_i64)
+            .unwrap_or(5),
+        expires_in_seconds: parsed
+            .body
+            .get("expires_in")
+            .and_then(Value::as_i64)
+            .unwrap_or(900),
     })
 }
 
@@ -299,20 +360,39 @@ pub async fn poll_device_code(device_code: &str) -> Result<Option<OAuthTokens>> 
         .await
         .context("device sign-in poll failed")?;
     let parsed = read(response, "device sign-in poll").await?;
-    let error = parsed.body.get("error").and_then(Value::as_str).unwrap_or_default();
+    let error = parsed
+        .body
+        .get("error")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     if error.is_empty() {
         return Ok(Some(OAuthTokens {
             access_token: require_string(&parsed.body, "access_token", "device sign-in poll")?,
-            refresh_token: parsed.body.get("refresh_token").and_then(Value::as_str).unwrap_or_default().to_string(),
-            expires_in: parsed.body.get("expires_in").and_then(Value::as_i64).unwrap_or(0),
+            refresh_token: parsed
+                .body
+                .get("refresh_token")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            expires_in: parsed
+                .body
+                .get("expires_in")
+                .and_then(Value::as_i64)
+                .unwrap_or(0),
         }));
     }
     match error {
         "authorization_pending" | "slow_down" => Ok(None),
-        "authorization_declined" => bail!("the sign-in was declined; run 'hestia auth login' again"),
+        "authorization_declined" => {
+            bail!("the sign-in was declined; run 'hestia auth login' again")
+        }
         "expired_token" => bail!("the sign-in request expired; run 'hestia auth login' again"),
         _ => {
-            let description = parsed.body.get("error_description").and_then(Value::as_str).unwrap_or(error);
+            let description = parsed
+                .body
+                .get("error_description")
+                .and_then(Value::as_str)
+                .unwrap_or(error);
             bail!("Microsoft rejected the sign-in: {description}");
         }
     }
@@ -367,7 +447,15 @@ pub async fn sisu_authorize(
         "RelyingParty": "http://xboxlive.com",
         "UseModernGamertag": true,
     });
-    let response = signed_post(SISU_AUTHORIZE_URL, "/authorize", &body, key, false, clock_offset).await?;
+    let response = signed_post(
+        SISU_AUTHORIZE_URL,
+        "/authorize",
+        &body,
+        key,
+        false,
+        clock_offset,
+    )
+    .await?;
     let parsed = read(response, "Xbox authorization").await?;
     Ok(SisuAuthorization {
         user_token: nested_token(&parsed.body, "UserToken", "Xbox authorization")?,
@@ -404,7 +492,10 @@ pub async fn xsts_authorize(
     let response = signed_post(XSTS_URL, "/xsts/authorize", &body, key, true, clock_offset).await?;
     if response.status().as_u16() == 401 {
         let text = response.text().await.unwrap_or_default();
-        let xerr = serde_json::from_str::<Value>(&text).ok().and_then(|d| d.get("XErr").and_then(Value::as_i64)).unwrap_or(0);
+        let xerr = serde_json::from_str::<Value>(&text)
+            .ok()
+            .and_then(|d| d.get("XErr").and_then(Value::as_i64))
+            .unwrap_or(0);
         bail!(xsts_error_message(xerr));
     }
     let parsed = read(response, "Xbox XSTS authorization").await?;
@@ -438,7 +529,10 @@ pub async fn launcher_login(xsts: &XstsToken) -> Result<String> {
         .await
         .context("Minecraft services sign-in failed")?;
     if response.status().as_u16() != 200 {
-        bail!("Minecraft services sign-in failed (HTTP {})", response.status().as_u16());
+        bail!(
+            "Minecraft services sign-in failed (HTTP {})",
+            response.status().as_u16()
+        );
     }
     let parsed = read(response, "Minecraft services").await?;
     require_string(&parsed.body, "access_token", "Minecraft services")

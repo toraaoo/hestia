@@ -23,8 +23,8 @@ use serde_json::Value;
 /// Object key order and whitespace are irrelevant (compared as `Value`); a
 /// changed field name, set, or enum string is not.
 fn round_trip<T: Serialize + DeserializeOwned>(name: &str, fixture: &str) {
-    let expected: Value =
-        serde_json::from_str(fixture).unwrap_or_else(|e| panic!("{name}: fixture is not JSON: {e}"));
+    let expected: Value = serde_json::from_str(fixture)
+        .unwrap_or_else(|e| panic!("{name}: fixture is not JSON: {e}"));
     let decoded: T = serde_json::from_value(expected.clone())
         .unwrap_or_else(|e| panic!("{name}: fixture does not decode into the type: {e}"));
     let reencoded = serde_json::to_value(&decoded).unwrap();
@@ -44,15 +44,35 @@ macro_rules! golden {
 }
 
 golden!(app_info_result, AppInfoResult, "app_info_result.json");
-golden!(daemon_status_result, DaemonStatusResult, "daemon_status_result.json");
+golden!(
+    daemon_status_result,
+    DaemonStatusResult,
+    "daemon_status_result.json"
+);
 golden!(cache_entry, CacheEntry, "cache_entry.json");
 golden!(cache_info_result, CacheInfoResult, "cache_info_result.json");
 golden!(java_runtime, JavaRuntime, "java_runtime.json");
-golden!(java_install_progress, JavaInstallProgress, "java_install_progress.json");
+golden!(
+    java_install_progress,
+    JavaInstallProgress,
+    "java_install_progress.json"
+);
 golden!(download_spec, DownloadSpec, "download_spec.json");
 golden!(account, Account, "account.json");
-golden!(account_login_begin_result, AccountLoginBeginResult, "account_login_begin_result.json");
+golden!(
+    account_login_begin_result,
+    AccountLoginBeginResult,
+    "account_login_begin_result.json"
+);
 golden!(process_spec, ProcessSpec, "process_spec.json");
 golden!(process_info, ProcessInfo, "process_info.json");
-golden!(process_output_event, ProcessOutputEvent, "process_output_event.json");
-golden!(process_exit_event, ProcessExitEvent, "process_exit_event.json");
+golden!(
+    process_output_event,
+    ProcessOutputEvent,
+    "process_output_event.json"
+);
+golden!(
+    process_exit_event,
+    ProcessExitEvent,
+    "process_exit_event.json"
+);

@@ -100,7 +100,10 @@ fn run(view: Arc<Mutex<View>>, stop: Arc<AtomicBool>) {
 
 fn draw(frame: &mut Frame, view: &View, step: usize) {
     let area = frame.area();
-    let spin = Span::styled(FRAMES[step % FRAMES.len()], Style::default().fg(Color::Cyan));
+    let spin = Span::styled(
+        FRAMES[step % FRAMES.len()],
+        Style::default().fg(Color::Cyan),
+    );
     match view {
         View::Spinner(label) => {
             let line = Line::from(vec![spin, Span::raw(" "), Span::raw(label.as_str())]);
@@ -158,7 +161,9 @@ pub struct InstallReporter {
 impl InstallReporter {
     pub fn new() -> Self {
         Self {
-            animator: Animator::start(View::Spinner(phase_label(JavaInstallPhase::Resolving).into())),
+            animator: Animator::start(View::Spinner(
+                phase_label(JavaInstallPhase::Resolving).into(),
+            )),
             rate: Mutex::new(RateMeter::default()),
             last_phase: Mutex::new(None),
         }

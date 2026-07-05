@@ -16,8 +16,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use microsoft::{
-    launcher_login, minecraft_profile, poll_device_code, redeem_code, refresh_oauth, request_device_code,
-    request_device_token, sisu_authenticate, sisu_authorize, xsts_authorize, OAuthTokens,
+    launcher_login, minecraft_profile, poll_device_code, redeem_code, refresh_oauth,
+    request_device_code, request_device_token, sisu_authenticate, sisu_authorize, xsts_authorize,
+    OAuthTokens,
 };
 use signing::{base64url_nopad, format_uuid_v4, hex, random_bytes, ProofKey};
 
@@ -73,7 +74,12 @@ struct Inner {
 
 impl Accounts {
     pub fn new(path: PathBuf) -> Self {
-        Accounts { inner: Mutex::new(Inner { path, pending: HashMap::new() }) }
+        Accounts {
+            inner: Mutex::new(Inner {
+                path,
+                pending: HashMap::new(),
+            }),
+        }
     }
 
     pub fn reload(&self, path: PathBuf) {
@@ -88,7 +94,10 @@ impl Accounts {
         load(&self.path())
             .accounts
             .into_iter()
-            .map(|a| Account { uuid: a.uuid, name: a.name })
+            .map(|a| Account {
+                uuid: a.uuid,
+                name: a.name,
+            })
             .collect()
     }
 
@@ -109,7 +118,11 @@ impl Accounts {
                 expires_at: now_seconds() + device.expires_in_seconds,
                 clock_offset: 0,
             };
-            self.inner.lock().unwrap().pending.insert(id.clone(), session);
+            self.inner
+                .lock()
+                .unwrap()
+                .pending
+                .insert(id.clone(), session);
             return Ok(LoginChallenge {
                 id,
                 method,
@@ -124,7 +137,8 @@ impl Accounts {
         let verifier = hex(&random_bytes(64));
         let challenge = base64url_nopad(&sha256_bytes(&verifier));
         let state = hex(&random_bytes(16));
-        let auth = sisu_authenticate(&device.token, &challenge, &state, &key, device.clock_offset).await?;
+        let auth =
+            sisu_authenticate(&device.token, &challenge, &state, &key, device.clock_offset).await?;
 
         let session = LoginSession {
             method,
@@ -137,27 +151,50 @@ impl Accounts {
             expires_at: 0,
             clock_offset: device.clock_offset,
         };
-        self.inner.lock().unwrap().pending.insert(id.clone(), session);
-        Ok(LoginChallenge { id, method, url: auth.url, user_code: String::new(), verification_uri: String::new() })
+        self.inner
+            .lock()
+            .unwrap()
+            .pending
+            .insert(id.clone(), session);
+        Ok(LoginChallenge {
+            id,
+            method,
+            url: auth.url,
+            user_code: String::new(),
+            verification_uri: String::new(),
+        })
     }
 
     pub async fn complete_login(&self, id: &str, code: &str) -> Result<Account> {
         let session = {
             let mut inner = self.inner.lock().unwrap();
-            inner.pending.remove(id).ok_or_else(|| anyhow!("no sign-in is in progress for this request"))?
+            inner
+                .pending
+                .remove(id)
+                .ok_or_else(|| anyhow!("no sign-in is in progress for this request"))?
         };
 
         let (oauth, xsts) = if session.method == LoginMethod::DeviceCode {
             let oauth = await_device_tokens(&session).await?;
             let key = ProofKey::generate();
             let device = request_device_token(&key).await?;
-            let authorization =
-                sisu_authorize("", &oauth.access_token, &device.token, &key, device.clock_offset).await?;
-            let xsts = xsts_authorize(&authorization, &device.token, &key, device.clock_offset).await?;
+            let authorization = sisu_authorize(
+                "",
+                &oauth.access_token,
+                &device.token,
+                &key,
+                device.clock_offset,
+            )
+            .await?;
+            let xsts =
+                xsts_authorize(&authorization, &device.token, &key, device.clock_offset).await?;
             (oauth, xsts)
         } else {
             let oauth = redeem_code(code, &session.verifier).await?;
-            let key = session.key.as_ref().ok_or_else(|| anyhow!("sisu session lost its proof key"))?;
+            let key = session
+                .key
+                .as_ref()
+                .ok_or_else(|| anyhow!("sisu session lost its proof key"))?;
             let authorization = sisu_authorize(
                 &session.session_id,
                 &oauth.access_token,
@@ -166,8 +203,13 @@ impl Accounts {
                 session.clock_offset,
             )
             .await?;
-            let xsts =
-                xsts_authorize(&authorization, &session.device_token, key, session.clock_offset).await?;
+            let xsts = xsts_authorize(
+                &authorization,
+                &session.device_token,
+                key,
+                session.clock_offset,
+            )
+            .await?;
             (oauth, xsts)
         };
 
@@ -190,7 +232,10 @@ impl Accounts {
             save(&path, &file)?;
         }
         tracing::info!(name = %profile.name, uuid = %profile.uuid, "signed in");
-        Ok(Account { uuid: profile.uuid, name: profile.name })
+        Ok(Account {
+            uuid: profile.uuid,
+            name: profile.name,
+        })
     }
 
     /// A currently-valid Minecraft access token for `reference` (uuid or name),
@@ -225,7 +270,8 @@ impl Accounts {
         let path = self.path();
         let mut file = load(&path);
         let before = file.accounts.len();
-        file.accounts.retain(|a| a.uuid != reference && a.name != reference);
+        file.accounts
+            .retain(|a| a.uuid != reference && a.name != reference);
         if file.accounts.len() == before {
             return Ok(false);
         }
@@ -254,7 +300,14 @@ async fn rotate_tokens(account: &mut StoredAccount) -> Result<()> {
     let oauth = refresh_oauth(&account.refresh_token).await?;
     let key = ProofKey::generate();
     let device = request_device_token(&key).await?;
-    let authorization = sisu_authorize("", &oauth.access_token, &device.token, &key, device.clock_offset).await?;
+    let authorization = sisu_authorize(
+        "",
+        &oauth.access_token,
+        &device.token,
+        &key,
+        device.clock_offset,
+    )
+    .await?;
     let xsts = xsts_authorize(&authorization, &device.token, &key, device.clock_offset).await?;
 
     account.access_token = launcher_login(&xsts).await?;
@@ -266,7 +319,10 @@ async fn rotate_tokens(account: &mut StoredAccount) -> Result<()> {
 }
 
 fn now_seconds() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 fn sha256_bytes(text: &str) -> Vec<u8> {

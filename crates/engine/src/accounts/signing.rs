@@ -190,7 +190,13 @@ mod tests {
     #[test]
     fn signature_header_envelope_layout() {
         let key = ProofKey::from_scalar_bytes(&[0x11; 32]);
-        let header = xbox_signature_header(&key, "/device/authenticate", "XBL3.0 x=1;t", "{}", 1_700_000_000);
+        let header = xbox_signature_header(
+            &key,
+            "/device/authenticate",
+            "XBL3.0 x=1;t",
+            "{}",
+            1_700_000_000,
+        );
         let envelope = STANDARD.decode(header).expect("base64 envelope");
         // version(4) + filetime(8) + raw r‖s signature(64)
         assert_eq!(envelope.len(), 4 + 8 + 64);
@@ -200,7 +206,8 @@ mod tests {
     #[test]
     fn signature_verifies_against_the_proof_key() {
         let key = ProofKey::from_scalar_bytes(&[0x11; 32]);
-        let (path, auth, body, unix) = ("/authorize", "XBL3.0 x=1;t", "{\"a\":1}", 1_700_000_000i64);
+        let (path, auth, body, unix) =
+            ("/authorize", "XBL3.0 x=1;t", "{\"a\":1}", 1_700_000_000i64);
         let header = xbox_signature_header(&key, path, auth, body, unix);
         let envelope = STANDARD.decode(header).expect("base64 envelope");
 

@@ -198,20 +198,27 @@ fn build_command(spec: &ProcessSpec) -> Command {
 /// and published as a `process.output` event as it arrives.
 fn attach_readers(child: &mut Child, id: &str, entry: &Arc<Entry>, hub: &Arc<EventHub>) {
     if let Some(stdout) = child.stdout.take() {
-        spawn_reader(stdout, LogStream::Stdout, id.to_string(), entry.clone(), hub.clone());
+        spawn_reader(
+            stdout,
+            LogStream::Stdout,
+            id.to_string(),
+            entry.clone(),
+            hub.clone(),
+        );
     }
     if let Some(stderr) = child.stderr.take() {
-        spawn_reader(stderr, LogStream::Stderr, id.to_string(), entry.clone(), hub.clone());
+        spawn_reader(
+            stderr,
+            LogStream::Stderr,
+            id.to_string(),
+            entry.clone(),
+            hub.clone(),
+        );
     }
 }
 
-fn spawn_reader<R>(
-    reader: R,
-    stream: LogStream,
-    id: String,
-    entry: Arc<Entry>,
-    hub: Arc<EventHub>,
-) where
+fn spawn_reader<R>(reader: R, stream: LogStream, id: String, entry: Arc<Entry>, hub: Arc<EventHub>)
+where
     R: tokio::io::AsyncRead + Unpin + Send + 'static,
 {
     tokio::spawn(async move {

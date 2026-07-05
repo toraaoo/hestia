@@ -71,7 +71,9 @@ async fn daemon_serves_the_full_client_surface() {
 
     // The reserved `home` key round-trips the isolated data directory.
     let home = client.config().get("home").await.expect("config.get home");
-    let home = home.and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default();
+    let home = home
+        .and_then(|v| v.as_str().map(str::to_string))
+        .unwrap_or_default();
     assert_eq!(
         std::path::Path::new(&home),
         daemon.home.as_path(),
@@ -110,7 +112,10 @@ async fn daemon_serves_the_full_client_surface() {
         .process()
         .start(ProcessSpec {
             program: "/bin/sh".into(),
-            args: vec!["-c".into(), "while true; do echo tick; sleep 1; done".into()],
+            args: vec![
+                "-c".into(),
+                "while true; do echo tick; sleep 1; done".into(),
+            ],
             ..Default::default()
         })
         .await
@@ -118,15 +123,34 @@ async fn daemon_serves_the_full_client_surface() {
     assert!(started.pid > 0);
 
     tokio::time::sleep(Duration::from_millis(1200)).await;
-    let status = client.process().status(&started.id).await.expect("process.status");
+    let status = client
+        .process()
+        .status(&started.id)
+        .await
+        .expect("process.status");
     assert_eq!(status.state, ProcessState::Running);
-    let logs = client.process().logs(&started.id, None).await.expect("process.logs");
-    assert!(logs.iter().any(|l| l.line == "tick"), "buffered logs should hold output");
+    let logs = client
+        .process()
+        .logs(&started.id, None)
+        .await
+        .expect("process.logs");
+    assert!(
+        logs.iter().any(|l| l.line == "tick"),
+        "buffered logs should hold output"
+    );
 
-    client.process().stop(&started.id).await.expect("process.stop");
+    client
+        .process()
+        .stop(&started.id)
+        .await
+        .expect("process.stop");
     let mut killed = false;
     for _ in 0..40 {
-        let s = client.process().status(&started.id).await.expect("process.status");
+        let s = client
+            .process()
+            .status(&started.id)
+            .await
+            .expect("process.status");
         if s.state == ProcessState::Killed {
             killed = true;
             break;

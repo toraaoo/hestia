@@ -4,8 +4,8 @@
 
 use engine::ConfigError;
 use proto::accounts::{
-    AccountList, AccountListResult, AccountLoginBegin, AccountLoginBeginResult, AccountLoginComplete,
-    AccountLoginCompleteResult, AccountRemove,
+    AccountList, AccountListResult, AccountLoginBegin, AccountLoginBeginResult,
+    AccountLoginComplete, AccountLoginCompleteResult, AccountRemove,
 };
 use proto::app::{AppInfo, AppInfoResult};
 use proto::cache::{
@@ -252,13 +252,18 @@ pub fn make_router() -> Router {
     });
 
     on.handle::<AccountList, _, _>(|_: Empty, ctx| async move {
-        Ok(AccountListResult { accounts: ctx.runtime.engine().accounts().list() })
+        Ok(AccountListResult {
+            accounts: ctx.runtime.engine().accounts().list(),
+        })
     });
 
     on.handle::<AccountRemove, _, _>(|p, ctx| async move {
         match ctx.runtime.engine().accounts().remove(&p.account) {
             Ok(true) => Ok(Empty {}),
-            Ok(false) => Err(ServiceError::not_found(format!("no account matches '{}'", p.account))),
+            Ok(false) => Err(ServiceError::not_found(format!(
+                "no account matches '{}'",
+                p.account
+            ))),
             Err(e) => Err(ServiceError::handler_error(e.to_string())),
         }
     });
@@ -270,9 +275,9 @@ pub fn make_router() -> Router {
                 pid: info.pid,
             }),
             Err(StartError::EmptyProgram) => Err(ServiceError::bad_request("program is empty")),
-            Err(StartError::Spawn(e)) => {
-                Err(ServiceError::handler_error(format!("cannot spawn process: {e}")))
-            }
+            Err(StartError::Spawn(e)) => Err(ServiceError::handler_error(format!(
+                "cannot spawn process: {e}"
+            ))),
         }
     });
 

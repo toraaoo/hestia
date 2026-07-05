@@ -9,7 +9,8 @@ use ipc::errors::IpcError;
 use ipc::protocol::Event;
 use proto::accounts::{
     Account, AccountList, AccountLoginBegin, AccountLoginBeginParams, AccountLoginBeginResult,
-    AccountLoginComplete, AccountLoginCompleteParams, AccountRemove, AccountRemoveParams, LoginMethod,
+    AccountLoginComplete, AccountLoginCompleteParams, AccountRemove, AccountRemoveParams,
+    LoginMethod,
 };
 use proto::process::{
     ProcessExitEvent, ProcessInfo, ProcessList, ProcessLogLine, ProcessLogs, ProcessLogsParams,
@@ -228,7 +229,11 @@ impl Process<'_> {
             .await
     }
 
-    pub async fn logs(&self, id: &str, tail: Option<usize>) -> Result<Vec<ProcessLogLine>, IpcError> {
+    pub async fn logs(
+        &self,
+        id: &str,
+        tail: Option<usize>,
+    ) -> Result<Vec<ProcessLogLine>, IpcError> {
         let params = ProcessLogsParams {
             id: id.to_string(),
             tail,
@@ -250,9 +255,9 @@ impl Process<'_> {
         let id = spec.id.clone();
 
         let on_event = move |event: &Event| {
-            if let Ok(out) = serde_json::from_value::<proto::process::ProcessOutputEvent>(
-                event.payload.clone(),
-            ) {
+            if let Ok(out) =
+                serde_json::from_value::<proto::process::ProcessOutputEvent>(event.payload.clone())
+            {
                 on_output(&out.line);
             }
         };
@@ -279,7 +284,10 @@ pub struct Accounts<'a> {
 impl Accounts<'_> {
     /// Begin a sign-in; returns what the user must act on (a device code or a
     /// browser URL). The daemon holds per-login state keyed by the returned id.
-    pub async fn begin_login(&self, method: LoginMethod) -> Result<AccountLoginBeginResult, IpcError> {
+    pub async fn begin_login(
+        &self,
+        method: LoginMethod,
+    ) -> Result<AccountLoginBeginResult, IpcError> {
         self.session
             .call_with_timeout::<AccountLoginBegin>(
                 &AccountLoginBeginParams { method },
@@ -291,7 +299,10 @@ impl Accounts<'_> {
     /// Drive a begun sign-in to a stored account. Long-running (the device-code
     /// flow polls until the user approves), so it carries a generous timeout.
     pub async fn complete_login(&self, id: &str, code: &str) -> Result<Account, IpcError> {
-        let params = AccountLoginCompleteParams { id: id.to_string(), code: code.to_string() };
+        let params = AccountLoginCompleteParams {
+            id: id.to_string(),
+            code: code.to_string(),
+        };
         Ok(self
             .session
             .call_with_timeout::<AccountLoginComplete>(&params, Duration::from_secs(16 * 60))
@@ -300,11 +311,17 @@ impl Accounts<'_> {
     }
 
     pub async fn list(&self) -> Result<Vec<Account>, IpcError> {
-        Ok(self.session.call::<AccountList>(&proto::Empty {}).await?.accounts)
+        Ok(self
+            .session
+            .call::<AccountList>(&proto::Empty {})
+            .await?
+            .accounts)
     }
 
     pub async fn remove(&self, reference: &str) -> Result<(), IpcError> {
-        let params = AccountRemoveParams { account: reference.to_string() };
+        let params = AccountRemoveParams {
+            account: reference.to_string(),
+        };
         self.session.call::<AccountRemove>(&params).await?;
         Ok(())
     }

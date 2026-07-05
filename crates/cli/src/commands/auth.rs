@@ -15,7 +15,10 @@ use crate::ui::Spinner;
 pub enum AuthCmd {
     /// Sign in to a Microsoft account
     Login {
-        #[arg(long, help = "Sign in through the browser-redirect (sisu) flow instead of a device code")]
+        #[arg(
+            long,
+            help = "Sign in through the browser-redirect (sisu) flow instead of a device code"
+        )]
         sisu: bool,
     },
     /// List signed-in accounts
@@ -28,13 +31,19 @@ pub async fn run(cmd: AuthCmd) -> Result<()> {
     let client = super::connect().await?;
     match cmd {
         AuthCmd::Login { sisu } => {
-            let account =
-                if sisu { sisu_login(&client).await? } else { device_code_login(&client).await? };
+            let account = if sisu {
+                sisu_login(&client).await?
+            } else {
+                device_code_login(&client).await?
+            };
             println!("Signed in as {} ({})", account.name, account.uuid);
         }
         AuthCmd::List => {
             let accounts = client.accounts().list().await?;
-            let rows = accounts.iter().map(|a| vec![a.name.clone(), a.uuid.clone()]).collect::<Vec<_>>();
+            let rows = accounts
+                .iter()
+                .map(|a| vec![a.name.clone(), a.uuid.clone()])
+                .collect::<Vec<_>>();
             print_table(&["NAME", "UUID"], &rows);
         }
         AuthCmd::Logout { account } => {
@@ -46,7 +55,10 @@ pub async fn run(cmd: AuthCmd) -> Result<()> {
 }
 
 async fn device_code_login(client: &Client) -> Result<Account> {
-    let flow = client.accounts().begin_login(LoginMethod::DeviceCode).await?;
+    let flow = client
+        .accounts()
+        .begin_login(LoginMethod::DeviceCode)
+        .await?;
     println!(
         "\nTo sign in, open\n\n  {}\n\nand enter the code\n\n  {}\n",
         flow.verification_uri, flow.user_code
@@ -59,7 +71,10 @@ async fn device_code_login(client: &Client) -> Result<Account> {
 
 async fn sisu_login(client: &Client) -> Result<Account> {
     let flow = client.accounts().begin_login(LoginMethod::Sisu).await?;
-    println!("Open this URL in your browser and sign in:\n\n  {}\n", flow.url);
+    println!(
+        "Open this URL in your browser and sign in:\n\n  {}\n",
+        flow.url
+    );
     wait_for_enter("Press Enter to open your browser... ");
     open_browser(&flow.url);
     print!(
