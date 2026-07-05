@@ -10,7 +10,7 @@ use serde_json::Value;
 
 async fn fetch_json(url: &str) -> Result<Value> {
     tracing::debug!(url, "minecraft meta GET");
-    let response = reqwest::Client::new()
+    let response = crate::download::http_client()
         .get(url)
         .send()
         .await

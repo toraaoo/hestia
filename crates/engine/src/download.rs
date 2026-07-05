@@ -4,6 +4,7 @@
 //! and feeds it after a successful download.
 
 use std::path::Path;
+use std::sync::OnceLock;
 
 use anyhow::{anyhow, bail, Context, Result};
 use futures_util::StreamExt;
@@ -14,6 +15,20 @@ use crate::cache::Cache;
 use crate::checksum::Hasher;
 
 pub type ProgressFn<'a> = dyn Fn(&DownloadProgress) + Send + Sync + 'a;
+
+/// The engine-wide HTTP client. One pooled client keeps connections alive
+/// across requests — a fresh client per request (what `reqwest::get` does)
+/// pays a TCP + TLS handshake for every one of the thousands of small fetches
+/// an asset materialisation makes.
+pub(crate) fn http_client() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .user_agent(format!("{}/{}", common::app::NAME, common::app::VERSION))
+            .build()
+            .expect("default reqwest client builds")
+    })
+}
 
 pub struct Downloader<'a> {
     cache: Option<&'a Cache>,
@@ -87,7 +102,9 @@ impl<'a> Downloader<'a> {
         checksum: Option<&Checksum>,
         on_progress: &ProgressFn<'_>,
     ) -> Result<()> {
-        let response = reqwest::get(url)
+        let response = http_client()
+            .get(url)
+            .send()
             .await
             .with_context(|| format!("download of {url} failed"))?;
         if !response.status().is_success() {

@@ -17,10 +17,7 @@ use crate::cache::Cache;
 use crate::download::Downloader;
 
 const ASSET_HOST: &str = "https://resources.download.minecraft.net";
-const CONCURRENT_FETCHES: usize = 8;
-/// Completed-count granularity for asset progress, so a few-thousand-object
-/// index does not flood the event stream.
-const ASSET_PROGRESS_STEP: u64 = 25;
+const CONCURRENT_FETCHES: usize = 16;
 
 pub type OnProgress<'a> = &'a (dyn Fn(&ProvisionProgress) + Send + Sync);
 
@@ -214,15 +211,13 @@ pub async fn ensure_assets(
                     .with_context(|| format!("asset object {hash}"))?;
             }
             let current = done.fetch_add(1, Ordering::Relaxed) + 1;
-            if current % ASSET_PROGRESS_STEP == 0 || current == total {
-                report_count(
-                    on_progress,
-                    ProvisionPhase::Assets,
-                    current,
-                    total,
-                    index_id,
-                );
-            }
+            report_count(
+                on_progress,
+                ProvisionPhase::Assets,
+                current,
+                total,
+                index_id,
+            );
             Ok::<(), anyhow::Error>(())
         }
     });

@@ -21,7 +21,7 @@ pub struct JavaPackage {
 
 async fn fetch_json(url: &str, query: &[(&str, &str)]) -> Result<Value> {
     tracing::debug!(url, "adoptium GET");
-    let response = reqwest::Client::new()
+    let response = crate::download::http_client()
         .get(url)
         .query(query)
         .send()
