@@ -18,22 +18,32 @@ use proto::daemon::{DaemonStatus, DaemonStatusResult, DaemonStop, DaemonStopResu
 use proto::download::DownloadStart;
 use proto::events::{EventsSubscribe, EventsSubscribeResult};
 use proto::health::{Ping, PingResult};
-use proto::instance::{InstanceFlavors, InstanceResolve, InstanceVersions};
+use proto::instance::{
+    InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch, InstanceLaunchResult,
+    InstanceList, InstanceListResult, InstanceRemove, InstanceResolve, InstanceStop,
+    InstanceVersions,
+};
 use proto::java::{
     JavaInstall, JavaInstallResult, JavaList, JavaListResult, JavaReleases, JavaReleasesResult,
     JavaUninstall,
 };
 use proto::minecraft::{FlavorsResult, VersionsResult};
 use proto::process::{
-    ProcessList, ProcessListResult, ProcessLogs, ProcessLogsResult, ProcessStart,
-    ProcessStartResult, ProcessStatus, ProcessStop,
+    ProcessList, ProcessListResult, ProcessLogs, ProcessLogsResult, ProcessSpec, ProcessStart,
+    ProcessStartResult, ProcessState, ProcessStatus, ProcessStop, RestartPolicy,
 };
-use proto::server::{ServerFlavors, ServerResolve, ServerVersions};
+use proto::server::{
+    ServerCreate, ServerCreateResult, ServerFlavors, ServerList, ServerListResult, ServerLogs,
+    ServerRemove, ServerResolve, ServerStart, ServerStartResult, ServerStatus, ServerStop,
+    ServerVersions,
+};
 use proto::Empty;
 use serde_json::{json, Value};
 
 use crate::autostart;
-use crate::runtime::{Channels, Router, ServiceError, StartError};
+use crate::runtime::{
+    instance_process_id, server_process_id, Channels, Router, ServiceError, StartError,
+};
 
 pub fn make_router() -> Router {
     let mut router = Router::default();
@@ -372,5 +382,217 @@ pub fn make_router() -> Router {
             .map_err(|e| ServiceError::handler_error(e.to_string()))
     });
 
+    on.handle::<ServerCreate, _, _>(|p, ctx| async move {
+        if p.flavor.is_empty() || p.version.is_empty() {
+            return Err(ServiceError::bad_request("flavor and version are required"));
+        }
+        if !p.eula {
+            return Err(ServiceError::bad_request(
+                "creating a server requires accepting the Minecraft EULA",
+            ));
+        }
+        match ctx.runtime.server_creates().start(p) {
+            Some(id) => Ok(ServerCreateResult { id }),
+            None => Err(ServiceError::bad_request(
+                "that server is already being created",
+            )),
+        }
+    });
+
+    on.handle::<ServerList, _, _>(|_: Empty, ctx| async move {
+        let servers = ctx
+            .runtime
+            .engine()
+            .servers()
+            .list()
+            .into_iter()
+            .map(|r| ctx.runtime.server_view(r))
+            .collect();
+        Ok(ServerListResult { servers })
+    });
+
+    on.handle::<ServerStatus, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        Ok(ctx.runtime.server_view(record))
+    });
+
+    on.handle::<ServerRemove, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        if is_running(&ctx, &server_process_id(&record.id)) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is running; stop it first",
+                record.name
+            )));
+        }
+        ctx.runtime
+            .engine()
+            .servers()
+            .remove(&record.id)
+            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+        Ok(Empty {})
+    });
+
+    on.handle::<ServerStart, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        let process_id = server_process_id(&record.id);
+        if is_running(&ctx, &process_id) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is already running",
+                record.name
+            )));
+        }
+        let (_, plan) = ctx
+            .runtime
+            .engine()
+            .server_launch_plan(&record.id)
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        let spec = ProcessSpec {
+            id: process_id,
+            program: plan.program.to_string_lossy().into_owned(),
+            args: plan.args,
+            cwd: Some(plan.cwd),
+            env: Default::default(),
+            restart: RestartPolicy::Never,
+        };
+        match ctx.runtime.processes().start(spec).await {
+            Ok(info) => Ok(ServerStartResult {
+                process_id: info.id,
+                pid: info.pid,
+            }),
+            Err(StartError::EmptyProgram) => Err(ServiceError::bad_request("program is empty")),
+            Err(StartError::Spawn(e)) => Err(ServiceError::handler_error(format!(
+                "cannot spawn the server: {e}"
+            ))),
+        }
+    });
+
+    on.handle::<ServerStop, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        let process_id = server_process_id(&record.id);
+        if !is_running(&ctx, &process_id) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is not running",
+                record.name
+            )));
+        }
+        ctx.runtime.processes().stop(&process_id);
+        Ok(Empty {})
+    });
+
+    on.handle::<ServerLogs, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        let lines = ctx
+            .runtime
+            .processes()
+            .logs(&server_process_id(&record.id), p.tail)
+            .unwrap_or_default();
+        Ok(ProcessLogsResult { lines })
+    });
+
+    on.handle::<InstanceCreate, _, _>(|p, ctx| async move {
+        if p.flavor.is_empty() || p.version.is_empty() {
+            return Err(ServiceError::bad_request("flavor and version are required"));
+        }
+        let record = ctx
+            .runtime
+            .engine()
+            .create_instance(&p.name, &p.flavor, &p.version, p.loader_version)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(InstanceCreateResult {
+            instance: ctx.runtime.instance_view(record),
+        })
+    });
+
+    on.handle::<InstanceList, _, _>(|_: Empty, ctx| async move {
+        let instances = ctx
+            .runtime
+            .engine()
+            .instances()
+            .list()
+            .into_iter()
+            .map(|r| ctx.runtime.instance_view(r))
+            .collect();
+        Ok(InstanceListResult { instances })
+    });
+
+    on.handle::<InstanceRemove, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        if is_running(&ctx, &instance_process_id(&record.id)) {
+            return Err(ServiceError::bad_request(format!(
+                "instance '{}' is running; stop it first",
+                record.name
+            )));
+        }
+        ctx.runtime
+            .engine()
+            .instances()
+            .remove(&record.id)
+            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+        Ok(Empty {})
+    });
+
+    on.handle::<InstanceLaunch, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        if is_running(&ctx, &instance_process_id(&record.id)) {
+            return Err(ServiceError::bad_request(format!(
+                "instance '{}' is already running",
+                record.name
+            )));
+        }
+        match ctx
+            .runtime
+            .instance_launches()
+            .start(record.id, p.account, p.id)
+        {
+            Some(id) => Ok(InstanceLaunchResult { id }),
+            None => Err(ServiceError::bad_request(
+                "that instance is already launching",
+            )),
+        }
+    });
+
+    on.handle::<InstanceStop, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        let process_id = instance_process_id(&record.id);
+        if !is_running(&ctx, &process_id) {
+            return Err(ServiceError::bad_request(format!(
+                "instance '{}' is not running",
+                record.name
+            )));
+        }
+        ctx.runtime.processes().stop(&process_id);
+        Ok(Empty {})
+    });
+
     router
+}
+
+fn find_server(
+    ctx: &crate::runtime::HandlerContext,
+    reference: &str,
+) -> Result<engine::ServerRecord, ServiceError> {
+    ctx.runtime
+        .engine()
+        .servers()
+        .get(reference)
+        .ok_or_else(|| ServiceError::not_found(format!("no server matches '{reference}'")))
+}
+
+fn find_instance(
+    ctx: &crate::runtime::HandlerContext,
+    reference: &str,
+) -> Result<engine::InstanceRecord, ServiceError> {
+    ctx.runtime
+        .engine()
+        .instances()
+        .get(reference)
+        .ok_or_else(|| ServiceError::not_found(format!("no instance matches '{reference}'")))
+}
+
+fn is_running(ctx: &crate::runtime::HandlerContext, process_id: &str) -> bool {
+    ctx.runtime
+        .processes()
+        .status(process_id)
+        .is_some_and(|info| info.state == ProcessState::Running)
 }

@@ -2,16 +2,26 @@
 //! or download answers immediately while progress and the terminal outcome are
 //! published through the event hub.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use engine::{Downloader, Engine};
 use ipc::protocol::Event;
 use proto::download::{DownloadDoneEvent, DownloadErrorEvent, DownloadProgressEvent, DownloadSpec};
+use proto::instance::{
+    InstanceLaunchDoneEvent, InstanceLaunchErrorEvent, InstanceLaunchProgressEvent,
+};
 use proto::java::{JavaInstallDoneEvent, JavaInstallErrorEvent};
+use proto::minecraft::ProvisionProgress;
+use proto::process::{ProcessSpec, RestartPolicy};
+use proto::server::{
+    ServerCreateDoneEvent, ServerCreateErrorEvent, ServerCreateParams, ServerCreateProgressEvent,
+};
 
 use super::event_hub::EventHub;
+use super::process::{ProcessSupervisor, StartError};
+use super::{instance_process_id, server_info};
 
 fn topic_event<E: proto::Topic + serde::Serialize>(event: &E) -> Event {
     Event {
@@ -89,6 +99,182 @@ impl JavaInstallManager {
             active.lock().unwrap().remove(&major);
         });
         Some(id)
+    }
+}
+
+pub struct ServerCreateManager {
+    engine: Arc<Engine>,
+    hub: Arc<EventHub>,
+    active: Arc<Mutex<HashSet<String>>>,
+}
+
+impl ServerCreateManager {
+    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>) -> Self {
+        ServerCreateManager {
+            engine,
+            hub,
+            active: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
+
+    /// Start a provisioning job off-thread, one per server name at a time.
+    /// Returns the job id, or `None` if that name is already being created.
+    pub fn start(&self, params: ServerCreateParams) -> Option<String> {
+        let id = if params.id.is_empty() {
+            generate_id("server-create")
+        } else {
+            params.id.clone()
+        };
+        let key = if params.name.trim().is_empty() {
+            format!("{}-{}", params.flavor, params.version)
+        } else {
+            params.name.trim().to_string()
+        };
+        {
+            let mut active = self.active.lock().unwrap();
+            if !active.insert(key.clone()) {
+                return None;
+            }
+        }
+        let engine = self.engine.clone();
+        let hub = self.hub.clone();
+        let active = self.active.clone();
+        let job_id = id.clone();
+
+        tokio::spawn(async move {
+            let progress_hub = hub.clone();
+            let progress_id = job_id.clone();
+            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> = Box::new(move |p| {
+                progress_hub.publish(&topic_event(&ServerCreateProgressEvent {
+                    id: progress_id.clone(),
+                    progress: p.clone(),
+                }));
+            });
+
+            let result = engine
+                .provision_server(
+                    &params.name,
+                    &params.flavor,
+                    &params.version,
+                    params.loader_version.clone(),
+                    on_progress.as_ref(),
+                )
+                .await;
+
+            match result {
+                Ok(record) => hub.publish(&topic_event(&ServerCreateDoneEvent {
+                    id: job_id.clone(),
+                    server: server_info(record, None),
+                })),
+                Err(e) => hub.publish(&topic_event(&ServerCreateErrorEvent {
+                    id: job_id.clone(),
+                    message: format!("{e:#}"),
+                })),
+            }
+            active.lock().unwrap().remove(&key);
+        });
+        Some(id)
+    }
+}
+
+pub struct InstanceLaunchManager {
+    engine: Arc<Engine>,
+    hub: Arc<EventHub>,
+    processes: Arc<ProcessSupervisor>,
+    active: Arc<Mutex<HashSet<String>>>,
+}
+
+impl InstanceLaunchManager {
+    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, processes: Arc<ProcessSupervisor>) -> Self {
+        InstanceLaunchManager {
+            engine,
+            hub,
+            processes,
+            active: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
+
+    /// Prepare and spawn an instance off-thread, one launch per instance at a
+    /// time. Returns the job id, or `None` if that instance is already
+    /// launching.
+    pub fn start(&self, instance_id: String, account: String, id: String) -> Option<String> {
+        let id = if id.is_empty() {
+            generate_id("instance-launch")
+        } else {
+            id
+        };
+        {
+            let mut active = self.active.lock().unwrap();
+            if !active.insert(instance_id.clone()) {
+                return None;
+            }
+        }
+        let engine = self.engine.clone();
+        let hub = self.hub.clone();
+        let processes = self.processes.clone();
+        let active = self.active.clone();
+        let job_id = id.clone();
+
+        tokio::spawn(async move {
+            let progress_hub = hub.clone();
+            let progress_id = job_id.clone();
+            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> = Box::new(move |p| {
+                progress_hub.publish(&topic_event(&InstanceLaunchProgressEvent {
+                    id: progress_id.clone(),
+                    progress: p.clone(),
+                }));
+            });
+
+            let outcome = launch(
+                &engine,
+                &processes,
+                &instance_id,
+                &account,
+                on_progress.as_ref(),
+            )
+            .await;
+            match outcome {
+                Ok((process_id, pid)) => hub.publish(&topic_event(&InstanceLaunchDoneEvent {
+                    id: job_id.clone(),
+                    process_id,
+                    pid,
+                })),
+                Err(message) => hub.publish(&topic_event(&InstanceLaunchErrorEvent {
+                    id: job_id.clone(),
+                    message,
+                })),
+            }
+            active.lock().unwrap().remove(&instance_id);
+        });
+        Some(id)
+    }
+}
+
+/// Materialise the instance, then hand the plan to the supervisor.
+async fn launch(
+    engine: &Engine,
+    processes: &ProcessSupervisor,
+    instance_id: &str,
+    account: &str,
+    on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
+) -> Result<(String, u32), String> {
+    let (record, plan) = engine
+        .prepare_instance(instance_id, account, on_progress)
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+
+    let spec = ProcessSpec {
+        id: instance_process_id(&record.id),
+        program: plan.program.to_string_lossy().into_owned(),
+        args: plan.args,
+        cwd: Some(plan.cwd),
+        env: BTreeMap::new(),
+        restart: RestartPolicy::Never,
+    };
+    match processes.start(spec).await {
+        Ok(info) => Ok((info.id, info.pid)),
+        Err(StartError::EmptyProgram) => Err("launch plan has no program".to_string()),
+        Err(StartError::Spawn(e)) => Err(format!("cannot spawn the game: {e}")),
     }
 }
 

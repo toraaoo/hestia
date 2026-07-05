@@ -10,22 +10,71 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-use engine::Engine;
+use engine::{Engine, InstanceRecord, ServerRecord};
 use ipc::Peer;
+use proto::instance::InstanceInfo;
+use proto::server::ServerInfo;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Notify;
 
 pub use event_hub::EventHub;
-pub use managers::{DownloadManager, JavaInstallManager};
+pub use managers::{
+    DownloadManager, InstanceLaunchManager, JavaInstallManager, ServerCreateManager,
+};
 pub use process::{ProcessSupervisor, StartError};
 pub use router::{Channels, Router, ServiceError};
+
+/// The supervisor id a managed server runs under — deterministic, so every
+/// channel can find a server's process without bookkeeping.
+pub fn server_process_id(id: &str) -> String {
+    format!("server-{id}")
+}
+
+pub fn instance_process_id(id: &str) -> String {
+    format!("instance-{id}")
+}
+
+pub fn server_info(
+    record: ServerRecord,
+    process: Option<proto::process::ProcessInfo>,
+) -> ServerInfo {
+    ServerInfo {
+        id: record.id,
+        name: record.name,
+        flavor: record.profile.flavor,
+        game_version: record.profile.game_version,
+        loader_version: record.profile.loader_version,
+        java_major: record.profile.java_major,
+        created_unix: record.created_unix,
+        ready: record.ready,
+        process,
+    }
+}
+
+pub fn instance_info(
+    record: InstanceRecord,
+    process: Option<proto::process::ProcessInfo>,
+) -> InstanceInfo {
+    InstanceInfo {
+        id: record.id,
+        name: record.name,
+        flavor: record.profile.flavor,
+        game_version: record.profile.game_version,
+        loader_version: record.profile.loader_version,
+        java_major: record.profile.java_major,
+        created_unix: record.created_unix,
+        process,
+    }
+}
 
 pub struct Runtime {
     engine: Arc<Engine>,
     hub: Arc<EventHub>,
     java_installs: JavaInstallManager,
     downloads: DownloadManager,
-    processes: ProcessSupervisor,
+    server_creates: ServerCreateManager,
+    instance_launches: InstanceLaunchManager,
+    processes: Arc<ProcessSupervisor>,
     log_path: PathBuf,
     started: Instant,
     stop: Notify,
@@ -37,17 +86,33 @@ impl Runtime {
         let hub = Arc::new(EventHub::default());
         let java_installs = JavaInstallManager::new(engine.clone(), hub.clone());
         let downloads = DownloadManager::new(engine.clone(), hub.clone());
-        let processes = ProcessSupervisor::new(hub.clone());
+        let processes = Arc::new(ProcessSupervisor::new(hub.clone()));
+        let server_creates = ServerCreateManager::new(engine.clone(), hub.clone());
+        let instance_launches =
+            InstanceLaunchManager::new(engine.clone(), hub.clone(), processes.clone());
         Runtime {
             engine,
             hub,
             java_installs,
             downloads,
+            server_creates,
+            instance_launches,
             processes,
             log_path,
             started: Instant::now(),
             stop: Notify::new(),
         }
+    }
+
+    /// A server's record merged with its live process state (when started).
+    pub fn server_view(&self, record: ServerRecord) -> ServerInfo {
+        let process = self.processes.status(&server_process_id(&record.id));
+        server_info(record, process)
+    }
+
+    pub fn instance_view(&self, record: InstanceRecord) -> InstanceInfo {
+        let process = self.processes.status(&instance_process_id(&record.id));
+        instance_info(record, process)
     }
 
     pub fn engine(&self) -> &Engine {
@@ -64,6 +129,14 @@ impl Runtime {
 
     pub fn downloads(&self) -> &DownloadManager {
         &self.downloads
+    }
+
+    pub fn server_creates(&self) -> &ServerCreateManager {
+        &self.server_creates
+    }
+
+    pub fn instance_launches(&self) -> &InstanceLaunchManager {
+        &self.instance_launches
     }
 
     pub fn processes(&self) -> &ProcessSupervisor {
