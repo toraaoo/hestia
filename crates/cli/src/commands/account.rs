@@ -1,4 +1,4 @@
-//! `hestia auth …` — Microsoft/Minecraft sign-in.
+//! `hestia account …` — Microsoft/Minecraft sign-in and account switching.
 
 use std::io;
 use std::process::Stdio;
@@ -11,7 +11,7 @@ use client::Client;
 use crate::ui::{self, Spinner, View};
 
 #[derive(Subcommand)]
-pub enum AuthCmd {
+pub enum AccountCmd {
     /// Sign in to a Microsoft account
     Login {
         #[arg(
@@ -20,16 +20,26 @@ pub enum AuthCmd {
         )]
         sisu: bool,
     },
-    /// List signed-in accounts
+    /// Signed-in accounts (* marks the one launches use)
+    #[command(visible_alias = "ls")]
     List,
+    /// Pick the account launches use; prompts when omitted
+    #[command(visible_alias = "use")]
+    Switch {
+        /// Account name or uuid
+        account: Option<String>,
+    },
     /// Sign out of an account and forget its tokens
-    Logout { account: String },
+    Logout {
+        /// Account name or uuid
+        account: String,
+    },
 }
 
-pub async fn run(cmd: AuthCmd) -> Result<()> {
+pub async fn run(cmd: AccountCmd) -> Result<()> {
     let client = super::connect().await?;
     match cmd {
-        AuthCmd::Login { sisu } => {
+        AccountCmd::Login { sisu } => {
             let account = if sisu {
                 sisu_login(&client).await?
             } else {
@@ -40,23 +50,63 @@ pub async fn run(cmd: AuthCmd) -> Result<()> {
                 account.name, account.uuid
             )))?;
         }
-        AuthCmd::List => {
-            let accounts = client.accounts().list().await?;
-            if accounts.is_empty() {
-                return ui::show(View::note("no accounts signed in"));
+        AccountCmd::List => {
+            let listing = client.accounts().list().await?;
+            if listing.accounts.is_empty() {
+                return ui::show(View::note("no accounts signed in (hestia account login)"));
             }
-            let rows = accounts
+            let rows = listing
+                .accounts
                 .iter()
-                .map(|a| vec![a.name.clone(), a.uuid.clone()])
+                .map(|a| {
+                    let marker = if a.uuid == listing.default_uuid {
+                        "*"
+                    } else {
+                        ""
+                    };
+                    vec![marker.to_string(), a.name.clone(), a.uuid.clone()]
+                })
                 .collect();
-            ui::show(View::table("accounts", ["NAME", "UUID"], rows))?;
+            ui::show(View::table("accounts", ["", "NAME", "UUID"], rows))?;
         }
-        AuthCmd::Logout { account } => {
+        AccountCmd::Switch { account } => {
+            let reference = match account {
+                Some(reference) => reference,
+                None => pick_account(&client).await?,
+            };
+            let switched = client.accounts().switch(&reference).await?;
+            ui::show(View::line(format!(
+                "launches now use {} ({})",
+                switched.name, switched.uuid
+            )))?;
+        }
+        AccountCmd::Logout { account } => {
             client.accounts().remove(&account).await?;
             ui::show(View::line(format!("Signed out {account}")))?;
         }
     }
     Ok(())
+}
+
+/// Interactive account picker for a `switch` without an argument.
+async fn pick_account(client: &Client) -> Result<String> {
+    let listing = client.accounts().list().await?;
+    if listing.accounts.is_empty() {
+        bail!("no accounts signed in (hestia account login)");
+    }
+    let labels: Vec<String> = listing
+        .accounts
+        .iter()
+        .map(|a| {
+            if a.uuid == listing.default_uuid {
+                format!("{} (current)", a.name)
+            } else {
+                a.name.clone()
+            }
+        })
+        .collect();
+    let index = ui::select("switch launches to", &labels)?;
+    Ok(listing.accounts[index].uuid.clone())
 }
 
 async fn device_code_login(client: &Client) -> Result<Account> {

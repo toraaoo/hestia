@@ -34,6 +34,32 @@ pub fn pick_flavor(flavors: Vec<Flavor>, provided: Option<String>) -> Result<Str
     Ok(flavors[index].id.clone())
 }
 
+/// Return the chosen version id: validated against the flavor's catalogue when
+/// `provided`, otherwise picked from an interactive selector over the releases.
+pub fn pick_version(versions: Vec<GameVersion>, provided: Option<String>) -> Result<String> {
+    if versions.is_empty() {
+        bail!("no versions are available");
+    }
+    if let Some(id) = provided {
+        if versions.iter().any(|v| v.id == id) {
+            return Ok(id);
+        }
+        bail!("unknown version '{id}' (see `hestia server|instance versions`)");
+    }
+    let releases: Vec<&GameVersion> = versions
+        .iter()
+        .filter(|v| v.kind == VersionKind::Release)
+        .collect();
+    let pool = if releases.is_empty() {
+        versions.iter().collect()
+    } else {
+        releases
+    };
+    let labels: Vec<String> = pool.iter().map(|v| v.id.clone()).collect();
+    let index = ui::select("select a version", &labels)?;
+    Ok(pool[index].id.clone())
+}
+
 /// The non-interactive form of the selector: the available flavors as a table.
 pub fn show_flavors(flavors: &[Flavor]) -> Result<()> {
     if flavors.is_empty() {

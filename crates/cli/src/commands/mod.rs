@@ -1,13 +1,13 @@
-//! CLI command groups. Each mirrors a C++ `Command` and drives the daemon over
-//! the client SDK.
+//! CLI command groups, each driving the daemon over the client SDK.
 
-pub mod auth;
+pub mod account;
 pub mod cache;
 pub mod config;
 pub mod daemon;
 pub mod instance;
 pub mod java;
 mod mc;
+pub mod play;
 pub mod server;
 
 use anyhow::{Context, Result};

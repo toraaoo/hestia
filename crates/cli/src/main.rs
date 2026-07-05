@@ -33,10 +33,18 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Minecraft accounts (Microsoft sign-in)
-    Auth {
+    /// Launch an instance (picks interactively when omitted)
+    Play {
+        /// Instance name or id; the sole instance launches directly
+        instance: Option<String>,
+        #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
+        account: Option<String>,
+    },
+    /// Minecraft accounts (Microsoft sign-in, switching)
+    #[command(visible_alias = "auth")]
+    Account {
         #[command(subcommand)]
-        cmd: commands::auth::AuthCmd,
+        cmd: commands::account::AccountCmd,
     },
     /// Java runtimes (Eclipse Temurin via the Adoptium API)
     Java {
@@ -112,7 +120,8 @@ fn main() -> ExitCode {
 
 async fn dispatch(command: Command) -> anyhow::Result<()> {
     match command {
-        Command::Auth { cmd } => commands::auth::run(cmd).await,
+        Command::Play { instance, account } => commands::play::run(instance, account).await,
+        Command::Account { cmd } => commands::account::run(cmd).await,
         Command::Java { cmd } => commands::java::run(cmd).await,
         Command::Server { cmd } => commands::server::run(cmd).await,
         Command::Instance { cmd } => commands::instance::run(cmd).await,

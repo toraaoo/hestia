@@ -10,7 +10,8 @@ use crate::ui::{self, InstallReporter, Spinner, View};
 #[derive(Subcommand)]
 pub enum JavaCmd {
     /// Release lines the provider ships
-    Available,
+    #[command(visible_alias = "available")]
+    Releases,
     /// Resolve, download, verify, extract, and register a runtime
     Install {
         major: i32,
@@ -18,6 +19,7 @@ pub enum JavaCmd {
         force: bool,
     },
     /// Installed runtimes
+    #[command(visible_alias = "ls")]
     List,
     /// Remove an installed runtime
     Uninstall { major: i32 },
@@ -26,7 +28,7 @@ pub enum JavaCmd {
 pub async fn run(cmd: JavaCmd) -> Result<()> {
     let client = super::connect().await?;
     match cmd {
-        JavaCmd::Available => {
+        JavaCmd::Releases => {
             let releases = {
                 let _spinner = Spinner::start("fetching release lines");
                 client.java().releases().await?
