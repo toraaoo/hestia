@@ -6,6 +6,7 @@ pub mod cache;
 pub mod config;
 pub mod daemon;
 pub mod java;
+pub mod process;
 
 use anyhow::{Context, Result};
 use client::Client;

@@ -1,12 +1,12 @@
 //! `hestia java …` — release lines, install/uninstall, and installed runtimes.
 
-use std::io::Write;
+use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Subcommand;
-use client::proto::java::{JavaInstallPhase, JavaInstallProgress};
 
-use crate::output::{human_bytes, print_table};
+use crate::output::print_table;
+use crate::ui::InstallReporter;
 
 #[derive(Subcommand)]
 pub enum JavaCmd {
@@ -60,8 +60,13 @@ pub async fn run(cmd: JavaCmd) -> Result<()> {
             print_table(&["MAJOR", "VENDOR", "RELEASE", "HOME"], &rows);
         }
         JavaCmd::Install { major, force } => {
-            let (runtime, already) = client.java().install(major, force, print_progress).await?;
-            eprintln!();
+            let reporter = Arc::new(InstallReporter::new());
+            let progress = reporter.clone();
+            let (runtime, already) = client
+                .java()
+                .install(major, force, move |p| progress.update(p))
+                .await?;
+            reporter.finish();
             if already {
                 println!(
                     "java {} already installed ({})",
@@ -80,24 +85,4 @@ pub async fn run(cmd: JavaCmd) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn print_progress(p: &JavaInstallProgress) {
-    match p.phase {
-        JavaInstallPhase::Resolving => eprint!("\rresolving…                    "),
-        JavaInstallPhase::Downloading => {
-            let total = if p.total > 0 {
-                human_bytes(p.total)
-            } else {
-                "?".into()
-            };
-            eprint!(
-                "\rdownloading {} / {}            ",
-                human_bytes(p.current),
-                total
-            );
-        }
-        JavaInstallPhase::Extracting => eprint!("\rextracting…                   "),
-    }
-    let _ = std::io::stderr().flush();
 }

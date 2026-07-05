@@ -2,6 +2,7 @@
 
 mod commands;
 mod output;
+mod ui;
 
 use std::process::ExitCode;
 
@@ -58,6 +59,11 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::daemon::DaemonCmd,
     },
+    /// Launch and supervise processes through the daemon
+    Process {
+        #[command(subcommand)]
+        cmd: commands::process::ProcessCmd,
+    },
 }
 
 fn main() -> ExitCode {
@@ -107,5 +113,6 @@ async fn dispatch(command: Command) -> anyhow::Result<()> {
         Command::Cache { cmd } => commands::cache::run(cmd).await,
         Command::Config { cmd } => commands::config::run(cmd).await,
         Command::Daemon { cmd } => commands::daemon::run(cmd).await,
+        Command::Process { cmd } => commands::process::run(cmd).await,
     }
 }
