@@ -1,6 +1,5 @@
 //! `hestia account …` — Microsoft/Minecraft sign-in and account switching.
 
-use std::io;
 use std::process::Stdio;
 
 use anyhow::{bail, Result};
@@ -118,7 +117,7 @@ async fn device_code_login(client: &Client) -> Result<Account> {
         "To sign in, open\n\n  {}\n\nand enter the code\n\n  {}",
         flow.verification_uri, flow.user_code
     )))?;
-    wait_for_enter("Press Enter to open your browser... ");
+    let _ = ui::input("press Enter to open your browser", "");
     open_browser(&flow.verification_uri);
     let _spinner = Spinner::start("waiting for you to finish in the browser…");
     Ok(client.accounts().complete_login(&flow.id, "").await?)
@@ -130,26 +129,19 @@ async fn sisu_login(client: &Client) -> Result<Account> {
         "Open this URL in your browser and sign in:\n\n  {}",
         flow.url
     )))?;
-    wait_for_enter("Press Enter to open your browser... ");
+    let _ = ui::input("press Enter to open your browser", "");
     open_browser(&flow.url);
-    ui::prompt(
-        "You'll land on a blank page — paste its full address (or just the\ncode) here, then press Enter:\n> ",
-    );
 
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let code = extract_code(&input);
+    let pasted = ui::input(
+        "you'll land on a blank page — paste its full address (or the code)",
+        "",
+    )?;
+    let code = extract_code(&pasted);
     if code.is_empty() {
         bail!("no authorization code was pasted");
     }
     let _spinner = Spinner::start("signing in…");
     Ok(client.accounts().complete_login(&flow.id, &code).await?)
-}
-
-fn wait_for_enter(message: &str) {
-    ui::prompt(message);
-    let mut discard = String::new();
-    let _ = io::stdin().read_line(&mut discard);
 }
 
 fn open_browser(url: &str) {

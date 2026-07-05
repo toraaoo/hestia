@@ -1,12 +1,10 @@
-//! Terminal progress + spinner rendering for long-running commands. A background
-//! thread owns a `ratatui` inline viewport (a single line, no alternate screen)
-//! and redraws it on a fixed tick, so an indeterminate spinner keeps animating
-//! and a download gauge stays smooth without the caller pumping frames. When
-//! stderr is redirected (a pipe, CI) rendering is skipped and callers that want a
-//! paper trail degrade to terse per-phase lines. Ported from the C++ CLI's
-//! `Spinner`/`ProgressBar`.
+//! Terminal progress + spinner rendering for long-running commands. A
+//! background thread redraws the shared inline screen on a fixed tick, so an
+//! indeterminate spinner keeps animating and a download gauge stays smooth
+//! without the caller pumping frames. When stderr is redirected (a pipe, CI)
+//! rendering is skipped and callers that want a paper trail degrade to terse
+//! per-phase lines.
 
-use std::io::IsTerminal;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -14,16 +12,14 @@ use std::time::{Duration, Instant};
 
 use client::proto::java::{JavaInstallPhase, JavaInstallProgress};
 use client::proto::minecraft::{ProvisionPhase, ProvisionProgress};
-use ratatui::backend::CrosstermBackend;
-use ratatui::crossterm::cursor::{Hide, MoveToColumn, Show};
-use ratatui::crossterm::execute;
-use ratatui::layout::{Constraint, Layout};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Gauge, Paragraph};
-use ratatui::{Frame, Terminal, TerminalOptions, Viewport};
+use ratatui::Frame;
 
 use super::render::human_bytes;
+use super::screen;
 
 const FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const TICK: Duration = Duration::from_millis(80);
@@ -45,7 +41,7 @@ struct Animator {
 
 impl Animator {
     fn start(initial: View) -> Option<Self> {
-        if !std::io::stderr().is_terminal() {
+        if !screen::stderr_is_tty() {
             return None;
         }
         let view = Arc::new(Mutex::new(initial));
@@ -78,31 +74,28 @@ impl Drop for Animator {
 }
 
 fn run(view: Arc<Mutex<View>>, stop: Arc<AtomicBool>) {
-    let backend = CrosstermBackend::new(std::io::stderr());
-    let options = TerminalOptions {
-        viewport: Viewport::Inline(1),
-    };
-    let Ok(mut terminal) = Terminal::with_options(backend, options) else {
-        return;
-    };
-    let _ = execute!(std::io::stderr(), Hide);
     let mut step = 0usize;
     while !stop.load(Ordering::Relaxed) {
         {
             let view = view.lock().unwrap();
-            let _ = terminal.draw(|frame| draw(frame, &view, step));
+            let _ = screen::with(|terminal| {
+                terminal.draw(|frame| draw(frame, &view, step))?;
+                Ok(())
+            });
         }
         step = step.wrapping_add(1);
         thread::sleep(TICK);
     }
-    let _ = terminal.clear();
-    // Clearing the inline viewport leaves the cursor where drawing ended;
-    // return it to column 0 so following output does not start indented.
-    let _ = execute!(std::io::stderr(), MoveToColumn(0), Show);
+    screen::blank();
 }
 
 fn draw(frame: &mut Frame, view: &View, step: usize) {
-    let area = frame.area();
+    // One line at the top of the shared viewport.
+    let full = frame.area();
+    let area = Rect {
+        height: full.height.min(1),
+        ..full
+    };
     let spin = Span::styled(
         FRAMES[step % FRAMES.len()],
         Style::default().fg(Color::Cyan),

@@ -1,159 +1,134 @@
-//! Interactive terminal widgets over a `ratatui` inline viewport (no alternate
-//! screen): a single-select prompt and a scrollable pager for long tables. Both
-//! require an interactive terminal; callers degrade to an argument or a plain
-//! dump when there is none.
+//! Interactive widgets — a single-select prompt, a one-line text input, and a
+//! scrollable pager — implemented as modal key-loops drawing into the shared
+//! screen. Each widget requests only the viewport height it needs; the mode
+//! gate (an interactive terminal) is the facade's job.
 
+use std::cell::RefCell;
 use std::io::{self, IsTerminal};
 
-use anyhow::{bail, Result};
-use ratatui::backend::CrosstermBackend;
-use ratatui::crossterm::cursor::{Hide, MoveToColumn, Show};
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use ratatui::crossterm::execute;
-use ratatui::crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
+use anyhow::{anyhow, Result};
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use ratatui::layout::{Constraint, Layout, Margin};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{
     Block, Cell, List, ListItem, ListState, Paragraph, Row, Scrollbar, ScrollbarOrientation,
     ScrollbarState, Table, TableState,
 };
-use ratatui::{Frame, Terminal, TerminalOptions, Viewport};
+use ratatui::Frame;
 
 use super::render::column_widths;
+use super::screen;
 
-type Stderr = Terminal<CrosstermBackend<io::Stderr>>;
-
+/// The select shows at most this many items at once (it scrolls past them).
 const MAX_SELECT_ROWS: u16 = 12;
-const MAX_PAGER_ROWS: u16 = 20;
 
-/// Prompts draw on stderr and read stdin, so both must be a terminal.
-fn can_prompt() -> bool {
-    io::stdin().is_terminal() && io::stderr().is_terminal()
-}
-
-/// Run `body` against an inline viewport of `height` rows, restoring the terminal
-/// afterwards regardless of outcome.
-fn with_viewport<T>(height: u16, body: impl FnOnce(&mut Stderr) -> Result<T>) -> Result<T> {
-    let backend = CrosstermBackend::new(io::stderr());
-    let mut terminal = Terminal::with_options(
-        backend,
-        TerminalOptions {
-            viewport: Viewport::Inline(height),
-        },
-    )?;
+/// Drive one widget: draw through the shared screen at `height` rows, feed it
+/// key presses until it resolves, then blank the viewport for whatever runs
+/// next. Raw mode spans the loop; the screen lock is never held while waiting
+/// for a key.
+fn run_widget<T>(
+    height: u16,
+    mut draw: impl FnMut(&mut Frame),
+    mut on_key: impl FnMut(KeyEvent) -> Option<Result<T>>,
+) -> Result<T> {
     enable_raw_mode()?;
-    let _ = execute!(io::stderr(), Hide);
-    let result = body(&mut terminal);
+    let result = loop {
+        let drawn = screen::with_min(height, |terminal| {
+            terminal.draw(&mut draw)?;
+            Ok(())
+        });
+        if let Err(e) = drawn {
+            break Err(e);
+        }
+        let key = match event::read() {
+            Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => key,
+            Ok(_) => continue,
+            Err(e) => break Err(e.into()),
+        };
+        if let Some(outcome) = on_key(key) {
+            break outcome;
+        }
+    };
     let _ = disable_raw_mode();
-    let _ = terminal.clear();
-    // Clearing the inline viewport leaves the cursor where drawing ended;
-    // return it to column 0 so following output does not start indented.
-    let _ = execute!(io::stderr(), MoveToColumn(0), Show);
+    screen::blank();
     result
 }
 
-/// Present `items` under `prompt` and return the chosen index. Errors if there is
-/// no interactive terminal or the user cancels (Esc / q / Ctrl-C).
-pub fn select(prompt: &str, items: &[String]) -> Result<usize> {
-    if items.is_empty() {
-        bail!("nothing to select");
-    }
-    if !can_prompt() {
-        bail!("no interactive terminal; pass the choice as an argument");
-    }
+fn is_cancel(key: &KeyEvent) -> bool {
+    matches!(key.code, KeyCode::Esc | KeyCode::Char('q'))
+        || (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL))
+}
 
+/// Present `items` under `prompt` and return the chosen index. Errors when the
+/// user cancels (Esc / q / Ctrl-C).
+pub fn select(prompt: &str, items: &[String]) -> Result<usize> {
+    let state = RefCell::new(ListState::default());
+    state.borrow_mut().select(Some(0));
     let height = (items.len() as u16).min(MAX_SELECT_ROWS) + 1;
-    with_viewport(height, |terminal| {
-        let mut state = ListState::default();
-        state.select(Some(0));
-        loop {
-            terminal.draw(|frame| draw_select(frame, prompt, items, &mut state))?;
-            let Event::Key(key) = event::read()? else {
-                continue;
-            };
-            if key.kind != KeyEventKind::Press {
-                continue;
+    run_widget(
+        height,
+        |frame| draw_select(frame, prompt, items, &mut state.borrow_mut()),
+        |key| match key.code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                step(&mut state.borrow_mut(), items.len(), -1);
+                None
             }
-            match key.code {
-                KeyCode::Up | KeyCode::Char('k') => step(&mut state, items.len(), -1),
-                KeyCode::Down | KeyCode::Char('j') => step(&mut state, items.len(), 1),
-                KeyCode::Enter => return Ok(state.selected().unwrap_or(0)),
-                KeyCode::Esc | KeyCode::Char('q') => bail!("selection cancelled"),
-                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    bail!("selection cancelled")
-                }
-                _ => {}
+            KeyCode::Down | KeyCode::Char('j') => {
+                step(&mut state.borrow_mut(), items.len(), 1);
+                None
             }
-        }
-    })
+            KeyCode::Enter => Some(Ok(state.borrow().selected().unwrap_or(0))),
+            _ if is_cancel(&key) => Some(Err(anyhow!("selection cancelled"))),
+            _ => None,
+        },
+    )
 }
 
 /// A single-line text prompt: type to edit, Enter accepts (empty takes
-/// `default`, shown dim), Esc cancels. Errors when there is no interactive
-/// terminal.
+/// `default`, shown dim), Esc cancels.
 pub fn input(prompt: &str, default: &str) -> Result<String> {
-    if !can_prompt() {
-        bail!("no interactive terminal; pass the value as an argument");
-    }
-    with_viewport(1, |terminal| {
-        let mut typed = String::new();
-        loop {
-            terminal.draw(|frame| draw_input(frame, prompt, &typed, default))?;
-            let Event::Key(key) = event::read()? else {
-                continue;
-            };
-            if key.kind != KeyEventKind::Press {
-                continue;
+    let typed = RefCell::new(String::new());
+    run_widget(
+        1,
+        |frame| draw_input(frame, prompt, &typed.borrow(), default),
+        |key| match key.code {
+            KeyCode::Enter => {
+                let typed = typed.borrow();
+                let value = typed.trim();
+                Some(Ok(if value.is_empty() {
+                    default.to_string()
+                } else {
+                    value.to_string()
+                }))
             }
-            match key.code {
-                KeyCode::Enter => {
-                    let value = typed.trim();
-                    return Ok(if value.is_empty() {
-                        default.to_string()
-                    } else {
-                        value.to_string()
-                    });
-                }
-                KeyCode::Backspace => {
-                    typed.pop();
-                }
-                KeyCode::Esc => bail!("input cancelled"),
-                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    bail!("input cancelled")
-                }
-                KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    typed.push(c);
-                }
-                _ => {}
+            KeyCode::Backspace => {
+                typed.borrow_mut().pop();
+                None
             }
-        }
-    })
-}
-
-fn draw_input(frame: &mut Frame, prompt: &str, typed: &str, default: &str) {
-    let dim = Style::default().fg(Color::DarkGray);
-    let mut spans = vec![
-        ratatui::text::Span::styled(format!("{prompt}: "), Style::default().fg(Color::Cyan)),
-        ratatui::text::Span::raw(typed.to_string()),
-        ratatui::text::Span::styled("▏", Style::default().fg(Color::Cyan)),
-    ];
-    if typed.is_empty() {
-        spans.push(ratatui::text::Span::styled(default.to_string(), dim));
-    }
-    frame.render_widget(Paragraph::new(Line::from(spans)), frame.area());
+            KeyCode::Esc => Some(Err(anyhow!("input cancelled"))),
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(Err(anyhow!("input cancelled")))
+            }
+            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                typed.borrow_mut().push(c);
+                None
+            }
+            _ => None,
+        },
+    )
 }
 
 /// Page through a table interactively (sticky header, scrollbar, scroll, quit).
-/// Returns `true` when it handled display. Returns `false` — so the caller falls
-/// back to a plain dump — when there is no terminal, output is being captured, or
-/// the table already fits on screen (no point taking over the terminal for it).
+/// Returns `true` when it handled display. Returns `false` — so the caller
+/// falls back to inserting/printing it whole — when keys are unavailable or
+/// the table already fits in the tallest viewport.
 pub fn browse(title: &str, headers: &[&str], rows: &[Vec<String>]) -> Result<bool> {
-    if rows.is_empty() || !can_prompt() || !io::stdout().is_terminal() {
+    if rows.is_empty() || !io::stdin().is_terminal() || !screen::stderr_is_tty() {
         return Ok(false);
     }
-    let term_height = size().map(|(_, h)| h).unwrap_or(24);
-    if rows.len() as u16 + 3 <= term_height {
+    if rows.len() as u16 + 3 <= screen::MAX_HEIGHT {
         return Ok(false);
     }
 
@@ -161,22 +136,25 @@ pub fn browse(title: &str, headers: &[&str], rows: &[Vec<String>]) -> Result<boo
         .into_iter()
         .map(|w| Constraint::Length(w as u16))
         .collect();
-    let height = (rows.len() as u16 + 3).min(MAX_PAGER_ROWS);
-    let page = height.saturating_sub(3).max(1) as isize;
+    let page = screen::MAX_HEIGHT.saturating_sub(3).max(1) as isize;
 
-    with_viewport(height, |terminal| {
-        let mut state = TableState::default();
-        state.select(Some(0));
-        loop {
-            terminal
-                .draw(|frame| draw_pager(frame, title, headers, rows, &constraints, &mut state))?;
-            let Event::Key(key) = event::read()? else {
-                continue;
-            };
-            if key.kind != KeyEventKind::Press {
-                continue;
-            }
+    let state = RefCell::new(TableState::default());
+    state.borrow_mut().select(Some(0));
+    run_widget(
+        screen::MAX_HEIGHT,
+        |frame| {
+            draw_pager(
+                frame,
+                title,
+                headers,
+                rows,
+                &constraints,
+                &mut state.borrow_mut(),
+            )
+        },
+        |key| {
             let len = rows.len();
+            let mut state = state.borrow_mut();
             match key.code {
                 KeyCode::Down | KeyCode::Char('j') => move_row(&mut state, len, 1),
                 KeyCode::Up | KeyCode::Char('k') => move_row(&mut state, len, -1),
@@ -184,14 +162,13 @@ pub fn browse(title: &str, headers: &[&str], rows: &[Vec<String>]) -> Result<boo
                 KeyCode::PageUp | KeyCode::Char('b') => move_row(&mut state, len, -page),
                 KeyCode::Home | KeyCode::Char('g') => state.select(Some(0)),
                 KeyCode::End | KeyCode::Char('G') => state.select(Some(len - 1)),
-                KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => return Ok(true),
-                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    return Ok(true)
-                }
+                KeyCode::Enter => return Some(Ok(true)),
+                _ if is_cancel(&key) => return Some(Ok(true)),
                 _ => {}
             }
-        }
-    })
+            None
+        },
+    )
 }
 
 fn step(state: &mut ListState, len: usize, delta: isize) {
@@ -218,6 +195,22 @@ fn draw_select(frame: &mut Frame, prompt: &str, items: &[String], state: &mut Li
                 .add_modifier(Modifier::BOLD),
         );
     frame.render_stateful_widget(list, layout[1], state);
+}
+
+fn draw_input(frame: &mut Frame, prompt: &str, typed: &str, default: &str) {
+    let mut spans = vec![
+        Span::styled(format!("{prompt}: "), Style::default().fg(Color::Cyan)),
+        Span::raw(typed.to_string()),
+        Span::styled("▏", Style::default().fg(Color::Cyan)),
+    ];
+    if typed.is_empty() {
+        spans.push(Span::styled(
+            default.to_string(),
+            Style::default().fg(Color::DarkGray),
+        ));
+    }
+    let rows = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(frame.area());
+    frame.render_widget(Paragraph::new(Line::from(spans)), rows[0]);
 }
 
 fn draw_pager(

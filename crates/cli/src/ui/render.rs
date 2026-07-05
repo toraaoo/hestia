@@ -1,27 +1,78 @@
-//! Static rendering of `View`s to stdout: aligned tables and detail blocks,
-//! dimmed on a terminal and plain when piped or redirected (so `| grep` and
-//! `> file` keep working). Long tables hand off to the interactive pager.
+//! Rendering of `View`s. While the shared screen holds the terminal, views are
+//! inserted above its viewport so output and widgets stay ordered; otherwise
+//! they print to stdout — dimmed on a terminal, bare when piped or redirected
+//! (so `| grep` and `> file` keep working). Long tables hand off to the pager.
 
 use std::io::{self, IsTerminal};
 
 use anyhow::Result;
 use ratatui::crossterm::style::Stylize;
+use ratatui::style::{Color, Style};
+use ratatui::text::{Line, Span};
 
 use super::interactive;
+use super::screen;
 use super::view::View;
 
 pub fn show(view: View) -> Result<()> {
+    if stdout_is_tty() && screen::active() {
+        return show_on_screen(view);
+    }
     match view {
         View::Line(text) => println!("{text}"),
         View::Note(text) => note(&text),
         View::Detail(rows) => detail(&rows),
-        View::Table {
-            title,
-            headers,
-            rows,
-        } => return table(&title, &headers, &rows),
+        View::Table { headers, rows, .. } => print_table(&headers, &rows),
     }
     Ok(())
+}
+
+/// The screen is holding the terminal: insert above its viewport instead of
+/// printing at the cursor (which sits inside the viewport). Long tables page.
+fn show_on_screen(view: View) -> Result<()> {
+    if let View::Table {
+        title,
+        headers,
+        rows,
+    } = &view
+    {
+        let header_refs: Vec<&str> = headers.iter().map(String::as_str).collect();
+        if interactive::browse(title, &header_refs, rows)? {
+            return Ok(());
+        }
+    }
+    screen::insert(view_lines(view))
+}
+
+/// A view as styled lines for the scrollback (multi-line text is split — a
+/// buffer line cannot hold a newline).
+fn view_lines(view: View) -> Vec<Line<'static>> {
+    let dim = Style::default().fg(Color::DarkGray);
+    match view {
+        View::Line(text) => text.split('\n').map(|l| Line::raw(l.to_string())).collect(),
+        View::Note(text) => text
+            .split('\n')
+            .map(|l| Line::styled(l.to_string(), dim))
+            .collect(),
+        View::Detail(rows) => {
+            let width = rows.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+            rows.into_iter()
+                .map(|(key, value)| {
+                    Line::from(vec![
+                        Span::styled(format!("{key:width$}"), dim),
+                        Span::raw(format!("  {value}")),
+                    ])
+                })
+                .collect()
+        }
+        View::Table { headers, rows, .. } => {
+            let header_refs: Vec<&str> = headers.iter().map(String::as_str).collect();
+            let widths = column_widths(&header_refs, &rows);
+            let mut lines = vec![Line::styled(render_row(&header_refs, &widths), dim)];
+            lines.extend(rows.iter().map(|row| Line::raw(render_row(row, &widths))));
+            lines
+        }
+    }
 }
 
 fn stdout_is_tty() -> bool {
@@ -48,19 +99,11 @@ fn detail(rows: &[(String, String)]) {
     }
 }
 
-fn table(title: &str, headers: &[String], rows: &[Vec<String>]) -> Result<()> {
+/// Print a left-aligned table (the plain path).
+fn print_table(headers: &[String], rows: &[Vec<String>]) {
     let header_refs: Vec<&str> = headers.iter().map(String::as_str).collect();
-    if !interactive::browse(title, &header_refs, rows)? {
-        print_table(&header_refs, rows);
-    }
-    Ok(())
-}
-
-/// Print a left-aligned table inline (the plain, non-paging path). Also the
-/// fallback the pager degrades to when there is no terminal.
-fn print_table(headers: &[&str], rows: &[Vec<String>]) {
-    let widths = column_widths(headers, rows);
-    let header = render_row(headers, &widths);
+    let widths = column_widths(&header_refs, rows);
+    let header = render_row(&header_refs, &widths);
     if stdout_is_tty() {
         println!("{}", header.dark_grey());
     } else {
