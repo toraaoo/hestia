@@ -12,6 +12,10 @@ use proto::accounts::{
     AccountLoginComplete, AccountLoginCompleteParams, AccountRemove, AccountRemoveParams,
     LoginMethod,
 };
+use proto::minecraft::{
+    Flavor, GameVersion, InstanceFlavors, InstanceProfile, InstanceResolve, InstanceVersions,
+    ResolveParams, ServerFlavors, ServerProfile, ServerResolve, ServerVersions, VersionsParams,
+};
 use proto::process::{
     ProcessExitEvent, ProcessInfo, ProcessList, ProcessLogLine, ProcessLogs, ProcessLogsParams,
     ProcessRef, ProcessSpec, ProcessStart, ProcessStartResult, ProcessStatus, ProcessStop,
@@ -274,6 +278,84 @@ impl Process<'_> {
             .await?;
 
         serde_json::from_value(payload).map_err(|e| IpcError::Malformed(e.to_string()))
+    }
+}
+
+pub struct Server<'a> {
+    pub(crate) session: &'a Session,
+}
+
+impl Server<'_> {
+    pub async fn flavors(&self) -> Result<Vec<Flavor>, IpcError> {
+        Ok(self
+            .session
+            .call::<ServerFlavors>(&proto::Empty {})
+            .await?
+            .flavors)
+    }
+
+    pub async fn versions(&self, flavor: &str) -> Result<Vec<GameVersion>, IpcError> {
+        let params = VersionsParams {
+            flavor: flavor.to_string(),
+        };
+        Ok(self
+            .session
+            .call::<ServerVersions>(&params)
+            .await?
+            .versions)
+    }
+
+    pub async fn resolve(
+        &self,
+        flavor: &str,
+        version: &str,
+        loader_version: Option<String>,
+    ) -> Result<ServerProfile, IpcError> {
+        let params = ResolveParams {
+            flavor: flavor.to_string(),
+            version: version.to_string(),
+            loader_version,
+        };
+        self.session.call::<ServerResolve>(&params).await
+    }
+}
+
+pub struct Instance<'a> {
+    pub(crate) session: &'a Session,
+}
+
+impl Instance<'_> {
+    pub async fn flavors(&self) -> Result<Vec<Flavor>, IpcError> {
+        Ok(self
+            .session
+            .call::<InstanceFlavors>(&proto::Empty {})
+            .await?
+            .flavors)
+    }
+
+    pub async fn versions(&self, flavor: &str) -> Result<Vec<GameVersion>, IpcError> {
+        let params = VersionsParams {
+            flavor: flavor.to_string(),
+        };
+        Ok(self
+            .session
+            .call::<InstanceVersions>(&params)
+            .await?
+            .versions)
+    }
+
+    pub async fn resolve(
+        &self,
+        flavor: &str,
+        version: &str,
+        loader_version: Option<String>,
+    ) -> Result<InstanceProfile, IpcError> {
+        let params = ResolveParams {
+            flavor: flavor.to_string(),
+            version: version.to_string(),
+            loader_version,
+        };
+        self.session.call::<InstanceResolve>(&params).await
     }
 }
 

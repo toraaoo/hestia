@@ -8,6 +8,7 @@ use crate::accounts::Accounts;
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::java::Java;
+use crate::minecraft::Minecraft;
 
 pub struct Engine {
     data_home: Mutex<PathBuf>,
@@ -15,6 +16,7 @@ pub struct Engine {
     cache: Cache,
     java: Java,
     accounts: Accounts,
+    minecraft: Minecraft,
 }
 
 impl Engine {
@@ -31,6 +33,7 @@ impl Engine {
             cache,
             java,
             accounts,
+            minecraft: Minecraft::new(),
         }
     }
 
@@ -67,5 +70,9 @@ impl Engine {
 
     pub fn accounts(&self) -> &Accounts {
         &self.accounts
+    }
+
+    pub fn minecraft(&self) -> &Minecraft {
+        &self.minecraft
     }
 }

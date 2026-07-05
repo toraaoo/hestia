@@ -11,6 +11,7 @@ pub mod download;
 pub mod events;
 pub mod health;
 pub mod java;
+pub mod minecraft;
 pub mod process;
 
 pub use contract::{Contract, Empty, Topic};

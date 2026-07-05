@@ -1,0 +1,73 @@
+//! Vanilla (Mojang) — server jar and client, resolved straight from a version's
+//! piston-meta detail JSON.
+
+use anyhow::Result;
+use async_trait::async_trait;
+use proto::minecraft::{GameVersion, InstanceProfile, ServerProfile};
+
+use super::meta::mojang;
+use super::provider::{InstanceProvider, ResolveRequest, ServerProvider};
+
+const ID: &str = "vanilla";
+const NAME: &str = "Vanilla";
+
+pub struct VanillaServer;
+
+#[async_trait]
+impl ServerProvider for VanillaServer {
+    fn id(&self) -> &'static str {
+        ID
+    }
+    fn name(&self) -> &'static str {
+        NAME
+    }
+
+    async fn versions(&self) -> Result<Vec<GameVersion>> {
+        mojang::versions().await
+    }
+
+    async fn resolve(&self, request: &ResolveRequest) -> Result<ServerProfile> {
+        let version = mojang::version_json(&request.version).await?;
+        Ok(ServerProfile {
+            flavor: ID.to_string(),
+            game_version: request.version.clone(),
+            loader_version: None,
+            primary: mojang::server_artifact(&version)?,
+            libraries: Vec::new(),
+            java_major: mojang::java_major(&version),
+            main_class: String::new(),
+        })
+    }
+}
+
+pub struct VanillaInstance;
+
+#[async_trait]
+impl InstanceProvider for VanillaInstance {
+    fn id(&self) -> &'static str {
+        ID
+    }
+    fn name(&self) -> &'static str {
+        NAME
+    }
+
+    async fn versions(&self) -> Result<Vec<GameVersion>> {
+        mojang::versions().await
+    }
+
+    async fn resolve(&self, request: &ResolveRequest) -> Result<InstanceProfile> {
+        let version = mojang::version_json(&request.version).await?;
+        Ok(InstanceProfile {
+            flavor: ID.to_string(),
+            game_version: request.version.clone(),
+            loader_version: None,
+            client: mojang::client_artifact(&version)?,
+            libraries: mojang::libraries(&version),
+            asset_index: mojang::asset_index(&version)?,
+            java_major: mojang::java_major(&version),
+            main_class: mojang::main_class(&version),
+            jvm_args: mojang::jvm_args(&version),
+            game_args: mojang::game_args(&version),
+        })
+    }
+}

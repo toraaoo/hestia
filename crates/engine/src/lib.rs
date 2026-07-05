@@ -9,6 +9,7 @@ mod config;
 mod download;
 mod engine;
 mod java;
+mod minecraft;
 
 pub use accounts::{Accounts, LoginChallenge};
 pub use cache::{Cache, CacheEntry, CacheUsage};
@@ -16,3 +17,4 @@ pub use config::{Config, ConfigError, Settings};
 pub use download::Downloader;
 pub use engine::Engine;
 pub use java::{Java, JavaInstallOutcome};
+pub use minecraft::Minecraft;

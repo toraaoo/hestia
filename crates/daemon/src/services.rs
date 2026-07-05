@@ -22,6 +22,10 @@ use proto::java::{
     JavaInstall, JavaInstallResult, JavaList, JavaListResult, JavaReleases, JavaReleasesResult,
     JavaUninstall,
 };
+use proto::minecraft::{
+    FlavorsResult, InstanceFlavors, InstanceResolve, InstanceVersions, ServerFlavors,
+    ServerResolve, ServerVersions, VersionsResult,
+};
 use proto::process::{
     ProcessList, ProcessListResult, ProcessLogs, ProcessLogsResult, ProcessStart,
     ProcessStartResult, ProcessStatus, ProcessStop,
@@ -315,6 +319,58 @@ pub fn make_router() -> Router {
             .hub()
             .subscribe(ctx.conn_id, ctx.out.clone(), filter);
         Ok(EventsSubscribeResult { subscribed: true })
+    });
+
+    on.handle::<ServerFlavors, _, _>(|_: Empty, ctx| async move {
+        Ok(FlavorsResult {
+            flavors: ctx.runtime.engine().minecraft().server_flavors(),
+        })
+    });
+
+    on.handle::<ServerVersions, _, _>(|p, ctx| async move {
+        let versions = ctx
+            .runtime
+            .engine()
+            .minecraft()
+            .server_versions(&p.flavor)
+            .await
+            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+        Ok(VersionsResult { versions })
+    });
+
+    on.handle::<ServerResolve, _, _>(|p, ctx| async move {
+        ctx.runtime
+            .engine()
+            .minecraft()
+            .resolve_server(&p.flavor, &p.version, p.loader_version)
+            .await
+            .map_err(|e| ServiceError::handler_error(e.to_string()))
+    });
+
+    on.handle::<InstanceFlavors, _, _>(|_: Empty, ctx| async move {
+        Ok(FlavorsResult {
+            flavors: ctx.runtime.engine().minecraft().instance_flavors(),
+        })
+    });
+
+    on.handle::<InstanceVersions, _, _>(|p, ctx| async move {
+        let versions = ctx
+            .runtime
+            .engine()
+            .minecraft()
+            .instance_versions(&p.flavor)
+            .await
+            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+        Ok(VersionsResult { versions })
+    });
+
+    on.handle::<InstanceResolve, _, _>(|p, ctx| async move {
+        ctx.runtime
+            .engine()
+            .minecraft()
+            .resolve_instance(&p.flavor, &p.version, p.loader_version)
+            .await
+            .map_err(|e| ServiceError::handler_error(e.to_string()))
     });
 
     router
