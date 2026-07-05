@@ -11,6 +11,10 @@ use proto::accounts::{
     Account, AccountList, AccountLoginBegin, AccountLoginBeginParams, AccountLoginBeginResult,
     AccountLoginComplete, AccountLoginCompleteParams, AccountRemove, AccountRemoveParams, LoginMethod,
 };
+use proto::process::{
+    ProcessExitEvent, ProcessInfo, ProcessList, ProcessLogLine, ProcessLogs, ProcessLogsParams,
+    ProcessRef, ProcessSpec, ProcessStart, ProcessStartResult, ProcessStatus, ProcessStop,
+};
 use serde_json::Value;
 
 use crate::session::{job_id, Session};
@@ -191,6 +195,80 @@ impl Java<'_> {
             .and_then(Value::as_bool)
             .unwrap_or(false);
         Ok((runtime, already))
+    }
+}
+
+pub struct Process<'a> {
+    pub(crate) session: &'a Session,
+}
+
+impl Process<'_> {
+    pub async fn start(&self, spec: ProcessSpec) -> Result<ProcessStartResult, IpcError> {
+        self.session.call::<ProcessStart>(&spec).await
+    }
+
+    pub async fn stop(&self, id: &str) -> Result<(), IpcError> {
+        self.session
+            .call::<ProcessStop>(&ProcessRef { id: id.to_string() })
+            .await?;
+        Ok(())
+    }
+
+    pub async fn list(&self) -> Result<Vec<ProcessInfo>, IpcError> {
+        Ok(self
+            .session
+            .call::<ProcessList>(&proto::Empty {})
+            .await?
+            .processes)
+    }
+
+    pub async fn status(&self, id: &str) -> Result<ProcessInfo, IpcError> {
+        self.session
+            .call::<ProcessStatus>(&ProcessRef { id: id.to_string() })
+            .await
+    }
+
+    pub async fn logs(&self, id: &str, tail: Option<usize>) -> Result<Vec<ProcessLogLine>, IpcError> {
+        let params = ProcessLogsParams {
+            id: id.to_string(),
+            tail,
+        };
+        Ok(self.session.call::<ProcessLogs>(&params).await?.lines)
+    }
+
+    /// Launch a process and block until it exits, forwarding each output line to
+    /// `on_output`. Returns the terminal exit event (state + code). The spec's id
+    /// is filled in when empty so events can be matched before the process starts.
+    pub async fn run(
+        &self,
+        mut spec: ProcessSpec,
+        on_output: impl Fn(&ProcessLogLine) + Send + Sync + 'static,
+    ) -> Result<ProcessExitEvent, IpcError> {
+        if spec.id.is_empty() {
+            spec.id = job_id("process");
+        }
+        let id = spec.id.clone();
+
+        let on_event = move |event: &Event| {
+            if let Ok(out) = serde_json::from_value::<proto::process::ProcessOutputEvent>(
+                event.payload.clone(),
+            ) {
+                on_output(&out.line);
+            }
+        };
+
+        let session = self.session;
+        let start_spec = spec.clone();
+        // process.exit is the sole terminal topic; pass an unused error topic so
+        // run_job's failure branch never fires (a non-zero exit is still "done").
+        let payload = self
+            .session
+            .run_job(&id, "process.exit", "", on_event, move || async move {
+                session.call::<ProcessStart>(&start_spec).await.map(|_| ())
+            })
+            .await?;
+
+        serde_json::from_value(payload).map_err(|e| IpcError::Malformed(e.to_string()))
     }
 }
 
