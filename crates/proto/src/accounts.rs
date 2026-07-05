@@ -70,6 +70,9 @@ impl Contract for AccountLoginComplete {
 #[serde(default)]
 pub struct AccountListResult {
     pub accounts: Vec<Account>,
+    /// The account launches use when none is named.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub default_uuid: String,
 }
 
 pub struct AccountList;
@@ -77,6 +80,26 @@ impl Contract for AccountList {
     const CHANNEL: &'static str = "account.list";
     type Params = Empty;
     type Result = AccountListResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct AccountSwitchParams {
+    /// Name or uuid.
+    pub account: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct AccountSwitchResult {
+    pub account: Account,
+}
+
+pub struct AccountSwitch;
+impl Contract for AccountSwitch {
+    const CHANNEL: &'static str = "account.switch";
+    type Params = AccountSwitchParams;
+    type Result = AccountSwitchResult;
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]

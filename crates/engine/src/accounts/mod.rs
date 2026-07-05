@@ -61,6 +61,10 @@ struct StoredAccount {
 struct AccountsFile {
     #[serde(default)]
     accounts: Vec<StoredAccount>,
+    /// The account launches use when none is named; empty falls back to the
+    /// first signed-in one.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    default_uuid: String,
 }
 
 pub struct Accounts {
@@ -99,6 +103,43 @@ impl Accounts {
                 name: a.name,
             })
             .collect()
+    }
+
+    /// The account launches use when none is named: the switched-to one, else
+    /// the first signed-in one.
+    pub fn default_account(&self) -> Option<Account> {
+        let file = load(&self.path());
+        let stored = file
+            .accounts
+            .iter()
+            .find(|a| a.uuid == file.default_uuid)
+            .or_else(|| file.accounts.first())?;
+        Some(Account {
+            uuid: stored.uuid.clone(),
+            name: stored.name.clone(),
+        })
+    }
+
+    /// Make `reference` (name or uuid) the default account. Returns `None` when
+    /// no account matches.
+    pub fn switch(&self, reference: &str) -> Result<Option<Account>> {
+        let path = self.path();
+        let mut file = load(&path);
+        let Some(chosen) = file
+            .accounts
+            .iter()
+            .find(|a| a.uuid == reference || a.name == reference)
+            .map(|a| Account {
+                uuid: a.uuid.clone(),
+                name: a.name.clone(),
+            })
+        else {
+            return Ok(None);
+        };
+        file.default_uuid = chosen.uuid.clone();
+        save(&path, &file)?;
+        tracing::info!(name = %chosen.name, "switched default account");
+        Ok(Some(chosen))
     }
 
     pub async fn begin_login(&self, method: LoginMethod) -> Result<LoginChallenge> {
@@ -275,6 +316,9 @@ impl Accounts {
         if file.accounts.len() == before {
             return Ok(false);
         }
+        if !file.accounts.iter().any(|a| a.uuid == file.default_uuid) {
+            file.default_uuid = String::new();
+        }
         save(&path, &file)?;
         tracing::info!(reference, "signed out account");
         Ok(true)
@@ -289,7 +333,7 @@ async fn await_device_tokens(session: &LoginSession) -> Result<OAuthTokens> {
         }
         tokio::time::sleep(interval).await;
     }
-    bail!("the sign-in request expired before it was approved; run 'hestia auth login' again")
+    bail!("the sign-in request expired before it was approved; run 'hestia account login' again")
 }
 
 async fn rotate_tokens(account: &mut StoredAccount) -> Result<()> {

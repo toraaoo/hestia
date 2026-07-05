@@ -384,9 +384,9 @@ pub async fn poll_device_code(device_code: &str) -> Result<Option<OAuthTokens>> 
     match error {
         "authorization_pending" | "slow_down" => Ok(None),
         "authorization_declined" => {
-            bail!("the sign-in was declined; run 'hestia auth login' again")
+            bail!("the sign-in was declined; run 'hestia account login' again")
         }
-        "expired_token" => bail!("the sign-in request expired; run 'hestia auth login' again"),
+        "expired_token" => bail!("the sign-in request expired; run 'hestia account login' again"),
         _ => {
             let description = parsed
                 .body

@@ -5,7 +5,8 @@
 use engine::ConfigError;
 use proto::accounts::{
     AccountList, AccountListResult, AccountLoginBegin, AccountLoginBeginResult,
-    AccountLoginComplete, AccountLoginCompleteResult, AccountRemove,
+    AccountLoginComplete, AccountLoginCompleteResult, AccountRemove, AccountSwitch,
+    AccountSwitchResult,
 };
 use proto::app::{AppInfo, AppInfoResult};
 use proto::cache::{
@@ -265,9 +266,25 @@ pub fn make_router() -> Router {
     });
 
     on.handle::<AccountList, _, _>(|_: Empty, ctx| async move {
+        let accounts = ctx.runtime.engine().accounts();
         Ok(AccountListResult {
-            accounts: ctx.runtime.engine().accounts().list(),
+            accounts: accounts.list(),
+            default_uuid: accounts
+                .default_account()
+                .map(|a| a.uuid)
+                .unwrap_or_default(),
         })
+    });
+
+    on.handle::<AccountSwitch, _, _>(|p, ctx| async move {
+        match ctx.runtime.engine().accounts().switch(&p.account) {
+            Ok(Some(account)) => Ok(AccountSwitchResult { account }),
+            Ok(None) => Err(ServiceError::not_found(format!(
+                "no account matches '{}'",
+                p.account
+            ))),
+            Err(e) => Err(ServiceError::handler_error(e.to_string())),
+        }
     });
 
     on.handle::<AccountRemove, _, _>(|p, ctx| async move {

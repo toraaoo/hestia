@@ -8,9 +8,9 @@ use std::time::Duration;
 use ipc::errors::IpcError;
 use ipc::protocol::Event;
 use proto::accounts::{
-    Account, AccountList, AccountLoginBegin, AccountLoginBeginParams, AccountLoginBeginResult,
-    AccountLoginComplete, AccountLoginCompleteParams, AccountRemove, AccountRemoveParams,
-    LoginMethod,
+    Account, AccountList, AccountListResult, AccountLoginBegin, AccountLoginBeginParams,
+    AccountLoginBeginResult, AccountLoginComplete, AccountLoginCompleteParams, AccountRemove,
+    AccountRemoveParams, AccountSwitch, AccountSwitchParams, LoginMethod,
 };
 use proto::instance::{
     InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo, InstanceLaunch,
@@ -583,12 +583,17 @@ impl Accounts<'_> {
             .account)
     }
 
-    pub async fn list(&self) -> Result<Vec<Account>, IpcError> {
-        Ok(self
-            .session
-            .call::<AccountList>(&proto::Empty {})
-            .await?
-            .accounts)
+    /// The signed-in accounts plus the uuid launches default to.
+    pub async fn list(&self) -> Result<AccountListResult, IpcError> {
+        self.session.call::<AccountList>(&proto::Empty {}).await
+    }
+
+    /// Make `reference` (name or uuid) the default account for launches.
+    pub async fn switch(&self, reference: &str) -> Result<Account, IpcError> {
+        let params = AccountSwitchParams {
+            account: reference.to_string(),
+        };
+        Ok(self.session.call::<AccountSwitch>(&params).await?.account)
     }
 
     pub async fn remove(&self, reference: &str) -> Result<(), IpcError> {

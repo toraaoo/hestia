@@ -267,14 +267,13 @@ impl Engine {
     }
 
     async fn launch_account(&self, reference: &str) -> Result<LaunchAccount> {
-        let accounts = self.accounts.list();
         let account = if reference.is_empty() {
-            accounts
-                .into_iter()
-                .next()
-                .context("no Minecraft account is signed in (run `hestia auth login`)")?
+            self.accounts
+                .default_account()
+                .context("no Minecraft account is signed in (run `hestia account login`)")?
         } else {
-            accounts
+            self.accounts
+                .list()
                 .into_iter()
                 .find(|a| a.name.eq_ignore_ascii_case(reference) || a.uuid == reference)
                 .with_context(|| format!("no account matches '{reference}'"))?
