@@ -9,8 +9,8 @@ it's just as comfortable from a terminal as from a window.
 > C++ tree is gone. Hestia runs as a daemon (`hestiad`) with thin clients over a
 > local socket. In place today: the build/workspace, logging, a config store, the
 > CLI, Java runtime management (install/list/uninstall via the Adoptium API),
-> Microsoft account sign-in, a process supervisor (launch/track/stream/stop child
-> processes), and a stock Tauri desktop shell. Still to come: the Minecraft launch
+> Microsoft account sign-in, a daemon-internal process supervisor (the mechanism
+> that will launch and track the game), and a stock Tauri desktop shell. Still to come: the Minecraft launch
 > pipeline (instances, version manifests, assembling the JVM command) and a
 > functional tray.
 
@@ -115,13 +115,6 @@ hestia config set autostart true # register the daemon to start at login
 
 # Daemon lifecycle
 hestia daemon status | start | stop | restart
-
-# Processes (launched and supervised by the daemon)
-hestia process start <program> [args...]   # launch; --wait streams output until exit
-hestia process list                         # tracked processes and their state
-hestia process status <id>                  # state of one process
-hestia process logs <id> [--tail N]         # captured output
-hestia process stop <id>                    # terminate
 
 # Global flags (any position)
 hestia -v java list              # verbose / debug logging

@@ -9,6 +9,7 @@ use client::proto::accounts::{Account, LoginMethod};
 use client::Client;
 
 use crate::output::print_table;
+use crate::ui::Spinner;
 
 #[derive(Subcommand)]
 pub enum AuthCmd {
@@ -52,7 +53,7 @@ async fn device_code_login(client: &Client) -> Result<Account> {
     );
     wait_for_enter("Press Enter to open your browser... ");
     open_browser(&flow.verification_uri);
-    eprintln!("Waiting for you to finish in the browser…");
+    let _spinner = Spinner::start("waiting for you to finish in the browser…");
     Ok(client.accounts().complete_login(&flow.id, "").await?)
 }
 
@@ -72,6 +73,7 @@ async fn sisu_login(client: &Client) -> Result<Account> {
     if code.is_empty() {
         bail!("no authorization code was pasted");
     }
+    let _spinner = Spinner::start("signing in…");
     Ok(client.accounts().complete_login(&flow.id, &code).await?)
 }
 

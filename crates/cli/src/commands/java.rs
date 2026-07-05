@@ -6,7 +6,7 @@ use anyhow::Result;
 use clap::Subcommand;
 
 use crate::output::print_table;
-use crate::ui::InstallReporter;
+use crate::ui::{InstallReporter, Spinner};
 
 #[derive(Subcommand)]
 pub enum JavaCmd {
@@ -28,7 +28,10 @@ pub async fn run(cmd: JavaCmd) -> Result<()> {
     let client = super::connect().await?;
     match cmd {
         JavaCmd::Available => {
-            let releases = client.java().releases().await?;
+            let releases = {
+                let _spinner = Spinner::start("fetching release lines");
+                client.java().releases().await?
+            };
             let rows = releases
                 .iter()
                 .map(|r| {
@@ -80,7 +83,10 @@ pub async fn run(cmd: JavaCmd) -> Result<()> {
             }
         }
         JavaCmd::Uninstall { major } => {
-            client.java().uninstall(major).await?;
+            {
+                let _spinner = Spinner::start(format!("uninstalling java {major}"));
+                client.java().uninstall(major).await?;
+            }
             println!("uninstalled java {major}");
         }
     }

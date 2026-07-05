@@ -6,13 +6,15 @@ pub mod cache;
 pub mod config;
 pub mod daemon;
 pub mod java;
-pub mod process;
 
 use anyhow::{Context, Result};
 use client::Client;
 
+use crate::ui::Spinner;
+
 /// Connect to the daemon, auto-spawning it if it is not already running.
 pub async fn connect() -> Result<Client> {
+    let _spinner = Spinner::start("connecting to the daemon");
     Client::connect(true)
         .await
         .context("cannot reach the daemon")

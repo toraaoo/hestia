@@ -30,11 +30,11 @@ pub fn print_table(headers: &[&str], rows: &[Vec<String>]) {
 
 /// Render a byte count in human units (matching the CLI's cache/size output).
 pub fn human_bytes(bytes: u64) -> String {
-    const UNITS: [&str; 6] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+    const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
     let mut value = bytes as f64;
     let mut unit = 0;
-    while value >= 1024.0 && unit < UNITS.len() - 1 {
-        value /= 1024.0;
+    while value >= 1000.0 && unit < UNITS.len() - 1 {
+        value /= 1000.0;
         unit += 1;
     }
     if unit == 0 {
