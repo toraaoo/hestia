@@ -13,8 +13,11 @@ use proto::app::AppInfoResult;
 use proto::cache::{CacheEntry, CacheInfoResult};
 use proto::daemon::DaemonStatusResult;
 use proto::download::DownloadSpec;
+use proto::instance::InstanceInfo;
 use proto::java::{JavaInstallProgress, JavaRuntime};
+use proto::minecraft::ProvisionProgress;
 use proto::process::{ProcessExitEvent, ProcessInfo, ProcessOutputEvent, ProcessSpec};
+use proto::server::ServerInfo;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
@@ -75,4 +78,11 @@ golden!(
     process_exit_event,
     ProcessExitEvent,
     "process_exit_event.json"
+);
+golden!(server_info, ServerInfo, "server_info.json");
+golden!(instance_info, InstanceInfo, "instance_info.json");
+golden!(
+    provision_progress,
+    ProvisionProgress,
+    "provision_progress.json"
 );

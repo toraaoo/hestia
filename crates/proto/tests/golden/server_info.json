@@ -1,0 +1,18 @@
+{
+  "id": "fabric-1-21-1",
+  "name": "fabric-1.21.1",
+  "flavor": "fabric",
+  "game_version": "1.21.1",
+  "loader_version": "0.16.5",
+  "java_major": 21,
+  "created_unix": 1751000000,
+  "ready": true,
+  "process": {
+    "id": "server-fabric-1-21-1",
+    "pid": 5150,
+    "program": "java",
+    "args": ["-jar", "server.jar", "nogui"],
+    "state": "running",
+    "started_unix": 1751000100
+  }
+}

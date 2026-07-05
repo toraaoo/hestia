@@ -18,18 +18,17 @@ use proto::daemon::{DaemonStatus, DaemonStatusResult, DaemonStop, DaemonStopResu
 use proto::download::DownloadStart;
 use proto::events::{EventsSubscribe, EventsSubscribeResult};
 use proto::health::{Ping, PingResult};
+use proto::instance::{InstanceFlavors, InstanceResolve, InstanceVersions};
 use proto::java::{
     JavaInstall, JavaInstallResult, JavaList, JavaListResult, JavaReleases, JavaReleasesResult,
     JavaUninstall,
 };
-use proto::minecraft::{
-    FlavorsResult, InstanceFlavors, InstanceResolve, InstanceVersions, ServerFlavors,
-    ServerResolve, ServerVersions, VersionsResult,
-};
+use proto::minecraft::{FlavorsResult, VersionsResult};
 use proto::process::{
     ProcessList, ProcessListResult, ProcessLogs, ProcessLogsResult, ProcessStart,
     ProcessStartResult, ProcessStatus, ProcessStop,
 };
+use proto::server::{ServerFlavors, ServerResolve, ServerVersions};
 use proto::Empty;
 use serde_json::{json, Value};
 

@@ -12,14 +12,15 @@ use proto::accounts::{
     AccountLoginComplete, AccountLoginCompleteParams, AccountRemove, AccountRemoveParams,
     LoginMethod,
 };
+use proto::instance::{InstanceFlavors, InstanceResolve, InstanceVersions};
 use proto::minecraft::{
-    Flavor, GameVersion, InstanceFlavors, InstanceProfile, InstanceResolve, InstanceVersions,
-    ResolveParams, ServerFlavors, ServerProfile, ServerResolve, ServerVersions, VersionsParams,
+    Flavor, GameVersion, InstanceProfile, ResolveParams, ServerProfile, VersionsParams,
 };
 use proto::process::{
     ProcessExitEvent, ProcessInfo, ProcessList, ProcessLogLine, ProcessLogs, ProcessLogsParams,
     ProcessRef, ProcessSpec, ProcessStart, ProcessStartResult, ProcessStatus, ProcessStop,
 };
+use proto::server::{ServerFlavors, ServerResolve, ServerVersions};
 use serde_json::Value;
 
 use crate::session::{job_id, Session};

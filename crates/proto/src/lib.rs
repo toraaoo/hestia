@@ -10,8 +10,10 @@ pub mod daemon;
 pub mod download;
 pub mod events;
 pub mod health;
+pub mod instance;
 pub mod java;
 pub mod minecraft;
 pub mod process;
+pub mod server;
 
 pub use contract::{Contract, Empty, Topic};

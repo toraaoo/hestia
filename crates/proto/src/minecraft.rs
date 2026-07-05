@@ -1,12 +1,12 @@
-//! Minecraft provider vocabulary + resolution contracts, shared by both sides of
-//! the socket. A *flavor* is a distribution (vanilla, fabric, …); a provider
-//! lists the game *versions* it supports and *resolves* a request into a launch
-//! profile — the full descriptor the launch pipeline will consume. Servers and
-//! instances (clients) share this vocabulary but resolve to different profiles.
+//! Minecraft provider vocabulary shared by both sides of the socket. A *flavor*
+//! is a distribution (vanilla, fabric, …); a provider lists the game *versions*
+//! it supports and *resolves* a request into a launch profile — the full
+//! descriptor the launch pipeline consumes. Servers and instances (clients)
+//! share this vocabulary but resolve to different profiles; their contracts live
+//! in the `server` and `instance` modules.
 
 use serde::{Deserialize, Serialize};
 
-use crate::contract::{Contract, Empty};
 use crate::download::Checksum;
 
 /// A distribution offered by a domain: the first level of the `available`
@@ -125,44 +125,28 @@ pub struct ResolveParams {
     pub loader_version: Option<String>,
 }
 
-pub struct ServerFlavors;
-impl Contract for ServerFlavors {
-    const CHANNEL: &'static str = "server.flavors";
-    type Params = Empty;
-    type Result = FlavorsResult;
+/// Where a provisioning job (server create, instance launch preparation) is.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ProvisionPhase {
+    #[default]
+    Resolving,
+    Java,
+    Server,
+    Client,
+    Libraries,
+    Assets,
 }
 
-pub struct ServerVersions;
-impl Contract for ServerVersions {
-    const CHANNEL: &'static str = "server.versions";
-    type Params = VersionsParams;
-    type Result = VersionsResult;
-}
-
-pub struct ServerResolve;
-impl Contract for ServerResolve {
-    const CHANNEL: &'static str = "server.resolve";
-    type Params = ResolveParams;
-    type Result = ServerProfile;
-}
-
-pub struct InstanceFlavors;
-impl Contract for InstanceFlavors {
-    const CHANNEL: &'static str = "instance.flavors";
-    type Params = Empty;
-    type Result = FlavorsResult;
-}
-
-pub struct InstanceVersions;
-impl Contract for InstanceVersions {
-    const CHANNEL: &'static str = "instance.versions";
-    type Params = VersionsParams;
-    type Result = VersionsResult;
-}
-
-pub struct InstanceResolve;
-impl Contract for InstanceResolve {
-    const CHANNEL: &'static str = "instance.resolve";
-    type Params = ResolveParams;
-    type Result = InstanceProfile;
+/// Progress for a provisioning job. `current`/`total` are bytes for a
+/// single-artifact phase and completed/total counts for `Libraries`/`Assets`;
+/// a phase with unknown extent reports `0/0`.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ProvisionProgress {
+    pub phase: ProvisionPhase,
+    pub current: u64,
+    pub total: u64,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub detail: String,
 }
