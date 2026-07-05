@@ -35,7 +35,6 @@ hestia/
 ├── Cargo.toml                 [workspace] members = ["crates/*"]
 ├── rust-toolchain.toml        pinned toolchain + clippy/rustfmt
 ├── deny.toml                  cargo-deny: licenses, bans, advisories
-├── dist-workspace.toml        cargo-dist config (cli/daemon installers)
 ├── crates/
 │   ├── proto/                 wire contracts + domain types (serde)
 │   ├── ipc/                   transport (unix socket / named pipe) + envelope (tokio)
@@ -82,7 +81,8 @@ cargo install tauri-cli --version '^2'
 ```
 
 The [`scripts/`](scripts/) helpers wrap all of this: `scripts/build.sh cli`,
-`scripts/run.sh daemon serve`, `scripts/run.sh desktop`, `scripts/package.sh cli`.
+`scripts/run.sh daemon serve`, `scripts/run.sh desktop`, `scripts/package.sh`
+(Tauri installers + portable archive — see [docs/packaging.md](docs/packaging.md)).
 For an interactive loop, `scripts/dev.sh` opens a subshell with `hestia`/`hestiad`
 on `PATH` (or `scripts/dev.sh --desktop` for the Tauri shell with frontend HMR).
 

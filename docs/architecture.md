@@ -132,7 +132,7 @@ hestia-cpp/
 └── docs/
     ├── architecture.md        this file
     ├── contributing.md        conventions + how-to recipes
-    └── packaging.md           release formats, components, CEF layout, CI caching
+    └── packaging.md           release formats, Tauri bundling + sidecars, CI
 ```
 
 ### Tech stack
