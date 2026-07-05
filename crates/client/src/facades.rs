@@ -12,15 +12,24 @@ use proto::accounts::{
     AccountLoginComplete, AccountLoginCompleteParams, AccountRemove, AccountRemoveParams,
     LoginMethod,
 };
-use proto::instance::{InstanceFlavors, InstanceResolve, InstanceVersions};
+use proto::instance::{
+    InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo, InstanceLaunch,
+    InstanceLaunchParams, InstanceList, InstanceRef, InstanceRemove, InstanceResolve, InstanceStop,
+    InstanceVersions,
+};
 use proto::minecraft::{
-    Flavor, GameVersion, InstanceProfile, ResolveParams, ServerProfile, VersionsParams,
+    Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams, ServerProfile,
+    VersionsParams,
 };
 use proto::process::{
     ProcessExitEvent, ProcessInfo, ProcessList, ProcessLogLine, ProcessLogs, ProcessLogsParams,
     ProcessRef, ProcessSpec, ProcessStart, ProcessStartResult, ProcessStatus, ProcessStop,
 };
-use proto::server::{ServerFlavors, ServerResolve, ServerVersions};
+use proto::server::{
+    ServerCreate, ServerCreateParams, ServerFlavors, ServerInfo, ServerList, ServerLogs,
+    ServerLogsParams, ServerRef, ServerRemove, ServerResolve, ServerStart, ServerStartResult,
+    ServerStatus, ServerStop, ServerVersions,
+};
 use serde_json::Value;
 
 use crate::session::{job_id, Session};
@@ -315,6 +324,97 @@ impl Server<'_> {
         };
         self.session.call::<ServerResolve>(&params).await
     }
+
+    /// Create a fully provisioned server, blocking until the daemon reports
+    /// done or error and forwarding each progress event to `on_progress`.
+    /// `eula` asserts the user accepted the Minecraft EULA.
+    pub async fn create(
+        &self,
+        name: &str,
+        flavor: &str,
+        version: &str,
+        loader_version: Option<String>,
+        eula: bool,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<ServerInfo, IpcError> {
+        let id = job_id("server-create");
+        let on_event = move |event: &Event| {
+            if let Ok(progress) = serde_json::from_value::<ProvisionProgress>(event.payload.clone())
+            {
+                on_progress(&progress);
+            }
+        };
+
+        let session = self.session;
+        let create_id = id.clone();
+        let params = ServerCreateParams {
+            name: name.to_string(),
+            flavor: flavor.to_string(),
+            version: version.to_string(),
+            loader_version,
+            eula,
+            id: create_id.clone(),
+        };
+        let payload = self
+            .session
+            .run_job(
+                &id,
+                "server.create.done",
+                "server.create.error",
+                on_event,
+                move || async move { session.call::<ServerCreate>(&params).await.map(|_| ()) },
+            )
+            .await?;
+
+        serde_json::from_value(payload.get("server").cloned().unwrap_or(Value::Null))
+            .map_err(|e| IpcError::Malformed(e.to_string()))
+    }
+
+    pub async fn list(&self) -> Result<Vec<ServerInfo>, IpcError> {
+        Ok(self
+            .session
+            .call::<ServerList>(&proto::Empty {})
+            .await?
+            .servers)
+    }
+
+    pub async fn status(&self, server: &str) -> Result<ServerInfo, IpcError> {
+        self.session.call::<ServerStatus>(&server_ref(server)).await
+    }
+
+    pub async fn remove(&self, server: &str) -> Result<(), IpcError> {
+        self.session
+            .call::<ServerRemove>(&server_ref(server))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn start(&self, server: &str) -> Result<ServerStartResult, IpcError> {
+        self.session.call::<ServerStart>(&server_ref(server)).await
+    }
+
+    pub async fn stop(&self, server: &str) -> Result<(), IpcError> {
+        self.session.call::<ServerStop>(&server_ref(server)).await?;
+        Ok(())
+    }
+
+    pub async fn logs(
+        &self,
+        server: &str,
+        tail: Option<usize>,
+    ) -> Result<Vec<ProcessLogLine>, IpcError> {
+        let params = ServerLogsParams {
+            server: server.to_string(),
+            tail,
+        };
+        Ok(self.session.call::<ServerLogs>(&params).await?.lines)
+    }
+}
+
+fn server_ref(server: &str) -> ServerRef {
+    ServerRef {
+        server: server.to_string(),
+    }
 }
 
 pub struct Instance<'a> {
@@ -353,6 +453,100 @@ impl Instance<'_> {
             loader_version,
         };
         self.session.call::<InstanceResolve>(&params).await
+    }
+
+    /// Create an instance record (the profile is resolved upstream, so this can
+    /// take a little while; files are materialised at launch).
+    pub async fn create(
+        &self,
+        name: &str,
+        flavor: &str,
+        version: &str,
+        loader_version: Option<String>,
+    ) -> Result<InstanceInfo, IpcError> {
+        let params = InstanceCreateParams {
+            name: name.to_string(),
+            flavor: flavor.to_string(),
+            version: version.to_string(),
+            loader_version,
+        };
+        Ok(self
+            .session
+            .call_with_timeout::<InstanceCreate>(&params, Duration::from_secs(60))
+            .await?
+            .instance)
+    }
+
+    pub async fn list(&self) -> Result<Vec<InstanceInfo>, IpcError> {
+        Ok(self
+            .session
+            .call::<InstanceList>(&proto::Empty {})
+            .await?
+            .instances)
+    }
+
+    pub async fn remove(&self, instance: &str) -> Result<(), IpcError> {
+        self.session
+            .call::<InstanceRemove>(&instance_ref(instance))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn stop(&self, instance: &str) -> Result<(), IpcError> {
+        self.session
+            .call::<InstanceStop>(&instance_ref(instance))
+            .await?;
+        Ok(())
+    }
+
+    /// Launch an instance, blocking until the game process has spawned (or the
+    /// preparation failed) and forwarding each progress event to `on_progress`.
+    /// Returns the supervised process id and pid.
+    pub async fn launch(
+        &self,
+        instance: &str,
+        account: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<(String, u32), IpcError> {
+        let id = job_id("instance-launch");
+        let on_event = move |event: &Event| {
+            if let Ok(progress) = serde_json::from_value::<ProvisionProgress>(event.payload.clone())
+            {
+                on_progress(&progress);
+            }
+        };
+
+        let session = self.session;
+        let launch_id = id.clone();
+        let params = InstanceLaunchParams {
+            instance: instance.to_string(),
+            account: account.to_string(),
+            id: launch_id.clone(),
+        };
+        let payload = self
+            .session
+            .run_job(
+                &id,
+                "instance.launch.done",
+                "instance.launch.error",
+                on_event,
+                move || async move { session.call::<InstanceLaunch>(&params).await.map(|_| ()) },
+            )
+            .await?;
+
+        let process_id = payload
+            .get("process_id")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let pid = payload.get("pid").and_then(Value::as_u64).unwrap_or(0) as u32;
+        Ok((process_id, pid))
+    }
+}
+
+fn instance_ref(instance: &str) -> InstanceRef {
+    InstanceRef {
+        instance: instance.to_string(),
     }
 }
 
