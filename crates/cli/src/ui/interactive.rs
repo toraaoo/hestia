@@ -111,7 +111,8 @@ pub fn browse(title: &str, headers: &[&str], rows: &[Vec<String>]) -> Result<boo
         let mut state = TableState::default();
         state.select(Some(0));
         loop {
-            terminal.draw(|frame| draw_pager(frame, title, headers, rows, &constraints, &mut state))?;
+            terminal
+                .draw(|frame| draw_pager(frame, title, headers, rows, &constraints, &mut state))?;
             let Event::Key(key) = event::read()? else {
                 continue;
             };
@@ -154,7 +155,11 @@ fn draw_select(frame: &mut Frame, prompt: &str, items: &[String], state: &mut Li
     );
     let list = List::new(items.iter().map(|i| ListItem::new(i.as_str())))
         .highlight_symbol("> ")
-        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+        .highlight_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        );
     frame.render_stateful_widget(list, layout[1], state);
 }
 
@@ -179,7 +184,11 @@ fn draw_pager(
 
     let table = Table::new(body, constraints.to_vec())
         .header(header)
-        .row_highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .row_highlight_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
         .highlight_symbol("> ")
         .block(
             Block::bordered()

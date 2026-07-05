@@ -29,7 +29,11 @@ impl View {
     pub fn detail<K: Into<String>, V: Into<String>>(
         rows: impl IntoIterator<Item = (K, V)>,
     ) -> View {
-        View::Detail(rows.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
+        View::Detail(
+            rows.into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        )
     }
 
     pub fn table(

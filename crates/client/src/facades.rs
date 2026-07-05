@@ -298,11 +298,7 @@ impl Server<'_> {
         let params = VersionsParams {
             flavor: flavor.to_string(),
         };
-        Ok(self
-            .session
-            .call::<ServerVersions>(&params)
-            .await?
-            .versions)
+        Ok(self.session.call::<ServerVersions>(&params).await?.versions)
     }
 
     pub async fn resolve(

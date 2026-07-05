@@ -72,7 +72,11 @@ pub async fn run(cmd: JavaCmd) -> Result<()> {
                 .install(major, force, move |p| progress.update(p))
                 .await?;
             reporter.finish();
-            let verb = if already { "already installed" } else { "installed" };
+            let verb = if already {
+                "already installed"
+            } else {
+                "installed"
+            };
             ui::show(View::line(format!(
                 "java {} {verb} ({})",
                 runtime.major, runtime.release_name

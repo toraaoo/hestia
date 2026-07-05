@@ -19,7 +19,9 @@ fn env_path(name: &str) -> Option<PathBuf> {
 #[cfg(debug_assertions)]
 fn dev_data_home() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
-    let target = exe.ancestors().find(|p| p.file_name() == Some(OsStr::new("target")))?;
+    let target = exe
+        .ancestors()
+        .find(|p| p.file_name() == Some(OsStr::new("target")))?;
     Some(target.parent()?.join(".hestia"))
 }
 

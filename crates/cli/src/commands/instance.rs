@@ -70,7 +70,10 @@ fn show_profile(profile: InstanceProfile) -> Result<()> {
     ui::show(View::detail([
         ("flavor", profile.flavor),
         ("version", profile.game_version),
-        ("loader", profile.loader_version.unwrap_or_else(|| "-".into())),
+        (
+            "loader",
+            profile.loader_version.unwrap_or_else(|| "-".into()),
+        ),
         ("java", profile.java_major.to_string()),
         ("main", profile.main_class),
         ("assets", profile.asset_index.id),

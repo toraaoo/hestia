@@ -38,7 +38,10 @@ impl Minecraft {
     }
 
     pub fn server_flavors(&self) -> Vec<Flavor> {
-        self.servers.iter().map(|p| flavor(p.id(), p.name())).collect()
+        self.servers
+            .iter()
+            .map(|p| flavor(p.id(), p.name()))
+            .collect()
     }
 
     pub fn instance_flavors(&self) -> Vec<Flavor> {

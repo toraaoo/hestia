@@ -16,7 +16,10 @@ async fn fetch_json(url: &str) -> Result<Value> {
         .await
         .with_context(|| format!("request to {url} failed"))?;
     if !response.status().is_success() {
-        bail!("request to {url} failed: HTTP {}", response.status().as_u16());
+        bail!(
+            "request to {url} failed: HTTP {}",
+            response.status().as_u16()
+        );
     }
     response
         .json()
@@ -50,12 +53,20 @@ fn rules_allow(rules: &Value) -> bool {
         if rule.get("features").is_some() {
             continue;
         }
-        let matches = match rule.get("os").and_then(|o| o.get("name")).and_then(Value::as_str) {
+        let matches = match rule
+            .get("os")
+            .and_then(|o| o.get("name"))
+            .and_then(Value::as_str)
+        {
             Some(name) => name == host_os(),
             None => true,
         };
         if matches {
-            allowed = rule.get("action").and_then(Value::as_str).unwrap_or("allow") == "allow";
+            allowed = rule
+                .get("action")
+                .and_then(Value::as_str)
+                .unwrap_or("allow")
+                == "allow";
         }
     }
     allowed

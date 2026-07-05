@@ -50,7 +50,10 @@ pub async fn latest_loader(game: &str) -> Result<String> {
 }
 
 pub async fn profile_json(game: &str, loader: &str) -> Result<Value> {
-    fetch_json(&format!("{META}/versions/loader/{game}/{loader}/profile/json")).await
+    fetch_json(&format!(
+        "{META}/versions/loader/{game}/{loader}/profile/json"
+    ))
+    .await
 }
 
 /// The self-contained Fabric server launcher jar for a game/loader pair.
@@ -84,7 +87,10 @@ pub fn libraries(profile: &Value) -> Vec<Library> {
         let Some(path) = maven_path(name) else {
             continue;
         };
-        let base = lib.get("url").and_then(Value::as_str).unwrap_or(DEFAULT_MAVEN);
+        let base = lib
+            .get("url")
+            .and_then(Value::as_str)
+            .unwrap_or(DEFAULT_MAVEN);
         let sep = if base.ends_with('/') { "" } else { "/" };
         let sha1 = lib
             .get("sha1")
@@ -113,6 +119,11 @@ pub fn jvm_args(profile: &Value) -> Vec<String> {
         .get("arguments")
         .and_then(|a| a.get("jvm"))
         .and_then(Value::as_array)
-        .map(|arr| arr.iter().filter_map(Value::as_str).map(String::from).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(Value::as_str)
+                .map(String::from)
+                .collect()
+        })
         .unwrap_or_default()
 }

@@ -89,7 +89,13 @@ pub fn render_row<S: AsRef<str>>(cells: &[S], widths: &[usize]) -> String {
     let line: Vec<String> = cells
         .iter()
         .enumerate()
-        .map(|(i, c)| format!("{:width$}", c.as_ref(), width = widths.get(i).copied().unwrap_or(0)))
+        .map(|(i, c)| {
+            format!(
+                "{:width$}",
+                c.as_ref(),
+                width = widths.get(i).copied().unwrap_or(0)
+            )
+        })
         .collect();
     line.join("  ").trim_end().to_string()
 }
