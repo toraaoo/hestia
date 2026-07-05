@@ -24,14 +24,24 @@ pub fn runtime_dir() -> PathBuf {
     std::env::temp_dir().join("hestia")
 }
 
+/// An explicit endpoint override, shared by bind and connect. Lets tests (and
+/// side-by-side daemons) use an isolated socket without touching the per-user
+/// default.
+fn endpoint_override() -> Option<PathBuf> {
+    match std::env::var_os("HESTIA_SOCK") {
+        Some(value) if !value.is_empty() => Some(PathBuf::from(value)),
+        _ => None,
+    }
+}
+
 /// The default daemon endpoint. Both the daemon (bind) and clients (connect)
 /// resolve the same path here.
 #[cfg(unix)]
 pub fn default_endpoint() -> PathBuf {
-    runtime_dir().join("hestiad.sock")
+    endpoint_override().unwrap_or_else(|| runtime_dir().join("hestiad.sock"))
 }
 
 #[cfg(windows)]
 pub fn default_endpoint() -> PathBuf {
-    PathBuf::from(r"\\.\pipe\hestia-hestiad")
+    endpoint_override().unwrap_or_else(|| PathBuf::from(r"\\.\pipe\hestia-hestiad"))
 }
