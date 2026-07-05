@@ -1,0 +1,7 @@
+{
+  "pid": 4242,
+  "version": "0.0.1",
+  "uptime_seconds": 3600,
+  "home": "/home/user/.hestia",
+  "log": "/home/user/.hestia/logs/hestiad.log"
+}

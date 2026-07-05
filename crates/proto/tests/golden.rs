@@ -1,0 +1,58 @@
+//! Wire-compat golden tests. Each fixture under `tests/golden/` is a canonical
+//! JSON wire form for one `proto` type; the test decodes it into that type and
+//! re-encodes it, asserting the round-tripped value equals the fixture. A field
+//! renamed, dropped, added, or an enum string changed makes this fail — the
+//! guard that a `proto` type cannot silently drift from the shape on the socket.
+//!
+//! (The original plan captured these from the running C++ daemon; after the
+//! all-Rust cutover there is no C++ oracle, so the fixtures are maintained by
+//! hand as the authoritative wire contract.)
+
+use proto::accounts::{Account, AccountLoginBeginResult};
+use proto::app::AppInfoResult;
+use proto::cache::{CacheEntry, CacheInfoResult};
+use proto::daemon::DaemonStatusResult;
+use proto::download::DownloadSpec;
+use proto::java::{JavaInstallProgress, JavaRuntime};
+use proto::process::{ProcessExitEvent, ProcessInfo, ProcessOutputEvent, ProcessSpec};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use serde_json::Value;
+
+/// Decode `fixture` into `T`, re-encode it, and assert the value is unchanged.
+/// Object key order and whitespace are irrelevant (compared as `Value`); a
+/// changed field name, set, or enum string is not.
+fn round_trip<T: Serialize + DeserializeOwned>(name: &str, fixture: &str) {
+    let expected: Value =
+        serde_json::from_str(fixture).unwrap_or_else(|e| panic!("{name}: fixture is not JSON: {e}"));
+    let decoded: T = serde_json::from_value(expected.clone())
+        .unwrap_or_else(|e| panic!("{name}: fixture does not decode into the type: {e}"));
+    let reencoded = serde_json::to_value(&decoded).unwrap();
+    assert_eq!(
+        reencoded, expected,
+        "{name}: re-encoded wire form drifted from the golden fixture"
+    );
+}
+
+macro_rules! golden {
+    ($test:ident, $ty:ty, $file:literal) => {
+        #[test]
+        fn $test() {
+            round_trip::<$ty>($file, include_str!(concat!("golden/", $file)));
+        }
+    };
+}
+
+golden!(app_info_result, AppInfoResult, "app_info_result.json");
+golden!(daemon_status_result, DaemonStatusResult, "daemon_status_result.json");
+golden!(cache_entry, CacheEntry, "cache_entry.json");
+golden!(cache_info_result, CacheInfoResult, "cache_info_result.json");
+golden!(java_runtime, JavaRuntime, "java_runtime.json");
+golden!(java_install_progress, JavaInstallProgress, "java_install_progress.json");
+golden!(download_spec, DownloadSpec, "download_spec.json");
+golden!(account, Account, "account.json");
+golden!(account_login_begin_result, AccountLoginBeginResult, "account_login_begin_result.json");
+golden!(process_spec, ProcessSpec, "process_spec.json");
+golden!(process_info, ProcessInfo, "process_info.json");
+golden!(process_output_event, ProcessOutputEvent, "process_output_event.json");
+golden!(process_exit_event, ProcessExitEvent, "process_exit_event.json");

@@ -1,0 +1,7 @@
+{
+  "vendor": "eclipse-temurin",
+  "major": 21,
+  "release_name": "jdk-21.0.4+7",
+  "home": "/home/user/.hestia/java/eclipse-temurin-21",
+  "executable": "/home/user/.hestia/java/eclipse-temurin-21/bin/java"
+}
