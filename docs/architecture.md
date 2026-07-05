@@ -1,525 +1,351 @@
 # Architecture
 
-This is the reference for Hestia: what exists today, where it lives, and the
-reasoning behind the structure.
+The reference for Hestia: what exists today, where it lives, and the reasoning
+behind the structure. Read this first; [contributing.md](contributing.md) has the
+copy-and-adapt recipes for extending it, and [packaging.md](packaging.md) covers
+release artifacts.
 
-> **As-built (Rust).** Hestia is now an all-Rust cargo workspace. The C++ tree
-> has been removed. The daemon + thin-client model, the wire protocol, the
-> data-directory resolution, and the command surface are preserved verbatim —
-> only the language and the desktop shell changed. The crate graph:
->
-> ```
-> proto   → wire contracts + domain types (serde)                      leaf
-> ipc     → transport (unix socket / named pipe) + envelope (tokio)    leaf
-> common  → logging (tracing) + app identity + paths                   leaf
-> client  → typed client SDK (facades over a Session)   → proto, ipc, common
-> engine  → config·cache·download·java·accounts         → proto, common   (daemon-only)
-> cli     → bin hestia          (clap)                  → client, common
-> daemon  → bin hestiad         (router, services)      → engine, proto, ipc, common
-> desktop → bin hestia-desktop  (Tauri v2)              → client, common   (+ frontend/)
-> tray    → bin tray            (placeholder)
-> ```
->
-> The one-way arrows are enforced by cargo: only `daemon` depends on `engine`, so
-> a front-end physically cannot reach launcher logic except over the socket
-> (`cargo tree -i engine` shows only `daemon`). Collapses from the C++: the
-> `kFields` codec became `serde` derive; Xbox signing lost its OpenSSL/CNG split
-> for one cross-platform `p256` impl; archive extraction stopped shelling out
-> (the `tar`+`flate2`/`zip` crates). Accounts, config, cache, download, java, and
-> the process supervisor (`process.*` — launch, track, stream output, stop, with a
-> restart policy) are ported. Still pending: the Minecraft launch pipeline that
-> drives the supervisor (instances, version manifests, JVM command assembly) and a
-> functional tray.
->
-> **The prose and target names below (`libs/…`, `apps/…`, `hestia_shared`, CEF)
-> describe the historical C++ design and are retained for the reasoning; map them
-> to the crates above.**
+Hestia is an all-Rust cargo workspace of small path crates. It runs as a daemon
+(`hestiad`) with thin clients — the CLI, the desktop shell, the tray — driving it
+over a local socket. The launcher engine lives only in the daemon; a front-end
+physically cannot reach it except over the wire.
 
-> **Daemon architecture.** Hestia runs as a daemon + thin-client model:
-> `hestiad` owns the IPC endpoint, a request router, process supervision, and
-> autostart; frontends are clients that drive it over a local socket (a Unix
-> domain socket on POSIX, a named pipe on Windows). `libs/core` was split into
-> **`libs/shared`** (IPC transport, the typed wire contracts, client SDK, app
-> identity, logging — linked by the daemon *and* every client) and **`libs/engine`** (config store,
-> java runtimes, launcher logic — daemon-internal). The CLI and tray already reach
-> the engine only over the socket; the desktop app still links it directly (a
-> transitional exception being retired — see the target graph).
+## One daemon, many front-ends
 
-## One daemon, many frontends
+Hestia is a single domain core — the `engine` — owned by the daemon, driven by
+several front-ends that are each a thin client over the socket (a Unix domain
+socket on POSIX, a named pipe on Windows):
 
-Hestia is a single domain core — `hestia_engine`, owned by the daemon
-(`hestiad`) — driven by several frontends, each a thin client over the socket:
+| Front-end | Binary           | Crate     | Stack                 | State                      |
+|-----------|------------------|-----------|-----------------------|----------------------------|
+| CLI       | `hestia`         | `cli`     | clap + ratatui        | shipped                    |
+| Desktop   | `hestia-desktop` | `desktop` | Tauri v2 + React/Vite | stock shell, not yet wired |
+| Tray      | `tray`           | `tray`    | native per-platform   | placeholder                |
 
-| Frontend | Target           | Binary           | Stack              |
-|----------|------------------|------------------|--------------------|
-| Desktop  | `hestia_desktop` | `HestiaLauncher` | CEF + React/Vite   |
-| CLI      | `hestia_cli`     | `hestia`         | CLI11              |
-| Tray     | `hestia_tray`    | `tray`           | GDBus SNI / native |
+The daemon (`hestiad`) is the resident core. The CLI is the first-class,
+fully-wired front-end; the desktop and tray are scaffolds (see
+[Front-ends](#front-ends-cli-desktop-tray)).
 
-The desktop app is a separate `main()` — a thin Chromium Embedded Framework (CEF)
-shell hosting a React frontend. The tray is a resident system-tray helper showing
-daemon status. Each talks to the core over IPC.
+## The crate graph
 
-The daemon (`hestiad`) and tray (`tray`) are the resident core and are
-**always built**. The front-ends are opt-out via `BUILD_DESKTOP` and `BUILD_CLI`
-(both `ON` by default). Skipping the desktop avoids the heaviest cost: CEF (~1 GB)
-is fetched at configure time only when `BUILD_DESKTOP` is on, and the desktop
-frontend must be built first (see [Build & dependency conventions](#build--dependency-conventions)).
-
-## Target graph
+A single workspace (`crates/*`). The one-way arrows are enforced by cargo, not by
+discipline: only `daemon` lists `engine` as a dependency, so a front-end **cannot**
+reach launcher logic — `cargo tree -i engine` shows only `daemon`.
 
 ```
-libs/shared  → IPC transport + protocol, typed wire contracts (hestia::proto),
-               client SDK, shared identity (app_info.h), logging; linked by the
-               daemon AND every client; zero UI dependencies
-libs/engine  → launcher engine (config, java runtimes, launcher logic); daemon-internal
-apps/cli     → CLI11 commands + thin main(); depends on shared
-apps/desktop → CEF shell + embedded React frontend; depends on shared (+ engine, transitional)
-apps/tray    → resident system-tray helper; depends on shared ONLY
-apps/daemon  → hestiad; IPC router, supervision, autostart; the only target that links engine
+proto   → wire contracts + domain types (serde)                    leaf
+ipc     → transport (unix socket / named pipe) + JSON envelope      leaf   → (tokio, libc)
+common  → logging (tracing) + app identity + path resolution        leaf
+client  → typed client SDK (Session + one facade per domain)       → proto, ipc, common
+engine  → config·cache·download·java·accounts·minecraft            → proto, common          (daemon-only)
+cli     → bin hestia          (clap + ratatui presentation)        → client, common, proto
+daemon  → bin hestiad         (router, services, supervisor)       → engine, proto, ipc, common, client
+desktop → bin hestia-desktop  (Tauri v2 shell)                     → (tauri)                 (+ frontend/)
+tray    → bin tray            (placeholder)
 ```
 
-The dependency arrows are one-way and **enforced by the build, not by
-discipline**. `shared` is the common base every target links; `engine` is
-daemon-only, so a front-end physically cannot reach launcher logic except over
-the socket:
-
-```
-shared ◄──── cli
-
-engine ◄──── daemon   (no front-end links engine)
-```
-
-> **Transitional:** `apps/desktop` still links `hestia_engine` directly. The
-> CLI and tray already reach it only over the socket — `hestia java` and
-> `config` (including the reserved `home` and `autostart` keys) all round-trip to
-> the daemon via the client SDK. The
-> end-state is engine = daemon-only, with every front-end reaching it over IPC.
-
-The desktop launcher follows the same one-way rule: `apps/desktop` (namespace
-`desktop::`) depends on `hestia_shared` and never the reverse. Its CEF shell knows
-about windows, schemes, and IPC; it contains **no launcher logic** — that lives
-in the engine and is reached over the IPC bridge. CEF's build flags are confined
-to the `apps/desktop` subdirectory so the shared library and the CLI never inherit them.
-
-## Directory layout
-
-```
-hestia-cpp/
-├── CMakeLists.txt              top-level: standard, output dirs, APP_* identity, subdirectories
-├── cmake/                      DownloadCEF, CMakeRC (resource compiler), PruneLocales
-├── third_party/               vendored C++ deps as git submodules; cef/ fetched at configure (gitignored)
-├── libs/
-│   ├── shared/                hestia_shared — IPC + wire contracts + client SDK + identity + logging
-│   │   ├── include/hestia/    PUBLIC headers: logging.h, app_info.h (GENERATED from
-│   │   │                      app_info.h.in), ipc/* (transport machinery), proto/*
-│   │   │                      (one contract header per domain), client/* (one facade
-│   │   │                      per domain over the Session core)
-│   │   └── src/               implementations (transport, protocol, proto/, client/)
-│   └── engine/                hestia_engine — launcher engine (daemon-internal)
-│       ├── include/hestia/engine/  PUBLIC API — flat, one header per domain:
-│       │                      engine.h (aggregate root), accounts.h, config.h, downloader.h, java.h
-│       └── src/               internals grouped by domain folder (accounts/, config/,
-│                              download/, java/), including private headers (checksum.h)
-├── apps/
-│   ├── cli/                   hestia_cli — CLI11 commands + main()
-│   ├── daemon/               hestia_daemon (hestiad) — bootstrap main.cc over
-│   │                          src/{runtime,process,downloads,java,accounts,platform,services}/
-│   ├── tray/                 hestia_tray — resident system-tray helper (per-platform backends)
-│   └── desktop/               hestia_desktop — CEF launcher (see "Desktop launcher" below)
-│       ├── frontend/          Vite + React + TS app (built with Bun) → dist/ embedded
-│       └── src/core/          the CEF shell; src/features/ the IPC feature modules
-└── docs/
-    ├── architecture.md        this file
-    ├── contributing.md        conventions + how-to recipes
-    └── packaging.md           release formats, Tauri bundling + sidecars, CI
-```
+- **`proto`** and **`ipc`** together form the socket boundary — the one seam the
+  daemon and every client share. `proto` is the *what* (typed payloads), `ipc` is
+  the *how* (framing + envelope). Neither knows anything launcher-specific.
+- **`client`** re-exports `proto`, so a front-end depends only on `client` to get
+  both the SDK and the domain types.
+- **`daemon`** is the only crate that links `engine`. It also links `client`, but
+  only so `hestiad ping` can talk to an already-running daemon.
+- **`engine`** is daemon-internal domain logic — the equivalent of Tailscale's
+  `LocalBackend`. It never links `ipc` or `client`; it does not know a socket
+  exists.
 
 ### Tech stack
 
-- **C++20**, **CMake** (≥ 3.21), built with **Ninja**.
-- [spdlog](https://github.com/gabime/spdlog) + [fmt](https://github.com/fmtlib/fmt) — logging and formatting.
-- [CLI11](https://github.com/CLIUtils/CLI11) — command-line parsing.
-- [FTXUI](https://github.com/ArthurSonzogni/FTXUI) — terminal UI elements (the
-  CLI's progress gauges; the future TUI).
-- [cpr](https://github.com/libcpr/cpr) — HTTP client for the engine's downloader
-  (builds its bundled curl, fetched at configure time).
-- [CEF](https://bitbucket.org/chromiumembedded/cef) — Chromium Embedded Framework (desktop).
-- [React](https://react.dev/) + [Vite](https://vitejs.dev/), built with [Bun](https://bun.sh/) — desktop frontend.
+- **Rust** (edition 2021), a **cargo** workspace; `rustfmt` + `clippy -D warnings`
+  kept clean, `cargo-deny` for licenses/advisories.
+- [tokio](https://tokio.rs/) — async runtime (client + daemon transport).
+- [serde](https://serde.rs/) / serde_json — the wire and persistence marshalling.
+- [tracing](https://github.com/tokio-rs/tracing) — structured logging.
+- [clap](https://github.com/clap-rs/clap) — CLI parsing; [ratatui](https://ratatui.rs/)
+  — the CLI's terminal presentation layer.
+- [reqwest](https://github.com/seanmonstar/reqwest) (rustls) — engine HTTP
+  (downloader, Adoptium, Mojang/Fabric meta, Microsoft auth).
+- [p256](https://github.com/RustCrypto/elliptic-curves) — Xbox proof-key ECDSA
+  (one cross-platform impl; no OpenSSL/CNG split).
+- `sha1`/`sha2`, `tar`+`flate2`, `zip` — in-process checksums and archive
+  extraction (no shelling out to system tools).
+- [Tauri v2](https://tauri.app/) + [React](https://react.dev/)/[Vite](https://vitejs.dev/)
+  (built with [Bun](https://bun.sh/)) — desktop.
 
-The C++ libraries are vendored as git submodules under `third_party/` and added
-with `add_subdirectory`; their tests/examples/docs and install rules are turned
-off in `third_party/CMakeLists.txt`. **CEF is the exception**: it is a ~1 GB
-prebuilt binary distribution fetched at configure time by `cmake/DownloadCEF.cmake`
-into `third_party/cef/` (gitignored, SHA-verified, pinned via `CEF_VERSION`). The
-frontend's `dist/` tree is compiled into the binary by **CMakeRC**
-(`cmake/CMakeRC.cmake`) as an in-memory virtual filesystem.
+## The socket boundary
 
-### Namespaces
+Every request crosses the same seam. Two crates own it.
 
-| Namespace           | Home           | Contents                                         |
-|---------------------|----------------|--------------------------------------------------|
-| `hestia`            | `libs/shared`  | cross-cutting (`init_logging`, `LogLevel`)       |
-| `hestia::ipc`       | `libs/shared`  | transport, endpoint, protocol envelope           |
-| `hestia::proto`     | `libs/shared`  | typed wire contracts + domain types              |
-| `hestia::client`    | `libs/shared`  | typed client SDK (`Client`)                      |
-| `hestia::engine`    | `libs/engine`  | `Engine` root, `Config`, `Downloader`, `Java`    |
-| `hestia::cli`       | `apps/cli`     | command framework + commands                     |
-| `desktop::core`†    | `apps/desktop` | CEF shell — app/browser/window/scheme            |
-| `desktop::ipc`      | `apps/desktop` | the JS⇄C++ bridge (router + registry)            |
-| `desktop::features` | `apps/desktop` | IPC feature modules (app, window, …)             |
+### `proto` — the no-drift wire contract
 
-† the shell sub-namespaces are `desktop::app`, `desktop::browser`,
-`desktop::common`, `desktop::window`. The desktop is deliberately **not** under
-`hestia::` — it is a UI shell over the engine, not part of it. Shared identity
-macros (`APP_NAME`, `APP_VERSION`, …) come from `<hestia/app_info.h>` and are used
-by every frontend.
+`proto` is pure data: no I/O, no async, `serde` derive is the codec. Both sides of
+the socket marshal through **one** definition per channel, so the daemon and every
+client cannot disagree — a mismatch is a compile error, not a runtime surprise.
 
-## Shared library (`libs/shared`)
+A **`Contract`** (`contract.rs`) names its channel once and pairs it with request
+and response payload types:
 
-UI-free, cross-cutting code linked by the daemon **and** every client. It carries
-the one public boundary between them — the socket — and nothing launcher-specific.
+```rust
+pub trait Contract {
+    const CHANNEL: &'static str;
+    type Params: Serialize + DeserializeOwned;
+    type Result: Serialize + DeserializeOwned;
+}
+```
 
-- **`logging`** — `init_logging(LogLevel)` configures the process-wide spdlog
-  logger once at startup. `LogLevel` is Hestia's own enum so callers don't depend
-  on spdlog's; `logging.cc` maps it across.
-- **`ipc`** — the transport machinery only: the platform transport
-  (`transport_posix.cc` / `transport_windows.cc`), endpoint resolution, the JSON
-  protocol envelope, and the error-code vocabulary. Nothing domain-specific.
-- **`proto`** — the typed wire contracts, one header per domain (`config.h`,
-  `process.h`, `download.h`, `java.h`, `cache.h`, …). A call contract names its
-  channel exactly once and pairs it with the `Params`/`Result` payload shapes
-  (`JavaInstall::kChannel`); an event contract names its topic and is its own
-  payload. A payload struct declares its wire format once as a `kFields` table;
-  the generic codec in `contract.h` consumes it (field flags cover required
-  keys, omit-when-empty, and flattened payloads; paths, durations, enums, and
-  optionals are bridged in one place). Both sides of the socket marshal through
-  the contract, so the daemon and every client cannot drift — a disagreement is
-  a compile error, not a runtime surprise.
-- **`client`** — the typed client SDK. `Client` owns the connection core
-  (`Session`, private to the library: request/response correlation, the event
-  callback, blocking jobs) and exposes one `Facade` per domain, reached through
-  accessors — `client.java().install(21)`, `client.config().get(key)` —
-  mirroring the engine's `engine.java()` on the other side of the socket.
-  Facade methods are one-liners over `Session::call<Contract>()` and return
-  `proto` types directly.
-- **identity** — `app_info.h` is generated from `app_info.h.in` and exposed on the
-  **public** interface, so every target shares one source of truth (name, id,
-  vendor, version, channel).
+An unsolicited daemon→client push is a **`Topic`** (the implementing type is its
+own payload). `Empty` is the `{}` payload for channels that take or return
+nothing. One module per domain: `app`, `health`, `daemon`, `config`, `cache`,
+`download`, `java`, `accounts`, `process`, `minecraft`, `events`. Adding a channel
+is a struct plus an `impl Contract` — see [contributing.md](contributing.md).
 
-`shared` links spdlog and fmt **privately**; `nlohmann_json` is **public** because
-it appears in the protocol envelope headers.
+### `ipc` — transport + envelope
 
-## Engine library (`libs/engine`)
+`ipc` carries the bytes and nothing domain-specific:
 
-The launcher engine — daemon-internal domain logic, the equivalent of Tailscale's
-`LocalBackend`. Front-ends reach it over the socket, not by linking it (with the
-transitional exception noted in the target graph).
+- **transport** (`transport.rs`) — the platform socket (Unix domain socket /
+  Windows named pipe), `bind`/`connect`, a length-framed `FrameReader`/
+  `FrameWriter`, and `Peer` (the connection's verified identity; `uid` and
+  `authorized()` on POSIX via `libc` peer credentials).
+- **protocol** (`protocol.rs`) — the JSON envelope, encoded/decoded in exactly one
+  place. A request is `{v, channel, payload, id?}`; a response is
+  `{v, ok, payload | error, id?}`; an event is `{event, payload}`. `PROTOCOL_VERSION`
+  is `1`; same-major only.
+- **endpoint** (`endpoint.rs`) — where the socket lives. The **runtime dir** holds
+  the ephemeral socket (`$XDG_RUNTIME_DIR/hestia/hestiad.sock`, else
+  `/tmp/hestia-<uid>/…`; a named pipe on Windows) and is deliberately distinct from
+  the engine's persistent data home. `HESTIA_SOCK` overrides it so tests and
+  side-by-side daemons never collide.
+- **errors** (`errors.rs`) — the error-code vocabulary (`BAD_REQUEST`, `NOT_FOUND`,
+  `UNKNOWN_CHANNEL`, `HANDLER_ERROR`, …) and the client-facing `IpcError`.
 
-**`hestia::engine::Engine`** (`engine.h`) is the aggregate root: the daemon
-constructs exactly one and threads it through every request handler (see
-`HandlerContext`). It resolves the data directory once at startup and owns each
-domain subsystem as a member, exposed through a getter (`engine.config()`). This
-is the single growth point for launcher logic — adding a domain (instances,
-accounts, versions, …) is a module class constructed in `Engine`'s initializer
-list plus a getter, with no change to the daemon's wiring. `set_data_home()`
-re-resolves the data directory and repoints every subsystem so a `config set home`
+## `common` — cross-cutting
+
+UI-free, domain-free code linked by the daemon and every client:
+
+- **`app`** — the application identity constants (`NAME`, `ID`, `VENDOR`,
+  `CHANNEL`, `VERSION` from `CARGO_PKG_VERSION`): one source of truth every binary
+  reads.
+- **`logging`** — `init_logging(LogLevel, Option<&Path>)` configures the process
+  `tracing` subscriber once and returns a `LogGuard`. Passing a path also writes a
+  rotated file (the daemon does; short-lived clients log to stderr only).
+- **`paths`** — data-directory resolution: `--home` → `$HESTIA_HOME` → a persisted
+  pointer (`config set home`) → the platform default (`~/.hestia`, `%APPDATA%\Hestia`
+  on Windows). **Debug builds** anchor the default at `<workspace>/.hestia` so
+  development never touches the real per-user directory. Also `config_path`,
+  `log_dir`, and `set_persisted_home`.
+
+## `client` — the typed SDK
+
+The one way a front-end drives the daemon. `Client::connect(auto_spawn)` opens a
+connection (auto-spawning `hestiad` if it is not running and `auto_spawn` is set);
+`connect_to(endpoint)` targets an explicit socket without spawning.
+
+- **`Session`** (`session.rs`) — the connection core, private to the crate: one
+  persistent, multiplexed connection whose background reader task fulfils pending
+  requests by id and delivers events to an installed callback. `call::<C>()`
+  marshals through the contract and returns the `proto` result directly;
+  `try_call` maps a `not_found` to `None`; `call_with_timeout` overrides the 10 s
+  default; `run_job` drives a long-running operation, forwarding its progress
+  events and blocking until a done/error topic arrives.
+- **facades** (`facades.rs`) — one struct per domain, reached through a `Client`
+  accessor (`client.java().install(21, …)`), mirroring the engine's domain modules
+  on the other side of the socket. Facade methods are one-liners over `Session`:
+  `App`, `Daemon`, `Config`, `Cache`, `Java`, `Accounts`, `Process`, `Server`,
+  `Instance`.
+- **spawn** (`spawn.rs`) — locates and launches the `hestiad` binary, then retries
+  the connection until it is listening.
+
+## `engine` — the launcher engine
+
+Daemon-internal domain logic. **`Engine`** (`engine.rs`) is the aggregate root:
+the daemon constructs exactly one and threads it through every request handler. It
+resolves the data directory once and owns each subsystem as a member behind a
+getter. Adding a domain is a module, a member, and a getter here — the single
+growth point, with no change to the daemon's serve loop. `set_data_home()`
+re-resolves the directory and `reload()`s every subsystem so a `config set home`
 takes effect on the running daemon, not just the next start.
 
-The public API in `include/hestia/engine/` is **flat — one header per domain**
-(`config.h`, `downloader.h`, `java.h`), so includes never exceed two levels
-(`<hestia/engine/config.h>`, matching `<hestia/ipc/transport.h>`). Implementation
-complexity grows privately instead: `src/<domain>/` holds the `.cc` files and any
-internal helpers as private headers (`src` is a PRIVATE include dir). A new domain
-is one public header plus a `src/<domain>/` folder, however large it gets inside.
-The subsystems behind the aggregate today:
+The subsystems behind the aggregate:
 
-- **`Config`** (`config.h`) — the typed settings store. The schema is one
-  struct, `Settings`: a setting is a field with its default plus a `kFields`
-  entry (a nested struct with its own `kFields` becomes a sub-object), persisted
-  as JSON through the same generic codec the wire contracts use — a setting is
-  declared exactly once. Internal code reads a `settings()` snapshot and writes
-  through `update()`, which saves immediately; the dotted-path `get`/`set`
-  (`"launcher.memory"`) serve the `config.*` channels, derive the key space
-  from the struct's serialized form, and reject unknown keys and
-  type-mismatched values — the schema is the validation. Reads/writes are
-  serialized for concurrent clients; `reload()` repoints it when the data
-  directory changes; `all()` returns the effective settings (served over
-  `config.list`). Data-directory resolution (`--home` →
-  `$HESTIA_HOME` → persisted pointer → platform default) lives in shared's
-  `hestia::paths`; Debug builds anchor the platform default at `<repo>/.hestia`
-  so development never populates the real per-user directory.
-- **`Downloader`** (`downloader.h`) — streams a URL to disk through a
-  `.part` temp file (via cpr), hashing incrementally when a checksum is given and
-  renaming into place only on success. Stateless, so it hangs off no aggregate —
-  the daemon's download manager constructs one per download. Its checksum
-  vocabulary (`proto::Checksum`, `proto::HashAlgorithm`) comes from
-  `<hestia/proto/download.h>`, the same types the wire uses. The native incremental
-  SHA-1/SHA-256 `Hasher` is the private `src/download/checksum.{h,cc}`.
-- **`Cache`** (`cache.h`) — a content-addressed store of verified downloads
-  under `<data_home>/cache/<algorithm>/<hex[0:2]>/<hex>`, keyed by checksum so
-  a file fetched once (a JDK, a mod) is reused regardless of URL. Given a
-  cache, `Downloader` serves checksummed fetches from it and feeds it after a
-  successful download; hits are **re-hashed on the way out**, so a damaged
-  blob is evicted and the fetch falls back to the network — the cache can
-  speed things up but never corrupt them. Managed over the `cache.*` channels
-  (`hestia cache info|list|clear`).
-- **`Accounts`** (`accounts.h`) — Minecraft accounts signed in through
-  Microsoft, persisted with their tokens in `<data_home>/accounts.json`
-  (owner-only on POSIX). Both sign-in methods use the well-known Minecraft
-  client id `00000000402b5328`, so no per-distribution Azure application is
-  needed; the client picks one via `begin_login(LoginMethod)`. Sign-in is two
-  blocking steps — `begin_login()` returns what the user must act on and holds
-  per-login state in an in-memory pending map keyed by login id;
-  `complete_login()` drives it to a stored account, upserting by uuid. Both
-  converge on the same signed tail — Xbox device token → sisu `/authorize`
-  (no session) → XSTS → `launcher/login` → profile — the path `access_token()`'s
-  token rotation also runs:
-    - **device_code** (the CLI default, no paste): `begin_login()` requests a
-      device code and returns the `user_code` + `verification_uri`;
-      `complete_login()` polls the device-code grant until the user approves in
-      a browser (or the code expires), then runs the signed tail with a fresh
-      proof key. Per-connection daemon threads make the long poll safe.
-    - **sisu** (the launcher flow the official launcher and Modrinth App use,
-      suited to a front-end with an embedded browser): `begin_login()` mints an
-      ECDSA P-256 proof key, gets a proof-of-possession device token, runs PKCE
-      sisu `/authenticate`, and returns the Microsoft sign-in URL;
-      `complete_login()` redeems the redirect's OAuth code through the sisu
-      session before the shared tail. The CLI reaches it with `auth login --sisu`.
-  The HTTP steps live in the private `src/accounts/microsoft.{h,cc}`; Xbox
-  request signing (the proof key and the FILETIME-stamped `Signature` header) is
-  `src/accounts/signing.{h,cc}` with platform backends `signing_openssl.cc`
-  (POSIX, OpenSSL) and `signing_windows.cc` (Windows, CNG). Both steps are
-  synchronous request/response channels, so there is no daemon-side login worker.
-- **`Java`** (`java.h`) — installs and tracks Java runtimes under
-  `<data_home>/java`. **`JavaProvider`** is the abstract catalogue seam: an
-  implementation resolves release lines and the latest GA build for a
-  `JavaTarget` (os/arch in Adoptium's vocabulary); `AdoptiumProvider`
-  (Eclipse Temurin, cpr + nlohmann::json) is the default and private to
-  `src/java/`. `install()` runs the blocking pipeline — resolve → download
-  (SHA-256-verified, via `Downloader`) → extract (system tar; bsdtar reads the
-  `.zip` on Windows) → register — staging into `<vendor>-<major>.staging` and
-  renaming into place so a failure leaves nothing behind. Each install carries a
-  `runtime.json` record and `installed()` scans the directory: the disk is the
-  registry. The async wrapper and `java.install.*` progress events live in the
-  daemon's `JavaInstallManager`, not here.
+- **`config`** (`Config`, `Settings`) — the typed settings store. The schema is one
+  `Settings` struct: a setting is a field with its default, persisted as JSON
+  through serde. Internal code reads a `settings()` snapshot and writes through
+  `update()`; the dotted-path `get`/`set` serve the `config.*` channels and reject
+  unknown keys and type-mismatched values — the struct *is* the validation.
+  (`Settings` is empty today; the only live keys are the reserved `home` and
+  `autostart`, which the daemon routes to the path pointer and the login
+  registration rather than the store.) `reload()` repoints it on a data-home
+  change.
+- **`download`** (`Downloader`) — streams a URL to disk through a `.part` temp file
+  (via reqwest), hashing incrementally when a checksum is given and renaming into
+  place only on success. Stateless — the daemon's `DownloadManager` constructs one
+  per download. The incremental SHA-1/SHA-256 hasher is `checksum.rs`.
+- **`cache`** (`Cache`) — a content-addressed store of verified downloads under
+  `<data_home>/cache/<algorithm>/<hex[..2]>/<hex>`, keyed by checksum so a file
+  fetched once (a JDK, a library) is reused regardless of URL. Hits are **re-hashed
+  on the way out**, so a damaged blob is evicted and the fetch falls back to the
+  network — the cache can speed things up but never corrupt them. Served over the
+  `cache.*` channels.
+- **`accounts`** (`Accounts`) — Minecraft accounts signed in through Microsoft,
+  persisted with their tokens in `<data_home>/accounts.json` (owner-only on POSIX;
+  tokens never leave the daemon). Both methods use the well-known Minecraft client
+  id, so no per-distribution Azure app is needed. Sign-in is two steps —
+  `begin_login()` returns what the user must act on and holds per-login state in an
+  in-memory pending map; `complete_login()` drives it to a stored account. Both
+  converge on the same signed tail — Xbox device token → sisu `/authorize` → XSTS →
+  `launcher/login` → profile — which `access_token()`'s token rotation also runs:
+    - **device_code** (the CLI default, no paste): returns a `user_code` +
+      `verification_uri`, then polls the device-code grant until the user approves.
+    - **sisu** (the embedded-browser flow, `auth login --sisu`): mints an ECDSA
+      P-256 proof key, runs PKCE sisu `/authenticate`, returns the Microsoft
+      sign-in URL, and redeems the redirect's OAuth code.
+      The HTTP steps are the private `accounts/microsoft.rs`; Xbox request signing (the
+      proof key and the FILETIME-stamped `Signature` header) is `accounts/signing.rs` —
+      one cross-platform `p256` implementation.
+- **`java`** (`Java`, `JavaProvider`) — installs and tracks Java runtimes under
+  `<data_home>/java/<vendor>-<major>/` beside a `runtime.json` record; listing
+  scans the directory, so the disk is the registry. `JavaProvider` is the abstract
+  catalogue seam; `adoptium` (Eclipse Temurin) is the default. `install()` runs the
+  blocking pipeline — resolve → download (SHA-256-verified, via `Downloader`) →
+  extract (`tar`+`flate2`, the `zip` crate on Windows; all in-process) → register —
+  staging into a `.staging` dir and renaming into place so a failure leaves nothing
+  behind. The async wrapper and `java.install.*` progress events live in the
+  daemon's `JavaInstallManager`.
+- **`minecraft`** (`Minecraft`) — the server and instance (client) provider
+  registries. A *flavor* is a distribution (`vanilla`, `fabric`); a provider lists
+  the game *versions* it supports and *resolves* a request into a launch profile —
+  the full descriptor (`ServerProfile` / `InstanceProfile`: primary artifact,
+  libraries, asset index, java major, main class, args) the launch pipeline will
+  consume. Stateless (every result is fetched upstream), so it needs no data
+  directory. Manifest parsing lives in `minecraft/meta/` (`mojang`, `fabric`).
 
-`engine` links fmt and cpr **privately** — implementation details that do not leak
-through its public headers. `hestia_shared` is linked **publicly**: the engine's
-headers expose shared download types, and it resolves paths through
-`hestia::paths`.
+Errors are `thiserror` enums (e.g. `ConfigError`); the daemon maps them to
+`ipc::errors` codes at the service boundary. `anyhow` is used where an operation
+composes many fallible steps (accounts, minecraft, java).
 
-## Daemon (`apps/daemon`)
+## `daemon` — hestiad
 
-`hestiad` is the resident core: it owns the IPC endpoint, routes requests to
-services, supervises launched processes, and manages autostart. It is the only
-target that links `hestia_engine` directly.
+The resident core: it owns the IPC endpoint, routes requests to handlers,
+supervises launched processes, and manages autostart. The only crate that links
+`engine`.
 
-`src/` is split into a thin bootstrap plus one folder per concern; local includes
-are subdir-qualified (`"runtime/router.h"`):
+- **`main.rs`** — bootstrap only: clap parsing (`serve`, the default, or `ping`),
+  logging init (a rotated file for the long-lived daemon; stderr for `ping`), and
+  dispatch.
+- **`server.rs`** — the serve loop: `bind` the endpoint, then `accept` connections,
+  rejecting any peer that is not `authorized()`. Each connection gets an id and an
+  outbound mpsc channel drained by a writer task, so a streaming channel
+  (`events.subscribe`) is an ordinary handler that pushes onto that channel. The
+  loop runs under `tokio::select!` against a stop request (`daemon.stop`) and an OS
+  signal (SIGTERM / Ctrl-C).
+- **`runtime/`** — the daemon's long-lived collaborators in one place, the
+  anti-churn seam a new subsystem hangs off (mirroring the engine's aggregate):
+    - **`Runtime`** (`runtime/mod.rs`) — holds the `Engine`, the `EventHub`, the
+      `JavaInstallManager`, the `DownloadManager`, and the `ProcessSupervisor`,
+      plus the log path and a stop `Notify`. **`HandlerContext`** is what every
+      handler receives: `{runtime, conn_id, out, peer}` — collaborators reached
+      through `ctx.runtime.*()`, the outbound channel for streaming, and the
+      verified peer (carried for a future auth check).
+    - **`router.rs`** — `Router` maps a channel string to a handler; an unknown
+      channel becomes a well-formed error response. `Channels` is the registrar:
+      `on.handle::<C>(…)` decodes `C::Params` (a malformed payload answers
+      `bad_request`), invokes the handler, and encodes `C::Result`, mapping a
+      returned `ServiceError` (`not_found` / `bad_request` / `handler_error`) to its
+      protocol code. The channel name and payload shapes come from the contract, so
+      a handler physically cannot drift from the client SDK.
+    - **`managers.rs`** — `DownloadManager` and `JavaInstallManager`: the
+      worker-thread pattern that lets `download.start` / `java.install` answer
+      immediately while the blocking engine work runs off-thread, publishing
+      progress/done/error events through the hub.
+    - **`process.rs`** — `ProcessSupervisor`: launches Minecraft (and other)
+      processes as children of the daemon, tracks them, streams their logs, and
+      applies a restart policy. Emits `process.started` / `process.output` /
+      `process.exit`; reaping yields exit codes.
+    - **`event_hub.rs`** — `EventHub` fans daemon events out to subscribed
+      connections, filtered by job id, and unsubscribes them on disconnect.
+- **`services.rs`** — the single wire-in point: `make_router()` registers every
+  channel with one `on.handle::<C>(…)` apiece. Today: `health.ping`, `app.info`,
+  `daemon.status|stop`, `config.get|set|list` (the reserved `home`/`autostart` keys
+  routed to the path pointer and login registration), `cache.info|list|clear`,
+  `java.releases|list|install|uninstall`, `download.start`,
+  `account.login.begin|login.complete`, `account.list|remove`,
+  `process.start|stop|list|status|logs`, `events.subscribe`,
+  `server.flavors|versions|resolve`, and `instance.flavors|versions|resolve`.
+- **`autostart.rs`** — registers/removes the daemon as a login-time service per
+  platform, driven by the `config` service when the reserved `autostart` key is
+  set (`is_enabled()` / `set()`).
 
-- **`main.cc`** — bootstrap only: CLI11 parsing, logging init, `hestiad ping`,
-  and a delegation to `runtime::run_daemon()`.
-- **`runtime/`** — the serving machinery. `server.{h,cc}` binds the endpoint,
-  builds the `Runtime`, registers the services, and serves connections until
-  signalled; `router.{h,cc}` maps a channel string to a handler
-  (`router.on("config.get", …)`); `event_hub.h` fans daemon events out to
-  subscribed connections.
-    - **`Runtime`** (`runtime.h`) — the one place the daemon's long-lived
-      collaborators live: the engine, the event hub, the download manager, the
-      java install manager, and the process supervisor, constructed in dependency
-      order (the hub before anything that publishes into it, so reverse-order
-      destruction tears the publishers down first). Adding a subsystem is a member plus an accessor here — the serve
-      loop and every existing service are untouched.
-    - **`HandlerContext`** (`handler_context.h`) — what every handler receives:
-      `{Runtime &runtime, connection, peer}`. Handlers reach collaborators through
-      accessors (`ctx.runtime.engine()`, `ctx.runtime.supervisor()`, …); the
-      per-request connection is what lets streaming channels (`events.subscribe`)
-      be ordinary handlers.
-- **`services/`** — one `Service` class per channel-prefix (mirroring the CLI's
-  `Command` and the desktop's `Feature`), registering typed handlers through the
-  `Channels` registrar: `on.handle<proto::JavaInstall>(…)` decodes `Params`
-  (a malformed payload answers `bad_request`), encodes the returned `Result`,
-  and maps a thrown `ServiceError` to its protocol error code — the channel
-  name and payload shapes come from the contract, so a service physically
-  cannot drift from the client SDK. Wired in once via `make_services()`
-  (`services/registry.cc`). Today: `health` (`health.ping`),
-  `app` (`app.info`), `daemon` (`daemon.status|stop` — stop answers, then shuts
-  the serve loop down, so `hestia daemon restart` can hand over to a fresh
-  binary), `config` (`config.get|set|list` — the reserved keys `home` and
-  `autostart` are routed to the data-directory pointer and the platform login
-  registration respectively),
-  `process` (`process.start|stop|list|status|logs`), `downloads` (`download.start`),
-  `java` (`java.releases|install|list|uninstall`), `cache`
-  (`cache.info|list|clear`), `accounts`
-  (`account.login.begin|login.complete|list|remove`), and
-  `events` (`events.subscribe`, a streaming channel that pushes to the calling
-  connection).
-- **`downloads/`** (`download_manager.{h,cc}`) — runs each download on a worker
-  thread so `download.start` answers immediately; progress and the terminal
-  outcome are published through the event hub as `download.progress`,
-  `download.done`, and `download.error` events (throttled progress, filtered by
-  the download's id like process events).
-- **`java/`** (`install_manager.{h,cc}`) — the same worker-thread pattern for
-  `java.install`: the engine's blocking `Java::install()` runs off-thread, one
-  install per release line at a time, publishing `java.install.progress`,
-  `java.install.done` (carrying the registered runtime), and
-  `java.install.error`.
-- **`process/`** (`process_supervisor`, `process_table`, `process_spawner`,
-  `liveness_probe`, `log_streamer`, `restart_policy`) — launches Minecraft (and
-  other) processes as children of the daemon, tracks them in a process table,
-  probes liveness, streams their logs, and applies a restart policy. Reaping the
-  children yields their exit codes.
-- **`platform/`** (`autostart.{h,cc}`, `win_util.h`) — registers/removes the
-  daemon as a login-time service per platform, driven by the `ConfigService`
-  when the reserved `autostart` key is set, plus Windows-specific helpers.
+> **No Service-class-per-prefix.** Unlike the historical C++ tree (which had one
+> `Service` object per channel-prefix), the Rust daemon wires every channel in the
+> flat `make_router()`. A handler is a closure, not a class; the registry is the
+> single list.
 
-The daemon links `hestia_shared`, `hestia_engine`, CLI11, nlohmann_json, and
-spdlog — no UI dependencies.
+## Front-ends: CLI, desktop, tray
 
-## Tray (`apps/tray`)
+### CLI (`cli`) — hestia
 
-The `tray` binary (`hestia_tray` target) is a resident system-tray helper that surfaces daemon status and a
-one-click toggle for starting the daemon at login. It depends on `hestia_shared`
-**only** (no engine link — it talks over the socket) and has a per-platform
-backend: `backend_linux.cc` (GDBus StatusNotifierItem), `backend_windows.cc`
-(Shell_NotifyIcon), and `backend_macos.mm` (Cocoa). A `single_instance` guard
-allows only one tray per session.
+A thin client over the daemon, built on clap's derive API. `main.rs` defines a
+`Command` enum — `auth`, `java`, `server`, `instance`, `cache`, `config`,
+`daemon` — each a module under `commands/` exposing a `Subcommand` enum and a
+`run()`. Global flags (`--verbose`/`--quiet`/`--home`) sit on the root; `--home` is
+exported as `$HESTIA_HOME` and only takes effect when this invocation auto-spawns
+the daemon (a running daemon keeps its own directory). `commands/connect()`
+auto-spawns via the client SDK; `connect_running()` requires an existing daemon.
 
-## CLI command system (`apps/cli`)
+**Presentation layer (`ui/`).** Commands **never print directly** — they build a
+`View` (`Line`, `Note`, `Detail`, `Table`) and hand it to `ui::show`, which owns
+all output. On a terminal it renders with **ratatui** (interactive select,
+scrollable pager for long tables, live install/download progress); piped or
+redirected it degrades to plain text so output stays scriptable. `select`,
+`prompt`, `Spinner`, `InstallReporter`, and `human_bytes` round out the module.
+This is the seam for the planned TUI: bare `hestia` (no subcommand) currently
+prints help, but the intended end-state is a full-screen TUI driving the same
+`View`s (à la the claude/codex model — a bare invocation is interactive, a
+subcommand is scriptable).
 
-Commands are objects implementing the `Command` interface
-(`command.h`): each `register_command(parent, ctx)` attaches its subcommand,
-options, and callback onto a parent `CLI::App`. Because the parent can be the
-root app *or* another command's app, commands **nest to any depth**.
+### Desktop (`desktop`) — hestia-desktop
 
-- **`Command`** — a leaf unit of functionality (e.g. `java install`).
-- **`CommandGroup`** — a `Command` that holds children and registers them onto
-  its own subcommand app (e.g. `config get|set|list`). The same
-  mechanism recurses.
-- **`AppContext`** — parsed `GlobalOptions` (`--verbose`/`--quiet`/`--home`) plus
-  the collected `exit_code`, passed by reference to every command.
-- **`make_commands()`** (`registry.cc`) — the single place a top-level command is
-  wired in.
+A Tauri v2 shell hosting the React frontend in the root `frontend/`. **Today it is
+the stock Tauri template** (a `greet` command in `lib.rs`) — the shell is
+scaffolded but not yet wired to the daemon over the client SDK. The design rule,
+once wired, is the same one-way boundary as the CLI: the shell owns windows and
+IPC, and reaches launcher logic only through `client` (never by linking `engine`).
+See [contributing.md](contributing.md) for the intended `#[tauri::command]` recipe.
 
-`cli.cc::run()` builds the root `CLI::App`, binds the global flags, configures
-logging via a parse-complete callback (so verbosity is set before any command
-callback runs), registers `make_commands()`, parses, and returns the context's
-exit code. No subcommand → print help.
+### Tray (`tray`)
 
-## Desktop launcher (`apps/desktop`)
+A resident system-tray helper (daemon status + a start-at-login toggle). A
+single-file placeholder; not yet ported.
 
-A thin CEF shell hosting the React frontend. The design rule: the shell
-(`desktop::`) owns windows, schemes, and IPC; **all launcher logic stays in
-`hestia_engine`** and is reached over the bridge. Two halves: `src/core/` is the
-reusable shell you rarely touch; `src/features/` is where day-to-day work happens.
+## What's built vs. pending
 
-### Process model (`src/core/app`)
+**Built end-to-end:** the workspace and its enforced dependency graph; logging,
+identity, path resolution; the wire protocol and typed client SDK; the config
+store; the download cache; Java runtime management (install/list/uninstall via
+Adoptium); Microsoft account sign-in (device-code and sisu) with token rotation;
+the daemon's process supervisor; the Minecraft provider layer (flavors, versions,
+and profile resolution for vanilla and fabric, servers and instances); and the CLI
+front-end over all of it.
 
-CEF runs the browser, renderer, GPU, and utility roles as **sub-processes of the
-same executable**, distinguished by the `--type` switch. `main_util.cc` maps that
-to a `ProcessType` and `CreateApp()` returns the right `CefApp`:
+**Pending:** the Minecraft *launch pipeline* that consumes a resolved profile and
+drives the supervisor (materialising libraries/assets, assembling the JVM command);
+wiring the desktop shell to the daemon; and a functional tray.
 
-- `AppBase` — registers the custom scheme in *every* process (schemes must match
-  across all of them).
-- `BrowserApp` — `OnContextInitialized()` is the wiring hub: init settings,
-  register the scheme handler, init the IPC router, register features, then create
-  the browser view + frameless window.
-- `RendererApp` — hosts the renderer side of the message router. It creates the
-  router in **`OnWebKitInitialized()`** (not later) — that is when the router
-  registers the native `window.cefQuery` binding; creating it in `OnContextCreated`
-  misses that window and the bridge silently never appears. It also turns
-  native→JS event messages into DOM `CustomEvent`s.
-- `OtherApp` — gpu/utility processes (scheme registration only).
+## Tests
 
-> **Linux zygote.** On Linux the zygote process forks into the other roles and
-> the fork inherits this process's `CefApp`. Since the eventual role is unknown at
-> fork time, the zygote is given the **renderer** app — otherwise forked renderers
-> get no render-process handler and `cefQuery` is never injected. See
-> `GetProcessType()` in `main_util.cc`.
+- `crates/proto/tests/` — `wire` and `golden`: the envelope and contract encodings
+  are pinned so a wire change is caught.
+- `crates/engine/tests/` — `store` (config/cache/java persistence) and
+  `auth_oracle` (the account sign-in state machine).
+- `crates/daemon/tests/e2e.rs` — a client-to-daemon round trip over a real socket.
 
-### IPC bridge (`src/core/ipc`)
+Run the fast core with `cargo build -p cli -p daemon`, then
+`cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace`.
 
-Built on CEF's message router (`window.cefQuery`). Wire format is
-`{ "channel": "...", "payload": <any> }`; responses are JSON. A global `Registry`
-maps a channel to a `Handler`; a scoped `Actions` registrar prefixes channels by
-feature name (`Actions("app")("info", …)` → channel `app.info`). Handlers answer
-synchronously, or hold the copyable `Response` and answer later from any thread.
-Push native→JS events with `ipc::Emit(browser, "channel", value)` — they arrive in
-the page as `window.addEventListener(channel, e => e.detail)`. The browser- and
-renderer-side routers share one `RouterConfig()` so their function names match.
+## Recording a decision
 
-### Window & scheme (`src/core/window`, `src/core/common`)
-
-`WindowDelegate` hosts the browser view in a **frameless** top-level window — the
-React app draws its own title bar and drives minimize/maximize/close over the
-`window.*` IPC channels. `app_scheme.cc` registers a standard, secure, fetch-
-enabled scheme (`hestia://app/`) and serves the embedded `dist/` tree from the
-CMakeRC virtual filesystem, with MIME detection and an SPA fallback to
-`index.html`. `app_settings.cc` decides the startup URL.
-
-### Embedded vs. dev server
-
-`GetStartupURL()` returns the dev-server URL when set, else the embedded scheme.
-The dev path is **Debug-only and compiled out of Release** (`#if !defined(NDEBUG)`):
-the `--dev-url` switch, the `APP_DEV_SERVER_URL` env var, and the compile-time
-default are all ignored in Release, so production can only load embedded assets.
-This is what enables frontend hot-reload in development (Vite HMR) while keeping
-the shipped build self-contained.
-
-### Feature modules (`src/features`)
-
-Launcher functionality is added as a **feature module**, never by editing the
-shell. A `Feature` declares its channel-prefix `Name()` and registers its actions;
-`feature_registry.cc` is the one list where features are wired in. `AppFeature`
-(`app.info`, `app.ping`) exposes identity and forwards daemon channels over the
-socket via `RegisterForward`. `WindowFeature` drives the frameless window.
-
-### Sandbox & size (Release)
-
-The CEF sandbox is **on in Release, off in Debug** (`USE_SANDBOX`, defaulted by
-build type). On Linux the sandbox lives inside `libcef.so`; the `chrome-sandbox`
-helper must be SUID root once per build location (CMake prints the command).
-Release post-build steps strip `libcef.so` (~1.4 GB → ~200 MB) and prune unused
-locales to `en-US.pak`.
-
-On Windows the sandbox uses CEF's bootstrap model: the app builds as a DLL and
-CEF's prebuilt `bootstrap.exe` is copied to `HestiaLauncher.exe`, which loads
-the same-named DLL. The stock bootstrap ships CEF's own version resources
-("CEF bootstrap application"), so a post-build step rewrites its VERSIONINFO
-and icon from the shared `APP_*` identity using [rcedit](https://github.com/electron/rcedit)
-— the resource-editing approach CEF recommends (chromiumembedded/cef#3824).
-rcedit is a build-machine-only requirement (dev/CI, enforced at configure
-time); it never ships. Non-sandbox Windows builds compile the metadata straight
-into the exe via `src/resources/windows/app.rc.in`. Any release code signing
-must happen after the rewrite, since editing resources invalidates a prior
-signature.
-
-## Build & dependency conventions
-
-- **One configure builds everything by default**, gated by the `BUILD_DESKTOP`
-  and `BUILD_CLI` toggles (both `ON`; the daemon and tray are always built). With
-  the desktop on, the configure fetches CEF (~1 GB, first run only) and requires a
-  built `frontend/dist`, so **build the frontend before configuring** (CMakeRC globs
-  `dist/` at configure time; a missing `dist/` is a hard `FATAL_ERROR`):
-  `(cd apps/desktop/frontend && bun run build)` → `cmake … -B build` →
-  `cmake --build`. A `-DBUILD_DESKTOP=OFF` configure skips CEF entirely for a fast
-  daemon/CLI loop.
-- Each library/app sets `-Wall -Wextra -Wpedantic` (GNU/Clang) or `/W4` (MSVC).
-  CEF discovery is isolated inside `apps/desktop/` so its compiler/linker flags
-  never reach the shared library, the engine, or the CLI.
-- The root `CMakeLists.txt` defines the `APP_*` identity (name, id, vendor,
-  channel; version from `project(... VERSION)`). `hestia_shared` generates
-  `<hestia/app_info.h>` from these and exposes it on its **public** interface, so
-  every frontend shares one source of truth — the CLI's `--version`, the desktop's
-  `app.info`, etc. all read the same `APP_VERSION`.
-- Dependencies that don't appear in a target's public headers are linked
-  `PRIVATE` (e.g. shared's spdlog/fmt). They still propagate as transitive link
-  deps to the final executable.
-- Build artifacts land in `build/<config>/` (e.g. `build/Release/`); the desktop
-  binary and its CEF runtime files are copied alongside it.
-
-## See also
-
-- [contributing.md](contributing.md): step-by-step recipes for adding views,
-  layouts, components, overlays, and CLI commands.
+When a non-trivial architectural choice is made, capture *what* changed and *why*
+here, next to the structure it explains, so this file stays the single source of
+truth rather than letting the reasoning drift into commit messages or chat logs.
