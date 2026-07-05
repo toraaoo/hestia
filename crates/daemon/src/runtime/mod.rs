@@ -3,6 +3,7 @@
 
 mod event_hub;
 mod managers;
+mod process;
 pub mod router;
 
 use std::path::PathBuf;
@@ -16,6 +17,7 @@ use tokio::sync::Notify;
 
 pub use event_hub::EventHub;
 pub use managers::{DownloadManager, JavaInstallManager};
+pub use process::{ProcessSupervisor, StartError};
 pub use router::{Channels, Router, ServiceError};
 
 pub struct Runtime {
@@ -23,6 +25,7 @@ pub struct Runtime {
     hub: Arc<EventHub>,
     java_installs: JavaInstallManager,
     downloads: DownloadManager,
+    processes: ProcessSupervisor,
     log_path: PathBuf,
     started: Instant,
     stop: Notify,
@@ -34,11 +37,13 @@ impl Runtime {
         let hub = Arc::new(EventHub::default());
         let java_installs = JavaInstallManager::new(engine.clone(), hub.clone());
         let downloads = DownloadManager::new(engine.clone(), hub.clone());
+        let processes = ProcessSupervisor::new(hub.clone());
         Runtime {
             engine,
             hub,
             java_installs,
             downloads,
+            processes,
             log_path,
             started: Instant::now(),
             stop: Notify::new(),
@@ -59,6 +64,10 @@ impl Runtime {
 
     pub fn downloads(&self) -> &DownloadManager {
         &self.downloads
+    }
+
+    pub fn processes(&self) -> &ProcessSupervisor {
+        &self.processes
     }
 
     pub fn log_path(&self) -> &PathBuf {

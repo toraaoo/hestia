@@ -22,11 +22,15 @@ use proto::java::{
     JavaInstall, JavaInstallResult, JavaList, JavaListResult, JavaReleases, JavaReleasesResult,
     JavaUninstall,
 };
+use proto::process::{
+    ProcessList, ProcessListResult, ProcessLogs, ProcessLogsResult, ProcessStart,
+    ProcessStartResult, ProcessStatus, ProcessStop,
+};
 use proto::Empty;
 use serde_json::{json, Value};
 
 use crate::autostart;
-use crate::runtime::{Channels, Router, ServiceError};
+use crate::runtime::{Channels, Router, ServiceError, StartError};
 
 pub fn make_router() -> Router {
     let mut router = Router::default();
@@ -256,6 +260,47 @@ pub fn make_router() -> Router {
             Ok(true) => Ok(Empty {}),
             Ok(false) => Err(ServiceError::not_found(format!("no account matches '{}'", p.account))),
             Err(e) => Err(ServiceError::handler_error(e.to_string())),
+        }
+    });
+
+    on.handle::<ProcessStart, _, _>(|spec, ctx| async move {
+        match ctx.runtime.processes().start(spec).await {
+            Ok(info) => Ok(ProcessStartResult {
+                id: info.id,
+                pid: info.pid,
+            }),
+            Err(StartError::EmptyProgram) => Err(ServiceError::bad_request("program is empty")),
+            Err(StartError::Spawn(e)) => {
+                Err(ServiceError::handler_error(format!("cannot spawn process: {e}")))
+            }
+        }
+    });
+
+    on.handle::<ProcessStop, _, _>(|p, ctx| async move {
+        if ctx.runtime.processes().stop(&p.id) {
+            Ok(Empty {})
+        } else {
+            Err(ServiceError::not_found(format!("no process '{}'", p.id)))
+        }
+    });
+
+    on.handle::<ProcessList, _, _>(|_: Empty, ctx| async move {
+        Ok(ProcessListResult {
+            processes: ctx.runtime.processes().list(),
+        })
+    });
+
+    on.handle::<ProcessStatus, _, _>(|p, ctx| async move {
+        ctx.runtime
+            .processes()
+            .status(&p.id)
+            .ok_or_else(|| ServiceError::not_found(format!("no process '{}'", p.id)))
+    });
+
+    on.handle::<ProcessLogs, _, _>(|p, ctx| async move {
+        match ctx.runtime.processes().logs(&p.id, p.tail) {
+            Some(lines) => Ok(ProcessLogsResult { lines }),
+            None => Err(ServiceError::not_found(format!("no process '{}'", p.id))),
         }
     });
 
