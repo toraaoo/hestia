@@ -23,6 +23,6 @@ tokio = { workspace = true }
 futures-util = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-p256 = { version = "0.13", features = ["ecdsa"] }
-rand_core = { version = "0.6", features = ["getrandom"] }
-base64 = "0.22"
+p256 = { version = "0.14.0", features = ["ecdsa"] }
+rand_core = { version = "0.10.1" }
+base64 = "0.22.1"
