@@ -49,6 +49,24 @@ pub async fn latest_loader(game: &str) -> Result<String> {
         .with_context(|| format!("no fabric loader is published for Minecraft {game}"))
 }
 
+/// The newest installer: the first stable build, else the newest. The server
+/// launcher endpoint is keyed by it.
+pub async fn latest_installer() -> Result<String> {
+    let j = fetch_json(&format!("{META}/versions/installer")).await?;
+    let arr = j
+        .as_array()
+        .context("fabric installer response is not an array")?;
+    let stable = arr
+        .iter()
+        .find(|e| e.get("stable").and_then(Value::as_bool).unwrap_or(false));
+    stable
+        .or_else(|| arr.first())
+        .and_then(|e| e.get("version"))
+        .and_then(Value::as_str)
+        .map(String::from)
+        .context("no fabric installer is published")
+}
+
 pub async fn profile_json(game: &str, loader: &str) -> Result<Value> {
     fetch_json(&format!(
         "{META}/versions/loader/{game}/{loader}/profile/json"
@@ -56,9 +74,10 @@ pub async fn profile_json(game: &str, loader: &str) -> Result<Value> {
     .await
 }
 
-/// The self-contained Fabric server launcher jar for a game/loader pair.
-pub fn server_launcher_url(game: &str, loader: &str) -> String {
-    format!("{META}/versions/loader/{game}/{loader}/server/jar")
+/// The self-contained Fabric server launcher jar for a game/loader/installer
+/// triple (the endpoint 404s without the installer segment).
+pub fn server_launcher_url(game: &str, loader: &str, installer: &str) -> String {
+    format!("{META}/versions/loader/{game}/{loader}/{installer}/server/jar")
 }
 
 /// `mainClass` in a loader profile is a bare string for the client and an object

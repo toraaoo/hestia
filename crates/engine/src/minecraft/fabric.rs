@@ -52,16 +52,17 @@ impl ServerProvider for FabricServer {
 
     async fn resolve(&self, request: &ResolveRequest) -> Result<ServerProfile> {
         let loader = resolve_loader(request).await?;
+        let installer = fabric::latest_installer().await?;
         let base = mojang::version_json(&request.version).await?;
-        let url = fabric::server_launcher_url(&request.version, &loader);
+        let url = fabric::server_launcher_url(&request.version, &loader, &installer);
         Ok(ServerProfile {
             flavor: ID.to_string(),
             game_version: request.version.clone(),
             loader_version: Some(loader.clone()),
             primary: Artifact {
                 filename: format!(
-                    "fabric-server-mc.{}-loader.{}-launcher.jar",
-                    request.version, loader
+                    "fabric-server-mc.{}-loader.{}-launcher.{}.jar",
+                    request.version, loader, installer
                 ),
                 url,
                 size: 0,
