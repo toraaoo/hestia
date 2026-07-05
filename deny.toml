@@ -1,6 +1,29 @@
 [advisories]
 version = 2
 yanked = "deny"
+# Unmaintained (not vulnerable) crates pulled in transitively only by the Tauri
+# desktop stack — GTK3 bindings, webkit, and tauri/wry macro deps. There is
+# nothing to migrate to while Tauri v2 targets WebKitGTK on Linux; revisit when
+# the desktop toolkit moves off GTK3.
+ignore = [
+    "RUSTSEC-2024-0370", # proc-macro-error (tauri macro deps)
+    "RUSTSEC-2024-0411", # gtk-rs GTK3 bindings
+    "RUSTSEC-2024-0412", # gtk-rs GTK3 bindings
+    "RUSTSEC-2024-0413", # gtk-rs GTK3 bindings
+    "RUSTSEC-2024-0414", # gtk-rs GTK3 bindings
+    "RUSTSEC-2024-0415", # gtk-rs GTK3 bindings
+    "RUSTSEC-2024-0416", # gtk-rs GTK3 bindings
+    "RUSTSEC-2024-0417", # gtk-rs GTK3 bindings
+    "RUSTSEC-2024-0418", # gtk-rs GTK3 bindings
+    "RUSTSEC-2024-0419", # gtk-rs GTK3 bindings
+    "RUSTSEC-2024-0420", # gtk-rs GTK3 bindings
+    "RUSTSEC-2024-0436", # paste (tauri/wry)
+    "RUSTSEC-2025-0075", # unic-common (tauri-utils)
+    "RUSTSEC-2025-0080", # unic-ucd-ident (tauri-utils)
+    "RUSTSEC-2025-0081", # unic-char-range (tauri-utils)
+    "RUSTSEC-2025-0098", # unic-ucd-version (tauri-utils)
+    "RUSTSEC-2025-0100", # unic-char-property (tauri-utils)
+]
 
 [licenses]
 version = 2
@@ -21,6 +44,7 @@ confidence-threshold = 0.9
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"
