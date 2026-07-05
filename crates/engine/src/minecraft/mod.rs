@@ -3,6 +3,8 @@
 //! (every result is fetched from upstream), so it needs no data directory.
 
 mod fabric;
+pub(crate) mod launch;
+pub(crate) mod materialize;
 mod meta;
 mod provider;
 mod vanilla;

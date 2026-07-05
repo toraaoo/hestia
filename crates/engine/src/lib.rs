@@ -1,6 +1,7 @@
-//! The launcher engine: config, cache, downloader, java. Daemon-only domain
-//! logic; front-ends reach it over the socket, not by linking it. Accounts +
-//! crypto are not implemented yet.
+//! The launcher engine: config, cache, downloader, java, accounts, minecraft
+//! providers, and the server/instance stores with their launch pipeline.
+//! Daemon-only domain logic; front-ends reach it over the socket, not by
+//! linking it.
 
 mod accounts;
 mod cache;
@@ -8,13 +9,19 @@ mod checksum;
 mod config;
 mod download;
 mod engine;
+mod instances;
 mod java;
 mod minecraft;
+mod registry;
+mod servers;
 
 pub use accounts::{Accounts, LoginChallenge};
 pub use cache::{Cache, CacheEntry, CacheUsage};
 pub use config::{Config, ConfigError, Settings};
 pub use download::Downloader;
 pub use engine::Engine;
+pub use instances::{InstanceRecord, Instances};
 pub use java::{Java, JavaInstallOutcome};
+pub use minecraft::launch::LaunchPlan;
 pub use minecraft::Minecraft;
+pub use servers::{ServerRecord, Servers};
