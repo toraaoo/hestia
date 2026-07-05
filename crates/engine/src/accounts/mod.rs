@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 
 use microsoft::{
     launcher_login, minecraft_profile, poll_device_code, redeem_code, refresh_oauth, request_device_code,
-    request_device_token, sisu_authenticate, sisu_authorize, xsts_authorize, OAuthTokens, XstsToken,
+    request_device_token, sisu_authenticate, sisu_authorize, xsts_authorize, OAuthTokens,
 };
 use signing::{base64url_nopad, format_uuid_v4, hex, random_bytes, ProofKey};
 

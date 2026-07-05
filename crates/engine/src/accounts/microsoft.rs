@@ -74,7 +74,6 @@ fn http() -> reqwest::Client {
 }
 
 struct Parsed {
-    status: u16,
     headers: HeaderMap,
     body: Value,
 }
@@ -97,7 +96,7 @@ async fn read(response: reqwest::Response, what: &str) -> Result<Parsed> {
             bail!(message);
         }
     };
-    Ok(Parsed { status, headers, body })
+    Ok(Parsed { headers, body })
 }
 
 fn require_string(body: &Value, key: &str, what: &str) -> Result<String> {
@@ -119,7 +118,7 @@ fn proof_jwk(key: &ProofKey) -> Value {
 fn days_from_civil(mut year: i64, month: u32, day: u32) -> i64 {
     year -= (month <= 2) as i64;
     let era = (if year >= 0 { year } else { year - 399 }) / 400;
-    let yoe = (year - era * 400) as i64;
+    let yoe = year - era * 400;
     let doy = (153 * (if month > 2 { month - 3 } else { month + 9 }) as i64 + 2) / 5 + day as i64 - 1;
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
     era * 146097 + doe - 719468
