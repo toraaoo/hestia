@@ -335,29 +335,41 @@ fn provision_noun(phase: ProvisionPhase) -> &'static str {
     }
 }
 
-/// Exponential-moving-average byte rate, smoothing throughput between progress
-/// callbacks so the reported speed does not jitter.
+/// Byte rate measured over fixed minimum windows. Progress events arrive over
+/// the socket in bursts (one per chunk, several within microseconds), so a
+/// per-event instantaneous rate is dominated by intra-burst spikes and wildly
+/// overstates throughput; averaging each ≥`RATE_WINDOW` span weights fast and
+/// stalled periods by their real duration.
 #[derive(Default)]
 struct RateMeter {
-    last: Option<(Instant, u64)>,
+    window: Option<(Instant, u64)>,
     per_second: f64,
 }
 
+const RATE_WINDOW: Duration = Duration::from_millis(500);
+
 impl RateMeter {
     fn observe(&mut self, current: u64) -> f64 {
-        let now = Instant::now();
-        if let Some((last_time, last_count)) = self.last {
-            let elapsed = now.duration_since(last_time).as_secs_f64();
-            if elapsed > 0.0 && current >= last_count {
-                let instant = (current - last_count) as f64 / elapsed;
-                self.per_second = if self.per_second == 0.0 {
-                    instant
-                } else {
-                    0.7 * self.per_second + 0.3 * instant
-                };
+        self.observe_at(Instant::now(), current)
+    }
+
+    fn observe_at(&mut self, now: Instant, current: u64) -> f64 {
+        match self.window {
+            Some((start, count)) if current >= count => {
+                let elapsed = now.duration_since(start);
+                if elapsed >= RATE_WINDOW {
+                    let rate = (current - count) as f64 / elapsed.as_secs_f64();
+                    self.per_second = if self.per_second == 0.0 {
+                        rate
+                    } else {
+                        0.5 * self.per_second + 0.5 * rate
+                    };
+                    self.window = Some((now, current));
+                }
             }
+            // First observation, or the counter went backwards (a new file).
+            _ => self.window = Some((now, current)),
         }
-        self.last = Some((now, current));
         self.per_second
     }
 }
@@ -367,5 +379,39 @@ fn phase_label(phase: JavaInstallPhase) -> &'static str {
         JavaInstallPhase::Resolving => "resolving…",
         JavaInstallPhase::Downloading => "downloading…",
         JavaInstallPhase::Extracting => "extracting…",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rate_ignores_intra_burst_spikes() {
+        let start = Instant::now();
+        let mut meter = RateMeter::default();
+        // 10 KB/s real throughput, delivered as micro-bursts of 5 events.
+        let mut rate = 0.0;
+        for second in 0..4u64 {
+            for burst in 0..5u64 {
+                let t = start + Duration::from_secs(second) + Duration::from_micros(burst * 50);
+                rate = meter.observe_at(t, second * 10_000 + burst * 2_000);
+            }
+        }
+        assert!(
+            (5_000.0..20_000.0).contains(&rate),
+            "expected ~10 KB/s, got {rate} B/s"
+        );
+    }
+
+    #[test]
+    fn rate_resets_when_the_counter_goes_backwards() {
+        let start = Instant::now();
+        let mut meter = RateMeter::default();
+        meter.observe_at(start, 100_000);
+        meter.observe_at(start + Duration::from_secs(1), 200_000);
+        // A new file restarts the byte counter; no negative/huge sample.
+        let rate = meter.observe_at(start + Duration::from_secs(2), 1_000);
+        assert!((0.0..=100_000.0).contains(&rate));
     }
 }
