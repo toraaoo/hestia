@@ -5,11 +5,14 @@ A Minecraft launcher built in Rust.
 Alongside a desktop UI (Tauri), Hestia ships a first-class **CLI** front-end, so
 it's just as comfortable from a terminal as from a window.
 
-> **Status:** early development (`v0.0.1`). Hestia runs as a daemon (`hestiad`)
-> with thin clients over a local socket. In place today: the build/workspace,
-> logging, a config store, the CLI, Java runtime management (install/list/
-> uninstall via the Adoptium API), Microsoft account sign-in, and a scaffolded
-> Tauri desktop shell. Launching Minecraft itself is not implemented yet.
+> **Status:** early development (`v0.0.1`), now a fully all-Rust workspace — the
+> C++ tree is gone. Hestia runs as a daemon (`hestiad`) with thin clients over a
+> local socket. In place today: the build/workspace, logging, a config store, the
+> CLI, Java runtime management (install/list/uninstall via the Adoptium API),
+> Microsoft account sign-in, a process supervisor (launch/track/stream/stop child
+> processes), and a stock Tauri desktop shell. Still to come: the Minecraft launch
+> pipeline (instances, version manifests, assembling the JVM command) and a
+> functional tray.
 
 ## Front-ends
 
@@ -80,6 +83,8 @@ cargo install tauri-cli --version '^2'
 
 The [`scripts/`](scripts/) helpers wrap all of this: `scripts/build.sh cli`,
 `scripts/run.sh daemon serve`, `scripts/run.sh desktop`, `scripts/package.sh cli`.
+For an interactive loop, `scripts/dev.sh` opens a subshell with `hestia`/`hestiad`
+on `PATH` (or `scripts/dev.sh --desktop` for the Tauri shell with frontend HMR).
 
 ## Usage
 
@@ -110,6 +115,13 @@ hestia config set autostart true # register the daemon to start at login
 
 # Daemon lifecycle
 hestia daemon status | start | stop | restart
+
+# Processes (launched and supervised by the daemon)
+hestia process start <program> [args...]   # launch; --wait streams output until exit
+hestia process list                         # tracked processes and their state
+hestia process status <id>                  # state of one process
+hestia process logs <id> [--tail N]         # captured output
+hestia process stop <id>                    # terminate
 
 # Global flags (any position)
 hestia -v java list              # verbose / debug logging

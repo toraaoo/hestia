@@ -25,8 +25,11 @@ reasoning behind the structure.
 > (`cargo tree -i engine` shows only `daemon`). Collapses from the C++: the
 > `kFields` codec became `serde` derive; Xbox signing lost its OpenSSL/CNG split
 > for one cross-platform `p256` impl; archive extraction stopped shelling out
-> (the `tar`+`flate2`/`zip` crates). Accounts, config, cache, download, and java
-> are ported; the process supervisor and a functional tray are not yet.
+> (the `tar`+`flate2`/`zip` crates). Accounts, config, cache, download, java, and
+> the process supervisor (`process.*` — launch, track, stream output, stop, with a
+> restart policy) are ported. Still pending: the Minecraft launch pipeline that
+> drives the supervisor (instances, version manifests, JVM command assembly) and a
+> functional tray.
 >
 > **The prose and target names below (`libs/…`, `apps/…`, `hestia_shared`, CEF)
 > describe the historical C++ design and are retained for the reasoning; map them
