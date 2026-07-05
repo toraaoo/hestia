@@ -4,5 +4,6 @@
 pub mod app;
 pub mod logging;
 pub mod paths;
+mod rolling;
 
-pub use logging::{init_logging, LogGuard, LogLevel};
+pub use logging::{init_logging, FileLog, LogGuard, LogLevel};

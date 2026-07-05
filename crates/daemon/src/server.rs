@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use ipc::protocol::{decode_request, encode_response, Response};
 use ipc::{Connection, Peer};
+use tracing::Instrument;
 
 use crate::runtime::{HandlerContext, Router, Runtime};
 use crate::services::make_router;
@@ -36,6 +37,7 @@ pub async fn run_daemon(log_path: std::path::PathBuf) -> i32 {
 }
 
 async fn accept_loop(listener: ipc::Listener, router: Arc<Router>, runtime: Arc<Runtime>) {
+    static COUNTER: AtomicU64 = AtomicU64::new(1);
     loop {
         let (conn, peer) = match listener.accept().await {
             Ok(pair) => pair,
@@ -53,23 +55,28 @@ async fn accept_loop(listener: ipc::Listener, router: Arc<Router>, runtime: Arc<
         }
         let router = router.clone();
         let runtime = runtime.clone();
-        tokio::spawn(async move {
-            tracing::debug!(uid = peer.uid, "client connected");
-            serve_connection(conn, peer, router, runtime).await;
-            tracing::debug!("client disconnected");
-        });
+        let conn_id = COUNTER.fetch_add(1, Ordering::Relaxed);
+        // A span per connection, so every request and handler log it fans out is
+        // tagged with the connection id and peer uid — the traceability seam.
+        let span = tracing::info_span!("conn", id = conn_id, uid = peer.uid);
+        tokio::spawn(
+            async move {
+                tracing::debug!("client connected");
+                serve_connection(conn, peer, conn_id, router, runtime).await;
+                tracing::debug!("client disconnected");
+            }
+            .instrument(span),
+        );
     }
 }
 
 async fn serve_connection(
     conn: Connection,
     peer: Peer,
+    conn_id: u64,
     router: Arc<Router>,
     runtime: Arc<Runtime>,
 ) {
-    static COUNTER: AtomicU64 = AtomicU64::new(1);
-    let conn_id = COUNTER.fetch_add(1, Ordering::Relaxed);
-
     let (mut reader, mut writer) = conn.into_split();
     let (out_tx, mut out_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 

@@ -11,6 +11,7 @@ use ipc::errors;
 use ipc::protocol::{Request, Response};
 use proto::Contract;
 use serde_json::Value;
+use tracing::Instrument;
 
 use super::HandlerContext;
 
@@ -55,19 +56,28 @@ impl Router {
     }
 
     pub async fn route(&self, request: Request, ctx: HandlerContext) -> Response {
-        match self.handlers.get(&request.channel) {
-            Some(handler) => {
-                tracing::debug!(channel = %request.channel, "dispatch");
-                handler(request, ctx).await
-            }
-            None => {
-                tracing::warn!(channel = %request.channel, "no handler for channel");
-                Response::failure(
-                    errors::UNKNOWN_CHANNEL,
-                    format!("unknown channel: {}", request.channel),
-                )
+        let span = tracing::info_span!(
+            "req",
+            channel = %request.channel,
+            id = request.id.unwrap_or_default()
+        );
+        async move {
+            match self.handlers.get(&request.channel) {
+                Some(handler) => {
+                    tracing::debug!("dispatch");
+                    handler(request, ctx).await
+                }
+                None => {
+                    tracing::warn!("no handler for channel");
+                    Response::failure(
+                        errors::UNKNOWN_CHANNEL,
+                        format!("unknown channel: {}", request.channel),
+                    )
+                }
             }
         }
+        .instrument(span)
+        .await
     }
 }
 
