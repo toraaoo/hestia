@@ -13,7 +13,7 @@ use std::io::Write;
 
 use anyhow::Result;
 
-pub use progress::{InstallReporter, Spinner};
+pub use progress::{InstallReporter, ProvisionReporter, Spinner};
 pub use view::View;
 
 /// Write an input prompt (no trailing newline) and flush, ahead of a stdin read.

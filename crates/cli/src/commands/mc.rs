@@ -3,8 +3,18 @@
 
 use anyhow::{bail, Result};
 use client::proto::minecraft::{Flavor, GameVersion, VersionKind};
+use client::proto::process::{ProcessInfo, ProcessState};
 
 use crate::ui::{self, View};
+
+/// One-word state for a managed server/instance from its supervised process
+/// snapshot (absent means it has never been started).
+pub fn process_state_label(process: &Option<ProcessInfo>) -> String {
+    match process {
+        Some(p) if p.state == ProcessState::Running => format!("running (pid {})", p.pid),
+        Some(_) | None => "stopped".to_string(),
+    }
+}
 
 /// Return the chosen flavor id: validated when `provided`, otherwise picked from
 /// an interactive selector.

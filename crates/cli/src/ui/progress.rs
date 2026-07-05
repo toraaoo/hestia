@@ -13,6 +13,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use client::proto::java::{JavaInstallPhase, JavaInstallProgress};
+use client::proto::minecraft::{ProvisionPhase, ProvisionProgress};
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::cursor::{Hide, Show};
 use ratatui::crossterm::execute;
@@ -218,6 +219,119 @@ fn download_detail(progress: &JavaInstallProgress, rate: f64) -> String {
         format!("{current} / {total} · {}/s", human_bytes(rate as u64))
     } else {
         format!("{current} / {total}")
+    }
+}
+
+/// Reports provisioning progress (server create / instance launch): a live
+/// gauge on a terminal, one line per phase when stderr is redirected. Byte
+/// phases (java, jars) show sizes and throughput; count phases (libraries,
+/// assets) show completed/total.
+pub struct ProvisionReporter {
+    animator: Option<Animator>,
+    rate: Mutex<RateMeter>,
+    last_phase: Mutex<Option<ProvisionPhase>>,
+}
+
+impl ProvisionReporter {
+    pub fn new() -> Self {
+        Self {
+            animator: Animator::start(View::Spinner(
+                provision_label(ProvisionPhase::Resolving).into(),
+            )),
+            rate: Mutex::new(RateMeter::default()),
+            last_phase: Mutex::new(None),
+        }
+    }
+
+    pub fn update(&self, progress: &ProvisionProgress) {
+        let phase_changed = {
+            let mut last = self.last_phase.lock().unwrap();
+            let changed = *last != Some(progress.phase);
+            *last = Some(progress.phase);
+            changed
+        };
+        let Some(animator) = &self.animator else {
+            if phase_changed {
+                eprintln!("{}", provision_label(progress.phase));
+            }
+            return;
+        };
+        if phase_changed {
+            *self.rate.lock().unwrap() = RateMeter::default();
+        }
+        let view = match progress.phase {
+            ProvisionPhase::Java | ProvisionPhase::Server | ProvisionPhase::Client => {
+                let rate = self.rate.lock().unwrap().observe(progress.current);
+                View::Download {
+                    ratio: count_ratio(progress.current, progress.total),
+                    detail: bytes_detail(progress, rate),
+                }
+            }
+            ProvisionPhase::Libraries | ProvisionPhase::Assets if progress.total > 0 => {
+                View::Download {
+                    ratio: count_ratio(progress.current, progress.total),
+                    detail: format!(
+                        "{} · {}/{}",
+                        provision_noun(progress.phase),
+                        progress.current,
+                        progress.total
+                    ),
+                }
+            }
+            phase => View::Spinner(provision_label(phase).into()),
+        };
+        animator.set(view);
+    }
+
+    /// Clear the gauge so a following message prints on a clean line.
+    pub fn finish(&self) {
+        if let Some(animator) = &self.animator {
+            animator.stop();
+        }
+    }
+}
+
+fn count_ratio(current: u64, total: u64) -> f64 {
+    if total > 0 {
+        (current as f64 / total as f64).clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+fn bytes_detail(progress: &ProvisionProgress, rate: f64) -> String {
+    let current = human_bytes(progress.current);
+    let total = if progress.total > 0 {
+        human_bytes(progress.total)
+    } else {
+        "?".to_string()
+    };
+    let mut detail = format!("{} · {current} / {total}", provision_noun(progress.phase));
+    if rate > 0.0 {
+        detail.push_str(&format!(" · {}/s", human_bytes(rate as u64)));
+    }
+    detail
+}
+
+fn provision_label(phase: ProvisionPhase) -> &'static str {
+    match phase {
+        ProvisionPhase::Resolving => "resolving…",
+        ProvisionPhase::Java => "java runtime…",
+        ProvisionPhase::Server => "server jar…",
+        ProvisionPhase::Client => "client jar…",
+        ProvisionPhase::Libraries => "libraries…",
+        ProvisionPhase::Assets => "assets…",
+    }
+}
+
+fn provision_noun(phase: ProvisionPhase) -> &'static str {
+    match phase {
+        ProvisionPhase::Resolving => "profile",
+        ProvisionPhase::Java => "java",
+        ProvisionPhase::Server => "server jar",
+        ProvisionPhase::Client => "client jar",
+        ProvisionPhase::Libraries => "libraries",
+        ProvisionPhase::Assets => "assets",
     }
 }
 

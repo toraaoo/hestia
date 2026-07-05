@@ -1,11 +1,15 @@
-//! `hestia instance …` — browse client flavors/versions and resolve a client.
+//! `hestia instance …` — browse client flavors/versions, manage instances, and
+//! launch them (files materialise on first launch).
+
+use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Subcommand;
-use client::proto::minecraft::InstanceProfile;
+use client::proto::instance::InstanceInfo;
+use client::Client;
 
 use crate::commands::mc;
-use crate::ui::{self, Spinner, View};
+use crate::ui::{self, ProvisionReporter, Spinner, View};
 
 #[derive(Subcommand)]
 pub enum InstanceCmd {
@@ -18,7 +22,7 @@ pub enum InstanceCmd {
         #[arg(long, help = "Include snapshots and old versions")]
         all: bool,
     },
-    /// Resolve a flavor + version into a client profile and print its URL
+    /// Create an instance (its files download at first launch)
     Create {
         /// Flavor id (e.g. vanilla, fabric)
         flavor: String,
@@ -26,6 +30,27 @@ pub enum InstanceCmd {
         version: String,
         #[arg(long, help = "Pin a loader version (modloaders only; default latest)")]
         loader: Option<String>,
+        #[arg(long, help = "Display name (defaults to <flavor>-<version>)")]
+        name: Option<String>,
+    },
+    /// Managed instances and their state
+    List,
+    /// Delete an instance (its saves and all)
+    Remove {
+        /// Instance name or id
+        instance: String,
+    },
+    /// Prepare (java, client jar, libraries, assets) and launch an instance
+    Launch {
+        /// Instance name or id
+        instance: String,
+        #[arg(long, help = "Account name or uuid (default: the signed-in account)")]
+        account: Option<String>,
+    },
+    /// Kill a running instance
+    Stop {
+        /// Instance name or id
+        instance: String,
     },
 }
 
@@ -55,29 +80,93 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
             flavor,
             version,
             loader,
+            name,
         } => {
-            let profile = {
-                let _spinner = Spinner::start("resolving");
-                client.instance().resolve(&flavor, &version, loader).await?
+            let instance = {
+                let _spinner = Spinner::start("resolving profile");
+                client
+                    .instance()
+                    .create(
+                        name.as_deref().unwrap_or_default(),
+                        &flavor,
+                        &version,
+                        loader,
+                    )
+                    .await?
             };
-            show_profile(profile)?;
+            ui::show(View::line(format!("instance '{}' created", instance.name)))?;
+            show_status(&instance)?;
+        }
+        InstanceCmd::List => list(&client).await?,
+        InstanceCmd::Remove { instance } => {
+            {
+                let _spinner = Spinner::start(format!("removing '{instance}'"));
+                client.instance().remove(&instance).await?;
+            }
+            ui::show(View::line(format!("instance '{instance}' removed")))?;
+        }
+        InstanceCmd::Launch { instance, account } => {
+            let reporter = Arc::new(ProvisionReporter::new());
+            let progress = reporter.clone();
+            let result = client
+                .instance()
+                .launch(
+                    &instance,
+                    account.as_deref().unwrap_or_default(),
+                    move |p| progress.update(p),
+                )
+                .await;
+            reporter.finish();
+            let (_, pid) = result?;
+            ui::show(View::line(format!(
+                "instance '{instance}' launched (pid {pid})"
+            )))?;
+        }
+        InstanceCmd::Stop { instance } => {
+            {
+                let _spinner = Spinner::start(format!("stopping '{instance}'"));
+                client.instance().stop(&instance).await?;
+            }
+            ui::show(View::line(format!("instance '{instance}' stopped")))?;
         }
     }
     Ok(())
 }
 
-fn show_profile(profile: InstanceProfile) -> Result<()> {
+async fn list(client: &Client) -> Result<()> {
+    let instances = client.instance().list().await?;
+    if instances.is_empty() {
+        return ui::show(View::note("no instances yet (hestia instance create …)"));
+    }
+    let rows = instances
+        .iter()
+        .map(|i| {
+            vec![
+                i.name.clone(),
+                i.flavor.clone(),
+                i.game_version.clone(),
+                i.loader_version.clone().unwrap_or_else(|| "-".into()),
+                mc::process_state_label(&i.process),
+            ]
+        })
+        .collect();
+    ui::show(View::table(
+        "instances",
+        ["NAME", "FLAVOR", "VERSION", "LOADER", "STATE"],
+        rows,
+    ))
+}
+
+fn show_status(info: &InstanceInfo) -> Result<()> {
     ui::show(View::detail([
-        ("flavor", profile.flavor),
-        ("version", profile.game_version),
+        ("name", info.name.clone()),
+        ("id", info.id.clone()),
+        ("flavor", info.flavor.clone()),
+        ("version", info.game_version.clone()),
         (
             "loader",
-            profile.loader_version.unwrap_or_else(|| "-".into()),
+            info.loader_version.clone().unwrap_or_else(|| "-".into()),
         ),
-        ("java", profile.java_major.to_string()),
-        ("main", profile.main_class),
-        ("assets", profile.asset_index.id),
-        ("libraries", profile.libraries.len().to_string()),
-    ]))?;
-    ui::show(View::line(profile.client.url))
+        ("java", info.java_major.to_string()),
+    ]))
 }

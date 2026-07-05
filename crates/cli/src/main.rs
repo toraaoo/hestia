@@ -43,12 +43,12 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::java::JavaCmd,
     },
-    /// Minecraft servers (browse flavors/versions, resolve a server jar)
+    /// Minecraft servers (create, start/stop, logs)
     Server {
         #[command(subcommand)]
         cmd: commands::server::ServerCmd,
     },
-    /// Minecraft instances (browse flavors/versions, resolve a client)
+    /// Minecraft instances (create, launch)
     Instance {
         #[command(subcommand)]
         cmd: commands::instance::InstanceCmd,
