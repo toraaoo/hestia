@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Format staged Rust code before it is committed. Managed by husky-rs, which
+# points core.hooksPath here on `cargo test`. Skip with `git commit --no-verify`.
+set -e
+
+staged=$(git diff --cached --name-only --diff-filter=ACM -- '*.rs')
+[ -z "$staged" ] && exit 0
+
+cargo fmt --all
+
+# Re-stage the Rust files that were part of this commit so rustfmt's changes
+# are included, without picking up unrelated edits.
+printf '%s\n' "$staged" | while IFS= read -r file; do
+    [ -f "$file" ] && git add -- "$file"
+done

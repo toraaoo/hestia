@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Run the workspace test suite before pushing. Managed by husky-rs, which points
+# core.hooksPath here on `cargo test`. Skip with `git push --no-verify`.
+set -e
+
+cargo test --workspace
