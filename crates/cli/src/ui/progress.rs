@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use client::proto::java::{JavaInstallPhase, JavaInstallProgress};
 use client::proto::minecraft::{ProvisionPhase, ProvisionProgress};
 use ratatui::backend::CrosstermBackend;
-use ratatui::crossterm::cursor::{Hide, Show};
+use ratatui::crossterm::cursor::{Hide, MoveToColumn, Show};
 use ratatui::crossterm::execute;
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Style};
@@ -96,7 +96,9 @@ fn run(view: Arc<Mutex<View>>, stop: Arc<AtomicBool>) {
         thread::sleep(TICK);
     }
     let _ = terminal.clear();
-    let _ = execute!(std::io::stderr(), Show);
+    // Clearing the inline viewport leaves the cursor where drawing ended;
+    // return it to column 0 so following output does not start indented.
+    let _ = execute!(std::io::stderr(), MoveToColumn(0), Show);
 }
 
 fn draw(frame: &mut Frame, view: &View, step: usize) {

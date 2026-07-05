@@ -158,17 +158,16 @@ async fn create(
         client.instance().versions(&flavor).await?
     };
     let version = mc::pick_version(versions, version)?;
+    let name = match name {
+        Some(name) => name,
+        None => ui::input("instance name", &format!("{flavor}-{version}"))?,
+    };
 
     let instance = {
         let _spinner = Spinner::start("resolving profile");
         client
             .instance()
-            .create(
-                name.as_deref().unwrap_or_default(),
-                &flavor,
-                &version,
-                loader,
-            )
+            .create(&name, &flavor, &version, loader)
             .await?
     };
     ui::show(View::line(format!("instance '{}' created", instance.name)))?;

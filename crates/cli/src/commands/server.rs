@@ -173,6 +173,10 @@ async fn create(
         client.server().versions(&flavor).await?
     };
     let version = mc::pick_version(versions, version)?;
+    let name = match name {
+        Some(name) => name,
+        None => ui::input("server name", &format!("{flavor}-{version}"))?,
+    };
     if !eula {
         confirm_eula()?;
     }
@@ -181,14 +185,9 @@ async fn create(
     let progress = reporter.clone();
     let result = client
         .server()
-        .create(
-            name.as_deref().unwrap_or_default(),
-            &flavor,
-            &version,
-            loader,
-            true,
-            move |p| progress.update(p),
-        )
+        .create(&name, &flavor, &version, loader, true, move |p| {
+            progress.update(p)
+        })
         .await;
     reporter.finish();
     let server = result?;

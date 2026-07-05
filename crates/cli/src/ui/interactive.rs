@@ -7,7 +7,7 @@ use std::io::{self, IsTerminal};
 
 use anyhow::{bail, Result};
 use ratatui::backend::CrosstermBackend;
-use ratatui::crossterm::cursor::{Hide, Show};
+use ratatui::crossterm::cursor::{Hide, MoveToColumn, Show};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::crossterm::execute;
 use ratatui::crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
@@ -46,8 +46,10 @@ fn with_viewport<T>(height: u16, body: impl FnOnce(&mut Stderr) -> Result<T>) ->
     let _ = execute!(io::stderr(), Hide);
     let result = body(&mut terminal);
     let _ = disable_raw_mode();
-    let _ = execute!(io::stderr(), Show);
     let _ = terminal.clear();
+    // Clearing the inline viewport leaves the cursor where drawing ended;
+    // return it to column 0 so following output does not start indented.
+    let _ = execute!(io::stderr(), MoveToColumn(0), Show);
     result
 }
 
@@ -85,6 +87,61 @@ pub fn select(prompt: &str, items: &[String]) -> Result<usize> {
             }
         }
     })
+}
+
+/// A single-line text prompt: type to edit, Enter accepts (empty takes
+/// `default`, shown dim), Esc cancels. Errors when there is no interactive
+/// terminal.
+pub fn input(prompt: &str, default: &str) -> Result<String> {
+    if !can_prompt() {
+        bail!("no interactive terminal; pass the value as an argument");
+    }
+    with_viewport(1, |terminal| {
+        let mut typed = String::new();
+        loop {
+            terminal.draw(|frame| draw_input(frame, prompt, &typed, default))?;
+            let Event::Key(key) = event::read()? else {
+                continue;
+            };
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
+            match key.code {
+                KeyCode::Enter => {
+                    let value = typed.trim();
+                    return Ok(if value.is_empty() {
+                        default.to_string()
+                    } else {
+                        value.to_string()
+                    });
+                }
+                KeyCode::Backspace => {
+                    typed.pop();
+                }
+                KeyCode::Esc => bail!("input cancelled"),
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    bail!("input cancelled")
+                }
+                KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    typed.push(c);
+                }
+                _ => {}
+            }
+        }
+    })
+}
+
+fn draw_input(frame: &mut Frame, prompt: &str, typed: &str, default: &str) {
+    let dim = Style::default().fg(Color::DarkGray);
+    let mut spans = vec![
+        ratatui::text::Span::styled(format!("{prompt}: "), Style::default().fg(Color::Cyan)),
+        ratatui::text::Span::raw(typed.to_string()),
+        ratatui::text::Span::styled("▏", Style::default().fg(Color::Cyan)),
+    ];
+    if typed.is_empty() {
+        spans.push(ratatui::text::Span::styled(default.to_string(), dim));
+    }
+    frame.render_widget(Paragraph::new(Line::from(spans)), frame.area());
 }
 
 /// Page through a table interactively (sticky header, scrollbar, scroll, quit).

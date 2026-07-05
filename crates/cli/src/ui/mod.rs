@@ -22,6 +22,18 @@ pub fn prompt(text: &str) {
     let _ = std::io::stdout().flush();
 }
 
+/// Ask for one line of input (an inline ratatui prompt): typing edits, Enter
+/// accepts — empty takes `default`, shown dim — Esc cancels with an error.
+/// Without an interactive terminal the default is returned (the value is
+/// optional).
+pub fn input(text: &str, default: &str) -> Result<String> {
+    use std::io::IsTerminal;
+    if !std::io::stdin().is_terminal() || !std::io::stderr().is_terminal() {
+        return Ok(default.to_string());
+    }
+    interactive::input(text, default)
+}
+
 /// Render a static view: a line, a note, a key/value block, or a table (long
 /// tables page interactively on a terminal).
 pub fn show(view: View) -> Result<()> {
