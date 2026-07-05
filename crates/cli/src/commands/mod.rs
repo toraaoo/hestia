@@ -5,7 +5,10 @@ pub mod auth;
 pub mod cache;
 pub mod config;
 pub mod daemon;
+pub mod instance;
 pub mod java;
+mod mc;
+pub mod server;
 
 use anyhow::{Context, Result};
 use client::Client;

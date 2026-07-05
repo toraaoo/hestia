@@ -22,7 +22,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Gauge, Paragraph};
 use ratatui::{Frame, Terminal, TerminalOptions, Viewport};
 
-use crate::output::human_bytes;
+use super::render::human_bytes;
 
 const FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const TICK: Duration = Duration::from_millis(80);

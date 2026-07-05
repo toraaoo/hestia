@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use crate::output::{human_bytes, print_table};
+use crate::ui::{self, View};
 
 #[derive(Subcommand)]
 pub enum CacheCmd {
@@ -20,34 +20,35 @@ pub async fn run(cmd: CacheCmd) -> Result<()> {
     match cmd {
         CacheCmd::Info => {
             let info = client.cache().info().await?;
-            println!("location: {}", info.path.display());
-            println!("entries:  {}", info.usage.entries);
-            println!("size:     {}", human_bytes(info.usage.bytes));
+            ui::show(View::detail([
+                ("location", info.path.display().to_string()),
+                ("entries", info.usage.entries.to_string()),
+                ("size", ui::human_bytes(info.usage.bytes)),
+            ]))?;
         }
         CacheCmd::List => {
             let entries = client.cache().list().await?;
             if entries.is_empty() {
-                println!("cache is empty");
-                return Ok(());
+                return ui::show(View::note("cache is empty"));
             }
             let rows = entries
                 .iter()
                 .map(|e| {
                     vec![
                         format!("{}:{}", e.checksum.algorithm.as_str(), e.checksum.hex),
-                        human_bytes(e.size),
+                        ui::human_bytes(e.size),
                     ]
                 })
-                .collect::<Vec<_>>();
-            print_table(&["CHECKSUM", "SIZE"], &rows);
+                .collect();
+            ui::show(View::table("cache", ["CHECKSUM", "SIZE"], rows))?;
         }
         CacheCmd::Clear => {
             let freed = client.cache().clear().await?;
-            println!(
+            ui::show(View::line(format!(
                 "freed {} across {} entries",
-                human_bytes(freed.bytes),
+                ui::human_bytes(freed.bytes),
                 freed.entries
-            );
+            )))?;
         }
     }
     Ok(())

@@ -1,6 +1,6 @@
 //! `hestia auth …` — Microsoft/Minecraft sign-in.
 
-use std::io::{self, Write};
+use std::io;
 use std::process::Stdio;
 
 use anyhow::{bail, Result};
@@ -8,8 +8,7 @@ use clap::Subcommand;
 use client::proto::accounts::{Account, LoginMethod};
 use client::Client;
 
-use crate::output::print_table;
-use crate::ui::Spinner;
+use crate::ui::{self, Spinner, View};
 
 #[derive(Subcommand)]
 pub enum AuthCmd {
@@ -36,19 +35,25 @@ pub async fn run(cmd: AuthCmd) -> Result<()> {
             } else {
                 device_code_login(&client).await?
             };
-            println!("Signed in as {} ({})", account.name, account.uuid);
+            ui::show(View::line(format!(
+                "Signed in as {} ({})",
+                account.name, account.uuid
+            )))?;
         }
         AuthCmd::List => {
             let accounts = client.accounts().list().await?;
+            if accounts.is_empty() {
+                return ui::show(View::note("no accounts signed in"));
+            }
             let rows = accounts
                 .iter()
                 .map(|a| vec![a.name.clone(), a.uuid.clone()])
-                .collect::<Vec<_>>();
-            print_table(&["NAME", "UUID"], &rows);
+                .collect();
+            ui::show(View::table("accounts", ["NAME", "UUID"], rows))?;
         }
         AuthCmd::Logout { account } => {
             client.accounts().remove(&account).await?;
-            println!("Signed out {account}");
+            ui::show(View::line(format!("Signed out {account}")))?;
         }
     }
     Ok(())
@@ -59,10 +64,10 @@ async fn device_code_login(client: &Client) -> Result<Account> {
         .accounts()
         .begin_login(LoginMethod::DeviceCode)
         .await?;
-    println!(
-        "\nTo sign in, open\n\n  {}\n\nand enter the code\n\n  {}\n",
+    ui::show(View::line(format!(
+        "To sign in, open\n\n  {}\n\nand enter the code\n\n  {}",
         flow.verification_uri, flow.user_code
-    );
+    )))?;
     wait_for_enter("Press Enter to open your browser... ");
     open_browser(&flow.verification_uri);
     let _spinner = Spinner::start("waiting for you to finish in the browser…");
@@ -71,16 +76,15 @@ async fn device_code_login(client: &Client) -> Result<Account> {
 
 async fn sisu_login(client: &Client) -> Result<Account> {
     let flow = client.accounts().begin_login(LoginMethod::Sisu).await?;
-    println!(
-        "Open this URL in your browser and sign in:\n\n  {}\n",
+    ui::show(View::line(format!(
+        "Open this URL in your browser and sign in:\n\n  {}",
         flow.url
-    );
+    )))?;
     wait_for_enter("Press Enter to open your browser... ");
     open_browser(&flow.url);
-    print!(
-        "You'll land on a blank page — paste its full address (or just the\ncode) here, then press Enter:\n> "
+    ui::prompt(
+        "You'll land on a blank page — paste its full address (or just the\ncode) here, then press Enter:\n> ",
     );
-    io::stdout().flush().ok();
 
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
@@ -92,9 +96,8 @@ async fn sisu_login(client: &Client) -> Result<Account> {
     Ok(client.accounts().complete_login(&flow.id, &code).await?)
 }
 
-fn wait_for_enter(prompt: &str) {
-    print!("{prompt}");
-    io::stdout().flush().ok();
+fn wait_for_enter(message: &str) {
+    ui::prompt(message);
     let mut discard = String::new();
     let _ = io::stdin().read_line(&mut discard);
 }

@@ -3,6 +3,8 @@
 use anyhow::Result;
 use clap::Subcommand;
 
+use crate::ui::{self, View};
+
 #[derive(Subcommand)]
 pub enum DaemonCmd {
     /// Running (pid, uptime, home, log) or stopped
@@ -20,25 +22,30 @@ pub async fn run(cmd: DaemonCmd) -> Result<()> {
         DaemonCmd::Status => match super::connect_running().await {
             Ok(client) => {
                 let s = client.daemon().status().await?;
-                println!("running");
-                println!("  pid:    {}", s.pid);
-                println!("  uptime: {}s", s.uptime_seconds);
-                println!("  home:   {}", s.home.display());
-                println!("  log:    {}", s.log.display());
+                ui::show(View::line("running"))?;
+                ui::show(View::detail([
+                    ("pid", s.pid.to_string()),
+                    ("uptime", format!("{}s", s.uptime_seconds)),
+                    ("home", s.home.display().to_string()),
+                    ("log", s.log.display().to_string()),
+                ]))?;
             }
-            Err(_) => println!("stopped"),
+            Err(_) => ui::show(View::line("stopped"))?,
         },
         DaemonCmd::Start => {
             let client = super::connect().await?;
             let info = client.app().info().await?;
-            println!("hestiad running ({} {})", info.name, info.version);
+            ui::show(View::line(format!(
+                "hestiad running ({} {})",
+                info.name, info.version
+            )))?;
         }
         DaemonCmd::Stop => match super::connect_running().await {
             Ok(client) => {
                 client.daemon().stop().await?;
-                println!("hestiad stopping");
+                ui::show(View::line("hestiad stopping"))?;
             }
-            Err(_) => println!("hestiad is not running"),
+            Err(_) => ui::show(View::line("hestiad is not running"))?,
         },
         DaemonCmd::Restart => {
             if let Ok(client) = super::connect_running().await {
@@ -49,7 +56,10 @@ pub async fn run(cmd: DaemonCmd) -> Result<()> {
             }
             let client = super::connect().await?;
             let info = client.app().info().await?;
-            println!("hestiad restarted ({} {})", info.name, info.version);
+            ui::show(View::line(format!(
+                "hestiad restarted ({} {})",
+                info.name, info.version
+            )))?;
         }
     }
     Ok(())

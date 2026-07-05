@@ -5,8 +5,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use clap::Subcommand;
 
-use crate::output::print_table;
-use crate::ui::{InstallReporter, Spinner};
+use crate::ui::{self, InstallReporter, Spinner, View};
 
 #[derive(Subcommand)]
 pub enum JavaCmd {
@@ -40,14 +39,13 @@ pub async fn run(cmd: JavaCmd) -> Result<()> {
                         if r.lts { "LTS".into() } else { String::new() },
                     ]
                 })
-                .collect::<Vec<_>>();
-            print_table(&["MAJOR", "TYPE"], &rows);
+                .collect();
+            ui::show(View::table("java", ["MAJOR", "TYPE"], rows))?;
         }
         JavaCmd::List => {
             let runtimes = client.java().list().await?;
             if runtimes.is_empty() {
-                println!("no java runtimes installed");
-                return Ok(());
+                return ui::show(View::note("no java runtimes installed"));
             }
             let rows = runtimes
                 .iter()
@@ -59,8 +57,12 @@ pub async fn run(cmd: JavaCmd) -> Result<()> {
                         r.home.display().to_string(),
                     ]
                 })
-                .collect::<Vec<_>>();
-            print_table(&["MAJOR", "VENDOR", "RELEASE", "HOME"], &rows);
+                .collect();
+            ui::show(View::table(
+                "java runtimes",
+                ["MAJOR", "VENDOR", "RELEASE", "HOME"],
+                rows,
+            ))?;
         }
         JavaCmd::Install { major, force } => {
             let reporter = Arc::new(InstallReporter::new());
@@ -70,24 +72,18 @@ pub async fn run(cmd: JavaCmd) -> Result<()> {
                 .install(major, force, move |p| progress.update(p))
                 .await?;
             reporter.finish();
-            if already {
-                println!(
-                    "java {} already installed ({})",
-                    runtime.major, runtime.release_name
-                );
-            } else {
-                println!(
-                    "installed java {} ({})",
-                    runtime.major, runtime.release_name
-                );
-            }
+            let verb = if already { "already installed" } else { "installed" };
+            ui::show(View::line(format!(
+                "java {} {verb} ({})",
+                runtime.major, runtime.release_name
+            )))?;
         }
         JavaCmd::Uninstall { major } => {
             {
                 let _spinner = Spinner::start(format!("uninstalling java {major}"));
                 client.java().uninstall(major).await?;
             }
-            println!("uninstalled java {major}");
+            ui::show(View::line(format!("uninstalled java {major}")))?;
         }
     }
     Ok(())

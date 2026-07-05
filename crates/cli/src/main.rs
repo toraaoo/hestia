@@ -1,7 +1,6 @@
 //! hestia — the Hestia command-line interface. A thin client over the daemon.
 
 mod commands;
-mod output;
 mod ui;
 
 use std::process::ExitCode;
@@ -43,6 +42,16 @@ enum Command {
     Java {
         #[command(subcommand)]
         cmd: commands::java::JavaCmd,
+    },
+    /// Minecraft servers (browse flavors/versions, resolve a server jar)
+    Server {
+        #[command(subcommand)]
+        cmd: commands::server::ServerCmd,
+    },
+    /// Minecraft instances (browse flavors/versions, resolve a client)
+    Instance {
+        #[command(subcommand)]
+        cmd: commands::instance::InstanceCmd,
     },
     /// Download cache
     Cache {
@@ -105,6 +114,8 @@ async fn dispatch(command: Command) -> anyhow::Result<()> {
     match command {
         Command::Auth { cmd } => commands::auth::run(cmd).await,
         Command::Java { cmd } => commands::java::run(cmd).await,
+        Command::Server { cmd } => commands::server::run(cmd).await,
+        Command::Instance { cmd } => commands::instance::run(cmd).await,
         Command::Cache { cmd } => commands::cache::run(cmd).await,
         Command::Config { cmd } => commands::config::run(cmd).await,
         Command::Daemon { cmd } => commands::daemon::run(cmd).await,

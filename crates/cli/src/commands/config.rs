@@ -4,7 +4,7 @@ use anyhow::{bail, Result};
 use clap::Subcommand;
 use serde_json::Value;
 
-use crate::output::print_table;
+use crate::ui::{self, View};
 
 #[derive(Subcommand)]
 pub enum ConfigCmd {
@@ -20,8 +20,8 @@ pub async fn run(cmd: ConfigCmd) -> Result<()> {
     let client = super::connect().await?;
     match cmd {
         ConfigCmd::Get { key } => match client.config().get(&key).await? {
-            Some(Value::String(s)) => println!("{s}"),
-            Some(value) => println!("{}", serde_json::to_string_pretty(&value)?),
+            Some(Value::String(s)) => ui::show(View::line(s))?,
+            Some(value) => ui::show(View::line(serde_json::to_string_pretty(&value)?))?,
             None => bail!("unknown config key: {key}"),
         },
         ConfigCmd::Set { key, value } => {
@@ -33,7 +33,7 @@ pub async fn run(cmd: ConfigCmd) -> Result<()> {
             let entries = client.config().list().await?;
             let mut rows = Vec::new();
             flatten(&entries, "", &mut rows);
-            print_table(&["KEY", "VALUE"], &rows);
+            ui::show(View::table("config", ["KEY", "VALUE"], rows))?;
         }
     }
     Ok(())
