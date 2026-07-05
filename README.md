@@ -93,33 +93,37 @@ on `PATH` (or `scripts/dev.sh --desktop` for the Tauri shell with frontend HMR).
 
 ```bash
 hestia                           # help
+hestia play                      # launch an instance — the happy path:
+                                 #   one instance runs directly, several prompt a pick
 
-# Minecraft accounts (Microsoft sign-in)
-hestia auth login                # device-code flow — enter the shown code in a browser
-hestia auth login --sisu         # browser-redirect flow: sign in, paste the redirect back
-hestia auth list                 # signed-in accounts
-hestia auth logout <name|uuid>   # sign out and forget the stored tokens
+# Minecraft accounts (Microsoft sign-in; `auth` is an alias)
+hestia account login             # device-code flow — enter the shown code in a browser
+hestia account login --sisu      # browser-redirect flow: sign in, paste the redirect back
+hestia account list              # signed-in accounts ('*' marks the one launches use)
+hestia account switch [name]     # pick the account launches use (prompts when omitted)
+hestia account logout <name|uuid>
 
 # Java runtimes (Eclipse Temurin via the Adoptium API)
-hestia java available            # release lines the provider ships
+hestia java releases             # release lines the provider ships
 hestia java install 21           # resolve, download, verify, extract, register
 hestia java list                 # installed runtimes
 hestia java uninstall 21
 
 # Minecraft servers (fully provisioned at create; run under the daemon)
-hestia server available          # pick a flavor, list its versions
-hestia server create vanilla 1.21.1 --eula     # profile + java + jar + eula
-hestia server create fabric 1.21.1 --name smp  # --loader pins a loader version
+hestia server create             # interactive: flavor → version → EULA confirm
+hestia server create vanilla 1.21.1 --eula -n smp   # scriptable (-l pins a loader)
 hestia server list               # managed servers and their state
 hestia server start smp          # immediate spawn (already provisioned)
-hestia server logs smp --tail 50
-hestia server status smp | stop smp | remove smp
+hestia server logs smp -n 50
+hestia server status smp | stop smp | restart smp | remove smp
+hestia server versions [flavor] | flavors           # browse the catalogue
 
 # Minecraft instances (clients; files materialise at first launch)
-hestia instance available
-hestia instance create fabric 1.21.1 --name modded
+hestia instance create           # interactive: flavor → version
+hestia instance create fabric 1.21.1 -n modded
 hestia instance launch modded    # ensures java/client/libraries/assets, then runs
-hestia instance list | stop modded | remove modded
+hestia instance list | info modded | stop modded | remove modded
+hestia instance versions [flavor] | flavors
 
 # Download cache
 hestia cache info | list | clear
