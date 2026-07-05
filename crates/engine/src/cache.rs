@@ -64,13 +64,16 @@ impl Cache {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed) + 1;
         let tmp = blob.with_extension(format!("part{n}"));
-        if std::fs::copy(file, &tmp).is_err() {
+        if let Err(e) = std::fs::copy(file, &tmp) {
+            tracing::warn!(hex = %checksum.hex, "failed to stage cache blob: {e}");
             let _ = std::fs::remove_file(&tmp);
             return;
         }
         if std::fs::rename(&tmp, &blob).is_err() {
             let _ = std::fs::remove_file(&tmp);
+            return;
         }
+        tracing::debug!(algorithm = checksum.algorithm.as_str(), hex = %checksum.hex, "cached blob");
     }
 
     pub fn evict(&self, checksum: &Checksum) {
@@ -105,6 +108,11 @@ impl Cache {
         for algorithm in ALGORITHMS {
             let _ = std::fs::remove_dir_all(base.join(algorithm.as_str()));
         }
+        tracing::info!(
+            entries = freed.entries,
+            bytes = freed.bytes,
+            "cache cleared"
+        );
         freed
     }
 }

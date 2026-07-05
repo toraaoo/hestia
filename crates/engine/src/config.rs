@@ -89,7 +89,9 @@ impl Config {
                 source,
             })?;
         inner.settings = settings;
-        save_settings(&inner.path, &inner.settings)
+        save_settings(&inner.path, &inner.settings)?;
+        tracing::info!(key, "config updated");
+        Ok(())
     }
 
     /// The effective settings as a JSON object.
@@ -101,6 +103,7 @@ impl Config {
     pub fn reload(&self, path: PathBuf) {
         let mut inner = self.inner.lock().unwrap();
         inner.settings = load_settings(&path);
+        tracing::debug!(path = %path.display(), "config store reloaded");
         inner.path = path;
     }
 }

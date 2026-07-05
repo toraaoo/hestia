@@ -76,6 +76,7 @@ impl<'a> Downloader<'a> {
         if let (Some(cache), Some(checksum)) = (self.cache, checksum) {
             cache.store(destination, checksum);
         }
+        tracing::debug!(url, dest = %destination.display(), "download complete");
         Ok(())
     }
 

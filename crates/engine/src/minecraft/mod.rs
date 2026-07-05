@@ -61,6 +61,7 @@ impl Minecraft {
         version: &str,
         loader_version: Option<String>,
     ) -> Result<ServerProfile> {
+        tracing::info!(flavor, version, ?loader_version, "resolving server profile");
         self.server(flavor)?
             .resolve(&ResolveRequest {
                 version: version.to_string(),
@@ -79,6 +80,12 @@ impl Minecraft {
         version: &str,
         loader_version: Option<String>,
     ) -> Result<InstanceProfile> {
+        tracing::info!(
+            flavor,
+            version,
+            ?loader_version,
+            "resolving instance profile"
+        );
         self.instance(flavor)?
             .resolve(&ResolveRequest {
                 version: version.to_string(),

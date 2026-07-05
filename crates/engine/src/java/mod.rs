@@ -75,6 +75,11 @@ impl Java {
                 }
             }
         }
+        if removed {
+            tracing::info!(major, "uninstalled java runtime");
+        } else {
+            tracing::debug!(major, "no java runtime to uninstall");
+        }
         removed
     }
 
@@ -90,8 +95,10 @@ impl Java {
         if major <= 0 {
             bail!("invalid java major version: {major}");
         }
+        tracing::info!(major, force, "java install requested");
         if !force {
             if let Some(runtime) = self.installed().into_iter().find(|r| r.major == major) {
+                tracing::info!(major, release = %runtime.release_name, "java already installed");
                 return Ok(JavaInstallOutcome {
                     runtime,
                     already_installed: true,
@@ -107,6 +114,12 @@ impl Java {
         on_progress(&phase(JavaInstallPhase::Resolving));
         let package = adoptium::resolve(major, &platform::host_target()?).await?;
         validate_archive_name(&package.archive_name)?;
+        tracing::info!(
+            major,
+            release = %package.release_name,
+            archive = %package.archive_name,
+            "resolved java package"
+        );
 
         let base = self.dir();
         let install_dir = base.join(format!("{}-{}", package.vendor, package.major));
@@ -124,14 +137,15 @@ impl Java {
                 &on_progress,
             )
             .await;
-        if result.is_err() {
+        if let Err(e) = &result {
+            tracing::error!(major, "java install failed: {e:#}");
             let _ = std::fs::remove_dir_all(&staging);
             let _ = std::fs::remove_file(&archive);
         }
         result?;
         let _ = std::fs::remove_file(&archive);
 
-        read_runtime(&install_dir)
+        let outcome = read_runtime(&install_dir)
             .map(|runtime| JavaInstallOutcome {
                 runtime,
                 already_installed: false,
@@ -141,7 +155,13 @@ impl Java {
                     "install of {} did not produce a usable runtime",
                     package.release_name
                 )
-            })
+            })?;
+        tracing::info!(
+            major,
+            home = %outcome.runtime.home.display(),
+            "installed java runtime"
+        );
+        Ok(outcome)
     }
 
     async fn run_install(
@@ -168,6 +188,7 @@ impl Java {
             current: 0,
             total: 0,
         });
+        tracing::debug!(archive = %archive.display(), "extracting java archive");
         let archive_owned = archive.to_path_buf();
         let staging_owned = staging.to_path_buf();
         tokio::task::spawn_blocking(move || {
