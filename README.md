@@ -9,10 +9,13 @@ it's just as comfortable from a terminal as from a window.
 > C++ tree is gone. Hestia runs as a daemon (`hestiad`) with thin clients over a
 > local socket. In place today: the build/workspace, logging, a config store, the
 > CLI, Java runtime management (install/list/uninstall via the Adoptium API),
-> Microsoft account sign-in, a daemon-internal process supervisor (the mechanism
-> that will launch and track the game), and a stock Tauri desktop shell. Still to come: the Minecraft launch
-> pipeline (instances, version manifests, assembling the JVM command) and a
-> functional tray.
+> Microsoft account sign-in, a daemon-internal process supervisor, and full
+> Minecraft **server** and **instance** management — a server is fully
+> provisioned at create (jar + java runtime + EULA) and started/stopped under
+> the supervisor; an instance materialises its files (client jar, libraries,
+> assets) at launch and runs as the signed-in account. Vanilla and Fabric are
+> the shipped flavors. Still to come: wiring the stock Tauri desktop shell to
+> the daemon and a functional tray.
 
 ## Front-ends
 
@@ -102,6 +105,21 @@ hestia java available            # release lines the provider ships
 hestia java install 21           # resolve, download, verify, extract, register
 hestia java list                 # installed runtimes
 hestia java uninstall 21
+
+# Minecraft servers (fully provisioned at create; run under the daemon)
+hestia server available          # pick a flavor, list its versions
+hestia server create vanilla 1.21.1 --eula     # profile + java + jar + eula
+hestia server create fabric 1.21.1 --name smp  # --loader pins a loader version
+hestia server list               # managed servers and their state
+hestia server start smp          # immediate spawn (already provisioned)
+hestia server logs smp --tail 50
+hestia server status smp | stop smp | remove smp
+
+# Minecraft instances (clients; files materialise at first launch)
+hestia instance available
+hestia instance create fabric 1.21.1 --name modded
+hestia instance launch modded    # ensures java/client/libraries/assets, then runs
+hestia instance list | stop modded | remove modded
 
 # Download cache
 hestia cache info | list | clear

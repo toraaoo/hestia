@@ -97,8 +97,11 @@ pub trait Contract {
 An unsolicited daemon→client push is a **`Topic`** (the implementing type is its
 own payload). `Empty` is the `{}` payload for channels that take or return
 nothing. One module per domain: `app`, `health`, `daemon`, `config`, `cache`,
-`download`, `java`, `accounts`, `process`, `minecraft`, `events`. Adding a channel
-is a struct plus an `impl Contract` — see [contributing.md](contributing.md).
+`download`, `java`, `accounts`, `process`, `server`, `instance`, `events` —
+plus `minecraft`, the provider vocabulary (`Flavor`, `GameVersion`, `Artifact`,
+the profiles, `ProvisionProgress`) the `server` and `instance` domains share.
+Adding a channel is a struct plus an `impl Contract` — see
+[contributing.md](contributing.md).
 
 ### `ipc` — transport + envelope
 
@@ -217,13 +220,35 @@ The subsystems behind the aggregate:
   registries. A *flavor* is a distribution (`vanilla`, `fabric`); a provider lists
   the game *versions* it supports and *resolves* a request into a launch profile —
   the full descriptor (`ServerProfile` / `InstanceProfile`: primary artifact,
-  libraries, asset index, java major, main class, args) the launch pipeline will
-  consume. Stateless (every result is fetched upstream), so it needs no data
+  libraries, asset index, java major, main class, args) the launch pipeline
+  consumes. Stateless (every result is fetched upstream), so it needs no data
   directory. Manifest parsing lives in `minecraft/meta/` (`mojang`, `fabric`).
+  Two further modules are the launch pipeline over the profiles:
+    - **`minecraft/materialize`** — idempotently ensures profile pieces on disk
+      (skip-if-present): single jars, Maven-layout libraries under a shared
+      `libraries/` root, and the content-addressed asset store
+      (`assets/indexes/<id>.json` + `assets/objects/<hh>/<hash>`), all
+      SHA-verified through `Downloader` (a bounded number of concurrent fetches).
+    - **`minecraft/launch`** — pure assembly of a **`LaunchPlan`**
+      (program/args/cwd): classpath joining and Mojang `${placeholder}`
+      substitution (auth, paths, names); no I/O.
+- **`servers`** / **`instances`** (`Servers`, `Instances`) — the persistent
+  stores, one directory per entry beside a JSON record (`servers/<id>/server.json`
+  holding the resolved profile snapshot; the disk is the registry, as with
+  `java`). A server directory is also its working dir — jar, `eula.txt`, world.
+  An instance directory is the game dir (saves, options); its heavyweight files
+  live in the shared roots and materialise at launch. The `Engine` aggregate
+  composes the cross-subsystem flows: `provision_server` (resolve → register →
+  ensure the Java runtime, installing through the cache when missing → download
+  files → mark ready, removing the record on failure), `server_launch_plan`,
+  `create_instance`, and `prepare_instance` (materialise java/client/libraries/
+  assets, then assemble the plan for the signed-in account's rotated token).
+  Servers are fully provisioned at create so `start` is an immediate spawn;
+  instances are records at create and pay at launch.
 
 Errors are `thiserror` enums (e.g. `ConfigError`); the daemon maps them to
 `ipc::errors` codes at the service boundary. `anyhow` is used where an operation
-composes many fallible steps (accounts, minecraft, java).
+composes many fallible steps (accounts, minecraft, java, provisioning).
 
 ## `daemon` — hestiad
 
@@ -255,10 +280,14 @@ supervises launched processes, and manages autostart. The only crate that links
       returned `ServiceError` (`not_found` / `bad_request` / `handler_error`) to its
       protocol code. The channel name and payload shapes come from the contract, so
       a handler physically cannot drift from the client SDK.
-    - **`managers.rs`** — `DownloadManager` and `JavaInstallManager`: the
-      worker-thread pattern that lets `download.start` / `java.install` answer
-      immediately while the blocking engine work runs off-thread, publishing
-      progress/done/error events through the hub.
+    - **`managers.rs`** — `DownloadManager`, `JavaInstallManager`,
+      `ServerCreateManager`, and `InstanceLaunchManager`: the worker-thread
+      pattern that lets `download.start` / `java.install` / `server.create` /
+      `instance.launch` answer immediately while the blocking engine work runs
+      off-thread, publishing progress/done/error events through the hub. The
+      launch manager hands the prepared `LaunchPlan` to the supervisor under a
+      deterministic process id (`server-<id>` / `instance-<id>`), so every
+      channel can find a server's process without bookkeeping.
     - **`process.rs`** — `ProcessSupervisor`: launches Minecraft (and other)
       processes as children of the daemon, tracks them, streams their logs, and
       applies a restart policy. Emits `process.started` / `process.output` /
@@ -272,7 +301,12 @@ supervises launched processes, and manages autostart. The only crate that links
   `java.releases|list|install|uninstall`, `download.start`,
   `account.login.begin|login.complete`, `account.list|remove`,
   `process.start|stop|list|status|logs`, `events.subscribe`,
-  `server.flavors|versions|resolve`, and `instance.flavors|versions|resolve`.
+  `server.flavors|versions|resolve`,
+  `server.create|list|status|remove|start|stop|logs` (create requires the
+  caller to assert EULA acceptance; start/stop/status/logs are thin over the
+  supervisor, merging the stored record with live process state), and the
+  `instance.*` counterparts: `flavors|versions|resolve|create|list|remove`,
+  plus `instance.launch|stop`.
 - **`autostart.rs`** — registers/removes the daemon as a login-time service per
   platform, driven by the `config` service when the reserved `autostart` key is
   set (`is_enabled()` / `set()`).
@@ -326,19 +360,33 @@ identity, path resolution; the wire protocol and typed client SDK; the config
 store; the download cache; Java runtime management (install/list/uninstall via
 Adoptium); Microsoft account sign-in (device-code and sisu) with token rotation;
 the daemon's process supervisor; the Minecraft provider layer (flavors, versions,
-and profile resolution for vanilla and fabric, servers and instances); and the CLI
-front-end over all of it.
+and profile resolution for vanilla and fabric, servers and instances); server
+management (create = fully provisioned: profile + java + jar + EULA;
+start/stop/status/logs over the supervisor); instance management (create a
+record, launch materialises client/libraries/assets and spawns the game as the
+signed-in account); and the CLI front-end over all of it.
 
-**Pending:** the Minecraft *launch pipeline* that consumes a resolved profile and
-drives the supervisor (materialising libraries/assets, assembling the JVM command);
-wiring the desktop shell to the daemon; and a functional tray.
+**Pending:** natives-classifier extraction for pre-1.19 clients (the resolver
+skips legacy `natives-<os>` classifier libraries, so old versions launch
+without their LWJGL natives) and the legacy (virtual) asset layout; wiring the
+desktop shell to the daemon; and a functional tray.
+
+> **Server provisioning is front-loaded by design.** A server is a long-lived,
+> repeatedly-started thing, often driven headless/scripted — `create` pays the
+> whole cost once (jar, java, EULA) so `start` is an immediate spawn that cannot
+> fail on the network. An instance is the opposite: cheap to create, and its
+> heavyweight files (client jar, shared libraries, thousands of assets) are
+> ensured idempotently at launch, shared across instances via the
+> `libraries/` / `assets/` / `versions/` roots.
 
 ## Tests
 
 - `crates/proto/tests/` — `wire` and `golden`: the envelope and contract encodings
   are pinned so a wire change is caught.
-- `crates/engine/tests/` — `store` (config/cache/java persistence) and
-  `auth_oracle` (the account sign-in state machine).
+- `crates/engine/tests/` — `store` (config/cache/java/servers/instances
+  persistence) and `auth_oracle` (the account sign-in state machine); launch-plan
+  assembly (classpath, placeholder substitution) is unit-tested in
+  `minecraft/launch.rs`.
 - `crates/daemon/tests/e2e.rs` — a client-to-daemon round trip over a real socket.
 
 Run the fast core with `cargo build -p cli -p daemon`, then
