@@ -6,7 +6,7 @@ use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine as _;
 use p256::ecdsa::signature::Signer;
 use p256::ecdsa::{Signature, SigningKey};
-use rand_core::{OsRng, RngCore};
+use p256::elliptic_curve::Generate;
 
 /// A per-login ECDSA P-256 proof key. Its public point (x, y) is advertised in
 /// the Xbox proof-of-possession JWK; `sign` produces the raw 64-byte (r‖s)
@@ -20,8 +20,8 @@ pub struct ProofKey {
 
 impl ProofKey {
     pub fn generate() -> ProofKey {
-        let signing_key = SigningKey::random(&mut OsRng);
-        let point = signing_key.verifying_key().to_encoded_point(false);
+        let signing_key = SigningKey::generate();
+        let point = signing_key.verifying_key().to_sec1_point(false);
         let x = point.x().expect("P-256 public point has an x coordinate");
         let y = point.y().expect("P-256 public point has a y coordinate");
         ProofKey {
@@ -54,7 +54,7 @@ impl ProofKey {
 
 pub fn random_bytes(count: usize) -> Vec<u8> {
     let mut out = vec![0u8; count];
-    OsRng.fill_bytes(&mut out);
+    getrandom::fill(&mut out).expect("system RNG must be available for Xbox proof-key material");
     out
 }
 
@@ -141,7 +141,7 @@ mod tests {
         /// Build a proof key from a fixed scalar so a test signs deterministically.
         fn from_scalar_bytes(bytes: &[u8; 32]) -> ProofKey {
             let signing_key = SigningKey::from_slice(bytes).expect("valid P-256 scalar");
-            let point = signing_key.verifying_key().to_encoded_point(false);
+            let point = signing_key.verifying_key().to_sec1_point(false);
             let x = point.x().expect("x coordinate");
             let y = point.y().expect("y coordinate");
             ProofKey {
