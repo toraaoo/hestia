@@ -29,6 +29,7 @@ use proto::java::{
     JavaUninstall,
 };
 use proto::minecraft::{FlavorsResult, VersionsResult};
+use proto::process::LogSource;
 use proto::process::{
     ProcessList, ProcessListResult, ProcessLogs, ProcessLogsResult, ProcessSpec, ProcessStart,
     ProcessStartResult, ProcessState, ProcessStatus, ProcessStop, RestartPolicy,
@@ -77,13 +78,13 @@ pub fn make_router() -> Router {
         })
     });
 
-    on.handle::<DaemonStop, _, _>(|_: Empty, ctx| async move {
+    on.handle::<DaemonStop, _, _>(|p, ctx| async move {
         // Stop on a short delay so this response reaches the client before the
         // serve loop shuts down.
         let runtime = ctx.runtime.clone();
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-            runtime.request_stop();
+            runtime.request_stop(p.stop_processes);
         });
         Ok(DaemonStopResult { stopping: true })
     });
@@ -305,6 +306,9 @@ pub fn make_router() -> Router {
                 pid: info.pid,
             }),
             Err(StartError::EmptyProgram) => Err(ServiceError::bad_request("program is empty")),
+            Err(StartError::InvalidId) => Err(ServiceError::bad_request(
+                "process id may only contain letters, digits, '-', '_' and '.'",
+            )),
             Err(StartError::Spawn(e)) => Err(ServiceError::handler_error(format!(
                 "cannot spawn process: {e}"
             ))),
@@ -446,6 +450,9 @@ pub fn make_router() -> Router {
             .servers()
             .remove(&record.id)
             .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+        ctx.runtime
+            .processes()
+            .discard(&server_process_id(&record.id));
         Ok(Empty {})
     });
 
@@ -467,6 +474,7 @@ pub fn make_router() -> Router {
             id: process_id,
             program: plan.program.to_string_lossy().into_owned(),
             args: plan.args,
+            log: LogSource::File(plan.cwd.join("logs").join("latest.log")),
             cwd: Some(plan.cwd),
             env: Default::default(),
             restart: RestartPolicy::Never,
@@ -476,7 +484,9 @@ pub fn make_router() -> Router {
                 process_id: info.id,
                 pid: info.pid,
             }),
-            Err(StartError::EmptyProgram) => Err(ServiceError::bad_request("program is empty")),
+            Err(StartError::EmptyProgram | StartError::InvalidId) => {
+                Err(ServiceError::bad_request("invalid launch plan"))
+            }
             Err(StartError::Spawn(e)) => Err(ServiceError::handler_error(format!(
                 "cannot spawn the server: {e}"
             ))),
@@ -546,6 +556,9 @@ pub fn make_router() -> Router {
             .instances()
             .remove(&record.id)
             .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+        ctx.runtime
+            .processes()
+            .discard(&instance_process_id(&record.id));
         Ok(Empty {})
     });
 

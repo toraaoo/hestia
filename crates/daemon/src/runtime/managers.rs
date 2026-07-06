@@ -14,7 +14,7 @@ use proto::instance::{
 };
 use proto::java::{JavaInstallDoneEvent, JavaInstallErrorEvent};
 use proto::minecraft::ProvisionProgress;
-use proto::process::{ProcessSpec, RestartPolicy};
+use proto::process::{LogSource, ProcessSpec, RestartPolicy};
 use proto::server::{
     ServerCreateDoneEvent, ServerCreateErrorEvent, ServerCreateParams, ServerCreateProgressEvent,
 };
@@ -267,13 +267,16 @@ async fn launch(
         id: instance_process_id(&record.id),
         program: plan.program.to_string_lossy().into_owned(),
         args: plan.args,
+        log: LogSource::File(plan.cwd.join("logs").join("latest.log")),
         cwd: Some(plan.cwd),
         env: BTreeMap::new(),
         restart: RestartPolicy::Never,
     };
     match processes.start(spec).await {
         Ok(info) => Ok((info.id, info.pid)),
-        Err(StartError::EmptyProgram) => Err("launch plan has no program".to_string()),
+        Err(StartError::EmptyProgram | StartError::InvalidId) => {
+            Err("invalid launch plan".to_string())
+        }
         Err(StartError::Spawn(e)) => Err(format!("cannot spawn the game: {e}")),
     }
 }

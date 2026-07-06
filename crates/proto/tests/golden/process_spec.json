@@ -1,10 +1,15 @@
 {
   "id": "process-1",
   "program": "java",
-  "args": ["-jar", "server.jar", "--nogui"],
+  "args": [
+    "-jar",
+    "server.jar",
+    "--nogui"
+  ],
   "cwd": "/home/user/.hestia/instances/main",
   "env": {
     "JAVA_TOOL_OPTIONS": "-Xmx4G"
   },
-  "restart": "on_failure"
+  "restart": "on_failure",
+  "log": "capture"
 }

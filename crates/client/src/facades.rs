@@ -63,9 +63,14 @@ impl Daemon<'_> {
             .await
     }
 
-    pub async fn stop(&self) -> Result<proto::daemon::DaemonStopResult, IpcError> {
+    /// Without `stop_processes` the supervised workloads keep running and the
+    /// next daemon re-adopts them.
+    pub async fn stop(
+        &self,
+        stop_processes: bool,
+    ) -> Result<proto::daemon::DaemonStopResult, IpcError> {
         self.session
-            .call::<proto::daemon::DaemonStop>(&proto::Empty {})
+            .call::<proto::daemon::DaemonStop>(&proto::daemon::DaemonStopParams { stop_processes })
             .await
     }
 }

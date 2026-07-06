@@ -18,13 +18,28 @@ use client::Client;
 struct Daemon {
     child: Child,
     home: std::path::PathBuf,
+    cleanup: bool,
+}
+
+impl Daemon {
+    fn wait_exit(&mut self) {
+        for _ in 0..100 {
+            if matches!(self.child.try_wait(), Ok(Some(_))) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        panic!("daemon did not exit within 5s");
+    }
 }
 
 impl Drop for Daemon {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
-        let _ = std::fs::remove_dir_all(&self.home);
+        if self.cleanup {
+            let _ = std::fs::remove_dir_all(&self.home);
+        }
     }
 }
 
@@ -37,7 +52,10 @@ fn unique_dir() -> std::path::PathBuf {
 }
 
 async fn spawn_daemon() -> (Daemon, Client) {
-    let home = unique_dir();
+    spawn_daemon_at(unique_dir(), true).await
+}
+
+async fn spawn_daemon_at(home: std::path::PathBuf, cleanup: bool) -> (Daemon, Client) {
     let sock = home.join("hestiad.sock");
     let child = Command::new(env!("CARGO_BIN_EXE_hestiad"))
         .arg("serve")
@@ -58,7 +76,18 @@ async fn spawn_daemon() -> (Daemon, Client) {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     let client = client.expect("daemon did not become reachable within 5s");
-    (Daemon { child, home }, client)
+    (
+        Daemon {
+            child,
+            home,
+            cleanup,
+        },
+        client,
+    )
+}
+
+fn pid_alive(pid: u32) -> bool {
+    unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
 }
 
 #[tokio::test]
@@ -159,6 +188,88 @@ async fn daemon_serves_the_full_client_surface() {
     }
     assert!(killed, "the process should report Killed after stop");
 
-    client.daemon().stop().await.expect("daemon.stop");
+    client.daemon().stop(false).await.expect("daemon.stop");
     drop(daemon);
+}
+
+#[tokio::test]
+async fn supervised_processes_survive_a_daemon_restart() {
+    let home = unique_dir();
+    let (mut daemon, client) = spawn_daemon_at(home.clone(), false).await;
+
+    let started = client
+        .process()
+        .start(ProcessSpec {
+            id: "e2e-survivor".into(),
+            program: "/bin/sh".into(),
+            args: vec!["-c".into(), "sleep 60".into()],
+            ..Default::default()
+        })
+        .await
+        .expect("process.start");
+    let pid = started.pid;
+    assert!(pid_alive(pid));
+
+    client.daemon().stop(false).await.expect("daemon.stop");
+    drop(client);
+    daemon.wait_exit();
+    assert!(
+        pid_alive(pid),
+        "the process should outlive the daemon that spawned it"
+    );
+
+    let (daemon2, client) = spawn_daemon_at(home.clone(), true).await;
+    let status = client
+        .process()
+        .status("e2e-survivor")
+        .await
+        .expect("process.status after restart");
+    assert_eq!(status.state, ProcessState::Running);
+    assert_eq!(status.pid, pid, "the adopted process keeps its pid");
+
+    client
+        .process()
+        .stop("e2e-survivor")
+        .await
+        .expect("process.stop");
+    let mut stopped = false;
+    for _ in 0..100 {
+        let s = client.process().status("e2e-survivor").await.unwrap();
+        if s.state == ProcessState::Killed {
+            stopped = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(stopped, "an adopted process should still be stoppable");
+    assert!(!pid_alive(pid));
+
+    drop(daemon2);
+    drop(daemon);
+}
+
+#[tokio::test]
+async fn daemon_stop_all_takes_workloads_down() {
+    let (mut daemon, client) = spawn_daemon().await;
+
+    let started = client
+        .process()
+        .start(ProcessSpec {
+            program: "/bin/sh".into(),
+            args: vec!["-c".into(), "sleep 60".into()],
+            ..Default::default()
+        })
+        .await
+        .expect("process.start");
+
+    client.daemon().stop(true).await.expect("daemon.stop");
+    drop(client);
+    daemon.wait_exit();
+    for _ in 0..50 {
+        if !pid_alive(started.pid) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    panic!("stop --all should take the workload down with the daemon");
 }

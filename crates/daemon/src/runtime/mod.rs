@@ -7,6 +7,7 @@ mod process;
 pub mod router;
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -78,6 +79,7 @@ pub struct Runtime {
     log_path: PathBuf,
     started: Instant,
     stop: Notify,
+    stop_processes: AtomicBool,
 }
 
 impl Runtime {
@@ -86,7 +88,10 @@ impl Runtime {
         let hub = Arc::new(EventHub::default());
         let java_installs = JavaInstallManager::new(engine.clone(), hub.clone());
         let downloads = DownloadManager::new(engine.clone(), hub.clone());
-        let processes = Arc::new(ProcessSupervisor::new(hub.clone()));
+        let processes = Arc::new(ProcessSupervisor::new(
+            hub.clone(),
+            engine.data_home().join("processes"),
+        ));
         let server_creates = ServerCreateManager::new(engine.clone(), hub.clone());
         let instance_launches =
             InstanceLaunchManager::new(engine.clone(), hub.clone(), processes.clone());
@@ -101,6 +106,7 @@ impl Runtime {
             log_path,
             started: Instant::now(),
             stop: Notify::new(),
+            stop_processes: AtomicBool::new(false),
         }
     }
 
@@ -152,13 +158,22 @@ impl Runtime {
     }
 
     /// Ask the serve loop to shut down (the `daemon.stop` handler calls this).
-    pub fn request_stop(&self) {
+    pub fn request_stop(&self, stop_processes: bool) {
+        self.stop_processes.store(stop_processes, Ordering::SeqCst);
         self.stop.notify_waiters();
     }
 
     /// Resolves when a stop has been requested.
     pub async fn stopped(&self) {
         self.stop.notified().await;
+    }
+
+    /// An OS-signal shutdown never stops workloads; only an explicit
+    /// `daemon.stop` with `stop_processes` does.
+    pub async fn shutdown_workloads(&self) {
+        if self.stop_processes.load(Ordering::SeqCst) {
+            self.processes.stop_all_and_wait().await;
+        }
     }
 }
 

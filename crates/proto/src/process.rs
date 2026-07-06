@@ -16,7 +16,18 @@ pub enum RestartPolicy {
     OnFailure,
 }
 
-/// A request to launch a process as a child of the daemon.
+/// Where a supervised process's output ends up.
+#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LogSource {
+    /// The supervisor captures stdout+stderr into a file it owns.
+    #[default]
+    Capture,
+    /// The process writes its own log; the supervisor tails this file instead.
+    File(PathBuf),
+}
+
+/// A request to launch a process under the daemon's supervisor.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
 pub struct ProcessSpec {
@@ -28,6 +39,7 @@ pub struct ProcessSpec {
     pub cwd: Option<PathBuf>,
     pub env: BTreeMap<String, String>,
     pub restart: RestartPolicy,
+    pub log: LogSource,
 }
 
 /// Where a supervised process is in its lifecycle.

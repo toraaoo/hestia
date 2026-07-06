@@ -11,7 +11,7 @@
 use proto::accounts::{Account, AccountLoginBeginResult};
 use proto::app::AppInfoResult;
 use proto::cache::{CacheEntry, CacheInfoResult};
-use proto::daemon::DaemonStatusResult;
+use proto::daemon::{DaemonStatusResult, DaemonStopParams};
 use proto::download::DownloadSpec;
 use proto::instance::InstanceInfo;
 use proto::java::{JavaInstallProgress, JavaRuntime};
@@ -68,6 +68,16 @@ golden!(
     "account_login_begin_result.json"
 );
 golden!(process_spec, ProcessSpec, "process_spec.json");
+golden!(
+    process_spec_log_file,
+    ProcessSpec,
+    "process_spec_log_file.json"
+);
+golden!(
+    daemon_stop_params,
+    DaemonStopParams,
+    "daemon_stop_params.json"
+);
 golden!(process_info, ProcessInfo, "process_info.json");
 golden!(
     process_output_event,

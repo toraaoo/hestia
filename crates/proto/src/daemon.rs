@@ -23,6 +23,13 @@ impl Contract for DaemonStatus {
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
+pub struct DaemonStopParams {
+    /// When false (the default), supervised processes keep running.
+    pub stop_processes: bool,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
 pub struct DaemonStopResult {
     pub stopping: bool,
 }
@@ -30,6 +37,6 @@ pub struct DaemonStopResult {
 pub struct DaemonStop;
 impl Contract for DaemonStop {
     const CHANNEL: &'static str = "daemon.stop";
-    type Params = Empty;
+    type Params = DaemonStopParams;
     type Result = DaemonStopResult;
 }
