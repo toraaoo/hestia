@@ -232,19 +232,29 @@ The subsystems behind the aggregate:
     - **`minecraft/launch`** — pure assembly of a **`LaunchPlan`**
       (program/args/cwd): classpath joining and Mojang `${placeholder}`
       substitution (auth, paths, names); no I/O.
+    - **`minecraft/rcon`** — a minimal RCON client (the vanilla remote-console
+      protocol over localhost TCP): connect + authenticate + one command per
+      call. The server console's transport — see the decision note below.
 - **`servers`** / **`instances`** (`Servers`, `Instances`) — the persistent
   stores, one directory per entry beside a JSON record (`servers/<id>/server.json`
   holding the resolved profile snapshot; the disk is the registry, as with
   `java`). A server directory is also its working dir — jar, `eula.txt`, world.
+  A server's record also claims its **ports**: the game port at create (lowest
+  free from 25565, or pinned via the create params) and its rcon console
+  (port + random password) at first start. Claims are checked against every
+  other record plus a live bind probe under one allocation lock, so concurrent
+  servers can never collide; `ensure_start_config` reconciles them into
+  `server.properties` (preserving user edits) before each spawn.
   An instance directory is the game dir (saves, options); its heavyweight files
   live in the shared roots and materialise at launch. The `Engine` aggregate
   composes the cross-subsystem flows: `provision_server` (resolve → register →
   ensure the Java runtime, installing through the cache when missing → download
   files → mark ready, removing the record on failure), `server_launch_plan`,
-  `create_instance`, and `prepare_instance` (materialise java/client/libraries/
-  assets, then assemble the plan for the signed-in account's rotated token).
-  Servers are fully provisioned at create so `start` is an immediate spawn;
-  instances are records at create and pay at launch.
+  `server_command` (one console command over rcon), `create_instance`, and
+  `prepare_instance` (materialise java/client/libraries/assets, then assemble
+  the plan for the signed-in account's rotated token). Servers are fully
+  provisioned at create so `start` is an immediate spawn; instances are
+  records at create and pay at launch.
 
 Errors are `thiserror` enums (e.g. `ConfigError`); the daemon maps them to
 `ipc::errors` codes at the service boundary. `anyhow` is used where an operation
@@ -321,9 +331,10 @@ supervises launched processes, and manages autostart. The only crate that links
   picks the default account launches use; `list` reports it),
   `process.start|stop|list|status|logs`, `events.subscribe`,
   `server.flavors|versions|resolve`,
-  `server.create|list|status|remove|start|stop|logs` (create requires the
-  caller to assert EULA acceptance; start/stop/status/logs are thin over the
-  supervisor, merging the stored record with live process state), and the
+  `server.create|list|status|remove|start|stop|logs|command` (create requires
+  the caller to assert EULA acceptance; start/stop/status/logs are thin over
+  the supervisor, merging the stored record with live process state; command
+  relays one console command over the running server's rcon channel), and the
   `instance.*` counterparts: `flavors|versions|resolve|create|list|remove`,
   plus `instance.launch|stop`.
 - **`autostart.rs`** — registers/removes the daemon as a login-time service per
@@ -344,6 +355,17 @@ supervises launched processes, and manages autostart. The only crate that links
 > effect of daemon lifetime. The cost is honest bookkeeping — on-disk records,
 > start-time identity checks, file-based logs — and one observable gap: an
 > adopted process's exit code is unknowable.
+
+> **The server console is RCON, not stdin.** The input-side twin of the
+> decision above: a stdin pipe exists only between a parent and the child it
+> spawned, so it cannot be re-established for an adopted process (and dies
+> with every daemon restart). RCON is re-establishable TCP state — any daemon
+> can connect to any running server it knows the port and password for, which
+> the server's record persists. Log streaming needed nothing new for the same
+> reason: output already lives in files, tailed into `process.output` events.
+> One caveat is inherited from vanilla: rcon has no bind-address setting, so
+> the listener is network-reachable and the per-server random password is the
+> only barrier (it never appears in logs).
 
 ## Front-ends: CLI, desktop, tray
 
@@ -370,9 +392,10 @@ verbs stay aligned with the wire channels (`remove`, not `delete`).
 **Presentation layer (`ui/`).** Commands **never print directly** — they build a
 `View` (`Line`, `Note`, `Detail`, `Table`) and hand it to `ui::show`, which owns
 all output. On a terminal it renders with **ratatui** (interactive select,
-scrollable pager for long tables, live install/download progress); piped or
-redirected it degrades to plain text so output stays scriptable. `select`,
-`prompt`, `Spinner`, `InstallReporter`, and `human_bytes` round out the module.
+scrollable pager for long tables, live install/download progress, the attach
+console — live output above an input line); piped or redirected it degrades to
+plain text so output stays scriptable. `select`, `prompt`, `Spinner`,
+`InstallReporter`, `console`, and `human_bytes` round out the module.
 This is the seam for the planned TUI: bare `hestia` (no subcommand) currently
 prints help, but the intended end-state is a full-screen TUI driving the same
 `View`s (à la the claude/codex model — a bare invocation is interactive, a
@@ -400,8 +423,10 @@ store; the download cache; Java runtime management (install/list/uninstall via
 Adoptium); Microsoft account sign-in (device-code and sisu) with token rotation;
 the daemon's process supervisor; the Minecraft provider layer (flavors, versions,
 and profile resolution for vanilla and fabric, servers and instances); server
-management (create = fully provisioned: profile + java + jar + EULA;
-start/stop/status/logs over the supervisor); instance management (create a
+management (create = fully provisioned: profile + java + jar + EULA, each
+server on its own claimed port; start/stop/status/logs over the supervisor;
+a console over rcon — one-shot `command`, followed logs, interactive
+`attach`); instance management (create a
 record, launch materialises client/libraries/assets and spawns the game as the
 signed-in account); and the CLI front-end over all of it.
 

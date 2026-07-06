@@ -12,8 +12,10 @@ it's just as comfortable from a terminal as from a window.
 > Microsoft account sign-in, a process supervisor whose workloads survive
 > daemon restarts (on-disk records + re-adoption), and full
 > Minecraft **server** and **instance** management — a server is fully
-> provisioned at create (jar + java runtime + EULA) and started/stopped under
-> the supervisor; an instance materialises its files (client jar, libraries,
+> provisioned at create (jar + java runtime + EULA), runs on its own claimed
+> port under the supervisor, and has an RCON-backed console (interactive
+> attach, one-shot commands, followed logs); an instance materialises its
+> files (client jar, libraries,
 > assets) at launch and runs as the signed-in account. Vanilla and Fabric are
 > the shipped flavors. Still to come: wiring the stock Tauri desktop shell to
 > the daemon and a functional tray.
@@ -110,12 +112,17 @@ hestia java install 21           # resolve, download, verify, extract, register
 hestia java list                 # installed runtimes
 hestia java uninstall 21
 
-# Minecraft servers (fully provisioned at create; run under the daemon)
+# Minecraft servers (fully provisioned at create; run under the daemon;
+# each server claims its own port, so several run side by side)
 hestia server create             # interactive: flavor → version → EULA confirm
-hestia server create vanilla 1.21.1 --eula -n smp   # scriptable (-l pins a loader)
-hestia server list               # managed servers and their state
+hestia server create vanilla 1.21.1 --eula -n smp   # scriptable (-l pins a
+                                 #   loader, -p pins the game port)
+hestia server list               # managed servers, their address and state
 hestia server start smp          # immediate spawn (already provisioned)
-hestia server logs smp -n 50
+hestia server attach smp         # interactive console: live logs, type to send
+                                 #   commands, Esc detaches (alias: console)
+hestia server command smp say hi # one-shot console command (alias: cmd)
+hestia server logs smp -n 50     # captured output (-f keeps following)
 hestia server status smp | stop smp | restart smp | remove smp
 hestia server versions [flavor] | flavors           # browse the catalogue
 
