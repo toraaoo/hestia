@@ -9,6 +9,7 @@
 //! to arguments. The future TUI (bare `hestia`) is a third driver over the
 //! same `View`s.
 
+mod console;
 mod interactive;
 mod progress;
 mod render;
@@ -20,6 +21,7 @@ use std::sync::OnceLock;
 
 use anyhow::{bail, Result};
 
+pub use console::ConsoleEvent;
 pub use progress::{InstallReporter, ProvisionReporter, Spinner};
 pub use view::View;
 
@@ -56,6 +58,25 @@ pub fn input(text: &str, default: &str) -> Result<String> {
         return Ok(default.to_string());
     }
     interactive::input(text, default)
+}
+
+/// Run the attach console: live output above an input line whose entries go
+/// to `commands`. Blocking until detach or a `Closed` event, whose message it
+/// returns. Requires an interactive terminal. The console is the whole
+/// session, so it returns the terminal on exit — anything shown after prints
+/// plainly below it instead of into the (gone) viewport.
+pub fn console(
+    title: &str,
+    backfill: Vec<String>,
+    events: tokio::sync::mpsc::UnboundedReceiver<ConsoleEvent>,
+    commands: tokio::sync::mpsc::UnboundedSender<String>,
+) -> Result<Option<String>> {
+    if !is_interactive() {
+        bail!("no interactive terminal");
+    }
+    let result = console::run(title, backfill, events, commands);
+    screen::teardown();
+    result
 }
 
 /// Render a byte count in human units (KB, MB, …).

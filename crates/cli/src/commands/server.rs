@@ -7,9 +7,9 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
-use client::proto::process::ProcessState;
-use client::proto::server::ServerInfo;
-use client::Client;
+use client::proto::process::{ProcessInfo, ProcessState};
+use client::proto::server::{ServerCreateParams, ServerInfo};
+use client::{Client, ProcessEvent};
 
 use crate::commands::mc;
 use crate::ui::{self, ProvisionReporter, Spinner, View};
@@ -37,10 +37,27 @@ pub enum ServerCmd {
             help = "Accept the Minecraft EULA (https://aka.ms/MinecraftEULA)"
         )]
         eula: bool,
+        #[arg(short, long, help = "Pin the game port (default: lowest free)")]
+        port: Option<u16>,
     },
     /// Managed servers and their state
     #[command(visible_alias = "ls")]
     List,
+    /// Attach an interactive console: live logs, type to send commands
+    #[command(visible_alias = "console")]
+    Attach {
+        /// Server name or id
+        server: String,
+    },
+    /// Send one console command and print the reply
+    #[command(visible_alias = "cmd")]
+    Command {
+        /// Server name or id
+        server: String,
+        /// The command, as it would be typed in the console
+        #[arg(required = true, trailing_var_arg = true)]
+        command: Vec<String>,
+    },
     /// Start a server under the daemon's supervisor
     Start {
         /// Server name or id
@@ -67,6 +84,8 @@ pub enum ServerCmd {
         server: String,
         #[arg(short = 'n', long = "tail", help = "Only the last N lines")]
         tail: Option<usize>,
+        #[arg(short, long, help = "Keep streaming new output until Ctrl-C")]
+        follow: bool,
     },
     /// Delete a server (its jar, world and all)
     #[command(visible_alias = "rm")]
@@ -94,8 +113,14 @@ pub async fn run(cmd: ServerCmd) -> Result<()> {
             loader,
             name,
             eula,
-        } => create(&client, flavor, version, loader, name, eula).await?,
+            port,
+        } => create(&client, flavor, version, loader, name, eula, port).await?,
         ServerCmd::List => list(&client).await?,
+        ServerCmd::Attach { server } => return attach(client, &server).await,
+        ServerCmd::Command { server, command } => {
+            let reply = client.server().command(&server, &command.join(" ")).await?;
+            show_reply(&reply)?;
+        }
         ServerCmd::Start { server } => start(&client, &server).await?,
         ServerCmd::Stop { server } => {
             {
@@ -116,13 +141,20 @@ pub async fn run(cmd: ServerCmd) -> Result<()> {
             let info = client.server().status(&server).await?;
             show_status(&info)?;
         }
-        ServerCmd::Logs { server, tail } => {
+        ServerCmd::Logs {
+            server,
+            tail,
+            follow,
+        } => {
             let lines = client.server().logs(&server, tail).await?;
-            if lines.is_empty() {
+            if lines.is_empty() && !follow {
                 return ui::show(View::note("no output captured (has it been started?)"));
             }
             for line in lines {
                 ui::show(View::line(line.line))?;
+            }
+            if follow {
+                follow_logs(&client, &server).await?;
             }
         }
         ServerCmd::Remove { server } => {
@@ -162,6 +194,7 @@ async fn create(
     loader: Option<String>,
     name: Option<String>,
     eula: bool,
+    port: Option<u16>,
 ) -> Result<()> {
     let flavors = {
         let _spinner = Spinner::start("fetching flavors");
@@ -183,16 +216,132 @@ async fn create(
 
     let reporter = Arc::new(ProvisionReporter::new());
     let progress = reporter.clone();
+    let params = ServerCreateParams {
+        name,
+        flavor,
+        version,
+        loader_version: loader,
+        eula: true,
+        port,
+        id: String::new(),
+    };
     let result = client
         .server()
-        .create(&name, &flavor, &version, loader, true, move |p| {
-            progress.update(p)
-        })
+        .create(params, move |p| progress.update(p))
         .await;
     reporter.finish();
     let server = result?;
     ui::show(View::line(format!("server '{}' created", server.name)))?;
     show_status(&server)
+}
+
+/// Attach an interactive console to a running server: its live output above
+/// an input line; Esc detaches without touching the server.
+async fn attach(client: Client, server: &str) -> Result<()> {
+    if !ui::is_interactive() {
+        bail!("attach needs an interactive terminal (use `server logs -f` and `server command`)");
+    }
+    let info = client.server().status(server).await?;
+    let process =
+        running_process(&info).with_context(|| format!("server '{}' is not running", info.name))?;
+    let backfill = client
+        .server()
+        .logs(&info.id, Some(100))
+        .await?
+        .into_iter()
+        .map(|l| l.line)
+        .collect();
+    let mut process_events = client.process().subscribe(&process.id).await?;
+
+    let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (command_tx, mut command_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+
+    let forward_tx = event_tx.clone();
+    tokio::spawn(async move {
+        while let Some(event) = process_events.recv().await {
+            let sent = match event {
+                ProcessEvent::Output(line) => forward_tx.send(ui::ConsoleEvent::Output(line.line)),
+                ProcessEvent::Exit(_) => {
+                    let _ = forward_tx.send(ui::ConsoleEvent::Closed("server stopped".into()));
+                    break;
+                }
+            };
+            if sent.is_err() {
+                break;
+            }
+        }
+    });
+
+    // The command task owns the client: the session (and with it the
+    // subscription) lives exactly as long as the console runs.
+    let server_id = info.id.clone();
+    tokio::spawn(async move {
+        while let Some(command) = command_rx.recv().await {
+            let event = match client.server().command(&server_id, &command).await {
+                Ok(reply) => ui::ConsoleEvent::Reply(strip_codes(&reply)),
+                Err(e) => ui::ConsoleEvent::Notice(format!("{e:#}")),
+            };
+            if event_tx.send(event).is_err() {
+                break;
+            }
+        }
+    });
+
+    let title = format!(" {} ", info.name);
+    let closed =
+        tokio::task::spawn_blocking(move || ui::console(&title, backfill, event_rx, command_tx))
+            .await??;
+    match closed {
+        Some(message) => ui::show(View::note(message)),
+        None => ui::show(View::note(format!("detached ('{server}' keeps running)"))),
+    }
+}
+
+async fn follow_logs(client: &Client, server: &str) -> Result<()> {
+    let info = client.server().status(server).await?;
+    let process =
+        running_process(&info).with_context(|| format!("server '{}' is not running", info.name))?;
+    let mut events = client.process().subscribe(&process.id).await?;
+    while let Some(event) = events.recv().await {
+        match event {
+            ProcessEvent::Output(line) => ui::show(View::line(line.line))?,
+            ProcessEvent::Exit(_) => {
+                return ui::show(View::note("server stopped"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn running_process(info: &ServerInfo) -> Option<ProcessInfo> {
+    info.process
+        .clone()
+        .filter(|p| p.state == ProcessState::Running)
+}
+
+fn show_reply(reply: &str) -> Result<()> {
+    let reply = strip_codes(reply);
+    if reply.trim().is_empty() {
+        return ui::show(View::note("(no reply)"));
+    }
+    for line in reply.lines() {
+        ui::show(View::line(line))?;
+    }
+    Ok(())
+}
+
+/// Drop Minecraft's `§x` color codes — RCON replies carry them verbatim.
+fn strip_codes(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c == '§' {
+            chars.next();
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 /// Interactive fallback for a missing `--eula`; errors when stdin is not a
@@ -249,13 +398,14 @@ async fn list(client: &Client) -> Result<()> {
                 s.flavor.clone(),
                 s.game_version.clone(),
                 s.loader_version.clone().unwrap_or_else(|| "-".into()),
+                address_label(s),
                 state_label(s),
             ]
         })
         .collect();
     ui::show(View::table(
         "servers",
-        ["NAME", "FLAVOR", "VERSION", "LOADER", "STATE"],
+        ["NAME", "FLAVOR", "VERSION", "LOADER", "ADDRESS", "STATE"],
         rows,
     ))
 }
@@ -271,8 +421,20 @@ fn show_status(info: &ServerInfo) -> Result<()> {
             info.loader_version.clone().unwrap_or_else(|| "-".into()),
         ),
         ("java", info.java_major.to_string()),
+        ("address", address_label(info)),
+        (
+            "console",
+            if info.console { "yes" } else { "on next start" }.into(),
+        ),
         ("state", state_label(info)),
     ]))
+}
+
+fn address_label(info: &ServerInfo) -> String {
+    match info.game_port {
+        Some(port) => format!("localhost:{port}"),
+        None => "-".into(),
+    }
 }
 
 fn state_label(info: &ServerInfo) -> String {
