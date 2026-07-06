@@ -34,6 +34,7 @@ fn find_daemon() -> PathBuf {
 /// front-end that spawned it.
 pub fn spawn_daemon() -> std::io::Result<()> {
     let program = find_daemon();
+    tracing::debug!(program = %program.display(), "spawning the daemon");
     let mut cmd = Command::new(program);
     cmd.arg("serve")
         .stdin(std::process::Stdio::null())
@@ -64,11 +65,16 @@ pub fn spawn_daemon() -> std::io::Result<()> {
 
 /// Poll briefly for a freshly-spawned daemon's endpoint to appear.
 pub async fn connect_with_retry(endpoint: &std::path::Path) -> Option<Connection> {
-    for _ in 0..60 {
+    for attempt in 1..=60 {
         if let Ok(conn) = ipc::connect(endpoint).await {
+            tracing::debug!(attempt, "connected to the spawned daemon");
             return Some(conn);
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
+    tracing::warn!(
+        endpoint = %endpoint.display(),
+        "spawned daemon never came up on its endpoint"
+    );
     None
 }

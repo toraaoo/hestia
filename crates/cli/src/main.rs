@@ -11,8 +11,14 @@ use common::LogLevel;
 #[derive(Parser)]
 #[command(name = "hestia", version, about = "Hestia command-line interface")]
 struct Cli {
-    #[arg(short, long, global = true, help = "Enable verbose (debug) logging")]
-    verbose: bool,
+    #[arg(
+        short,
+        long,
+        global = true,
+        action = clap::ArgAction::Count,
+        help = "Increase log verbosity (-v debug, -vv trace)"
+    )]
+    verbose: u8,
     #[arg(
         short,
         long,
@@ -81,20 +87,24 @@ enum Command {
 fn main() -> ExitCode {
     let cli = Cli::parse();
 
-    let level = if cli.verbose {
-        LogLevel::Debug
-    } else if cli.quiet {
+    let level = if cli.quiet {
         LogLevel::Warn
     } else {
-        LogLevel::Info
+        match cli.verbose {
+            0 => LogLevel::Info,
+            1 => LogLevel::Debug,
+            _ => LogLevel::Trace,
+        }
     };
     let _guard = common::init_logging(level, None);
+    tracing::debug!(version = common::app::VERSION, "hestia cli starting");
 
     // In the daemon model the data directory is daemon-global, so --home is
     // exported as $HESTIA_HOME and only takes effect when this invocation
     // auto-spawns the daemon; a daemon already running keeps its own directory.
     if let Some(home) = &cli.home {
         if !home.is_empty() {
+            tracing::debug!(home, "exporting HESTIA_HOME for an auto-spawned daemon");
             std::env::set_var("HESTIA_HOME", home);
         }
     }

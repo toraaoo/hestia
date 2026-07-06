@@ -27,10 +27,18 @@ impl Client {
     pub async fn connect(auto_spawn: bool) -> Result<Client, IpcError> {
         let endpoint = ipc::endpoint::default_endpoint();
         match ipc::connect(&endpoint).await {
-            Ok(conn) => Ok(Client {
-                session: Session::new(conn),
-            }),
-            Err(_) if auto_spawn => {
+            Ok(conn) => {
+                tracing::debug!(endpoint = %endpoint.display(), "connected to the daemon");
+                Ok(Client {
+                    session: Session::new(conn),
+                })
+            }
+            Err(e) if auto_spawn => {
+                tracing::debug!(
+                    endpoint = %endpoint.display(),
+                    error = %e,
+                    "daemon not reachable; auto-spawning"
+                );
                 spawn::spawn_daemon()?;
                 match spawn::connect_with_retry(&endpoint).await {
                     Some(conn) => Ok(Client {
