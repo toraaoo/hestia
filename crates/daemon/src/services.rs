@@ -35,9 +35,9 @@ use proto::process::{
     ProcessStartResult, ProcessState, ProcessStatus, ProcessStop, RestartPolicy,
 };
 use proto::server::{
-    ServerCreate, ServerCreateResult, ServerFlavors, ServerList, ServerListResult, ServerLogs,
-    ServerRemove, ServerResolve, ServerStart, ServerStartResult, ServerStatus, ServerStop,
-    ServerVersions,
+    ServerCommand, ServerCommandResult, ServerCreate, ServerCreateResult, ServerFlavors,
+    ServerList, ServerListResult, ServerLogs, ServerRemove, ServerResolve, ServerStart,
+    ServerStartResult, ServerStatus, ServerStop, ServerVersions,
 };
 use proto::Empty;
 use serde_json::{json, Value};
@@ -504,6 +504,26 @@ pub fn make_router() -> Router {
         }
         ctx.runtime.processes().stop(&process_id);
         Ok(Empty {})
+    });
+
+    on.handle::<ServerCommand, _, _>(|p, ctx| async move {
+        if p.command.trim().is_empty() {
+            return Err(ServiceError::bad_request("command is empty"));
+        }
+        let record = find_server(&ctx, &p.server)?;
+        if !is_running(&ctx, &server_process_id(&record.id)) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is not running",
+                record.name
+            )));
+        }
+        let response = ctx
+            .runtime
+            .engine()
+            .server_command(&record.id, &p.command)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(ServerCommandResult { response })
     });
 
     on.handle::<ServerLogs, _, _>(|p, ctx| async move {

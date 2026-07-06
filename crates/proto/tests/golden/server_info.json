@@ -7,6 +7,8 @@
   "java_major": 21,
   "created_unix": 1751000000,
   "ready": true,
+  "game_port": 25565,
+  "console": true,
   "process": {
     "id": "server-fabric-1-21-1",
     "pid": 5150,

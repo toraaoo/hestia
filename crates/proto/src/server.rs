@@ -48,6 +48,12 @@ pub struct ServerInfo {
     pub created_unix: i64,
     /// False while the create job is still provisioning files.
     pub ready: bool,
+    /// Allocated at create and stable thereafter — players connect to it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub game_port: Option<u16>,
+    /// True once RCON is configured (a server started before the console
+    /// existed gains one on its next start).
+    pub console: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub process: Option<ProcessInfo>,
 }
@@ -63,6 +69,9 @@ pub struct ServerCreateParams {
     pub loader_version: Option<String>,
     /// The caller confirms the user accepted the Minecraft EULA.
     pub eula: bool,
+    /// Pin the game port; `None` picks the lowest free one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
     /// Client-supplied job id; empty asks the daemon to allocate one.
     pub id: String,
 }
@@ -149,6 +158,26 @@ impl Contract for ServerLogs {
     const CHANNEL: &'static str = "server.logs";
     type Params = ServerLogsParams;
     type Result = ProcessLogsResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerCommandParams {
+    pub server: String,
+    pub command: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerCommandResult {
+    pub response: String,
+}
+
+pub struct ServerCommand;
+impl Contract for ServerCommand {
+    const CHANNEL: &'static str = "server.command";
+    type Params = ServerCommandParams;
+    type Result = ServerCommandResult;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

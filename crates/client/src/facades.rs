@@ -26,9 +26,9 @@ use proto::process::{
     ProcessRef, ProcessSpec, ProcessStart, ProcessStartResult, ProcessStatus, ProcessStop,
 };
 use proto::server::{
-    ServerCreate, ServerCreateParams, ServerFlavors, ServerInfo, ServerList, ServerLogs,
-    ServerLogsParams, ServerRef, ServerRemove, ServerResolve, ServerStart, ServerStartResult,
-    ServerStatus, ServerStop, ServerVersions,
+    ServerCommand, ServerCommandParams, ServerCreate, ServerCreateParams, ServerFlavors,
+    ServerInfo, ServerList, ServerLogs, ServerLogsParams, ServerRef, ServerRemove, ServerResolve,
+    ServerStart, ServerStartResult, ServerStatus, ServerStop, ServerVersions,
 };
 use serde_json::Value;
 
@@ -218,6 +218,12 @@ impl Java<'_> {
     }
 }
 
+/// One event from a subscribed process's live stream.
+pub enum ProcessEvent {
+    Output(ProcessLogLine),
+    Exit(ProcessExitEvent),
+}
+
 pub struct Process<'a> {
     pub(crate) session: &'a Session,
 }
@@ -258,6 +264,40 @@ impl Process<'_> {
             tail,
         };
         Ok(self.session.call::<ProcessLogs>(&params).await?.lines)
+    }
+
+    /// Stream a process's output and exit as they happen. Installs the
+    /// session's (single) event callback, so it composes with `call`s on the
+    /// same client but not with `run_job` or another subscription; the stream
+    /// ends when the connection closes.
+    pub async fn subscribe(
+        &self,
+        id: &str,
+    ) -> Result<tokio::sync::mpsc::UnboundedReceiver<ProcessEvent>, IpcError> {
+        use proto::events::{EventsSubscribe, EventsSubscribeParams};
+        use proto::process::ProcessOutputEvent;
+        use proto::Topic;
+
+        self.session
+            .call::<EventsSubscribe>(&EventsSubscribeParams { id: id.to_string() })
+            .await?;
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        self.session
+            .set_event_callback(Some(std::sync::Arc::new(move |event: &Event| {
+                let sent = match event.topic.as_str() {
+                    ProcessOutputEvent::TOPIC => {
+                        serde_json::from_value::<ProcessOutputEvent>(event.payload.clone())
+                            .map(|e| tx.send(ProcessEvent::Output(e.line)))
+                    }
+                    ProcessExitEvent::TOPIC => {
+                        serde_json::from_value::<ProcessExitEvent>(event.payload.clone())
+                            .map(|e| tx.send(ProcessEvent::Exit(e)))
+                    }
+                    _ => return,
+                };
+                let _ = sent;
+            })));
+        Ok(rx)
     }
 
     /// Launch a process and block until it exits, forwarding each output line to
@@ -332,17 +372,15 @@ impl Server<'_> {
 
     /// Create a fully provisioned server, blocking until the daemon reports
     /// done or error and forwarding each progress event to `on_progress`.
-    /// `eula` asserts the user accepted the Minecraft EULA.
+    /// `params.eula` asserts the user accepted the Minecraft EULA; the job id
+    /// is filled in here.
     pub async fn create(
         &self,
-        name: &str,
-        flavor: &str,
-        version: &str,
-        loader_version: Option<String>,
-        eula: bool,
+        mut params: ServerCreateParams,
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
     ) -> Result<ServerInfo, IpcError> {
         let id = job_id("server-create");
+        params.id = id.clone();
         let on_event = move |event: &Event| {
             if let Ok(progress) = serde_json::from_value::<ProvisionProgress>(event.payload.clone())
             {
@@ -351,15 +389,6 @@ impl Server<'_> {
         };
 
         let session = self.session;
-        let create_id = id.clone();
-        let params = ServerCreateParams {
-            name: name.to_string(),
-            flavor: flavor.to_string(),
-            version: version.to_string(),
-            loader_version,
-            eula,
-            id: create_id.clone(),
-        };
         let payload = self
             .session
             .run_job(
@@ -413,6 +442,15 @@ impl Server<'_> {
             tail,
         };
         Ok(self.session.call::<ServerLogs>(&params).await?.lines)
+    }
+
+    /// Send one console command to a running server; returns its reply.
+    pub async fn command(&self, server: &str, command: &str) -> Result<String, IpcError> {
+        let params = ServerCommandParams {
+            server: server.to_string(),
+            command: command.to_string(),
+        };
+        Ok(self.session.call::<ServerCommand>(&params).await?.response)
     }
 }
 

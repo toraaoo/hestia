@@ -24,4 +24,4 @@ pub use instances::{InstanceRecord, Instances};
 pub use java::{Java, JavaInstallOutcome};
 pub use minecraft::launch::LaunchPlan;
 pub use minecraft::Minecraft;
-pub use servers::{ServerRecord, Servers};
+pub use servers::{RconConfig, ServerRecord, Servers};

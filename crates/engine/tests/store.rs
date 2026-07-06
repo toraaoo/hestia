@@ -66,10 +66,18 @@ fn servers_store_round_trips_records() {
         java_major: 21,
         ..Default::default()
     };
-    let record = servers.create("My Server!", profile.clone()).unwrap();
+    let record = servers.create("My Server!", profile.clone(), None).unwrap();
     assert_eq!(record.id, "my-server");
     assert!(!record.ready);
-    assert!(servers.create("My Server!", profile.clone()).is_err());
+    assert!(record.game_port.is_some());
+    assert!(servers.create("My Server!", profile.clone(), None).is_err());
+
+    let second = servers.create("Other", profile.clone(), None).unwrap();
+    assert_ne!(second.game_port, record.game_port);
+    assert!(servers
+        .create("Third", profile.clone(), record.game_port)
+        .is_err());
+    assert!(servers.remove("other").unwrap());
 
     let ready = servers.mark_ready(&record.id).unwrap();
     assert!(ready.ready);

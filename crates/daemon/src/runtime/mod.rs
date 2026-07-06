@@ -48,6 +48,8 @@ pub fn server_info(
         java_major: record.profile.java_major,
         created_unix: record.created_unix,
         ready: record.ready,
+        game_port: record.game_port,
+        console: record.rcon.is_some(),
         process,
     }
 }

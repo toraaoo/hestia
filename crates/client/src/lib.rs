@@ -5,7 +5,9 @@ mod facades;
 mod session;
 mod spawn;
 
-pub use facades::{Accounts, App, Cache, Config, Daemon, Instance, Java, Process, Server};
+pub use facades::{
+    Accounts, App, Cache, Config, Daemon, Instance, Java, Process, ProcessEvent, Server,
+};
 pub use ipc::errors::IpcError;
 pub use session::{job_id, Session};
 

@@ -157,6 +157,7 @@ impl ServerCreateManager {
                     &params.flavor,
                     &params.version,
                     params.loader_version.clone(),
+                    params.port,
                     on_progress.as_ref(),
                 )
                 .await;

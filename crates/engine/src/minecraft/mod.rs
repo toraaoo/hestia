@@ -7,6 +7,7 @@ pub(crate) mod launch;
 pub(crate) mod materialize;
 mod meta;
 mod provider;
+pub(crate) mod rcon;
 mod vanilla;
 
 use anyhow::{Context, Result};

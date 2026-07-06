@@ -14,6 +14,7 @@ use crate::instances::{InstanceRecord, Instances};
 use crate::java::Java;
 use crate::minecraft::launch::{self, InstancePaths, LaunchAccount, LaunchPlan};
 use crate::minecraft::materialize::{self, OnProgress};
+use crate::minecraft::rcon;
 use crate::minecraft::Minecraft;
 use crate::servers::{ServerRecord, Servers};
 
@@ -109,6 +110,7 @@ impl Engine {
         flavor: &str,
         version: &str,
         loader_version: Option<String>,
+        port: Option<u16>,
         on_progress: OnProgress<'_>,
     ) -> Result<ServerRecord> {
         on_progress(&phase_progress(ProvisionPhase::Resolving));
@@ -117,7 +119,7 @@ impl Engine {
             .resolve_server(flavor, version, loader_version)
             .await?;
         let name = effective_name(name, flavor, version);
-        let record = self.servers.create(&name, profile)?;
+        let record = self.servers.create(&name, profile, port)?;
 
         let provisioned = async {
             self.ensure_java(record.profile.java_major, on_progress)
@@ -134,7 +136,8 @@ impl Engine {
         self.servers.mark_ready(&record.id)
     }
 
-    /// The ready-to-spawn invocation for a provisioned server.
+    /// The ready-to-spawn invocation for a provisioned server, with its ports
+    /// reconciled into `server.properties`.
     pub fn server_launch_plan(&self, reference: &str) -> Result<(ServerRecord, LaunchPlan)> {
         let record = self
             .servers
@@ -143,9 +146,24 @@ impl Engine {
         if !record.ready {
             anyhow::bail!("server '{}' is still provisioning", record.name);
         }
+        let record = self.servers.ensure_start_config(&record.id)?;
         let java = self.installed_java(record.profile.java_major)?;
         let plan = self.servers.launch_plan(&record, &java);
         Ok((record, plan))
+    }
+
+    /// Send one console command to a running server over its RCON channel and
+    /// return the server's reply.
+    pub async fn server_command(&self, reference: &str, command: &str) -> Result<String> {
+        let record = self
+            .servers
+            .get(reference)
+            .with_context(|| format!("unknown server: {reference}"))?;
+        let rcon = record
+            .rcon
+            .context("this server has no console yet (restart it to enable one)")?;
+        let mut conn = rcon::Rcon::connect(rcon.port, &rcon.password).await?;
+        conn.command(command).await
     }
 
     /// Create an instance record from a freshly resolved profile; its files are
