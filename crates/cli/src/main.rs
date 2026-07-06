@@ -3,6 +3,7 @@
 mod commands;
 mod ui;
 
+use std::path::Path;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
@@ -24,7 +25,7 @@ struct Cli {
         long,
         global = true,
         conflicts_with = "verbose",
-        help = "Only show warnings and errors"
+        help = "Only show errors on the console"
     )]
     quiet: bool,
     #[arg(
@@ -87,16 +88,20 @@ enum Command {
 fn main() -> ExitCode {
     let cli = Cli::parse();
 
-    let level = if cli.quiet {
-        LogLevel::Warn
+    // Diagnostics go to an appended logs/hestia.log so they never garble command
+    // output; the console only sees warnings and errors unless -v/-vv raise it.
+    let (console_level, file_level) = if cli.quiet {
+        (LogLevel::Error, LogLevel::Warn)
     } else {
         match cli.verbose {
-            0 => LogLevel::default(),
-            1 => LogLevel::Debug,
-            _ => LogLevel::Trace,
+            0 => (LogLevel::Warn, LogLevel::default()),
+            1 => (LogLevel::Debug, LogLevel::Debug),
+            _ => (LogLevel::Trace, LogLevel::Trace),
         }
     };
-    let _guard = common::init_logging(level, None);
+    let home = cli.home.as_deref().filter(|h| !h.is_empty()).map(Path::new);
+    let file = common::FileLog::appending(common::paths::log_dir(home), "hestia", file_level);
+    let _guard = common::init_logging(console_level, Some(file));
     tracing::debug!(version = common::app::VERSION, "hestia cli starting");
 
     // In the daemon model the data directory is daemon-global, so --home is

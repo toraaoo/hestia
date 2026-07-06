@@ -130,9 +130,12 @@ UI-free, domain-free code linked by the daemon and every client:
 - **`app`** — the application identity constants (`NAME`, `ID`, `VENDOR`,
   `CHANNEL`, `VERSION` from `CARGO_PKG_VERSION`): one source of truth every binary
   reads.
-- **`logging`** — `init_logging(LogLevel, Option<&Path>)` configures the process
-  `tracing` subscriber once and returns a `LogGuard`. Passing a path also writes a
-  rotated file (the daemon does; short-lived clients log to stderr only).
+- **`logging`** — `init_logging(console LogLevel, Option<FileLog>)` configures the
+  process `tracing` subscriber once and returns a `LogGuard`. Each sink has its
+  own level: the console (stderr), plus an optional rotated, compressed file —
+  fresh-per-run (`logs/latest.log`, the long-lived daemon's) or appended across
+  runs and rotated by size (`logs/hestia.log`, shared by the short-lived CLI
+  invocations, whose console stays at warnings/errors unless `-v`/`-vv` raise it).
 - **`paths`** — data-directory resolution: `--home` → `$HESTIA_HOME` → a persisted
   pointer (`config set home`) → the platform default (`~/.hestia`, `%APPDATA%\Hestia`
   on Windows). **Debug builds** anchor the default at `<workspace>/.hestia` so

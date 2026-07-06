@@ -1,7 +1,10 @@
-//! Minecraft-style rotating log file. The active log is always `latest.log`; on
-//! startup and whenever it grows past `max_bytes` it is gzip-compressed to a dated
-//! archive (`<stem>-YYYY-MM-DD-N.log.gz`) and a fresh `latest.log` begins. Archives
-//! beyond `keep` are pruned oldest-first.
+//! Minecraft-style rotating log file, gzip-compressed to dated archives
+//! (`<stem>-YYYY-MM-DD-N.log.gz`) with archives beyond `keep` pruned oldest-first.
+//! Two modes: [`RollingLog::open`] starts a fresh `latest.log` per run, archiving
+//! any leftover (the long-lived daemon); [`RollingLog::open_append`] appends to a
+//! shared `<stem>.log` that accumulates across runs and rotates only once it
+//! exceeds `max_bytes` (short-lived clients, where an archive per invocation
+//! would churn).
 //!
 //! This writer runs on tracing-appender's non-blocking worker thread, so the
 //! blocking compression on rotation never stalls an application thread.
@@ -20,6 +23,8 @@ pub const ACTIVE_NAME: &str = "latest.log";
 pub struct RollingLog {
     dir: PathBuf,
     stem: String,
+    active: String,
+    append: bool,
     max_bytes: u64,
     keep: usize,
     file: File,
@@ -27,22 +32,52 @@ pub struct RollingLog {
 }
 
 impl RollingLog {
-    /// Open the live log, first archiving any leftover `latest.log` from a previous
-    /// run so each run starts a fresh file.
+    /// Open the live `latest.log` fresh, first archiving any leftover from a
+    /// previous run so each run starts a new file.
     pub fn open(dir: PathBuf, stem: &str, max_bytes: u64, keep: usize) -> io::Result<Self> {
+        Self::open_with(dir, stem, ACTIVE_NAME.to_string(), max_bytes, keep, false)
+    }
+
+    /// Open the live `<stem>.log` for appending: runs accumulate into the same
+    /// file, archived only once it exceeds `max_bytes`.
+    pub fn open_append(dir: PathBuf, stem: &str, max_bytes: u64, keep: usize) -> io::Result<Self> {
+        let active = format!("{stem}.log");
+        Self::open_with(dir, stem, active, max_bytes, keep, true)
+    }
+
+    fn open_with(
+        dir: PathBuf,
+        stem: &str,
+        active_name: String,
+        max_bytes: u64,
+        keep: usize,
+        append: bool,
+    ) -> io::Result<Self> {
         fs::create_dir_all(&dir)?;
-        let active = dir.join(ACTIVE_NAME);
-        if fs::metadata(&active).map(|m| m.len() > 0).unwrap_or(false) {
-            let _ = archive(&dir, stem, &active);
+        let active = dir.join(&active_name);
+        let len = fs::metadata(&active).map(|m| m.len()).unwrap_or(0);
+        if len > 0 && (!append || len >= max_bytes) {
+            // In append mode the open below does not truncate, so an archived
+            // file must be removed by hand or it would be archived again.
+            if archive(&dir, stem, &active).is_ok() && append {
+                let _ = fs::remove_file(&active);
+            }
         }
-        let file = open_active(&active)?;
+        let file = open_active(&active, append)?;
+        let written = if append {
+            file.metadata().map(|m| m.len()).unwrap_or(0)
+        } else {
+            0
+        };
         let log = RollingLog {
             dir,
             stem: stem.to_string(),
+            active: active_name,
+            append,
             max_bytes,
             keep,
             file,
-            written: 0,
+            written,
         };
         log.prune();
         Ok(log)
@@ -50,9 +85,12 @@ impl RollingLog {
 
     fn rotate(&mut self) -> io::Result<()> {
         self.file.flush()?;
-        let active = self.dir.join(ACTIVE_NAME);
+        let active = self.dir.join(&self.active);
         archive(&self.dir, &self.stem, &active)?;
-        self.file = open_active(&active)?;
+        if self.append {
+            let _ = fs::remove_file(&active);
+        }
+        self.file = open_active(&active, self.append)?;
         self.written = 0;
         self.prune();
         Ok(())
@@ -92,12 +130,15 @@ impl Write for RollingLog {
     }
 }
 
-fn open_active(active: &Path) -> io::Result<File> {
-    OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(active)
+fn open_active(active: &Path, append: bool) -> io::Result<File> {
+    let mut opts = OpenOptions::new();
+    opts.create(true);
+    if append {
+        opts.append(true);
+    } else {
+        opts.write(true).truncate(true);
+    }
+    opts.open(active)
 }
 
 fn archive(dir: &Path, stem: &str, active: &Path) -> io::Result<()> {
@@ -202,6 +243,53 @@ mod tests {
         assert_eq!(
             fs::read_to_string(dir.join(ACTIVE_NAME)).unwrap(),
             "fresh run\n"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn open_append_accumulates_and_archives_on_size() {
+        let dir = std::env::temp_dir().join(format!("hestia-append-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+
+        {
+            let mut log = RollingLog::open_append(dir.clone(), "test", 1024, 2).unwrap();
+            log.write_all(b"first run\n").unwrap();
+            log.flush().unwrap();
+        }
+        {
+            let mut log = RollingLog::open_append(dir.clone(), "test", 1024, 2).unwrap();
+            log.write_all(b"second run\n").unwrap();
+            log.flush().unwrap();
+        }
+        assert_eq!(
+            fs::read_to_string(dir.join("test.log")).unwrap(),
+            "first run\nsecond run\n"
+        );
+        let archives = fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| is_archive(p, "test"))
+            .count();
+        assert_eq!(archives, 0, "under the limit nothing should be archived");
+
+        {
+            let mut log = RollingLog::open_append(dir.clone(), "test", 8, 2).unwrap();
+            log.write_all(b"third run\n").unwrap();
+            log.flush().unwrap();
+        }
+        let archives = fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| is_archive(p, "test"))
+            .count();
+        assert_eq!(archives, 1, "an oversized log should be archived on open");
+        assert_eq!(
+            fs::read_to_string(dir.join("test.log")).unwrap(),
+            "third run\n"
         );
 
         let _ = fs::remove_dir_all(&dir);

@@ -161,8 +161,9 @@ hestia daemon stop --all         # stop supervised processes too
 hestia daemon stop --keep        # leave them running (script-safe)
 
 # Global flags (any position)
-hestia -v java list              # verbose / debug logging (-vv for trace)
-hestia -q java list              # warnings and errors only
+hestia -v java list              # verbose / debug logging (-vv for trace);
+                                 #   diagnostics also land in logs/hestia.log
+hestia -q java list              # errors only on the console
 hestia --home /path/to/dir config get home
 hestia --version
 ```

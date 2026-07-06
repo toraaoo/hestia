@@ -68,7 +68,7 @@ fn main() -> ExitCode {
         _ => {
             // The long-lived daemon also logs to a rotating, compressed file, since
             // clients detach its stderr.
-            let file = common::FileLog::new(common::paths::log_dir(None), "hestiad");
+            let file = common::FileLog::new(common::paths::log_dir(None), "hestiad", level);
             let log_path = file.active_path();
             let _guard = common::init_logging(level, Some(file));
             rt.block_on(server::run_daemon(log_path))
