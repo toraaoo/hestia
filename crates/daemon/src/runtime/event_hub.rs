@@ -23,6 +23,11 @@ pub struct EventHub {
 
 impl EventHub {
     pub fn subscribe(&self, conn_id: u64, out: UnboundedSender<String>, filter: Option<String>) {
+        tracing::debug!(
+            conn = conn_id,
+            filter = filter.as_deref(),
+            "event subscription added"
+        );
         self.subs.lock().unwrap().push(Sub {
             conn_id,
             out,
@@ -31,13 +36,19 @@ impl EventHub {
     }
 
     pub fn unsubscribe(&self, conn_id: u64) {
-        self.subs.lock().unwrap().retain(|s| s.conn_id != conn_id);
+        let mut subs = self.subs.lock().unwrap();
+        let before = subs.len();
+        subs.retain(|s| s.conn_id != conn_id);
+        if subs.len() < before {
+            tracing::debug!(conn = conn_id, "event subscriptions removed");
+        }
     }
 
     /// Deliver `event` to every matching subscriber, pruning any whose connection
     /// has gone away.
     pub fn publish(&self, event: &Event) {
         let id = event.payload.get("id").and_then(Value::as_str);
+        tracing::trace!(topic = %event.topic, id, "publishing event");
         let frame = encode_event(event);
         let mut subs = self.subs.lock().unwrap();
         subs.retain(|sub| {

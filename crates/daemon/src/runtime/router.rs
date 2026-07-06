@@ -65,7 +65,19 @@ impl Router {
             match self.handlers.get(&request.channel) {
                 Some(handler) => {
                     tracing::debug!("dispatch");
-                    handler(request, ctx).await
+                    let started = std::time::Instant::now();
+                    let response = handler(request, ctx).await;
+                    let elapsed_ms = started.elapsed().as_millis() as u64;
+                    match &response.error {
+                        Some(err) => tracing::warn!(
+                            code = %err.code,
+                            message = %err.message,
+                            elapsed_ms,
+                            "request failed"
+                        ),
+                        None => tracing::debug!(elapsed_ms, "request ok"),
+                    }
+                    response
                 }
                 None => {
                     tracing::warn!("no handler for channel");

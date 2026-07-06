@@ -156,6 +156,14 @@ impl ProcessSupervisor {
         );
         let snapshot = entry.snapshot();
 
+        // spec.args may carry launch credentials (e.g. an access token) — never log them.
+        tracing::info!(
+            id = %spec.id,
+            pid,
+            program = %spec.program,
+            cwd = spec.cwd.as_ref().map(|p| p.display().to_string()),
+            "process started"
+        );
         self.hub.publish(&topic_event(&ProcessStartedEvent {
             id: spec.id.clone(),
             pid,
@@ -256,6 +264,7 @@ impl ProcessSupervisor {
         let entry = self.table.lock().unwrap().get(id).cloned();
         match entry {
             Some(entry) => {
+                tracing::info!(id, "stop requested");
                 entry.stopping.store(true, Ordering::SeqCst);
                 // notify_one stores a permit, so a stop that races ahead of the
                 // supervision task's wait is not lost.
@@ -301,6 +310,7 @@ impl ProcessSupervisor {
         }
         table.remove(id);
         drop(table);
+        tracing::debug!(id, "discarding process state");
         let _ = std::fs::remove_dir_all(self.dir.join(id));
         true
     }
@@ -449,7 +459,7 @@ async fn supervise(
             spec.id.clone(),
             hub.clone(),
         );
-        let code = wait_or_stop(&entry, &mut watched).await;
+        let code = wait_or_stop(&entry, &mut watched, &spec.id).await;
         tailer.finish().await;
 
         let killed = entry.stopping.load(Ordering::SeqCst);
@@ -463,6 +473,11 @@ async fn supervise(
             let mut info = entry.info.lock().unwrap();
             info.state = state;
             info.exit_code = code;
+        }
+        if success || killed {
+            tracing::info!(id = %spec.id, ?state, exit_code = code, "process exited");
+        } else {
+            tracing::warn!(id = %spec.id, ?state, exit_code = code, "process exited with failure");
         }
         hub.publish(&topic_event(&ProcessExitEvent {
             id: spec.id.clone(),
@@ -482,6 +497,12 @@ async fn supervise(
         }
 
         attempts += 1;
+        tracing::warn!(
+            id = %spec.id,
+            attempt = attempts,
+            max = MAX_RESTARTS,
+            "restarting failed process"
+        );
         tokio::time::sleep(Duration::from_millis(500)).await;
         let respawned = prepare_stdio(&spec, &proc_dir)
             .and_then(|io| Ok((build_command(&spec, io.out, io.err).spawn()?, io.tail_from)));
@@ -500,6 +521,7 @@ async fn supervise(
                     &proc_dir,
                     &ProcessRecord::for_spawn(&spec, pid, started_unix),
                 );
+                tracing::info!(id = %spec.id, pid, "process restarted");
                 hub.publish(&topic_event(&ProcessStartedEvent {
                     id: spec.id.clone(),
                     pid,
@@ -507,7 +529,8 @@ async fn supervise(
                 watched = Watched::Owned(next);
                 tail_from = from;
             }
-            Err(_) => {
+            Err(e) => {
+                tracing::error!(id = %spec.id, error = %e, "cannot respawn process; giving up");
                 records::remove(&proc_dir);
                 return;
             }
@@ -515,13 +538,14 @@ async fn supervise(
     }
 }
 
-async fn wait_or_stop(entry: &Entry, watched: &mut Watched) -> Option<i32> {
+async fn wait_or_stop(entry: &Entry, watched: &mut Watched, id: &str) -> Option<i32> {
     match watched {
         Watched::Owned(child) => {
             let pid = child.id().unwrap_or(0);
             tokio::select! {
                 status = child.wait() => status.ok().and_then(|s| s.code()),
                 _ = entry.stop_notify.notified() => {
+                    tracing::debug!(id, pid, "requesting graceful stop");
                     identity::request_stop(pid);
                     let graceful = tokio::select! {
                         status = child.wait() => Some(status),
@@ -530,6 +554,7 @@ async fn wait_or_stop(entry: &Entry, watched: &mut Watched) -> Option<i32> {
                     match graceful {
                         Some(status) => status.ok().and_then(|s| s.code()),
                         None => {
+                            tracing::warn!(id, pid, "grace period expired; killing process");
                             let _ = child.start_kill();
                             child.wait().await.ok().and_then(|s| s.code())
                         }
@@ -547,10 +572,14 @@ async fn wait_or_stop(entry: &Entry, watched: &mut Watched) -> Option<i32> {
                         }
                     }
                     _ = entry.stop_notify.notified() => {
+                        tracing::debug!(id, pid, "requesting graceful stop of adopted process");
                         identity::request_stop(pid);
                         let deadline = tokio::time::Instant::now() + STOP_GRACE;
+                        let mut killed = false;
                         while identity::is_same(pid, token) {
-                            if tokio::time::Instant::now() >= deadline {
+                            if !killed && tokio::time::Instant::now() >= deadline {
+                                tracing::warn!(id, pid, "grace period expired; killing adopted process");
+                                killed = true;
                                 identity::kill(pid);
                             }
                             tokio::time::sleep(Duration::from_millis(200)).await;

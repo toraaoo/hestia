@@ -24,6 +24,12 @@ pub async fn run_daemon(log_path: std::path::PathBuf) -> i32 {
     };
 
     let runtime = Arc::new(Runtime::new(log_path, None));
+    tracing::info!(
+        version = common::app::VERSION,
+        pid = std::process::id(),
+        home = %runtime.engine().data_home().display(),
+        "hestiad starting"
+    );
     runtime.processes().recover();
     let router = Arc::new(make_router());
 

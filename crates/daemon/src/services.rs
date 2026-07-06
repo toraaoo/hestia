@@ -79,6 +79,7 @@ pub fn make_router() -> Router {
     });
 
     on.handle::<DaemonStop, _, _>(|p, ctx| async move {
+        tracing::info!(stop_processes = p.stop_processes, "daemon stop requested");
         // Stop on a short delay so this response reaches the client before the
         // serve loop shuts down.
         let runtime = ctx.runtime.clone();
@@ -118,13 +119,14 @@ pub fn make_router() -> Router {
                 .engine()
                 .set_data_home(&dir)
                 .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+            tracing::info!(home = %dir, "data home changed");
             return Ok(Empty {});
         }
         if p.key == AUTOSTART_KEY {
             let Value::Bool(enabled) = p.value else {
                 return Err(ServiceError::bad_request("autostart expects a boolean"));
             };
-            autostart::set(enabled).map_err(|e| ServiceError::handler_error(e.to_string()))?;
+            autostart::set(enabled).map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
             return Ok(Empty {});
         }
         ctx.runtime
@@ -132,6 +134,7 @@ pub fn make_router() -> Router {
             .config()
             .set(&p.key, p.value)
             .map_err(|e| ServiceError::bad_request(e.to_string()))?;
+        tracing::info!(key = %p.key, "config updated");
         Ok(Empty {})
     });
 
@@ -176,6 +179,11 @@ pub fn make_router() -> Router {
 
     on.handle::<CacheClear, _, _>(|_: Empty, ctx| async move {
         let freed = ctx.runtime.engine().cache().clear();
+        tracing::info!(
+            entries = freed.entries,
+            bytes = freed.bytes,
+            "cache cleared"
+        );
         Ok(CacheUsage {
             entries: freed.entries,
             bytes: freed.bytes,
@@ -189,7 +197,7 @@ pub fn make_router() -> Router {
             .java()
             .releases()
             .await
-            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
         Ok(JavaReleasesResult { releases })
     });
 
@@ -221,6 +229,7 @@ pub fn make_router() -> Router {
             ));
         }
         if ctx.runtime.engine().java().uninstall(p.major) {
+            tracing::info!(major = p.major, "java runtime uninstalled");
             Ok(Empty {})
         } else {
             Err(ServiceError::not_found(format!(
@@ -239,13 +248,14 @@ pub fn make_router() -> Router {
     });
 
     on.handle::<AccountLoginBegin, _, _>(|p, ctx| async move {
+        tracing::info!(method = ?p.method, "account login started");
         let challenge = ctx
             .runtime
             .engine()
             .accounts()
             .begin_login(p.method)
             .await
-            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
         Ok(AccountLoginBeginResult {
             id: challenge.id,
             method: challenge.method,
@@ -262,7 +272,8 @@ pub fn make_router() -> Router {
             .accounts()
             .complete_login(&p.id, &p.code)
             .await
-            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        tracing::info!(account = %account.name, "account signed in");
         Ok(AccountLoginCompleteResult { account })
     });
 
@@ -279,23 +290,29 @@ pub fn make_router() -> Router {
 
     on.handle::<AccountSwitch, _, _>(|p, ctx| async move {
         match ctx.runtime.engine().accounts().switch(&p.account) {
-            Ok(Some(account)) => Ok(AccountSwitchResult { account }),
+            Ok(Some(account)) => {
+                tracing::info!(account = %account.name, "default account switched");
+                Ok(AccountSwitchResult { account })
+            }
             Ok(None) => Err(ServiceError::not_found(format!(
                 "no account matches '{}'",
                 p.account
             ))),
-            Err(e) => Err(ServiceError::handler_error(e.to_string())),
+            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
         }
     });
 
     on.handle::<AccountRemove, _, _>(|p, ctx| async move {
         match ctx.runtime.engine().accounts().remove(&p.account) {
-            Ok(true) => Ok(Empty {}),
+            Ok(true) => {
+                tracing::info!(account = %p.account, "account removed");
+                Ok(Empty {})
+            }
             Ok(false) => Err(ServiceError::not_found(format!(
                 "no account matches '{}'",
                 p.account
             ))),
-            Err(e) => Err(ServiceError::handler_error(e.to_string())),
+            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
         }
     });
 
@@ -364,7 +381,7 @@ pub fn make_router() -> Router {
             .minecraft()
             .server_versions(&p.flavor)
             .await
-            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
         Ok(VersionsResult { versions })
     });
 
@@ -374,7 +391,7 @@ pub fn make_router() -> Router {
             .minecraft()
             .resolve_server(&p.flavor, &p.version, p.loader_version)
             .await
-            .map_err(|e| ServiceError::handler_error(e.to_string()))
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
     });
 
     on.handle::<InstanceFlavors, _, _>(|_: Empty, ctx| async move {
@@ -390,7 +407,7 @@ pub fn make_router() -> Router {
             .minecraft()
             .instance_versions(&p.flavor)
             .await
-            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
         Ok(VersionsResult { versions })
     });
 
@@ -400,7 +417,7 @@ pub fn make_router() -> Router {
             .minecraft()
             .resolve_instance(&p.flavor, &p.version, p.loader_version)
             .await
-            .map_err(|e| ServiceError::handler_error(e.to_string()))
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
     });
 
     on.handle::<ServerCreate, _, _>(|p, ctx| async move {
@@ -449,10 +466,11 @@ pub fn make_router() -> Router {
             .engine()
             .servers()
             .remove(&record.id)
-            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
         ctx.runtime
             .processes()
             .discard(&server_process_id(&record.id));
+        tracing::info!(server = %record.id, name = %record.name, "server removed");
         Ok(Empty {})
     });
 
@@ -465,6 +483,7 @@ pub fn make_router() -> Router {
                 record.name
             )));
         }
+        tracing::info!(server = %record.id, name = %record.name, "starting server");
         let (_, plan) = ctx
             .runtime
             .engine()
@@ -546,6 +565,13 @@ pub fn make_router() -> Router {
             .create_instance(&p.name, &p.flavor, &p.version, p.loader_version)
             .await
             .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        tracing::info!(
+            instance = %record.id,
+            name = %record.name,
+            flavor = %record.profile.flavor,
+            version = %record.profile.game_version,
+            "instance created"
+        );
         Ok(InstanceCreateResult {
             instance: ctx.runtime.instance_view(record),
         })
@@ -575,10 +601,11 @@ pub fn make_router() -> Router {
             .engine()
             .instances()
             .remove(&record.id)
-            .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
         ctx.runtime
             .processes()
             .discard(&instance_process_id(&record.id));
+        tracing::info!(instance = %record.id, name = %record.name, "instance removed");
         Ok(Empty {})
     });
 

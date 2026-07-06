@@ -148,9 +148,13 @@ pub fn is_enabled() -> bool {
 }
 
 pub fn set(enabled: bool) -> Result<()> {
-    if enabled {
+    let result = if enabled {
         backend::enable().context("failed to enable autostart")
     } else {
         backend::disable().context("failed to disable autostart")
+    };
+    if result.is_ok() {
+        tracing::info!(enabled, "autostart registration changed");
     }
+    result
 }

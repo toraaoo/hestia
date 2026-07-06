@@ -19,8 +19,13 @@ use common::LogLevel;
 #[derive(Parser)]
 #[command(name = "hestiad", version, about = "hestiad — the Hestia daemon")]
 struct Cli {
-    #[arg(short, long, help = "Verbose (debug) logging")]
-    verbose: bool,
+    #[arg(
+        short,
+        long,
+        action = clap::ArgAction::Count,
+        help = "Increase log verbosity (-v debug, -vv trace)"
+    )]
+    verbose: u8,
     #[arg(
         short,
         long,
@@ -42,12 +47,14 @@ enum Command {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let level = if cli.verbose {
-        LogLevel::Debug
-    } else if cli.quiet {
+    let level = if cli.quiet {
         LogLevel::Warn
     } else {
-        LogLevel::Info
+        match cli.verbose {
+            0 => LogLevel::Info,
+            1 => LogLevel::Debug,
+            _ => LogLevel::Trace,
+        }
     };
 
     let rt = tokio::runtime::Runtime::new().expect("build tokio runtime");

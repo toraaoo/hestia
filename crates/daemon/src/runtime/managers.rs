@@ -62,6 +62,7 @@ impl JavaInstallManager {
         {
             let mut active = self.active.lock().unwrap();
             if !active.insert(major) {
+                tracing::debug!(major, "java install already in flight");
                 return None;
             }
         }
@@ -69,6 +70,7 @@ impl JavaInstallManager {
         let hub = self.hub.clone();
         let active = self.active.clone();
         let job_id = id.clone();
+        tracing::info!(job = %id, major, force, "java install started");
 
         tokio::spawn(async move {
             let progress_hub = hub.clone();
@@ -86,15 +88,26 @@ impl JavaInstallManager {
                 .await;
 
             match result {
-                Ok(outcome) => hub.publish(&topic_event(&JavaInstallDoneEvent {
-                    id: job_id.clone(),
-                    runtime: outcome.runtime,
-                    already_installed: outcome.already_installed,
-                })),
-                Err(e) => hub.publish(&topic_event(&JavaInstallErrorEvent {
-                    id: job_id.clone(),
-                    message: e.to_string(),
-                })),
+                Ok(outcome) => {
+                    tracing::info!(
+                        job = %job_id,
+                        major,
+                        already_installed = outcome.already_installed,
+                        "java install done"
+                    );
+                    hub.publish(&topic_event(&JavaInstallDoneEvent {
+                        id: job_id.clone(),
+                        runtime: outcome.runtime,
+                        already_installed: outcome.already_installed,
+                    }));
+                }
+                Err(e) => {
+                    tracing::error!(job = %job_id, major, error = format!("{e:#}"), "java install failed");
+                    hub.publish(&topic_event(&JavaInstallErrorEvent {
+                        id: job_id.clone(),
+                        message: format!("{e:#}"),
+                    }));
+                }
             }
             active.lock().unwrap().remove(&major);
         });
@@ -133,6 +146,7 @@ impl ServerCreateManager {
         {
             let mut active = self.active.lock().unwrap();
             if !active.insert(key.clone()) {
+                tracing::debug!(server = %key, "server create already in flight");
                 return None;
             }
         }
@@ -140,6 +154,13 @@ impl ServerCreateManager {
         let hub = self.hub.clone();
         let active = self.active.clone();
         let job_id = id.clone();
+        tracing::info!(
+            job = %id,
+            name = %params.name,
+            flavor = %params.flavor,
+            version = %params.version,
+            "server create started"
+        );
 
         tokio::spawn(async move {
             let progress_hub = hub.clone();
@@ -163,14 +184,25 @@ impl ServerCreateManager {
                 .await;
 
             match result {
-                Ok(record) => hub.publish(&topic_event(&ServerCreateDoneEvent {
-                    id: job_id.clone(),
-                    server: server_info(record, None),
-                })),
-                Err(e) => hub.publish(&topic_event(&ServerCreateErrorEvent {
-                    id: job_id.clone(),
-                    message: format!("{e:#}"),
-                })),
+                Ok(record) => {
+                    tracing::info!(
+                        job = %job_id,
+                        server = %record.id,
+                        name = %record.name,
+                        "server create done"
+                    );
+                    hub.publish(&topic_event(&ServerCreateDoneEvent {
+                        id: job_id.clone(),
+                        server: server_info(record, None),
+                    }));
+                }
+                Err(e) => {
+                    tracing::error!(job = %job_id, error = format!("{e:#}"), "server create failed");
+                    hub.publish(&topic_event(&ServerCreateErrorEvent {
+                        id: job_id.clone(),
+                        message: format!("{e:#}"),
+                    }));
+                }
             }
             active.lock().unwrap().remove(&key);
         });
@@ -207,6 +239,7 @@ impl InstanceLaunchManager {
         {
             let mut active = self.active.lock().unwrap();
             if !active.insert(instance_id.clone()) {
+                tracing::debug!(instance = %instance_id, "instance launch already in flight");
                 return None;
             }
         }
@@ -215,6 +248,7 @@ impl InstanceLaunchManager {
         let processes = self.processes.clone();
         let active = self.active.clone();
         let job_id = id.clone();
+        tracing::info!(job = %id, instance = %instance_id, account = %account, "instance launch started");
 
         tokio::spawn(async move {
             let progress_hub = hub.clone();
@@ -235,15 +269,21 @@ impl InstanceLaunchManager {
             )
             .await;
             match outcome {
-                Ok((process_id, pid)) => hub.publish(&topic_event(&InstanceLaunchDoneEvent {
-                    id: job_id.clone(),
-                    process_id,
-                    pid,
-                })),
-                Err(message) => hub.publish(&topic_event(&InstanceLaunchErrorEvent {
-                    id: job_id.clone(),
-                    message,
-                })),
+                Ok((process_id, pid)) => {
+                    tracing::info!(job = %job_id, process = %process_id, pid, "instance launch done");
+                    hub.publish(&topic_event(&InstanceLaunchDoneEvent {
+                        id: job_id.clone(),
+                        process_id,
+                        pid,
+                    }));
+                }
+                Err(message) => {
+                    tracing::error!(job = %job_id, instance = %instance_id, error = %message, "instance launch failed");
+                    hub.publish(&topic_event(&InstanceLaunchErrorEvent {
+                        id: job_id.clone(),
+                        message,
+                    }));
+                }
             }
             active.lock().unwrap().remove(&instance_id);
         });
@@ -301,6 +341,7 @@ impl DownloadManager {
         let job_id = id.clone();
         let engine = self.engine.clone();
         let hub = self.hub.clone();
+        tracing::info!(job = %id, url = %spec.url, "download started");
 
         tokio::spawn(async move {
             let progress_hub = hub.clone();
@@ -323,14 +364,20 @@ impl DownloadManager {
                 .await;
 
             match result {
-                Ok(()) => hub.publish(&topic_event(&DownloadDoneEvent {
-                    id: job_id.clone(),
-                    path: spec.destination.clone(),
-                })),
-                Err(e) => hub.publish(&topic_event(&DownloadErrorEvent {
-                    id: job_id.clone(),
-                    message: e.to_string(),
-                })),
+                Ok(()) => {
+                    tracing::info!(job = %job_id, path = %spec.destination.display(), "download done");
+                    hub.publish(&topic_event(&DownloadDoneEvent {
+                        id: job_id.clone(),
+                        path: spec.destination.clone(),
+                    }));
+                }
+                Err(e) => {
+                    tracing::error!(job = %job_id, url = %spec.url, error = format!("{e:#}"), "download failed");
+                    hub.publish(&topic_event(&DownloadErrorEvent {
+                        id: job_id.clone(),
+                        message: e.to_string(),
+                    }));
+                }
             }
         });
         id
