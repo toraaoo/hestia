@@ -20,6 +20,18 @@ pub enum LogLevel {
     Off,
 }
 
+impl Default for LogLevel {
+    /// The level used when none is requested: `Trace` in debug builds so a
+    /// development run captures everything, `Info` in release.
+    fn default() -> Self {
+        if cfg!(debug_assertions) {
+            LogLevel::Trace
+        } else {
+            LogLevel::Info
+        }
+    }
+}
+
 impl LogLevel {
     fn filter(self) -> LevelFilter {
         match self {

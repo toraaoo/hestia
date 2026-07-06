@@ -51,7 +51,7 @@ fn main() -> ExitCode {
         LogLevel::Warn
     } else {
         match cli.verbose {
-            0 => LogLevel::Info,
+            0 => LogLevel::default(),
             1 => LogLevel::Debug,
             _ => LogLevel::Trace,
         }
