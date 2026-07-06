@@ -9,7 +9,8 @@ it's just as comfortable from a terminal as from a window.
 > C++ tree is gone. Hestia runs as a daemon (`hestiad`) with thin clients over a
 > local socket. In place today: the build/workspace, logging, a config store, the
 > CLI, Java runtime management (install/list/uninstall via the Adoptium API),
-> Microsoft account sign-in, a daemon-internal process supervisor, and full
+> Microsoft account sign-in, a process supervisor whose workloads survive
+> daemon restarts (on-disk records + re-adoption), and full
 > Minecraft **server** and **instance** management — a server is fully
 > provisioned at create (jar + java runtime + EULA) and started/stopped under
 > the supervisor; an instance materialises its files (client jar, libraries,
@@ -135,8 +136,12 @@ hestia config set home <dir>     # persist the data dir (empty reverts to defaul
 hestia config get autostart      # true if the daemon starts at login
 hestia config set autostart true # register the daemon to start at login
 
-# Daemon lifecycle
-hestia daemon status | start | stop | restart
+# Daemon lifecycle — servers and instances keep running across daemon
+# stops/restarts and are re-adopted by the next daemon
+hestia daemon status | start | restart
+hestia daemon stop               # asks about running workloads on a terminal
+hestia daemon stop --all         # stop supervised processes too
+hestia daemon stop --keep        # leave them running (script-safe)
 
 # Global flags (any position)
 hestia -v java list              # verbose / debug logging

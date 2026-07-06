@@ -288,15 +288,33 @@ supervises launched processes, and manages autostart. The only crate that links
       launch manager hands the prepared `LaunchPlan` to the supervisor under a
       deterministic process id (`server-<id>` / `instance-<id>`), so every
       channel can find a server's process without bookkeeping.
-    - **`process.rs`** — `ProcessSupervisor`: launches Minecraft (and other)
-      processes as children of the daemon, tracks them, streams their logs, and
-      applies a restart policy. Emits `process.started` / `process.output` /
-      `process.exit`; reaping yields exit codes.
+    - **`process/`** — `ProcessSupervisor`: launches processes whose lifetime
+      is decoupled from the daemon's (own process group, no `kill_on_drop`, no
+      pipes back to the daemon), tracks them, and applies a restart policy.
+      Emits `process.started` / `process.output` / `process.exit`. Each live
+      process has a record under `<data_home>/processes/<id>/` —
+      `{pid, start-time token, spec}` (`records.rs`, owner-only: the spec can
+      carry launch credentials) — and `recover()` re-adopts survivors at the
+      next daemon start, verifying the pid against the start-time token
+      (`identity.rs`, per-platform) so pid reuse is never mistaken for the old
+      process. An adopted process is not our child: exit is detected by
+      polling and its exit code reports `null`. Output lives on disk, not in
+      pipes: `LogSource::File` points at a log the process writes itself
+      (Minecraft's `logs/latest.log`; a `jvm.log` catches pre-log4j stderr),
+      `LogSource::Capture` redirects into a supervisor-owned `output.log` —
+      either way `tail.rs` polls the file for `process.output` events and
+      `process.logs` reads its tail on demand, so log history survives daemon
+      restarts. Stops are polite: SIGTERM (the JVM saves and exits), a hard
+      kill only after a grace period. Cleanup is lifecycle-driven: a terminal
+      state removes the record but keeps logs for post-mortem, removing the
+      server/instance discards its process dir, and a startup sweep deletes
+      recordless dirs.
     - **`event_hub.rs`** — `EventHub` fans daemon events out to subscribed
       connections, filtered by job id, and unsubscribes them on disconnect.
 - **`services.rs`** — the single wire-in point: `make_router()` registers every
   channel with one `on.handle::<C>(…)` apiece. Today: `health.ping`, `app.info`,
-  `daemon.status|stop`, `config.get|set|list` (the reserved `home`/`autostart` keys
+  `daemon.status|stop` (stop takes `stop_processes`; without it supervised
+  processes keep running), `config.get|set|list` (the reserved `home`/`autostart` keys
   routed to the path pointer and login registration), `cache.info|list|clear`,
   `java.releases|list|install|uninstall`, `download.start`,
   `account.login.begin|login.complete`, `account.list|switch|remove` (`switch`
@@ -316,6 +334,16 @@ supervises launched processes, and manages autostart. The only crate that links
 > `Service` object per channel-prefix), the Rust daemon wires every channel in the
 > flat `make_router()`. A handler is a closure, not a class; the registry is the
 > single list.
+
+> **Workloads outlive the daemon by design.** The supervisor originally spawned
+> children with `kill_on_drop` and piped output, which killed every server and
+> game session on a graceful daemon stop — and leaked them untracked on a crash.
+> Now the daemon is restartable/upgradable under live workloads (the same reason
+> Docker grew `live-restore`): stopping a workload is always an explicit act
+> (`server stop`, `process.stop`, `hestia daemon stop --all`), never a side
+> effect of daemon lifetime. The cost is honest bookkeeping — on-disk records,
+> start-time identity checks, file-based logs — and one observable gap: an
+> adopted process's exit code is unknowable.
 
 ## Front-ends: CLI, desktop, tray
 
