@@ -7,11 +7,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use anyhow::{bail, Context, Result};
-use proto::minecraft::{ProvisionPhase, ServerProfile};
+use proto::minecraft::{ProvisionPhase, ProvisionProgress, ServerProfile};
 use serde::{Deserialize, Serialize};
 
 use crate::cache::Cache;
-use crate::minecraft::launch::{self, LaunchPlan};
+use crate::minecraft::launch::{self, JavaSettings, LaunchPlan};
 use crate::minecraft::materialize::{self, OnProgress};
 use crate::registry;
 
@@ -20,6 +20,14 @@ const PROPERTIES: &str = "server.properties";
 const GAME_PORT_BASE: u16 = 25565;
 const RCON_PORT_BASE: u16 = 25575;
 const PORT_SPAN: u16 = 100;
+
+// Pre-EULA servers (before 1.7.10) have no gate and would boot for real; the
+// generation run is killed after this long and the file check decides.
+const GENERATE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// `server.properties` keys hestia owns; a `config set` to any of them is
+/// rejected (the game port is fixed at create, rcon is configured at start).
+const MANAGED_PROPERTIES: &[&str] = &["server-port", "enable-rcon", "rcon.port", "rcon.password"];
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RconConfig {
@@ -41,6 +49,9 @@ pub struct ServerRecord {
     /// Claimed at first start; internal, so it may be reallocated freely.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rcon: Option<RconConfig>,
+    /// Per-entry JVM tuning (memory, extra flags) injected at each start.
+    #[serde(default)]
+    pub jvm: JavaSettings,
     pub profile: ServerProfile,
 }
 
@@ -105,6 +116,7 @@ impl Servers {
             ready: false,
             game_port: Some(game_port),
             rcon: None,
+            jvm: JavaSettings::default(),
             profile,
         };
         let dir = self.server_dir(&id);
@@ -187,12 +199,14 @@ impl Servers {
         Ok(record)
     }
 
-    /// Download the server's files into its directory and record the EULA
-    /// acceptance the caller obtained from the user.
+    /// Download the server's files into its directory, generate its
+    /// `server.properties` schema, and record the EULA acceptance the caller
+    /// obtained from the user.
     pub async fn provision(
         &self,
         record: &ServerRecord,
         cache: Option<&Cache>,
+        java: &Path,
         on_progress: OnProgress<'_>,
     ) -> Result<()> {
         let dir = self.server_dir(&record.id);
@@ -214,8 +228,49 @@ impl Servers {
             on_progress,
         )
         .await?;
+
+        on_progress(&ProvisionProgress {
+            phase: ProvisionPhase::Server,
+            current: 0,
+            total: 0,
+            detail: "generating server.properties".into(),
+        });
+        if let Err(e) = self.generate_properties(record, java).await {
+            tracing::warn!(id = %record.id, error = format!("{e:#}"), "server.properties generation failed");
+        } else if !dir.join(PROPERTIES).exists() {
+            tracing::warn!(id = %record.id, "the server did not write server.properties");
+        }
+
         std::fs::write(dir.join("eula.txt"), "eula=true\n").context("cannot write eula.txt")?;
         tracing::info!(id = %record.id, "server provisioned");
+        Ok(())
+    }
+
+    /// Run the server once, before `eula.txt` exists, to make it write the
+    /// complete `server.properties` for exactly its version: the EULA gate
+    /// stops it right after, before it binds ports or generates a world. The
+    /// file is the ground truth `config_set` validates against.
+    async fn generate_properties(&self, record: &ServerRecord, java: &Path) -> Result<()> {
+        let plan = self.launch_plan(record, java);
+        let mut child = tokio::process::Command::new(&plan.program)
+            .args(&plan.args)
+            .current_dir(&plan.cwd)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .with_context(|| format!("cannot run {}", plan.program.display()))?;
+        match tokio::time::timeout(GENERATE_TIMEOUT, child.wait()).await {
+            Ok(status) => {
+                let status = status.context("waiting for the generation run")?;
+                tracing::debug!(id = %record.id, %status, "server.properties generation run exited");
+            }
+            Err(_) => {
+                let _ = child.kill().await;
+                tracing::debug!(id = %record.id, "server.properties generation run timed out (no EULA gate?)");
+            }
+        }
         Ok(())
     }
 
@@ -242,8 +297,102 @@ impl Servers {
     }
 
     pub fn launch_plan(&self, record: &ServerRecord, java: &Path) -> LaunchPlan {
-        launch::server_plan(&record.profile, java, &self.server_dir(&record.id))
+        launch::server_plan(
+            &record.profile,
+            java,
+            &self.server_dir(&record.id),
+            &record.jvm,
+        )
     }
+
+    /// Read one setting: a reserved JVM key from the record, or any other key
+    /// from `server.properties`. `Ok(None)` means the key is not set.
+    pub fn config_get(&self, id: &str, key: &str) -> Result<Option<String>> {
+        let record = self
+            .get(id)
+            .with_context(|| format!("unknown server: {id}"))?;
+        if let Some(value) = record.jvm.get(key) {
+            return Ok(value);
+        }
+        Ok(read_property(
+            &self.server_dir(&record.id).join(PROPERTIES),
+            key,
+        ))
+    }
+
+    /// Write one setting: a reserved JVM key onto the record, or a
+    /// `server.properties` key through to the file. A property key must exist
+    /// in the file the server itself generated at create — the ground truth
+    /// for exactly its version — so a typo cannot silently drift the file
+    /// (without a file to check against, any key is accepted). The
+    /// hestia-managed keys are rejected. An empty value clears a JVM key.
+    /// Settings take effect on the next start.
+    pub fn config_set(&self, id: &str, key: &str, value: &str) -> Result<()> {
+        let _claims = self.claims.lock().unwrap();
+        let mut record = self
+            .get(id)
+            .with_context(|| format!("unknown server: {id}"))?;
+        if record.jvm.set(key, value)? {
+            registry::write_record(&self.server_dir(&record.id), RECORD, &record)?;
+            return Ok(());
+        }
+        if MANAGED_PROPERTIES.contains(&key) {
+            bail!(
+                "'{key}' is managed by hestia (the game port is fixed at create with -p; \
+                 rcon is configured automatically)"
+            );
+        }
+        let properties = self.server_dir(&record.id).join(PROPERTIES);
+        if properties.exists() {
+            if read_property(&properties, key).is_none() {
+                bail!("'{key}' is not a server.properties key this server's version knows");
+            }
+        } else {
+            tracing::debug!(
+                id = %record.id,
+                key,
+                "no server.properties to validate against; accepting the key"
+            );
+        }
+        merge_properties(&properties, &[(key, value.to_string())])
+    }
+
+    /// The reserved JVM settings (always shown) followed by every current
+    /// `server.properties` entry.
+    pub fn config_list(&self, id: &str) -> Result<Vec<(String, String)>> {
+        let record = self
+            .get(id)
+            .with_context(|| format!("unknown server: {id}"))?;
+        let mut entries = record.jvm.entries();
+        entries.extend(read_properties(
+            &self.server_dir(&record.id).join(PROPERTIES),
+        ));
+        Ok(entries)
+    }
+}
+
+/// Parse `server.properties` into key/value pairs, skipping blank and comment
+/// lines. Values are kept verbatim; the split is on the first `=`.
+fn read_properties(path: &Path) -> Vec<(String, String)> {
+    std::fs::read_to_string(path)
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                return None;
+            }
+            let (key, value) = trimmed.split_once('=')?;
+            Some((key.trim().to_string(), value.to_string()))
+        })
+        .collect()
+}
+
+fn read_property(path: &Path, key: &str) -> Option<String> {
+    read_properties(path)
+        .into_iter()
+        .find(|(k, _)| k == key)
+        .map(|(_, v)| v)
 }
 
 // Both the game and rcon listeners bind all interfaces, so probe the same way.

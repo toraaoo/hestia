@@ -13,20 +13,22 @@ use proto::accounts::{
     AccountRemoveParams, AccountSwitch, AccountSwitchParams, LoginMethod,
 };
 use proto::instance::{
-    InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo, InstanceLaunch,
-    InstanceLaunchParams, InstanceList, InstanceLogs, InstanceLogsParams, InstanceRef,
-    InstanceRemove, InstanceResolve, InstanceStop, InstanceVersions,
+    InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
+    InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo,
+    InstanceLaunch, InstanceLaunchParams, InstanceList, InstanceLogs, InstanceLogsParams,
+    InstanceRef, InstanceRemove, InstanceResolve, InstanceStop, InstanceVersions,
 };
 use proto::minecraft::{
-    Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams, ServerProfile,
-    VersionsParams,
+    ConfigEntry, Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams,
+    ServerProfile, VersionsParams,
 };
 use proto::process::{
     ProcessExitEvent, ProcessInfo, ProcessList, ProcessLogLine, ProcessLogs, ProcessLogsParams,
     ProcessRef, ProcessSpec, ProcessStart, ProcessStartResult, ProcessStatus, ProcessStop,
 };
 use proto::server::{
-    ServerCommand, ServerCommandParams, ServerCreate, ServerCreateParams, ServerFlavors,
+    ServerCommand, ServerCommandParams, ServerConfigGet, ServerConfigGetParams, ServerConfigList,
+    ServerConfigSet, ServerConfigSetParams, ServerCreate, ServerCreateParams, ServerFlavors,
     ServerInfo, ServerList, ServerLogs, ServerLogsParams, ServerRef, ServerRemove, ServerResolve,
     ServerStart, ServerStartResult, ServerStatus, ServerStop, ServerVersions,
 };
@@ -452,6 +454,38 @@ impl Server<'_> {
         };
         Ok(self.session.call::<ServerCommand>(&params).await?.response)
     }
+
+    /// Read one setting; `None` when it is not set (a `not_found` from the
+    /// daemon).
+    pub async fn config_get(&self, server: &str, key: &str) -> Result<Option<String>, IpcError> {
+        let params = ServerConfigGetParams {
+            server: server.to_string(),
+            key: key.to_string(),
+        };
+        Ok(self
+            .session
+            .try_call::<ServerConfigGet>(&params)
+            .await?
+            .map(|r| r.value))
+    }
+
+    pub async fn config_set(&self, server: &str, key: &str, value: &str) -> Result<(), IpcError> {
+        let params = ServerConfigSetParams {
+            server: server.to_string(),
+            key: key.to_string(),
+            value: value.to_string(),
+        };
+        self.session.call::<ServerConfigSet>(&params).await?;
+        Ok(())
+    }
+
+    pub async fn config_list(&self, server: &str) -> Result<Vec<ConfigEntry>, IpcError> {
+        Ok(self
+            .session
+            .call::<ServerConfigList>(&server_ref(server))
+            .await?
+            .entries)
+    }
 }
 
 fn server_ref(server: &str) -> ServerRef {
@@ -506,12 +540,14 @@ impl Instance<'_> {
         flavor: &str,
         version: &str,
         loader_version: Option<String>,
+        config: Vec<ConfigEntry>,
     ) -> Result<InstanceInfo, IpcError> {
         let params = InstanceCreateParams {
             name: name.to_string(),
             flavor: flavor.to_string(),
             version: version.to_string(),
             loader_version,
+            config,
         };
         Ok(self
             .session
@@ -552,6 +588,38 @@ impl Instance<'_> {
             tail,
         };
         Ok(self.session.call::<InstanceLogs>(&params).await?.lines)
+    }
+
+    /// Read one JVM setting; `None` when it is not set (a `not_found` from the
+    /// daemon).
+    pub async fn config_get(&self, instance: &str, key: &str) -> Result<Option<String>, IpcError> {
+        let params = InstanceConfigGetParams {
+            instance: instance.to_string(),
+            key: key.to_string(),
+        };
+        Ok(self
+            .session
+            .try_call::<InstanceConfigGet>(&params)
+            .await?
+            .map(|r| r.value))
+    }
+
+    pub async fn config_set(&self, instance: &str, key: &str, value: &str) -> Result<(), IpcError> {
+        let params = InstanceConfigSetParams {
+            instance: instance.to_string(),
+            key: key.to_string(),
+            value: value.to_string(),
+        };
+        self.session.call::<InstanceConfigSet>(&params).await?;
+        Ok(())
+    }
+
+    pub async fn config_list(&self, instance: &str) -> Result<Vec<ConfigEntry>, IpcError> {
+        Ok(self
+            .session
+            .call::<InstanceConfigList>(&instance_ref(instance))
+            .await?
+            .entries)
     }
 
     /// Launch an instance, blocking until the game process has spawned (or the

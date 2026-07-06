@@ -2,10 +2,42 @@
 //! flavor (interactively when not given) and rendering flavor/version lists.
 
 use anyhow::{bail, Result};
-use client::proto::minecraft::{Flavor, GameVersion, VersionKind};
+use clap::Subcommand;
+use client::proto::minecraft::{ConfigEntry, Flavor, GameVersion, VersionKind};
 use client::proto::process::{ProcessInfo, ProcessState};
 
 use crate::ui::{self, View};
+
+/// The shared `config` grammar for a server/instance: `get`/`set`/`list`,
+/// mirroring `hestia config`.
+#[derive(Subcommand)]
+pub enum ConfigCmd {
+    /// Print the value of a setting
+    Get {
+        /// Setting key (e.g. memory, jvm-args, or a server.properties key)
+        key: String,
+    },
+    /// Set a setting (an empty value clears it)
+    Set {
+        /// Setting key
+        key: String,
+        /// New value; a JVM-flag string may start with '-'
+        #[arg(allow_hyphen_values = true)]
+        value: String,
+    },
+    /// List every setting
+    #[command(visible_alias = "ls")]
+    List,
+}
+
+/// Render `config list` entries as a KEY/VALUE table.
+pub fn show_config_entries(title: impl Into<String>, entries: Vec<ConfigEntry>) -> Result<()> {
+    let rows = entries
+        .into_iter()
+        .map(|e| vec![e.key, e.value])
+        .collect::<Vec<_>>();
+    ui::show(View::table(title, ["KEY", "VALUE"], rows))
+}
 
 /// One-word state for a managed server/instance from its supervised process
 /// snapshot (absent means it has never been started).

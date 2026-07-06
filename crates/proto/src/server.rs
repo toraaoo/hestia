@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty, Topic};
 use crate::minecraft::{
-    FlavorsResult, ProvisionProgress, ResolveParams, ServerProfile, VersionsParams, VersionsResult,
+    ConfigEntry, FlavorsResult, ProvisionProgress, ResolveParams, ServerProfile, VersionsParams,
+    VersionsResult,
 };
 use crate::process::{ProcessInfo, ProcessLogsResult};
 
@@ -72,6 +73,10 @@ pub struct ServerCreateParams {
     /// Pin the game port; `None` picks the lowest free one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
+    /// Create-time settings applied after the record is registered (memory,
+    /// jvm-args, and any `server.properties` key).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub config: Vec<ConfigEntry>,
     /// Client-supplied job id; empty asks the daemon to allocate one.
     pub id: String,
 }
@@ -178,6 +183,54 @@ impl Contract for ServerCommand {
     const CHANNEL: &'static str = "server.command";
     type Params = ServerCommandParams;
     type Result = ServerCommandResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerConfigGetParams {
+    pub server: String,
+    pub key: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerConfigGetResult {
+    pub value: String,
+}
+
+pub struct ServerConfigGet;
+impl Contract for ServerConfigGet {
+    const CHANNEL: &'static str = "server.config.get";
+    type Params = ServerConfigGetParams;
+    type Result = ServerConfigGetResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerConfigSetParams {
+    pub server: String,
+    pub key: String,
+    pub value: String,
+}
+
+pub struct ServerConfigSet;
+impl Contract for ServerConfigSet {
+    const CHANNEL: &'static str = "server.config.set";
+    type Params = ServerConfigSetParams;
+    type Result = Empty;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerConfigListResult {
+    pub entries: Vec<ConfigEntry>,
+}
+
+pub struct ServerConfigList;
+impl Contract for ServerConfigList {
+    const CHANNEL: &'static str = "server.config.list";
+    type Params = ServerRef;
+    type Result = ServerConfigListResult;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty, Topic};
 use crate::minecraft::{
-    FlavorsResult, InstanceProfile, ProvisionProgress, ResolveParams, VersionsParams,
+    ConfigEntry, FlavorsResult, InstanceProfile, ProvisionProgress, ResolveParams, VersionsParams,
     VersionsResult,
 };
 use crate::process::{ProcessInfo, ProcessLogsResult};
@@ -59,6 +59,10 @@ pub struct InstanceCreateParams {
     pub version: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub loader_version: Option<String>,
+    /// Create-time settings applied after the record is registered (memory,
+    /// jvm-args).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub config: Vec<ConfigEntry>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -122,6 +126,54 @@ impl Contract for InstanceLogs {
     const CHANNEL: &'static str = "instance.logs";
     type Params = InstanceLogsParams;
     type Result = ProcessLogsResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceConfigGetParams {
+    pub instance: String,
+    pub key: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceConfigGetResult {
+    pub value: String,
+}
+
+pub struct InstanceConfigGet;
+impl Contract for InstanceConfigGet {
+    const CHANNEL: &'static str = "instance.config.get";
+    type Params = InstanceConfigGetParams;
+    type Result = InstanceConfigGetResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceConfigSetParams {
+    pub instance: String,
+    pub key: String,
+    pub value: String,
+}
+
+pub struct InstanceConfigSet;
+impl Contract for InstanceConfigSet {
+    const CHANNEL: &'static str = "instance.config.set";
+    type Params = InstanceConfigSetParams;
+    type Result = Empty;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceConfigListResult {
+    pub entries: Vec<ConfigEntry>,
+}
+
+pub struct InstanceConfigList;
+impl Contract for InstanceConfigList {
+    const CHANNEL: &'static str = "instance.config.list";
+    type Params = InstanceRef;
+    type Result = InstanceConfigListResult;
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]

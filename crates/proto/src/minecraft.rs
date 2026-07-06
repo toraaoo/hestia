@@ -18,6 +18,15 @@ pub struct Flavor {
     pub name: String,
 }
 
+/// One key/value setting, shared by the server and instance `config` channels
+/// and their create-time settings list.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ConfigEntry {
+    pub key: String,
+    pub value: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum VersionKind {

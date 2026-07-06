@@ -116,8 +116,16 @@ hestia java uninstall 21
 # each server claims its own port, so several run side by side)
 hestia server create             # interactive: flavor → version → EULA confirm
 hestia server create vanilla 1.21.1 --eula -n smp   # scriptable (-l pins a
-                                 #   loader, -p pins the game port)
+                                 #   loader, -p pins the game port, --memory 4G
+                                 #   sets -Xms/-Xmx; --motd, --max-players,
+                                 #   --difficulty, --gamemode, --seed cover the
+                                 #   common properties, --prop KEY=VALUE the rest)
 hestia server list               # managed servers, their address and state
+hestia server config smp list    # memory, jvm-args, and server.properties keys
+hestia server config smp set memory 4G          # applies from the next start
+hestia server config smp set motd "hi"          # any server.properties key its
+                                                #   version knows (validated
+                                                #   against the generated file)
 hestia server start smp          # immediate spawn (already provisioned)
 hestia server attach smp         # interactive console: live logs, type to send
                                  #   commands, Esc detaches (alias: console)
@@ -128,8 +136,9 @@ hestia server versions [flavor] | flavors           # browse the catalogue
 
 # Minecraft instances (clients; files materialise at first launch)
 hestia instance create           # interactive: flavor → version
-hestia instance create fabric 1.21.1 -n modded
+hestia instance create fabric 1.21.1 -n modded --memory 4G
 hestia instance launch modded    # ensures java/client/libraries/assets, then runs
+hestia instance config modded set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
 hestia instance logs modded -n 50 # captured output (-f keeps following)
 hestia instance list | info modded | stop modded | remove modded
 hestia instance versions [flavor] | flavors

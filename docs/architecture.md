@@ -238,7 +238,15 @@ The subsystems behind the aggregate:
 - **`servers`** / **`instances`** (`Servers`, `Instances`) — the persistent
   stores, one directory per entry beside a JSON record (`servers/<id>/server.json`
   holding the resolved profile snapshot; the disk is the registry, as with
-  `java`). A server directory is also its working dir — jar, `eula.txt`, world.
+  `java`). Each record also carries a `JavaSettings` (`minecraft/launch.rs`):
+  the per-entry `memory` (one value driving both `-Xms`/`-Xmx`) and extra
+  `jvm-args`, injected into the launch plan at each start/launch; the
+  `config_get/set/list` methods validate and persist them (servers also pass
+  property keys through to `server.properties` — a set must name a key the
+  server's own generated file carries, so a typo cannot silently drift the
+  file; the hestia-managed ports/rcon keys are rejected — see the decision
+  note below). A server directory is also its working dir — jar, `eula.txt`,
+  world.
   A server's record also claims its **ports**: the game port at create (lowest
   free from 25565, or pinned via the create params) and its rcon console
   (port + random password) at first start. Claims are checked against every
@@ -249,12 +257,27 @@ The subsystems behind the aggregate:
   live in the shared roots and materialise at launch. The `Engine` aggregate
   composes the cross-subsystem flows: `provision_server` (resolve → register →
   ensure the Java runtime, installing through the cache when missing → download
-  files → mark ready, removing the record on failure), `server_launch_plan`,
+  files → generate `server.properties` → apply create-time config → mark
+  ready, removing the record on failure), `server_launch_plan`,
   `server_command` (one console command over rcon), `create_instance`, and
   `prepare_instance` (materialise java/client/libraries/assets, then assemble
   the plan for the signed-in account's rotated token). Servers are fully
   provisioned at create so `start` is an immediate spawn; instances are
   records at create and pay at launch.
+
+> **The properties schema is generated, not maintained.** `config set`
+> validates a `server.properties` key against the server's own file, written
+> by the server itself during provisioning — not against a curated key list.
+> A hand-kept list is a per-version maintenance liability (keys appear,
+> disappear, and differ across the versions Hestia launches; the list would
+> silently rot). Instead the create job runs the freshly downloaded server
+> once *before* writing `eula.txt`: the EULA gate makes it emit a complete
+> `server.properties` (every key + default for exactly that version, mods
+> included) and exit almost immediately, before binding ports or generating a
+> world. Pre-1.7.10 servers have no EULA gate and would boot for real, so the
+> run is killed after a 60 s timeout. Generation failure is a warning, not a
+> create failure — and a server with no file to validate against accepts any
+> key rather than rejecting every key.
 
 Errors are `thiserror` enums (e.g. `ConfigError`); the daemon maps them to
 `ipc::errors` codes at the service boundary. `anyhow` is used where an operation
@@ -334,10 +357,13 @@ supervises launched processes, and manages autostart. The only crate that links
   `server.create|list|status|remove|start|stop|logs|command` (create requires
   the caller to assert EULA acceptance; start/stop/status/logs are thin over
   the supervisor, merging the stored record with live process state; command
-  relays one console command over the running server's rcon channel), and the
-  `instance.*` counterparts: `flavors|versions|resolve|create|list|remove`,
-  plus `instance.launch|stop|logs` (`logs` is thin over the supervisor, like
-  the server's).
+  relays one console command over the running server's rcon channel),
+  `server.config.get|set|list` (the reserved `memory`/`jvm-args` keys on the
+  record plus any `server.properties` key, bar the hestia-managed ports/rcon
+  ones), and the `instance.*` counterparts:
+  `flavors|versions|resolve|create|list|remove`, plus
+  `instance.launch|stop|logs` (`logs` is thin over the supervisor, like the
+  server's) and `instance.config.get|set|list` (`memory`/`jvm-args` only).
 - **`autostart.rs`** — registers/removes the daemon as a login-time service per
   platform, driven by the `config` service when the reserved `autostart` key is
   set (`is_enabled()` / `set()`).

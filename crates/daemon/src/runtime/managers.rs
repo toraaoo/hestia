@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use engine::{Downloader, Engine};
+use engine::{Downloader, Engine, ServerCreateSpec};
 use ipc::protocol::Event;
 use proto::download::{DownloadDoneEvent, DownloadErrorEvent, DownloadProgressEvent, DownloadSpec};
 use proto::instance::{
@@ -172,16 +172,15 @@ impl ServerCreateManager {
                 }));
             });
 
-            let result = engine
-                .provision_server(
-                    &params.name,
-                    &params.flavor,
-                    &params.version,
-                    params.loader_version.clone(),
-                    params.port,
-                    on_progress.as_ref(),
-                )
-                .await;
+            let spec = ServerCreateSpec {
+                name: params.name,
+                flavor: params.flavor,
+                version: params.version,
+                loader_version: params.loader_version,
+                port: params.port,
+                config: params.config,
+            };
+            let result = engine.provision_server(spec, on_progress.as_ref()).await;
 
             match result {
                 Ok(record) => {

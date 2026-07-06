@@ -10,6 +10,7 @@ use anyhow::{bail, Context, Result};
 use proto::minecraft::InstanceProfile;
 use serde::{Deserialize, Serialize};
 
+use crate::minecraft::launch::{JavaSettings, JVM_ARGS_KEY, MEMORY_KEY};
 use crate::registry;
 
 const RECORD: &str = "instance.json";
@@ -19,6 +20,9 @@ pub struct InstanceRecord {
     pub id: String,
     pub name: String,
     pub created_unix: i64,
+    /// Per-entry JVM tuning (memory, extra flags) injected at each launch.
+    #[serde(default)]
+    pub jvm: JavaSettings,
     pub profile: InstanceProfile,
 }
 
@@ -67,6 +71,7 @@ impl Instances {
             id: id.clone(),
             name: name.to_string(),
             created_unix: registry::now_unix(),
+            jvm: JavaSettings::default(),
             profile,
         };
         let dir = self.instance_dir(&id);
@@ -75,6 +80,37 @@ impl Instances {
         registry::write_record(&dir, RECORD, &record)?;
         tracing::info!(id, name, "instance registered");
         Ok(record)
+    }
+
+    /// Read one JVM setting (`memory` / `jvm-args`); `Ok(None)` means unset. An
+    /// unknown key is an error naming the valid keys.
+    pub fn config_get(&self, id: &str, key: &str) -> Result<Option<String>> {
+        let record = self
+            .get(id)
+            .with_context(|| format!("unknown instance: {id}"))?;
+        record.jvm.get(key).with_context(|| {
+            format!("unknown key '{key}' (valid keys: {MEMORY_KEY}, {JVM_ARGS_KEY})")
+        })
+    }
+
+    /// Write one JVM setting; an empty value clears it. Settings take effect on
+    /// the next launch.
+    pub fn config_set(&self, id: &str, key: &str, value: &str) -> Result<()> {
+        let mut record = self
+            .get(id)
+            .with_context(|| format!("unknown instance: {id}"))?;
+        if !record.jvm.set(key, value)? {
+            bail!("unknown key '{key}' (valid keys: {MEMORY_KEY}, {JVM_ARGS_KEY})");
+        }
+        registry::write_record(&self.instance_dir(&record.id), RECORD, &record)
+    }
+
+    /// Both JVM settings with their current values (empty when unset).
+    pub fn config_list(&self, id: &str) -> Result<Vec<(String, String)>> {
+        let record = self
+            .get(id)
+            .with_context(|| format!("unknown instance: {id}"))?;
+        Ok(record.jvm.entries())
     }
 
     /// Delete an instance's directory (record, saves and all). Returns false

@@ -20,22 +20,24 @@ use proto::download::DownloadStart;
 use proto::events::{EventsSubscribe, EventsSubscribeResult};
 use proto::health::{Ping, PingResult};
 use proto::instance::{
-    InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch, InstanceLaunchResult,
-    InstanceList, InstanceListResult, InstanceLogs, InstanceRemove, InstanceResolve, InstanceStop,
-    InstanceVersions,
+    InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList, InstanceConfigListResult,
+    InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch,
+    InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLogs, InstanceRemove,
+    InstanceResolve, InstanceStop, InstanceVersions,
 };
 use proto::java::{
     JavaInstall, JavaInstallResult, JavaList, JavaListResult, JavaReleases, JavaReleasesResult,
     JavaUninstall,
 };
-use proto::minecraft::{FlavorsResult, VersionsResult};
+use proto::minecraft::{ConfigEntry, FlavorsResult, VersionsResult};
 use proto::process::LogSource;
 use proto::process::{
     ProcessList, ProcessListResult, ProcessLogs, ProcessLogsResult, ProcessSpec, ProcessStart,
     ProcessStartResult, ProcessState, ProcessStatus, ProcessStop, RestartPolicy,
 };
 use proto::server::{
-    ServerCommand, ServerCommandResult, ServerCreate, ServerCreateResult, ServerFlavors,
+    ServerCommand, ServerCommandResult, ServerConfigGet, ServerConfigGetResult, ServerConfigList,
+    ServerConfigListResult, ServerConfigSet, ServerCreate, ServerCreateResult, ServerFlavors,
     ServerList, ServerListResult, ServerLogs, ServerRemove, ServerResolve, ServerStart,
     ServerStartResult, ServerStatus, ServerStop, ServerVersions,
 };
@@ -555,6 +557,45 @@ pub fn make_router() -> Router {
         Ok(ProcessLogsResult { lines })
     });
 
+    on.handle::<ServerConfigGet, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        match ctx
+            .runtime
+            .engine()
+            .servers()
+            .config_get(&record.id, &p.key)
+        {
+            Ok(Some(value)) => Ok(ServerConfigGetResult { value }),
+            Ok(None) => Err(ServiceError::not_found(format!("'{}' is not set", p.key))),
+            Err(e) => Err(ServiceError::bad_request(format!("{e:#}"))),
+        }
+    });
+
+    on.handle::<ServerConfigSet, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        ctx.runtime
+            .engine()
+            .servers()
+            .config_set(&record.id, &p.key, &p.value)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+        tracing::info!(server = %record.id, key = %p.key, "server config updated");
+        Ok(Empty {})
+    });
+
+    on.handle::<ServerConfigList, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        let entries = ctx
+            .runtime
+            .engine()
+            .servers()
+            .config_list(&record.id)
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?
+            .into_iter()
+            .map(|(key, value)| ConfigEntry { key, value })
+            .collect();
+        Ok(ServerConfigListResult { entries })
+    });
+
     on.handle::<InstanceCreate, _, _>(|p, ctx| async move {
         if p.flavor.is_empty() || p.version.is_empty() {
             return Err(ServiceError::bad_request("flavor and version are required"));
@@ -562,7 +603,7 @@ pub fn make_router() -> Router {
         let record = ctx
             .runtime
             .engine()
-            .create_instance(&p.name, &p.flavor, &p.version, p.loader_version)
+            .create_instance(&p.name, &p.flavor, &p.version, p.loader_version, &p.config)
             .await
             .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
         tracing::info!(
@@ -650,6 +691,45 @@ pub fn make_router() -> Router {
             .logs(&instance_process_id(&record.id), p.tail)
             .unwrap_or_default();
         Ok(ProcessLogsResult { lines })
+    });
+
+    on.handle::<InstanceConfigGet, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        match ctx
+            .runtime
+            .engine()
+            .instances()
+            .config_get(&record.id, &p.key)
+        {
+            Ok(Some(value)) => Ok(InstanceConfigGetResult { value }),
+            Ok(None) => Err(ServiceError::not_found(format!("'{}' is not set", p.key))),
+            Err(e) => Err(ServiceError::bad_request(format!("{e:#}"))),
+        }
+    });
+
+    on.handle::<InstanceConfigSet, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        ctx.runtime
+            .engine()
+            .instances()
+            .config_set(&record.id, &p.key, &p.value)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+        tracing::info!(instance = %record.id, key = %p.key, "instance config updated");
+        Ok(Empty {})
+    });
+
+    on.handle::<InstanceConfigList, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        let entries = ctx
+            .runtime
+            .engine()
+            .instances()
+            .config_list(&record.id)
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?
+            .into_iter()
+            .map(|(key, value)| ConfigEntry { key, value })
+            .collect();
+        Ok(InstanceConfigListResult { entries })
     });
 
     router

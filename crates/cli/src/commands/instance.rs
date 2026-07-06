@@ -7,6 +7,7 @@ use std::sync::Arc;
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use client::proto::instance::InstanceInfo;
+use client::proto::minecraft::ConfigEntry;
 use client::proto::process::{ProcessInfo, ProcessState};
 use client::{Client, ProcessEvent};
 
@@ -29,10 +30,19 @@ pub enum InstanceCmd {
         loader: Option<String>,
         #[arg(short, long, help = "Display name (defaults to <flavor>-<version>)")]
         name: Option<String>,
+        #[arg(long, help = "Set -Xms and -Xmx together (e.g. 4G, 2048M)")]
+        memory: Option<String>,
     },
     /// Managed instances and their state
     #[command(visible_alias = "ls")]
     List,
+    /// Get, set, or list this instance's settings (memory, jvm-args)
+    Config {
+        /// Instance name or id
+        instance: String,
+        #[command(subcommand)]
+        cmd: mc::ConfigCmd,
+    },
     /// Prepare (java, client jar, libraries, assets) and launch an instance
     Launch {
         /// Instance name or id
@@ -84,8 +94,10 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
             version,
             loader,
             name,
-        } => create(&client, flavor, version, loader, name).await?,
+            memory,
+        } => create(&client, flavor, version, loader, name, memory).await?,
         InstanceCmd::List => list(&client).await?,
+        InstanceCmd::Config { instance, cmd } => config(&client, &instance, cmd).await?,
         InstanceCmd::Launch { instance, account } => {
             launch(&client, &instance, account.as_deref().unwrap_or_default()).await?
         }
@@ -173,6 +185,7 @@ async fn create(
     version: Option<String>,
     loader: Option<String>,
     name: Option<String>,
+    memory: Option<String>,
 ) -> Result<()> {
     let flavors = {
         let _spinner = Spinner::start("fetching flavors");
@@ -188,16 +201,43 @@ async fn create(
         Some(name) => name,
         None => ui::input("instance name", &format!("{flavor}-{version}"))?,
     };
+    let config = memory
+        .map(|memory| ConfigEntry {
+            key: "memory".into(),
+            value: memory,
+        })
+        .into_iter()
+        .collect();
 
     let instance = {
         let _spinner = Spinner::start("resolving profile");
         client
             .instance()
-            .create(&name, &flavor, &version, loader)
+            .create(&name, &flavor, &version, loader, config)
             .await?
     };
     ui::show(View::line(format!("instance '{}' created", instance.name)))?;
     show_info(&instance)
+}
+
+/// `hestia instance config <instance> get|set|list` — the per-instance JVM
+/// settings surface. Changes apply on the next launch.
+async fn config(client: &Client, instance: &str, cmd: mc::ConfigCmd) -> Result<()> {
+    match cmd {
+        mc::ConfigCmd::Get { key } => match client.instance().config_get(instance, &key).await? {
+            Some(value) => ui::show(View::line(value))?,
+            None => bail!("'{key}' is not set"),
+        },
+        mc::ConfigCmd::Set { key, value } => {
+            client.instance().config_set(instance, &key, &value).await?;
+            ui::show(View::note("applies from the next launch"))?;
+        }
+        mc::ConfigCmd::List => {
+            let entries = client.instance().config_list(instance).await?;
+            mc::show_config_entries(format!("{instance} config"), entries)?;
+        }
+    }
+    Ok(())
 }
 
 async fn list(client: &Client) -> Result<()> {

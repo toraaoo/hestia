@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use anyhow::{Context, Result};
-use proto::minecraft::{ProvisionPhase, ProvisionProgress};
+use proto::minecraft::{ConfigEntry, ProvisionPhase, ProvisionProgress};
 
 use crate::accounts::Accounts;
 use crate::cache::Cache;
@@ -17,6 +17,18 @@ use crate::minecraft::materialize::{self, OnProgress};
 use crate::minecraft::rcon;
 use crate::minecraft::Minecraft;
 use crate::servers::{ServerRecord, Servers};
+
+/// Everything a server create needs from the caller — the engine-side input to
+/// `provision_server` (EULA assertion and job ids are daemon concerns).
+#[derive(Debug, Clone, Default)]
+pub struct ServerCreateSpec {
+    pub name: String,
+    pub flavor: String,
+    pub version: String,
+    pub loader_version: Option<String>,
+    pub port: Option<u16>,
+    pub config: Vec<ConfigEntry>,
+}
 
 pub struct Engine {
     data_home: Mutex<PathBuf>,
@@ -106,27 +118,31 @@ impl Engine {
     /// The caller is responsible for having obtained the user's EULA acceptance.
     pub async fn provision_server(
         &self,
-        name: &str,
-        flavor: &str,
-        version: &str,
-        loader_version: Option<String>,
-        port: Option<u16>,
+        spec: ServerCreateSpec,
         on_progress: OnProgress<'_>,
     ) -> Result<ServerRecord> {
         on_progress(&phase_progress(ProvisionPhase::Resolving));
         let profile = self
             .minecraft
-            .resolve_server(flavor, version, loader_version)
+            .resolve_server(&spec.flavor, &spec.version, spec.loader_version)
             .await?;
-        let name = effective_name(name, flavor, version);
-        let record = self.servers.create(&name, profile, port)?;
+        let name = effective_name(&spec.name, &spec.flavor, &spec.version);
+        let record = self.servers.create(&name, profile, spec.port)?;
 
+        // Config entries apply after provisioning so property keys validate
+        // against the schema the server itself generated.
         let provisioned = async {
-            self.ensure_java(record.profile.java_major, on_progress)
+            let java = self
+                .ensure_java(record.profile.java_major, on_progress)
                 .await?;
             self.servers
-                .provision(&record, Some(&self.cache), on_progress)
-                .await
+                .provision(&record, Some(&self.cache), &java, on_progress)
+                .await?;
+            for entry in &spec.config {
+                self.servers
+                    .config_set(&record.id, &entry.key, &entry.value)?;
+            }
+            Ok::<_, anyhow::Error>(())
         }
         .await;
         if provisioned.is_err() {
@@ -174,13 +190,26 @@ impl Engine {
         flavor: &str,
         version: &str,
         loader_version: Option<String>,
+        config: &[ConfigEntry],
     ) -> Result<InstanceRecord> {
         let profile = self
             .minecraft
             .resolve_instance(flavor, version, loader_version)
             .await?;
         let name = effective_name(name, flavor, version);
-        self.instances.create(&name, profile)
+        let record = self.instances.create(&name, profile)?;
+
+        let applied = config.iter().try_for_each(|entry| {
+            self.instances
+                .config_set(&record.id, &entry.key, &entry.value)
+        });
+        if let Err(e) = applied {
+            let _ = self.instances.remove(&record.id);
+            return Err(e);
+        }
+        self.instances
+            .get(&record.id)
+            .with_context(|| format!("instance '{}' vanished after create", record.id))
     }
 
     /// Materialise everything an instance launch needs — the Java runtime, the
@@ -251,6 +280,7 @@ impl Engine {
                 assets_root: &assets_root,
             },
             &account,
+            &record.jvm,
         );
         Ok((record, plan))
     }
