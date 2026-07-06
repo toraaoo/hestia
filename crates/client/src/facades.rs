@@ -14,8 +14,8 @@ use proto::accounts::{
 };
 use proto::instance::{
     InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo, InstanceLaunch,
-    InstanceLaunchParams, InstanceList, InstanceRef, InstanceRemove, InstanceResolve, InstanceStop,
-    InstanceVersions,
+    InstanceLaunchParams, InstanceList, InstanceLogs, InstanceLogsParams, InstanceRef,
+    InstanceRemove, InstanceResolve, InstanceStop, InstanceVersions,
 };
 use proto::minecraft::{
     Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams, ServerProfile,
@@ -540,6 +540,18 @@ impl Instance<'_> {
             .call::<InstanceStop>(&instance_ref(instance))
             .await?;
         Ok(())
+    }
+
+    pub async fn logs(
+        &self,
+        instance: &str,
+        tail: Option<usize>,
+    ) -> Result<Vec<ProcessLogLine>, IpcError> {
+        let params = InstanceLogsParams {
+            instance: instance.to_string(),
+            tail,
+        };
+        Ok(self.session.call::<InstanceLogs>(&params).await?.lines)
     }
 
     /// Launch an instance, blocking until the game process has spawned (or the

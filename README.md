@@ -130,6 +130,7 @@ hestia server versions [flavor] | flavors           # browse the catalogue
 hestia instance create           # interactive: flavor → version
 hestia instance create fabric 1.21.1 -n modded
 hestia instance launch modded    # ensures java/client/libraries/assets, then runs
+hestia instance logs modded -n 50 # captured output (-f keeps following)
 hestia instance list | info modded | stop modded | remove modded
 hestia instance versions [flavor] | flavors
 

@@ -21,7 +21,7 @@ use proto::events::{EventsSubscribe, EventsSubscribeResult};
 use proto::health::{Ping, PingResult};
 use proto::instance::{
     InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch, InstanceLaunchResult,
-    InstanceList, InstanceListResult, InstanceRemove, InstanceResolve, InstanceStop,
+    InstanceList, InstanceListResult, InstanceLogs, InstanceRemove, InstanceResolve, InstanceStop,
     InstanceVersions,
 };
 use proto::java::{
@@ -613,6 +613,16 @@ pub fn make_router() -> Router {
         }
         ctx.runtime.processes().stop(&process_id);
         Ok(Empty {})
+    });
+
+    on.handle::<InstanceLogs, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        let lines = ctx
+            .runtime
+            .processes()
+            .logs(&instance_process_id(&record.id), p.tail)
+            .unwrap_or_default();
+        Ok(ProcessLogsResult { lines })
     });
 
     router

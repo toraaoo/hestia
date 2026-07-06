@@ -336,7 +336,8 @@ supervises launched processes, and manages autostart. The only crate that links
   the supervisor, merging the stored record with live process state; command
   relays one console command over the running server's rcon channel), and the
   `instance.*` counterparts: `flavors|versions|resolve|create|list|remove`,
-  plus `instance.launch|stop`.
+  plus `instance.launch|stop|logs` (`logs` is thin over the supervisor, like
+  the server's).
 - **`autostart.rs`** — registers/removes the daemon as a login-time service per
   platform, driven by the `config` service when the reserved `autostart` key is
   set (`is_enabled()` / `set()`).

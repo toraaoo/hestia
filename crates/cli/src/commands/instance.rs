@@ -4,10 +4,11 @@
 
 use std::sync::Arc;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use client::proto::instance::InstanceInfo;
-use client::Client;
+use client::proto::process::{ProcessInfo, ProcessState};
+use client::{Client, ProcessEvent};
 
 use crate::commands::mc;
 use crate::ui::{self, ProvisionReporter, Spinner, View};
@@ -48,6 +49,15 @@ pub enum InstanceCmd {
     Info {
         /// Instance name or id
         instance: String,
+    },
+    /// Captured instance output
+    Logs {
+        /// Instance name or id
+        instance: String,
+        #[arg(short = 'n', long = "tail", help = "Only the last N lines")]
+        tail: Option<usize>,
+        #[arg(short, long, help = "Keep streaming new output until Ctrl-C")]
+        follow: bool,
     },
     /// Delete an instance (its saves and all)
     #[command(visible_alias = "rm")]
@@ -95,6 +105,22 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
                 bail!("no instance matches '{instance}'");
             };
             show_info(info)?;
+        }
+        InstanceCmd::Logs {
+            instance,
+            tail,
+            follow,
+        } => {
+            let lines = client.instance().logs(&instance, tail).await?;
+            if lines.is_empty() && !follow {
+                return ui::show(View::note("no output captured (has it been launched?)"));
+            }
+            for line in lines {
+                ui::show(View::line(line.line))?;
+            }
+            if follow {
+                follow_logs(&client, &instance).await?;
+            }
         }
         InstanceCmd::Remove { instance } => {
             {
@@ -196,6 +222,32 @@ async fn list(client: &Client) -> Result<()> {
         ["NAME", "FLAVOR", "VERSION", "LOADER", "STATE"],
         rows,
     ))
+}
+
+async fn follow_logs(client: &Client, instance: &str) -> Result<()> {
+    let instances = client.instance().list().await?;
+    let info = instances
+        .iter()
+        .find(|i| i.id == instance || i.name == instance)
+        .with_context(|| format!("no instance matches '{instance}'"))?;
+    let process = running_process(info)
+        .with_context(|| format!("instance '{}' is not running", info.name))?;
+    let mut events = client.process().subscribe(&process.id).await?;
+    while let Some(event) = events.recv().await {
+        match event {
+            ProcessEvent::Output(line) => ui::show(View::line(line.line))?,
+            ProcessEvent::Exit(_) => {
+                return ui::show(View::note("instance stopped"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn running_process(info: &InstanceInfo) -> Option<ProcessInfo> {
+    info.process
+        .clone()
+        .filter(|p| p.state == ProcessState::Running)
 }
 
 fn show_info(info: &InstanceInfo) -> Result<()> {

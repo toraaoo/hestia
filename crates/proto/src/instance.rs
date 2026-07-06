@@ -10,7 +10,7 @@ use crate::minecraft::{
     FlavorsResult, InstanceProfile, ProvisionProgress, ResolveParams, VersionsParams,
     VersionsResult,
 };
-use crate::process::ProcessInfo;
+use crate::process::{ProcessInfo, ProcessLogsResult};
 
 pub struct InstanceFlavors;
 impl Contract for InstanceFlavors {
@@ -106,6 +106,22 @@ impl Contract for InstanceStop {
     const CHANNEL: &'static str = "instance.stop";
     type Params = InstanceRef;
     type Result = Empty;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceLogsParams {
+    pub instance: String,
+    /// Return only the last `tail` lines when set; all buffered lines otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tail: Option<usize>,
+}
+
+pub struct InstanceLogs;
+impl Contract for InstanceLogs {
+    const CHANNEL: &'static str = "instance.logs";
+    type Params = InstanceLogsParams;
+    type Result = ProcessLogsResult;
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
