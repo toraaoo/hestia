@@ -146,7 +146,7 @@ pub struct InstancePaths<'a> {
     pub assets_root: &'a Path,
 }
 
-/// The server invocation, run from the server directory. A profile without a
+/// The server invocation, run from the server's data directory. A profile without a
 /// main class is a self-contained jar (`-jar <primary> nogui`); one with a main
 /// class runs off a classpath of its libraries plus the primary.
 pub fn server_plan(

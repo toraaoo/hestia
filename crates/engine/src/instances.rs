@@ -1,7 +1,10 @@
 //! Persistent Minecraft instance (client) store: each instance lives at
-//! `<dir>/<id>/` — its record beside the game directory the client writes into
-//! (saves, options). Files shared across instances (client jars, libraries,
-//! assets) live in the engine-wide stores and are materialised at launch.
+//! `<dir>/<id>/` — the `instance.json` record beside `data/`, the game
+//! directory the client writes into (saves, options). The root is reserved
+//! for managed content directories (`mods/`, `resourcepacks/`, `configs/`,
+//! `backups/`); every directory appears on demand. Files shared across
+//! instances (client jars, libraries, assets) live in the engine-wide stores
+//! and are materialised at launch.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -14,6 +17,7 @@ use crate::minecraft::launch::{JavaSettings, JVM_ARGS_KEY, MEMORY_KEY};
 use crate::registry;
 
 const RECORD: &str = "instance.json";
+const DATA: &str = "data";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InstanceRecord {
@@ -47,6 +51,12 @@ impl Instances {
 
     pub fn instance_dir(&self, id: &str) -> PathBuf {
         self.dir().join(id)
+    }
+
+    /// The instance's game directory — everything the client itself reads and
+    /// writes (saves, options, logs).
+    pub fn data_dir(&self, id: &str) -> PathBuf {
+        self.instance_dir(id).join(DATA)
     }
 
     pub fn list(&self) -> Vec<InstanceRecord> {

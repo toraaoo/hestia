@@ -342,7 +342,9 @@ impl Engine {
         )
         .await?;
 
-        let game_dir = self.instances.instance_dir(&record.id);
+        let game_dir = self.instances.data_dir(&record.id);
+        std::fs::create_dir_all(&game_dir)
+            .with_context(|| format!("cannot create {}", game_dir.display()))?;
         let natives_dir = meta.join("natives").join(&record.profile.game_version);
         std::fs::create_dir_all(&natives_dir)
             .with_context(|| format!("cannot create {}", natives_dir.display()))?;

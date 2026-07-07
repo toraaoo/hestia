@@ -248,15 +248,31 @@ The subsystems behind the aggregate:
   property keys through to `server.properties` — a set must name a key the
   server's own generated file carries, so a typo cannot silently drift the
   file; the hestia-managed ports/rcon keys are rejected — see the decision
-  note below). A server directory is also its working dir — jar, `eula.txt`,
-  world.
+  note below). An entry directory holds the record beside `data/`, the game's
+  own working directory; the root is reserved for the managed content
+  directories (`mods/`, `plugins/` for servers / `resourcepacks/` for
+  instances, `configs/`, `backups/`), each created on demand — see the
+  decision note below:
+
+  ```
+  servers/<id>/               instances/<id>/
+  ├── server.json             ├── instance.json
+  ├── mods/ plugins/          ├── mods/ resourcepacks/
+  │   configs/ backups/       │   configs/ backups/
+  └── data/                   └── data/
+      jar, libraries/,            saves, options, logs —
+      eula.txt,                   the game dir the client
+      server.properties,          writes into
+      world, logs
+  ```
+
   A server's record also claims its **ports**: the game port at create (lowest
   free from 25565, or pinned via the create params) and its rcon console
   (port + random password) at first start. Claims are checked against every
   other record plus a live bind probe under one allocation lock, so concurrent
   servers can never collide; `ensure_start_config` reconciles them into
   `server.properties` (preserving user edits) before each spawn.
-  An instance directory is the game dir (saves, options); its heavyweight files
+  An instance's heavyweight files
   live in the shared roots and materialise at launch. The `Engine` aggregate
   composes the cross-subsystem flows: `provision_server` (resolve → register →
   ensure the Java runtime, installing through the cache when missing → download
@@ -273,6 +289,18 @@ The subsystems behind the aggregate:
   flavor's own newest-first catalogue, not by parsing version strings.
   Servers are fully provisioned at create so `start` is an immediate spawn;
   instances are records at create and pay at launch.
+
+> **The entry root is hestia's; `data/` is the game's.** A server or instance
+> directory used to *be* the game's working directory, which left hestia
+> nowhere to put its own artifacts without mixing them into files the game
+> owns and rewrites. Splitting the tree gives each side a clean namespace:
+> `data/` is exactly what the game reads and writes (the launch plan's cwd —
+> jar, world, saves, logs), and the root holds the record beside the managed
+> content directories the upcoming mod/plugin/config/backup management will
+> populate (`mods/`, `plugins/`, `resourcepacks/`, `configs/`, `backups/`).
+> Directories appear on demand rather than at create, so a tree only shows
+> what is actually in use. The layout change is not migrated: pre-`data/`
+> entries must be recreated (or their game files moved into `data/` by hand).
 
 > **The properties schema is generated, not maintained.** `config set`
 > validates a `server.properties` key against the server's own file, written

@@ -1,6 +1,9 @@
-//! Persistent Minecraft server store: each server lives at `<dir>/<id>/`
-//! (its jar, `eula.txt`, and the world the game writes) beside a `server.json`
-//! record; listing scans the directory — the disk is the registry.
+//! Persistent Minecraft server store: each server lives at `<dir>/<id>/` —
+//! the `server.json` record beside `data/`, the working directory the game
+//! itself runs in (jar, `eula.txt`, `server.properties`, the world). The root
+//! is reserved for managed content directories (`mods/`, `plugins/`,
+//! `configs/`, `backups/`); every directory appears on demand. Listing scans
+//! the parent — the disk is the registry.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -17,6 +20,7 @@ use crate::registry;
 
 const RECORD: &str = "server.json";
 const PROPERTIES: &str = "server.properties";
+const DATA: &str = "data";
 const GAME_PORT_BASE: u16 = 25565;
 const RCON_PORT_BASE: u16 = 25575;
 const PORT_SPAN: u16 = 100;
@@ -80,6 +84,12 @@ impl Servers {
 
     pub fn server_dir(&self, id: &str) -> PathBuf {
         self.dir().join(id)
+    }
+
+    /// The server's working directory — everything the game itself reads and
+    /// writes (jar, libraries, `eula.txt`, `server.properties`, the world).
+    pub fn data_dir(&self, id: &str) -> PathBuf {
+        self.server_dir(id).join(DATA)
     }
 
     pub fn list(&self) -> Vec<ServerRecord> {
@@ -185,7 +195,7 @@ impl Servers {
         };
 
         merge_properties(
-            &self.server_dir(&record.id).join(PROPERTIES),
+            &self.data_dir(&record.id).join(PROPERTIES),
             &[
                 ("server-port", game_port.to_string()),
                 ("enable-rcon", "true".to_string()),
@@ -209,13 +219,15 @@ impl Servers {
         java: &Path,
         on_progress: OnProgress<'_>,
     ) -> Result<()> {
-        let dir = self.server_dir(&record.id);
+        let data = self.data_dir(&record.id);
+        std::fs::create_dir_all(&data)
+            .with_context(|| format!("cannot create {}", data.display()))?;
         materialize::validate_filename(&record.profile.primary.filename)?;
         if !record.profile.libraries.is_empty() {
             materialize::ensure_libraries(
                 cache,
                 &record.profile.libraries,
-                &dir.join("libraries"),
+                &data.join("libraries"),
                 on_progress,
             )
             .await?;
@@ -223,7 +235,7 @@ impl Servers {
         materialize::ensure_artifact(
             cache,
             &record.profile.primary,
-            &dir.join(&record.profile.primary.filename),
+            &data.join(&record.profile.primary.filename),
             ProvisionPhase::Server,
             on_progress,
         )
@@ -237,11 +249,11 @@ impl Servers {
         });
         if let Err(e) = self.generate_properties(record, java).await {
             tracing::warn!(id = %record.id, error = format!("{e:#}"), "server.properties generation failed");
-        } else if !dir.join(PROPERTIES).exists() {
+        } else if !data.join(PROPERTIES).exists() {
             tracing::warn!(id = %record.id, "the server did not write server.properties");
         }
 
-        std::fs::write(dir.join("eula.txt"), "eula=true\n").context("cannot write eula.txt")?;
+        std::fs::write(data.join("eula.txt"), "eula=true\n").context("cannot write eula.txt")?;
         tracing::info!(id = %record.id, "server provisioned");
         Ok(())
     }
@@ -292,15 +304,15 @@ impl Servers {
         let previous_primary = record.profile.primary.filename.clone();
         record.profile = profile;
         record.ready = false;
-        let dir = self.server_dir(&record.id);
+        let data = self.data_dir(&record.id);
         materialize::validate_filename(&record.profile.primary.filename)?;
-        registry::write_record(&dir, RECORD, &record)?;
+        registry::write_record(&self.server_dir(&record.id), RECORD, &record)?;
 
         if !record.profile.libraries.is_empty() {
             materialize::ensure_libraries(
                 cache,
                 &record.profile.libraries,
-                &dir.join("libraries"),
+                &data.join("libraries"),
                 on_progress,
             )
             .await?;
@@ -308,7 +320,7 @@ impl Servers {
         materialize::ensure_artifact(
             cache,
             &record.profile.primary,
-            &dir.join(&record.profile.primary.filename),
+            &data.join(&record.profile.primary.filename),
             ProvisionPhase::Server,
             on_progress,
         )
@@ -325,7 +337,7 @@ impl Servers {
         }
 
         if previous_primary != record.profile.primary.filename {
-            let _ = std::fs::remove_file(dir.join(&previous_primary));
+            let _ = std::fs::remove_file(data.join(&previous_primary));
         }
         tracing::info!(
             id = %record.id,
@@ -342,7 +354,7 @@ impl Servers {
     /// know are dropped. The acceptance recorded at create is rewritten even
     /// when the run fails.
     async fn regenerate_properties(&self, record: &ServerRecord, java: &Path) -> Result<()> {
-        let eula = self.server_dir(&record.id).join("eula.txt");
+        let eula = self.data_dir(&record.id).join("eula.txt");
         if eula.exists() {
             std::fs::remove_file(&eula).context("cannot suspend eula.txt for the schema run")?;
         }
@@ -377,7 +389,7 @@ impl Servers {
         launch::server_plan(
             &record.profile,
             java,
-            &self.server_dir(&record.id),
+            &self.data_dir(&record.id),
             &record.jvm,
         )
     }
@@ -392,7 +404,7 @@ impl Servers {
             return Ok(value);
         }
         Ok(read_property(
-            &self.server_dir(&record.id).join(PROPERTIES),
+            &self.data_dir(&record.id).join(PROPERTIES),
             key,
         ))
     }
@@ -419,7 +431,7 @@ impl Servers {
                  rcon is configured automatically)"
             );
         }
-        let properties = self.server_dir(&record.id).join(PROPERTIES);
+        let properties = self.data_dir(&record.id).join(PROPERTIES);
         if properties.exists() {
             if read_property(&properties, key).is_none() {
                 bail!("'{key}' is not a server.properties key this server's version knows");
@@ -441,9 +453,7 @@ impl Servers {
             .get(id)
             .with_context(|| format!("unknown server: {id}"))?;
         let mut entries = record.jvm.entries();
-        entries.extend(read_properties(
-            &self.server_dir(&record.id).join(PROPERTIES),
-        ));
+        entries.extend(read_properties(&self.data_dir(&record.id).join(PROPERTIES)));
         Ok(entries)
     }
 }
@@ -496,8 +506,13 @@ fn generate_password() -> String {
 }
 
 /// Rewrite `entries` into the properties file, preserving every other line
-/// (user edits included) and appending keys not yet present.
+/// (user edits included) and appending keys not yet present. The data
+/// directory appears on demand with the file.
 fn merge_properties(path: &Path, entries: &[(&str, String)]) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
+    }
     let existing = std::fs::read_to_string(path).unwrap_or_default();
     let mut lines: Vec<String> = existing.lines().map(str::to_string).collect();
     for (key, value) in entries {

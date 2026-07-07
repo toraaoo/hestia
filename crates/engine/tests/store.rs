@@ -70,6 +70,11 @@ fn servers_store_round_trips_records() {
     assert_eq!(record.id, "my-server");
     assert!(!record.ready);
     assert!(record.game_port.is_some());
+    assert!(servers.server_dir(&record.id).is_dir());
+    assert!(
+        !servers.data_dir(&record.id).exists(),
+        "data/ appears on demand, not at create"
+    );
     assert!(servers.create("My Server!", profile.clone(), None).is_err());
 
     let second = servers.create("Other", profile.clone(), None).unwrap();
@@ -116,6 +121,14 @@ fn instances_store_round_trips_records() {
         Some("0.16.5".into())
     );
     assert!(instances.instance_dir(&record.id).is_dir());
+    assert_eq!(
+        instances.data_dir(&record.id),
+        instances.instance_dir(&record.id).join("data")
+    );
+    assert!(
+        !instances.data_dir(&record.id).exists(),
+        "data/ appears on demand, not at create"
+    );
 
     assert!(instances.remove("modded").unwrap());
     assert!(instances.list().is_empty());
@@ -203,7 +216,8 @@ fn server_config_covers_jvm_and_properties() {
 
     // Seed the file as the generation run would: every key the server's
     // version knows, with its default.
-    let properties = servers.server_dir(id).join("server.properties");
+    let properties = servers.data_dir(id).join("server.properties");
+    std::fs::create_dir_all(properties.parent().unwrap()).unwrap();
     std::fs::write(&properties, "motd=A Minecraft Server\nview-distance=10\n").unwrap();
 
     // A key in the generated schema is accepted and reads back.
