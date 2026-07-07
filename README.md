@@ -150,7 +150,7 @@ hestia instance update modded 1.21.4  # move to another version (saves stay;
                                  #   downgrade asks for a confirm)
 hestia instance config modded set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
 hestia instance logs modded -n 50 # captured output (-f keeps following)
-hestia instance list | info modded | stop modded | remove modded
+hestia instance list | info modded | stop modded | restart modded | remove modded
 hestia instance versions [flavor] | flavors
 
 # Download cache

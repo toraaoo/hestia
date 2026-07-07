@@ -3,6 +3,7 @@
 //! on first launch.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
@@ -73,6 +74,13 @@ pub enum InstanceCmd {
         /// Instance name or id
         instance: String,
     },
+    /// Stop a running instance and launch it again
+    Restart {
+        /// Instance name or id
+        instance: String,
+        #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
+        account: Option<String>,
+    },
     /// An instance's record and process state
     Info {
         /// Instance name or id
@@ -131,6 +139,14 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
                 client.instance().stop(&instance).await?;
             }
             ui::show(View::line(format!("instance '{instance}' stopped")))?;
+        }
+        InstanceCmd::Restart { instance, account } => {
+            {
+                let _spinner = Spinner::start(format!("stopping '{instance}'"));
+                client.instance().stop(&instance).await?;
+                wait_until_stopped(&client, &instance).await?;
+            }
+            launch(&client, &instance, account.as_deref().unwrap_or_default()).await?
         }
         InstanceCmd::Info { instance } => {
             let instances = client.instance().list().await?;
@@ -364,6 +380,23 @@ fn running_process(info: &InstanceInfo) -> Option<ProcessInfo> {
     info.process
         .clone()
         .filter(|p| p.state == ProcessState::Running)
+}
+
+/// Poll until the instance's process has exited, so a restart's `launch` does
+/// not race the old game.
+async fn wait_until_stopped(client: &Client, instance: &str) -> Result<()> {
+    for _ in 0..30 {
+        let instances = client.instance().list().await?;
+        let running = instances
+            .iter()
+            .filter(|i| i.id == instance || i.name == instance)
+            .any(|i| running_process(i).is_some());
+        if !running {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    bail!("instance '{instance}' did not stop in time");
 }
 
 fn show_info(info: &InstanceInfo) -> Result<()> {
