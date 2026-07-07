@@ -20,6 +20,10 @@ use proto::cache::{
 use proto::config::{
     ConfigGet, ConfigGetResult, ConfigList, ConfigListResult, ConfigSet, AUTOSTART_KEY, HOME_KEY,
 };
+use proto::content::{
+    ContentProjectGet, ContentSearch, ContentSources, ContentVersions, ModpackResolve,
+    SourcesResult, VersionsResult as ContentVersionsResult,
+};
 use proto::daemon::{DaemonStatus, DaemonStatusResult, DaemonStop, DaemonStopResult};
 use proto::download::DownloadStart;
 use proto::events::{EventsSubscribe, EventsSubscribeResult};
@@ -953,6 +957,59 @@ pub fn make_router() -> Router {
             .map(|(key, value)| ConfigEntry { key, value })
             .collect();
         Ok(InstanceConfigListResult { entries })
+    });
+
+    on.handle::<ContentSources, _, _>(|_: Empty, ctx| async move {
+        Ok(SourcesResult {
+            sources: ctx.runtime.engine().content().sources(),
+        })
+    });
+
+    on.handle::<ContentSearch, _, _>(|q, ctx| async move {
+        ctx.runtime
+            .engine()
+            .content()
+            .search(&q)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+    });
+
+    on.handle::<ContentProjectGet, _, _>(|p, ctx| async move {
+        if p.project.is_empty() {
+            return Err(ServiceError::bad_request("project is required"));
+        }
+        ctx.runtime
+            .engine()
+            .content()
+            .project(&p.source, &p.project)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+    });
+
+    on.handle::<ContentVersions, _, _>(|q, ctx| async move {
+        if q.project.is_empty() {
+            return Err(ServiceError::bad_request("project is required"));
+        }
+        let versions = ctx
+            .runtime
+            .engine()
+            .content()
+            .versions(&q)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(ContentVersionsResult { versions })
+    });
+
+    on.handle::<ModpackResolve, _, _>(|p, ctx| async move {
+        if p.version_id.is_empty() {
+            return Err(ServiceError::bad_request("version_id is required"));
+        }
+        ctx.runtime
+            .engine()
+            .content()
+            .resolve_modpack(&p.source, &p.version_id)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
     });
 
     router

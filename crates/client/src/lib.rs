@@ -6,7 +6,7 @@ mod session;
 mod spawn;
 
 pub use facades::{
-    Accounts, App, Cache, Config, Daemon, Instance, Java, Process, ProcessEvent, Server,
+    Accounts, App, Cache, Config, Content, Daemon, Instance, Java, Process, ProcessEvent, Server,
 };
 pub use ipc::errors::IpcError;
 pub use session::{job_id, Session};
@@ -113,6 +113,12 @@ impl Client {
 
     pub fn instance(&self) -> Instance<'_> {
         Instance {
+            session: &self.session,
+        }
+    }
+
+    pub fn content(&self) -> Content<'_> {
+        Content {
             session: &self.session,
         }
     }

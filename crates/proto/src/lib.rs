@@ -6,6 +6,7 @@ pub mod app;
 pub mod backup;
 pub mod cache;
 pub mod config;
+pub mod content;
 pub mod contract;
 pub mod daemon;
 pub mod download;

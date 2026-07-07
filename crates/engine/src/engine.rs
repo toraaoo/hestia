@@ -13,6 +13,7 @@ use crate::accounts::Accounts;
 use crate::backup;
 use crate::cache::Cache;
 use crate::config::Config;
+use crate::content::Content;
 use crate::instances::{InstanceRecord, Instances};
 use crate::java::Java;
 use crate::minecraft::launch::{self, InstancePaths, LaunchAccount, LaunchPlan};
@@ -50,6 +51,7 @@ pub struct Engine {
     java: Java,
     accounts: Accounts,
     minecraft: Minecraft,
+    content: Content,
     servers: Servers,
     instances: Instances,
     // One backup or restore per entry at a time: two archives of the same
@@ -74,6 +76,7 @@ impl Engine {
             java,
             accounts,
             minecraft: Minecraft::new(),
+            content: Content::new(),
             servers,
             instances,
             backups_active: Mutex::new(HashSet::new()),
@@ -119,6 +122,10 @@ impl Engine {
 
     pub fn minecraft(&self) -> &Minecraft {
         &self.minecraft
+    }
+
+    pub fn content(&self) -> &Content {
+        &self.content
     }
 
     pub fn servers(&self) -> &Servers {
