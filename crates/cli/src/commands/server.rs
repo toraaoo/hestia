@@ -93,7 +93,13 @@ pub enum ServerCmd {
     /// Managed servers and their state
     #[command(visible_alias = "ls")]
     List,
-    /// Get, set, or list this server's settings (memory, jvm-args, server.properties)
+    /// Archive, restore, or manage a server's backups (prompts for anything omitted)
+    Backup {
+        #[command(subcommand)]
+        cmd: BackupCmd,
+    },
+    /// Get, set, or list this server's settings (memory, jvm-args,
+    /// backup-interval, backup-retention, server.properties)
     Config {
         /// Server name or id
         server: String,
@@ -161,6 +167,43 @@ pub enum ServerCmd {
     Flavors,
 }
 
+/// The `server backup` grammar: on-demand archives of the server's data
+/// directory. Scheduled backups are configured through `server config`
+/// (`backup-interval`, `backup-retention`).
+#[derive(Subcommand)]
+pub enum BackupCmd {
+    /// Archive the server's data (a running server keeps running; its world
+    /// saving pauses during the archive)
+    Create {
+        /// Server name or id (prompts when omitted)
+        server: Option<String>,
+    },
+    /// Stored backups, newest first
+    #[command(visible_alias = "ls")]
+    List {
+        /// Server name or id (prompts when omitted)
+        server: Option<String>,
+    },
+    /// Replace a stopped server's data with a backup's content (the current
+    /// jar and libraries are kept)
+    Restore {
+        /// Server name or id (prompts when omitted)
+        server: Option<String>,
+        /// Backup id (prompts when omitted)
+        backup: Option<String>,
+        #[arg(long, help = "Replace the current data without confirming")]
+        force: bool,
+    },
+    /// Delete a backup
+    #[command(visible_alias = "rm")]
+    Remove {
+        /// Server name or id (prompts when omitted)
+        server: Option<String>,
+        /// Backup id (prompts when omitted)
+        backup: Option<String>,
+    },
+}
+
 pub async fn run(cmd: ServerCmd) -> Result<()> {
     let client = super::connect().await?;
     match cmd {
@@ -173,6 +216,7 @@ pub async fn run(cmd: ServerCmd) -> Result<()> {
             restart,
         } => update(&client, server, version, loader, downgrade, restart).await?,
         ServerCmd::List => list(&client).await?,
+        ServerCmd::Backup { cmd } => backup(&client, cmd).await?,
         ServerCmd::Config { server, cmd } => config(&client, &server, cmd).await?,
         ServerCmd::Attach { server } => return attach(client, &server).await,
         ServerCmd::Command { server, command } => {
@@ -429,6 +473,72 @@ fn build_config(
         });
     }
     Ok(config)
+}
+
+/// `hestia server backup create|list|restore|remove` — the per-server backup
+/// surface. Create and restore render live progress; restore confirms before
+/// replacing the current data.
+async fn backup(client: &Client, cmd: BackupCmd) -> Result<()> {
+    match cmd {
+        BackupCmd::Create { server } => {
+            let info = pick_server(client.server().list().await?, server)?;
+            let reporter = Arc::new(ProvisionReporter::new());
+            reporter.update(&mc::backup_phase());
+            let progress = reporter.clone();
+            let result = client
+                .server()
+                .backup_create(&info.id, move |p| progress.update(p))
+                .await;
+            reporter.finish();
+            let backup = result?;
+            ui::show(View::line(format!(
+                "backup '{}' of '{}' created ({})",
+                backup.id,
+                info.name,
+                ui::human_bytes(backup.size)
+            )))
+        }
+        BackupCmd::List { server } => {
+            let info = pick_server(client.server().list().await?, server)?;
+            let backups = client.server().backup_list(&info.id).await?;
+            if backups.is_empty() {
+                return ui::show(View::note("no backups yet (hestia server backup create)"));
+            }
+            mc::show_backups(format!("{} backups", info.name), backups)
+        }
+        BackupCmd::Restore {
+            server,
+            backup,
+            force,
+        } => {
+            let info = pick_server(client.server().list().await?, server)?;
+            let backups = client.server().backup_list(&info.id).await?;
+            let backup = mc::pick_backup(backups, backup)?;
+            if !force {
+                mc::confirm_restore(&info.name, "world and settings", &backup)?;
+            }
+            let reporter = Arc::new(ProvisionReporter::new());
+            reporter.update(&mc::backup_phase());
+            let progress = reporter.clone();
+            let result = client
+                .server()
+                .backup_restore(&info.id, &backup.id, move |p| progress.update(p))
+                .await;
+            reporter.finish();
+            result?;
+            ui::show(View::line(format!(
+                "backup '{}' restored onto '{}'",
+                backup.id, info.name
+            )))
+        }
+        BackupCmd::Remove { server, backup } => {
+            let info = pick_server(client.server().list().await?, server)?;
+            let backups = client.server().backup_list(&info.id).await?;
+            let backup = mc::pick_backup(backups, backup)?;
+            client.server().backup_remove(&info.id, &backup.id).await?;
+            ui::show(View::line(format!("backup '{}' removed", backup.id)))
+        }
+    }
 }
 
 /// `hestia server config <server> get|set|list` — the per-server settings

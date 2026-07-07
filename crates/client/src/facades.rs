@@ -12,6 +12,12 @@ use proto::accounts::{
     AccountLoginBeginResult, AccountLoginComplete, AccountLoginCompleteParams, AccountRemove,
     AccountRemoveParams, AccountSwitch, AccountSwitchParams, LoginMethod,
 };
+use proto::backup::{
+    BackupInfo, InstanceBackupCreate, InstanceBackupCreateParams, InstanceBackupList,
+    InstanceBackupRef, InstanceBackupRemove, InstanceBackupRestore, InstanceBackupRestoreParams,
+    ServerBackupCreate, ServerBackupCreateParams, ServerBackupList, ServerBackupRef,
+    ServerBackupRemove, ServerBackupRestore, ServerBackupRestoreParams,
+};
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo,
@@ -491,6 +497,72 @@ impl Server<'_> {
         Ok(self.session.call::<ServerCommand>(&params).await?.response)
     }
 
+    /// Archive the server's data directory, blocking until the daemon reports
+    /// done or error and forwarding each progress event to `on_progress`. A
+    /// running server keeps running — its world saving pauses around the
+    /// archive.
+    pub async fn backup_create(
+        &self,
+        server: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<BackupInfo, IpcError> {
+        let id = job_id("server-backup");
+        let params = ServerBackupCreateParams {
+            server: server.to_string(),
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_backup_job(session, &id, on_progress, move || async move {
+            session
+                .call::<ServerBackupCreate>(&params)
+                .await
+                .map(|_| ())
+        })
+        .await
+    }
+
+    pub async fn backup_list(&self, server: &str) -> Result<Vec<BackupInfo>, IpcError> {
+        Ok(self
+            .session
+            .call::<ServerBackupList>(&server_ref(server))
+            .await?
+            .backups)
+    }
+
+    /// Replace a stopped server's data directory with a backup's content,
+    /// blocking until the daemon reports done or error and forwarding each
+    /// progress event to `on_progress`.
+    pub async fn backup_restore(
+        &self,
+        server: &str,
+        backup: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<BackupInfo, IpcError> {
+        let id = job_id("server-restore");
+        let params = ServerBackupRestoreParams {
+            server: server.to_string(),
+            backup: backup.to_string(),
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_backup_job(session, &id, on_progress, move || async move {
+            session
+                .call::<ServerBackupRestore>(&params)
+                .await
+                .map(|_| ())
+        })
+        .await
+    }
+
+    pub async fn backup_remove(&self, server: &str, backup: &str) -> Result<(), IpcError> {
+        let params = ServerBackupRef {
+            server: server.to_string(),
+            backup: backup.to_string(),
+        };
+        self.session.call::<ServerBackupRemove>(&params).await?;
+        Ok(())
+    }
+
     /// Read one setting; `None` when it is not set (a `not_found` from the
     /// daemon).
     pub async fn config_get(&self, server: &str, key: &str) -> Result<Option<String>, IpcError> {
@@ -528,6 +600,31 @@ fn server_ref(server: &str) -> ServerRef {
     ServerRef {
         server: server.to_string(),
     }
+}
+
+/// Drive one backup/restore job: forward its progress events and decode the
+/// done event's backup. Shared by the server and instance facades — the four
+/// job types publish the same `backup.*` topics, disambiguated by job id.
+async fn run_backup_job<F, Fut>(
+    session: &Session,
+    id: &str,
+    on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    start: F,
+) -> Result<BackupInfo, IpcError>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<(), IpcError>>,
+{
+    let on_event = move |event: &Event| {
+        if let Ok(progress) = serde_json::from_value::<ProvisionProgress>(event.payload.clone()) {
+            on_progress(&progress);
+        }
+    };
+    let payload = session
+        .run_job(id, "backup.done", "backup.error", on_event, start)
+        .await?;
+    serde_json::from_value(payload.get("backup").cloned().unwrap_or(Value::Null))
+        .map_err(|e| IpcError::Malformed(e.to_string()))
 }
 
 pub struct Instance<'a> {
@@ -593,9 +690,9 @@ impl Instance<'_> {
     }
 
     /// Move a stopped instance to another version (the profile is resolved
-    /// upstream, so this can take a little while; the new files materialise at
-    /// the next launch). `allow_downgrade` asserts the user confirmed a
-    /// downgrade.
+    /// upstream and the game directory is backed up first, so this can take a
+    /// while; the new files materialise at the next launch). `allow_downgrade`
+    /// asserts the user confirmed a downgrade.
     pub async fn update(
         &self,
         instance: &str,
@@ -611,7 +708,7 @@ impl Instance<'_> {
         };
         Ok(self
             .session
-            .call_with_timeout::<InstanceUpdate>(&params, Duration::from_secs(60))
+            .call_with_timeout::<InstanceUpdate>(&params, Duration::from_secs(10 * 60))
             .await?
             .instance)
     }
@@ -648,6 +745,71 @@ impl Instance<'_> {
             tail,
         };
         Ok(self.session.call::<InstanceLogs>(&params).await?.lines)
+    }
+
+    /// Archive a stopped instance's data directory, blocking until the daemon
+    /// reports done or error and forwarding each progress event to
+    /// `on_progress`.
+    pub async fn backup_create(
+        &self,
+        instance: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<BackupInfo, IpcError> {
+        let id = job_id("instance-backup");
+        let params = InstanceBackupCreateParams {
+            instance: instance.to_string(),
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_backup_job(session, &id, on_progress, move || async move {
+            session
+                .call::<InstanceBackupCreate>(&params)
+                .await
+                .map(|_| ())
+        })
+        .await
+    }
+
+    pub async fn backup_list(&self, instance: &str) -> Result<Vec<BackupInfo>, IpcError> {
+        Ok(self
+            .session
+            .call::<InstanceBackupList>(&instance_ref(instance))
+            .await?
+            .backups)
+    }
+
+    /// Replace a stopped instance's data directory with a backup's content,
+    /// blocking until the daemon reports done or error and forwarding each
+    /// progress event to `on_progress`.
+    pub async fn backup_restore(
+        &self,
+        instance: &str,
+        backup: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<BackupInfo, IpcError> {
+        let id = job_id("instance-restore");
+        let params = InstanceBackupRestoreParams {
+            instance: instance.to_string(),
+            backup: backup.to_string(),
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_backup_job(session, &id, on_progress, move || async move {
+            session
+                .call::<InstanceBackupRestore>(&params)
+                .await
+                .map(|_| ())
+        })
+        .await
+    }
+
+    pub async fn backup_remove(&self, instance: &str, backup: &str) -> Result<(), IpcError> {
+        let params = InstanceBackupRef {
+            instance: instance.to_string(),
+            backup: backup.to_string(),
+        };
+        self.session.call::<InstanceBackupRemove>(&params).await?;
+        Ok(())
     }
 
     /// Read one JVM setting; `None` when it is not set (a `not_found` from the

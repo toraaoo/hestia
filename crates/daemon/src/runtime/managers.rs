@@ -8,6 +8,9 @@ use std::sync::{Arc, Mutex};
 
 use engine::{Downloader, Engine, ServerCreateSpec, ServerUpdateSpec};
 use ipc::protocol::Event;
+use proto::backup::{
+    BackupDoneEvent, BackupErrorEvent, BackupInfo, BackupKind, BackupProgressEvent,
+};
 use proto::download::{DownloadDoneEvent, DownloadErrorEvent, DownloadProgressEvent, DownloadSpec};
 use proto::instance::{
     InstanceLaunchDoneEvent, InstanceLaunchErrorEvent, InstanceLaunchProgressEvent,
@@ -22,7 +25,7 @@ use proto::server::{
 
 use super::event_hub::EventHub;
 use super::process::{ProcessSupervisor, StartError};
-use super::{instance_process_id, server_info};
+use super::{instance_process_id, server_info, server_process_id};
 
 fn topic_event<E: proto::Topic + serde::Serialize>(event: &E) -> Event {
     Event {
@@ -230,6 +233,11 @@ impl ServerUpdateManager {
         }
     }
 
+    /// Whether an update for this server id is still running.
+    pub fn in_flight(&self, server_id: &str) -> bool {
+        self.active.lock().unwrap().contains(server_id)
+    }
+
     /// Start an update job off-thread, one per server at a time. Returns the
     /// job id, or `None` if that server is already being updated.
     pub fn start(&self, server_id: String, params: ServerUpdateParams) -> Option<String> {
@@ -411,6 +419,145 @@ async fn launch(
             Err("invalid launch plan".to_string())
         }
         Err(StartError::Spawn(e)) => Err(format!("cannot spawn the game: {e}")),
+    }
+}
+
+/// One backup or restore job for one entry — what `BackupManager::start`
+/// runs off-thread.
+pub enum BackupJob {
+    ServerBackup { server_id: String, live: bool },
+    ServerRestore { server_id: String, backup: String },
+    InstanceBackup { instance_id: String },
+    InstanceRestore { instance_id: String, backup: String },
+}
+
+impl BackupJob {
+    /// The in-flight key: one backup *or* restore per entry at a time. The
+    /// entry's process id is the key, so handlers can check it without
+    /// re-deriving a format.
+    fn key(&self) -> String {
+        match self {
+            BackupJob::ServerBackup { server_id, .. }
+            | BackupJob::ServerRestore { server_id, .. } => server_process_id(server_id),
+            BackupJob::InstanceBackup { instance_id }
+            | BackupJob::InstanceRestore { instance_id, .. } => instance_process_id(instance_id),
+        }
+    }
+
+    fn id_prefix(&self) -> &'static str {
+        match self {
+            BackupJob::ServerBackup { .. } => "server-backup",
+            BackupJob::ServerRestore { .. } => "server-restore",
+            BackupJob::InstanceBackup { .. } => "instance-backup",
+            BackupJob::InstanceRestore { .. } => "instance-restore",
+        }
+    }
+
+    async fn run(
+        self,
+        engine: &Engine,
+        on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
+    ) -> anyhow::Result<BackupInfo> {
+        match self {
+            BackupJob::ServerBackup { server_id, live } => {
+                engine
+                    .backup_server(&server_id, BackupKind::Manual, live, on_progress)
+                    .await
+            }
+            BackupJob::ServerRestore { server_id, backup } => {
+                engine
+                    .restore_server_backup(&server_id, &backup, on_progress)
+                    .await
+            }
+            BackupJob::InstanceBackup { instance_id } => {
+                engine
+                    .backup_instance(&instance_id, BackupKind::Manual, on_progress)
+                    .await
+            }
+            BackupJob::InstanceRestore {
+                instance_id,
+                backup,
+            } => {
+                engine
+                    .restore_instance_backup(&instance_id, &backup, on_progress)
+                    .await
+            }
+        }
+    }
+}
+
+pub struct BackupManager {
+    engine: Arc<Engine>,
+    hub: Arc<EventHub>,
+    active: Arc<Mutex<HashSet<String>>>,
+}
+
+impl BackupManager {
+    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>) -> Self {
+        BackupManager {
+            engine,
+            hub,
+            active: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
+
+    /// Whether a backup or restore is still running for this entry key
+    /// (`server-<id>` / `instance-<id>`).
+    pub fn in_flight(&self, key: &str) -> bool {
+        self.active.lock().unwrap().contains(key)
+    }
+
+    /// Start a backup/restore job off-thread, one per entry at a time.
+    /// Returns the job id, or `None` if that entry is already busy.
+    pub fn start(&self, job: BackupJob, id: String) -> Option<String> {
+        let id = if id.is_empty() {
+            generate_id(job.id_prefix())
+        } else {
+            id
+        };
+        let key = job.key();
+        {
+            let mut active = self.active.lock().unwrap();
+            if !active.insert(key.clone()) {
+                tracing::debug!(entry = %key, "backup job already in flight");
+                return None;
+            }
+        }
+        let engine = self.engine.clone();
+        let hub = self.hub.clone();
+        let active = self.active.clone();
+        let job_id = id.clone();
+        tracing::info!(job = %id, entry = %key, kind = job.id_prefix(), "backup job started");
+
+        tokio::spawn(async move {
+            let progress_hub = hub.clone();
+            let progress_id = job_id.clone();
+            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> = Box::new(move |p| {
+                progress_hub.publish(&topic_event(&BackupProgressEvent {
+                    id: progress_id.clone(),
+                    progress: p.clone(),
+                }));
+            });
+
+            match job.run(&engine, on_progress.as_ref()).await {
+                Ok(backup) => {
+                    tracing::info!(job = %job_id, backup = %backup.id, size = backup.size, "backup job done");
+                    hub.publish(&topic_event(&BackupDoneEvent {
+                        id: job_id.clone(),
+                        backup,
+                    }));
+                }
+                Err(e) => {
+                    tracing::error!(job = %job_id, error = format!("{e:#}"), "backup job failed");
+                    hub.publish(&topic_event(&BackupErrorEvent {
+                        id: job_id.clone(),
+                        message: format!("{e:#}"),
+                    }));
+                }
+            }
+            active.lock().unwrap().remove(&key);
+        });
+        Some(id)
     }
 }
 

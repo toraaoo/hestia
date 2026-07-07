@@ -243,7 +243,9 @@ The subsystems behind the aggregate:
   holding the resolved profile snapshot; the disk is the registry, as with
   `java`). Each record also carries a `JavaSettings` (`minecraft/launch.rs`):
   the per-entry `memory` (one value driving both `-Xms`/`-Xmx`) and extra
-  `jvm-args`, injected into the launch plan at each start/launch; the
+  `jvm-args`, injected into the launch plan at each start/launch; a server
+  record also carries a `BackupSettings` (`backup.rs`): the scheduled-backup
+  `backup-interval` (m/h/d units, empty disables) and `backup-retention`. The
   `config_get/set/list` methods validate and persist them (servers also pass
   property keys through to `server.properties` — a set must name a key the
   server's own generated file carries, so a typo cannot silently drift the
@@ -266,6 +268,17 @@ The subsystems behind the aggregate:
       world, logs
   ```
 
+- **`backup`** — entry backups: gzipped tar archives of an entry's `data/`
+  under its `backups/`, named `<utc-stamp>-<kind>.tar.gz` (kind = `manual` /
+  `scheduled` / `update`) — the disk is the registry, here too. Creation
+  skips what the launcher re-materialises (the server jar, `libraries/`,
+  `logs/`, `cache/` — docker-mc-backup's default exclude set; instances skip
+  `logs/`) and writes through a `.part` temp file; restore extracts into a
+  staging directory, carries the skipped names over from the current tree
+  (they belong to the record's *current* version), and swaps — a failure
+  leaves the current data untouched. `prune` keeps the newest N of one kind.
+  Every pass reports per-file progress.
+
   A server's record also claims its **ports**: the game port at create (lowest
   free from 25565, or pinned via the create params) and its rcon console
   (port + random password) at first start. Claims are checked against every
@@ -282,11 +295,19 @@ The subsystems behind the aggregate:
   `prepare_instance` (materialise java/client/libraries/assets, then assemble
   the plan for the signed-in account's rotated token), and the version moves
   `update_server` / `update_instance` (re-resolve the same flavor at another
-  version and swap the record's profile — a server also re-materialises its
-  files under the `ready` gate and regenerates its properties schema; an
-  instance pays at the next launch). Both directions work; a downgrade must
-  be allowed explicitly, and the direction is judged by position in the
-  flavor's own newest-first catalogue, not by parsing version strings.
+  version, take an automatic `update`-kind backup of the existing data, and
+  swap the record's profile — a server also re-materialises its files under
+  the `ready` gate and regenerates its properties schema; an instance pays at
+  the next launch). Both directions work; a downgrade must be allowed
+  explicitly, and the direction is judged by position in the flavor's own
+  newest-first catalogue, not by parsing version strings. The aggregate also
+  composes the backup flows over the `backup` module: `backup_server` (a live
+  server's world saving pauses over RCON around the archive — `save-off`,
+  `save-all flush`, tar, `save-on`, with `save-on` retried even when
+  archiving fails, exactly docker-mc-backup's sequence),
+  `restore_server_backup`, their instance counterparts (instances archive
+  only while stopped — no RCON to quiesce a client), and
+  `prune_server_backups`; one backup *or* restore runs per entry at a time.
   Servers are fully provisioned at create so `start` is an immediate spawn;
   instances are records at create and pay at launch.
 
@@ -301,6 +322,26 @@ The subsystems behind the aggregate:
 > Directories appear on demand rather than at create, so a tree only shows
 > what is actually in use. The layout change is not migrated: pre-`data/`
 > entries must be recreated (or their game files moved into `data/` by hand).
+
+> **Backups follow docker-mc-backup, minus what the launcher already owns.**
+> The reference behaviour (itzg/docker-mc-backup) is: pause world writes over
+> RCON (`save-off`, `save-all flush`), tar the data, `save-on` guaranteed by
+> an exit trap, timestamped `%Y%m%d-%H%M%S` gzip archives, exclude
+> `*.jar,cache,logs`, prune on a schedule. Hestia keeps that shape and
+> diverges where the launcher knows more than a sidecar can: excluded
+> binaries (jar, `libraries/`) are *carried over* on restore rather than
+> missing, because the record's profile — not the archive — says which
+> version the entry runs; restore is a staged swap instead of an
+> extract-into-empty-dir script; retention is count-based per kind, pruning
+> only `scheduled` archives so a deliberate manual or pre-update backup is
+> never auto-deleted; and the schedule lives on the server record
+> (`backup-interval`/`backup-retention` config keys) rather than a sidecar's
+> environment. Version updates always back up first — an update is the one
+> moment data provably changes shape, and the confirmation gate (downgrade
+> warnings) already marks it as risky. Instances get on-demand backups only:
+> a Minecraft client has no RCON channel to quiesce it, so it must be stopped
+> to archive, and an interactive client session has no analogue of a
+> long-running server's unattended schedule.
 
 > **The properties schema is generated, not maintained.** `config set`
 > validates a `server.properties` key against the server's own file, written
@@ -354,13 +395,24 @@ supervises launched processes, and manages autostart. The only crate that links
       protocol code. The channel name and payload shapes come from the contract, so
       a handler physically cannot drift from the client SDK.
     - **`managers.rs`** — `DownloadManager`, `JavaInstallManager`,
-      `ServerCreateManager`, and `InstanceLaunchManager`: the worker-thread
-      pattern that lets `download.start` / `java.install` / `server.create` /
-      `instance.launch` answer immediately while the blocking engine work runs
-      off-thread, publishing progress/done/error events through the hub. The
-      launch manager hands the prepared `LaunchPlan` to the supervisor under a
-      deterministic process id (`server-<id>` / `instance-<id>`), so every
-      channel can find a server's process without bookkeeping.
+      `ServerCreateManager`, `InstanceLaunchManager`, and `BackupManager`: the
+      worker-thread pattern that lets `download.start` / `java.install` /
+      `server.create` / `instance.launch` / `*.backup.create|restore` answer
+      immediately while the blocking engine work runs off-thread, publishing
+      progress/done/error events through the hub (the four backup job types
+      share the `backup.progress|done|error` topics, disambiguated by job id).
+      The launch manager hands the prepared `LaunchPlan` to the supervisor
+      under a deterministic process id (`server-<id>` / `instance-<id>`), so
+      every channel can find a server's process without bookkeeping; the same
+      id doubles as the backup in-flight key, which lifecycle handlers
+      (start, update, remove) check so nothing swaps the tree an archive is
+      reading.
+    - **`scheduler.rs`** — the scheduled-backup loop: every minute, archive
+      each *running* server whose `backup-interval` has elapsed since its
+      newest backup (any kind — a fresh manual or pre-update archive resets
+      the clock), then prune its `scheduled` archives beyond
+      `backup-retention`. A stopped server's world cannot change, so it is
+      never re-archived on schedule.
     - **`process/`** — `ProcessSupervisor`: launches processes whose lifetime
       is decoupled from the daemon's (own process group, no `kill_on_drop`, no
       pipes back to the daemon), tracks them, and applies a restart policy.
@@ -402,12 +454,17 @@ supervises launched processes, and manages autostart. The only crate that links
   start/stop/status/logs are thin over
   the supervisor, merging the stored record with live process state; command
   relays one console command over the running server's rcon channel),
-  `server.config.get|set|list` (the reserved `memory`/`jvm-args` keys on the
-  record plus any `server.properties` key, bar the hestia-managed ports/rcon
-  ones), and the `instance.*` counterparts:
-  `flavors|versions|resolve|create|update|list|remove`, plus
+  `server.config.get|set|list` (the reserved `memory`/`jvm-args`/
+  `backup-interval`/`backup-retention` keys on the record plus any
+  `server.properties` key, bar the hestia-managed ports/rcon ones),
+  `server.backup.create|list|restore|remove` (create archives a running
+  server live; restore refuses a running or busy server and verifies the
+  backup exists before answering with the job id), and the `instance.*`
+  counterparts: `flavors|versions|resolve|create|update|list|remove`, plus
   `instance.launch|stop|logs` (`logs` is thin over the supervisor, like the
-  server's) and `instance.config.get|set|list` (`memory`/`jvm-args` only).
+  server's), `instance.backup.create|list|restore|remove` (create and
+  restore require the instance stopped), and `instance.config.get|set|list`
+  (`memory`/`jvm-args` only).
 - **`autostart.rs`** — registers/removes the daemon as a login-time service per
   platform, driven by the `config` service when the reserved `autostart` key is
   set (`is_enabled()` / `set()`).
@@ -500,7 +557,11 @@ a console over rcon — one-shot `command`, followed logs, interactive
 `attach`); instance management (create a
 record, launch materialises client/libraries/assets and spawns the game as the
 signed-in account); in-place version updates for both (downgrades gated
-behind an explicit confirmation); and the CLI front-end over all of it.
+behind an explicit confirmation, the existing data backed up automatically
+first); backups for both (on-demand archive/restore with live progress — a
+running server is archived under the RCON save-off dance — plus per-server
+scheduled backups with retention pruning); and the CLI front-end over all of
+it.
 
 **Pending:** natives-classifier extraction for pre-1.19 clients (the resolver
 skips legacy `natives-<os>` classifier libraries, so old versions launch

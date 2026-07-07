@@ -5,6 +5,7 @@ mod event_hub;
 mod managers;
 mod process;
 pub mod router;
+mod scheduler;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -20,11 +21,12 @@ use tokio::sync::Notify;
 
 pub use event_hub::EventHub;
 pub use managers::{
-    DownloadManager, InstanceLaunchManager, JavaInstallManager, ServerCreateManager,
-    ServerUpdateManager,
+    BackupJob, BackupManager, DownloadManager, InstanceLaunchManager, JavaInstallManager,
+    ServerCreateManager, ServerUpdateManager,
 };
 pub use process::{ProcessSupervisor, StartError};
 pub use router::{Channels, Router, ServiceError};
+pub use scheduler::spawn_backup_scheduler;
 
 /// The supervisor id a managed server runs under — deterministic, so every
 /// channel can find a server's process without bookkeeping.
@@ -79,6 +81,7 @@ pub struct Runtime {
     server_creates: ServerCreateManager,
     server_updates: ServerUpdateManager,
     instance_launches: InstanceLaunchManager,
+    backups: BackupManager,
     processes: Arc<ProcessSupervisor>,
     log_path: PathBuf,
     started: Instant,
@@ -100,6 +103,7 @@ impl Runtime {
         let server_updates = ServerUpdateManager::new(engine.clone(), hub.clone());
         let instance_launches =
             InstanceLaunchManager::new(engine.clone(), hub.clone(), processes.clone());
+        let backups = BackupManager::new(engine.clone(), hub.clone());
         Runtime {
             engine,
             hub,
@@ -108,6 +112,7 @@ impl Runtime {
             server_creates,
             server_updates,
             instance_launches,
+            backups,
             processes,
             log_path,
             started: Instant::now(),
@@ -153,6 +158,10 @@ impl Runtime {
 
     pub fn instance_launches(&self) -> &InstanceLaunchManager {
         &self.instance_launches
+    }
+
+    pub fn backups(&self) -> &BackupManager {
+        &self.backups
     }
 
     pub fn processes(&self) -> &ProcessSupervisor {

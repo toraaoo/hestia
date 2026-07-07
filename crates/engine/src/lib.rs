@@ -4,6 +4,7 @@
 //! linking it.
 
 mod accounts;
+mod backup;
 mod cache;
 mod checksum;
 mod config;
@@ -16,6 +17,7 @@ mod registry;
 mod servers;
 
 pub use accounts::{Accounts, LoginChallenge};
+pub use backup::BackupSettings;
 pub use cache::{Cache, CacheEntry, CacheUsage};
 pub use config::{Config, ConfigError, Settings};
 pub use download::Downloader;

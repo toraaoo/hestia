@@ -262,7 +262,9 @@ impl ProvisionReporter {
                     detail: bytes_detail(progress, rate),
                 }
             }
-            ProvisionPhase::Libraries | ProvisionPhase::Assets if progress.total > 0 => {
+            ProvisionPhase::Libraries | ProvisionPhase::Assets | ProvisionPhase::Backup
+                if progress.total > 0 =>
+            {
                 View::Download {
                     ratio: count_ratio(progress.current, progress.total),
                     detail: format!(
@@ -311,6 +313,7 @@ fn bytes_detail(progress: &ProvisionProgress, rate: f64) -> String {
 fn provision_label(phase: ProvisionPhase) -> &'static str {
     match phase {
         ProvisionPhase::Resolving => "resolving…",
+        ProvisionPhase::Backup => "backing up…",
         ProvisionPhase::Java => "java runtime…",
         ProvisionPhase::Server => "server jar…",
         ProvisionPhase::Client => "client jar…",
@@ -322,6 +325,7 @@ fn provision_label(phase: ProvisionPhase) -> &'static str {
 fn provision_noun(phase: ProvisionPhase) -> &'static str {
     match phase {
         ProvisionPhase::Resolving => "profile",
+        ProvisionPhase::Backup => "files",
         ProvisionPhase::Java => "java",
         ProvisionPhase::Server => "server jar",
         ProvisionPhase::Client => "client jar",

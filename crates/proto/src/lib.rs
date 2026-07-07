@@ -3,6 +3,7 @@
 
 pub mod accounts;
 pub mod app;
+pub mod backup;
 pub mod cache;
 pub mod config;
 pub mod contract;

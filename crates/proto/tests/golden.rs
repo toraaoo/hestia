@@ -10,6 +10,7 @@
 
 use proto::accounts::{Account, AccountLoginBeginResult};
 use proto::app::AppInfoResult;
+use proto::backup::BackupInfo;
 use proto::cache::{CacheEntry, CacheInfoResult};
 use proto::daemon::{DaemonStatusResult, DaemonStopParams};
 use proto::download::DownloadSpec;
@@ -91,6 +92,7 @@ golden!(
 );
 golden!(server_info, ServerInfo, "server_info.json");
 golden!(instance_info, InstanceInfo, "instance_info.json");
+golden!(backup_info, BackupInfo, "backup_info.json");
 golden!(
     provision_progress,
     ProvisionProgress,

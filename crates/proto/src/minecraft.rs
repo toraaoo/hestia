@@ -149,6 +149,7 @@ pub struct ResolveParams {
 pub enum ProvisionPhase {
     #[default]
     Resolving,
+    Backup,
     Java,
     Server,
     Client,

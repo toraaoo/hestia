@@ -1,9 +1,14 @@
 //! Shared helpers for the `server` and `instance` command trees: resolving a
 //! flavor (interactively when not given) and rendering flavor/version lists.
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
-use client::proto::minecraft::{ConfigEntry, Flavor, GameVersion, VersionKind};
+use client::proto::backup::BackupInfo;
+use client::proto::minecraft::{
+    ConfigEntry, Flavor, GameVersion, ProvisionPhase, ProvisionProgress, VersionKind,
+};
 use client::proto::process::{ProcessInfo, ProcessState};
 
 use crate::ui::{self, View};
@@ -45,6 +50,91 @@ pub fn process_state_label(process: &Option<ProcessInfo>) -> String {
     match process {
         Some(p) if p.state == ProcessState::Running => format!("running (pid {})", p.pid),
         Some(_) | None => "stopped".to_string(),
+    }
+}
+
+/// Render backups (newest first) as an ID/KIND/SIZE/AGE table.
+pub fn show_backups(title: impl Into<String>, backups: Vec<BackupInfo>) -> Result<()> {
+    let rows = backups
+        .iter()
+        .map(|b| {
+            vec![
+                b.id.clone(),
+                b.kind.as_str().to_string(),
+                ui::human_bytes(b.size),
+                age_label(b.created_unix),
+            ]
+        })
+        .collect();
+    ui::show(View::table(title, ["ID", "KIND", "SIZE", "AGE"], rows))
+}
+
+/// Return the chosen backup: validated when `provided`, otherwise picked from
+/// an interactive selector (newest first).
+pub fn pick_backup(backups: Vec<BackupInfo>, provided: Option<String>) -> Result<BackupInfo> {
+    if backups.is_empty() {
+        bail!("no backups yet (see `backup create`)");
+    }
+    if let Some(reference) = provided {
+        return backups
+            .into_iter()
+            .find(|b| b.id == reference)
+            .with_context(|| format!("no backup matches '{reference}'"));
+    }
+    let labels: Vec<String> = backups
+        .iter()
+        .map(|b| {
+            format!(
+                "{} ({}, {}, {})",
+                b.id,
+                b.kind.as_str(),
+                ui::human_bytes(b.size),
+                age_label(b.created_unix)
+            )
+        })
+        .collect();
+    let index = ui::select("select a backup", &labels)?;
+    Ok(backups.into_iter().nth(index).expect("selector index"))
+}
+
+/// Interactive fallback for a missing `--force`; errors when stdin is not a
+/// terminal so scripts must pass the flag explicitly.
+pub fn confirm_restore(name: &str, data: &str, backup: &BackupInfo) -> Result<()> {
+    let choice = ui::select(
+        &format!(
+            "restoring '{}' replaces the current {data} of '{name}'",
+            backup.id
+        ),
+        &["restore".to_string(), "cancel".to_string()],
+    )
+    .context("pass --force to restore without confirming")?;
+    if choice != 0 {
+        bail!("restore cancelled");
+    }
+    Ok(())
+}
+
+/// The reporter state a backup/restore job opens with, so the gauge reads
+/// "backing up…" from the first frame instead of the default "resolving…".
+pub fn backup_phase() -> ProvisionProgress {
+    ProvisionProgress {
+        phase: ProvisionPhase::Backup,
+        ..Default::default()
+    }
+}
+
+/// Coarse "how long ago" label for a unix timestamp.
+pub fn age_label(created_unix: i64) -> String {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let secs = now.saturating_sub(created_unix).max(0);
+    match secs {
+        0..=59 => "just now".to_string(),
+        60..=3599 => format!("{}m ago", secs / 60),
+        3600..=86_399 => format!("{}h ago", secs / 3600),
+        _ => format!("{}d ago", secs / 86_400),
     }
 }
 

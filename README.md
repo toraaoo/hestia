@@ -18,9 +18,12 @@ it's just as comfortable from a terminal as from a window.
 > files (client jar, libraries,
 > assets) at launch and runs as the signed-in account. Both move between game
 > versions in place (`server|instance update`; downgrades warn — worlds and
-> saves do not downgrade). Vanilla and Fabric are
-> the shipped flavors. Still to come: wiring the stock Tauri desktop shell to
-> the daemon and a functional tray.
+> saves do not downgrade, and both are backed up automatically first). Both
+> also have **backups**: on-demand archive/restore of the entry's game data
+> (a running server keeps running — world saving pauses around the archive),
+> plus per-server scheduled backups with retention pruning. Vanilla and
+> Fabric are the shipped flavors. Still to come: wiring the stock Tauri
+> desktop shell to the daemon and a functional tray.
 
 ## Front-ends
 
@@ -129,10 +132,25 @@ hestia server config smp set motd "hi"          # any server.properties key its
                                                 #   version knows (validated
                                                 #   against the generated file)
 hestia server update smp 1.21.4  # move a server to another version (world,
-                                 #   ports, config stay; prompts for anything
-                                 #   omitted; a downgrade asks for a confirm —
-                                 #   --downgrade for scripts; a running server
-                                 #   confirms a stop-update-start — --restart)
+                                 #   ports, config stay, and the data is
+                                 #   backed up automatically first; prompts
+                                 #   for anything omitted; a downgrade asks
+                                 #   for a confirm — --downgrade for scripts;
+                                 #   a running server confirms a
+                                 #   stop-update-start — --restart)
+hestia server backup create smp  # archive the world + config into the
+                                 #   server's backups/ (a running server keeps
+                                 #   running; its world saving pauses around
+                                 #   the archive)
+hestia server backup list smp    # stored backups, newest first
+hestia server backup restore smp # replace the data with a backup (prompts for
+                                 #   the backup and confirms — --force for
+                                 #   scripts; the current jar/libraries stay)
+hestia server backup remove smp <backup>
+hestia server config smp set backup-interval 6h  # archive the running server
+                                 #   on a schedule (m/h/d units; empty
+                                 #   disables); scheduled archives beyond
+                                 #   backup-retention (default 7) are pruned
 hestia server start smp          # immediate spawn (already provisioned)
 hestia server attach smp         # interactive console: live logs, type to send
                                  #   commands, Esc detaches (alias: console)
@@ -145,9 +163,13 @@ hestia server versions [flavor] | flavors           # browse the catalogue
 hestia instance create           # interactive: flavor → version
 hestia instance create fabric 1.21.1 -n modded --memory 4G
 hestia instance launch modded    # ensures java/client/libraries/assets, then runs
-hestia instance update modded 1.21.4  # move to another version (saves stay;
+hestia instance update modded 1.21.4  # move to another version (saves stay
+                                 #   and are backed up automatically first;
                                  #   files download at the next launch; a
                                  #   downgrade asks for a confirm)
+hestia instance backup create modded  # archive saves + options (instance
+                                 #   stopped; on demand only — no schedule)
+hestia instance backup list modded | restore modded | remove modded <backup>
 hestia instance config modded set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
 hestia instance logs modded -n 50 # captured output (-f keeps following)
 hestia instance list | info modded | stop modded | restart modded | remove modded

@@ -9,6 +9,11 @@ use proto::accounts::{
     AccountSwitchResult,
 };
 use proto::app::{AppInfo, AppInfoResult};
+use proto::backup::{
+    BackupJobResult, BackupListResult, InstanceBackupCreate, InstanceBackupList,
+    InstanceBackupRemove, InstanceBackupRestore, ServerBackupCreate, ServerBackupList,
+    ServerBackupRemove, ServerBackupRestore,
+};
 use proto::cache::{
     CacheClear, CacheEntry, CacheInfo, CacheInfoResult, CacheList, CacheListResult, CacheUsage,
 };
@@ -46,7 +51,7 @@ use serde_json::{json, Value};
 
 use crate::autostart;
 use crate::runtime::{
-    instance_process_id, server_process_id, Channels, Router, ServiceError, StartError,
+    instance_process_id, server_process_id, BackupJob, Channels, Router, ServiceError, StartError,
 };
 
 pub fn make_router() -> Router {
@@ -456,6 +461,7 @@ pub fn make_router() -> Router {
                 record.name
             )));
         }
+        ensure_no_backup(&ctx, &server_process_id(&record.id), &record.name)?;
         match ctx.runtime.server_updates().start(record.id, p) {
             Some(id) => Ok(ServerUpdateResult { id }),
             None => Err(ServiceError::bad_request(
@@ -489,6 +495,7 @@ pub fn make_router() -> Router {
                 record.name
             )));
         }
+        ensure_no_backup(&ctx, &server_process_id(&record.id), &record.name)?;
         ctx.runtime
             .engine()
             .servers()
@@ -510,6 +517,7 @@ pub fn make_router() -> Router {
                 record.name
             )));
         }
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
         tracing::info!(server = %record.id, name = %record.name, "starting server");
         let (_, plan) = ctx
             .runtime
@@ -621,6 +629,166 @@ pub fn make_router() -> Router {
         Ok(ServerConfigListResult { entries })
     });
 
+    on.handle::<ServerBackupCreate, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        if !record.ready {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is still provisioning",
+                record.name
+            )));
+        }
+        if ctx.runtime.server_updates().in_flight(&record.id) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is being updated",
+                record.name
+            )));
+        }
+        let live = is_running(&ctx, &server_process_id(&record.id));
+        match ctx.runtime.backups().start(
+            BackupJob::ServerBackup {
+                server_id: record.id,
+                live,
+            },
+            p.id,
+        ) {
+            Some(id) => Ok(BackupJobResult { id }),
+            None => Err(ServiceError::bad_request(
+                "a backup or restore is already running for that server",
+            )),
+        }
+    });
+
+    on.handle::<ServerBackupList, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        let backups = ctx
+            .runtime
+            .engine()
+            .server_backups(&record.id)
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(BackupListResult { backups })
+    });
+
+    on.handle::<ServerBackupRestore, _, _>(|p, ctx| async move {
+        if p.backup.is_empty() {
+            return Err(ServiceError::bad_request("backup is required"));
+        }
+        let record = find_server(&ctx, &p.server)?;
+        if is_running(&ctx, &server_process_id(&record.id)) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is running; stop it first",
+                record.name
+            )));
+        }
+        if ctx.runtime.server_updates().in_flight(&record.id) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is being updated",
+                record.name
+            )));
+        }
+        require_backup(ctx.runtime.engine().server_backups(&record.id), &p.backup)?;
+        match ctx.runtime.backups().start(
+            BackupJob::ServerRestore {
+                server_id: record.id,
+                backup: p.backup,
+            },
+            p.id,
+        ) {
+            Some(id) => Ok(BackupJobResult { id }),
+            None => Err(ServiceError::bad_request(
+                "a backup or restore is already running for that server",
+            )),
+        }
+    });
+
+    on.handle::<ServerBackupRemove, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        match ctx
+            .runtime
+            .engine()
+            .remove_server_backup(&record.id, &p.backup)
+        {
+            Ok(true) => Ok(Empty {}),
+            Ok(false) => Err(ServiceError::not_found(format!(
+                "no backup matches '{}'",
+                p.backup
+            ))),
+            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+        }
+    });
+
+    on.handle::<InstanceBackupCreate, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        if is_running(&ctx, &instance_process_id(&record.id)) {
+            return Err(ServiceError::bad_request(format!(
+                "instance '{}' is running; stop it first",
+                record.name
+            )));
+        }
+        match ctx.runtime.backups().start(
+            BackupJob::InstanceBackup {
+                instance_id: record.id,
+            },
+            p.id,
+        ) {
+            Some(id) => Ok(BackupJobResult { id }),
+            None => Err(ServiceError::bad_request(
+                "a backup or restore is already running for that instance",
+            )),
+        }
+    });
+
+    on.handle::<InstanceBackupList, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        let backups = ctx
+            .runtime
+            .engine()
+            .instance_backups(&record.id)
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(BackupListResult { backups })
+    });
+
+    on.handle::<InstanceBackupRestore, _, _>(|p, ctx| async move {
+        if p.backup.is_empty() {
+            return Err(ServiceError::bad_request("backup is required"));
+        }
+        let record = find_instance(&ctx, &p.instance)?;
+        if is_running(&ctx, &instance_process_id(&record.id)) {
+            return Err(ServiceError::bad_request(format!(
+                "instance '{}' is running; stop it first",
+                record.name
+            )));
+        }
+        require_backup(ctx.runtime.engine().instance_backups(&record.id), &p.backup)?;
+        match ctx.runtime.backups().start(
+            BackupJob::InstanceRestore {
+                instance_id: record.id,
+                backup: p.backup,
+            },
+            p.id,
+        ) {
+            Some(id) => Ok(BackupJobResult { id }),
+            None => Err(ServiceError::bad_request(
+                "a backup or restore is already running for that instance",
+            )),
+        }
+    });
+
+    on.handle::<InstanceBackupRemove, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        match ctx
+            .runtime
+            .engine()
+            .remove_instance_backup(&record.id, &p.backup)
+        {
+            Ok(true) => Ok(Empty {}),
+            Ok(false) => Err(ServiceError::not_found(format!(
+                "no backup matches '{}'",
+                p.backup
+            ))),
+            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+        }
+    });
+
     on.handle::<InstanceCreate, _, _>(|p, ctx| async move {
         if p.flavor.is_empty() || p.version.is_empty() {
             return Err(ServiceError::bad_request("flavor and version are required"));
@@ -654,6 +822,7 @@ pub fn make_router() -> Router {
                 record.name
             )));
         }
+        ensure_no_backup(&ctx, &instance_process_id(&record.id), &record.name)?;
         let record = ctx
             .runtime
             .engine()
@@ -690,6 +859,7 @@ pub fn make_router() -> Router {
                 record.name
             )));
         }
+        ensure_no_backup(&ctx, &instance_process_id(&record.id), &record.name)?;
         ctx.runtime
             .engine()
             .instances()
@@ -710,6 +880,7 @@ pub fn make_router() -> Router {
                 record.name
             )));
         }
+        ensure_no_backup(&ctx, &instance_process_id(&record.id), &record.name)?;
         match ctx
             .runtime
             .instance_launches()
@@ -814,4 +985,34 @@ fn is_running(ctx: &crate::runtime::HandlerContext, process_id: &str) -> bool {
         .processes()
         .status(process_id)
         .is_some_and(|info| info.state == ProcessState::Running)
+}
+
+/// Refuse lifecycle changes (start, update, remove) while an archive is being
+/// written or restored — they would race the file tree it is reading. The
+/// entry's process id doubles as the backup in-flight key.
+fn ensure_no_backup(
+    ctx: &crate::runtime::HandlerContext,
+    key: &str,
+    name: &str,
+) -> Result<(), ServiceError> {
+    if ctx.runtime.backups().in_flight(key) {
+        return Err(ServiceError::bad_request(format!(
+            "'{name}' has a backup or restore in progress; wait for it to finish"
+        )));
+    }
+    Ok(())
+}
+
+fn require_backup(
+    backups: anyhow::Result<Vec<proto::backup::BackupInfo>>,
+    reference: &str,
+) -> Result<(), ServiceError> {
+    let backups = backups.map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+    if backups.iter().any(|b| b.id == reference) {
+        Ok(())
+    } else {
+        Err(ServiceError::not_found(format!(
+            "no backup matches '{reference}'"
+        )))
+    }
 }

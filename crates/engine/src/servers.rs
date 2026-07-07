@@ -13,6 +13,7 @@ use anyhow::{bail, Context, Result};
 use proto::minecraft::{ProvisionPhase, ProvisionProgress, ServerProfile};
 use serde::{Deserialize, Serialize};
 
+use crate::backup::BackupSettings;
 use crate::cache::Cache;
 use crate::minecraft::launch::{self, JavaSettings, LaunchPlan};
 use crate::minecraft::materialize::{self, OnProgress};
@@ -56,6 +57,10 @@ pub struct ServerRecord {
     /// Per-entry JVM tuning (memory, extra flags) injected at each start.
     #[serde(default)]
     pub jvm: JavaSettings,
+    /// Scheduled-backup tuning (interval, retention); unset disables the
+    /// schedule.
+    #[serde(default)]
+    pub backup: BackupSettings,
     pub profile: ServerProfile,
 }
 
@@ -127,6 +132,7 @@ impl Servers {
             game_port: Some(game_port),
             rcon: None,
             jvm: JavaSettings::default(),
+            backup: BackupSettings::default(),
             profile,
         };
         let dir = self.server_dir(&id);
@@ -394,13 +400,13 @@ impl Servers {
         )
     }
 
-    /// Read one setting: a reserved JVM key from the record, or any other key
-    /// from `server.properties`. `Ok(None)` means the key is not set.
+    /// Read one setting: a reserved JVM or backup key from the record, or any
+    /// other key from `server.properties`. `Ok(None)` means the key is not set.
     pub fn config_get(&self, id: &str, key: &str) -> Result<Option<String>> {
         let record = self
             .get(id)
             .with_context(|| format!("unknown server: {id}"))?;
-        if let Some(value) = record.jvm.get(key) {
+        if let Some(value) = record.jvm.get(key).or_else(|| record.backup.get(key)) {
             return Ok(value);
         }
         Ok(read_property(
@@ -409,7 +415,7 @@ impl Servers {
         ))
     }
 
-    /// Write one setting: a reserved JVM key onto the record, or a
+    /// Write one setting: a reserved JVM or backup key onto the record, or a
     /// `server.properties` key through to the file. A property key must exist
     /// in the file the server itself generated at create — the ground truth
     /// for exactly its version — so a typo cannot silently drift the file
@@ -421,7 +427,7 @@ impl Servers {
         let mut record = self
             .get(id)
             .with_context(|| format!("unknown server: {id}"))?;
-        if record.jvm.set(key, value)? {
+        if record.jvm.set(key, value)? || record.backup.set(key, value)? {
             registry::write_record(&self.server_dir(&record.id), RECORD, &record)?;
             return Ok(());
         }
@@ -446,13 +452,14 @@ impl Servers {
         merge_properties(&properties, &[(key, value.to_string())])
     }
 
-    /// The reserved JVM settings (always shown) followed by every current
-    /// `server.properties` entry.
+    /// The reserved JVM and backup settings (always shown) followed by every
+    /// current `server.properties` entry.
     pub fn config_list(&self, id: &str) -> Result<Vec<(String, String)>> {
         let record = self
             .get(id)
             .with_context(|| format!("unknown server: {id}"))?;
         let mut entries = record.jvm.entries();
+        entries.extend(record.backup.entries());
         entries.extend(read_properties(&self.data_dir(&record.id).join(PROPERTIES)));
         Ok(entries)
     }

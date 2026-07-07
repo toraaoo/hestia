@@ -55,6 +55,11 @@ pub enum InstanceCmd {
     /// Managed instances and their state
     #[command(visible_alias = "ls")]
     List,
+    /// Archive, restore, or manage an instance's backups (prompts for anything omitted)
+    Backup {
+        #[command(subcommand)]
+        cmd: BackupCmd,
+    },
     /// Get, set, or list this instance's settings (memory, jvm-args)
     Config {
         /// Instance name or id
@@ -112,6 +117,41 @@ pub enum InstanceCmd {
     Flavors,
 }
 
+/// The `instance backup` grammar: on-demand archives of the instance's game
+/// directory (saves, options). Instances back up on demand only — no
+/// schedule.
+#[derive(Subcommand)]
+pub enum BackupCmd {
+    /// Archive a stopped instance's game directory
+    Create {
+        /// Instance name or id (prompts when omitted)
+        instance: Option<String>,
+    },
+    /// Stored backups, newest first
+    #[command(visible_alias = "ls")]
+    List {
+        /// Instance name or id (prompts when omitted)
+        instance: Option<String>,
+    },
+    /// Replace a stopped instance's game directory with a backup's content
+    Restore {
+        /// Instance name or id (prompts when omitted)
+        instance: Option<String>,
+        /// Backup id (prompts when omitted)
+        backup: Option<String>,
+        #[arg(long, help = "Replace the current data without confirming")]
+        force: bool,
+    },
+    /// Delete a backup
+    #[command(visible_alias = "rm")]
+    Remove {
+        /// Instance name or id (prompts when omitted)
+        instance: Option<String>,
+        /// Backup id (prompts when omitted)
+        backup: Option<String>,
+    },
+}
+
 pub async fn run(cmd: InstanceCmd) -> Result<()> {
     let client = super::connect().await?;
     match cmd {
@@ -129,6 +169,7 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
             downgrade,
         } => update(&client, instance, version, loader, downgrade).await?,
         InstanceCmd::List => list(&client).await?,
+        InstanceCmd::Backup { cmd } => backup(&client, cmd).await?,
         InstanceCmd::Config { instance, cmd } => config(&client, &instance, cmd).await?,
         InstanceCmd::Launch { instance, account } => {
             launch(&client, &instance, account.as_deref().unwrap_or_default()).await?
@@ -310,6 +351,75 @@ fn pick_instance(instances: Vec<InstanceInfo>, provided: Option<String>) -> Resu
         .collect();
     let index = ui::select("select an instance", &labels)?;
     Ok(instances.into_iter().nth(index).expect("selector index"))
+}
+
+/// `hestia instance backup create|list|restore|remove` — the per-instance
+/// backup surface. Create and restore need the instance stopped, render live
+/// progress, and restore confirms before replacing the current data.
+async fn backup(client: &Client, cmd: BackupCmd) -> Result<()> {
+    match cmd {
+        BackupCmd::Create { instance } => {
+            let info = pick_instance(client.instance().list().await?, instance)?;
+            let reporter = Arc::new(ProvisionReporter::new());
+            reporter.update(&mc::backup_phase());
+            let progress = reporter.clone();
+            let result = client
+                .instance()
+                .backup_create(&info.id, move |p| progress.update(p))
+                .await;
+            reporter.finish();
+            let backup = result?;
+            ui::show(View::line(format!(
+                "backup '{}' of '{}' created ({})",
+                backup.id,
+                info.name,
+                ui::human_bytes(backup.size)
+            )))
+        }
+        BackupCmd::List { instance } => {
+            let info = pick_instance(client.instance().list().await?, instance)?;
+            let backups = client.instance().backup_list(&info.id).await?;
+            if backups.is_empty() {
+                return ui::show(View::note("no backups yet (hestia instance backup create)"));
+            }
+            mc::show_backups(format!("{} backups", info.name), backups)
+        }
+        BackupCmd::Restore {
+            instance,
+            backup,
+            force,
+        } => {
+            let info = pick_instance(client.instance().list().await?, instance)?;
+            let backups = client.instance().backup_list(&info.id).await?;
+            let backup = mc::pick_backup(backups, backup)?;
+            if !force {
+                mc::confirm_restore(&info.name, "saves and settings", &backup)?;
+            }
+            let reporter = Arc::new(ProvisionReporter::new());
+            reporter.update(&mc::backup_phase());
+            let progress = reporter.clone();
+            let result = client
+                .instance()
+                .backup_restore(&info.id, &backup.id, move |p| progress.update(p))
+                .await;
+            reporter.finish();
+            result?;
+            ui::show(View::line(format!(
+                "backup '{}' restored onto '{}'",
+                backup.id, info.name
+            )))
+        }
+        BackupCmd::Remove { instance, backup } => {
+            let info = pick_instance(client.instance().list().await?, instance)?;
+            let backups = client.instance().backup_list(&info.id).await?;
+            let backup = mc::pick_backup(backups, backup)?;
+            client
+                .instance()
+                .backup_remove(&info.id, &backup.id)
+                .await?;
+            ui::show(View::line(format!("backup '{}' removed", backup.id)))
+        }
+    }
 }
 
 /// `hestia instance config <instance> get|set|list` — the per-instance JVM
