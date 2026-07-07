@@ -7,11 +7,13 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
+use client::proto::content::ContentKind;
 use client::proto::minecraft::ConfigEntry;
 use client::proto::process::{ProcessInfo, ProcessState};
 use client::proto::server::{ServerCreateParams, ServerInfo, ServerUpdateParams};
 use client::{Client, ProcessEvent};
 
+use crate::commands::content::{self, EntryKind};
 use crate::commands::mc;
 use crate::ui::{self, ProvisionReporter, Spinner, View};
 
@@ -105,6 +107,11 @@ pub enum ServerCmd {
         server: String,
         #[command(subcommand)]
         cmd: mc::ConfigCmd,
+    },
+    /// Install, list, remove, or update this server's mods
+    Mod {
+        #[command(subcommand)]
+        cmd: content::ContentCmd,
     },
     /// Attach an interactive console: live logs, type to send commands
     #[command(visible_alias = "console")]
@@ -218,6 +225,9 @@ pub async fn run(cmd: ServerCmd) -> Result<()> {
         ServerCmd::List => list(&client).await?,
         ServerCmd::Backup { cmd } => backup(&client, cmd).await?,
         ServerCmd::Config { server, cmd } => config(&client, &server, cmd).await?,
+        ServerCmd::Mod { cmd } => {
+            content::run_entry(&client, EntryKind::Server, ContentKind::Mod, cmd).await?
+        }
         ServerCmd::Attach { server } => return attach(client, &server).await,
         ServerCmd::Command { server, command } => {
             let reply = client.server().command(&server, &command.join(" ")).await?;

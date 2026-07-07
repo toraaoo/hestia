@@ -21,9 +21,14 @@ it's just as comfortable from a terminal as from a window.
 > saves do not downgrade, and both are backed up automatically first). Both
 > also have **backups**: on-demand archive/restore of the entry's game data
 > (a running server keeps running — world saving pauses around the archive),
-> plus per-server scheduled backups with retention pruning. Vanilla and
-> Fabric are the shipped flavors. Still to come: wiring the stock Tauri
-> desktop shell to the daemon and a functional tray.
+> plus per-server scheduled backups with retention pruning. **Content** —
+> mods, resourcepacks, shaders — is discovered on Modrinth (search, browse,
+> resolve versions) and installed into a server (mods) or instance
+> (mods/resourcepacks/shaders) from a project, a Modrinth page URL, or a local
+> file, with required dependencies pulled in and a `data/` mirror that survives
+> backup/restore. Vanilla and Fabric are the shipped flavors, Modrinth the
+> shipped content source. Still to come: installing a whole modpack, wiring the
+> stock Tauri desktop shell to the daemon, and a functional tray.
 
 ## Front-ends
 
@@ -174,6 +179,27 @@ hestia instance config modded set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
 hestia instance logs modded -n 50 # captured output (-f keeps following)
 hestia instance list | info modded | stop modded | restart modded | remove modded
 hestia instance versions [flavor] | flavors
+hestia instance mod add modded sodium      # install a mod (resolves required
+                                 #   deps; --version pins one; the file is
+                                 #   mirrored into the game dir at launch)
+hestia instance mod add modded https://modrinth.com/mod/lithium  # a page URL
+hestia instance mod add modded --file ./my-mod.jar   # import a local file
+hestia instance mod list modded  # installed mods (+ any untracked jars in the
+                                 #   game dir)
+hestia instance mod update modded [sodium]   # newest compatible (all, or one)
+hestia instance mod remove modded sodium
+hestia instance resourcepack add modded <slug>   # same verbs for packs/shaders
+hestia instance shader add modded <slug>
+hestia server mod add smp <slug>   # servers take mods (fabric/plugin flavors)
+
+# Content discovery (Modrinth today; installs are per-entry, above)
+hestia search sodium             # quick mod search (alias for `mod search`)
+hestia mod search sodium -l fabric -g 1.21.1   # filter by loader / version
+hestia modpack search "create"   # browse other kinds: modpack, resourcepack,
+hestia resourcepack search faithful            #   shader, datapack
+hestia mod info sodium           # a project's details (downloads, sides, …)
+hestia mod versions sodium -l fabric -g 1.21.1  # downloadable versions
+hestia sources                   # the available content sources
 
 # Download cache
 hestia cache info | list | clear

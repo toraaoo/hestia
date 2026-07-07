@@ -7,19 +7,24 @@ use std::sync::Mutex;
 
 use anyhow::{bail, Context, Result};
 use proto::backup::{BackupInfo, BackupKind};
+use proto::content::{
+    ContentAddSpec, ContentKind, ContentProject, DependencyKind, InstalledContent, SideSupport,
+    VersionQuery,
+};
 use proto::minecraft::{ConfigEntry, ProvisionPhase, ProvisionProgress};
 
 use crate::accounts::Accounts;
 use crate::backup;
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::content::Content;
+use crate::content::{install, Content};
 use crate::instances::{InstanceRecord, Instances};
 use crate::java::Java;
 use crate::minecraft::launch::{self, InstancePaths, LaunchAccount, LaunchPlan};
 use crate::minecraft::materialize::{self, OnProgress};
 use crate::minecraft::rcon;
 use crate::minecraft::Minecraft;
+use crate::registry;
 use crate::servers::{RconConfig, ServerRecord, Servers};
 
 /// Everything a server create needs from the caller — the engine-side input to
@@ -266,6 +271,10 @@ impl Engine {
             anyhow::bail!("server '{}' is still provisioning", record.name);
         }
         let record = self.servers.ensure_start_config(&record.id)?;
+        install::sync(
+            &self.servers.server_dir(&record.id),
+            &self.servers.data_dir(&record.id),
+        )?;
         let java = self.installed_java(record.profile.java_major)?;
         let plan = self.servers.launch_plan(&record, &java);
         Ok((record, plan))
@@ -457,6 +466,416 @@ impl Engine {
         backup::remove(&self.instances.instance_dir(&record.id), backup)
     }
 
+    /// Install content into a server (mods only) from a platform project, a
+    /// direct URL, or a local file. Returns everything installed — the item
+    /// plus any required dependencies.
+    pub async fn add_server_content(
+        &self,
+        reference: &str,
+        spec: &ContentAddSpec,
+        on_progress: OnProgress<'_>,
+    ) -> Result<Vec<InstalledContent>> {
+        if spec.kind != ContentKind::Mod {
+            bail!("a server takes mods only");
+        }
+        let (_, ctx) = self.server_content_ctx(reference)?;
+        self.add_content(&ctx, spec, on_progress).await
+    }
+
+    /// Install content into an instance (mods, resourcepacks, shaders).
+    pub async fn add_instance_content(
+        &self,
+        reference: &str,
+        spec: &ContentAddSpec,
+        on_progress: OnProgress<'_>,
+    ) -> Result<Vec<InstalledContent>> {
+        install::kind_dir(spec.kind)?;
+        let (_, ctx) = self.instance_content_ctx(reference)?;
+        self.add_content(&ctx, spec, on_progress).await
+    }
+
+    /// A server's installed items of one kind, plus untracked filenames found
+    /// in its game directory.
+    pub fn server_content(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+    ) -> Result<(Vec<InstalledContent>, Vec<String>)> {
+        let (_, ctx) = self.server_content_ctx(reference)?;
+        Ok(list_content(&ctx, kind))
+    }
+
+    pub fn instance_content(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+    ) -> Result<(Vec<InstalledContent>, Vec<String>)> {
+        let (_, ctx) = self.instance_content_ctx(reference)?;
+        Ok(list_content(&ctx, kind))
+    }
+
+    /// Uninstall one item (matched by project id, slug, filename, or title).
+    /// Returns false when nothing matches.
+    pub fn remove_server_content(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+        item: &str,
+    ) -> Result<bool> {
+        let (_, ctx) = self.server_content_ctx(reference)?;
+        remove_content(&ctx, kind, item)
+    }
+
+    pub fn remove_instance_content(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+        item: &str,
+    ) -> Result<bool> {
+        let (_, ctx) = self.instance_content_ctx(reference)?;
+        remove_content(&ctx, kind, item)
+    }
+
+    /// Move platform-sourced items to their newest compatible version — one
+    /// named item, or every item of the kind when `item` is empty. Returns
+    /// what actually changed.
+    pub async fn update_server_content(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+        item: &str,
+        on_progress: OnProgress<'_>,
+    ) -> Result<Vec<InstalledContent>> {
+        let (_, ctx) = self.server_content_ctx(reference)?;
+        self.update_content(&ctx, kind, item, on_progress).await
+    }
+
+    pub async fn update_instance_content(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+        item: &str,
+        on_progress: OnProgress<'_>,
+    ) -> Result<Vec<InstalledContent>> {
+        let (_, ctx) = self.instance_content_ctx(reference)?;
+        self.update_content(&ctx, kind, item, on_progress).await
+    }
+
+    fn server_content_ctx(&self, reference: &str) -> Result<(ServerRecord, EntryContent)> {
+        let record = self
+            .servers
+            .get(reference)
+            .with_context(|| format!("unknown server: {reference}"))?;
+        if !record.ready {
+            bail!("server '{}' is still provisioning", record.name);
+        }
+        let ctx = EntryContent {
+            entry_dir: self.servers.server_dir(&record.id),
+            data_dir: self.servers.data_dir(&record.id),
+            game_version: record.profile.game_version.clone(),
+            flavor: record.profile.flavor.clone(),
+            side: EntrySide::Server,
+        };
+        Ok((record, ctx))
+    }
+
+    fn instance_content_ctx(&self, reference: &str) -> Result<(InstanceRecord, EntryContent)> {
+        let record = self
+            .instances
+            .get(reference)
+            .with_context(|| format!("unknown instance: {reference}"))?;
+        let ctx = EntryContent {
+            entry_dir: self.instances.instance_dir(&record.id),
+            data_dir: self.instances.data_dir(&record.id),
+            game_version: record.profile.game_version.clone(),
+            flavor: record.profile.flavor.clone(),
+            side: EntrySide::Client,
+        };
+        Ok((record, ctx))
+    }
+
+    async fn add_content(
+        &self,
+        ctx: &EntryContent,
+        spec: &ContentAddSpec,
+        on_progress: OnProgress<'_>,
+    ) -> Result<Vec<InstalledContent>> {
+        install::kind_dir(spec.kind)?;
+        if spec.kind == ContentKind::Mod && ctx.flavor == "vanilla" {
+            bail!("a vanilla {} cannot load mods", ctx.side.noun());
+        }
+        let picked = [&spec.project, &spec.url, &spec.path]
+            .iter()
+            .filter(|s| !s.is_empty())
+            .count();
+        if picked != 1 {
+            bail!("specify exactly one of a project, a url, or a file");
+        }
+
+        let items = if !spec.url.is_empty() {
+            let (source, parsed) = self.content.parse_url(&spec.url).with_context(|| {
+                format!(
+                    "'{}' is not a project URL on a supported content source",
+                    spec.url
+                )
+            })?;
+            let mut resolved = spec.clone();
+            resolved.source = source;
+            resolved.project = parsed.project;
+            if let Some(version) = parsed.version {
+                resolved.version = version;
+            }
+            self.add_platform_content(ctx, &resolved, on_progress)
+                .await?
+        } else if !spec.project.is_empty() {
+            self.add_platform_content(ctx, spec, on_progress).await?
+        } else {
+            vec![add_file_content(ctx, spec)?]
+        };
+
+        let mut index = install::load(&ctx.entry_dir);
+        for item in &items {
+            let replaced = index.iter().position(|i| {
+                i.kind == item.kind
+                    && ((!item.project_id.is_empty() && i.project_id == item.project_id)
+                        || i.filename == item.filename)
+            });
+            if let Some(pos) = replaced {
+                let old = index.remove(pos);
+                if old.filename != item.filename {
+                    install::remove_files(&ctx.entry_dir, &ctx.data_dir, &old);
+                }
+            }
+            index.push(item.clone());
+        }
+        install::save(&ctx.entry_dir, index)?;
+        for item in &items {
+            tracing::info!(
+                entry = %ctx.entry_dir.display(),
+                kind = ?item.kind,
+                title = %item.title,
+                filename = %item.filename,
+                version = %item.version_number,
+                "content installed"
+            );
+        }
+        Ok(items)
+    }
+
+    /// Resolve a platform project (and, for mods, its required dependencies —
+    /// breadth-first, skipping anything already installed) and download each
+    /// pick into the managed directory.
+    async fn add_platform_content(
+        &self,
+        ctx: &EntryContent,
+        spec: &ContentAddSpec,
+        on_progress: OnProgress<'_>,
+    ) -> Result<Vec<InstalledContent>> {
+        on_progress(&phase_progress(ProvisionPhase::Resolving));
+        let root = self.content.project(&spec.source, &spec.project).await?;
+        if root.kind != spec.kind {
+            bail!(
+                "'{}' is {:?} content, not {:?}",
+                root.title,
+                root.kind,
+                spec.kind
+            );
+        }
+        side_gate(&root, ctx.side)?;
+
+        let mut visited: std::collections::HashSet<String> = install::load(&ctx.entry_dir)
+            .into_iter()
+            .map(|i| i.project_id)
+            .filter(|p| !p.is_empty())
+            .collect();
+        visited.insert(root.id.clone());
+        let loader = (spec.kind == ContentKind::Mod).then(|| ctx.flavor.clone());
+
+        let mut items = Vec::new();
+        let mut queue = vec![(root, spec.version.clone())];
+        while let Some((project, pin)) = queue.pop() {
+            let versions = self
+                .content
+                .versions(&VersionQuery {
+                    source: spec.source.clone(),
+                    project: project.id.clone(),
+                    loader: loader.clone(),
+                    game_version: Some(ctx.game_version.clone()),
+                })
+                .await?;
+            let version =
+                install::pick_version(&versions, &ctx.game_version, loader.as_deref(), &pin)
+                    .with_context(|| format!("cannot install '{}'", project.title))?
+                    .clone();
+
+            if spec.kind == ContentKind::Mod {
+                for dep in &version.dependencies {
+                    if dep.kind != DependencyKind::Required {
+                        continue;
+                    }
+                    if dep.project_id.is_empty() {
+                        tracing::warn!(
+                            of = %project.title,
+                            version_id = %dep.version_id,
+                            "required dependency names no project; skipping"
+                        );
+                        continue;
+                    }
+                    if !visited.insert(dep.project_id.clone()) {
+                        continue;
+                    }
+                    let dep_project = self.content.project(&spec.source, &dep.project_id).await?;
+                    if side_gate(&dep_project, ctx.side).is_err() {
+                        tracing::warn!(
+                            dependency = %dep_project.title,
+                            of = %project.title,
+                            "required dependency does not support this side; skipping"
+                        );
+                        continue;
+                    }
+                    queue.push((dep_project, String::new()));
+                }
+            }
+
+            items.push(
+                self.install_version_file(ctx, &project, &version, on_progress)
+                    .await?,
+            );
+        }
+        Ok(items)
+    }
+
+    async fn install_version_file(
+        &self,
+        ctx: &EntryContent,
+        project: &ContentProject,
+        version: &proto::content::ContentVersion,
+        on_progress: OnProgress<'_>,
+    ) -> Result<InstalledContent> {
+        let file = install::primary_file(version)?;
+        materialize::validate_filename(&file.artifact.filename)?;
+        let dir = install::kind_dir(project.kind)?;
+        let managed = ctx.entry_dir.join(dir).join(&file.artifact.filename);
+        materialize::ensure_artifact(
+            Some(&self.cache),
+            &file.artifact,
+            &managed,
+            ProvisionPhase::Content,
+            on_progress,
+        )
+        .await?;
+        install::mirror(
+            &managed,
+            &ctx.data_dir.join(dir).join(&file.artifact.filename),
+        )?;
+        Ok(InstalledContent {
+            kind: project.kind,
+            source: version.source.clone(),
+            project_id: project.id.clone(),
+            slug: project.slug.clone(),
+            title: project.title.clone(),
+            version_id: version.id.clone(),
+            version_number: version.version_number.clone(),
+            filename: file.artifact.filename.clone(),
+            sha1: file
+                .artifact
+                .checksum
+                .as_ref()
+                .map(|c| c.hex.clone())
+                .unwrap_or_default(),
+            url: file.artifact.url.clone(),
+            installed_unix: registry::now_unix(),
+        })
+    }
+
+    async fn update_content(
+        &self,
+        ctx: &EntryContent,
+        kind: ContentKind,
+        reference: &str,
+        on_progress: OnProgress<'_>,
+    ) -> Result<Vec<InstalledContent>> {
+        let index = install::load(&ctx.entry_dir);
+        let targets: Vec<InstalledContent> = index
+            .iter()
+            .filter(|i| i.kind == kind && (reference.is_empty() || install::matches(i, reference)))
+            .cloned()
+            .collect();
+        if targets.is_empty() {
+            match reference.is_empty() {
+                true => bail!("nothing is installed"),
+                false => bail!("no installed item matches '{reference}'"),
+            }
+        }
+        let loader = (kind == ContentKind::Mod).then(|| ctx.flavor.clone());
+
+        let mut updated = Vec::new();
+        for item in targets {
+            if item.project_id.is_empty() {
+                if !reference.is_empty() {
+                    bail!(
+                        "'{}' was installed from a {} and cannot be updated",
+                        item.filename,
+                        item.source
+                    );
+                }
+                continue;
+            }
+            on_progress(&phase_progress(ProvisionPhase::Resolving));
+            let versions = self
+                .content
+                .versions(&VersionQuery {
+                    source: item.source.clone(),
+                    project: item.project_id.clone(),
+                    loader: loader.clone(),
+                    game_version: Some(ctx.game_version.clone()),
+                })
+                .await?;
+            let version =
+                install::pick_version(&versions, &ctx.game_version, loader.as_deref(), "")
+                    .with_context(|| format!("cannot update '{}'", item.title))?
+                    .clone();
+            if version.id == item.version_id {
+                continue;
+            }
+            let project = ContentProject {
+                id: item.project_id.clone(),
+                slug: item.slug.clone(),
+                title: item.title.clone(),
+                kind: item.kind,
+                ..ContentProject::default()
+            };
+            let new_item = self
+                .install_version_file(ctx, &project, &version, on_progress)
+                .await?;
+            if new_item.filename != item.filename {
+                install::remove_files(&ctx.entry_dir, &ctx.data_dir, &item);
+            }
+            tracing::info!(
+                title = %item.title,
+                from = %item.version_number,
+                to = %new_item.version_number,
+                "content updated"
+            );
+            updated.push(new_item);
+        }
+
+        if !updated.is_empty() {
+            let mut index = install::load(&ctx.entry_dir);
+            for new_item in &updated {
+                match index
+                    .iter_mut()
+                    .find(|i| i.kind == new_item.kind && i.project_id == new_item.project_id)
+                {
+                    Some(entry) => *entry = new_item.clone(),
+                    None => index.push(new_item.clone()),
+                }
+            }
+            install::save(&ctx.entry_dir, index)?;
+        }
+        Ok(updated)
+    }
+
     fn claim_backup(&self, key: String) -> Result<BackupClaim<'_>> {
         let mut active = self.backups_active.lock().unwrap();
         if !active.insert(key.clone()) {
@@ -567,6 +986,7 @@ impl Engine {
         let game_dir = self.instances.data_dir(&record.id);
         std::fs::create_dir_all(&game_dir)
             .with_context(|| format!("cannot create {}", game_dir.display()))?;
+        install::sync(&self.instances.instance_dir(&record.id), &game_dir)?;
         let natives_dir = meta.join("natives").join(&record.profile.game_version);
         std::fs::create_dir_all(&natives_dir)
             .with_context(|| format!("cannot create {}", natives_dir.display()))?;
@@ -644,6 +1064,114 @@ fn meta_dir(home: &Path) -> PathBuf {
     home.join("meta")
 }
 
+/// The entry-shape a content operation needs, independent of whether the entry
+/// is a server or an instance.
+struct EntryContent {
+    entry_dir: PathBuf,
+    data_dir: PathBuf,
+    game_version: String,
+    flavor: String,
+    side: EntrySide,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EntrySide {
+    Server,
+    Client,
+}
+
+impl EntrySide {
+    fn noun(self) -> &'static str {
+        match self {
+            EntrySide::Server => "server",
+            EntrySide::Client => "instance",
+        }
+    }
+}
+
+/// Reject content the platform marks unsupported for the entry's side
+/// (`Unknown` passes — the platform did not say).
+fn side_gate(project: &ContentProject, side: EntrySide) -> Result<()> {
+    let support = match side {
+        EntrySide::Server => project.server_side,
+        EntrySide::Client => project.client_side,
+    };
+    if support == SideSupport::Unsupported {
+        bail!(
+            "'{}' does not support the {} side",
+            project.title,
+            side.noun()
+        );
+    }
+    Ok(())
+}
+
+/// Import a local file: copy it into the managed directory and mirror it into
+/// the game directory. No provenance beyond the hash, so it can never update.
+fn add_file_content(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<InstalledContent> {
+    let source = Path::new(&spec.path);
+    if !source.is_file() {
+        bail!("no file at {}", source.display());
+    }
+    let filename = if spec.filename.is_empty() {
+        source
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    } else {
+        spec.filename.clone()
+    };
+    materialize::validate_filename(&filename)?;
+    let dir = install::kind_dir(spec.kind)?;
+    let managed = ctx.entry_dir.join(dir).join(&filename);
+    if let Some(parent) = managed.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
+    }
+    std::fs::copy(source, &managed)
+        .with_context(|| format!("cannot import {}", source.display()))?;
+    install::mirror(&managed, &ctx.data_dir.join(dir).join(&filename))?;
+    Ok(InstalledContent {
+        kind: spec.kind,
+        source: "file".to_string(),
+        title: filename.clone(),
+        sha1: install::sha1_file(&managed)?,
+        filename,
+        installed_unix: registry::now_unix(),
+        ..InstalledContent::default()
+    })
+}
+
+fn list_content(ctx: &EntryContent, kind: ContentKind) -> (Vec<InstalledContent>, Vec<String>) {
+    let items: Vec<InstalledContent> = install::load(&ctx.entry_dir)
+        .into_iter()
+        .filter(|i| i.kind == kind)
+        .collect();
+    let untracked = install::untracked(&ctx.data_dir, kind, &items);
+    (items, untracked)
+}
+
+fn remove_content(ctx: &EntryContent, kind: ContentKind, reference: &str) -> Result<bool> {
+    let mut index = install::load(&ctx.entry_dir);
+    let Some(pos) = index
+        .iter()
+        .position(|i| i.kind == kind && install::matches(i, reference))
+    else {
+        return Ok(false);
+    };
+    let removed = index.remove(pos);
+    install::remove_files(&ctx.entry_dir, &ctx.data_dir, &removed);
+    install::save(&ctx.entry_dir, index)?;
+    tracing::info!(
+        entry = %ctx.entry_dir.display(),
+        kind = ?removed.kind,
+        title = %removed.title,
+        filename = %removed.filename,
+        "content removed"
+    );
+    Ok(true)
+}
+
 struct BackupClaim<'a> {
     active: &'a Mutex<std::collections::HashSet<String>>,
     key: String,
@@ -657,18 +1185,26 @@ impl Drop for BackupClaim<'_> {
 
 /// What a server backup skips and a restore carries over: content the
 /// launcher re-materialises for the record's *current* version (jar,
-/// libraries) plus logs and cache — the docker-mc-backup default set.
+/// libraries) plus logs and cache — the docker-mc-backup default set — and
+/// the managed content mirror (`mods/`), which the sync pass re-creates from
+/// the entry root at the next start.
 fn server_backup_excludes(record: &ServerRecord) -> Vec<String> {
     vec![
         record.profile.primary.filename.clone(),
         "libraries".into(),
         "logs".into(),
         "cache".into(),
+        "mods".into(),
     ]
 }
 
 fn instance_backup_excludes() -> Vec<String> {
-    vec!["logs".into()]
+    vec![
+        "logs".into(),
+        "mods".into(),
+        "resourcepacks".into(),
+        "shaders".into(),
+    ]
 }
 
 /// Run the blocking archive pass off-thread, forwarding its per-file ticks to

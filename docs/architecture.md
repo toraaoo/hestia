@@ -253,9 +253,23 @@ The subsystems behind the aggregate:
   UI); `resolve_modpack` fetches a version's `.mrpack`, reads its
   `modrinth.index.json` in-process (the `zip` crate over memory — pack indexes
   are references, not embedded jars), and returns the file manifest plus the
-  loader the pack pins, rejecting parent-escaping file paths at the edge.
-  Installing the resolved files (and the pack's `overrides/`) into an entry's
-  managed directories is the pending materialize step.
+  loader the pack pins, rejecting parent-escaping file paths at the edge. A
+  provider also recognises its own site's project/version page URLs
+  (`parse_url`), so a pasted `modrinth.com/mod/…` link installs like a slug.
+  `content/install` is the per-entry install half: a `content.json` index in
+  the entry root records each installed item's provenance
+  (`InstalledContent`: kind, source, project/version ids, filename, sha1); the
+  file itself lands in the managed kind directory (`<entry>/mods/`,
+  `resourcepacks/`, `shaders/`) and is **mirrored** (hardlink, else copy) into
+  the game dir's matching directory. A platform install picks the newest
+  compatible version (`pick_version`, filtered by the entry's game version and,
+  for mods, its loader) and resolves required dependencies breadth-first; a
+  direct URL or a local file import records `source: "file"`/a platform id with
+  no version to update against. `Engine` composes the flows
+  (`add_server_content`/`add_instance_content`, list/remove/update) and a
+  `sync` pass re-mirrors any missing managed file at every start/launch (below).
+  Installing a modpack's files and `overrides/` is the remaining materialize
+  step.
 - **`servers`** / **`instances`** (`Servers`, `Instances`) — the persistent
   stores, one directory per entry beside a JSON record (`servers/<id>/server.json`
   holding the resolved profile snapshot; the disk is the registry, as with
@@ -270,28 +284,31 @@ The subsystems behind the aggregate:
   file; the hestia-managed ports/rcon keys are rejected — see the decision
   note below). An entry directory holds the record beside `data/`, the game's
   own working directory; the root is reserved for the managed content
-  directories (`mods/`, `plugins/` for servers / `resourcepacks/` for
-  instances, `configs/`, `backups/`), each created on demand — see the
-  decision note below:
+  directories (`mods/` for servers / `mods/`, `resourcepacks/`, `shaders/` for
+  instances, `backups/`) and the `content.json` install index, each created on
+  demand — see the decision note below:
 
   ```
   servers/<id>/               instances/<id>/
   ├── server.json             ├── instance.json
-  ├── mods/ plugins/          ├── mods/ resourcepacks/
-  │   configs/ backups/       │   configs/ backups/
+  ├── content.json            ├── content.json
+  ├── mods/ backups/          ├── mods/ resourcepacks/
+  │                           │   shaders/ backups/
   └── data/                   └── data/
-      jar, libraries/,            saves, options, logs —
-      eula.txt,                   the game dir the client
-      server.properties,          writes into
-      world, logs
+      jar, libraries/,            saves, options, logs,
+      eula.txt,                   mods/ (mirror) —
+      server.properties,          the game dir the client
+      world, logs, mods/          writes into
   ```
 
 - **`backup`** — entry backups: gzipped tar archives of an entry's `data/`
   under its `backups/`, named `<utc-stamp>-<kind>.tar.gz` (kind = `manual` /
   `scheduled` / `update`) — the disk is the registry, here too. Creation
   skips what the launcher re-materialises (the server jar, `libraries/`,
-  `logs/`, `cache/` — docker-mc-backup's default exclude set; instances skip
-  `logs/`) and writes through a `.part` temp file; restore extracts into a
+  `logs/`, `cache/` — docker-mc-backup's default exclude set — plus the managed
+  content mirror `mods/`; instances skip `logs/` and the mirrors `mods/`,
+  `resourcepacks/`, `shaders/`) and writes through a `.part` temp file; restore
+  extracts into a
   staging directory, carries the skipped names over from the current tree
   (they belong to the record's *current* version), and swaps — a failure
   leaves the current data untouched. `prune` keeps the newest N of one kind.
@@ -341,6 +358,23 @@ The subsystems behind the aggregate:
 > locking (`data/` vs the managed `mods/`/`resourcepacks/` roots, the backup
 > in-flight keys) — that materialize step lands with mod management, and the
 > wire contract does not change when it does.
+
+> **Installed content is managed-dir-of-record, mirrored into `data/`.** A mod
+> is written to the entry root's `mods/` (hestia's namespace) with its
+> provenance in `content.json`, then hardlinked/copied into `data/mods/` (what
+> the game loads). The managed copy — not the one in `data/` — is the source of
+> truth, which pays off three ways: (1) a backup restore swaps `data/` but the
+> managed dirs live outside it, so `mods/`/`resourcepacks/`/`shaders/` are added
+> to the backup exclude/preserve set and a `sync` pass re-mirrors them at the
+> next start/launch (`server_launch_plan`, `prepare_instance`) — restore heals
+> itself and archives stay world-focused; (2) provenance survives, so `update`
+> knows each item's project and current version (Prism keeps the same metadata
+> in packwiz TOML sidecars — same idea, one index file); (3) a hand-dropped jar
+> in `data/mods/` is surfaced as *untracked* rather than silently adopted.
+> Installs run through a `ContentManager` mirroring `BackupManager` (job id,
+> per-entry in-flight key, `content.progress|done|error` topics) and are
+> refused on a running entry (open jars lock on Windows; changes only apply at
+> the next start) or during a backup/update.
 
 > **The entry root is hestia's; `data/` is the game's.** A server or instance
 > directory used to *be* the game's working directory, which left hestia
@@ -500,7 +534,11 @@ supervises launched processes, and manages autostart. The only crate that links
   engine's content registry (an empty `source` selects the default; search,
   project, and versions are plain request/response, and `modpack.resolve`
   downloads the `.mrpack` index inline, so the client facade calls it with a
-  longer timeout).
+  longer timeout) — plus the per-entry install surface
+  `server.content.add|list|remove|update` and its `instance.content.*`
+  counterpart (add/update are jobs over a `ContentManager`, publishing the
+  `content.*` topics; list/remove are plain request/response; all refuse a
+  running or busy entry).
 - **`autostart.rs`** — registers/removes the daemon as a login-time service per
   platform, driven by the `config` service when the reserved `autostart` key is
   set (`is_enabled()` / `set()`).
@@ -597,15 +635,19 @@ behind an explicit confirmation, the existing data backed up automatically
 first); backups for both (on-demand archive/restore with live progress — a
 running server is archived under the RCON save-off dance — plus per-server
 scheduled backups with retention pruning); the content provider layer
-(Modrinth search/project/versions/modpack resolution over the socket, not yet
-surfaced in the CLI); and the CLI front-end over all of it.
+(Modrinth search/project/versions/modpack resolution) with per-entry
+install/management — mods on servers, mods/resourcepacks/shaders on instances,
+from a platform project, a source page URL, or a local file, with required
+dependencies resolved and a `data/` mirror that heals across backups; the
+kind-first browse and management CLI (`hestia mod search`, `instance mod
+add|list|remove|update`, `hestia search`); and the CLI front-end over all of
+it.
 
 **Pending:** natives-classifier extraction for pre-1.19 clients (the resolver
 skips legacy `natives-<os>` classifier libraries, so old versions launch
 without their LWJGL natives) and the legacy (virtual) asset layout; installing
-resolved content (mod/modpack files and `overrides/`) into an entry's managed
-directories, and a CLI/desktop surface for content search; wiring the desktop
-shell to the daemon; and a functional tray.
+a resolved modpack (its files and `overrides/`, e.g. `instance create
+--modpack`); wiring the desktop shell to the daemon; and a functional tray.
 
 > **Server provisioning is front-loaded by design.** A server is a long-lived,
 > repeatedly-started thing, often driven headless/scripted — `create` pays the
@@ -634,7 +676,9 @@ shell to the daemon; and a functional tray.
 - `crates/engine/tests/` — `store` (config/cache/java/servers/instances
   persistence) and `auth_oracle` (the account sign-in state machine); launch-plan
   assembly (classpath, placeholder substitution) is unit-tested in
-  `minecraft/launch.rs`.
+  `minecraft/launch.rs`, the Modrinth mapping and `.mrpack`/URL parsing in
+  `content/modrinth.rs`, and content version-pick / reference-matching in
+  `content/install.rs`.
 - `crates/daemon/tests/e2e.rs` — a client-to-daemon round trip over a real socket.
 
 Run the fast core with `cargo build -p cli -p daemon`, then

@@ -3,6 +3,7 @@
 pub mod account;
 pub mod cache;
 pub mod config;
+pub mod content;
 pub mod daemon;
 pub mod instance;
 pub mod java;

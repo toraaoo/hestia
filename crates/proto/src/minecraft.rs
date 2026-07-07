@@ -155,6 +155,7 @@ pub enum ProvisionPhase {
     Client,
     Libraries,
     Assets,
+    Content,
 }
 
 /// Progress for a provisioning job. `current`/`total` are bytes for a

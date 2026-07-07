@@ -21,8 +21,8 @@ use tokio::sync::Notify;
 
 pub use event_hub::EventHub;
 pub use managers::{
-    BackupJob, BackupManager, DownloadManager, InstanceLaunchManager, JavaInstallManager,
-    ServerCreateManager, ServerUpdateManager,
+    BackupJob, BackupManager, ContentJob, ContentManager, DownloadManager, InstanceLaunchManager,
+    JavaInstallManager, ServerCreateManager, ServerUpdateManager,
 };
 pub use process::{ProcessSupervisor, StartError};
 pub use router::{Channels, Router, ServiceError};
@@ -82,6 +82,7 @@ pub struct Runtime {
     server_updates: ServerUpdateManager,
     instance_launches: InstanceLaunchManager,
     backups: BackupManager,
+    content_jobs: ContentManager,
     processes: Arc<ProcessSupervisor>,
     log_path: PathBuf,
     started: Instant,
@@ -104,6 +105,7 @@ impl Runtime {
         let instance_launches =
             InstanceLaunchManager::new(engine.clone(), hub.clone(), processes.clone());
         let backups = BackupManager::new(engine.clone(), hub.clone());
+        let content_jobs = ContentManager::new(engine.clone(), hub.clone());
         Runtime {
             engine,
             hub,
@@ -113,6 +115,7 @@ impl Runtime {
             server_updates,
             instance_launches,
             backups,
+            content_jobs,
             processes,
             log_path,
             started: Instant::now(),
@@ -162,6 +165,10 @@ impl Runtime {
 
     pub fn backups(&self) -> &BackupManager {
         &self.backups
+    }
+
+    pub fn content_jobs(&self) -> &ContentManager {
+        &self.content_jobs
     }
 
     pub fn processes(&self) -> &ProcessSupervisor {

@@ -21,8 +21,11 @@ use proto::config::{
     ConfigGet, ConfigGetResult, ConfigList, ConfigListResult, ConfigSet, AUTOSTART_KEY, HOME_KEY,
 };
 use proto::content::{
-    ContentProjectGet, ContentSearch, ContentSources, ContentVersions, ModpackResolve,
-    SourcesResult, VersionsResult as ContentVersionsResult,
+    ContentJobResult, ContentListResult, ContentProjectGet, ContentSearch, ContentSources,
+    ContentVersions, InstanceContentAdd, InstanceContentList, InstanceContentRemove,
+    InstanceContentUpdate, ModpackResolve, ServerContentAdd, ServerContentList,
+    ServerContentRemove, ServerContentUpdate, SourcesResult,
+    VersionsResult as ContentVersionsResult,
 };
 use proto::daemon::{DaemonStatus, DaemonStatusResult, DaemonStop, DaemonStopResult};
 use proto::download::DownloadStart;
@@ -55,7 +58,8 @@ use serde_json::{json, Value};
 
 use crate::autostart;
 use crate::runtime::{
-    instance_process_id, server_process_id, BackupJob, Channels, Router, ServiceError, StartError,
+    instance_process_id, server_process_id, BackupJob, Channels, ContentJob, Router, ServiceError,
+    StartError,
 };
 
 pub fn make_router() -> Router {
@@ -689,6 +693,7 @@ pub fn make_router() -> Router {
                 record.name
             )));
         }
+        ensure_no_content(&ctx, &server_process_id(&record.id), &record.name)?;
         require_backup(ctx.runtime.engine().server_backups(&record.id), &p.backup)?;
         match ctx.runtime.backups().start(
             BackupJob::ServerRestore {
@@ -762,6 +767,7 @@ pub fn make_router() -> Router {
                 record.name
             )));
         }
+        ensure_no_content(&ctx, &instance_process_id(&record.id), &record.name)?;
         require_backup(ctx.runtime.engine().instance_backups(&record.id), &p.backup)?;
         match ctx.runtime.backups().start(
             BackupJob::InstanceRestore {
@@ -959,6 +965,154 @@ pub fn make_router() -> Router {
         Ok(InstanceConfigListResult { entries })
     });
 
+    on.handle::<ServerContentAdd, _, _>(|p, ctx| async move {
+        require_one_content_source(&p.spec)?;
+        let record = find_server(&ctx, &p.server)?;
+        let process_id = server_process_id(&record.id);
+        ensure_stopped(&ctx, &process_id, "server", &record.name)?;
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
+        ensure_no_update(&ctx, &record.id, &record.name)?;
+        match ctx.runtime.content_jobs().start(
+            ContentJob::ServerAdd {
+                server_id: record.id,
+                spec: p.spec,
+            },
+            p.id,
+        ) {
+            Some(id) => Ok(ContentJobResult { id }),
+            None => Err(ServiceError::bad_request(
+                "a content change is already running for that server",
+            )),
+        }
+    });
+
+    on.handle::<ServerContentList, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        let (items, untracked) = ctx
+            .runtime
+            .engine()
+            .server_content(&record.id, p.kind)
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(ContentListResult { items, untracked })
+    });
+
+    on.handle::<ServerContentRemove, _, _>(|p, ctx| async move {
+        if p.item.is_empty() {
+            return Err(ServiceError::bad_request("item is required"));
+        }
+        let record = find_server(&ctx, &p.server)?;
+        let process_id = server_process_id(&record.id);
+        ensure_stopped(&ctx, &process_id, "server", &record.name)?;
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
+        ensure_no_content(&ctx, &process_id, &record.name)?;
+        match ctx
+            .runtime
+            .engine()
+            .remove_server_content(&record.id, p.kind, &p.item)
+        {
+            Ok(true) => Ok(Empty {}),
+            Ok(false) => Err(ServiceError::not_found(format!(
+                "nothing installed matches '{}'",
+                p.item
+            ))),
+            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+        }
+    });
+
+    on.handle::<ServerContentUpdate, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        let process_id = server_process_id(&record.id);
+        ensure_stopped(&ctx, &process_id, "server", &record.name)?;
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
+        ensure_no_update(&ctx, &record.id, &record.name)?;
+        match ctx.runtime.content_jobs().start(
+            ContentJob::ServerUpdate {
+                server_id: record.id,
+                kind: p.kind,
+                item: p.item,
+            },
+            p.id,
+        ) {
+            Some(id) => Ok(ContentJobResult { id }),
+            None => Err(ServiceError::bad_request(
+                "a content change is already running for that server",
+            )),
+        }
+    });
+
+    on.handle::<InstanceContentAdd, _, _>(|p, ctx| async move {
+        require_one_content_source(&p.spec)?;
+        let record = find_instance(&ctx, &p.instance)?;
+        let process_id = instance_process_id(&record.id);
+        ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
+        match ctx.runtime.content_jobs().start(
+            ContentJob::InstanceAdd {
+                instance_id: record.id,
+                spec: p.spec,
+            },
+            p.id,
+        ) {
+            Some(id) => Ok(ContentJobResult { id }),
+            None => Err(ServiceError::bad_request(
+                "a content change is already running for that instance",
+            )),
+        }
+    });
+
+    on.handle::<InstanceContentList, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        let (items, untracked) = ctx
+            .runtime
+            .engine()
+            .instance_content(&record.id, p.kind)
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(ContentListResult { items, untracked })
+    });
+
+    on.handle::<InstanceContentRemove, _, _>(|p, ctx| async move {
+        if p.item.is_empty() {
+            return Err(ServiceError::bad_request("item is required"));
+        }
+        let record = find_instance(&ctx, &p.instance)?;
+        let process_id = instance_process_id(&record.id);
+        ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
+        ensure_no_content(&ctx, &process_id, &record.name)?;
+        match ctx
+            .runtime
+            .engine()
+            .remove_instance_content(&record.id, p.kind, &p.item)
+        {
+            Ok(true) => Ok(Empty {}),
+            Ok(false) => Err(ServiceError::not_found(format!(
+                "nothing installed matches '{}'",
+                p.item
+            ))),
+            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+        }
+    });
+
+    on.handle::<InstanceContentUpdate, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        let process_id = instance_process_id(&record.id);
+        ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
+        match ctx.runtime.content_jobs().start(
+            ContentJob::InstanceUpdate {
+                instance_id: record.id,
+                kind: p.kind,
+                item: p.item,
+            },
+            p.id,
+        ) {
+            Some(id) => Ok(ContentJobResult { id }),
+            None => Err(ServiceError::bad_request(
+                "a content change is already running for that instance",
+            )),
+        }
+    });
+
     on.handle::<ContentSources, _, _>(|_: Empty, ctx| async move {
         Ok(SourcesResult {
             sources: ctx.runtime.engine().content().sources(),
@@ -1042,6 +1196,63 @@ fn is_running(ctx: &crate::runtime::HandlerContext, process_id: &str) -> bool {
         .processes()
         .status(process_id)
         .is_some_and(|info| info.state == ProcessState::Running)
+}
+
+/// Refuse content changes on a running entry: the JVM holds its jars open
+/// (locked on Windows), and changes only apply at the next start anyway.
+fn ensure_stopped(
+    ctx: &crate::runtime::HandlerContext,
+    process_id: &str,
+    noun: &str,
+    name: &str,
+) -> Result<(), ServiceError> {
+    if is_running(ctx, process_id) {
+        return Err(ServiceError::bad_request(format!(
+            "{noun} '{name}' is running; stop it first"
+        )));
+    }
+    Ok(())
+}
+
+fn ensure_no_update(
+    ctx: &crate::runtime::HandlerContext,
+    server_id: &str,
+    name: &str,
+) -> Result<(), ServiceError> {
+    if ctx.runtime.server_updates().in_flight(server_id) {
+        return Err(ServiceError::bad_request(format!(
+            "server '{name}' is being updated"
+        )));
+    }
+    Ok(())
+}
+
+/// Refuse operations that would race an in-flight content install/update; the
+/// entry's process id doubles as the content in-flight key.
+fn ensure_no_content(
+    ctx: &crate::runtime::HandlerContext,
+    key: &str,
+    name: &str,
+) -> Result<(), ServiceError> {
+    if ctx.runtime.content_jobs().in_flight(key) {
+        return Err(ServiceError::bad_request(format!(
+            "'{name}' has a content change in progress; wait for it to finish"
+        )));
+    }
+    Ok(())
+}
+
+fn require_one_content_source(spec: &proto::content::ContentAddSpec) -> Result<(), ServiceError> {
+    let picked = [&spec.project, &spec.url, &spec.path]
+        .iter()
+        .filter(|s| !s.is_empty())
+        .count();
+    if picked != 1 {
+        return Err(ServiceError::bad_request(
+            "specify exactly one of a project, a url, or a file",
+        ));
+    }
+    Ok(())
 }
 
 /// Refuse lifecycle changes (start, update, remove) while an archive is being

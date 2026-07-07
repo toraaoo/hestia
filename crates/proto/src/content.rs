@@ -7,8 +7,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::contract::{Contract, Empty};
-use crate::minecraft::Artifact;
+use crate::contract::{Contract, Empty, Topic};
+use crate::minecraft::{Artifact, ProvisionProgress};
 
 /// What a project is — the second selector level after the source.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -230,6 +230,206 @@ pub struct VersionsResult {
 pub struct ModpackParams {
     pub source: String,
     pub version_id: String,
+}
+
+/// One installed content item, as the entry's index records it. `source` is a
+/// platform id (`modrinth`) or the literal `file` for a local import — imports
+/// carry empty project/version ids and cannot be updated.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstalledContent {
+    pub kind: ContentKind,
+    pub source: String,
+    pub project_id: String,
+    pub slug: String,
+    pub title: String,
+    pub version_id: String,
+    pub version_number: String,
+    pub filename: String,
+    pub sha1: String,
+    pub url: String,
+    pub installed_unix: i64,
+}
+
+/// The installed items of one kind, plus filenames found in the entry's game
+/// directory that no index entry accounts for.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ContentListResult {
+    pub items: Vec<InstalledContent>,
+    pub untracked: Vec<String>,
+}
+
+/// What to install: exactly one of `project` (a platform project, optionally
+/// pinned by `version`), `url` (a project/version page URL on a supported
+/// source), or `path` (a daemon-local file to import).
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ContentAddSpec {
+    pub kind: ContentKind,
+    pub source: String,
+    pub project: String,
+    pub version: String,
+    pub url: String,
+    pub path: String,
+    pub filename: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerContentAddParams {
+    pub server: String,
+    #[serde(flatten)]
+    pub spec: ContentAddSpec,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceContentAddParams {
+    pub instance: String,
+    #[serde(flatten)]
+    pub spec: ContentAddSpec,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerContentListParams {
+    pub server: String,
+    pub kind: ContentKind,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceContentListParams {
+    pub instance: String,
+    pub kind: ContentKind,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerContentRemoveParams {
+    pub server: String,
+    pub kind: ContentKind,
+    pub item: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceContentRemoveParams {
+    pub instance: String,
+    pub kind: ContentKind,
+    pub item: String,
+}
+
+/// `item` empty updates every platform-sourced item of the kind.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerContentUpdateParams {
+    pub server: String,
+    pub kind: ContentKind,
+    pub item: String,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceContentUpdateParams {
+    pub instance: String,
+    pub kind: ContentKind,
+    pub item: String,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ContentJobResult {
+    pub id: String,
+}
+
+pub struct ServerContentAdd;
+impl Contract for ServerContentAdd {
+    const CHANNEL: &'static str = "server.content.add";
+    type Params = ServerContentAddParams;
+    type Result = ContentJobResult;
+}
+
+pub struct ServerContentList;
+impl Contract for ServerContentList {
+    const CHANNEL: &'static str = "server.content.list";
+    type Params = ServerContentListParams;
+    type Result = ContentListResult;
+}
+
+pub struct ServerContentRemove;
+impl Contract for ServerContentRemove {
+    const CHANNEL: &'static str = "server.content.remove";
+    type Params = ServerContentRemoveParams;
+    type Result = Empty;
+}
+
+pub struct ServerContentUpdate;
+impl Contract for ServerContentUpdate {
+    const CHANNEL: &'static str = "server.content.update";
+    type Params = ServerContentUpdateParams;
+    type Result = ContentJobResult;
+}
+
+pub struct InstanceContentAdd;
+impl Contract for InstanceContentAdd {
+    const CHANNEL: &'static str = "instance.content.add";
+    type Params = InstanceContentAddParams;
+    type Result = ContentJobResult;
+}
+
+pub struct InstanceContentList;
+impl Contract for InstanceContentList {
+    const CHANNEL: &'static str = "instance.content.list";
+    type Params = InstanceContentListParams;
+    type Result = ContentListResult;
+}
+
+pub struct InstanceContentRemove;
+impl Contract for InstanceContentRemove {
+    const CHANNEL: &'static str = "instance.content.remove";
+    type Params = InstanceContentRemoveParams;
+    type Result = Empty;
+}
+
+pub struct InstanceContentUpdate;
+impl Contract for InstanceContentUpdate {
+    const CHANNEL: &'static str = "instance.content.update";
+    type Params = InstanceContentUpdateParams;
+    type Result = ContentJobResult;
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ContentProgressEvent {
+    pub id: String,
+    #[serde(flatten)]
+    pub progress: ProvisionProgress,
+}
+impl Topic for ContentProgressEvent {
+    const TOPIC: &'static str = "content.progress";
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ContentDoneEvent {
+    pub id: String,
+    pub items: Vec<InstalledContent>,
+}
+impl Topic for ContentDoneEvent {
+    const TOPIC: &'static str = "content.done";
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ContentErrorEvent {
+    pub id: String,
+    pub message: String,
+}
+impl Topic for ContentErrorEvent {
+    const TOPIC: &'static str = "content.error";
 }
 
 pub struct ContentSources;

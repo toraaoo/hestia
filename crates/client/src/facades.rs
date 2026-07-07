@@ -19,9 +19,14 @@ use proto::backup::{
     ServerBackupRemove, ServerBackupRestore, ServerBackupRestoreParams,
 };
 use proto::content::{
-    ContentProject, ContentProjectGet, ContentSearch, ContentSource, ContentSources,
-    ContentVersion, ContentVersions, ModpackParams, ModpackResolve, ProjectParams, ResolvedModpack,
-    SearchQuery, SearchResult, VersionQuery,
+    ContentAddSpec, ContentKind, ContentProject, ContentProjectGet, ContentSearch, ContentSource,
+    ContentSources, ContentVersion, ContentVersions, InstalledContent, InstanceContentAdd,
+    InstanceContentAddParams, InstanceContentList, InstanceContentListParams,
+    InstanceContentRemove, InstanceContentRemoveParams, InstanceContentUpdate,
+    InstanceContentUpdateParams, ModpackParams, ModpackResolve, ProjectParams, ResolvedModpack,
+    SearchQuery, SearchResult, ServerContentAdd, ServerContentAddParams, ServerContentList,
+    ServerContentListParams, ServerContentRemove, ServerContentRemoveParams, ServerContentUpdate,
+    ServerContentUpdateParams, VersionQuery,
 };
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
@@ -599,6 +604,82 @@ impl Server<'_> {
             .await?
             .entries)
     }
+
+    /// Install content into a server, blocking until the daemon reports done or
+    /// error and forwarding each progress event to `on_progress`. Returns
+    /// everything installed (the item plus any required dependencies).
+    pub async fn content_add(
+        &self,
+        server: &str,
+        spec: ContentAddSpec,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<Vec<InstalledContent>, IpcError> {
+        let id = job_id("server-content-add");
+        let params = ServerContentAddParams {
+            server: server.to_string(),
+            spec,
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_content_job(session, &id, on_progress, move || async move {
+            session.call::<ServerContentAdd>(&params).await.map(|_| ())
+        })
+        .await
+    }
+
+    pub async fn content_list(
+        &self,
+        server: &str,
+        kind: ContentKind,
+    ) -> Result<(Vec<InstalledContent>, Vec<String>), IpcError> {
+        let params = ServerContentListParams {
+            server: server.to_string(),
+            kind,
+        };
+        let result = self.session.call::<ServerContentList>(&params).await?;
+        Ok((result.items, result.untracked))
+    }
+
+    pub async fn content_remove(
+        &self,
+        server: &str,
+        kind: ContentKind,
+        item: &str,
+    ) -> Result<(), IpcError> {
+        let params = ServerContentRemoveParams {
+            server: server.to_string(),
+            kind,
+            item: item.to_string(),
+        };
+        self.session.call::<ServerContentRemove>(&params).await?;
+        Ok(())
+    }
+
+    /// Update platform-sourced content to its newest compatible version — one
+    /// named item, or every item of the kind when `item` is empty.
+    pub async fn content_update(
+        &self,
+        server: &str,
+        kind: ContentKind,
+        item: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<Vec<InstalledContent>, IpcError> {
+        let id = job_id("server-content-update");
+        let params = ServerContentUpdateParams {
+            server: server.to_string(),
+            kind,
+            item: item.to_string(),
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_content_job(session, &id, on_progress, move || async move {
+            session
+                .call::<ServerContentUpdate>(&params)
+                .await
+                .map(|_| ())
+        })
+        .await
+    }
 }
 
 fn server_ref(server: &str) -> ServerRef {
@@ -629,6 +710,30 @@ where
         .run_job(id, "backup.done", "backup.error", on_event, start)
         .await?;
     serde_json::from_value(payload.get("backup").cloned().unwrap_or(Value::Null))
+        .map_err(|e| IpcError::Malformed(e.to_string()))
+}
+
+/// Drive one content install/update job: forward its progress events and decode
+/// the done event's installed items. Shared by the server and instance facades.
+async fn run_content_job<F, Fut>(
+    session: &Session,
+    id: &str,
+    on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    start: F,
+) -> Result<Vec<InstalledContent>, IpcError>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<(), IpcError>>,
+{
+    let on_event = move |event: &Event| {
+        if let Ok(progress) = serde_json::from_value::<ProvisionProgress>(event.payload.clone()) {
+            on_progress(&progress);
+        }
+    };
+    let payload = session
+        .run_job(id, "content.done", "content.error", on_event, start)
+        .await?;
+    serde_json::from_value(payload.get("items").cloned().unwrap_or(Value::Null))
         .map_err(|e| IpcError::Malformed(e.to_string()))
 }
 
@@ -891,6 +996,85 @@ impl Instance<'_> {
             .to_string();
         let pid = payload.get("pid").and_then(Value::as_u64).unwrap_or(0) as u32;
         Ok((process_id, pid))
+    }
+
+    /// Install content into an instance, blocking until the daemon reports done
+    /// or error and forwarding each progress event to `on_progress`. Returns
+    /// everything installed (the item plus any required dependencies).
+    pub async fn content_add(
+        &self,
+        instance: &str,
+        spec: ContentAddSpec,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<Vec<InstalledContent>, IpcError> {
+        let id = job_id("instance-content-add");
+        let params = InstanceContentAddParams {
+            instance: instance.to_string(),
+            spec,
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_content_job(session, &id, on_progress, move || async move {
+            session
+                .call::<InstanceContentAdd>(&params)
+                .await
+                .map(|_| ())
+        })
+        .await
+    }
+
+    pub async fn content_list(
+        &self,
+        instance: &str,
+        kind: ContentKind,
+    ) -> Result<(Vec<InstalledContent>, Vec<String>), IpcError> {
+        let params = InstanceContentListParams {
+            instance: instance.to_string(),
+            kind,
+        };
+        let result = self.session.call::<InstanceContentList>(&params).await?;
+        Ok((result.items, result.untracked))
+    }
+
+    pub async fn content_remove(
+        &self,
+        instance: &str,
+        kind: ContentKind,
+        item: &str,
+    ) -> Result<(), IpcError> {
+        let params = InstanceContentRemoveParams {
+            instance: instance.to_string(),
+            kind,
+            item: item.to_string(),
+        };
+        self.session.call::<InstanceContentRemove>(&params).await?;
+        Ok(())
+    }
+
+    /// Update platform-sourced content to its newest compatible version — one
+    /// named item, or every item of the kind when `item` is empty.
+    pub async fn content_update(
+        &self,
+        instance: &str,
+        kind: ContentKind,
+        item: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<Vec<InstalledContent>, IpcError> {
+        let id = job_id("instance-content-update");
+        let params = InstanceContentUpdateParams {
+            instance: instance.to_string(),
+            kind,
+            item: item.to_string(),
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_content_job(session, &id, on_progress, move || async move {
+            session
+                .call::<InstanceContentUpdate>(&params)
+                .await
+                .map(|_| ())
+        })
+        .await
     }
 }
 

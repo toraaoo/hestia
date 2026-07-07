@@ -7,11 +7,13 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
+use client::proto::content::ContentKind;
 use client::proto::instance::InstanceInfo;
 use client::proto::minecraft::ConfigEntry;
 use client::proto::process::{ProcessInfo, ProcessState};
 use client::{Client, ProcessEvent};
 
+use crate::commands::content::{self, EntryKind};
 use crate::commands::mc;
 use crate::ui::{self, ProvisionReporter, Spinner, View};
 
@@ -66,6 +68,21 @@ pub enum InstanceCmd {
         instance: String,
         #[command(subcommand)]
         cmd: mc::ConfigCmd,
+    },
+    /// Install, list, remove, or update this instance's mods
+    Mod {
+        #[command(subcommand)]
+        cmd: content::ContentCmd,
+    },
+    /// Install, list, remove, or update this instance's resource packs
+    Resourcepack {
+        #[command(subcommand)]
+        cmd: content::ContentCmd,
+    },
+    /// Install, list, remove, or update this instance's shaders
+    Shader {
+        #[command(subcommand)]
+        cmd: content::ContentCmd,
     },
     /// Prepare (java, client jar, libraries, assets) and launch an instance
     Launch {
@@ -171,6 +188,15 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
         InstanceCmd::List => list(&client).await?,
         InstanceCmd::Backup { cmd } => backup(&client, cmd).await?,
         InstanceCmd::Config { instance, cmd } => config(&client, &instance, cmd).await?,
+        InstanceCmd::Mod { cmd } => {
+            content::run_entry(&client, EntryKind::Instance, ContentKind::Mod, cmd).await?
+        }
+        InstanceCmd::Resourcepack { cmd } => {
+            content::run_entry(&client, EntryKind::Instance, ContentKind::ResourcePack, cmd).await?
+        }
+        InstanceCmd::Shader { cmd } => {
+            content::run_entry(&client, EntryKind::Instance, ContentKind::Shader, cmd).await?
+        }
         InstanceCmd::Launch { instance, account } => {
             launch(&client, &instance, account.as_deref().unwrap_or_default()).await?
         }

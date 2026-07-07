@@ -3,6 +3,7 @@
 //! modpack entry points over it. Stateless — every result is fetched upstream —
 //! so it needs no data directory, exactly like the `minecraft` aggregate.
 
+pub(crate) mod install;
 mod modrinth;
 mod provider;
 
@@ -13,6 +14,7 @@ use proto::content::{
 };
 
 use provider::ContentProvider;
+pub(crate) use provider::UrlRef;
 
 pub struct Content {
     providers: Vec<Box<dyn ContentProvider>>,
@@ -85,6 +87,14 @@ impl Content {
             "modpack resolved"
         );
         Ok(resolved)
+    }
+
+    /// Recognise a project/version page URL on any registered platform's site,
+    /// returning the owning source id and the reference it names.
+    pub(crate) fn parse_url(&self, url: &str) -> Option<(String, UrlRef)> {
+        self.providers
+            .iter()
+            .find_map(|p| p.parse_url(url).map(|r| (p.id().to_string(), r)))
     }
 
     /// The provider for `id`; an empty id selects the default (first) source.

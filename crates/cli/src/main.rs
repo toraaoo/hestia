@@ -68,6 +68,44 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::instance::InstanceCmd,
     },
+    /// Browse mods on a content source
+    Mod {
+        #[command(subcommand)]
+        cmd: commands::content::BrowseCmd,
+    },
+    /// Browse modpacks on a content source
+    Modpack {
+        #[command(subcommand)]
+        cmd: commands::content::BrowseCmd,
+    },
+    /// Browse resource packs on a content source
+    Resourcepack {
+        #[command(subcommand)]
+        cmd: commands::content::BrowseCmd,
+    },
+    /// Browse shaders on a content source
+    Shader {
+        #[command(subcommand)]
+        cmd: commands::content::BrowseCmd,
+    },
+    /// Browse data packs on a content source
+    Datapack {
+        #[command(subcommand)]
+        cmd: commands::content::BrowseCmd,
+    },
+    /// Search mods on a content source (alias for `mod search`)
+    Search {
+        /// Search terms
+        query: Option<String>,
+        #[arg(short, long, help = "Filter by loader (e.g. fabric)")]
+        loader: Option<String>,
+        #[arg(short = 'g', long = "game-version", help = "Filter by game version")]
+        game_version: Option<String>,
+        #[arg(short = 'S', long, help = "Content source (default: modrinth)")]
+        source: Option<String>,
+    },
+    /// The available content sources
+    Sources,
     /// Download cache
     Cache {
         #[command(subcommand)]
@@ -141,6 +179,44 @@ async fn dispatch(command: Command) -> anyhow::Result<()> {
         Command::Java { cmd } => commands::java::run(cmd).await,
         Command::Server { cmd } => commands::server::run(cmd).await,
         Command::Instance { cmd } => commands::instance::run(cmd).await,
+        Command::Mod { cmd } => {
+            commands::content::run_browse(client::proto::content::ContentKind::Mod, cmd).await
+        }
+        Command::Modpack { cmd } => {
+            commands::content::run_browse(client::proto::content::ContentKind::Modpack, cmd).await
+        }
+        Command::Resourcepack { cmd } => {
+            commands::content::run_browse(client::proto::content::ContentKind::ResourcePack, cmd)
+                .await
+        }
+        Command::Shader { cmd } => {
+            commands::content::run_browse(client::proto::content::ContentKind::Shader, cmd).await
+        }
+        Command::Datapack { cmd } => {
+            commands::content::run_browse(client::proto::content::ContentKind::DataPack, cmd).await
+        }
+        Command::Search {
+            query,
+            loader,
+            game_version,
+            source,
+        } => {
+            commands::content::run_browse(
+                client::proto::content::ContentKind::Mod,
+                commands::content::BrowseCmd::Search {
+                    query,
+                    loader,
+                    game_version,
+                    category: Vec::new(),
+                    sort: commands::content::SortArg::Relevance,
+                    source,
+                    limit: 20,
+                    offset: 0,
+                },
+            )
+            .await
+        }
+        Command::Sources => commands::content::run_sources().await,
         Command::Cache { cmd } => commands::cache::run(cmd).await,
         Command::Config { cmd } => commands::config::run(cmd).await,
         Command::Daemon { cmd } => commands::daemon::run(cmd).await,

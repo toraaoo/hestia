@@ -16,13 +16,24 @@ use serde_json::{Map, Value};
 use std::io::Cursor;
 use std::path::{Component, Path};
 
-use super::provider::ContentProvider;
+use super::provider::{ContentProvider, UrlRef};
 
 const API: &str = "https://api.modrinth.com/v2";
+const SITE: &str = "modrinth.com";
 
 /// Modrinth dependency keys that name a modloader, newest-preferred order. The
 /// loader name is the key with any `-loader` suffix stripped.
 const LOADER_KEYS: [&str; 4] = ["fabric-loader", "quilt-loader", "neoforge", "forge"];
+
+/// The site's project-type path segments (`modrinth.com/<type>/<slug>`).
+const SITE_TYPES: [&str; 6] = [
+    "mod",
+    "modpack",
+    "resourcepack",
+    "shader",
+    "datapack",
+    "plugin",
+];
 
 pub struct Modrinth;
 
@@ -34,6 +45,31 @@ impl ContentProvider for Modrinth {
 
     fn name(&self) -> &'static str {
         "Modrinth"
+    }
+
+    /// `modrinth.com/<type>/<slug>` names a project;
+    /// `…/<slug>/version/<number-or-id>` pins one of its versions.
+    fn parse_url(&self, url: &str) -> Option<UrlRef> {
+        let rest = url
+            .strip_prefix("https://")
+            .or_else(|| url.strip_prefix("http://"))?;
+        let rest = rest.strip_prefix("www.").unwrap_or(rest);
+        let path = rest.strip_prefix(SITE)?.strip_prefix('/')?;
+        let mut segments = path
+            .split(['?', '#'])
+            .next()?
+            .split('/')
+            .filter(|s| !s.is_empty());
+        let kind = segments.next()?;
+        if !SITE_TYPES.contains(&kind) {
+            return None;
+        }
+        let project = segments.next()?.to_string();
+        let version = match (segments.next(), segments.next()) {
+            (Some("version"), Some(v)) => Some(v.to_string()),
+            _ => None,
+        };
+        Some(UrlRef { project, version })
     }
 
     async fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
@@ -639,6 +675,35 @@ mod tests {
         assert_eq!(sort_index(SearchSort::Follows), "follows");
         assert_eq!(sort_index(SearchSort::Newest), "newest");
         assert_eq!(sort_index(SearchSort::Updated), "updated");
+    }
+
+    #[test]
+    fn site_urls_parse_to_project_refs() {
+        let m = Modrinth;
+        for url in [
+            "https://modrinth.com/mod/sodium",
+            "http://modrinth.com/mod/sodium",
+            "https://www.modrinth.com/mod/sodium/",
+            "https://modrinth.com/mod/sodium?query=x#gallery",
+            "https://modrinth.com/mod/sodium/versions",
+        ] {
+            let parsed = m
+                .parse_url(url)
+                .unwrap_or_else(|| panic!("should parse {url}"));
+            assert_eq!(parsed.project, "sodium");
+            assert_eq!(parsed.version, None, "{url}");
+        }
+        let pinned = m
+            .parse_url("https://modrinth.com/mod/sodium/version/mc1.21.1-0.8.12-fabric")
+            .unwrap();
+        assert_eq!(pinned.version.as_deref(), Some("mc1.21.1-0.8.12-fabric"));
+
+        assert!(m.parse_url("https://example.com/mod/sodium").is_none());
+        assert!(m
+            .parse_url("https://modrinth.com/user/jellysquid3")
+            .is_none());
+        assert!(m.parse_url("modrinth.com/mod/sodium").is_none());
+        assert!(m.parse_url("https://modrinth.com/mod").is_none());
     }
 
     #[test]

@@ -255,7 +255,10 @@ impl ProvisionReporter {
             *self.rate.lock().unwrap() = RateMeter::default();
         }
         let view = match progress.phase {
-            ProvisionPhase::Java | ProvisionPhase::Server | ProvisionPhase::Client => {
+            ProvisionPhase::Java
+            | ProvisionPhase::Server
+            | ProvisionPhase::Client
+            | ProvisionPhase::Content => {
                 let rate = self.rate.lock().unwrap().observe(progress.current);
                 View::Download {
                     ratio: count_ratio(progress.current, progress.total),
@@ -319,6 +322,7 @@ fn provision_label(phase: ProvisionPhase) -> &'static str {
         ProvisionPhase::Client => "client jar…",
         ProvisionPhase::Libraries => "libraries…",
         ProvisionPhase::Assets => "assets…",
+        ProvisionPhase::Content => "downloading…",
     }
 }
 
@@ -331,6 +335,7 @@ fn provision_noun(phase: ProvisionPhase) -> &'static str {
         ProvisionPhase::Client => "client jar",
         ProvisionPhase::Libraries => "libraries",
         ProvisionPhase::Assets => "assets",
+        ProvisionPhase::Content => "content",
     }
 }
 
