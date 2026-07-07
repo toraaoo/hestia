@@ -274,6 +274,83 @@ impl Servers {
         Ok(())
     }
 
+    /// Move a server onto a freshly resolved profile. The record swaps under
+    /// the `ready` gate, so a half-updated server cannot start and a failed
+    /// update is recovered by updating again. Name, ports, JVM settings, and
+    /// the world on disk are untouched.
+    pub async fn update(
+        &self,
+        id: &str,
+        profile: ServerProfile,
+        cache: Option<&Cache>,
+        java: &Path,
+        on_progress: OnProgress<'_>,
+    ) -> Result<ServerRecord> {
+        let mut record = self
+            .get(id)
+            .with_context(|| format!("unknown server: {id}"))?;
+        let previous_primary = record.profile.primary.filename.clone();
+        record.profile = profile;
+        record.ready = false;
+        let dir = self.server_dir(&record.id);
+        materialize::validate_filename(&record.profile.primary.filename)?;
+        registry::write_record(&dir, RECORD, &record)?;
+
+        if !record.profile.libraries.is_empty() {
+            materialize::ensure_libraries(
+                cache,
+                &record.profile.libraries,
+                &dir.join("libraries"),
+                on_progress,
+            )
+            .await?;
+        }
+        materialize::ensure_artifact(
+            cache,
+            &record.profile.primary,
+            &dir.join(&record.profile.primary.filename),
+            ProvisionPhase::Server,
+            on_progress,
+        )
+        .await?;
+
+        on_progress(&ProvisionProgress {
+            phase: ProvisionPhase::Server,
+            current: 0,
+            total: 0,
+            detail: "regenerating server.properties".into(),
+        });
+        if let Err(e) = self.regenerate_properties(&record, java).await {
+            tracing::warn!(id = %record.id, error = format!("{e:#}"), "server.properties regeneration failed");
+        }
+
+        if previous_primary != record.profile.primary.filename {
+            let _ = std::fs::remove_file(dir.join(&previous_primary));
+        }
+        tracing::info!(
+            id = %record.id,
+            version = %record.profile.game_version,
+            loader = ?record.profile.loader_version,
+            "server updated"
+        );
+        self.mark_ready(&record.id)
+    }
+
+    /// Rerun the schema-generation trick for the record's new version: with
+    /// `eula.txt` suspended the gate stops the run right after it rewrites
+    /// `server.properties` — set values survive, keys the version does not
+    /// know are dropped. The acceptance recorded at create is rewritten even
+    /// when the run fails.
+    async fn regenerate_properties(&self, record: &ServerRecord, java: &Path) -> Result<()> {
+        let eula = self.server_dir(&record.id).join("eula.txt");
+        if eula.exists() {
+            std::fs::remove_file(&eula).context("cannot suspend eula.txt for the schema run")?;
+        }
+        let generated = self.generate_properties(record, java).await;
+        std::fs::write(&eula, "eula=true\n").context("cannot restore eula.txt")?;
+        generated
+    }
+
     pub fn mark_ready(&self, id: &str) -> Result<ServerRecord> {
         let mut record = self
             .get(id)

@@ -16,7 +16,8 @@ use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo,
     InstanceLaunch, InstanceLaunchParams, InstanceList, InstanceLogs, InstanceLogsParams,
-    InstanceRef, InstanceRemove, InstanceResolve, InstanceStop, InstanceVersions,
+    InstanceRef, InstanceRemove, InstanceResolve, InstanceStop, InstanceUpdate,
+    InstanceUpdateParams, InstanceVersions,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams,
@@ -30,7 +31,8 @@ use proto::server::{
     ServerCommand, ServerCommandParams, ServerConfigGet, ServerConfigGetParams, ServerConfigList,
     ServerConfigSet, ServerConfigSetParams, ServerCreate, ServerCreateParams, ServerFlavors,
     ServerInfo, ServerList, ServerLogs, ServerLogsParams, ServerRef, ServerRemove, ServerResolve,
-    ServerStart, ServerStartResult, ServerStatus, ServerStop, ServerVersions,
+    ServerStart, ServerStartResult, ServerStatus, ServerStop, ServerUpdate, ServerUpdateParams,
+    ServerVersions,
 };
 use serde_json::Value;
 
@@ -406,6 +408,40 @@ impl Server<'_> {
             .map_err(|e| IpcError::Malformed(e.to_string()))
     }
 
+    /// Move a stopped server to another version, blocking until the daemon
+    /// reports done or error and forwarding each progress event to
+    /// `on_progress`. `params.allow_downgrade` asserts the user confirmed a
+    /// downgrade; the job id is filled in here.
+    pub async fn update(
+        &self,
+        mut params: ServerUpdateParams,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<ServerInfo, IpcError> {
+        let id = job_id("server-update");
+        params.id = id.clone();
+        let on_event = move |event: &Event| {
+            if let Ok(progress) = serde_json::from_value::<ProvisionProgress>(event.payload.clone())
+            {
+                on_progress(&progress);
+            }
+        };
+
+        let session = self.session;
+        let payload = self
+            .session
+            .run_job(
+                &id,
+                "server.update.done",
+                "server.update.error",
+                on_event,
+                move || async move { session.call::<ServerUpdate>(&params).await.map(|_| ()) },
+            )
+            .await?;
+
+        serde_json::from_value(payload.get("server").cloned().unwrap_or(Value::Null))
+            .map_err(|e| IpcError::Malformed(e.to_string()))
+    }
+
     pub async fn list(&self) -> Result<Vec<ServerInfo>, IpcError> {
         Ok(self
             .session
@@ -552,6 +588,30 @@ impl Instance<'_> {
         Ok(self
             .session
             .call_with_timeout::<InstanceCreate>(&params, Duration::from_secs(60))
+            .await?
+            .instance)
+    }
+
+    /// Move a stopped instance to another version (the profile is resolved
+    /// upstream, so this can take a little while; the new files materialise at
+    /// the next launch). `allow_downgrade` asserts the user confirmed a
+    /// downgrade.
+    pub async fn update(
+        &self,
+        instance: &str,
+        version: &str,
+        loader_version: Option<String>,
+        allow_downgrade: bool,
+    ) -> Result<InstanceInfo, IpcError> {
+        let params = InstanceUpdateParams {
+            instance: instance.to_string(),
+            version: version.to_string(),
+            loader_version,
+            allow_downgrade,
+        };
+        Ok(self
+            .session
+            .call_with_timeout::<InstanceUpdate>(&params, Duration::from_secs(60))
             .await?
             .instance)
     }

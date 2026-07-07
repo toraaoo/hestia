@@ -30,6 +30,16 @@ pub struct ServerCreateSpec {
     pub config: Vec<ConfigEntry>,
 }
 
+/// Everything a server update needs from the caller — the engine-side input to
+/// `update_server` (the downgrade confirmation is obtained by the front-end).
+#[derive(Debug, Clone, Default)]
+pub struct ServerUpdateSpec {
+    pub server: String,
+    pub version: String,
+    pub loader_version: Option<String>,
+    pub allow_downgrade: bool,
+}
+
 pub struct Engine {
     data_home: Mutex<PathBuf>,
     config: Config,
@@ -150,6 +160,74 @@ impl Engine {
         }
         provisioned?;
         self.servers.mark_ready(&record.id)
+    }
+
+    /// Move a server to another version of its flavor. A downgrade must be
+    /// allowed explicitly — Minecraft cannot load a world written by a newer
+    /// version.
+    pub async fn update_server(
+        &self,
+        spec: ServerUpdateSpec,
+        on_progress: OnProgress<'_>,
+    ) -> Result<ServerRecord> {
+        let record = self
+            .servers
+            .get(&spec.server)
+            .with_context(|| format!("unknown server: {}", spec.server))?;
+        let versions = self
+            .minecraft
+            .server_versions(&record.profile.flavor)
+            .await?;
+        guard_downgrade(
+            "world",
+            &record.name,
+            &record.profile.game_version,
+            &spec.version,
+            &versions,
+            spec.allow_downgrade,
+        )?;
+        on_progress(&phase_progress(ProvisionPhase::Resolving));
+        let profile = self
+            .minecraft
+            .resolve_server(&record.profile.flavor, &spec.version, spec.loader_version)
+            .await?;
+        let java = self.ensure_java(profile.java_major, on_progress).await?;
+        self.servers
+            .update(&record.id, profile, Some(&self.cache), &java, on_progress)
+            .await
+    }
+
+    /// Move an instance to another version of its flavor. A downgrade must be
+    /// allowed explicitly — Minecraft cannot load saves written by a newer
+    /// version. Only the record changes; files materialise at the next launch.
+    pub async fn update_instance(
+        &self,
+        reference: &str,
+        version: &str,
+        loader_version: Option<String>,
+        allow_downgrade: bool,
+    ) -> Result<InstanceRecord> {
+        let record = self
+            .instances
+            .get(reference)
+            .with_context(|| format!("unknown instance: {reference}"))?;
+        let versions = self
+            .minecraft
+            .instance_versions(&record.profile.flavor)
+            .await?;
+        guard_downgrade(
+            "saves",
+            &record.name,
+            &record.profile.game_version,
+            version,
+            &versions,
+            allow_downgrade,
+        )?;
+        let profile = self
+            .minecraft
+            .resolve_instance(&record.profile.flavor, version, loader_version)
+            .await?;
+        self.instances.update(&record.id, profile)
     }
 
     /// The ready-to-spawn invocation for a provisioned server, with its ports
@@ -340,6 +418,26 @@ impl Engine {
 /// user-facing entries and launcher internals.
 fn meta_dir(home: &Path) -> PathBuf {
     home.join("meta")
+}
+
+/// Reject an unconfirmed downgrade. The direction comes from the flavor's own
+/// newest-first catalogue; a version the catalogue no longer lists is
+/// undecidable and passes (the front-end still confirms what it can detect).
+fn guard_downgrade(
+    data: &str,
+    name: &str,
+    from: &str,
+    to: &str,
+    versions: &[proto::minecraft::GameVersion],
+    allowed: bool,
+) -> Result<()> {
+    if !allowed && proto::minecraft::downgrade_between(versions, from, to) == Some(true) {
+        anyhow::bail!(
+            "moving '{name}' from {from} back to {to} is a downgrade, and Minecraft cannot \
+             load {data} written by a newer version; confirm the downgrade to proceed"
+        );
+    }
+    Ok(())
 }
 
 fn effective_name(name: &str, flavor: &str, version: &str) -> String {

@@ -96,6 +96,36 @@ impl Contract for ServerCreate {
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
+pub struct ServerUpdateParams {
+    /// Server name or id.
+    pub server: String,
+    /// The game version to move to (either direction; a downgrade needs
+    /// `allow_downgrade`).
+    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loader_version: Option<String>,
+    /// The caller confirms the user accepted the risk of moving to an older
+    /// version (world data does not downgrade).
+    pub allow_downgrade: bool,
+    /// Client-supplied job id; empty asks the daemon to allocate one.
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerUpdateResult {
+    pub id: String,
+}
+
+pub struct ServerUpdate;
+impl Contract for ServerUpdate {
+    const CHANNEL: &'static str = "server.update";
+    type Params = ServerUpdateParams;
+    type Result = ServerUpdateResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
 pub struct ServerListResult {
     pub servers: Vec<ServerInfo>,
 }
@@ -259,4 +289,32 @@ pub struct ServerCreateErrorEvent {
 }
 impl Topic for ServerCreateErrorEvent {
     const TOPIC: &'static str = "server.create.error";
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ServerUpdateProgressEvent {
+    pub id: String,
+    #[serde(flatten)]
+    pub progress: ProvisionProgress,
+}
+impl Topic for ServerUpdateProgressEvent {
+    const TOPIC: &'static str = "server.update.progress";
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ServerUpdateDoneEvent {
+    pub id: String,
+    pub server: ServerInfo,
+}
+impl Topic for ServerUpdateDoneEvent {
+    const TOPIC: &'static str = "server.update.done";
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ServerUpdateErrorEvent {
+    pub id: String,
+    pub message: String,
+}
+impl Topic for ServerUpdateErrorEvent {
+    const TOPIC: &'static str = "server.update.error";
 }

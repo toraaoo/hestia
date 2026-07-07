@@ -80,6 +80,34 @@ impl Contract for InstanceCreate {
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
+pub struct InstanceUpdateParams {
+    /// Instance name or id.
+    pub instance: String,
+    /// The game version to move to (either direction; a downgrade needs
+    /// `allow_downgrade`).
+    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loader_version: Option<String>,
+    /// The caller confirms the user accepted the risk of moving to an older
+    /// version (saves do not downgrade).
+    pub allow_downgrade: bool,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceUpdateResult {
+    pub instance: InstanceInfo,
+}
+
+pub struct InstanceUpdate;
+impl Contract for InstanceUpdate {
+    const CHANNEL: &'static str = "instance.update";
+    type Params = InstanceUpdateParams;
+    type Result = InstanceUpdateResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
 pub struct InstanceListResult {
     pub instances: Vec<InstanceInfo>,
 }

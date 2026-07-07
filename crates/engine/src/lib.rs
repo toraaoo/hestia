@@ -19,7 +19,7 @@ pub use accounts::{Accounts, LoginChallenge};
 pub use cache::{Cache, CacheEntry, CacheUsage};
 pub use config::{Config, ConfigError, Settings};
 pub use download::Downloader;
-pub use engine::{Engine, ServerCreateSpec};
+pub use engine::{Engine, ServerCreateSpec, ServerUpdateSpec};
 pub use instances::{InstanceRecord, Instances};
 pub use java::{Java, JavaInstallOutcome};
 pub use minecraft::launch::{JavaSettings, LaunchPlan};

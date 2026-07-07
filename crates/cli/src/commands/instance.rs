@@ -33,6 +33,24 @@ pub enum InstanceCmd {
         #[arg(long, help = "Set -Xms and -Xmx together (e.g. 4G, 2048M)")]
         memory: Option<String>,
     },
+    /// Move a stopped instance to another version (prompts for anything omitted)
+    Update {
+        /// Instance name or id (prompts when omitted)
+        instance: Option<String>,
+        /// Target game version (prompts when omitted)
+        version: Option<String>,
+        #[arg(
+            short,
+            long,
+            help = "Pin a loader version (modloaders only; default latest)"
+        )]
+        loader: Option<String>,
+        #[arg(
+            long,
+            help = "Allow moving to an older version (saves do not downgrade)"
+        )]
+        downgrade: bool,
+    },
     /// Managed instances and their state
     #[command(visible_alias = "ls")]
     List,
@@ -96,6 +114,12 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
             name,
             memory,
         } => create(&client, flavor, version, loader, name, memory).await?,
+        InstanceCmd::Update {
+            instance,
+            version,
+            loader,
+            downgrade,
+        } => update(&client, instance, version, loader, downgrade).await?,
         InstanceCmd::List => list(&client).await?,
         InstanceCmd::Config { instance, cmd } => config(&client, &instance, cmd).await?,
         InstanceCmd::Launch { instance, account } => {
@@ -218,6 +242,58 @@ async fn create(
     };
     ui::show(View::line(format!("instance '{}' created", instance.name)))?;
     show_info(&instance)
+}
+
+async fn update(
+    client: &Client,
+    instance: Option<String>,
+    version: Option<String>,
+    loader: Option<String>,
+    downgrade: bool,
+) -> Result<()> {
+    let info = pick_instance(client.instance().list().await?, instance)?;
+    let versions = {
+        let _spinner = Spinner::start("fetching versions");
+        client.instance().versions(&info.flavor).await?
+    };
+    let version = mc::pick_version(versions.clone(), version)?;
+    let is_downgrade =
+        client::proto::minecraft::downgrade_between(&versions, &info.game_version, &version)
+            == Some(true);
+    if is_downgrade && !downgrade {
+        mc::confirm_downgrade(&info.name, "saves", &info.game_version, &version)?;
+    }
+
+    let updated = {
+        let _spinner = Spinner::start(format!("updating '{}' to {version}", info.name));
+        client
+            .instance()
+            .update(&info.id, &version, loader, downgrade || is_downgrade)
+            .await?
+    };
+    ui::show(View::line(format!(
+        "instance '{}' updated to {} (files download at the next launch)",
+        updated.name, updated.game_version
+    )))?;
+    show_info(&updated)
+}
+
+fn pick_instance(instances: Vec<InstanceInfo>, provided: Option<String>) -> Result<InstanceInfo> {
+    if instances.is_empty() {
+        bail!("no instances yet (hestia instance create)");
+    }
+    if let Some(reference) = provided {
+        return instances
+            .into_iter()
+            .find(|i| i.id == reference || i.name == reference)
+            .with_context(|| format!("no instance matches '{reference}'"));
+    }
+    let labels: Vec<String> = instances
+        .iter()
+        .map(|i| format!("{} ({} {})", i.name, i.flavor, i.game_version))
+        .collect();
+    let index = ui::select("select an instance", &labels)?;
+    Ok(instances.into_iter().nth(index).expect("selector index"))
 }
 
 /// `hestia instance config <instance> get|set|list` — the per-instance JVM

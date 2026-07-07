@@ -9,7 +9,7 @@ use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use client::proto::minecraft::ConfigEntry;
 use client::proto::process::{ProcessInfo, ProcessState};
-use client::proto::server::{ServerCreateParams, ServerInfo};
+use client::proto::server::{ServerCreateParams, ServerInfo, ServerUpdateParams};
 use client::{Client, ProcessEvent};
 
 use crate::commands::mc;
@@ -66,6 +66,29 @@ pub enum ServerCmd {
     Create {
         #[command(flatten)]
         args: CreateArgs,
+    },
+    /// Move a server to another version (prompts for anything omitted)
+    Update {
+        /// Server name or id (prompts when omitted)
+        server: Option<String>,
+        /// Target game version (prompts when omitted)
+        version: Option<String>,
+        #[arg(
+            short,
+            long,
+            help = "Pin a loader version (modloaders only; default latest)"
+        )]
+        loader: Option<String>,
+        #[arg(
+            long,
+            help = "Allow moving to an older version (worlds do not downgrade)"
+        )]
+        downgrade: bool,
+        #[arg(
+            long,
+            help = "Stop a running server for the update and start it again after"
+        )]
+        restart: bool,
     },
     /// Managed servers and their state
     #[command(visible_alias = "ls")]
@@ -142,6 +165,13 @@ pub async fn run(cmd: ServerCmd) -> Result<()> {
     let client = super::connect().await?;
     match cmd {
         ServerCmd::Create { args } => create(&client, args).await?,
+        ServerCmd::Update {
+            server,
+            version,
+            loader,
+            downgrade,
+            restart,
+        } => update(&client, server, version, loader, downgrade, restart).await?,
         ServerCmd::List => list(&client).await?,
         ServerCmd::Config { server, cmd } => config(&client, &server, cmd).await?,
         ServerCmd::Attach { server } => return attach(client, &server).await,
@@ -265,6 +295,104 @@ async fn create(client: &Client, args: CreateArgs) -> Result<()> {
     let server = result?;
     ui::show(View::line(format!("server '{}' created", server.name)))?;
     show_status(&server)
+}
+
+async fn update(
+    client: &Client,
+    server: Option<String>,
+    version: Option<String>,
+    loader: Option<String>,
+    downgrade: bool,
+    restart: bool,
+) -> Result<()> {
+    let info = pick_server(client.server().list().await?, server)?;
+    let was_running = running_process(&info).is_some();
+    if was_running && !restart {
+        confirm_update_restart(&info.name)?;
+    }
+    let versions = {
+        let _spinner = Spinner::start("fetching versions");
+        client.server().versions(&info.flavor).await?
+    };
+    let version = mc::pick_version(versions.clone(), version)?;
+    let is_downgrade =
+        client::proto::minecraft::downgrade_between(&versions, &info.game_version, &version)
+            == Some(true);
+    if is_downgrade && !downgrade {
+        mc::confirm_downgrade(&info.name, "a world", &info.game_version, &version)?;
+    }
+
+    if was_running {
+        {
+            let _spinner = Spinner::start(format!("stopping '{}'", info.name));
+            client.server().stop(&info.id).await?;
+            wait_until_stopped(client, &info.id).await?;
+        }
+        ui::show(View::note(format!(
+            "server '{}' stopped for the update",
+            info.name
+        )))?;
+    }
+
+    let reporter = Arc::new(ProvisionReporter::new());
+    let progress = reporter.clone();
+    let params = ServerUpdateParams {
+        server: info.id.clone(),
+        version: version.clone(),
+        loader_version: loader,
+        allow_downgrade: downgrade || is_downgrade,
+        id: String::new(),
+    };
+    let result = client
+        .server()
+        .update(params, move |p| progress.update(p))
+        .await;
+    reporter.finish();
+    let server = result?;
+    ui::show(View::line(format!(
+        "server '{}' updated to {}",
+        server.name, server.game_version
+    )))?;
+    show_status(&server)?;
+    if was_running {
+        start(client, &server.id).await?;
+    }
+    Ok(())
+}
+
+/// Interactive fallback for a missing `--restart`; errors when stdin is not a
+/// terminal so scripts must pass the flag explicitly.
+fn confirm_update_restart(name: &str) -> Result<()> {
+    let choice = ui::select(
+        &format!("server '{name}' is running and must restart to update"),
+        &[
+            "stop, update, and start again".to_string(),
+            "cancel".to_string(),
+        ],
+    )
+    .context("pass --restart to update a running server")?;
+    if choice != 0 {
+        bail!("update cancelled");
+    }
+    Ok(())
+}
+
+fn pick_server(servers: Vec<ServerInfo>, provided: Option<String>) -> Result<ServerInfo> {
+    if servers.is_empty() {
+        bail!("no servers yet (hestia server create)");
+    }
+    if let Some(reference) = provided {
+        return servers
+            .into_iter()
+            .find(|s| s.id == reference || s.name == reference)
+            .with_context(|| format!("no server matches '{reference}'"));
+    }
+    let labels: Vec<String> = servers
+        .iter()
+        .map(|s| format!("{} ({} {})", s.name, s.flavor, s.game_version))
+        .collect();
+    let index = ui::select("select a server", &labels)?;
+    Ok(servers.into_iter().nth(index).expect("selector index"))
 }
 
 /// Fold the create-time settings into one entries list: `--memory`, then the

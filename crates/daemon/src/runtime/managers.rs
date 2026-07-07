@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use engine::{Downloader, Engine, ServerCreateSpec};
+use engine::{Downloader, Engine, ServerCreateSpec, ServerUpdateSpec};
 use ipc::protocol::Event;
 use proto::download::{DownloadDoneEvent, DownloadErrorEvent, DownloadProgressEvent, DownloadSpec};
 use proto::instance::{
@@ -17,6 +17,7 @@ use proto::minecraft::ProvisionProgress;
 use proto::process::{LogSource, ProcessSpec, RestartPolicy};
 use proto::server::{
     ServerCreateDoneEvent, ServerCreateErrorEvent, ServerCreateParams, ServerCreateProgressEvent,
+    ServerUpdateDoneEvent, ServerUpdateErrorEvent, ServerUpdateParams, ServerUpdateProgressEvent,
 };
 
 use super::event_hub::EventHub;
@@ -130,6 +131,11 @@ impl ServerCreateManager {
         }
     }
 
+    /// Whether a create for this server name is still provisioning.
+    pub fn in_flight(&self, name: &str) -> bool {
+        self.active.lock().unwrap().contains(name)
+    }
+
     /// Start a provisioning job off-thread, one per server name at a time.
     /// Returns the job id, or `None` if that name is already being created.
     pub fn start(&self, params: ServerCreateParams) -> Option<String> {
@@ -204,6 +210,93 @@ impl ServerCreateManager {
                 }
             }
             active.lock().unwrap().remove(&key);
+        });
+        Some(id)
+    }
+}
+
+pub struct ServerUpdateManager {
+    engine: Arc<Engine>,
+    hub: Arc<EventHub>,
+    active: Arc<Mutex<HashSet<String>>>,
+}
+
+impl ServerUpdateManager {
+    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>) -> Self {
+        ServerUpdateManager {
+            engine,
+            hub,
+            active: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
+
+    /// Start an update job off-thread, one per server at a time. Returns the
+    /// job id, or `None` if that server is already being updated.
+    pub fn start(&self, server_id: String, params: ServerUpdateParams) -> Option<String> {
+        let id = if params.id.is_empty() {
+            generate_id("server-update")
+        } else {
+            params.id.clone()
+        };
+        {
+            let mut active = self.active.lock().unwrap();
+            if !active.insert(server_id.clone()) {
+                tracing::debug!(server = %server_id, "server update already in flight");
+                return None;
+            }
+        }
+        let engine = self.engine.clone();
+        let hub = self.hub.clone();
+        let active = self.active.clone();
+        let job_id = id.clone();
+        tracing::info!(
+            job = %id,
+            server = %server_id,
+            version = %params.version,
+            allow_downgrade = params.allow_downgrade,
+            "server update started"
+        );
+
+        tokio::spawn(async move {
+            let progress_hub = hub.clone();
+            let progress_id = job_id.clone();
+            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> = Box::new(move |p| {
+                progress_hub.publish(&topic_event(&ServerUpdateProgressEvent {
+                    id: progress_id.clone(),
+                    progress: p.clone(),
+                }));
+            });
+
+            let spec = ServerUpdateSpec {
+                server: server_id.clone(),
+                version: params.version,
+                loader_version: params.loader_version,
+                allow_downgrade: params.allow_downgrade,
+            };
+            let result = engine.update_server(spec, on_progress.as_ref()).await;
+
+            match result {
+                Ok(record) => {
+                    tracing::info!(
+                        job = %job_id,
+                        server = %record.id,
+                        version = %record.profile.game_version,
+                        "server update done"
+                    );
+                    hub.publish(&topic_event(&ServerUpdateDoneEvent {
+                        id: job_id.clone(),
+                        server: server_info(record, None),
+                    }));
+                }
+                Err(e) => {
+                    tracing::error!(job = %job_id, server = %server_id, error = format!("{e:#}"), "server update failed");
+                    hub.publish(&topic_event(&ServerUpdateErrorEvent {
+                        id: job_id.clone(),
+                        message: format!("{e:#}"),
+                    }));
+                }
+            }
+            active.lock().unwrap().remove(&server_id);
         });
         Some(id)
     }

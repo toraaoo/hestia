@@ -21,6 +21,7 @@ use tokio::sync::Notify;
 pub use event_hub::EventHub;
 pub use managers::{
     DownloadManager, InstanceLaunchManager, JavaInstallManager, ServerCreateManager,
+    ServerUpdateManager,
 };
 pub use process::{ProcessSupervisor, StartError};
 pub use router::{Channels, Router, ServiceError};
@@ -76,6 +77,7 @@ pub struct Runtime {
     java_installs: JavaInstallManager,
     downloads: DownloadManager,
     server_creates: ServerCreateManager,
+    server_updates: ServerUpdateManager,
     instance_launches: InstanceLaunchManager,
     processes: Arc<ProcessSupervisor>,
     log_path: PathBuf,
@@ -95,6 +97,7 @@ impl Runtime {
             engine.data_home().join("processes"),
         ));
         let server_creates = ServerCreateManager::new(engine.clone(), hub.clone());
+        let server_updates = ServerUpdateManager::new(engine.clone(), hub.clone());
         let instance_launches =
             InstanceLaunchManager::new(engine.clone(), hub.clone(), processes.clone());
         Runtime {
@@ -103,6 +106,7 @@ impl Runtime {
             java_installs,
             downloads,
             server_creates,
+            server_updates,
             instance_launches,
             processes,
             log_path,
@@ -141,6 +145,10 @@ impl Runtime {
 
     pub fn server_creates(&self) -> &ServerCreateManager {
         &self.server_creates
+    }
+
+    pub fn server_updates(&self) -> &ServerUpdateManager {
+        &self.server_updates
     }
 
     pub fn instance_launches(&self) -> &InstanceLaunchManager {

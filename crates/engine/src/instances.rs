@@ -82,6 +82,24 @@ impl Instances {
         Ok(record)
     }
 
+    /// Swap the record onto a freshly resolved profile; the new version's files
+    /// (version-keyed under the shared roots) materialise at the next launch.
+    /// Name, JVM settings, and the game directory are untouched.
+    pub fn update(&self, id: &str, profile: InstanceProfile) -> Result<InstanceRecord> {
+        let mut record = self
+            .get(id)
+            .with_context(|| format!("unknown instance: {id}"))?;
+        record.profile = profile;
+        registry::write_record(&self.instance_dir(&record.id), RECORD, &record)?;
+        tracing::info!(
+            id = %record.id,
+            version = %record.profile.game_version,
+            loader = ?record.profile.loader_version,
+            "instance updated"
+        );
+        Ok(record)
+    }
+
     /// Read one JVM setting (`memory` / `jvm-args`); `Ok(None)` means unset. An
     /// unknown key is an error naming the valid keys.
     pub fn config_get(&self, id: &str, key: &str) -> Result<Option<String>> {

@@ -1,7 +1,7 @@
 //! Shared helpers for the `server` and `instance` command trees: resolving a
 //! flavor (interactively when not given) and rendering flavor/version lists.
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use client::proto::minecraft::{ConfigEntry, Flavor, GameVersion, VersionKind};
 use client::proto::process::{ProcessInfo, ProcessState};
@@ -90,6 +90,23 @@ pub fn pick_version(versions: Vec<GameVersion>, provided: Option<String>) -> Res
     let labels: Vec<String> = pool.iter().map(|v| v.id.clone()).collect();
     let index = ui::select("select a version", &labels)?;
     Ok(pool[index].id.clone())
+}
+
+/// Interactive fallback for a missing `--downgrade`; errors when stdin is not
+/// a terminal so scripts must pass the flag explicitly.
+pub fn confirm_downgrade(name: &str, data: &str, from: &str, to: &str) -> Result<()> {
+    let choice = ui::select(
+        &format!(
+            "{to} is older than {from}, and Minecraft cannot load {data} \
+             written by a newer version"
+        ),
+        &[format!("downgrade '{name}'"), "cancel".to_string()],
+    )
+    .context("pass --downgrade to allow a downgrade")?;
+    if choice != 0 {
+        bail!("downgrade cancelled");
+    }
+    Ok(())
 }
 
 /// The non-interactive form of the selector: the available flavors as a table.

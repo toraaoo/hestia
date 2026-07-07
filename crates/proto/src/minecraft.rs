@@ -107,6 +107,15 @@ pub struct InstanceProfile {
     pub game_args: Vec<String>,
 }
 
+/// Whether moving `from` → `to` is a downgrade, judged by their positions in a
+/// provider's newest-first version list — the catalogue is the ordering ground
+/// truth, so no version-string parsing can drift from upstream. `None` when
+/// either version is not listed.
+pub fn downgrade_between(versions: &[GameVersion], from: &str, to: &str) -> Option<bool> {
+    let position = |id: &str| versions.iter().position(|v| v.id == id);
+    Some(position(to)? > position(from)?)
+}
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
 pub struct FlavorsResult {
@@ -158,4 +167,33 @@ pub struct ProvisionProgress {
     pub total: u64,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub detail: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn versions(ids: &[&str]) -> Vec<GameVersion> {
+        ids.iter()
+            .map(|id| GameVersion {
+                id: id.to_string(),
+                ..GameVersion::default()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn downgrade_follows_list_order() {
+        let list = versions(&["1.21.1", "1.21", "1.20.4"]);
+        assert_eq!(downgrade_between(&list, "1.20.4", "1.21.1"), Some(false));
+        assert_eq!(downgrade_between(&list, "1.21.1", "1.20.4"), Some(true));
+        assert_eq!(downgrade_between(&list, "1.21", "1.21"), Some(false));
+    }
+
+    #[test]
+    fn unknown_versions_are_undecidable() {
+        let list = versions(&["1.21.1", "1.21"]);
+        assert_eq!(downgrade_between(&list, "1.8.9", "1.21"), None);
+        assert_eq!(downgrade_between(&list, "1.21", "nope"), None);
+    }
 }

@@ -262,11 +262,17 @@ The subsystems behind the aggregate:
   ensure the Java runtime, installing through the cache when missing → download
   files → generate `server.properties` → apply create-time config → mark
   ready, removing the record on failure), `server_launch_plan`,
-  `server_command` (one console command over rcon), `create_instance`, and
+  `server_command` (one console command over rcon), `create_instance`,
   `prepare_instance` (materialise java/client/libraries/assets, then assemble
-  the plan for the signed-in account's rotated token). Servers are fully
-  provisioned at create so `start` is an immediate spawn; instances are
-  records at create and pay at launch.
+  the plan for the signed-in account's rotated token), and the version moves
+  `update_server` / `update_instance` (re-resolve the same flavor at another
+  version and swap the record's profile — a server also re-materialises its
+  files under the `ready` gate and regenerates its properties schema; an
+  instance pays at the next launch). Both directions work; a downgrade must
+  be allowed explicitly, and the direction is judged by position in the
+  flavor's own newest-first catalogue, not by parsing version strings.
+  Servers are fully provisioned at create so `start` is an immediate spawn;
+  instances are records at create and pay at launch.
 
 > **The properties schema is generated, not maintained.** `config set`
 > validates a `server.properties` key against the server's own file, written
@@ -280,7 +286,10 @@ The subsystems behind the aggregate:
 > world. Pre-1.7.10 servers have no EULA gate and would boot for real, so the
 > run is killed after a 60 s timeout. Generation failure is a warning, not a
 > create failure — and a server with no file to validate against accepts any
-> key rather than rejecting every key.
+> key rather than rejecting every key. A version update reruns the trick with
+> `eula.txt` suspended (and rewritten after): the new server binary rewrites
+> the file to exactly its version's schema, keeping set values and dropping
+> keys it no longer knows.
 
 Errors are `thiserror` enums (e.g. `ConfigError`); the daemon maps them to
 `ipc::errors` codes at the service boundary. `anyhow` is used where an operation
@@ -357,14 +366,18 @@ supervises launched processes, and manages autostart. The only crate that links
   picks the default account launches use; `list` reports it),
   `process.start|stop|list|status|logs`, `events.subscribe`,
   `server.flavors|versions|resolve`,
-  `server.create|list|status|remove|start|stop|logs|command` (create requires
-  the caller to assert EULA acceptance; start/stop/status/logs are thin over
+  `server.create|update|list|status|remove|start|stop|logs|command` (create
+  requires the caller to assert EULA acceptance; update refuses a running or
+  still-creating server and, without `allow_downgrade`, a downgrade — a
+  front-end updates a running server by explicitly stopping and restarting it
+  around the job, the CLI's confirmed stop-update-start;
+  start/stop/status/logs are thin over
   the supervisor, merging the stored record with live process state; command
   relays one console command over the running server's rcon channel),
   `server.config.get|set|list` (the reserved `memory`/`jvm-args` keys on the
   record plus any `server.properties` key, bar the hestia-managed ports/rcon
   ones), and the `instance.*` counterparts:
-  `flavors|versions|resolve|create|list|remove`, plus
+  `flavors|versions|resolve|create|update|list|remove`, plus
   `instance.launch|stop|logs` (`logs` is thin over the supervisor, like the
   server's) and `instance.config.get|set|list` (`memory`/`jvm-args` only).
 - **`autostart.rs`** — registers/removes the daemon as a login-time service per
@@ -458,7 +471,8 @@ server on its own claimed port; start/stop/status/logs over the supervisor;
 a console over rcon — one-shot `command`, followed logs, interactive
 `attach`); instance management (create a
 record, launch materialises client/libraries/assets and spawns the game as the
-signed-in account); and the CLI front-end over all of it.
+signed-in account); in-place version updates for both (downgrades gated
+behind an explicit confirmation); and the CLI front-end over all of it.
 
 **Pending:** natives-classifier extraction for pre-1.19 clients (the resolver
 skips legacy `natives-<os>` classifier libraries, so old versions launch

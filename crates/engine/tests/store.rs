@@ -123,6 +123,55 @@ fn instances_store_round_trips_records() {
 }
 
 #[test]
+fn instance_update_swaps_profile_and_keeps_settings() {
+    let dir = temp_dir("instance-update");
+    let instances = Instances::new(dir.join("instances"));
+    let record = instances
+        .create(
+            "Modded",
+            InstanceProfile {
+                flavor: "fabric".into(),
+                game_version: "1.21.1".into(),
+                loader_version: Some("0.16.5".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    instances.config_set(&record.id, "memory", "4G").unwrap();
+
+    let updated = instances
+        .update(
+            &record.id,
+            InstanceProfile {
+                flavor: "fabric".into(),
+                game_version: "1.21.4".into(),
+                loader_version: Some("0.16.9".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(updated.name, "Modded");
+    assert_eq!(updated.profile.game_version, "1.21.4");
+
+    assert_eq!(
+        instances.get("modded").unwrap().profile.game_version,
+        "1.21.4"
+    );
+    assert_eq!(
+        instances
+            .config_get(&record.id, "memory")
+            .unwrap()
+            .as_deref(),
+        Some("4G"),
+        "JVM settings survive an update"
+    );
+    assert!(instances
+        .update("missing", InstanceProfile::default())
+        .is_err());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn server_config_covers_jvm_and_properties() {
     let dir = temp_dir("server-config");
     let servers = Servers::new(dir.join("servers"));

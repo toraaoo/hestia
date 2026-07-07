@@ -23,7 +23,7 @@ use proto::instance::{
     InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList, InstanceConfigListResult,
     InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch,
     InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLogs, InstanceRemove,
-    InstanceResolve, InstanceStop, InstanceVersions,
+    InstanceResolve, InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions,
 };
 use proto::java::{
     JavaInstall, JavaInstallResult, JavaList, JavaListResult, JavaReleases, JavaReleasesResult,
@@ -39,7 +39,7 @@ use proto::server::{
     ServerCommand, ServerCommandResult, ServerConfigGet, ServerConfigGetResult, ServerConfigList,
     ServerConfigListResult, ServerConfigSet, ServerCreate, ServerCreateResult, ServerFlavors,
     ServerList, ServerListResult, ServerLogs, ServerRemove, ServerResolve, ServerStart,
-    ServerStartResult, ServerStatus, ServerStop, ServerVersions,
+    ServerStartResult, ServerStatus, ServerStop, ServerUpdate, ServerUpdateResult, ServerVersions,
 };
 use proto::Empty;
 use serde_json::{json, Value};
@@ -439,6 +439,31 @@ pub fn make_router() -> Router {
         }
     });
 
+    on.handle::<ServerUpdate, _, _>(|p, ctx| async move {
+        if p.version.is_empty() {
+            return Err(ServiceError::bad_request("version is required"));
+        }
+        let record = find_server(&ctx, &p.server)?;
+        if is_running(&ctx, &server_process_id(&record.id)) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is running; stop it first",
+                record.name
+            )));
+        }
+        if ctx.runtime.server_creates().in_flight(&record.name) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is still being created",
+                record.name
+            )));
+        }
+        match ctx.runtime.server_updates().start(record.id, p) {
+            Some(id) => Ok(ServerUpdateResult { id }),
+            None => Err(ServiceError::bad_request(
+                "that server is already being updated",
+            )),
+        }
+    });
+
     on.handle::<ServerList, _, _>(|_: Empty, ctx| async move {
         let servers = ctx
             .runtime
@@ -614,6 +639,33 @@ pub fn make_router() -> Router {
             "instance created"
         );
         Ok(InstanceCreateResult {
+            instance: ctx.runtime.instance_view(record),
+        })
+    });
+
+    on.handle::<InstanceUpdate, _, _>(|p, ctx| async move {
+        if p.version.is_empty() {
+            return Err(ServiceError::bad_request("version is required"));
+        }
+        let record = find_instance(&ctx, &p.instance)?;
+        if is_running(&ctx, &instance_process_id(&record.id)) {
+            return Err(ServiceError::bad_request(format!(
+                "instance '{}' is running; stop it first",
+                record.name
+            )));
+        }
+        let record = ctx
+            .runtime
+            .engine()
+            .update_instance(&record.id, &p.version, p.loader_version, p.allow_downgrade)
+            .await
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+        tracing::info!(
+            instance = %record.id,
+            version = %record.profile.game_version,
+            "instance updated"
+        );
+        Ok(InstanceUpdateResult {
             instance: ctx.runtime.instance_view(record),
         })
     });

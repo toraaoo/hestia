@@ -16,7 +16,9 @@ it's just as comfortable from a terminal as from a window.
 > port under the supervisor, and has an RCON-backed console (interactive
 > attach, one-shot commands, followed logs); an instance materialises its
 > files (client jar, libraries,
-> assets) at launch and runs as the signed-in account. Vanilla and Fabric are
+> assets) at launch and runs as the signed-in account. Both move between game
+> versions in place (`server|instance update`; downgrades warn — worlds and
+> saves do not downgrade). Vanilla and Fabric are
 > the shipped flavors. Still to come: wiring the stock Tauri desktop shell to
 > the daemon and a functional tray.
 
@@ -126,6 +128,11 @@ hestia server config smp set memory 4G          # applies from the next start
 hestia server config smp set motd "hi"          # any server.properties key its
                                                 #   version knows (validated
                                                 #   against the generated file)
+hestia server update smp 1.21.4  # move a server to another version (world,
+                                 #   ports, config stay; prompts for anything
+                                 #   omitted; a downgrade asks for a confirm —
+                                 #   --downgrade for scripts; a running server
+                                 #   confirms a stop-update-start — --restart)
 hestia server start smp          # immediate spawn (already provisioned)
 hestia server attach smp         # interactive console: live logs, type to send
                                  #   commands, Esc detaches (alias: console)
@@ -138,6 +145,9 @@ hestia server versions [flavor] | flavors           # browse the catalogue
 hestia instance create           # interactive: flavor → version
 hestia instance create fabric 1.21.1 -n modded --memory 4G
 hestia instance launch modded    # ensures java/client/libraries/assets, then runs
+hestia instance update modded 1.21.4  # move to another version (saves stay;
+                                 #   files download at the next launch; a
+                                 #   downgrade asks for a confirm)
 hestia instance config modded set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
 hestia instance logs modded -n 50 # captured output (-f keeps following)
 hestia instance list | info modded | stop modded | remove modded
