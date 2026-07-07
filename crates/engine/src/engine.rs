@@ -232,8 +232,8 @@ impl Engine {
             .await?;
 
         materialize::validate_filename(&record.profile.game_version)?;
-        let client_jar = self
-            .data_home()
+        let meta = meta_dir(&self.data_home());
+        let client_jar = meta
             .join("versions")
             .join(&record.profile.game_version)
             .join("client.jar");
@@ -246,7 +246,7 @@ impl Engine {
         )
         .await?;
 
-        let libraries_root = self.data_home().join("libraries");
+        let libraries_root = meta.join("libraries");
         materialize::ensure_libraries(
             Some(&self.cache),
             &record.profile.libraries,
@@ -255,7 +255,7 @@ impl Engine {
         )
         .await?;
 
-        let assets_root = self.data_home().join("assets");
+        let assets_root = meta.join("assets");
         materialize::ensure_assets(
             Some(&self.cache),
             &record.profile.asset_index,
@@ -265,7 +265,7 @@ impl Engine {
         .await?;
 
         let game_dir = self.instances.instance_dir(&record.id);
-        let natives_dir = game_dir.join("natives");
+        let natives_dir = meta.join("natives").join(&record.profile.game_version);
         std::fs::create_dir_all(&natives_dir)
             .with_context(|| format!("cannot create {}", natives_dir.display()))?;
 
@@ -333,6 +333,13 @@ impl Engine {
             access_token,
         })
     }
+}
+
+/// The root for launcher-managed shared game files (versions, libraries,
+/// assets, natives) — the Modrinth layout, keeping the data home itself to
+/// user-facing entries and launcher internals.
+fn meta_dir(home: &Path) -> PathBuf {
+    home.join("meta")
 }
 
 fn effective_name(name: &str, flavor: &str, version: &str) -> String {

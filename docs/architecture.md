@@ -228,9 +228,9 @@ The subsystems behind the aggregate:
   directory. Manifest parsing lives in `minecraft/meta/` (`mojang`, `fabric`).
   Two further modules are the launch pipeline over the profiles:
     - **`minecraft/materialize`** — idempotently ensures profile pieces on disk
-      (skip-if-present): single jars, Maven-layout libraries under a shared
-      `libraries/` root, and the content-addressed asset store
-      (`assets/indexes/<id>.json` + `assets/objects/<hh>/<hash>`), all
+      (skip-if-present): single jars, Maven-layout libraries under the shared
+      `meta/libraries/` root, and the content-addressed asset store
+      (`meta/assets/indexes/<id>.json` + `meta/assets/objects/<hh>/<hash>`), all
       SHA-verified through `Downloader` (a bounded number of concurrent fetches).
     - **`minecraft/launch`** — pure assembly of a **`LaunchPlan`**
       (program/args/cwd): classpath joining and Mojang `${placeholder}`
@@ -471,7 +471,19 @@ desktop shell to the daemon; and a functional tray.
 > fail on the network. An instance is the opposite: cheap to create, and its
 > heavyweight files (client jar, shared libraries, thousands of assets) are
 > ensured idempotently at launch, shared across instances via the
-> `libraries/` / `assets/` / `versions/` roots.
+> `meta/libraries/` / `meta/assets/` / `meta/versions/` roots.
+
+> **Materialised game files live under one `meta/` root.** The data home holds
+> what a user would recognise as theirs (`instances/`, `servers/`,
+> `accounts.json`, `config.json`), the launcher's internals (`cache/`, `logs/`,
+> `processes/`), and the `java/` runtimes; the game files the launcher
+> materialises at launch — `versions/`, `libraries/`, `assets/`, `natives/` —
+> sit under `meta/`. This is the Modrinth (Theseus) layout; Prism-style
+> root-level sprawl buries the user's own directories among derived,
+> re-downloadable ones. `meta/` is also one obvious unit to reclaim:
+> everything under it is regenerated on demand. Natives are per-version
+> (`meta/natives/<version>`), not per-instance, so the instance directory
+> stays a pure game dir.
 
 ## Tests
 
