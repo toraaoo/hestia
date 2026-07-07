@@ -37,7 +37,7 @@ proto   → wire contracts + domain types (serde)                    leaf
 ipc     → transport (unix socket / named pipe) + JSON envelope      leaf   → (tokio, libc)
 common  → logging (tracing) + app identity + path resolution        leaf
 client  → typed client SDK (Session + one facade per domain)       → proto, ipc, common
-engine  → config·cache·download·java·accounts·minecraft            → proto, common          (daemon-only)
+engine  → config·cache·download·java·accounts·minecraft·content    → proto, common          (daemon-only)
 cli     → bin hestia          (clap + ratatui presentation)        → client, common, proto
 daemon  → bin hestiad         (router, services, supervisor)       → engine, proto, ipc, common, client
 desktop → bin hestia-desktop  (Tauri v2 shell)                     → (tauri)                 (+ frontend/)
@@ -99,7 +99,10 @@ own payload). `Empty` is the `{}` payload for channels that take or return
 nothing. One module per domain: `app`, `health`, `daemon`, `config`, `cache`,
 `download`, `java`, `accounts`, `process`, `server`, `instance`, `events` —
 plus `minecraft`, the provider vocabulary (`Flavor`, `GameVersion`, `Artifact`,
-the profiles, `ProvisionProgress`) the `server` and `instance` domains share.
+the profiles, `ProvisionProgress`) the `server` and `instance` domains share,
+and `content`, the normalized third-party content vocabulary (`ContentProject`
+with its images, `ContentVersion`, the paginated `SearchQuery`/`SearchResult`,
+`ResolvedModpack`) — a front-end never sees a platform's raw shape.
 Adding a channel is a struct plus an `impl Contract` — see
 [contributing.md](contributing.md).
 
@@ -238,6 +241,21 @@ The subsystems behind the aggregate:
     - **`minecraft/rcon`** — a minimal RCON client (the vanilla remote-console
       protocol over localhost TCP): connect + authenticate + one command per
       call. The server console's transport — see the decision note below.
+- **`content`** (`Content`) — the third-party content provider registry: mods,
+  modpacks, resourcepacks, shaders discovered on a *source* platform. The
+  `ContentProvider` trait is the seam (search with pagination, project detail,
+  version resolution filtered by loader/game version, and modpack resolution);
+  `modrinth` is the shipped source, CurseForge is a future impl behind the same
+  trait — adding a source is a new impl plus one line in `Content::new`, the
+  same shape as `minecraft`'s flavor registry. Stateless, like `minecraft`.
+  Every platform response is mapped into the normalized `proto::content` types
+  at this boundary (projects carry `icon_url`/gallery images for the desktop
+  UI); `resolve_modpack` fetches a version's `.mrpack`, reads its
+  `modrinth.index.json` in-process (the `zip` crate over memory — pack indexes
+  are references, not embedded jars), and returns the file manifest plus the
+  loader the pack pins, rejecting parent-escaping file paths at the edge.
+  Installing the resolved files (and the pack's `overrides/`) into an entry's
+  managed directories is the pending materialize step.
 - **`servers`** / **`instances`** (`Servers`, `Instances`) — the persistent
   stores, one directory per entry beside a JSON record (`servers/<id>/server.json`
   holding the resolved profile snapshot; the disk is the registry, as with
@@ -310,6 +328,19 @@ The subsystems behind the aggregate:
   `prune_server_backups`; one backup *or* restore runs per entry at a time.
   Servers are fully provisioned at create so `start` is an immediate spawn;
   instances are records at create and pay at launch.
+
+> **Content is normalized behind one trait, following Prism's `ResourceAPI`.**
+> Prism Launcher drives Modrinth and CurseForge through a strategy-pattern
+> `ResourceAPI` whose results are platform-agnostic structs, so its UI never
+> special-cases a platform; Hestia adopts the same shape (`ContentProvider` +
+> `proto::content`) — and the same split as its own `minecraft` registry, so
+> the codebase has one way of saying "pluggable upstream catalogue". Resolution
+> is deliberately separate from installation: `modpack.resolve` returns a plain
+> file manifest (path, URL, checksum, client/server side) rather than writing
+> anything, because installing must compose with the entry stores' layout and
+> locking (`data/` vs the managed `mods/`/`resourcepacks/` roots, the backup
+> in-flight keys) — that materialize step lands with mod management, and the
+> wire contract does not change when it does.
 
 > **The entry root is hestia's; `data/` is the game's.** A server or instance
 > directory used to *be* the game's working directory, which left hestia
@@ -464,7 +495,12 @@ supervises launched processes, and manages autostart. The only crate that links
   `instance.launch|stop|logs` (`logs` is thin over the supervisor, like the
   server's), `instance.backup.create|list|restore|remove` (create and
   restore require the instance stopped), and `instance.config.get|set|list`
-  (`memory`/`jvm-args` only).
+  (`memory`/`jvm-args` only). Plus
+  `content.sources|search|project|versions|modpack.resolve` — thin over the
+  engine's content registry (an empty `source` selects the default; search,
+  project, and versions are plain request/response, and `modpack.resolve`
+  downloads the `.mrpack` index inline, so the client facade calls it with a
+  longer timeout).
 - **`autostart.rs`** — registers/removes the daemon as a login-time service per
   platform, driven by the `config` service when the reserved `autostart` key is
   set (`is_enabled()` / `set()`).
@@ -560,13 +596,16 @@ signed-in account); in-place version updates for both (downgrades gated
 behind an explicit confirmation, the existing data backed up automatically
 first); backups for both (on-demand archive/restore with live progress — a
 running server is archived under the RCON save-off dance — plus per-server
-scheduled backups with retention pruning); and the CLI front-end over all of
-it.
+scheduled backups with retention pruning); the content provider layer
+(Modrinth search/project/versions/modpack resolution over the socket, not yet
+surfaced in the CLI); and the CLI front-end over all of it.
 
 **Pending:** natives-classifier extraction for pre-1.19 clients (the resolver
 skips legacy `natives-<os>` classifier libraries, so old versions launch
-without their LWJGL natives) and the legacy (virtual) asset layout; wiring the
-desktop shell to the daemon; and a functional tray.
+without their LWJGL natives) and the legacy (virtual) asset layout; installing
+resolved content (mod/modpack files and `overrides/`) into an entry's managed
+directories, and a CLI/desktop surface for content search; wiring the desktop
+shell to the daemon; and a functional tray.
 
 > **Server provisioning is front-loaded by design.** A server is a long-lived,
 > repeatedly-started thing, often driven headless/scripted — `create` pays the
