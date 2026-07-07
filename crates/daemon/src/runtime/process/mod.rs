@@ -88,7 +88,7 @@ impl Entry {
 }
 
 enum Watched {
-    Owned(Child),
+    Owned(Box<Child>),
     /// Recovered from a record: not our child, so the exit code is
     /// unobservable and exit is detected by polling the identity.
     Adopted {
@@ -171,7 +171,7 @@ impl ProcessSupervisor {
 
         tokio::spawn(supervise(
             entry,
-            Watched::Owned(child),
+            Watched::Owned(Box::new(child)),
             spec,
             self.hub.clone(),
             proc_dir,
@@ -526,7 +526,7 @@ async fn supervise(
                     id: spec.id.clone(),
                     pid,
                 }));
-                watched = Watched::Owned(next);
+                watched = Watched::Owned(Box::new(next));
                 tail_from = from;
             }
             Err(e) => {
