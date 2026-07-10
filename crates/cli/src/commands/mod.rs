@@ -11,6 +11,7 @@ pub mod lifecycle;
 mod mc;
 pub mod play;
 pub mod server;
+mod wizard;
 
 use anyhow::{Context, Result};
 use client::Client;

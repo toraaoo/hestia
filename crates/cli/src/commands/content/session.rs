@@ -24,12 +24,13 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, Mou
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Gauge, List, ListItem, ListState, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::Frame;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use super::format::{channel_label, compact, kind_plural, side_label};
 use super::EntryKind;
+use crate::ui::components::working::draw_working;
 use crate::ui::components::{Picker, PickerItem, SelectList, TextInput};
 use crate::ui::session::{self, Flow, Screen};
 
@@ -695,7 +696,7 @@ impl Screen for ContentSession {
                 let cursor = *cursor;
                 self.draw_review(frame, cursor)
             }
-            Mode::Installing { progress } => draw_installing(frame, progress.as_ref()),
+            Mode::Installing { progress } => draw_working(frame, "installing", progress.as_ref()),
             Mode::Report(report) => draw_report(frame, report),
         }
         if self.overlay.is_some() {
@@ -989,39 +990,6 @@ impl ContentSession {
             None => {}
         }
     }
-}
-
-fn draw_installing(frame: &mut Frame, progress: Option<&ProvisionProgress>) {
-    let area = frame.area();
-    let [_, row, detail_row, _] = Layout::vertical([
-        Constraint::Percentage(40),
-        Constraint::Length(1),
-        Constraint::Length(1),
-        Constraint::Min(0),
-    ])
-    .areas(area);
-    let [_, gauge_area, _] = Layout::horizontal([
-        Constraint::Percentage(20),
-        Constraint::Percentage(60),
-        Constraint::Percentage(20),
-    ])
-    .areas(row);
-    let ratio = progress
-        .filter(|p| p.total > 0)
-        .map(|p| (p.current as f64 / p.total as f64).clamp(0.0, 1.0))
-        .unwrap_or(0.0);
-    frame.render_widget(
-        Gauge::default()
-            .ratio(ratio)
-            .gauge_style(Style::default().fg(Color::Cyan))
-            .label(format!("installing · {:.0}%", ratio * 100.0)),
-        gauge_area,
-    );
-    let detail = progress.map(|p| p.detail.clone()).unwrap_or_default();
-    frame.render_widget(
-        Paragraph::new(Line::styled(detail, Style::default().fg(Color::DarkGray))).centered(),
-        detail_row,
-    );
 }
 
 fn draw_report(frame: &mut Frame, report: &SessionReport) {

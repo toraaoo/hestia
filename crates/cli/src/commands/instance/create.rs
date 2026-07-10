@@ -1,12 +1,13 @@
 //! `hestia instance create` — the flavor/version pickers and the create-time
 //! JVM settings. The record is cheap; files materialise at the first launch.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use client::proto::minecraft::ConfigEntry;
 use client::Client;
 
 use super::entry;
 use crate::commands::mc;
+use crate::commands::wizard::{self, Field, WizardKind, WizardOutcome, WizardSeed};
 use crate::ui::{self, Spinner, View};
 
 pub(super) async fn run(
@@ -17,6 +18,9 @@ pub(super) async fn run(
     name: Option<String>,
     memory: Option<String>,
 ) -> Result<()> {
+    if ui::is_interactive() && !(flavor.is_some() && version.is_some()) {
+        return run_wizard(client, flavor, version, loader, name, memory).await;
+    }
     let flavors = {
         let _spinner = Spinner::start("fetching flavors");
         client.instance().flavors().await?
@@ -48,4 +52,45 @@ pub(super) async fn run(
     };
     ui::show(View::line(format!("instance '{}' created", instance.name)))?;
     entry::show_info(&instance)
+}
+
+/// The interactive path: the fullscreen step wizard, prefilled from whatever
+/// flags were given.
+async fn run_wizard(
+    client: &Client,
+    flavor: Option<String>,
+    version: Option<String>,
+    loader: Option<String>,
+    name: Option<String>,
+    memory: Option<String>,
+) -> Result<()> {
+    let flavors = {
+        let _spinner = Spinner::start("fetching flavors");
+        client.instance().flavors().await?
+    };
+    if let Some(flavor) = &flavor {
+        if !flavors.iter().any(|f| &f.id == flavor) {
+            let ids: Vec<&str> = flavors.iter().map(|f| f.id.as_str()).collect();
+            bail!("unknown flavor '{flavor}' (available: {})", ids.join(", "));
+        }
+    }
+    let seed = WizardSeed {
+        kind: WizardKind::Instance,
+        flavors,
+        flavor,
+        version,
+        name,
+        loader,
+        eula: true,
+        fields: vec![Field::text("memory", "memory", memory)],
+        extra: Vec::new(),
+    };
+    match wizard::run(client, seed).await? {
+        None => ui::show(View::note("cancelled")),
+        Some(WizardOutcome::Instance(instance)) => {
+            ui::show(View::line(format!("instance '{}' created", instance.name)))?;
+            entry::show_info(&instance)
+        }
+        Some(WizardOutcome::Server(_)) => unreachable!("instance wizard created a server"),
+    }
 }

@@ -10,6 +10,7 @@ use client::Client;
 
 use super::entry;
 use crate::commands::mc;
+use crate::commands::wizard::{self, Field, WizardKind, WizardOutcome, WizardSeed};
 use crate::ui::{self, ProvisionReporter, Spinner, View};
 
 const EULA_URL: &str = "https://aka.ms/MinecraftEULA";
@@ -58,6 +59,10 @@ pub struct CreateArgs {
 }
 
 pub(super) async fn run(client: &Client, args: CreateArgs) -> Result<()> {
+    let all_given = args.flavor.is_some() && args.version.is_some() && args.eula;
+    if ui::is_interactive() && !all_given {
+        return run_wizard(client, args).await;
+    }
     let flavors = {
         let _spinner = Spinner::start("fetching flavors");
         client.server().flavors().await?
@@ -107,6 +112,63 @@ pub(super) async fn run(client: &Client, args: CreateArgs) -> Result<()> {
     let server = result?;
     ui::show(View::line(format!("server '{}' created", server.name)))?;
     entry::show_status(&server)
+}
+
+/// The interactive path: the fullscreen step wizard, prefilled from whatever
+/// flags were given.
+async fn run_wizard(client: &Client, args: CreateArgs) -> Result<()> {
+    let flavors = {
+        let _spinner = Spinner::start("fetching flavors");
+        client.server().flavors().await?
+    };
+    if let Some(flavor) = &args.flavor {
+        if !flavors.iter().any(|f| &f.id == flavor) {
+            let ids: Vec<&str> = flavors.iter().map(|f| f.id.as_str()).collect();
+            bail!("unknown flavor '{flavor}' (available: {})", ids.join(", "));
+        }
+    }
+    let extra = build_config(None, [], args.prop)?;
+    let seed = WizardSeed {
+        kind: WizardKind::Server,
+        flavors,
+        flavor: args.flavor,
+        version: args.version,
+        name: args.name,
+        loader: args.loader,
+        eula: args.eula,
+        fields: vec![
+            Field::text("memory", "memory", args.memory),
+            Field::number("port", "port", args.port.map(|p| p.to_string())),
+            Field::text("motd", "motd", args.motd),
+            Field::number(
+                "max-players",
+                "max players",
+                args.max_players.map(|n| n.to_string()),
+            ),
+            Field::choice(
+                "difficulty",
+                "difficulty",
+                &["peaceful", "easy", "normal", "hard"],
+                args.difficulty,
+            ),
+            Field::choice(
+                "gamemode",
+                "gamemode",
+                &["survival", "creative", "adventure", "spectator"],
+                args.gamemode,
+            ),
+            Field::text("level-seed", "seed", args.seed),
+        ],
+        extra,
+    };
+    match wizard::run(client, seed).await? {
+        None => ui::show(View::note("cancelled")),
+        Some(WizardOutcome::Server(server)) => {
+            ui::show(View::line(format!("server '{}' created", server.name)))?;
+            entry::show_status(&server)
+        }
+        Some(WizardOutcome::Instance(_)) => unreachable!("server wizard created an instance"),
+    }
 }
 
 /// Fold the create-time settings into one entries list: `--memory`, then the

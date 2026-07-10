@@ -6,6 +6,7 @@ pub mod input;
 pub mod list;
 pub mod log;
 pub mod picker;
+pub mod working;
 
 pub use input::TextInput;
 pub use list::SelectList;

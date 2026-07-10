@@ -230,7 +230,7 @@ pub fn show_versions(flavor: &str, versions: Vec<GameVersion>, all: bool) -> Res
     ))
 }
 
-fn kind_label(kind: VersionKind) -> &'static str {
+pub fn kind_label(kind: VersionKind) -> &'static str {
     match kind {
         VersionKind::Release => "release",
         VersionKind::Snapshot => "snapshot",
