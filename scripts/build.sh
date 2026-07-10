@@ -10,10 +10,14 @@ cd "$(dirname "$0")/.."
 target="${1:-all}"
 shift || true
 
+# Compiling the desktop crate requires the Tauri externalBin sidecars to be
+# staged, or its build script fails on the missing resource paths.
 case "$target" in
   cli)     cargo build -p cli "$@" ;;
   daemon)  cargo build -p daemon "$@" ;;
-  desktop) (cd crates/desktop && cargo tauri build "$@") ;;
-  all)     cargo build --workspace "$@" ;;
+  desktop) scripts/sidecars.sh --ensure
+           (cd crates/desktop && cargo tauri build "$@") ;;
+  all)     scripts/sidecars.sh --ensure
+           cargo build --workspace "$@" ;;
   *) echo "usage: $0 [cli|daemon|desktop|all] [cargo flags]" >&2; exit 1 ;;
 esac

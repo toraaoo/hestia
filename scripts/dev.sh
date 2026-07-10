@@ -19,6 +19,7 @@ log() { printf '%b==>%b %s\n' "$_C" "$_R" "$*"; }
 if [ "${1:-}" = "--desktop" ]; then
     shift
     log "Desktop shell with frontend HMR (cargo tauri dev)"
+    scripts/sidecars.sh --ensure
     cd crates/desktop
     exec cargo tauri dev "$@"
 fi
