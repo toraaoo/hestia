@@ -102,129 +102,37 @@ The [`scripts/`](scripts/) helpers wrap all of this: `scripts/build.sh cli`,
 For an interactive loop, `scripts/dev.sh` opens a subshell with `hestia`/`hestiad`
 on `PATH` (or `scripts/dev.sh --desktop` for the Tauri shell with frontend HMR).
 
-## Usage
+## Quick start
 
 ```bash
-hestia                           # help
-hestia play                      # launch an instance — the happy path:
-                                 #   one instance runs directly, several prompt a pick
-
-# Minecraft accounts (Microsoft sign-in; `auth` is an alias)
-hestia account login             # device-code flow — enter the shown code in a browser
-hestia account login --sisu      # browser-redirect flow: sign in, paste the redirect back
-hestia account list              # signed-in accounts ('*' marks the one launches use)
-hestia account switch [name]     # pick the account launches use (prompts when omitted)
-hestia account logout <name|uuid>
-
-# Java runtimes (Eclipse Temurin via the Adoptium API)
-hestia java releases             # release lines the provider ships
-hestia java install 21           # resolve, download, verify, extract, register
-hestia java list                 # installed runtimes
-hestia java uninstall 21
-
-# Minecraft servers (fully provisioned at create; run under the daemon;
-# each server claims its own port, so several run side by side)
-hestia server create             # interactive: flavor → version → EULA confirm
-hestia server create vanilla 1.21.1 --eula -n smp   # scriptable (-l pins a
-                                 #   loader, -p pins the game port, --memory 4G
-                                 #   sets -Xms/-Xmx; --motd, --max-players,
-                                 #   --difficulty, --gamemode, --seed cover the
-                                 #   common properties, --prop KEY=VALUE the rest)
-hestia server list               # managed servers, their address and state
-hestia server config smp list    # memory, jvm-args, and server.properties keys
-hestia server config smp set memory 4G          # applies from the next start
-hestia server config smp set motd "hi"          # any server.properties key its
-                                                #   version knows (validated
-                                                #   against the generated file)
-hestia server update smp 1.21.4  # move a server to another version (world,
-                                 #   ports, config stay, and the data is
-                                 #   backed up automatically first; prompts
-                                 #   for anything omitted; a downgrade asks
-                                 #   for a confirm — --downgrade for scripts;
-                                 #   a running server confirms a
-                                 #   stop-update-start — --restart)
-hestia server backup create smp  # archive the world + config into the
-                                 #   server's backups/ (a running server keeps
-                                 #   running; its world saving pauses around
-                                 #   the archive)
-hestia server backup list smp    # stored backups, newest first
-hestia server backup restore smp # replace the data with a backup (prompts for
-                                 #   the backup and confirms — --force for
-                                 #   scripts; the current jar/libraries stay)
-hestia server backup remove smp <backup>
-hestia server config smp set backup-interval 6h  # archive the running server
-                                 #   on a schedule (m/h/d units; empty
-                                 #   disables); scheduled archives beyond
-                                 #   backup-retention (default 7) are pruned
-hestia server start smp          # immediate spawn (already provisioned)
-hestia server attach smp         # interactive console: live logs, type to send
-                                 #   commands, Esc detaches (alias: console)
-hestia server command smp say hi # one-shot console command (alias: cmd)
-hestia server logs smp -n 50     # captured output (-f keeps following)
-hestia server status smp | stop smp | restart smp | remove smp
-hestia server versions [flavor] | flavors           # browse the catalogue
-
-# Minecraft instances (clients; files materialise at first launch)
-hestia instance create           # interactive: flavor → version
-hestia instance create fabric 1.21.1 -n modded --memory 4G
-hestia instance launch modded    # ensures java/client/libraries/assets, then runs
-hestia instance update modded 1.21.4  # move to another version (saves stay
-                                 #   and are backed up automatically first;
-                                 #   files download at the next launch; a
-                                 #   downgrade asks for a confirm)
-hestia instance backup create modded  # archive saves + options (instance
-                                 #   stopped; on demand only — no schedule)
-hestia instance backup list modded | restore modded | remove modded <backup>
-hestia instance config modded set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
-hestia instance logs modded -n 50 # captured output (-f keeps following)
-hestia instance list | info modded | stop modded | restart modded | remove modded
-hestia instance versions [flavor] | flavors
-hestia instance mod add modded sodium      # install a mod (resolves required
-                                 #   deps; --version pins one; the file is
-                                 #   mirrored into the game dir at launch)
-hestia instance mod add modded https://modrinth.com/mod/lithium  # a page URL
-hestia instance mod add modded --file ./my-mod.jar   # import a local file
-hestia instance mod list modded  # installed mods (+ any untracked jars in the
-                                 #   game dir)
-hestia instance mod update modded [sodium]   # newest compatible (all, or one)
-hestia instance mod remove modded sodium
-hestia instance resourcepack add modded <slug>   # same verbs for packs/shaders
-hestia instance shader add modded <slug>
-hestia server mod add smp <slug>   # servers take mods (fabric/plugin flavors)
-
-# Content discovery (Modrinth today; installs are per-entry, above)
-hestia search sodium             # quick mod search (alias for `mod search`)
-hestia mod search sodium -l fabric -g 1.21.1   # filter by loader / version
-hestia modpack search "create"   # browse other kinds: modpack, resourcepack,
-hestia resourcepack search faithful            #   shader, datapack
-hestia mod info sodium           # a project's details (downloads, sides, …)
-hestia mod versions sodium -l fabric -g 1.21.1  # downloadable versions
-hestia sources                   # the available content sources
-
-# Download cache
-hestia cache info | list | clear
-
-# Configuration (typed settings, stored as JSON)
-hestia config get <key> | set <key> <value> | list
-hestia config get home           # resolved data directory
-hestia config set home <dir>     # persist the data dir (empty reverts to default)
-hestia config get autostart      # true if the daemon starts at login
-hestia config set autostart true # register the daemon to start at login
-
-# Daemon lifecycle — servers and instances keep running across daemon
-# stops/restarts and are re-adopted by the next daemon
-hestia daemon status | start | restart
-hestia daemon stop               # asks about running workloads on a terminal
-hestia daemon stop --all         # stop supervised processes too
-hestia daemon stop --keep        # leave them running (script-safe)
-
-# Global flags (any position)
-hestia -v java list              # verbose / debug logging (-vv for trace);
-                                 #   diagnostics also land in logs/hestia.log
-hestia -q java list              # errors only on the console
-hestia --home /path/to/dir config get home
-hestia --version
+hestia                            # help
+hestia account login              # sign in (Microsoft device-code flow)
+hestia play                       # launch an instance (prompts to pick when several)
 ```
+
+Create and drive a server or a client instance. Anything a `create` needs but
+wasn't given is prompted for on a terminal:
+
+```bash
+hestia server create              # interactive: flavor → version → EULA confirm
+hestia instance create            # interactive: flavor → version
+
+hestia start <name>               # start a server or launch an instance
+hestia stop <name>                # stop whichever it is
+hestia logs <name> -f             # follow its captured output
+```
+
+The grammar is entry-first — anything that acts on a specific server or instance
+names it right after the noun, then the action:
+
+```bash
+hestia server smp config set memory 4G   # applies from the next start
+hestia server smp backup create          # archive the world + config
+hestia instance modded mod add sodium    # install a mod (deps resolved)
+```
+
+The **full command reference** — servers, instances, backups, content, Java,
+config, and daemon lifecycle — is in **[docs/cli.md](docs/cli.md)**.
 
 The data directory is resolved as: `--home` → `$HESTIA_HOME` → a persisted
 pointer (`config set home`) → the platform default (`~/.hestia`, or
@@ -233,6 +141,7 @@ pointer (`config set home`) → the platform default (`~/.hestia`, or
 
 ## Documentation
 
+- **[docs/cli.md](docs/cli.md)** — the complete `hestia` command reference.
 - **[docs/architecture.md](docs/architecture.md)** — the target graph and the
   daemon/engine boundary.
 - **[docs/contributing.md](docs/contributing.md)** — conventions and recipes.

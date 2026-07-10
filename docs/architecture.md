@@ -609,26 +609,57 @@ supervises launched processes, and manages autostart. The only crate that links
 
 A thin client over the daemon, built on clap's derive API. `main.rs` defines a
 `Command` enum — `play`, `account` (alias `auth`), `java`, `server`, `instance`,
-`cache`, `config`, `daemon` — each a module under `commands/` exposing a
-`Subcommand` enum and a `run()`. A domain with many verbs is a directory whose
-`mod.rs` holds only that grammar and dispatch, with one file per verb group:
-`server/` and `instance/` split into `create`, `update`, `backup`, `config`,
-`lifecycle` (plus the server's `console`) over a shared `entry` module, and
-`content/` splits along its own seam — `browse` (search a source) versus `manage`
-(install into an entry). Global flags (`--verbose`/`--quiet`/`--home`)
-sit on the root; `--home` is exported as `$HESTIA_HOME` and only takes effect
-when this invocation auto-spawns the daemon (a running daemon keeps its own
-directory). `commands/connect()` auto-spawns via the client SDK;
-`connect_running()` requires an existing daemon.
+the cross-entry shortcuts `start`/`stop`/`restart`/`logs`, `cache`, `config`,
+`daemon` — each a module under `commands/` exposing a `Subcommand` enum and a
+`run()`. A domain with many verbs is a directory whose `mod.rs` holds only that
+grammar and dispatch, with one file per verb group: `server/` and `instance/`
+split into `create`, `update`, `backup`, `config`, `lifecycle` (plus the
+server's `console`) over a shared `entry` module, and `content/` splits along
+its own seam — `browse` (search a source) versus `manage` (install into an
+entry). Global flags (`--verbose`/`--quiet`/`--home`) sit on the root; `--home`
+is exported as `$HESTIA_HOME` and only takes effect when this invocation
+auto-spawns the daemon (a running daemon keeps its own directory).
+`commands/connect()` auto-spawns via the client SDK; `connect_running()`
+requires an existing daemon.
 
-The command grammar is noun-verb (`hestia server start`) with one deliberate
-exception: `hestia play [instance]`, the launcher's single most common action,
-which picks interactively when several instances exist. Anything a `create`
-needs but wasn't given is asked for interactively (flavor/version pickers, the
-EULA confirm) — on a terminal the picker *is* the browser; piped invocations
-error with the flag to pass, so scripts stay explicit. `versions`/`flavors`
-(not "available") name what they list, `ls`/`rm` alias every list/remove, and
-verbs stay aligned with the wire channels (`remove`, not `delete`).
+The command grammar is noun-first and **entry-first**: catalogue verbs read
+`hestia server create|list|versions|flavors`, but everything that acts on a
+specific entry names it once, right after the noun —
+`hestia server <name> <action>` (`server smp start`, `server smp config set
+memory 4G`, `server smp backup create`). The name occupies one fixed slot
+instead of floating to a different position per subcommand, which is what made
+the old `server config smp set …` / `server backup create smp` mix
+error-prone. clap models this with an `external_subcommand` variant on the
+noun's `Subcommand` (`ServerCmd::Entry(Vec<String>)`): an unrecognised first
+token — the entry name — is captured and re-parsed by a `no_binary_name`
+`Parser` (`ServerEntry { name, action }`), so the per-entry actions keep full
+clap help and validation while the catalogue verbs stay ordinary subcommands.
+On top of that sit two deliberate cross-cutting shortcuts: `hestia play
+[instance]`, the launcher's single most common action (picks interactively when
+several instances exist); and verb-first `hestia start|stop|restart|logs
+<name>`, which resolve a name across *both* the server and instance registries
+and dispatch to the right handler (a name that matches both asks the caller to
+qualify it) — so day-to-day driving need not recall which kind an entry is, nor
+that `server start` and `instance launch` differ. Anything a `create` needs but
+wasn't given is asked for interactively (flavor/version pickers, the EULA
+confirm) — on a terminal the picker *is* the browser; piped invocations error
+with the flag to pass, so scripts stay explicit. `versions`/`flavors` (not
+"available") name what they list, `ls`/`rm` alias every list/remove, and verbs
+stay aligned with the wire channels (`remove`, not `delete`).
+
+> **Entry-first, with verb-first shortcuts for the hot path.** The per-entry
+> grammar used to be verb-then-entry, but the entry landed in a different
+> argument position in every subcommand (`server start smp`, `server config
+> smp set …`, `server backup create smp`), with no rule for where the name
+> went — easy to get wrong and hard to remember. Fixing the name to one slot
+> (`server <name> <action>`) removes that guesswork and lets each per-entry
+> verb drop its own entry argument. The two exceptions to noun-first are
+> earned, not sloppy: `play` and the `start`/`stop`/`restart`/`logs` shortcuts
+> are the actions taken often enough that making the user first pick the right
+> noun (and remember `launch` ≠ `start`) is the friction worth paying a
+> cross-registry name lookup to avoid. Everything scriptable still has an
+> explicit, unambiguous noun-first form; the shortcuts are additive sugar over
+> it.
 
 **Presentation layer (`ui/`).** Commands **never print directly** — they build a
 `View` (`Line`, `Note`, `Detail`, `Table`) and hand it to `ui::show`, which owns
