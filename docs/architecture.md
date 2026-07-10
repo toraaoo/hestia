@@ -263,14 +263,22 @@ The subsystems behind the aggregate:
   (`parse_url`), so a pasted `modrinth.com/mod/…` link installs like a slug.
   `content/install` is the per-entry install half: a `content.json` index in
   the entry root records each installed item's provenance
-  (`InstalledContent`: kind, source, project/version ids, filename, sha1); the
-  file itself lands in the managed kind directory (`<entry>/mods/`,
-  `resourcepacks/`, `shaders/`) and is **mirrored** (hardlink, else copy) into
-  the game dir's matching directory. A platform install picks the newest
-  compatible version (`pick_version`, filtered by the entry's game version and,
-  for mods, its loader) and resolves required dependencies breadth-first; a
-  direct URL or a local file import records `source: "file"`/a platform id with
-  no version to update against. `Engine` composes the flows
+  (`InstalledContent`: kind, source, project/version ids, filename, sha1, and —
+  for datapacks — the world it lives in); the file itself lands in the managed
+  kind directory (`<entry>/mods/`, `resourcepacks/`, `shaders/`) and is
+  **mirrored** (hardlink, else copy) into the game dir's matching directory.
+  **Datapacks are the exception** — they load from inside a world, not a flat
+  dir, so a datapack installs *straight into* `data/<level-name>/datapacks/` (a
+  server's single world) or `data/saves/<world>/datapacks/` (an instance's
+  named save, picked interactively over `instance.worlds`) with no separate
+  managed copy: it is world data, so the world's own backup already covers it,
+  restore heals it for free, and `sync` skips it (see the decision note below).
+  A platform install picks the newest compatible version (`pick_version`,
+  filtered by the entry's game version and, for mods, its loader) and resolves
+  required dependencies breadth-first; a direct URL or a local file import
+  records `source: "file"`/a platform id with no version to update against.
+  Servers take mods and datapacks; instances take mods, resourcepacks, shaders,
+  and datapacks. `Engine` composes the flows
   (`add_server_content`/`add_instance_content`, list/remove/update) and a
   `sync` pass re-mirrors any missing managed file at every start/launch (below).
   Installing a modpack's files and `overrides/` is the remaining materialize
@@ -380,6 +388,19 @@ The subsystems behind the aggregate:
 > per-entry in-flight key, `content.progress|done|error` topics) and are
 > refused on a running entry (open jars lock on Windows; changes only apply at
 > the next start) or during a backup/update.
+
+> **Datapacks are world-of-record, not managed-dir-of-record.** The managed-dir
+> model above exists so content survives a `data/` swap on backup restore — but
+> a datapack *is* `data/`: it loads from inside a world (`data/<level-name>/`
+> for a server, `data/saves/<world>/` for an instance), which the world backup
+> already captures. So a datapack has no managed copy and no mirror; it installs
+> straight into its world's `datapacks/`, `sync` skips it (the world archive
+> restores it), and remove/untracked are world-aware. A server has one world
+> (`level-name`, read from `server.properties`); an instance has many, so the
+> install names one — `--world`, or an interactive pick over `instance.worlds`.
+> The client-side support flag is waived for datapacks: they run on a world's
+> server side, including a client's integrated server, so a source marking a
+> datapack client-unsupported must not block installing it on an instance.
 
 > **The entry root is hestia's; `data/` is the game's.** A server or instance
 > directory used to *be* the game's working directory, which left hestia
@@ -539,7 +560,8 @@ supervises launched processes, and manages autostart. The only crate that links
   `server.backup.create|list|restore|remove` (create archives a running
   server live; restore refuses a running or busy server and verifies the
   backup exists before answering with the job id), and the `instance.*`
-  counterparts: `flavors|versions|resolve|create|update|list|remove`, plus
+  counterparts: `flavors|versions|resolve|create|update|list|remove|worlds`
+  (`worlds` lists a client's save worlds for the datapack picker), plus
   `instance.launch|stop|logs` (`logs` is thin over the supervisor, like the
   server's), `instance.backup.create|list|restore|remove` (create and
   restore require the instance stopped), and `instance.config.get|set|list`
@@ -706,12 +728,13 @@ first); backups for both (on-demand archive/restore with live progress — a
 running server is archived under the RCON save-off dance — plus per-server
 scheduled backups with retention pruning); the content provider layer
 (Modrinth search/project/versions/modpack resolution) with per-entry
-install/management — mods on servers, mods/resourcepacks/shaders on instances,
-from a platform project, a source page URL, or a local file, with required
-dependencies resolved and a `data/` mirror that heals across backups; the
-kind-first browse and management CLI (`hestia mod search`, `instance mod
-add|list|remove|update`, `hestia search`); and the CLI front-end over all of
-it.
+install/management — mods and datapacks on servers, mods/resourcepacks/shaders/
+datapacks on instances, from a platform project, a source page URL, or a local
+file, with required dependencies resolved and a `data/` mirror that heals across
+backups (datapacks install into their world, which the world backup already
+covers); the kind-first browse and management CLI (`hestia mod search`,
+`instance <name> mod add|list|remove|update`, `hestia search`); and the CLI
+front-end over all of it.
 
 **Pending:** natives-classifier extraction for pre-1.19 clients (the resolver
 skips legacy `natives-<os>` classifier libraries, so old versions launch

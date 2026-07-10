@@ -22,13 +22,15 @@ it's just as comfortable from a terminal as from a window.
 > also have **backups**: on-demand archive/restore of the entry's game data
 > (a running server keeps running — world saving pauses around the archive),
 > plus per-server scheduled backups with retention pruning. **Content** —
-> mods, resourcepacks, shaders — is discovered on Modrinth (search, browse,
-> resolve versions) and installed into a server (mods) or instance
-> (mods/resourcepacks/shaders) from a project, a Modrinth page URL, or a local
-> file, with required dependencies pulled in and a `data/` mirror that survives
-> backup/restore. Vanilla and Fabric are the shipped flavors, Modrinth the
-> shipped content source. Still to come: installing a whole modpack, wiring the
-> stock Tauri desktop shell to the daemon, and a functional tray.
+> mods, resourcepacks, shaders, datapacks — is discovered on Modrinth (search,
+> browse, resolve versions) and installed into a server (mods, datapacks) or
+> instance (mods/resourcepacks/shaders/datapacks) from a project, a Modrinth
+> page URL, or a local file, with required dependencies pulled in and a `data/`
+> mirror that survives backup/restore (datapacks install straight into their
+> world, which the world backup already covers). Vanilla and Fabric are the
+> shipped flavors, Modrinth the shipped content source. Still to come:
+> installing a whole modpack, wiring the stock Tauri desktop shell to the
+> daemon, and a functional tray.
 
 ## Front-ends
 

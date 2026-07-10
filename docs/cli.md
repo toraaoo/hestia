@@ -103,6 +103,8 @@ hestia server smp stop           # stop the running server
 hestia server smp restart        # stop, then start again
 hestia server smp remove         # delete the server (its jar, world and all)
 hestia server smp mod add <slug> # servers take mods (fabric/plugin flavors)
+hestia server smp datapack add <slug>   # datapacks install into the server's world
+hestia server smp datapack add --file ./pack.zip   # any kind imports a local file
 ```
 
 ## Instances
@@ -136,7 +138,8 @@ hestia instance modded remove    # delete the instance (its saves and all)
 
 ### Content on an instance
 
-Mods, resource packs, and shaders install per entry:
+Mods, resource packs, shaders, and datapacks install per entry. Every kind
+takes a project slug/id, a source page URL, or a local `--file`:
 
 ```bash
 hestia instance modded mod add sodium      # install a mod (resolves required
@@ -150,6 +153,18 @@ hestia instance modded mod update [sodium]   # newest compatible (all, or one)
 hestia instance modded mod remove sodium
 hestia instance modded resourcepack add <slug>   # same verbs for packs/shaders
 hestia instance modded shader add <slug>
+```
+
+Datapacks load from inside a save world, so an instance datapack names the
+world (`--world`); omit it on a terminal to pick from the instance's worlds:
+
+```bash
+hestia instance modded datapack add terralith --world MyWorld
+hestia instance modded datapack add terralith    # prompts to pick a world
+hestia instance modded datapack add --file ./pack.zip --world MyWorld
+hestia instance modded datapack list      # installed datapacks, with their world
+hestia instance modded datapack remove <item>
+hestia instance modded datapack update [item]
 ```
 
 ## Shortcuts
