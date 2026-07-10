@@ -689,8 +689,9 @@ stay aligned with the wire channels (`remove`, not `delete`).
 `View` (`Line`, `Note`, `Detail`, `Table`) and hand it to `ui::show`, which owns
 all output. On a terminal it renders with **ratatui** (interactive select,
 scrollable pager for long tables, live install/download progress, the attach
-console — live output above an input line); piped or redirected it degrades to
-plain text so output stays scriptable. `select`, `prompt`, `Spinner`,
+console — live output above an input line, fullscreen in the alternate screen
+so it follows terminal resizes and hands the shell back intact on detach);
+piped or redirected it degrades to plain text so output stays scriptable. `select`, `prompt`, `Spinner`,
 `InstallReporter`, `console`, and `human_bytes` round out the module.
 This is the seam for the planned TUI: bare `hestia` (no subcommand) currently
 prints help, but the intended end-state is a full-screen TUI driving the same
