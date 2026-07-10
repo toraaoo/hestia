@@ -1,0 +1,188 @@
+//! Instance creation, in-place version updates, and the launch preparation that
+//! materialises the client jar, libraries, and assets.
+
+use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result};
+use proto::backup::BackupKind;
+use proto::minecraft::{ConfigEntry, ProvisionPhase};
+
+use super::{effective_name, guard_downgrade};
+use crate::content::install;
+use crate::engine::Engine;
+use crate::instances::InstanceRecord;
+use crate::minecraft::launch::{self, InstancePaths, LaunchAccount, LaunchPlan};
+use crate::minecraft::materialize::{self, OnProgress};
+
+impl Engine {
+    /// Move an instance to another version of its flavor. A downgrade must be
+    /// allowed explicitly — Minecraft cannot load saves written by a newer
+    /// version. Only the record changes; files materialise at the next launch.
+    pub async fn update_instance(
+        &self,
+        reference: &str,
+        version: &str,
+        loader_version: Option<String>,
+        allow_downgrade: bool,
+    ) -> Result<InstanceRecord> {
+        let record = self
+            .instances
+            .get(reference)
+            .with_context(|| format!("unknown instance: {reference}"))?;
+        let versions = self
+            .minecraft
+            .instance_versions(&record.profile.flavor)
+            .await?;
+        guard_downgrade(
+            "saves",
+            &record.name,
+            &record.profile.game_version,
+            version,
+            &versions,
+            allow_downgrade,
+        )?;
+        let profile = self
+            .minecraft
+            .resolve_instance(&record.profile.flavor, version, loader_version)
+            .await?;
+        if self.instances.data_dir(&record.id).is_dir() {
+            self.backup_instance(&record.id, BackupKind::Update, &|_| {})
+                .await
+                .context("pre-update backup failed")?;
+        }
+        self.instances.update(&record.id, profile)
+    }
+
+    /// Create an instance record from a freshly resolved profile; its files are
+    /// materialised by `prepare_instance` at launch time.
+    pub async fn create_instance(
+        &self,
+        name: &str,
+        flavor: &str,
+        version: &str,
+        loader_version: Option<String>,
+        config: &[ConfigEntry],
+    ) -> Result<InstanceRecord> {
+        let profile = self
+            .minecraft
+            .resolve_instance(flavor, version, loader_version)
+            .await?;
+        let name = effective_name(name, flavor, version);
+        let record = self.instances.create(&name, profile)?;
+
+        let applied = config.iter().try_for_each(|entry| {
+            self.instances
+                .config_set(&record.id, &entry.key, &entry.value)
+        });
+        if let Err(e) = applied {
+            let _ = self.instances.remove(&record.id);
+            return Err(e);
+        }
+        self.instances
+            .get(&record.id)
+            .with_context(|| format!("instance '{}' vanished after create", record.id))
+    }
+
+    /// Materialise everything an instance launch needs — the Java runtime, the
+    /// client jar, libraries, assets — and assemble the JVM invocation for the
+    /// given account (empty picks the sole signed-in one).
+    pub async fn prepare_instance(
+        &self,
+        reference: &str,
+        account: &str,
+        on_progress: OnProgress<'_>,
+    ) -> Result<(InstanceRecord, LaunchPlan)> {
+        let record = self
+            .instances
+            .get(reference)
+            .with_context(|| format!("unknown instance: {reference}"))?;
+        let account = self.launch_account(account).await?;
+
+        let java = self
+            .ensure_java(record.profile.java_major, on_progress)
+            .await?;
+
+        materialize::validate_filename(&record.profile.game_version)?;
+        let meta = meta_dir(&self.data_home());
+        let client_jar = meta
+            .join("versions")
+            .join(&record.profile.game_version)
+            .join("client.jar");
+        materialize::ensure_artifact(
+            Some(&self.cache),
+            &record.profile.client,
+            &client_jar,
+            ProvisionPhase::Client,
+            on_progress,
+        )
+        .await?;
+
+        let libraries_root = meta.join("libraries");
+        materialize::ensure_libraries(
+            Some(&self.cache),
+            &record.profile.libraries,
+            &libraries_root,
+            on_progress,
+        )
+        .await?;
+
+        let assets_root = meta.join("assets");
+        materialize::ensure_assets(
+            Some(&self.cache),
+            &record.profile.asset_index,
+            &assets_root,
+            on_progress,
+        )
+        .await?;
+
+        let game_dir = self.instances.data_dir(&record.id);
+        std::fs::create_dir_all(&game_dir)
+            .with_context(|| format!("cannot create {}", game_dir.display()))?;
+        install::sync(&self.instances.instance_dir(&record.id), &game_dir)?;
+        let natives_dir = meta.join("natives").join(&record.profile.game_version);
+        std::fs::create_dir_all(&natives_dir)
+            .with_context(|| format!("cannot create {}", natives_dir.display()))?;
+
+        let plan = launch::instance_plan(
+            &record.profile,
+            &java,
+            &InstancePaths {
+                game_dir: &game_dir,
+                natives_dir: &natives_dir,
+                client_jar: &client_jar,
+                libraries_root: &libraries_root,
+                assets_root: &assets_root,
+            },
+            &account,
+            &record.jvm,
+        );
+        Ok((record, plan))
+    }
+
+    async fn launch_account(&self, reference: &str) -> Result<LaunchAccount> {
+        let account = if reference.is_empty() {
+            self.accounts
+                .default_account()
+                .context("no Minecraft account is signed in (run `hestia account login`)")?
+        } else {
+            self.accounts
+                .list()
+                .into_iter()
+                .find(|a| a.name.eq_ignore_ascii_case(reference) || a.uuid == reference)
+                .with_context(|| format!("no account matches '{reference}'"))?
+        };
+        let access_token = self.accounts.access_token(&account.uuid).await?;
+        Ok(LaunchAccount {
+            name: account.name,
+            uuid: account.uuid,
+            access_token,
+        })
+    }
+}
+
+/// The root for launcher-managed shared game files (versions, libraries,
+/// assets, natives) — the Modrinth layout, keeping the data home itself to
+/// user-facing entries and launcher internals.
+fn meta_dir(home: &Path) -> PathBuf {
+    home.join("meta")
+}
