@@ -15,7 +15,7 @@ use proto::instance::{
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo,
     InstanceLaunch, InstanceLaunchParams, InstanceList, InstanceLogs, InstanceLogsParams,
     InstanceRef, InstanceRemove, InstanceResolve, InstanceStop, InstanceUpdate,
-    InstanceUpdateParams, InstanceVersions,
+    InstanceUpdateParams, InstanceVersions, InstanceWorlds,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams,
@@ -119,6 +119,16 @@ impl Instance<'_> {
             .call::<InstanceList>(&proto::Empty {})
             .await?
             .instances)
+    }
+
+    /// The instance's save-world folder names — the worlds a datapack can
+    /// install into.
+    pub async fn worlds(&self, instance: &str) -> Result<Vec<String>, IpcError> {
+        Ok(self
+            .session
+            .call::<InstanceWorlds>(&instance_ref(instance))
+            .await?
+            .worlds)
     }
 
     pub async fn remove(&self, instance: &str) -> Result<(), IpcError> {
