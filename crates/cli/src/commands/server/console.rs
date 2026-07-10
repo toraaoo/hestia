@@ -59,7 +59,7 @@ pub(super) async fn attach(client: Client, server: &str) -> Result<()> {
         }
     });
 
-    let title = format!(" {} ", info.name);
+    let title = info.name.clone();
     let closed =
         tokio::task::spawn_blocking(move || ui::console(&title, backfill, event_rx, command_tx))
             .await??;

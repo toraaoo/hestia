@@ -75,9 +75,10 @@ pub fn input(text: &str, default: &str) -> Result<String> {
 
 /// Run the attach console: live output above an input line whose entries go
 /// to `commands`. Blocking until detach or a `Closed` event, whose message it
-/// returns. Requires an interactive terminal. The console is the whole
-/// session, so it returns the terminal on exit — anything shown after prints
-/// plainly below it instead of into the (gone) viewport.
+/// returns. Requires an interactive terminal. The console owns the whole
+/// terminal: it releases the shared viewport, runs fullscreen in the
+/// alternate screen, and restores the original terminal on detach — anything
+/// shown after prints plainly below it instead of into the (gone) viewport.
 pub fn console(
     title: &str,
     backfill: Vec<String>,
@@ -87,9 +88,8 @@ pub fn console(
     if !is_interactive() {
         bail!("no interactive terminal");
     }
-    let result = console::run(title, backfill, events, commands);
     screen::teardown();
-    result
+    console::run(title, backfill, events, commands)
 }
 
 /// Render a byte count in human units (KB, MB, …).
