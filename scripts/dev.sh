@@ -15,6 +15,27 @@ cd "$(dirname "$0")/.."
 if [ -t 1 ]; then _C='\033[1;36m'; _R='\033[0m'; else _C=''; _R=''; fi
 log() { printf '%b==>%b %s\n' "$_C" "$_R" "$*"; }
 
+# Ignore an installed hestia entirely while developing: drop PATH entries that
+# carry one, and pin a dev-only daemon endpoint so the dev CLI never reaches
+# (or, via the exit trap, stops) an installed daemon.
+strip_installed_hestia() {
+  local kept="" dir
+  local IFS=':'
+  for dir in $PATH; do
+    if [ -e "$dir/hestia" ] || [ -e "$dir/hestia.exe" ] ||
+      [ -e "$dir/hestiad" ] || [ -e "$dir/hestiad.exe" ]; then
+      log "ignoring installed hestia in $dir" >&2
+      continue
+    fi
+    kept="${kept:+$kept:}$dir"
+  done
+  printf '%s' "$kept"
+}
+PATH="$(strip_installed_hestia)"
+# On Windows the dev endpoint is a named pipe, supplied by win.ps1 before it
+# forwards here.
+export HESTIA_SOCK="${HESTIA_SOCK:-${XDG_RUNTIME_DIR:-/tmp}/hestiad-dev-$(id -u).sock}"
+
 # Desktop launcher with Vite HMR: Tauri drives the frontend dev server itself.
 if [ "${1:-}" = "--desktop" ]; then
     shift

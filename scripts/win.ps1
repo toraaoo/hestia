@@ -51,5 +51,16 @@ if (-not $Command -or -not $scripts.ContainsKey($Command)) {
 }
 
 $bash = Find-Bash
+
+# The Windows half of dev.sh's isolation: pin the dev-only daemon endpoint
+# (a named pipe rather than dev.sh's unix socket path), and drop mise's PATH
+# snapshot so its prompt hook in the dev subshell re-baselines from the
+# stripped PATH instead of resurrecting the installed hestia.
+if ($Command -eq "dev") {
+  if (-not $env:HESTIA_SOCK) { $env:HESTIA_SOCK = '\\.\pipe\hestia-hestiad-dev' }
+  Get-ChildItem Env:__MISE_* -ErrorAction SilentlyContinue |
+    ForEach-Object { Remove-Item "Env:$($_.Name)" }
+}
+
 & $bash $scripts[$Command] @Rest
 exit $LASTEXITCODE
