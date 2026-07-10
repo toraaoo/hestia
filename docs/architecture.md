@@ -397,7 +397,9 @@ The subsystems behind the aggregate:
 > straight into its world's `datapacks/`, `sync` skips it (the world archive
 > restores it), and remove/untracked are world-aware. A server has one world
 > (`level-name`, read from `server.properties`); an instance has many, so the
-> install names one — `--world`, or an interactive pick over `instance.worlds`.
+> install names one or more — repeatable `--world`, or an interactive
+> multi-select over `instance.worlds`. The index keys a datapack by world, so
+> the same one coexists across several worlds and removing it clears every copy.
 > The client-side support flag is waived for datapacks: they run on a world's
 > server side, including a client's integrated server, so a source marking a
 > datapack client-unsupported must not block installing it on an instance.
