@@ -5,6 +5,7 @@
 //! the 80×24 minimum-size notice — a screen only draws its state and reacts
 //! to keys, mouse, ticks, and injected app events.
 
+pub mod console;
 pub mod pager;
 pub mod prompt;
 mod terminal;

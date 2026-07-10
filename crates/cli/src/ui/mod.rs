@@ -10,7 +10,6 @@
 //! `View`s.
 
 pub(crate) mod components;
-mod console;
 mod progress;
 mod render;
 mod screen;
@@ -22,8 +21,8 @@ use std::sync::OnceLock;
 
 use anyhow::{anyhow, bail, Result};
 
-pub use console::ConsoleEvent;
 pub use progress::{InstallReporter, ProvisionReporter, Spinner};
+pub use session::console::ConsoleEvent;
 pub use view::View;
 
 /// Whether this invocation can run widgets: stdin (keys) and stderr (drawing)
@@ -108,7 +107,10 @@ pub fn console(
         bail!("no interactive terminal");
     }
     screen::teardown();
-    console::run(title, backfill, events, commands)
+    session::run(
+        session::console::ConsoleScreen::new(title, backfill, commands),
+        Some(events),
+    )
 }
 
 /// Render a byte count in human units (KB, MB, …).

@@ -4,6 +4,7 @@
 
 pub mod input;
 pub mod list;
+pub mod log;
 
 pub use input::TextInput;
 pub use list::SelectList;
