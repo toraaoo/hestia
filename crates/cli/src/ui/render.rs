@@ -10,8 +10,9 @@ use ratatui::crossterm::style::Stylize;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 
-use super::interactive;
 use super::screen;
+use super::session;
+use super::session::pager::PagerScreen;
 use super::view::View;
 
 pub fn show(view: View) -> Result<()> {
@@ -36,12 +37,31 @@ fn show_on_screen(view: View) -> Result<()> {
         rows,
     } = &view
     {
-        let header_refs: Vec<&str> = headers.iter().map(String::as_str).collect();
-        if interactive::browse(title, &header_refs, rows)? {
+        if paged(title, headers, rows)? {
             return Ok(());
         }
     }
     screen::insert(view_lines(view))
+}
+
+/// Page a table too tall for the terminal in a fullscreen session; `false`
+/// hands it back for whole insertion/printing.
+fn paged(title: &str, headers: &[String], rows: &[Vec<String>]) -> Result<bool> {
+    if rows.is_empty() || !super::is_interactive() {
+        return Ok(false);
+    }
+    let height = ratatui::crossterm::terminal::size()
+        .map(|(_, h)| h)
+        .unwrap_or(0);
+    if rows.len() as u16 + 3 <= height {
+        return Ok(false);
+    }
+    screen::teardown();
+    session::run(
+        PagerScreen::new(title, headers.to_vec(), rows.to_vec()),
+        None,
+    )?;
+    Ok(true)
 }
 
 /// A view as styled lines for the scrollback (multi-line text is split — a

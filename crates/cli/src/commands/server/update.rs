@@ -77,15 +77,13 @@ pub(super) async fn run(
 /// Interactive fallback for a missing `--restart`; errors when stdin is not a
 /// terminal so scripts must pass the flag explicitly.
 fn confirm_update_restart(name: &str) -> Result<()> {
-    let choice = ui::select(
+    let restart = ui::confirm(
         &format!("server '{name}' is running and must restart to update"),
-        &[
-            "stop, update, and start again".to_string(),
-            "cancel".to_string(),
-        ],
+        "stop, update, and start again",
+        "cancel",
     )
     .context("pass --restart to update a running server")?;
-    if choice != 0 {
+    if !restart {
         bail!("update cancelled");
     }
     Ok(())

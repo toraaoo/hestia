@@ -2,24 +2,25 @@
 //! `View`s and hand them here, and this module owns the terminal.
 //!
 //! The mode is decided once per invocation. **Interactive** (stdin and stderr
-//! are terminals): the whole run shares one inline ratatui viewport
-//! (`screen`) — every widget and progress line draws into it, and finished
-//! output is inserted above it into scrollback, in order. Otherwise **plain**:
-//! text on stdout, so `| grep` and `> file` keep working, and widgets degrade
-//! to arguments. The future TUI (bare `hestia`) is a third driver over the
-//! same `View`s.
+//! are terminals): every widget runs as a fullscreen session in the alternate
+//! screen (`session`), built from shared `components`, and the terminal is
+//! handed back intact when it resolves. Otherwise **plain**: text on stdout,
+//! so `| grep` and `> file` keep working, and widgets degrade to arguments.
+//! The future TUI (bare `hestia`) is one more `session::Screen` over the same
+//! `View`s.
 
+pub(crate) mod components;
 mod console;
-mod interactive;
 mod progress;
 mod render;
 mod screen;
+pub(crate) mod session;
 mod view;
 
 use std::io::IsTerminal;
 use std::sync::OnceLock;
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 
 pub use console::ConsoleEvent;
 pub use progress::{InstallReporter, ProvisionReporter, Spinner};
@@ -32,8 +33,8 @@ pub(crate) fn is_interactive() -> bool {
     *MODE.get_or_init(|| std::io::stdin().is_terminal() && std::io::stderr().is_terminal())
 }
 
-/// Render a view: into the session's scrollback while the screen holds the
-/// terminal, plainly to stdout otherwise.
+/// Render a view: plainly to stdout, except tables too tall for the terminal,
+/// which page in a fullscreen session when interactive.
 pub fn show(view: View) -> Result<()> {
     render::show(view)
 }
@@ -47,7 +48,9 @@ pub fn select(prompt: &str, items: &[String]) -> Result<usize> {
     if !is_interactive() {
         bail!("no interactive terminal; pass the choice as an argument");
     }
-    interactive::select(prompt, items)
+    screen::teardown();
+    session::run(session::prompt::SelectScreen::new(prompt, items), None)?
+        .ok_or_else(|| anyhow!("selection cancelled"))
 }
 
 /// Prompt the user to check any number of `items`, returning their indices.
@@ -60,7 +63,9 @@ pub fn multi_select(prompt: &str, items: &[String]) -> Result<Vec<usize>> {
     if !is_interactive() {
         bail!("no interactive terminal; pass the choice as an argument");
     }
-    interactive::multi_select(prompt, items)
+    screen::teardown();
+    session::run(session::prompt::MultiSelectScreen::new(prompt, items), None)?
+        .ok_or_else(|| anyhow!("selection cancelled"))
 }
 
 /// Ask for one line of input: typing edits, Enter accepts — empty takes
@@ -70,7 +75,21 @@ pub fn input(text: &str, default: &str) -> Result<String> {
     if !is_interactive() {
         return Ok(default.to_string());
     }
-    interactive::input(text, default)
+    screen::teardown();
+    session::run(session::prompt::InputScreen::new(text, default), None)?
+        .ok_or_else(|| anyhow!("input cancelled"))
+}
+
+/// Ask a yes/no question with labeled answers, returning `true` for `yes`.
+/// Errors when the user cancels (Esc / q / Ctrl-C) or without an interactive
+/// terminal, so callers can chain a hint naming the flag to pass instead.
+pub fn confirm(prompt: &str, yes: &str, no: &str) -> Result<bool> {
+    if !is_interactive() {
+        bail!("no interactive terminal");
+    }
+    screen::teardown();
+    session::run(session::prompt::ConfirmScreen::new(prompt, yes, no), None)?
+        .ok_or_else(|| anyhow!("cancelled"))
 }
 
 /// Run the attach console: live output above an input line whose entries go

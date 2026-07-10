@@ -148,12 +148,13 @@ fn build_config(
 /// Interactive fallback for a missing `--eula`; errors when stdin is not a
 /// terminal so scripts must pass the flag explicitly.
 fn confirm_eula() -> Result<()> {
-    let choice = ui::select(
+    let accepted = ui::confirm(
         &format!("running a Minecraft server requires accepting the EULA ({EULA_URL})"),
-        &["accept".to_string(), "decline".to_string()],
+        "accept",
+        "decline",
     )
     .context("pass --eula to accept the Minecraft EULA")?;
-    if choice != 0 {
+    if !accepted {
         bail!("the Minecraft EULA was not accepted");
     }
     Ok(())

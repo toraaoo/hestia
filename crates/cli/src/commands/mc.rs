@@ -100,15 +100,16 @@ pub fn pick_backup(backups: Vec<BackupInfo>, provided: Option<String>) -> Result
 /// Interactive fallback for a missing `--force`; errors when stdin is not a
 /// terminal so scripts must pass the flag explicitly.
 pub fn confirm_restore(name: &str, data: &str, backup: &BackupInfo) -> Result<()> {
-    let choice = ui::select(
+    let restore = ui::confirm(
         &format!(
             "restoring '{}' replaces the current {data} of '{name}'",
             backup.id
         ),
-        &["restore".to_string(), "cancel".to_string()],
+        "restore",
+        "cancel",
     )
     .context("pass --force to restore without confirming")?;
-    if choice != 0 {
+    if !restore {
         bail!("restore cancelled");
     }
     Ok(())
@@ -185,15 +186,16 @@ pub fn pick_version(versions: Vec<GameVersion>, provided: Option<String>) -> Res
 /// Interactive fallback for a missing `--downgrade`; errors when stdin is not
 /// a terminal so scripts must pass the flag explicitly.
 pub fn confirm_downgrade(name: &str, data: &str, from: &str, to: &str) -> Result<()> {
-    let choice = ui::select(
+    let downgrade = ui::confirm(
         &format!(
             "{to} is older than {from}, and Minecraft cannot load {data} \
              written by a newer version"
         ),
-        &[format!("downgrade '{name}'"), "cancel".to_string()],
+        &format!("downgrade '{name}'"),
+        "cancel",
     )
     .context("pass --downgrade to allow a downgrade")?;
-    if choice != 0 {
+    if !downgrade {
         bail!("downgrade cancelled");
     }
     Ok(())
