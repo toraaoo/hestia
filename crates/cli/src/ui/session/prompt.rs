@@ -13,7 +13,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use super::{is_cancel, Flow, Screen};
-use crate::ui::components::{SelectList, TextInput};
+use crate::ui::components::{Picker, PickerItem, SelectList, TextInput};
 
 /// Draw the prompt row and hint row, returning the body area between them.
 fn chrome(frame: &mut Frame, prompt: &str, hint: &str) -> Rect {
@@ -176,6 +176,56 @@ impl Screen for InputScreen {
                 Flow::Continue
             }
         }
+    }
+}
+
+pub struct PickerScreen {
+    prompt: String,
+    picker: Picker,
+}
+
+impl PickerScreen {
+    pub fn new(prompt: &str, items: Vec<PickerItem>) -> Self {
+        PickerScreen {
+            prompt: prompt.to_string(),
+            picker: Picker::new(items),
+        }
+    }
+}
+
+impl Screen for PickerScreen {
+    type Event = Infallible;
+    type Outcome = Option<usize>;
+
+    fn draw(&mut self, frame: &mut Frame) {
+        let rows =
+            Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).split(frame.area());
+        self.picker.render(frame, rows[0], &self.prompt);
+        frame.render_widget(
+            Paragraph::new(Line::from(
+                "type to filter · tab all versions · ↑/↓ move · enter select · esc cancel",
+            ))
+            .style(Style::default().fg(Color::DarkGray)),
+            rows[1],
+        );
+    }
+
+    fn on_key(&mut self, key: KeyEvent) -> Flow<Self::Outcome> {
+        match key.code {
+            KeyCode::Esc => return Flow::Done(None),
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                return Flow::Done(None)
+            }
+            KeyCode::Enter => {
+                if let Some(index) = self.picker.selected() {
+                    return Flow::Done(Some(index));
+                }
+            }
+            _ => {
+                self.picker.on_key(&key);
+            }
+        }
+        Flow::Continue
     }
 }
 

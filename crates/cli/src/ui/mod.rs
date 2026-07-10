@@ -20,6 +20,7 @@ use std::sync::OnceLock;
 
 use anyhow::{anyhow, bail, Result};
 
+pub use components::PickerItem;
 pub use progress::{InstallReporter, ProvisionReporter, Spinner};
 pub use session::console::ConsoleEvent;
 pub use view::View;
@@ -73,6 +74,21 @@ pub fn input(text: &str, default: &str) -> Result<String> {
     }
     session::run(session::prompt::InputScreen::new(text, default), None)?
         .ok_or_else(|| anyhow!("input cancelled"))
+}
+
+/// Prompt through a searchable picker (type to filter, Tab widens the pool to
+/// unstable entries), returning the chosen item's index into `items`. Requires
+/// an interactive terminal; errors otherwise so callers can ask for an
+/// argument.
+pub fn pick(prompt: &str, items: Vec<PickerItem>) -> Result<usize> {
+    if items.is_empty() {
+        bail!("nothing to select");
+    }
+    if !is_interactive() {
+        bail!("no interactive terminal; pass the choice as an argument");
+    }
+    session::run(session::prompt::PickerScreen::new(prompt, items), None)?
+        .ok_or_else(|| anyhow!("selection cancelled"))
 }
 
 /// Ask a yes/no question with labeled answers, returning `true` for `yes`.

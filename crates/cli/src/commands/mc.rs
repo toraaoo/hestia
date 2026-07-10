@@ -158,7 +158,8 @@ pub fn pick_flavor(flavors: Vec<Flavor>, provided: Option<String>) -> Result<Str
 }
 
 /// Return the chosen version id: validated against the flavor's catalogue when
-/// `provided`, otherwise picked from an interactive selector over the releases.
+/// `provided`, otherwise picked from a searchable picker — releases lead, Tab
+/// pulls snapshots and old versions into the pool.
 pub fn pick_version(versions: Vec<GameVersion>, provided: Option<String>) -> Result<String> {
     if versions.is_empty() {
         bail!("no versions are available");
@@ -169,18 +170,16 @@ pub fn pick_version(versions: Vec<GameVersion>, provided: Option<String>) -> Res
         }
         bail!("unknown version '{id}' (see `hestia server|instance versions`)");
     }
-    let releases: Vec<&GameVersion> = versions
+    let items: Vec<ui::PickerItem> = versions
         .iter()
-        .filter(|v| v.kind == VersionKind::Release)
+        .map(|v| ui::PickerItem {
+            label: v.id.clone(),
+            tag: kind_label(v.kind).to_string(),
+            stable: v.kind == VersionKind::Release,
+        })
         .collect();
-    let pool = if releases.is_empty() {
-        versions.iter().collect()
-    } else {
-        releases
-    };
-    let labels: Vec<String> = pool.iter().map(|v| v.id.clone()).collect();
-    let index = ui::select("select a version", &labels)?;
-    Ok(pool[index].id.clone())
+    let index = ui::pick("version", items)?;
+    Ok(versions[index].id.clone())
 }
 
 /// Interactive fallback for a missing `--downgrade`; errors when stdin is not
