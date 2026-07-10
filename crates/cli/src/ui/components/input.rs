@@ -14,6 +14,13 @@ pub struct TextInput {
 }
 
 impl TextInput {
+    pub fn with_text(text: &str) -> Self {
+        TextInput {
+            text: text.to_string(),
+            cursor: text.chars().count(),
+        }
+    }
+
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -63,13 +70,22 @@ impl TextInput {
     /// Draw the field into `area`, scrolled so the caret stays visible, and
     /// place the terminal cursor at the caret.
     pub fn render(&self, frame: &mut Frame, area: Rect) {
+        self.render_focused(frame, area, true);
+    }
+
+    /// [`render`], but only claim the terminal cursor when `focused` — a field
+    /// sharing a screen with other focus targets stays visible without the
+    /// caret pretending to own the keys.
+    pub fn render_focused(&self, frame: &mut Frame, area: Rect, focused: bool) {
         let caret = Span::raw(&self.text[..byte_of(&self.text, self.cursor)]).width() as u16;
         let overflow = caret.saturating_sub(area.width.saturating_sub(1));
         frame.render_widget(
             Paragraph::new(self.text.as_str()).scroll((0, overflow)),
             area,
         );
-        frame.set_cursor_position(Position::new(area.x + caret - overflow, area.y));
+        if focused {
+            frame.set_cursor_position(Position::new(area.x + caret - overflow, area.y));
+        }
     }
 }
 

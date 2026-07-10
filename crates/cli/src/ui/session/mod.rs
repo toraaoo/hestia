@@ -80,6 +80,20 @@ pub fn run<S: Screen>(
     drive(&mut screen, events)
 }
 
+/// [`run`] off the async runtime, for sessions whose event channel is fed by
+/// a driver future the caller must keep polling concurrently.
+pub async fn run_async<S>(
+    screen: S,
+    events: Option<UnboundedReceiver<S::Event>>,
+) -> Result<S::Outcome>
+where
+    S: Screen + Send + 'static,
+    S::Event: Send + 'static,
+    S::Outcome: Send + 'static,
+{
+    tokio::task::spawn_blocking(move || run(screen, events)).await?
+}
+
 fn drive<S: Screen>(
     screen: &mut S,
     mut events: Option<UnboundedReceiver<S::Event>>,

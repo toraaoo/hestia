@@ -10,9 +10,10 @@ use client::proto::content::{
 };
 use client::Client;
 
-use super::browse::search_pick;
+use client::proto::content::SearchQuery;
+
 use super::format::{kind_plural, source_label};
-use super::EntryKind;
+use super::{session, EntryKind, PAGE};
 use crate::ui::{self, ProvisionReporter, View};
 
 /// The per-entry management grammar shared by every installable kind under a
@@ -96,7 +97,14 @@ async fn add(
     filename: Option<String>,
     world: Vec<String>,
 ) -> Result<()> {
-    let (id, name) = resolve_entry(client, entry, reference).await?;
+    let info = resolve_entry(client, entry, reference).await?;
+
+    if item.is_none() && file.is_none() {
+        if !ui::is_interactive() {
+            bail!("name an item to install (a project slug/id, a source URL, or --file)");
+        }
+        return add_session(client, entry, kind, info).await;
+    }
 
     let mut add_item = ContentAddItem {
         filename: filename.unwrap_or_default(),
@@ -109,10 +117,7 @@ async fn add(
             .to_string_lossy()
             .into_owned();
     } else {
-        let reference = match item {
-            Some(reference) => reference,
-            None => search_pick(client, kind).await?,
-        };
+        let reference = item.unwrap_or_default();
         if is_url(&reference) {
             add_item.url = reference;
         } else {
@@ -121,7 +126,7 @@ async fn add(
     }
 
     let worlds = if kind == ContentKind::DataPack && matches!(entry, EntryKind::Instance) {
-        pick_worlds(client, &id, world).await?
+        pick_worlds(client, &info.id, world).await?
     } else {
         Vec::new()
     };
@@ -132,8 +137,50 @@ async fn add(
         worlds,
         ..ContentAddSpec::default()
     };
-    let (installed, failures) = install_spec(client, entry, &id, spec).await?;
-    show_install_report(&name, &installed, &failures)
+    let (installed, failures) = install_spec(client, entry, &info.id, spec).await?;
+    show_install_report(&info.name, &installed, &failures)
+}
+
+/// The interactive install path: the fullscreen search → review → install
+/// session, seeded with the entry's own loader and game version as fixed
+/// search filters.
+async fn add_session(
+    client: &Client,
+    entry: EntryKind,
+    kind: ContentKind,
+    info: EntryInfo,
+) -> Result<()> {
+    let worlds = if kind == ContentKind::DataPack && matches!(entry, EntryKind::Instance) {
+        let worlds = client.instance().worlds(&info.id).await?;
+        if worlds.is_empty() {
+            bail!("no save worlds yet — launch the instance and create a world first");
+        }
+        worlds
+    } else {
+        Vec::new()
+    };
+    let base = SearchQuery {
+        kind,
+        loader: (kind == ContentKind::Mod).then(|| info.flavor.clone()),
+        game_version: Some(info.game_version.clone()),
+        limit: PAGE,
+        ..SearchQuery::default()
+    };
+    let target = session::Target {
+        entry,
+        id: info.id.clone(),
+        name: info.name.clone(),
+        worlds,
+    };
+    match session::run(client, base, Some(target)).await? {
+        None => ui::show(View::note("cancelled")),
+        Some(report) => {
+            if let Some(error) = report.error {
+                bail!(error);
+            }
+            show_install_report(&info.name, &report.items, &report.failures)
+        }
+    }
 }
 
 /// Print what a batch installed and what failed; errors (a non-zero exit)
@@ -198,7 +245,7 @@ pub(super) async fn install_spec(
 }
 
 async fn list(client: &Client, entry: EntryKind, kind: ContentKind, reference: &str) -> Result<()> {
-    let (id, name) = resolve_entry(client, entry, reference).await?;
+    let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
     let (items, untracked) = match entry {
         EntryKind::Server => client.server().content_list(&id, kind).await?,
         EntryKind::Instance => client.instance().content_list(&id, kind).await?,
@@ -253,7 +300,7 @@ async fn remove(
     reference: &str,
     item: Option<String>,
 ) -> Result<()> {
-    let (id, name) = resolve_entry(client, entry, reference).await?;
+    let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
     let item = match item {
         Some(item) => item,
         None => {
@@ -278,7 +325,7 @@ async fn update(
     reference: &str,
     item: Option<String>,
 ) -> Result<()> {
-    let (id, name) = resolve_entry(client, entry, reference).await?;
+    let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
     let target = item.unwrap_or_default();
 
     let reporter = Arc::new(ProvisionReporter::new());
@@ -356,31 +403,45 @@ fn world_label(content: &InstalledContent) -> Option<&str> {
     (!world.is_empty()).then_some(world)
 }
 
-/// Resolve a known server/instance reference to its `(id, name)`.
-async fn resolve_entry(
-    client: &Client,
-    entry: EntryKind,
-    reference: &str,
-) -> Result<(String, String)> {
-    let entries: Vec<(String, String)> = match entry {
+/// What a content command needs to know about its entry.
+pub(super) struct EntryInfo {
+    pub id: String,
+    pub name: String,
+    pub flavor: String,
+    pub game_version: String,
+}
+
+/// Resolve a known server/instance reference to its record essentials.
+async fn resolve_entry(client: &Client, entry: EntryKind, reference: &str) -> Result<EntryInfo> {
+    let entries: Vec<EntryInfo> = match entry {
         EntryKind::Server => client
             .server()
             .list()
             .await?
             .into_iter()
-            .map(|s| (s.id, s.name))
+            .map(|s| EntryInfo {
+                id: s.id,
+                name: s.name,
+                flavor: s.flavor,
+                game_version: s.game_version,
+            })
             .collect(),
         EntryKind::Instance => client
             .instance()
             .list()
             .await?
             .into_iter()
-            .map(|i| (i.id, i.name))
+            .map(|i| EntryInfo {
+                id: i.id,
+                name: i.name,
+                flavor: i.flavor,
+                game_version: i.game_version,
+            })
             .collect(),
     };
     entries
         .into_iter()
-        .find(|(id, name)| id == reference || name == reference)
+        .find(|e| e.id == reference || e.name == reference)
         .with_context(|| format!("no {} matches '{reference}'", entry.noun()))
 }
 

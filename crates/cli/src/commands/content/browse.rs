@@ -1,15 +1,16 @@
 //! The discovery half: `hestia <kind> search|info|versions` against a content
-//! source, plus the interactive project picker `add` falls back to.
+//! source. On a terminal, search opens the fullscreen browse session; piped
+//! it prints one page of results plainly.
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Subcommand;
 use client::proto::content::{
     ContentKind, ContentProject, ContentVersion, SearchQuery, VersionQuery,
 };
 use client::Client;
 
-use super::format::{channel_label, compact, kind_plural, side_label, truncate};
-use super::{SortArg, PAGE};
+use super::format::{channel_label, compact, side_label, truncate};
+use super::{session, SortArg, PAGE};
 use crate::commands::connect;
 use crate::ui::{self, Spinner, View};
 
@@ -81,7 +82,11 @@ pub async fn run_browse(kind: ContentKind, cmd: BrowseCmd) -> Result<()> {
                 limit: limit.clamp(1, 100),
                 offset,
             };
-            search_pages(&client, base).await
+            if ui::is_interactive() {
+                session::run(&client, base, None).await?;
+                return Ok(());
+            }
+            search_page(&client, base).await
         }
         BrowseCmd::Info { project, source } => {
             let detail = {
@@ -116,89 +121,38 @@ pub async fn run_browse(kind: ContentKind, cmd: BrowseCmd) -> Result<()> {
     }
 }
 
-/// Page through search results: render each page, and on a terminal offer to
-/// step forward/back until the user is done.
-async fn search_pages(client: &Client, mut query: SearchQuery) -> Result<()> {
-    loop {
-        let result = {
-            let _spinner = Spinner::start("searching");
-            client.content().search(&query).await?
-        };
-        if result.hits.is_empty() {
-            return ui::show(View::note("no results"));
-        }
-        let rows = result
-            .hits
-            .iter()
-            .map(|h| {
-                vec![
-                    h.title.clone(),
-                    h.slug.clone(),
-                    compact(h.downloads),
-                    truncate(&h.description, 60),
-                ]
-            })
-            .collect();
-        ui::show(View::table(
-            "results",
-            ["NAME", "SLUG", "DOWNLOADS", "DESCRIPTION"],
-            rows,
-        ))?;
-        let shown_to = query.offset + result.hits.len() as u32;
-        ui::show(View::note(format!(
-            "showing {}–{shown_to} of {}",
-            query.offset + 1,
-            result.total
-        )))?;
-
-        let has_next = shown_to < result.total;
-        let has_prev = query.offset > 0;
-        if !ui::is_interactive() || (!has_next && !has_prev) {
-            return Ok(());
-        }
-        let mut options = Vec::new();
-        if has_next {
-            options.push("next page".to_string());
-        }
-        if has_prev {
-            options.push("previous page".to_string());
-        }
-        options.push("done".to_string());
-        let choice = ui::select("browse", &options)?;
-        match options[choice].as_str() {
-            "next page" => query.offset = shown_to,
-            "previous page" => query.offset = query.offset.saturating_sub(query.limit),
-            _ => return Ok(()),
-        }
-    }
-}
-
-/// Search interactively and return the chosen project's slug — the picker for
-/// `add` with no item given.
-pub(super) async fn search_pick(client: &Client, kind: ContentKind) -> Result<String> {
-    let query = ui::input(&format!("search {}", kind_plural(kind)), "")?;
+/// Print one page of search results plainly (the piped path).
+async fn search_page(client: &Client, query: SearchQuery) -> Result<()> {
     let result = {
         let _spinner = Spinner::start("searching");
-        client
-            .content()
-            .search(&SearchQuery {
-                kind,
-                query,
-                limit: PAGE,
-                ..SearchQuery::default()
-            })
-            .await?
+        client.content().search(&query).await?
     };
     if result.hits.is_empty() {
-        bail!("no results");
+        return ui::show(View::note("no results"));
     }
-    let labels: Vec<String> = result
+    let rows = result
         .hits
         .iter()
-        .map(|h| format!("{} ({} downloads)", h.title, compact(h.downloads)))
+        .map(|h| {
+            vec![
+                h.title.clone(),
+                h.slug.clone(),
+                compact(h.downloads),
+                truncate(&h.description, 60),
+            ]
+        })
         .collect();
-    let index = ui::select("select a project", &labels)?;
-    Ok(result.hits[index].slug.clone())
+    ui::show(View::table(
+        "results",
+        ["NAME", "SLUG", "DOWNLOADS", "DESCRIPTION"],
+        rows,
+    ))?;
+    let shown_to = query.offset + result.hits.len() as u32;
+    ui::show(View::note(format!(
+        "showing {}–{shown_to} of {} (--offset pages)",
+        query.offset + 1,
+        result.total
+    )))
 }
 
 fn show_project(project: &ContentProject) -> Result<()> {

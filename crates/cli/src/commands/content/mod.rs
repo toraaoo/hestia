@@ -8,6 +8,7 @@
 mod browse;
 mod format;
 mod manage;
+mod session;
 
 use anyhow::Result;
 use clap::ValueEnum;
