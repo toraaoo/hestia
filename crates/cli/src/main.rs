@@ -68,6 +68,40 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::instance::InstanceCmd,
     },
+    /// Start a server or launch an instance by name
+    Start {
+        /// Server or instance name or id
+        target: String,
+        #[arg(
+            long,
+            help = "Account name or uuid for an instance (default: the switched-to account)"
+        )]
+        account: Option<String>,
+    },
+    /// Stop a running server or instance by name
+    Stop {
+        /// Server or instance name or id
+        target: String,
+    },
+    /// Restart a server or instance by name
+    Restart {
+        /// Server or instance name or id
+        target: String,
+        #[arg(
+            long,
+            help = "Account name or uuid for an instance (default: the switched-to account)"
+        )]
+        account: Option<String>,
+    },
+    /// Tail a server or instance's captured output by name
+    Logs {
+        /// Server or instance name or id
+        target: String,
+        #[arg(short = 'n', long = "tail", help = "Only the last N lines")]
+        tail: Option<usize>,
+        #[arg(short, long, help = "Keep streaming new output until Ctrl-C")]
+        follow: bool,
+    },
     /// Browse mods on a content source
     Mod {
         #[command(subcommand)]
@@ -179,6 +213,14 @@ async fn dispatch(command: Command) -> anyhow::Result<()> {
         Command::Java { cmd } => commands::java::run(cmd).await,
         Command::Server { cmd } => commands::server::run(cmd).await,
         Command::Instance { cmd } => commands::instance::run(cmd).await,
+        Command::Start { target, account } => commands::lifecycle::start(target, account).await,
+        Command::Stop { target } => commands::lifecycle::stop(target).await,
+        Command::Restart { target, account } => commands::lifecycle::restart(target, account).await,
+        Command::Logs {
+            target,
+            tail,
+            follow,
+        } => commands::lifecycle::logs(target, tail, follow).await,
         Command::Mod { cmd } => {
             commands::content::run_browse(client::proto::content::ContentKind::Mod, cmd).await
         }

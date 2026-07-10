@@ -7,6 +7,7 @@ pub mod content;
 pub mod daemon;
 pub mod instance;
 pub mod java;
+pub mod lifecycle;
 mod mc;
 pub mod play;
 pub mod server;

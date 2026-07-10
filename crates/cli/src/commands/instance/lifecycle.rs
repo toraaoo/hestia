@@ -25,7 +25,7 @@ pub async fn launch(client: &Client, reference: &str, account: &str) -> Result<(
     )))
 }
 
-pub(super) async fn stop(client: &Client, instance: &str) -> Result<()> {
+pub(crate) async fn stop(client: &Client, instance: &str) -> Result<()> {
     {
         let _spinner = Spinner::start(format!("stopping '{instance}'"));
         client.instance().stop(instance).await?;
@@ -33,7 +33,7 @@ pub(super) async fn stop(client: &Client, instance: &str) -> Result<()> {
     ui::show(View::line(format!("instance '{instance}' stopped")))
 }
 
-pub(super) async fn restart(client: &Client, instance: &str, account: &str) -> Result<()> {
+pub(crate) async fn restart(client: &Client, instance: &str, account: &str) -> Result<()> {
     {
         let _spinner = Spinner::start(format!("stopping '{instance}'"));
         client.instance().stop(instance).await?;
@@ -50,7 +50,7 @@ pub(super) async fn remove(client: &Client, instance: &str) -> Result<()> {
     ui::show(View::line(format!("instance '{instance}' removed")))
 }
 
-pub(super) async fn logs(
+pub(crate) async fn logs(
     client: &Client,
     instance: &str,
     tail: Option<usize>,

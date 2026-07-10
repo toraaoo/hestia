@@ -10,7 +10,7 @@ use client::{Client, ProcessEvent};
 use super::entry;
 use crate::ui::{self, Spinner, View};
 
-pub(super) async fn start(client: &Client, server: &str) -> Result<()> {
+pub(crate) async fn start(client: &Client, server: &str) -> Result<()> {
     let started = {
         let _spinner = Spinner::start(format!("starting '{server}'"));
         client.server().start(server).await?
@@ -21,7 +21,7 @@ pub(super) async fn start(client: &Client, server: &str) -> Result<()> {
     )))
 }
 
-pub(super) async fn stop(client: &Client, server: &str) -> Result<()> {
+pub(crate) async fn stop(client: &Client, server: &str) -> Result<()> {
     {
         let _spinner = Spinner::start(format!("stopping '{server}'"));
         client.server().stop(server).await?;
@@ -29,7 +29,7 @@ pub(super) async fn stop(client: &Client, server: &str) -> Result<()> {
     ui::show(View::line(format!("server '{server}' stopped")))
 }
 
-pub(super) async fn restart(client: &Client, server: &str) -> Result<()> {
+pub(crate) async fn restart(client: &Client, server: &str) -> Result<()> {
     {
         let _spinner = Spinner::start(format!("stopping '{server}'"));
         client.server().stop(server).await?;
@@ -46,7 +46,7 @@ pub(super) async fn remove(client: &Client, server: &str) -> Result<()> {
     ui::show(View::line(format!("server '{server}' removed")))
 }
 
-pub(super) async fn logs(
+pub(crate) async fn logs(
     client: &Client,
     server: &str,
     tail: Option<usize>,
