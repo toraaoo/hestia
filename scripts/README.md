@@ -11,7 +11,7 @@ packaging.
 | `clean.sh`     | `cargo clean` plus the frontend `dist`/`node_modules` and Tauri `gen` |
 | `sidecars.sh`  | build + stage `hestia`/`hestiad`/`tray` as Tauri sidecars for bundling |
 | `package.sh`   | release artifacts: Tauri installers + portable archive (`all`/`bundle`/`portable`) |
-| `win.ps1`      | the same flow on Windows (adds a `package` verb)                     |
+| `win.ps1`      | Windows entry point — forwards each verb to the matching `*.sh` via Git Bash |
 
 Examples:
 
