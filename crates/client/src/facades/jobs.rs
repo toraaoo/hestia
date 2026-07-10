@@ -5,7 +5,7 @@
 use ipc::errors::IpcError;
 use ipc::protocol::Event;
 use proto::backup::BackupInfo;
-use proto::content::InstalledContent;
+use proto::content::{ContentFailure, InstalledContent};
 use proto::minecraft::ProvisionProgress;
 use serde_json::Value;
 
@@ -37,13 +37,13 @@ where
 }
 
 /// Drive one content install/update job: forward its progress events and decode
-/// the done event's installed items.
+/// the done event's installed items and per-item failures.
 pub(super) async fn run_content_job<F, Fut>(
     session: &Session,
     id: &str,
     on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
     start: F,
-) -> Result<Vec<InstalledContent>, IpcError>
+) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>), IpcError>
 where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = Result<(), IpcError>>,
@@ -57,8 +57,11 @@ where
             start,
         )
         .await?;
-    serde_json::from_value(payload.get("items").cloned().unwrap_or(Value::Null))
-        .map_err(|e| IpcError::Malformed(e.to_string()))
+    let items = serde_json::from_value(payload.get("items").cloned().unwrap_or(Value::Null))
+        .map_err(|e| IpcError::Malformed(e.to_string()))?;
+    let failures = serde_json::from_value(payload.get("failures").cloned().unwrap_or(Value::Null))
+        .unwrap_or_default();
+    Ok((items, failures))
 }
 
 /// Adapt a `ProvisionProgress` callback into the session's raw event callback,

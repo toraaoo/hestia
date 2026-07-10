@@ -2,14 +2,15 @@
 //! URL, or a local file; list, remove, and update what is installed. The managed
 //! directory under the entry root is the source of truth; `data/` holds a mirror.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use proto::content::{
-    ContentAddSpec, ContentKind, ContentProject, DependencyKind, InstalledContent, SideSupport,
-    VersionQuery,
+    ContentAddItem, ContentAddSpec, ContentFailure, ContentKind, ContentProject, DependencyKind,
+    InstalledContent, SideSupport, VersionQuery,
 };
-use proto::minecraft::ProvisionPhase;
+use proto::minecraft::{ProvisionPhase, ProvisionProgress};
 
 use super::phase_progress;
 use crate::content::install;
@@ -20,15 +21,16 @@ use crate::registry;
 use crate::servers::ServerRecord;
 
 impl Engine {
-    /// Install content into a server (mods and datapacks) from a platform
-    /// project, a direct URL, or a local file. Returns everything installed —
-    /// the item plus any required dependencies.
+    /// Install a batch of content into a server (mods and datapacks) — each
+    /// item a platform project, a direct URL, or a local file. Returns
+    /// everything installed (items plus required dependencies) and, per item
+    /// that could not be installed, a failure; the batch continues past them.
     pub async fn add_server_content(
         &self,
         reference: &str,
         spec: &ContentAddSpec,
         on_progress: OnProgress<'_>,
-    ) -> Result<Vec<InstalledContent>> {
+    ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
         if !matches!(spec.kind, ContentKind::Mod | ContentKind::DataPack) {
             bail!("a server takes mods and datapacks only");
         }
@@ -36,13 +38,14 @@ impl Engine {
         self.add_content(&ctx, spec, on_progress).await
     }
 
-    /// Install content into an instance (mods, resourcepacks, shaders).
+    /// Install a batch of content into an instance (mods, resourcepacks,
+    /// shaders, datapacks).
     pub async fn add_instance_content(
         &self,
         reference: &str,
         spec: &ContentAddSpec,
         on_progress: OnProgress<'_>,
-    ) -> Result<Vec<InstalledContent>> {
+    ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
         install::kind_dir(spec.kind)?;
         let (_, ctx) = self.instance_content_ctx(reference)?;
         self.add_content(&ctx, spec, on_progress).await
@@ -153,41 +156,73 @@ impl Engine {
         ctx: &EntryContent,
         spec: &ContentAddSpec,
         on_progress: OnProgress<'_>,
-    ) -> Result<Vec<InstalledContent>> {
+    ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
         install::kind_dir(spec.kind)?;
         if spec.kind == ContentKind::Mod && ctx.flavor == "vanilla" {
             bail!("a vanilla {} cannot load mods", ctx.side.noun());
         }
-        let picked = [&spec.project, &spec.url, &spec.path]
-            .iter()
-            .filter(|s| !s.is_empty())
-            .count();
-        if picked != 1 {
-            bail!("specify exactly one of a project, a url, or a file");
+        if spec.items.is_empty() {
+            bail!("nothing to install");
         }
-        let world = datapack_world(ctx, spec)?;
+        let worlds = datapack_worlds(ctx, spec)?;
 
-        let items = if !spec.url.is_empty() {
-            let (source, parsed) = self.content.parse_url(&spec.url).with_context(|| {
-                format!(
-                    "'{}' is not a project URL on a supported content source",
-                    spec.url
-                )
-            })?;
-            let mut resolved = spec.clone();
-            resolved.source = source;
-            resolved.project = parsed.project;
-            if let Some(version) = parsed.version {
-                resolved.version = version;
+        let mut failures = Vec::new();
+        let mut roots = Vec::new();
+        let mut files = Vec::new();
+        for item in &spec.items {
+            let picked = [&item.project, &item.url, &item.path]
+                .iter()
+                .filter(|s| !s.is_empty())
+                .count();
+            if picked != 1 {
+                failures.push(failure(
+                    item_label(item),
+                    "",
+                    "specify exactly one of a project, a url, or a file",
+                ));
+                continue;
             }
-            self.add_platform_content(ctx, &resolved, &world, on_progress)
-                .await?
-        } else if !spec.project.is_empty() {
-            self.add_platform_content(ctx, spec, &world, on_progress)
-                .await?
-        } else {
-            vec![add_file_content(ctx, spec, &world)?]
-        };
+            if !item.url.is_empty() {
+                match self.content.parse_url(&item.url) {
+                    Some((source, parsed)) => roots.push(PlatformRoot {
+                        given: item.url.clone(),
+                        source,
+                        pin: parsed.version.unwrap_or_else(|| item.version.clone()),
+                        project: parsed.project,
+                    }),
+                    None => failures.push(failure(
+                        &item.url,
+                        "",
+                        format!(
+                            "'{}' is not a project URL on a supported content source",
+                            item.url
+                        ),
+                    )),
+                }
+            } else if !item.project.is_empty() {
+                roots.push(PlatformRoot {
+                    given: item.project.clone(),
+                    source: spec.source.clone(),
+                    project: item.project.clone(),
+                    pin: item.version.clone(),
+                });
+            } else {
+                files.push(item);
+            }
+        }
+
+        let mut items = Vec::new();
+        for item in files {
+            match add_file_content(ctx, spec.kind, item, &worlds) {
+                Ok(mut installed) => items.append(&mut installed),
+                Err(e) => failures.push(failure(&item.path, "", format!("{e:#}"))),
+            }
+        }
+        let (mut platform_items, mut platform_failures) = self
+            .add_platform_content(ctx, spec.kind, roots, &worlds, on_progress)
+            .await;
+        items.append(&mut platform_items);
+        failures.append(&mut platform_failures);
 
         let mut index = install::load(&ctx.entry_dir);
         for item in &items {
@@ -216,64 +251,124 @@ impl Engine {
                 "content installed"
             );
         }
-        Ok(items)
+        for fail in &failures {
+            tracing::warn!(
+                entry = %ctx.entry_dir.display(),
+                item = %fail.item,
+                message = %fail.message,
+                "content install failed"
+            );
+        }
+        Ok((items, failures))
     }
 
-    /// Resolve a platform project (and, for mods, its required dependencies —
-    /// breadth-first, skipping anything already installed) and download each
-    /// pick into the managed directory.
+    /// Resolve every platform root (and, for mods, required dependencies —
+    /// breadth-first under one visited set, so a dependency shared across the
+    /// batch installs once) and download each pick into the managed directory.
+    /// A node that fails records a per-item failure and the batch continues.
     async fn add_platform_content(
         &self,
         ctx: &EntryContent,
-        spec: &ContentAddSpec,
-        world: &str,
+        kind: ContentKind,
+        roots: Vec<PlatformRoot>,
+        worlds: &[String],
         on_progress: OnProgress<'_>,
-    ) -> Result<Vec<InstalledContent>> {
-        on_progress(&phase_progress(ProvisionPhase::Resolving));
-        let root = self.content.project(&spec.source, &spec.project).await?;
-        if root.kind != spec.kind {
-            bail!(
-                "'{}' is {:?} content, not {:?}",
-                root.title,
-                root.kind,
-                spec.kind
-            );
+    ) -> (Vec<InstalledContent>, Vec<ContentFailure>) {
+        let mut items = Vec::new();
+        let mut failures = Vec::new();
+        if roots.is_empty() {
+            return (items, failures);
         }
-        side_gate(&root, ctx.side)?;
+        on_progress(&phase_progress(ProvisionPhase::Resolving));
 
-        let mut visited: std::collections::HashSet<String> = install::load(&ctx.entry_dir)
+        let mut visited: HashSet<String> = install::load(&ctx.entry_dir)
             .into_iter()
             .map(|i| i.project_id)
             .filter(|p| !p.is_empty())
             .collect();
-        visited.insert(root.id.clone());
-        let loader = (spec.kind == ContentKind::Mod).then(|| ctx.flavor.clone());
+        let loader = (kind == ContentKind::Mod).then(|| ctx.flavor.clone());
 
-        let mut items = Vec::new();
-        let mut queue = vec![(root, spec.version.clone())];
-        while let Some((project, pin)) = queue.pop() {
-            let versions = self
+        // An explicitly named root installs even when already present (a
+        // reinstall/re-pin); only duplicates within the batch collapse.
+        let mut queued = HashSet::new();
+        let mut queue = Vec::new();
+        for root in roots {
+            let project = match self.content.project(&root.source, &root.project).await {
+                Ok(project) => project,
+                Err(e) => {
+                    failures.push(failure(&root.given, "", format!("{e:#}")));
+                    continue;
+                }
+            };
+            if project.kind != kind {
+                failures.push(failure(
+                    &root.given,
+                    &project.title,
+                    format!(
+                        "'{}' is {:?} content, not {:?}",
+                        project.title, project.kind, kind
+                    ),
+                ));
+                continue;
+            }
+            if let Err(e) = side_gate(&project, ctx.side) {
+                failures.push(failure(&root.given, &project.title, format!("{e:#}")));
+                continue;
+            }
+            if !queued.insert(project.id.clone()) {
+                continue;
+            }
+            visited.insert(project.id.clone());
+            queue.push(Node {
+                given: root.given,
+                source: root.source,
+                pin: root.pin,
+                project,
+            });
+        }
+
+        while let Some(node) = queue.pop() {
+            let versions = match self
                 .content
                 .versions(&VersionQuery {
-                    source: spec.source.clone(),
-                    project: project.id.clone(),
+                    source: node.source.clone(),
+                    project: node.project.id.clone(),
                     loader: loader.clone(),
                     game_version: Some(ctx.game_version.clone()),
                 })
-                .await?;
-            let version =
-                install::pick_version(&versions, &ctx.game_version, loader.as_deref(), &pin)
-                    .with_context(|| format!("cannot install '{}'", project.title))?
-                    .clone();
+                .await
+            {
+                Ok(versions) => versions,
+                Err(e) => {
+                    failures.push(failure(&node.given, &node.project.title, format!("{e:#}")));
+                    continue;
+                }
+            };
+            let version = match install::pick_version(
+                &versions,
+                &ctx.game_version,
+                loader.as_deref(),
+                &node.pin,
+            ) {
+                Ok(version) => version.clone(),
+                Err(e) => {
+                    failures.push(failure(
+                        &node.given,
+                        &node.project.title,
+                        format!("cannot install '{}': {e:#}", node.project.title),
+                    ));
+                    continue;
+                }
+            };
 
-            if spec.kind == ContentKind::Mod {
+            if kind == ContentKind::Mod {
                 for dep in &version.dependencies {
                     if dep.kind != DependencyKind::Required {
                         continue;
                     }
                     if dep.project_id.is_empty() {
                         tracing::warn!(
-                            of = %project.title,
+                            of = %node.project.title,
                             version_id = %dep.version_id,
                             "required dependency names no project; skipping"
                         );
@@ -282,68 +377,98 @@ impl Engine {
                     if !visited.insert(dep.project_id.clone()) {
                         continue;
                     }
-                    let dep_project = self.content.project(&spec.source, &dep.project_id).await?;
+                    let dep_project =
+                        match self.content.project(&node.source, &dep.project_id).await {
+                            Ok(project) => project,
+                            Err(e) => {
+                                failures.push(failure(&dep.project_id, "", format!("{e:#}")));
+                                continue;
+                            }
+                        };
                     if side_gate(&dep_project, ctx.side).is_err() {
                         tracing::warn!(
                             dependency = %dep_project.title,
-                            of = %project.title,
+                            of = %node.project.title,
                             "required dependency does not support this side; skipping"
                         );
                         continue;
                     }
-                    queue.push((dep_project, String::new()));
+                    queue.push(Node {
+                        given: dep_project.slug.clone(),
+                        source: node.source.clone(),
+                        pin: String::new(),
+                        project: dep_project,
+                    });
                 }
             }
 
-            items.push(
-                self.install_version_file(ctx, &project, &version, world, on_progress)
-                    .await?,
-            );
+            let title = node.project.title.clone();
+            let labeled = move |p: &ProvisionProgress| {
+                let mut progress = p.clone();
+                progress.detail = title.clone();
+                on_progress(&progress);
+            };
+            match self
+                .install_version_file(ctx, &node.project, &version, worlds, &labeled)
+                .await
+            {
+                Ok(mut installed) => items.append(&mut installed),
+                Err(e) => {
+                    failures.push(failure(&node.given, &node.project.title, format!("{e:#}")))
+                }
+            }
         }
-        Ok(items)
+        (items, failures)
     }
 
+    /// Download a version's primary file into every target world (one entry
+    /// per world; non-datapack kinds pass the single empty world).
     async fn install_version_file(
         &self,
         ctx: &EntryContent,
         project: &ContentProject,
         version: &proto::content::ContentVersion,
-        world: &str,
+        worlds: &[String],
         on_progress: OnProgress<'_>,
-    ) -> Result<InstalledContent> {
+    ) -> Result<Vec<InstalledContent>> {
         let file = install::primary_file(version)?;
         materialize::validate_filename(&file.artifact.filename)?;
-        let (managed, data) = content_targets(ctx, project.kind, world, &file.artifact.filename)?;
-        materialize::ensure_artifact(
-            Some(&self.cache),
-            &file.artifact,
-            &managed,
-            ProvisionPhase::Content,
-            on_progress,
-        )
-        .await?;
-        if managed != data {
-            install::mirror(&managed, &data)?;
+        let mut installed = Vec::new();
+        for world in worlds {
+            let (managed, data) =
+                content_targets(ctx, project.kind, world, &file.artifact.filename)?;
+            materialize::ensure_artifact(
+                Some(&self.cache),
+                &file.artifact,
+                &managed,
+                ProvisionPhase::Content,
+                on_progress,
+            )
+            .await?;
+            if managed != data {
+                install::mirror(&managed, &data)?;
+            }
+            installed.push(InstalledContent {
+                kind: project.kind,
+                source: version.source.clone(),
+                project_id: project.id.clone(),
+                slug: project.slug.clone(),
+                title: project.title.clone(),
+                version_id: version.id.clone(),
+                version_number: version.version_number.clone(),
+                filename: file.artifact.filename.clone(),
+                sha1: file
+                    .artifact
+                    .checksum
+                    .as_ref()
+                    .map(|c| c.hex.clone())
+                    .unwrap_or_default(),
+                url: file.artifact.url.clone(),
+                installed_unix: registry::now_unix(),
+                world: world.to_string(),
+            });
         }
-        Ok(InstalledContent {
-            kind: project.kind,
-            source: version.source.clone(),
-            project_id: project.id.clone(),
-            slug: project.slug.clone(),
-            title: project.title.clone(),
-            version_id: version.id.clone(),
-            version_number: version.version_number.clone(),
-            filename: file.artifact.filename.clone(),
-            sha1: file
-                .artifact
-                .checksum
-                .as_ref()
-                .map(|c| c.hex.clone())
-                .unwrap_or_default(),
-            url: file.artifact.url.clone(),
-            installed_unix: registry::now_unix(),
-            world: world.to_string(),
-        })
+        Ok(installed)
     }
 
     async fn update_content(
@@ -404,8 +529,17 @@ impl Engine {
                 ..ContentProject::default()
             };
             let new_item = self
-                .install_version_file(ctx, &project, &version, &item.world, on_progress)
-                .await?;
+                .install_version_file(
+                    ctx,
+                    &project,
+                    &version,
+                    std::slice::from_ref(&item.world),
+                    on_progress,
+                )
+                .await?
+                .into_iter()
+                .next()
+                .context("install produced no item")?;
             if new_item.filename != item.filename {
                 install::remove_files(&ctx.entry_dir, &ctx.data_dir, &item);
             }
@@ -434,6 +568,45 @@ impl Engine {
         }
         Ok(updated)
     }
+}
+
+/// One platform selector of a batch, resolved from its item: where it came
+/// from (`given`, for failure reporting), which source serves it, and the
+/// version pin.
+struct PlatformRoot {
+    given: String,
+    source: String,
+    project: String,
+    pin: String,
+}
+
+/// A BFS node: a fetched project awaiting version resolution and install.
+struct Node {
+    given: String,
+    source: String,
+    pin: String,
+    project: ContentProject,
+}
+
+fn failure(
+    item: impl Into<String>,
+    title: impl Into<String>,
+    message: impl Into<String>,
+) -> ContentFailure {
+    ContentFailure {
+        item: item.into(),
+        title: title.into(),
+        message: message.into(),
+    }
+}
+
+/// The selector an item names, for failure reporting on malformed items.
+fn item_label(item: &ContentAddItem) -> String {
+    [&item.project, &item.url, &item.path]
+        .iter()
+        .find(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "(empty item)".to_string())
 }
 
 /// The entry-shape a content operation needs, independent of whether the entry
@@ -483,24 +656,35 @@ fn side_gate(project: &ContentProject, side: EntrySide) -> Result<()> {
     Ok(())
 }
 
-/// Resolve the data-relative world directory a datapack installs into — a
-/// server's single `level-name` world, or an instance's chosen (and validated)
-/// save. Empty for every non-datapack kind, which install into a flat dir.
-fn datapack_world(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<String> {
+/// Resolve the data-relative world directories a datapack batch installs into
+/// — a server's single `level-name` world, or an instance's chosen (and
+/// validated) saves. The single empty world for every non-datapack kind,
+/// which installs into a flat dir.
+fn datapack_worlds(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<Vec<String>> {
     if spec.kind != ContentKind::DataPack {
-        return Ok(String::new());
+        return Ok(vec![String::new()]);
     }
     match ctx.side {
-        EntrySide::Server => Ok(crate::servers::level_name(&ctx.data_dir)),
+        EntrySide::Server => Ok(vec![crate::servers::level_name(&ctx.data_dir)]),
         EntrySide::Client => {
-            let requested = spec.world.trim();
-            if requested.is_empty() {
+            let mut worlds = Vec::new();
+            for world in &spec.worlds {
+                let requested = world.trim();
+                if requested.is_empty() {
+                    continue;
+                }
+                if !ctx.data_dir.join("saves").join(requested).is_dir() {
+                    bail!("no save world '{requested}' in this instance");
+                }
+                let resolved = format!("saves/{requested}");
+                if !worlds.contains(&resolved) {
+                    worlds.push(resolved);
+                }
+            }
+            if worlds.is_empty() {
                 bail!("name a save world for the datapack (the instance's --world)");
             }
-            if !ctx.data_dir.join("saves").join(requested).is_dir() {
-                bail!("no save world '{requested}' in this instance");
-            }
-            Ok(format!("saves/{requested}"))
+            Ok(worlds)
         }
     }
 }
@@ -526,47 +710,52 @@ fn content_targets(
     ))
 }
 
-/// Import a local file: copy it into the managed directory (or, for a datapack,
-/// straight into its world) and mirror it into the game directory. No
-/// provenance beyond the hash, so it can never update.
+/// Import a local file: copy it into the managed directory (or, for a
+/// datapack, straight into each target world) and mirror it into the game
+/// directory. No provenance beyond the hash, so it can never update.
 fn add_file_content(
     ctx: &EntryContent,
-    spec: &ContentAddSpec,
-    world: &str,
-) -> Result<InstalledContent> {
-    let source = Path::new(&spec.path);
+    kind: ContentKind,
+    item: &ContentAddItem,
+    worlds: &[String],
+) -> Result<Vec<InstalledContent>> {
+    let source = Path::new(&item.path);
     if !source.is_file() {
         bail!("no file at {}", source.display());
     }
-    let filename = if spec.filename.is_empty() {
+    let filename = if item.filename.is_empty() {
         source
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default()
     } else {
-        spec.filename.clone()
+        item.filename.clone()
     };
     materialize::validate_filename(&filename)?;
-    let (managed, data) = content_targets(ctx, spec.kind, world, &filename)?;
-    if let Some(parent) = managed.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("cannot create {}", parent.display()))?;
+    let mut installed = Vec::new();
+    for world in worlds {
+        let (managed, data) = content_targets(ctx, kind, world, &filename)?;
+        if let Some(parent) = managed.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("cannot create {}", parent.display()))?;
+        }
+        std::fs::copy(source, &managed)
+            .with_context(|| format!("cannot import {}", source.display()))?;
+        if managed != data {
+            install::mirror(&managed, &data)?;
+        }
+        installed.push(InstalledContent {
+            kind,
+            source: "file".to_string(),
+            title: filename.clone(),
+            sha1: install::sha1_file(&managed)?,
+            filename: filename.clone(),
+            installed_unix: registry::now_unix(),
+            world: world.to_string(),
+            ..InstalledContent::default()
+        });
     }
-    std::fs::copy(source, &managed)
-        .with_context(|| format!("cannot import {}", source.display()))?;
-    if managed != data {
-        install::mirror(&managed, &data)?;
-    }
-    Ok(InstalledContent {
-        kind: spec.kind,
-        source: "file".to_string(),
-        title: filename.clone(),
-        sha1: install::sha1_file(&managed)?,
-        filename,
-        installed_unix: registry::now_unix(),
-        world: world.to_string(),
-        ..InstalledContent::default()
-    })
+    Ok(installed)
 }
 
 fn list_content(ctx: &EntryContent, kind: ContentKind) -> (Vec<InstalledContent>, Vec<String>) {

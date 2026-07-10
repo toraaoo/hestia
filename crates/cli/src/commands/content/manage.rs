@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
-use client::proto::content::{ContentAddSpec, ContentKind, InstalledContent};
+use client::proto::content::{
+    ContentAddItem, ContentAddSpec, ContentFailure, ContentKind, InstalledContent,
+};
 use client::Client;
 
 use super::browse::search_pick;
@@ -96,14 +98,13 @@ async fn add(
 ) -> Result<()> {
     let (id, name) = resolve_entry(client, entry, reference).await?;
 
-    let mut spec = ContentAddSpec {
-        kind,
+    let mut add_item = ContentAddItem {
         filename: filename.unwrap_or_default(),
         version: version.unwrap_or_default(),
-        ..ContentAddSpec::default()
+        ..ContentAddItem::default()
     };
     if let Some(path) = file {
-        spec.path = std::fs::canonicalize(&path)
+        add_item.path = std::fs::canonicalize(&path)
             .with_context(|| format!("cannot read {path}"))?
             .to_string_lossy()
             .into_owned();
@@ -113,29 +114,36 @@ async fn add(
             None => search_pick(client, kind).await?,
         };
         if is_url(&reference) {
-            spec.url = reference;
+            add_item.url = reference;
         } else {
-            spec.project = reference;
+            add_item.project = reference;
         }
     }
 
     let worlds = if kind == ContentKind::DataPack && matches!(entry, EntryKind::Instance) {
         pick_worlds(client, &id, world).await?
     } else {
-        vec![String::new()]
+        Vec::new()
     };
 
-    let mut installed = Vec::new();
-    for target in worlds {
-        let mut per_world = spec.clone();
-        per_world.world = target;
-        installed.extend(install_spec(client, entry, &id, per_world).await?);
-    }
+    let spec = ContentAddSpec {
+        kind,
+        items: vec![add_item],
+        worlds,
+        ..ContentAddSpec::default()
+    };
+    let (installed, failures) = install_spec(client, entry, &id, spec).await?;
+    show_install_report(&name, &installed, &failures)
+}
 
-    if installed.is_empty() {
-        return ui::show(View::note("nothing installed"));
-    }
-    for content in &installed {
+/// Print what a batch installed and what failed; errors (a non-zero exit)
+/// when nothing landed at all.
+pub(super) fn show_install_report(
+    name: &str,
+    installed: &[InstalledContent],
+    failures: &[ContentFailure],
+) -> Result<()> {
+    for content in installed {
         let where_ = match world_label(content) {
             Some(world) => format!("'{name}' ({world})"),
             None => format!("'{name}'"),
@@ -145,15 +153,30 @@ async fn add(
             content.title, content.filename
         )))?;
     }
-    Ok(())
+    for failure in failures {
+        let label = if failure.title.is_empty() {
+            failure.item.clone()
+        } else {
+            failure.title.clone()
+        };
+        ui::show(View::note(format!("failed {label}: {}", failure.message)))?;
+    }
+    if installed.is_empty() {
+        match failures.is_empty() {
+            true => ui::show(View::note("nothing installed")),
+            false => bail!("nothing installed"),
+        }
+    } else {
+        Ok(())
+    }
 }
 
-async fn install_spec(
+pub(super) async fn install_spec(
     client: &Client,
     entry: EntryKind,
     id: &str,
     spec: ContentAddSpec,
-) -> Result<Vec<InstalledContent>> {
+) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
     let reporter = Arc::new(ProvisionReporter::new());
     let progress = reporter.clone();
     let result = match entry {

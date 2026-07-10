@@ -12,6 +12,10 @@ use proto::accounts::{Account, AccountLoginBeginResult};
 use proto::app::AppInfoResult;
 use proto::backup::BackupInfo;
 use proto::cache::{CacheEntry, CacheInfoResult};
+use proto::content::{
+    ContentAddSpec, ContentDoneEvent, ContentErrorEvent, ContentProgressEvent, ContentVersion,
+    InstalledContent, SearchQuery, ServerContentAddParams,
+};
 use proto::daemon::{DaemonStatusResult, DaemonStopParams};
 use proto::download::DownloadSpec;
 use proto::instance::InstanceInfo;
@@ -98,3 +102,31 @@ golden!(
     ProvisionProgress,
     "provision_progress.json"
 );
+golden!(content_add_spec, ContentAddSpec, "content_add_spec.json");
+golden!(
+    server_content_add_params,
+    ServerContentAddParams,
+    "server_content_add_params.json"
+);
+golden!(
+    installed_content,
+    InstalledContent,
+    "installed_content.json"
+);
+golden!(
+    content_progress_event,
+    ContentProgressEvent,
+    "content_progress_event.json"
+);
+golden!(
+    content_done_event,
+    ContentDoneEvent,
+    "content_done_event.json"
+);
+golden!(
+    content_error_event,
+    ContentErrorEvent,
+    "content_error_event.json"
+);
+golden!(search_query, SearchQuery, "search_query.json");
+golden!(content_version, ContentVersion, "content_version.json");

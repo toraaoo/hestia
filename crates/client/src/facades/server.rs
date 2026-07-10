@@ -4,9 +4,9 @@ use proto::backup::{
     ServerBackupRemove, ServerBackupRestore, ServerBackupRestoreParams,
 };
 use proto::content::{
-    ContentAddSpec, ContentKind, InstalledContent, ServerContentAdd, ServerContentAddParams,
-    ServerContentList, ServerContentListParams, ServerContentRemove, ServerContentRemoveParams,
-    ServerContentUpdate, ServerContentUpdateParams,
+    ContentAddSpec, ContentFailure, ContentKind, InstalledContent, ServerContentAdd,
+    ServerContentAddParams, ServerContentList, ServerContentListParams, ServerContentRemove,
+    ServerContentRemoveParams, ServerContentUpdate, ServerContentUpdateParams,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, ProvisionProgress, ResolveParams, ServerProfile,
@@ -262,15 +262,16 @@ impl Server<'_> {
             .entries)
     }
 
-    /// Install content into a server, blocking until the daemon reports done or
-    /// error and forwarding each progress event to `on_progress`. Returns
-    /// everything installed (the item plus any required dependencies).
+    /// Install a batch of content into a server, blocking until the daemon
+    /// reports done or error and forwarding each progress event to
+    /// `on_progress`. Returns everything installed (items plus required
+    /// dependencies) and, per item that could not be installed, a failure.
     pub async fn content_add(
         &self,
         server: &str,
         spec: ContentAddSpec,
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
-    ) -> Result<Vec<InstalledContent>, IpcError> {
+    ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>), IpcError> {
         let id = job_id("server-content-add");
         let params = ServerContentAddParams {
             server: server.to_string(),
@@ -336,6 +337,7 @@ impl Server<'_> {
                 .map(|_| ())
         })
         .await
+        .map(|(items, _)| items)
     }
 }
 

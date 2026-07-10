@@ -264,23 +264,43 @@ pub struct ContentListResult {
     pub untracked: Vec<String>,
 }
 
-/// What to install: exactly one of `project` (a platform project, optionally
-/// pinned by `version`), `url` (a project/version page URL on a supported
-/// source), or `path` (a daemon-local file to import).
+/// One thing to install: exactly one of `project` (a platform project,
+/// optionally pinned by `version`), `url` (a project/version page URL on a
+/// supported source), or `path` (a daemon-local file to import).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
-pub struct ContentAddSpec {
-    pub kind: ContentKind,
-    pub source: String,
+pub struct ContentAddItem {
     pub project: String,
     pub version: String,
     pub url: String,
     pub path: String,
     pub filename: String,
-    /// For a datapack on an instance: the save world to install into (the game
-    /// loads datapacks from inside a world). Ignored for other kinds; a server
-    /// uses its single `level-name` world.
-    pub world: String,
+}
+
+/// What to install: one or more items of one `kind` from one `source`,
+/// installed in a single job. Items that fail are reported per item on the
+/// done event; the rest of the batch proceeds.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ContentAddSpec {
+    pub kind: ContentKind,
+    pub source: String,
+    pub items: Vec<ContentAddItem>,
+    /// For datapacks on an instance: the save worlds each item installs into
+    /// (the game loads datapacks from inside a world). Ignored for other
+    /// kinds; a server uses its single `level-name` world.
+    pub worlds: Vec<String>,
+}
+
+/// One item of a batch that could not be installed.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ContentFailure {
+    /// The selector as given (project slug/id, URL, or path).
+    pub item: String,
+    /// The resolved project title, when resolution got that far.
+    pub title: String,
+    pub message: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -426,6 +446,8 @@ impl Topic for ContentProgressEvent {
 pub struct ContentDoneEvent {
     pub id: String,
     pub items: Vec<InstalledContent>,
+    #[serde(default)]
+    pub failures: Vec<ContentFailure>,
 }
 impl Topic for ContentDoneEvent {
     const TOPIC: &'static str = "content.done";

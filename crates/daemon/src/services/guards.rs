@@ -95,17 +95,25 @@ pub(super) fn ensure_no_backup(
     Ok(())
 }
 
-pub(super) fn require_one_content_source(
+pub(super) fn require_content_items(
     spec: &proto::content::ContentAddSpec,
 ) -> Result<(), ServiceError> {
-    let picked = [&spec.project, &spec.url, &spec.path]
-        .iter()
-        .filter(|s| !s.is_empty())
-        .count();
-    if picked != 1 {
-        return Err(ServiceError::bad_request(
-            "specify exactly one of a project, a url, or a file",
-        ));
+    if spec.items.is_empty() {
+        return Err(ServiceError::bad_request("nothing to install"));
+    }
+    for item in &spec.items {
+        let picked = [&item.project, &item.url, &item.path]
+            .iter()
+            .filter(|s| !s.is_empty())
+            .count();
+        if picked != 1 {
+            return Err(ServiceError::bad_request(
+                "each item must name exactly one of a project, a url, or a file",
+            ));
+        }
+    }
+    if !spec.worlds.is_empty() && spec.kind != proto::content::ContentKind::DataPack {
+        return Err(ServiceError::bad_request("worlds apply to datapacks only"));
     }
     Ok(())
 }
@@ -121,5 +129,69 @@ pub(super) fn require_backup(
         Err(ServiceError::not_found(format!(
             "no backup matches '{reference}'"
         )))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use proto::content::{ContentAddItem, ContentAddSpec, ContentKind};
+
+    use super::require_content_items;
+
+    fn project_item(project: &str) -> ContentAddItem {
+        ContentAddItem {
+            project: project.to_string(),
+            ..ContentAddItem::default()
+        }
+    }
+
+    #[test]
+    fn accepts_a_batch_of_single_selector_items() {
+        let spec = ContentAddSpec {
+            items: vec![project_item("sodium"), project_item("lithium")],
+            ..ContentAddSpec::default()
+        };
+        assert!(require_content_items(&spec).is_ok());
+    }
+
+    #[test]
+    fn rejects_an_empty_batch() {
+        assert!(require_content_items(&ContentAddSpec::default()).is_err());
+    }
+
+    #[test]
+    fn rejects_an_item_with_no_or_multiple_selectors() {
+        let empty = ContentAddSpec {
+            items: vec![ContentAddItem::default()],
+            ..ContentAddSpec::default()
+        };
+        assert!(require_content_items(&empty).is_err());
+
+        let mut both = project_item("sodium");
+        both.url = "https://modrinth.com/mod/sodium".to_string();
+        let spec = ContentAddSpec {
+            items: vec![both],
+            ..ContentAddSpec::default()
+        };
+        assert!(require_content_items(&spec).is_err());
+    }
+
+    #[test]
+    fn rejects_worlds_on_non_datapack_kinds() {
+        let spec = ContentAddSpec {
+            kind: ContentKind::Mod,
+            items: vec![project_item("sodium")],
+            worlds: vec!["world".to_string()],
+            ..ContentAddSpec::default()
+        };
+        assert!(require_content_items(&spec).is_err());
+
+        let spec = ContentAddSpec {
+            kind: ContentKind::DataPack,
+            items: vec![project_item("terralith")],
+            worlds: vec!["world".to_string()],
+            ..ContentAddSpec::default()
+        };
+        assert!(require_content_items(&spec).is_ok());
     }
 }

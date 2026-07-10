@@ -12,7 +12,7 @@ use proto::Empty;
 
 use super::guards::{
     ensure_no_backup, ensure_no_content, ensure_no_update, ensure_stopped, find_instance,
-    find_server, require_one_content_source,
+    find_server, require_content_items,
 };
 use crate::runtime::{instance_process_id, server_process_id, Channels, ContentJob, ServiceError};
 
@@ -79,7 +79,7 @@ fn register_sources(on: &mut Channels<'_>) {
 
 fn register_server(on: &mut Channels<'_>) {
     on.handle::<ServerContentAdd, _, _>(|p, ctx| async move {
-        require_one_content_source(&p.spec)?;
+        require_content_items(&p.spec)?;
         let record = find_server(&ctx, &p.server)?;
         let process_id = server_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "server", &record.name)?;
@@ -156,7 +156,7 @@ fn register_server(on: &mut Channels<'_>) {
 
 fn register_instance(on: &mut Channels<'_>) {
     on.handle::<InstanceContentAdd, _, _>(|p, ctx| async move {
-        require_one_content_source(&p.spec)?;
+        require_content_items(&p.spec)?;
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;

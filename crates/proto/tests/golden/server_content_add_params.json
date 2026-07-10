@@ -1,0 +1,16 @@
+{
+  "server": "srv-1",
+  "kind": "data_pack",
+  "source": "modrinth",
+  "items": [
+    {
+      "project": "terralith",
+      "version": "",
+      "url": "",
+      "path": "",
+      "filename": ""
+    }
+  ],
+  "worlds": [],
+  "id": "server-content-add-1"
+}

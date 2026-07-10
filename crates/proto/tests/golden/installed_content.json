@@ -1,0 +1,14 @@
+{
+  "kind": "mod",
+  "source": "modrinth",
+  "project_id": "AANobbMI",
+  "slug": "sodium",
+  "title": "Sodium",
+  "version_id": "abcd1234",
+  "version_number": "0.6.0",
+  "filename": "sodium-0.6.0.jar",
+  "sha1": "0123456789abcdef0123456789abcdef01234567",
+  "url": "https://cdn.modrinth.com/data/AANobbMI/versions/abcd1234/sodium-0.6.0.jar",
+  "installed_unix": 1783783800,
+  "world": ""
+}

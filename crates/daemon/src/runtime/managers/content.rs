@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use engine::Engine;
 use proto::content::{
-    ContentAddSpec, ContentDoneEvent, ContentErrorEvent, ContentKind, ContentProgressEvent,
-    InstalledContent,
+    ContentAddSpec, ContentDoneEvent, ContentErrorEvent, ContentFailure, ContentKind,
+    ContentProgressEvent, InstalledContent,
 };
 use proto::minecraft::ProvisionProgress;
 
@@ -58,7 +58,7 @@ impl ContentJob {
         self,
         engine: &Engine,
         on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
-    ) -> anyhow::Result<Vec<InstalledContent>> {
+    ) -> anyhow::Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
         match self {
             ContentJob::ServerAdd { server_id, spec } => {
                 engine
@@ -74,20 +74,18 @@ impl ContentJob {
                 server_id,
                 kind,
                 item,
-            } => {
-                engine
-                    .update_server_content(&server_id, kind, &item, on_progress)
-                    .await
-            }
+            } => engine
+                .update_server_content(&server_id, kind, &item, on_progress)
+                .await
+                .map(|items| (items, Vec::new())),
             ContentJob::InstanceUpdate {
                 instance_id,
                 kind,
                 item,
-            } => {
-                engine
-                    .update_instance_content(&instance_id, kind, &item, on_progress)
-                    .await
-            }
+            } => engine
+                .update_instance_content(&instance_id, kind, &item, on_progress)
+                .await
+                .map(|items| (items, Vec::new())),
         }
     }
 }
@@ -140,11 +138,17 @@ impl ContentManager {
             });
 
             match job.run(&engine, on_progress.as_ref()).await {
-                Ok(items) => {
-                    tracing::info!(job = %job_id, items = items.len(), "content job done");
+                Ok((items, failures)) => {
+                    tracing::info!(
+                        job = %job_id,
+                        items = items.len(),
+                        failures = failures.len(),
+                        "content job done"
+                    );
                     hub.publish(&topic_event(&ContentDoneEvent {
                         id: job_id.clone(),
                         items,
+                        failures,
                     }));
                 }
                 Err(e) => {

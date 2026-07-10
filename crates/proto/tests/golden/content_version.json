@@ -1,0 +1,34 @@
+{
+  "source": "modrinth",
+  "id": "abcd1234",
+  "project_id": "AANobbMI",
+  "name": "Sodium 0.6.0",
+  "version_number": "0.6.0",
+  "channel": "release",
+  "game_versions": ["1.21.1"],
+  "loaders": ["fabric"],
+  "featured": true,
+  "date_published": "2026-07-01T12:00:00Z",
+  "downloads": 123456,
+  "files": [
+    {
+      "artifact": {
+        "url": "https://cdn.modrinth.com/data/AANobbMI/versions/abcd1234/sodium-0.6.0.jar",
+        "filename": "sodium-0.6.0.jar",
+        "size": 987654,
+        "checksum": {
+          "algorithm": "sha1",
+          "hex": "0123456789abcdef0123456789abcdef01234567"
+        }
+      },
+      "primary": true
+    }
+  ],
+  "dependencies": [
+    {
+      "project_id": "P7dR8mSH",
+      "version_id": "",
+      "kind": "required"
+    }
+  ]
+}

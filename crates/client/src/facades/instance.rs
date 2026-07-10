@@ -6,9 +6,10 @@ use proto::backup::{
     InstanceBackupRef, InstanceBackupRemove, InstanceBackupRestore, InstanceBackupRestoreParams,
 };
 use proto::content::{
-    ContentAddSpec, ContentKind, InstalledContent, InstanceContentAdd, InstanceContentAddParams,
-    InstanceContentList, InstanceContentListParams, InstanceContentRemove,
-    InstanceContentRemoveParams, InstanceContentUpdate, InstanceContentUpdateParams,
+    ContentAddSpec, ContentFailure, ContentKind, InstalledContent, InstanceContentAdd,
+    InstanceContentAddParams, InstanceContentList, InstanceContentListParams,
+    InstanceContentRemove, InstanceContentRemoveParams, InstanceContentUpdate,
+    InstanceContentUpdateParams,
 };
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
@@ -290,15 +291,16 @@ impl Instance<'_> {
         Ok((process_id, pid))
     }
 
-    /// Install content into an instance, blocking until the daemon reports done
-    /// or error and forwarding each progress event to `on_progress`. Returns
-    /// everything installed (the item plus any required dependencies).
+    /// Install a batch of content into an instance, blocking until the daemon
+    /// reports done or error and forwarding each progress event to
+    /// `on_progress`. Returns everything installed (items plus required
+    /// dependencies) and, per item that could not be installed, a failure.
     pub async fn content_add(
         &self,
         instance: &str,
         spec: ContentAddSpec,
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
-    ) -> Result<Vec<InstalledContent>, IpcError> {
+    ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>), IpcError> {
         let id = job_id("instance-content-add");
         let params = InstanceContentAddParams {
             instance: instance.to_string(),
@@ -367,6 +369,7 @@ impl Instance<'_> {
                 .map(|_| ())
         })
         .await
+        .map(|(items, _)| items)
     }
 }
 
