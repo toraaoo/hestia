@@ -1,10 +1,11 @@
 //! Terminal progress + spinner rendering for long-running commands. A
-//! background thread redraws the shared inline screen on a fixed tick, so an
-//! indeterminate spinner keeps animating and a download gauge stays smooth
-//! without the caller pumping frames. When stderr is redirected (a pipe, CI)
-//! rendering is skipped and callers that want a paper trail degrade to terse
-//! per-phase lines.
+//! background thread rewrites one stderr line in place on a fixed tick — no
+//! viewport, so the shell keeps its scrollback and a fullscreen session can
+//! follow cleanly. When stderr is redirected (a pipe, CI) rendering is
+//! skipped and callers that want a paper trail degrade to terse per-phase
+//! lines.
 
+use std::io::{self, IsTerminal, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -12,18 +13,16 @@ use std::time::{Duration, Instant};
 
 use client::proto::java::{JavaInstallPhase, JavaInstallProgress};
 use client::proto::minecraft::{ProvisionPhase, ProvisionProgress};
-use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Gauge, Paragraph};
-use ratatui::Frame;
+use ratatui::crossterm::cursor::{Hide, MoveToColumn, Show};
+use ratatui::crossterm::execute;
+use ratatui::crossterm::style::Stylize;
+use ratatui::crossterm::terminal::{Clear, ClearType};
 
 use super::render::human_bytes;
-use super::screen;
 
 const FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const TICK: Duration = Duration::from_millis(80);
-const GAUGE_WIDTH: u16 = 30;
+const GAUGE_WIDTH: usize = 30;
 
 /// What the animator paints on the next tick.
 enum View {
@@ -31,8 +30,8 @@ enum View {
     Download { ratio: f64, detail: String },
 }
 
-/// A background renderer that owns the inline viewport and redraws the current
-/// `View` every tick until stopped. Created only when stderr is a terminal.
+/// A background renderer that rewrites the current `View` onto one stderr
+/// line every tick until stopped. Created only when stderr is a terminal.
 struct Animator {
     view: Arc<Mutex<View>>,
     stop: Arc<AtomicBool>,
@@ -41,7 +40,7 @@ struct Animator {
 
 impl Animator {
     fn start(initial: View) -> Option<Self> {
-        if !screen::stderr_is_tty() {
+        if !io::stderr().is_terminal() {
             return None;
         }
         let view = Arc::new(Mutex::new(initial));
@@ -74,52 +73,43 @@ impl Drop for Animator {
 }
 
 fn run(view: Arc<Mutex<View>>, stop: Arc<AtomicBool>) {
+    let mut err = io::stderr();
+    let _ = execute!(err, Hide);
     let mut step = 0usize;
     while !stop.load(Ordering::Relaxed) {
         {
             let view = view.lock().unwrap();
-            let _ = screen::with(|terminal| {
-                terminal.draw(|frame| draw(frame, &view, step))?;
-                Ok(())
-            });
+            let spin = FRAMES[step % FRAMES.len()].cyan();
+            let _ = execute!(err, MoveToColumn(0), Clear(ClearType::CurrentLine));
+            let _ = write!(err, "{spin} {}", line(&view));
+            let _ = err.flush();
         }
         step = step.wrapping_add(1);
         thread::sleep(TICK);
     }
-    screen::blank();
+    let _ = execute!(err, MoveToColumn(0), Clear(ClearType::CurrentLine), Show);
 }
 
-fn draw(frame: &mut Frame, view: &View, step: usize) {
-    // One line at the top of the shared viewport.
-    let full = frame.area();
-    let area = Rect {
-        height: full.height.min(1),
-        ..full
-    };
-    let spin = Span::styled(
-        FRAMES[step % FRAMES.len()],
-        Style::default().fg(Color::Cyan),
-    );
-    match view {
-        View::Spinner(label) => {
-            let line = Line::from(vec![spin, Span::raw(" "), Span::raw(label.as_str())]);
-            frame.render_widget(Paragraph::new(line), area);
-        }
+/// The line after the spinner frame, truncated to the terminal width.
+fn line(view: &View) -> String {
+    let text = match view {
+        View::Spinner(label) => label.clone(),
         View::Download { ratio, detail } => {
-            let cols = Layout::horizontal([
-                Constraint::Length(12),
-                Constraint::Length(GAUGE_WIDTH),
-                Constraint::Min(0),
-            ])
-            .split(area);
-            frame.render_widget(Paragraph::new(Line::from("downloading ")), cols[0]);
-            let gauge = Gauge::default()
-                .ratio(*ratio)
-                .gauge_style(Style::default().fg(Color::Cyan))
-                .label(format!("{:.0}%", ratio * 100.0));
-            frame.render_widget(gauge, cols[1]);
-            frame.render_widget(Paragraph::new(Line::from(format!(" {detail}"))), cols[2]);
+            let filled = ((ratio * GAUGE_WIDTH as f64).round() as usize).min(GAUGE_WIDTH);
+            format!(
+                "downloading {}{} {:>3.0}% · {detail}",
+                "█".repeat(filled).cyan(),
+                "░".repeat(GAUGE_WIDTH - filled).dark_grey(),
+                ratio * 100.0
+            )
         }
+    };
+    let width = ratatui::crossterm::terminal::size()
+        .map(|(w, _)| w as usize)
+        .unwrap_or(80);
+    match text.char_indices().nth(width.saturating_sub(2)) {
+        Some((byte, _)) => text[..byte].to_string(),
+        None => text,
     }
 }
 

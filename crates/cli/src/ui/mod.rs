@@ -12,7 +12,6 @@
 pub(crate) mod components;
 mod progress;
 mod render;
-mod screen;
 pub(crate) mod session;
 mod view;
 
@@ -47,7 +46,6 @@ pub fn select(prompt: &str, items: &[String]) -> Result<usize> {
     if !is_interactive() {
         bail!("no interactive terminal; pass the choice as an argument");
     }
-    screen::teardown();
     session::run(session::prompt::SelectScreen::new(prompt, items), None)?
         .ok_or_else(|| anyhow!("selection cancelled"))
 }
@@ -62,7 +60,6 @@ pub fn multi_select(prompt: &str, items: &[String]) -> Result<Vec<usize>> {
     if !is_interactive() {
         bail!("no interactive terminal; pass the choice as an argument");
     }
-    screen::teardown();
     session::run(session::prompt::MultiSelectScreen::new(prompt, items), None)?
         .ok_or_else(|| anyhow!("selection cancelled"))
 }
@@ -74,7 +71,6 @@ pub fn input(text: &str, default: &str) -> Result<String> {
     if !is_interactive() {
         return Ok(default.to_string());
     }
-    screen::teardown();
     session::run(session::prompt::InputScreen::new(text, default), None)?
         .ok_or_else(|| anyhow!("input cancelled"))
 }
@@ -86,17 +82,13 @@ pub fn confirm(prompt: &str, yes: &str, no: &str) -> Result<bool> {
     if !is_interactive() {
         bail!("no interactive terminal");
     }
-    screen::teardown();
     session::run(session::prompt::ConfirmScreen::new(prompt, yes, no), None)?
         .ok_or_else(|| anyhow!("cancelled"))
 }
 
 /// Run the attach console: live output above an input line whose entries go
 /// to `commands`. Blocking until detach or a `Closed` event, whose message it
-/// returns. Requires an interactive terminal. The console owns the whole
-/// terminal: it releases the shared viewport, runs fullscreen in the
-/// alternate screen, and restores the original terminal on detach — anything
-/// shown after prints plainly below it instead of into the (gone) viewport.
+/// returns. Requires an interactive terminal.
 pub fn console(
     title: &str,
     backfill: Vec<String>,
@@ -106,7 +98,6 @@ pub fn console(
     if !is_interactive() {
         bail!("no interactive terminal");
     }
-    screen::teardown();
     session::run(
         session::console::ConsoleScreen::new(title, backfill, commands),
         Some(events),
@@ -116,10 +107,4 @@ pub fn console(
 /// Render a byte count in human units (KB, MB, …).
 pub fn human_bytes(bytes: u64) -> String {
     render::human_bytes(bytes)
-}
-
-/// Return the terminal: clear the shared viewport and show the cursor. Called
-/// once when the command finishes, before any final error print.
-pub fn teardown() {
-    screen::teardown();
 }

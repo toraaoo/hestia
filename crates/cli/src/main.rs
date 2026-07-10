@@ -195,7 +195,6 @@ fn main() -> ExitCode {
 
     let rt = tokio::runtime::Runtime::new().expect("build tokio runtime");
     let result = rt.block_on(dispatch(command));
-    ui::teardown();
 
     match result {
         Ok(()) => ExitCode::SUCCESS,

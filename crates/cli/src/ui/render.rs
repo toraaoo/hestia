@@ -1,36 +1,18 @@
-//! Rendering of `View`s. While the shared screen holds the terminal, views are
-//! inserted above its viewport so output and widgets stay ordered; otherwise
-//! they print to stdout — dimmed on a terminal, bare when piped or redirected
-//! (so `| grep` and `> file` keep working). Long tables hand off to the pager.
+//! Rendering of `View`s: plain text on stdout — dimmed labels on a terminal,
+//! bare when piped or redirected (so `| grep` and `> file` keep working).
+//! Tables too tall for the terminal hand off to the fullscreen pager when the
+//! invocation is interactive.
 
 use std::io::{self, IsTerminal};
 
 use anyhow::Result;
 use ratatui::crossterm::style::Stylize;
-use ratatui::style::{Color, Style};
-use ratatui::text::{Line, Span};
 
-use super::screen;
 use super::session;
 use super::session::pager::PagerScreen;
 use super::view::View;
 
 pub fn show(view: View) -> Result<()> {
-    if stdout_is_tty() && screen::active() {
-        return show_on_screen(view);
-    }
-    match view {
-        View::Line(text) => println!("{text}"),
-        View::Note(text) => note(&text),
-        View::Detail(rows) => detail(&rows),
-        View::Table { headers, rows, .. } => print_table(&headers, &rows),
-    }
-    Ok(())
-}
-
-/// The screen is holding the terminal: insert above its viewport instead of
-/// printing at the cursor (which sits inside the viewport). Long tables page.
-fn show_on_screen(view: View) -> Result<()> {
     if let View::Table {
         title,
         headers,
@@ -41,13 +23,19 @@ fn show_on_screen(view: View) -> Result<()> {
             return Ok(());
         }
     }
-    screen::insert(view_lines(view))
+    match view {
+        View::Line(text) => println!("{text}"),
+        View::Note(text) => note(&text),
+        View::Detail(rows) => detail(&rows),
+        View::Table { headers, rows, .. } => print_table(&headers, &rows),
+    }
+    Ok(())
 }
 
 /// Page a table too tall for the terminal in a fullscreen session; `false`
-/// hands it back for whole insertion/printing.
+/// hands it back for plain printing.
 fn paged(title: &str, headers: &[String], rows: &[Vec<String>]) -> Result<bool> {
-    if rows.is_empty() || !super::is_interactive() {
+    if rows.is_empty() || !stdout_is_tty() || !super::is_interactive() {
         return Ok(false);
     }
     let height = ratatui::crossterm::terminal::size()
@@ -56,43 +44,11 @@ fn paged(title: &str, headers: &[String], rows: &[Vec<String>]) -> Result<bool> 
     if rows.len() as u16 + 3 <= height {
         return Ok(false);
     }
-    screen::teardown();
     session::run(
         PagerScreen::new(title, headers.to_vec(), rows.to_vec()),
         None,
     )?;
     Ok(true)
-}
-
-/// A view as styled lines for the scrollback (multi-line text is split — a
-/// buffer line cannot hold a newline).
-fn view_lines(view: View) -> Vec<Line<'static>> {
-    let dim = Style::default().fg(Color::DarkGray);
-    match view {
-        View::Line(text) => text.split('\n').map(|l| Line::raw(l.to_string())).collect(),
-        View::Note(text) => text
-            .split('\n')
-            .map(|l| Line::styled(l.to_string(), dim))
-            .collect(),
-        View::Detail(rows) => {
-            let width = rows.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
-            rows.into_iter()
-                .map(|(key, value)| {
-                    Line::from(vec![
-                        Span::styled(format!("{key:width$}"), dim),
-                        Span::raw(format!("  {value}")),
-                    ])
-                })
-                .collect()
-        }
-        View::Table { headers, rows, .. } => {
-            let header_refs: Vec<&str> = headers.iter().map(String::as_str).collect();
-            let widths = column_widths(&header_refs, &rows);
-            let mut lines = vec![Line::styled(render_row(&header_refs, &widths), dim)];
-            lines.extend(rows.iter().map(|row| Line::raw(render_row(row, &widths))));
-            lines
-        }
-    }
 }
 
 fn stdout_is_tty() -> bool {
