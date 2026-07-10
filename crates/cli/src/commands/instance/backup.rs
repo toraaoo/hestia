@@ -16,20 +16,12 @@ use crate::ui::{self, ProvisionReporter, View};
 #[derive(Subcommand)]
 pub enum BackupCmd {
     /// Archive a stopped instance's game directory
-    Create {
-        /// Instance name or id (prompts when omitted)
-        instance: Option<String>,
-    },
+    Create,
     /// Stored backups, newest first
     #[command(visible_alias = "ls")]
-    List {
-        /// Instance name or id (prompts when omitted)
-        instance: Option<String>,
-    },
+    List,
     /// Replace a stopped instance's game directory with a backup's content
     Restore {
-        /// Instance name or id (prompts when omitted)
-        instance: Option<String>,
         /// Backup id (prompts when omitted)
         backup: Option<String>,
         #[arg(long, help = "Replace the current data without confirming")]
@@ -38,17 +30,16 @@ pub enum BackupCmd {
     /// Delete a backup
     #[command(visible_alias = "rm")]
     Remove {
-        /// Instance name or id (prompts when omitted)
-        instance: Option<String>,
         /// Backup id (prompts when omitted)
         backup: Option<String>,
     },
 }
 
-pub(super) async fn run(client: &Client, cmd: BackupCmd) -> Result<()> {
+pub(super) async fn run(client: &Client, instance: &str, cmd: BackupCmd) -> Result<()> {
     match cmd {
-        BackupCmd::Create { instance } => {
-            let info = entry::pick_instance(client.instance().list().await?, instance)?;
+        BackupCmd::Create => {
+            let info =
+                entry::pick_instance(client.instance().list().await?, Some(instance.to_string()))?;
             let reporter = Arc::new(ProvisionReporter::new());
             reporter.update(&mc::backup_phase());
             let progress = reporter.clone();
@@ -65,20 +56,20 @@ pub(super) async fn run(client: &Client, cmd: BackupCmd) -> Result<()> {
                 ui::human_bytes(backup.size)
             )))
         }
-        BackupCmd::List { instance } => {
-            let info = entry::pick_instance(client.instance().list().await?, instance)?;
+        BackupCmd::List => {
+            let info =
+                entry::pick_instance(client.instance().list().await?, Some(instance.to_string()))?;
             let backups = client.instance().backup_list(&info.id).await?;
             if backups.is_empty() {
-                return ui::show(View::note("no backups yet (hestia instance backup create)"));
+                return ui::show(View::note(format!(
+                    "no backups yet (hestia instance {instance} backup create)"
+                )));
             }
             mc::show_backups(format!("{} backups", info.name), backups)
         }
-        BackupCmd::Restore {
-            instance,
-            backup,
-            force,
-        } => {
-            let info = entry::pick_instance(client.instance().list().await?, instance)?;
+        BackupCmd::Restore { backup, force } => {
+            let info =
+                entry::pick_instance(client.instance().list().await?, Some(instance.to_string()))?;
             let backups = client.instance().backup_list(&info.id).await?;
             let backup = mc::pick_backup(backups, backup)?;
             if !force {
@@ -98,8 +89,9 @@ pub(super) async fn run(client: &Client, cmd: BackupCmd) -> Result<()> {
                 backup.id, info.name
             )))
         }
-        BackupCmd::Remove { instance, backup } => {
-            let info = entry::pick_instance(client.instance().list().await?, instance)?;
+        BackupCmd::Remove { backup } => {
+            let info =
+                entry::pick_instance(client.instance().list().await?, Some(instance.to_string()))?;
             let backups = client.instance().backup_list(&info.id).await?;
             let backup = mc::pick_backup(backups, backup)?;
             client

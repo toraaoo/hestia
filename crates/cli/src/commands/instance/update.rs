@@ -10,12 +10,12 @@ use crate::ui::{self, Spinner, View};
 
 pub(super) async fn run(
     client: &Client,
-    instance: Option<String>,
+    instance: String,
     version: Option<String>,
     loader: Option<String>,
     downgrade: bool,
 ) -> Result<()> {
-    let info = entry::pick_instance(client.instance().list().await?, instance)?;
+    let info = entry::pick_instance(client.instance().list().await?, Some(instance))?;
     let versions = {
         let _spinner = Spinner::start("fetching versions");
         client.instance().versions(&info.flavor).await?

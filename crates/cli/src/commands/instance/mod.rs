@@ -2,20 +2,24 @@
 //! through flavor/version pickers when arguments are omitted; files materialise
 //! on first launch.
 //!
-//! This module is the grammar and the dispatch; each verb group lives beside it.
+//! The grammar is entry-first: catalogue verbs (`create`, `list`, `versions`,
+//! `flavors`) take no entry, while everything that acts on one instance reads
+//! as `instance <name> <action>`. This module is the grammar and the dispatch;
+//! each verb group lives beside it.
 
 mod backup;
 mod config;
 mod create;
 mod entry;
-mod lifecycle;
+pub(crate) mod lifecycle;
 mod update;
 
 use anyhow::{bail, Result};
-use clap::Subcommand;
+use clap::{Parser, Subcommand};
 use client::proto::content::ContentKind;
+use client::Client;
 
-use crate::commands::content::{self, EntryKind};
+use crate::commands::content::{self, ContentCmd, EntryKind};
 use crate::commands::mc;
 use crate::ui::Spinner;
 
@@ -23,6 +27,12 @@ pub use backup::BackupCmd;
 pub use lifecycle::launch;
 
 #[derive(Subcommand)]
+#[command(
+    after_help = "Act on one instance with `hestia instance <name> <action>`, e.g.\n  \
+        hestia instance modded launch\n  \
+        hestia instance modded mod add sodium\n  \
+        hestia instance modded config set memory 4G\nRun `hestia instance <name> --help` for every action."
+)]
 pub enum InstanceCmd {
     /// Create an instance (prompts for anything omitted; files download at first launch)
     Create {
@@ -41,10 +51,84 @@ pub enum InstanceCmd {
         #[arg(long, help = "Set -Xms and -Xmx together (e.g. 4G, 2048M)")]
         memory: Option<String>,
     },
-    /// Move a stopped instance to another version (prompts for anything omitted)
+    /// Managed instances and their state
+    #[command(visible_alias = "ls")]
+    List,
+    /// Game versions a flavor offers (prompts for the flavor when omitted)
+    Versions {
+        /// Flavor id (e.g. vanilla, fabric)
+        flavor: Option<String>,
+        #[arg(long, help = "Include snapshots and old versions")]
+        all: bool,
+    },
+    /// The available flavors
+    Flavors,
+    /// Act on one instance: `hestia instance <name> <launch|stop|mod|…>`
+    #[command(external_subcommand)]
+    Entry(Vec<String>),
+}
+
+/// The per-instance grammar reached through `hestia instance <name> …`. The
+/// name is captured once here so no action has to repeat it.
+#[derive(Parser)]
+#[command(no_binary_name = true, name = "hestia instance")]
+struct InstanceEntry {
+    /// Instance name or id
+    name: String,
+    #[command(subcommand)]
+    action: InstanceAction,
+}
+
+#[derive(Subcommand)]
+enum InstanceAction {
+    /// Prepare (java, client jar, libraries, assets) and launch the instance
+    Launch {
+        #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
+        account: Option<String>,
+    },
+    /// Kill the running instance
+    Stop,
+    /// Stop the running instance and launch it again
+    Restart {
+        #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
+        account: Option<String>,
+    },
+    /// The instance's record and process state
+    Info,
+    /// Captured instance output
+    Logs {
+        #[arg(short = 'n', long = "tail", help = "Only the last N lines")]
+        tail: Option<usize>,
+        #[arg(short, long, help = "Keep streaming new output until Ctrl-C")]
+        follow: bool,
+    },
+    /// Get, set, or list settings (memory, jvm-args)
+    Config {
+        #[command(subcommand)]
+        cmd: mc::ConfigCmd,
+    },
+    /// Archive, restore, or manage the instance's backups
+    Backup {
+        #[command(subcommand)]
+        cmd: BackupCmd,
+    },
+    /// Install, list, remove, or update the instance's mods
+    Mod {
+        #[command(subcommand)]
+        cmd: ContentCmd,
+    },
+    /// Install, list, remove, or update the instance's resource packs
+    Resourcepack {
+        #[command(subcommand)]
+        cmd: ContentCmd,
+    },
+    /// Install, list, remove, or update the instance's shaders
+    Shader {
+        #[command(subcommand)]
+        cmd: ContentCmd,
+    },
+    /// Move the instance to another version (prompts for anything omitted)
     Update {
-        /// Instance name or id (prompts when omitted)
-        instance: Option<String>,
         /// Target game version (prompts when omitted)
         version: Option<String>,
         #[arg(
@@ -59,156 +143,101 @@ pub enum InstanceCmd {
         )]
         downgrade: bool,
     },
-    /// Managed instances and their state
-    #[command(visible_alias = "ls")]
-    List,
-    /// Archive, restore, or manage an instance's backups (prompts for anything omitted)
-    Backup {
-        #[command(subcommand)]
-        cmd: BackupCmd,
-    },
-    /// Get, set, or list this instance's settings (memory, jvm-args)
-    Config {
-        /// Instance name or id
-        instance: String,
-        #[command(subcommand)]
-        cmd: mc::ConfigCmd,
-    },
-    /// Install, list, remove, or update this instance's mods
-    Mod {
-        #[command(subcommand)]
-        cmd: content::ContentCmd,
-    },
-    /// Install, list, remove, or update this instance's resource packs
-    Resourcepack {
-        #[command(subcommand)]
-        cmd: content::ContentCmd,
-    },
-    /// Install, list, remove, or update this instance's shaders
-    Shader {
-        #[command(subcommand)]
-        cmd: content::ContentCmd,
-    },
-    /// Prepare (java, client jar, libraries, assets) and launch an instance
-    Launch {
-        /// Instance name or id
-        instance: String,
-        #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
-        account: Option<String>,
-    },
-    /// Kill a running instance
-    Stop {
-        /// Instance name or id
-        instance: String,
-    },
-    /// Stop a running instance and launch it again
-    Restart {
-        /// Instance name or id
-        instance: String,
-        #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
-        account: Option<String>,
-    },
-    /// An instance's record and process state
-    Info {
-        /// Instance name or id
-        instance: String,
-    },
-    /// Captured instance output
-    Logs {
-        /// Instance name or id
-        instance: String,
-        #[arg(short = 'n', long = "tail", help = "Only the last N lines")]
-        tail: Option<usize>,
-        #[arg(short, long, help = "Keep streaming new output until Ctrl-C")]
-        follow: bool,
-    },
-    /// Delete an instance (its saves and all)
+    /// Delete the instance (its saves and all)
     #[command(visible_alias = "rm")]
-    Remove {
-        /// Instance name or id
-        instance: String,
-    },
-    /// Game versions a flavor offers (prompts for the flavor when omitted)
-    Versions {
-        /// Flavor id (e.g. vanilla, fabric)
-        flavor: Option<String>,
-        #[arg(long, help = "Include snapshots and old versions")]
-        all: bool,
-    },
-    /// The available flavors
-    Flavors,
+    Remove,
 }
 
 pub async fn run(cmd: InstanceCmd) -> Result<()> {
-    let client = super::connect().await?;
     match cmd {
-        InstanceCmd::Create {
-            flavor,
-            version,
-            loader,
-            name,
-            memory,
-        } => create::run(&client, flavor, version, loader, name, memory).await?,
-        InstanceCmd::Update {
-            instance,
+        InstanceCmd::Entry(argv) => {
+            let InstanceEntry { name, action } = match InstanceEntry::try_parse_from(argv) {
+                Ok(parsed) => parsed,
+                Err(err) => err.exit(),
+            };
+            let client = super::connect().await?;
+            run_action(&client, name, action).await
+        }
+        catalogue => {
+            let client = super::connect().await?;
+            match catalogue {
+                InstanceCmd::Create {
+                    flavor,
+                    version,
+                    loader,
+                    name,
+                    memory,
+                } => create::run(&client, flavor, version, loader, name, memory).await,
+                InstanceCmd::List => entry::list(&client).await,
+                InstanceCmd::Versions { flavor, all } => versions(&client, flavor, all).await,
+                InstanceCmd::Flavors => flavors(&client).await,
+                InstanceCmd::Entry(_) => unreachable!("handled above"),
+            }
+        }
+    }
+}
+
+async fn run_action(client: &Client, name: String, action: InstanceAction) -> Result<()> {
+    match action {
+        InstanceAction::Launch { account } => {
+            launch(client, &name, account.as_deref().unwrap_or_default()).await
+        }
+        InstanceAction::Stop => lifecycle::stop(client, &name).await,
+        InstanceAction::Restart { account } => {
+            lifecycle::restart(client, &name, account.as_deref().unwrap_or_default()).await
+        }
+        InstanceAction::Info => {
+            let instances = client.instance().list().await?;
+            let Some(info) = instances.iter().find(|i| i.id == name || i.name == name) else {
+                bail!("no instance matches '{name}'");
+            };
+            entry::show_info(info)
+        }
+        InstanceAction::Logs { tail, follow } => lifecycle::logs(client, &name, tail, follow).await,
+        InstanceAction::Config { cmd } => config::run(client, &name, cmd).await,
+        InstanceAction::Backup { cmd } => backup::run(client, &name, cmd).await,
+        InstanceAction::Mod { cmd } => {
+            content::run_entry(client, EntryKind::Instance, ContentKind::Mod, &name, cmd).await
+        }
+        InstanceAction::Resourcepack { cmd } => {
+            content::run_entry(
+                client,
+                EntryKind::Instance,
+                ContentKind::ResourcePack,
+                &name,
+                cmd,
+            )
+            .await
+        }
+        InstanceAction::Shader { cmd } => {
+            content::run_entry(client, EntryKind::Instance, ContentKind::Shader, &name, cmd).await
+        }
+        InstanceAction::Update {
             version,
             loader,
             downgrade,
-        } => update::run(&client, instance, version, loader, downgrade).await?,
-        InstanceCmd::List => entry::list(&client).await?,
-        InstanceCmd::Backup { cmd } => backup::run(&client, cmd).await?,
-        InstanceCmd::Config { instance, cmd } => config::run(&client, &instance, cmd).await?,
-        InstanceCmd::Mod { cmd } => {
-            content::run_entry(&client, EntryKind::Instance, ContentKind::Mod, cmd).await?
-        }
-        InstanceCmd::Resourcepack { cmd } => {
-            content::run_entry(&client, EntryKind::Instance, ContentKind::ResourcePack, cmd).await?
-        }
-        InstanceCmd::Shader { cmd } => {
-            content::run_entry(&client, EntryKind::Instance, ContentKind::Shader, cmd).await?
-        }
-        InstanceCmd::Launch { instance, account } => {
-            launch(&client, &instance, account.as_deref().unwrap_or_default()).await?
-        }
-        InstanceCmd::Stop { instance } => lifecycle::stop(&client, &instance).await?,
-        InstanceCmd::Restart { instance, account } => {
-            lifecycle::restart(&client, &instance, account.as_deref().unwrap_or_default()).await?
-        }
-        InstanceCmd::Info { instance } => {
-            let instances = client.instance().list().await?;
-            let Some(info) = instances
-                .iter()
-                .find(|i| i.id == instance || i.name == instance)
-            else {
-                bail!("no instance matches '{instance}'");
-            };
-            entry::show_info(info)?;
-        }
-        InstanceCmd::Logs {
-            instance,
-            tail,
-            follow,
-        } => lifecycle::logs(&client, &instance, tail, follow).await?,
-        InstanceCmd::Remove { instance } => lifecycle::remove(&client, &instance).await?,
-        InstanceCmd::Versions { flavor, all } => {
-            let flavors = {
-                let _spinner = Spinner::start("fetching flavors");
-                client.instance().flavors().await?
-            };
-            let flavor = mc::pick_flavor(flavors, flavor)?;
-            let versions = {
-                let _spinner = Spinner::start("fetching versions");
-                client.instance().versions(&flavor).await?
-            };
-            mc::show_versions(&flavor, versions, all)?;
-        }
-        InstanceCmd::Flavors => {
-            let flavors = {
-                let _spinner = Spinner::start("fetching flavors");
-                client.instance().flavors().await?
-            };
-            mc::show_flavors(&flavors)?;
-        }
+        } => update::run(client, name, version, loader, downgrade).await,
+        InstanceAction::Remove => lifecycle::remove(client, &name).await,
     }
-    Ok(())
+}
+
+async fn versions(client: &Client, flavor: Option<String>, all: bool) -> Result<()> {
+    let flavors = {
+        let _spinner = Spinner::start("fetching flavors");
+        client.instance().flavors().await?
+    };
+    let flavor = mc::pick_flavor(flavors, flavor)?;
+    let versions = {
+        let _spinner = Spinner::start("fetching versions");
+        client.instance().versions(&flavor).await?
+    };
+    mc::show_versions(&flavor, versions, all)
+}
+
+async fn flavors(client: &Client) -> Result<()> {
+    let flavors = {
+        let _spinner = Spinner::start("fetching flavors");
+        client.instance().flavors().await?
+    };
+    mc::show_flavors(&flavors)
 }

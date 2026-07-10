@@ -17,21 +17,13 @@ use crate::ui::{self, ProvisionReporter, View};
 pub enum BackupCmd {
     /// Archive the server's data (a running server keeps running; its world
     /// saving pauses during the archive)
-    Create {
-        /// Server name or id (prompts when omitted)
-        server: Option<String>,
-    },
+    Create,
     /// Stored backups, newest first
     #[command(visible_alias = "ls")]
-    List {
-        /// Server name or id (prompts when omitted)
-        server: Option<String>,
-    },
+    List,
     /// Replace a stopped server's data with a backup's content (the current
     /// jar and libraries are kept)
     Restore {
-        /// Server name or id (prompts when omitted)
-        server: Option<String>,
         /// Backup id (prompts when omitted)
         backup: Option<String>,
         #[arg(long, help = "Replace the current data without confirming")]
@@ -40,17 +32,15 @@ pub enum BackupCmd {
     /// Delete a backup
     #[command(visible_alias = "rm")]
     Remove {
-        /// Server name or id (prompts when omitted)
-        server: Option<String>,
         /// Backup id (prompts when omitted)
         backup: Option<String>,
     },
 }
 
-pub(super) async fn run(client: &Client, cmd: BackupCmd) -> Result<()> {
+pub(super) async fn run(client: &Client, server: &str, cmd: BackupCmd) -> Result<()> {
     match cmd {
-        BackupCmd::Create { server } => {
-            let info = entry::pick_server(client.server().list().await?, server)?;
+        BackupCmd::Create => {
+            let info = entry::pick_server(client.server().list().await?, Some(server.to_string()))?;
             let reporter = Arc::new(ProvisionReporter::new());
             reporter.update(&mc::backup_phase());
             let progress = reporter.clone();
@@ -67,20 +57,18 @@ pub(super) async fn run(client: &Client, cmd: BackupCmd) -> Result<()> {
                 ui::human_bytes(backup.size)
             )))
         }
-        BackupCmd::List { server } => {
-            let info = entry::pick_server(client.server().list().await?, server)?;
+        BackupCmd::List => {
+            let info = entry::pick_server(client.server().list().await?, Some(server.to_string()))?;
             let backups = client.server().backup_list(&info.id).await?;
             if backups.is_empty() {
-                return ui::show(View::note("no backups yet (hestia server backup create)"));
+                return ui::show(View::note(format!(
+                    "no backups yet (hestia server {server} backup create)"
+                )));
             }
             mc::show_backups(format!("{} backups", info.name), backups)
         }
-        BackupCmd::Restore {
-            server,
-            backup,
-            force,
-        } => {
-            let info = entry::pick_server(client.server().list().await?, server)?;
+        BackupCmd::Restore { backup, force } => {
+            let info = entry::pick_server(client.server().list().await?, Some(server.to_string()))?;
             let backups = client.server().backup_list(&info.id).await?;
             let backup = mc::pick_backup(backups, backup)?;
             if !force {
@@ -100,8 +88,8 @@ pub(super) async fn run(client: &Client, cmd: BackupCmd) -> Result<()> {
                 backup.id, info.name
             )))
         }
-        BackupCmd::Remove { server, backup } => {
-            let info = entry::pick_server(client.server().list().await?, server)?;
+        BackupCmd::Remove { backup } => {
+            let info = entry::pick_server(client.server().list().await?, Some(server.to_string()))?;
             let backups = client.server().backup_list(&info.id).await?;
             let backup = mc::pick_backup(backups, backup)?;
             client.server().backup_remove(&info.id, &backup.id).await?;

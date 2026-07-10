@@ -13,13 +13,13 @@ use crate::ui::{self, ProvisionReporter, Spinner, View};
 
 pub(super) async fn run(
     client: &Client,
-    server: Option<String>,
+    server: String,
     version: Option<String>,
     loader: Option<String>,
     downgrade: bool,
     restart: bool,
 ) -> Result<()> {
-    let info = entry::pick_server(client.server().list().await?, server)?;
+    let info = entry::pick_server(client.server().list().await?, Some(server))?;
     let was_running = entry::running_process(&info).is_some();
     if was_running && !restart {
         confirm_update_restart(&info.name)?;
