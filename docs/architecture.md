@@ -158,21 +158,26 @@ connection (auto-spawning `hestiad` if it is not running and `auto_spawn` is set
   `try_call` maps a `not_found` to `None`; `call_with_timeout` overrides the 10 s
   default; `run_job` drives a long-running operation, forwarding its progress
   events and blocking until a done/error topic arrives.
-- **facades** (`facades.rs`) — one struct per domain, reached through a `Client`
-  accessor (`client.java().install(21, …)`), mirroring the engine's domain modules
-  on the other side of the socket. Facade methods are one-liners over `Session`:
-  `App`, `Daemon`, `Config`, `Cache`, `Java`, `Accounts`, `Process`, `Server`,
-  `Instance`.
+- **facades** (`facades/`) — one struct per domain in its own module, reached
+  through a `Client` accessor (`client.java().install(21, …)`), mirroring the
+  engine's domain modules on the other side of the socket. Facade methods are
+  one-liners over `Session`: `App`, `Daemon`, `Config`, `Cache`, `Java`,
+  `Accounts`, `Process`, `Server`, `Instance`, `Content`. `facades/jobs.rs` holds
+  the drivers the server and instance facades share — the backup and content jobs
+  publish the same topics, disambiguated by job id.
 - **spawn** (`spawn.rs`) — locates and launches the `hestiad` binary, then retries
   the connection until it is listening.
 
 ## `engine` — the launcher engine
 
-Daemon-internal domain logic. **`Engine`** (`engine.rs`) is the aggregate root:
+Daemon-internal domain logic. **`Engine`** (`engine/mod.rs`) is the aggregate root:
 the daemon constructs exactly one and threads it through every request handler. It
 resolves the data directory once and owns each subsystem as a member behind a
-getter. Adding a domain is a module, a member, and a getter here — the single
-growth point, with no change to the daemon's serve loop. `set_data_home()`
+getter — and owns *only* that: the cross-subsystem flows composed over the
+subsystems live in `engine/flows/` (`server`, `instance`, `backup`, `content`),
+one `impl Engine` block apiece. Adding a domain is a module, a member, and a getter
+here — the single growth point, with no change to the daemon's serve loop.
+`set_data_home()`
 re-resolves the directory and `reload()`s every subsystem so a `config set home`
 takes effect on the running daemon, not just the next start.
 
@@ -459,19 +464,23 @@ supervises launched processes, and manages autostart. The only crate that links
       returned `ServiceError` (`not_found` / `bad_request` / `handler_error`) to its
       protocol code. The channel name and payload shapes come from the contract, so
       a handler physically cannot drift from the client SDK.
-    - **`managers.rs`** — `DownloadManager`, `JavaInstallManager`,
-      `ServerCreateManager`, `InstanceLaunchManager`, and `BackupManager`: the
+    - **`managers/`** — one module per manager: `DownloadManager`,
+      `JavaInstallManager`, `ServerCreateManager`, `ServerUpdateManager`,
+      `InstanceLaunchManager`, `BackupManager`, and `ContentManager`. The
       worker-thread pattern that lets `download.start` / `java.install` /
       `server.create` / `instance.launch` / `*.backup.create|restore` answer
       immediately while the blocking engine work runs off-thread, publishing
       progress/done/error events through the hub (the four backup job types
       share the `backup.progress|done|error` topics, disambiguated by job id).
-      The launch manager hands the prepared `LaunchPlan` to the supervisor
-      under a deterministic process id (`server-<id>` / `instance-<id>`), so
-      every channel can find a server's process without bookkeeping; the same
-      id doubles as the backup in-flight key, which lifecycle handlers
-      (start, update, remove) check so nothing swaps the tree an archive is
-      reading.
+      `managers/job.rs` is the plumbing they share: `topic_event`, the job-id
+      generator, and `InFlight<K>` — the "one job per key" set whose `claim()`
+      returns a guard that releases on drop, so a panicking job cannot wedge
+      its key. The launch manager hands the prepared `LaunchPlan` to the
+      supervisor under a deterministic process id (`server-<id>` /
+      `instance-<id>`), so every channel can find a server's process without
+      bookkeeping; the same id doubles as the backup in-flight key, which
+      lifecycle handlers (start, update, remove) check so nothing swaps the
+      tree an archive is reading.
     - **`scheduler.rs`** — the scheduled-backup loop: every minute, archive
       each *running* server whose `backup-interval` has elapsed since its
       newest backup (any kind — a fresh manual or pre-update archive resets
@@ -501,8 +510,13 @@ supervises launched processes, and manages autostart. The only crate that links
       recordless dirs.
     - **`event_hub.rs`** — `EventHub` fans daemon events out to subscribed
       connections, filtered by job id, and unsubscribes them on disconnect.
-- **`services.rs`** — the single wire-in point: `make_router()` registers every
-  channel with one `on.handle::<C>(…)` apiece. Today: `health.ping`, `app.info`,
+- **`services/`** — the single wire-in point, one registrar per domain
+  (`lifecycle`, `config`, `cache`, `java`, `download`, `accounts`, `process`,
+  `server`, `instance`, `backup`, `content`), each registering its channels with
+  one `on.handle::<C>(…)` apiece; `services/mod.rs`'s `make_router()` is the list
+  of `register()` calls, and `services/guards.rs` holds the preconditions the
+  registrars share (`find_server`, `is_running`, `ensure_stopped`,
+  `ensure_no_backup|update|content`, `require_backup`). Today: `health.ping`, `app.info`,
   `daemon.status|stop` (stop takes `stop_processes`; without it supervised
   processes keep running), `config.get|set|list` (the reserved `home`/`autostart` keys
   routed to the path pointer and login registration), `cache.info|list|clear`,
@@ -543,10 +557,30 @@ supervises launched processes, and manages autostart. The only crate that links
   platform, driven by the `config` service when the reserved `autostart` key is
   set (`is_enabled()` / `set()`).
 
-> **No Service-class-per-prefix.** Unlike the historical C++ tree (which had one
-> `Service` object per channel-prefix), the Rust daemon wires every channel in the
-> flat `make_router()`. A handler is a closure, not a class; the registry is the
-> single list.
+> **No Service-class-per-prefix — but one registrar function per domain.**
+> Unlike the historical C++ tree (which had one `Service` *object* per
+> channel-prefix, with its own lifetime and state), a handler here is a closure
+> and the registry is a flat map from channel to closure. What a domain gets is
+> only a `register(&mut Channels)` function: a compile-time grouping, no runtime
+> entity. The grouping exists because the flat `make_router()` grew to ~75
+> channels in one 1100-line function, which is the aggregation-point smell, not a
+> design: wiring in a channel is still exactly one `handle::<C>` line, now in the
+> file that owns its domain.
+
+> **An aggregation point is a directory, not a file.** Four places in this
+> codebase exist to gather every domain in one spot — the engine aggregate, the
+> client's facades, the daemon's router, the daemon's job managers — and each grew
+> linearly with the feature count until it was the largest file in its crate. The
+> convention that caused it ("wire-in is one line, in one place") is right; the
+> mistake was reading "one place" as "one file". Each is now a module directory
+> where the aggregating seam stays thin (`make_router()` is a list of
+> `register()`s; `Engine` is fields and getters) and every domain has its own
+> file. Nothing about the crate graph, the wire, or the call sites changed —
+> `Engine`'s flows are still `engine.provision_server(…)`, because Rust lets an
+> inherent `impl` span modules within a crate. Splitting also surfaced the real
+> duplication each file had been hiding: seven copies of a lock-insert-remove
+> in-flight set became one `InFlight`/`Claim` guard, and four copies of a
+> progress-decode closure became one `forward()`.
 
 > **Workloads outlive the daemon by design.** The supervisor originally spawned
 > children with `kill_on_drop` and piped output, which killed every server and
@@ -576,7 +610,12 @@ supervises launched processes, and manages autostart. The only crate that links
 A thin client over the daemon, built on clap's derive API. `main.rs` defines a
 `Command` enum — `play`, `account` (alias `auth`), `java`, `server`, `instance`,
 `cache`, `config`, `daemon` — each a module under `commands/` exposing a
-`Subcommand` enum and a `run()`. Global flags (`--verbose`/`--quiet`/`--home`)
+`Subcommand` enum and a `run()`. A domain with many verbs is a directory whose
+`mod.rs` holds only that grammar and dispatch, with one file per verb group:
+`server/` and `instance/` split into `create`, `update`, `backup`, `config`,
+`lifecycle` (plus the server's `console`) over a shared `entry` module, and
+`content/` splits along its own seam — `browse` (search a source) versus `manage`
+(install into an entry). Global flags (`--verbose`/`--quiet`/`--home`)
 sit on the root; `--home` is exported as `$HESTIA_HOME` and only takes effect
 when this invocation auto-spawns the daemon (a running daemon keeps its own
 directory). `commands/connect()` auto-spawns via the client SDK;

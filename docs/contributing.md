@@ -10,11 +10,14 @@ A few rules hold everywhere; the recipes below assume them.
 - **`rustfmt` + `clippy -D warnings` stay clean.** No exceptions; CI enforces both,
   plus `cargo-deny`.
 - **Wire-in is one line.** Each kind of thing has exactly one place it is added — a
-  `Command` enum variant (CLI), a `handle::<C>` in `make_router()` (daemon), a
-  facade accessor (client). Adding a feature should not touch the serve loop or the
-  transport.
+  `Command` enum variant (CLI), a `handle::<C>` in the domain's registrar (daemon),
+  a facade accessor (client). Adding a feature should not touch the serve loop or
+  the transport.
 - **One thing per file / module.** A CLI domain is its own module under
-  `commands/`; an engine domain is its own module under `engine/src/`.
+  `commands/`; an engine domain is its own module under `engine/src/`. An
+  aggregation point (the daemon's router, the client's facades, the engine
+  aggregate) is a module *directory*, never one growing file: the thing that
+  aggregates stays thin and each domain gets its own file beside it.
 - **Single-word module names** (`config`, not `config_store`). Follow Rust naming
   throughout.
 - **Errors:** `thiserror` enums in library crates, mapped to an `ipc::errors` code
@@ -32,14 +35,14 @@ Most features touch the same five seams, one line each. The `config` channels ar
 the shipped end-to-end reference (`hestia config get home` round-trips
 `config.get` → `ConfigService` handler → `engine.config()`).
 
-| Seam            | Where                                 | What                                                  |
-|-----------------|---------------------------------------|-------------------------------------------------------|
-| Wire contract   | `crates/proto/src/<domain>.rs`        | a struct + `impl Contract` (serde codec)              |
-| Engine domain   | `crates/engine/src/<domain>/`         | a module hung off the `Engine` aggregate              |
-| Daemon channel  | `crates/daemon/src/services.rs`       | one `on.handle::<C>(…)` in `make_router()`            |
-| Client facade   | `crates/client/src/facades.rs`        | a one-liner over `Session::call::<C>()`               |
-| CLI command     | `crates/cli/src/commands/<domain>.rs` | a `clap` `Subcommand` + a `run()`, wired in `main.rs` |
-| Desktop command | `crates/desktop/src/` (Tauri)         | a `#[tauri::command]` in `generate_handler!`          |
+| Seam            | Where                                         | What                                                  |
+|-----------------|-----------------------------------------------|-------------------------------------------------------|
+| Wire contract   | `crates/proto/src/<domain>.rs`                | a struct + `impl Contract` (serde codec)              |
+| Engine domain   | `crates/engine/src/<domain>/`                 | a module hung off the `Engine` aggregate              |
+| Daemon channel  | `crates/daemon/src/services/<domain>.rs`      | one `on.handle::<C>(…)` in that domain's `register()` |
+| Client facade   | `crates/client/src/facades/<domain>.rs`       | a one-liner over `Session::call::<C>()`               |
+| CLI command     | `crates/cli/src/commands/<domain>.rs` (or `<domain>/`) | a `clap` `Subcommand` + a `run()`, wired in `main.rs` |
+| Desktop command | `crates/desktop/src/` (Tauri)                 | a `#[tauri::command]` in `generate_handler!`          |
 
 ---
 
@@ -100,8 +103,9 @@ If you change an existing payload's shape, update `crates/proto/tests/` (the
 ## Add an engine domain
 
 Launcher/domain logic lives in `crates/engine`, daemon-internal. A subsystem hangs
-off the `Engine` aggregate root (`engine.rs`), which the daemon owns and hands to
-every handler. The worked example adds an `instances` store; model it on `config`.
+off the `Engine` aggregate root (`engine/mod.rs`), which the daemon owns and hands
+to every handler. The worked example adds an `instances` store; model it on
+`config`.
 
 **1. Write the subsystem** as a module under `crates/engine/src/instances/` (or a
 single `instances.rs` if small). Take a path under the data dir in the
@@ -137,12 +141,12 @@ impl Instances {
 
 Add `mod instances;` and a `pub use` to `crates/engine/src/lib.rs`.
 
-**2. Hang it off `Engine`** (`engine.rs`) — a field, a getter, construction in
+**2. Hang it off `Engine`** (`engine/mod.rs`) — a field, a getter, construction in
 `new()`, and a `reload()` line in `set_data_home()`. This is the *only* change to
 the engine's wiring; `HandlerContext` already carries the `Engine`.
 
 ```rust
-// crates/engine/src/engine.rs — inside struct Engine
+// crates/engine/src/engine/mod.rs — inside struct Engine
 instances: Instances,
 
 // in new():
@@ -158,17 +162,23 @@ pub fn instances(&self) -> &Instances { &self.instances }
 A stateless helper (like `minecraft`) needs no data dir and can be constructed
 without a path; a stateless *free* function needs no aggregate member at all.
 
+**3. A flow that spans subsystems** — provisioning, launching, backups, content —
+is *not* a method on the aggregate. It goes in `engine/flows/<concern>.rs` as an
+`impl Engine` block (Rust lets an inherent impl span modules in a crate), so the
+aggregate stays wiring and callers still write `engine.provision_server(…)`.
+
 ---
 
 ## Add a daemon channel
 
-One `on.handle::<C>(…)` in `make_router()` (`crates/daemon/src/services.rs`). The
-registrar decodes `C::Params` (a malformed payload answers `bad_request` for you)
-and encodes the returned `C::Result`; the handler reaches collaborators through
-`ctx.runtime.*()` and returns a `ServiceError` for a typed failure.
+One `on.handle::<C>(…)` in the domain's `register()`
+(`crates/daemon/src/services/<domain>.rs`). The registrar decodes `C::Params` (a
+malformed payload answers `bad_request` for you) and encodes the returned
+`C::Result`; the handler reaches collaborators through `ctx.runtime.*()` and
+returns a `ServiceError` for a typed failure.
 
 ```rust
-// crates/daemon/src/services.rs — inside make_router()
+// crates/daemon/src/services/instance.rs — inside register()
 use proto::instances::{InstanceList, InstanceListResult};
 
 on.handle::<InstanceList, _, _ > ( | _: Empty, ctx| async move {
@@ -178,17 +188,24 @@ on.handle::<InstanceList, _, _ > ( | _: Empty, ctx| async move {
 });
 ```
 
+A brand-new domain adds `mod <domain>;` plus one `<domain>::register(&mut on);`
+line to `services/mod.rs` — the only change `make_router()` ever needs. Shared
+preconditions (`find_server`, `is_running`, `ensure_no_backup`, …) live in
+`services/guards.rs`.
+
 Map engine errors to codes with `ServiceError::not_found` / `bad_request` /
-`handler_error`. For a long-running operation, follow `JavaInstallManager`: kick
-the blocking work onto a manager that answers immediately and publishes progress /
-done / error `Topic`s through `ctx.runtime.hub()`.
+`handler_error`. For a long-running operation, follow `JavaInstallManager`
+(`runtime/managers/java.rs`): kick the blocking work onto a manager that answers
+immediately and publishes progress / done / error `Topic`s through
+`ctx.runtime.hub()`. A manager that admits one job per entry takes its key from
+`InFlight` (`runtime/managers/job.rs`), whose `claim()` guard releases on drop.
 
 ---
 
 ## Add a client facade method
 
 Facade methods are one-liners over `Session::call::<C>()` that return `proto` types
-directly (`crates/client/src/facades.rs`).
+directly (`crates/client/src/facades/<domain>.rs`).
 
 ```rust
 pub struct Instance<'a> {
@@ -206,10 +223,13 @@ impl Instance<'_> {
 }
 ```
 
-If the domain is new, add the accessor on `Client` (`crates/client/src/lib.rs`) and
-export the facade type from the crate root. Use `try_call` when a `not_found`
-should surface as `None`, `call_with_timeout` for a long call, and `run_job` to
-block on a progress-streaming operation (see `Java::install` / `Process::run`).
+If the domain is new, add its module and `pub use` to `facades/mod.rs`, the
+accessor on `Client` (`crates/client/src/lib.rs`), and the export from the crate
+root. Use `try_call` when a `not_found` should surface as `None`,
+`call_with_timeout` for a long call, and `run_job` to block on a
+progress-streaming operation (see `Java::install` / `Process::run`) — or
+`facades/jobs.rs` when the job publishes the shared `backup.*` / `content.*`
+topics.
 
 ---
 
@@ -219,7 +239,7 @@ Commands are clap `Subcommand` enums, one module per domain under
 `crates/cli/src/commands/`, dispatched from `main.rs`. Commands **never print
 directly** — they build a `View` and hand it to `ui::show`.
 
-**1. The module** (`crates/cli/src/commands/instance.rs`):
+**1. The module** (`crates/cli/src/commands/example.rs`):
 
 ```rust
 use anyhow::Result;
@@ -229,14 +249,14 @@ use crate::commands::connect;
 use crate::ui::{self, View};
 
 #[derive(Subcommand)]
-pub enum InstanceCmd {
+pub enum ExampleCmd {
     /// List instances
     List,
 }
 
-pub async fn run(cmd: InstanceCmd) -> Result<()> {
+pub async fn run(cmd: ExampleCmd) -> Result<()> {
     match cmd {
-        InstanceCmd::List => list().await,
+        ExampleCmd::List => list().await,
     }
 }
 
@@ -258,6 +278,12 @@ Use `connect()` to auto-spawn the daemon, or `connect_running()` when the comman
 must not start it. Build `View::line` / `note` / `detail` / `table`; call
 `ui::select` for an interactive pick (it errors when stdin is not a terminal, so
 offer an argument as the fallback), and `ui::human_bytes` for sizes.
+
+Once a domain grows past a handful of verbs, make it a directory: `mod.rs` keeps
+the `Subcommand` enum and the dispatch, and each verb group gets its own file —
+as `commands/server/` and `commands/instance/` do (`create`, `update`, `backup`,
+`config`, `lifecycle`, plus an `entry` module for the select/render helpers they
+share).
 
 **2. Wire it in** `crates/cli/src/main.rs`:
 
