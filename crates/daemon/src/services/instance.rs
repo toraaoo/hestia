@@ -7,6 +7,7 @@ use proto::instance::{
     InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch,
     InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLogs, InstanceRemove,
     InstanceResolve, InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions,
+    InstanceWorlds, InstanceWorldsResult,
 };
 use proto::minecraft::{ConfigEntry, FlavorsResult, VersionsResult};
 use proto::process::ProcessLogsResult;
@@ -102,6 +103,15 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .map(|r| ctx.runtime.instance_view(r))
             .collect();
         Ok(InstanceListResult { instances })
+    });
+
+    on.handle::<InstanceWorlds, _, _>(|p, ctx| async move {
+        let worlds = ctx
+            .runtime
+            .engine()
+            .instance_worlds(&p.instance)
+            .map_err(|e| ServiceError::not_found(format!("{e:#}")))?;
+        Ok(InstanceWorldsResult { worlds })
     });
 
     on.handle::<InstanceRemove, _, _>(|p, ctx| async move {
