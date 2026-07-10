@@ -50,6 +50,19 @@ pub fn select(prompt: &str, items: &[String]) -> Result<usize> {
     interactive::select(prompt, items)
 }
 
+/// Prompt the user to check any number of `items`, returning their indices.
+/// Requires an interactive terminal; errors otherwise so callers can ask for
+/// arguments instead.
+pub fn multi_select(prompt: &str, items: &[String]) -> Result<Vec<usize>> {
+    if items.is_empty() {
+        bail!("nothing to select");
+    }
+    if !is_interactive() {
+        bail!("no interactive terminal; pass the choice as an argument");
+    }
+    interactive::multi_select(prompt, items)
+}
+
 /// Ask for one line of input: typing edits, Enter accepts — empty takes
 /// `default`, shown dim — Esc cancels with an error. Without an interactive
 /// terminal the default is returned (the value is optional).

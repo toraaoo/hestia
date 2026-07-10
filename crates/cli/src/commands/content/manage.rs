@@ -35,9 +35,9 @@ pub enum ContentCmd {
         filename: Option<String>,
         #[arg(
             long,
-            help = "For a datapack on an instance: the save world to install into (prompts when omitted)"
+            help = "For a datapack on an instance: a save world to install into (repeatable; prompts to pick when omitted)"
         )]
-        world: Option<String>,
+        world: Vec<String>,
     },
     /// Installed content of this kind
     #[command(visible_alias = "ls")]
@@ -92,7 +92,7 @@ async fn add(
     version: Option<String>,
     file: Option<String>,
     filename: Option<String>,
-    world: Option<String>,
+    world: Vec<String>,
 ) -> Result<()> {
     let (id, name) = resolve_entry(client, entry, reference).await?;
 
@@ -102,11 +102,6 @@ async fn add(
         version: version.unwrap_or_default(),
         ..ContentAddSpec::default()
     };
-    // A datapack loads from inside a world; an instance has many, so name one
-    // (a server uses its single level-name world, resolved daemon-side).
-    if kind == ContentKind::DataPack && matches!(entry, EntryKind::Instance) {
-        spec.world = pick_world(client, &id, world).await?;
-    }
     if let Some(path) = file {
         spec.path = std::fs::canonicalize(&path)
             .with_context(|| format!("cannot read {path}"))?
@@ -124,38 +119,61 @@ async fn add(
         }
     }
 
-    let reporter = Arc::new(ProvisionReporter::new());
-    let progress = reporter.clone();
-    let installed = {
-        let facade_progress = progress;
-        let result = match entry {
-            EntryKind::Server => {
-                client
-                    .server()
-                    .content_add(&id, spec, move |p| facade_progress.update(p))
-                    .await
-            }
-            EntryKind::Instance => {
-                client
-                    .instance()
-                    .content_add(&id, spec, move |p| facade_progress.update(p))
-                    .await
-            }
-        };
-        reporter.finish();
-        result?
+    let worlds = if kind == ContentKind::DataPack && matches!(entry, EntryKind::Instance) {
+        pick_worlds(client, &id, world).await?
+    } else {
+        vec![String::new()]
     };
+
+    let mut installed = Vec::new();
+    for target in worlds {
+        let mut per_world = spec.clone();
+        per_world.world = target;
+        installed.extend(install_spec(client, entry, &id, per_world).await?);
+    }
 
     if installed.is_empty() {
         return ui::show(View::note("nothing installed"));
     }
     for content in &installed {
+        let where_ = match world_label(content) {
+            Some(world) => format!("'{name}' ({world})"),
+            None => format!("'{name}'"),
+        };
         ui::show(View::line(format!(
-            "installed {} ({}) into '{name}'",
+            "installed {} ({}) into {where_}",
             content.title, content.filename
         )))?;
     }
     Ok(())
+}
+
+/// Run one content-add job (into the spec's world, if any), rendering its
+/// progress, and return what it installed.
+async fn install_spec(
+    client: &Client,
+    entry: EntryKind,
+    id: &str,
+    spec: ContentAddSpec,
+) -> Result<Vec<InstalledContent>> {
+    let reporter = Arc::new(ProvisionReporter::new());
+    let progress = reporter.clone();
+    let result = match entry {
+        EntryKind::Server => {
+            client
+                .server()
+                .content_add(id, spec, move |p| progress.update(p))
+                .await
+        }
+        EntryKind::Instance => {
+            client
+                .instance()
+                .content_add(id, spec, move |p| progress.update(p))
+                .await
+        }
+    };
+    reporter.finish();
+    Ok(result?)
 }
 
 async fn list(client: &Client, entry: EntryKind, kind: ContentKind, reference: &str) -> Result<()> {
@@ -168,15 +186,34 @@ async fn list(client: &Client, entry: EntryKind, kind: ContentKind, reference: &
         return ui::show(View::note(format!("no {} installed", kind_plural(kind))));
     }
     if !items.is_empty() {
-        let rows = items
-            .iter()
-            .map(|i| vec![i.title.clone(), i.version_number.clone(), source_label(i)])
-            .collect();
-        ui::show(View::table(
-            format!("{name} {}", kind_plural(kind)),
-            ["NAME", "VERSION", "SOURCE"],
-            rows,
-        ))?;
+        if kind == ContentKind::DataPack {
+            let rows = items
+                .iter()
+                .map(|i| {
+                    vec![
+                        i.title.clone(),
+                        i.version_number.clone(),
+                        world_label(i).unwrap_or("-").to_string(),
+                        source_label(i),
+                    ]
+                })
+                .collect();
+            ui::show(View::table(
+                format!("{name} {}", kind_plural(kind)),
+                ["NAME", "VERSION", "WORLD", "SOURCE"],
+                rows,
+            ))?;
+        } else {
+            let rows = items
+                .iter()
+                .map(|i| vec![i.title.clone(), i.version_number.clone(), source_label(i)])
+                .collect();
+            ui::show(View::table(
+                format!("{name} {}", kind_plural(kind)),
+                ["NAME", "VERSION", "SOURCE"],
+                rows,
+            ))?;
+        }
     }
     if !untracked.is_empty() {
         ui::show(View::note(format!(
@@ -273,19 +310,29 @@ fn pick_installed(items: Vec<InstalledContent>) -> Result<String> {
     })
 }
 
-/// Choose the save world for an instance datapack: the given `--world` when
-/// present, otherwise an interactive pick over the instance's worlds (which
-/// errors when stdin is not a terminal, so scripts must pass `--world`).
-async fn pick_world(client: &Client, id: &str, world: Option<String>) -> Result<String> {
-    if let Some(world) = world.filter(|w| !w.is_empty()) {
-        return Ok(world);
+/// Choose the save world(s) for an instance datapack: the given `--world`
+/// flags when present, otherwise an interactive multi-select over the
+/// instance's worlds (which errors when stdin is not a terminal, so scripts
+/// must pass `--world`).
+async fn pick_worlds(client: &Client, id: &str, world: Vec<String>) -> Result<Vec<String>> {
+    let flags: Vec<String> = world.into_iter().filter(|w| !w.is_empty()).collect();
+    if !flags.is_empty() {
+        return Ok(flags);
     }
     let worlds = client.instance().worlds(id).await?;
     if worlds.is_empty() {
         bail!("no save worlds yet — launch the instance and create a world first");
     }
-    let index = ui::select("select a world", &worlds).context("pass --world to name the world")?;
-    Ok(worlds[index].clone())
+    let picks = ui::multi_select("select world(s)", &worlds)
+        .context("pass --world to name the world(s)")?;
+    Ok(picks.into_iter().map(|i| worlds[i].clone()).collect())
+}
+
+/// A datapack's world shown as its folder name (the last path component of the
+/// stored `saves/<world>`); `None` for content that has no world.
+fn world_label(content: &InstalledContent) -> Option<&str> {
+    let world = content.world.rsplit('/').next().unwrap_or(&content.world);
+    (!world.is_empty()).then_some(world)
 }
 
 /// Resolve a known server/instance reference to its `(id, name)`.

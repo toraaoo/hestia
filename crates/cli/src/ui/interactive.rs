@@ -4,6 +4,7 @@
 //! gate (an interactive terminal) is the facade's job.
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::io::{self, IsTerminal};
 
 use anyhow::{anyhow, Result};
@@ -80,6 +81,58 @@ pub fn select(prompt: &str, items: &[String]) -> Result<usize> {
                 None
             }
             KeyCode::Enter => Some(Ok(state.borrow().selected().unwrap_or(0))),
+            _ if is_cancel(&key) => Some(Err(anyhow!("selection cancelled"))),
+            _ => None,
+        },
+    )
+}
+
+/// Present `items` under `prompt` with checkboxes and return the checked
+/// indices (Space toggles, Enter confirms — with nothing checked, Enter takes
+/// the highlighted row). Errors when the user cancels.
+pub fn multi_select(prompt: &str, items: &[String]) -> Result<Vec<usize>> {
+    let state = RefCell::new(ListState::default());
+    state.borrow_mut().select(Some(0));
+    let checked = RefCell::new(HashSet::<usize>::new());
+    let height = (items.len() as u16).min(MAX_SELECT_ROWS) + 2;
+    run_widget(
+        height,
+        |frame| {
+            draw_multi_select(
+                frame,
+                prompt,
+                items,
+                &checked.borrow(),
+                &mut state.borrow_mut(),
+            )
+        },
+        |key| match key.code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                step(&mut state.borrow_mut(), items.len(), -1);
+                None
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                step(&mut state.borrow_mut(), items.len(), 1);
+                None
+            }
+            KeyCode::Char(' ') => {
+                let current = state.borrow().selected().unwrap_or(0);
+                let mut checked = checked.borrow_mut();
+                if !checked.remove(&current) {
+                    checked.insert(current);
+                }
+                None
+            }
+            KeyCode::Enter => {
+                let checked = checked.borrow();
+                let mut chosen: Vec<usize> = if checked.is_empty() {
+                    vec![state.borrow().selected().unwrap_or(0)]
+                } else {
+                    checked.iter().copied().collect()
+                };
+                chosen.sort_unstable();
+                Some(Ok(chosen))
+            }
             _ if is_cancel(&key) => Some(Err(anyhow!("selection cancelled"))),
             _ => None,
         },
@@ -195,6 +248,41 @@ fn draw_select(frame: &mut Frame, prompt: &str, items: &[String], state: &mut Li
                 .add_modifier(Modifier::BOLD),
         );
     frame.render_stateful_widget(list, layout[1], state);
+}
+
+fn draw_multi_select(
+    frame: &mut Frame,
+    prompt: &str,
+    items: &[String],
+    checked: &HashSet<usize>,
+    state: &mut ListState,
+) {
+    let layout = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Min(0),
+        Constraint::Length(1),
+    ])
+    .split(frame.area());
+    frame.render_widget(
+        Paragraph::new(Line::from(prompt)).style(Style::default().fg(Color::Cyan)),
+        layout[0],
+    );
+    let list = List::new(items.iter().enumerate().map(|(i, item)| {
+        let mark = if checked.contains(&i) { "[x] " } else { "[ ] " };
+        ListItem::new(format!("{mark}{item}"))
+    }))
+    .highlight_symbol("> ")
+    .highlight_style(
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    );
+    frame.render_stateful_widget(list, layout[1], state);
+    frame.render_widget(
+        Paragraph::new(Line::from("space toggles · enter confirms"))
+            .style(Style::default().fg(Color::DarkGray)),
+        layout[2],
+    );
 }
 
 fn draw_input(frame: &mut Frame, prompt: &str, typed: &str, default: &str) {

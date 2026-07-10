@@ -193,6 +193,7 @@ impl Engine {
         for item in &items {
             let replaced = index.iter().position(|i| {
                 i.kind == item.kind
+                    && (i.kind != ContentKind::DataPack || i.world == item.world)
                     && ((!item.project_id.is_empty() && i.project_id == item.project_id)
                         || i.filename == item.filename)
             });
@@ -420,10 +421,11 @@ impl Engine {
         if !updated.is_empty() {
             let mut index = install::load(&ctx.entry_dir);
             for new_item in &updated {
-                match index
-                    .iter_mut()
-                    .find(|i| i.kind == new_item.kind && i.project_id == new_item.project_id)
-                {
+                match index.iter_mut().find(|i| {
+                    i.kind == new_item.kind
+                        && i.project_id == new_item.project_id
+                        && (i.kind != ContentKind::DataPack || i.world == new_item.world)
+                }) {
                     Some(entry) => *entry = new_item.clone(),
                     None => index.push(new_item.clone()),
                 }
@@ -577,22 +579,23 @@ fn list_content(ctx: &EntryContent, kind: ContentKind) -> (Vec<InstalledContent>
 }
 
 fn remove_content(ctx: &EntryContent, kind: ContentKind, reference: &str) -> Result<bool> {
-    let mut index = install::load(&ctx.entry_dir);
-    let Some(pos) = index
-        .iter()
-        .position(|i| i.kind == kind && install::matches(i, reference))
-    else {
+    let (removed, kept): (Vec<_>, Vec<_>) = install::load(&ctx.entry_dir)
+        .into_iter()
+        .partition(|i| i.kind == kind && install::matches(i, reference));
+    if removed.is_empty() {
         return Ok(false);
-    };
-    let removed = index.remove(pos);
-    install::remove_files(&ctx.entry_dir, &ctx.data_dir, &removed);
-    install::save(&ctx.entry_dir, index)?;
-    tracing::info!(
-        entry = %ctx.entry_dir.display(),
-        kind = ?removed.kind,
-        title = %removed.title,
-        filename = %removed.filename,
-        "content removed"
-    );
+    }
+    for item in &removed {
+        install::remove_files(&ctx.entry_dir, &ctx.data_dir, item);
+        tracing::info!(
+            entry = %ctx.entry_dir.display(),
+            kind = ?item.kind,
+            title = %item.title,
+            filename = %item.filename,
+            world = %item.world,
+            "content removed"
+        );
+    }
+    install::save(&ctx.entry_dir, kept)?;
     Ok(true)
 }
