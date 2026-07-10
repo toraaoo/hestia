@@ -20,17 +20,17 @@ use crate::registry;
 use crate::servers::ServerRecord;
 
 impl Engine {
-    /// Install content into a server (mods only) from a platform project, a
-    /// direct URL, or a local file. Returns everything installed — the item
-    /// plus any required dependencies.
+    /// Install content into a server (mods and datapacks) from a platform
+    /// project, a direct URL, or a local file. Returns everything installed —
+    /// the item plus any required dependencies.
     pub async fn add_server_content(
         &self,
         reference: &str,
         spec: &ContentAddSpec,
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
-        if spec.kind != ContentKind::Mod {
-            bail!("a server takes mods only");
+        if !matches!(spec.kind, ContentKind::Mod | ContentKind::DataPack) {
+            bail!("a server takes mods and datapacks only");
         }
         let (_, ctx) = self.server_content_ctx(reference)?;
         self.add_content(&ctx, spec, on_progress).await
@@ -165,6 +165,7 @@ impl Engine {
         if picked != 1 {
             bail!("specify exactly one of a project, a url, or a file");
         }
+        let world = datapack_world(ctx, spec)?;
 
         let items = if !spec.url.is_empty() {
             let (source, parsed) = self.content.parse_url(&spec.url).with_context(|| {
@@ -179,12 +180,13 @@ impl Engine {
             if let Some(version) = parsed.version {
                 resolved.version = version;
             }
-            self.add_platform_content(ctx, &resolved, on_progress)
+            self.add_platform_content(ctx, &resolved, &world, on_progress)
                 .await?
         } else if !spec.project.is_empty() {
-            self.add_platform_content(ctx, spec, on_progress).await?
+            self.add_platform_content(ctx, spec, &world, on_progress)
+                .await?
         } else {
-            vec![add_file_content(ctx, spec)?]
+            vec![add_file_content(ctx, spec, &world)?]
         };
 
         let mut index = install::load(&ctx.entry_dir);
@@ -223,6 +225,7 @@ impl Engine {
         &self,
         ctx: &EntryContent,
         spec: &ContentAddSpec,
+        world: &str,
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
         on_progress(&phase_progress(ProvisionPhase::Resolving));
@@ -292,7 +295,7 @@ impl Engine {
             }
 
             items.push(
-                self.install_version_file(ctx, &project, &version, on_progress)
+                self.install_version_file(ctx, &project, &version, world, on_progress)
                     .await?,
             );
         }
@@ -304,12 +307,12 @@ impl Engine {
         ctx: &EntryContent,
         project: &ContentProject,
         version: &proto::content::ContentVersion,
+        world: &str,
         on_progress: OnProgress<'_>,
     ) -> Result<InstalledContent> {
         let file = install::primary_file(version)?;
         materialize::validate_filename(&file.artifact.filename)?;
-        let dir = install::kind_dir(project.kind)?;
-        let managed = ctx.entry_dir.join(dir).join(&file.artifact.filename);
+        let (managed, data) = content_targets(ctx, project.kind, world, &file.artifact.filename)?;
         materialize::ensure_artifact(
             Some(&self.cache),
             &file.artifact,
@@ -318,10 +321,9 @@ impl Engine {
             on_progress,
         )
         .await?;
-        install::mirror(
-            &managed,
-            &ctx.data_dir.join(dir).join(&file.artifact.filename),
-        )?;
+        if managed != data {
+            install::mirror(&managed, &data)?;
+        }
         Ok(InstalledContent {
             kind: project.kind,
             source: version.source.clone(),
@@ -339,6 +341,7 @@ impl Engine {
                 .unwrap_or_default(),
             url: file.artifact.url.clone(),
             installed_unix: registry::now_unix(),
+            world: world.to_string(),
         })
     }
 
@@ -400,7 +403,7 @@ impl Engine {
                 ..ContentProject::default()
             };
             let new_item = self
-                .install_version_file(ctx, &project, &version, on_progress)
+                .install_version_file(ctx, &project, &version, &item.world, on_progress)
                 .await?;
             if new_item.filename != item.filename {
                 install::remove_files(&ctx.entry_dir, &ctx.data_dir, &item);
@@ -457,8 +460,13 @@ impl EntrySide {
 }
 
 /// Reject content the platform marks unsupported for the entry's side
-/// (`Unknown` passes — the platform did not say).
+/// (`Unknown` passes — the platform did not say). Datapacks are exempt: they
+/// run on the server side of any world, including a client's integrated server,
+/// so a source's client-side flag must not block installing one on an instance.
 fn side_gate(project: &ContentProject, side: EntrySide) -> Result<()> {
+    if project.kind == ContentKind::DataPack {
+        return Ok(());
+    }
     let support = match side {
         EntrySide::Server => project.server_side,
         EntrySide::Client => project.client_side,
@@ -473,9 +481,57 @@ fn side_gate(project: &ContentProject, side: EntrySide) -> Result<()> {
     Ok(())
 }
 
-/// Import a local file: copy it into the managed directory and mirror it into
-/// the game directory. No provenance beyond the hash, so it can never update.
-fn add_file_content(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<InstalledContent> {
+/// Resolve the data-relative world directory a datapack installs into — a
+/// server's single `level-name` world, or an instance's chosen (and validated)
+/// save. Empty for every non-datapack kind, which install into a flat dir.
+fn datapack_world(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<String> {
+    if spec.kind != ContentKind::DataPack {
+        return Ok(String::new());
+    }
+    match ctx.side {
+        EntrySide::Server => Ok(crate::servers::level_name(&ctx.data_dir)),
+        EntrySide::Client => {
+            let requested = spec.world.trim();
+            if requested.is_empty() {
+                bail!("name a save world for the datapack (the instance's --world)");
+            }
+            if !ctx.data_dir.join("saves").join(requested).is_dir() {
+                bail!("no save world '{requested}' in this instance");
+            }
+            Ok(format!("saves/{requested}"))
+        }
+    }
+}
+
+/// The `(managed, data)` paths a kind's file occupies. Mods/resourcepacks/
+/// shaders keep a managed copy in the entry root that is mirrored into `data/`;
+/// a datapack has one file, inside its world under `data/` (managed == data),
+/// so the caller skips the mirror.
+fn content_targets(
+    ctx: &EntryContent,
+    kind: ContentKind,
+    world: &str,
+    filename: &str,
+) -> Result<(PathBuf, PathBuf)> {
+    if kind == ContentKind::DataPack {
+        let path = ctx.data_dir.join(world).join("datapacks").join(filename);
+        return Ok((path.clone(), path));
+    }
+    let dir = install::kind_dir(kind)?;
+    Ok((
+        ctx.entry_dir.join(dir).join(filename),
+        ctx.data_dir.join(dir).join(filename),
+    ))
+}
+
+/// Import a local file: copy it into the managed directory (or, for a datapack,
+/// straight into its world) and mirror it into the game directory. No
+/// provenance beyond the hash, so it can never update.
+fn add_file_content(
+    ctx: &EntryContent,
+    spec: &ContentAddSpec,
+    world: &str,
+) -> Result<InstalledContent> {
     let source = Path::new(&spec.path);
     if !source.is_file() {
         bail!("no file at {}", source.display());
@@ -489,15 +545,16 @@ fn add_file_content(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<Install
         spec.filename.clone()
     };
     materialize::validate_filename(&filename)?;
-    let dir = install::kind_dir(spec.kind)?;
-    let managed = ctx.entry_dir.join(dir).join(&filename);
+    let (managed, data) = content_targets(ctx, spec.kind, world, &filename)?;
     if let Some(parent) = managed.parent() {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("cannot create {}", parent.display()))?;
     }
     std::fs::copy(source, &managed)
         .with_context(|| format!("cannot import {}", source.display()))?;
-    install::mirror(&managed, &ctx.data_dir.join(dir).join(&filename))?;
+    if managed != data {
+        install::mirror(&managed, &data)?;
+    }
     Ok(InstalledContent {
         kind: spec.kind,
         source: "file".to_string(),
@@ -505,6 +562,7 @@ fn add_file_content(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<Install
         sha1: install::sha1_file(&managed)?,
         filename,
         installed_unix: registry::now_unix(),
+        world: world.to_string(),
         ..InstalledContent::default()
     })
 }

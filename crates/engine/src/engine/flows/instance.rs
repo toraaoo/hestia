@@ -15,6 +15,25 @@ use crate::minecraft::launch::{self, InstancePaths, LaunchAccount, LaunchPlan};
 use crate::minecraft::materialize::{self, OnProgress};
 
 impl Engine {
+    /// The instance's save-world folder names (sorted) under `data/saves/` —
+    /// the worlds a datapack can install into.
+    pub fn instance_worlds(&self, reference: &str) -> Result<Vec<String>> {
+        let record = self
+            .instances
+            .get(reference)
+            .with_context(|| format!("unknown instance: {reference}"))?;
+        let saves = self.instances.data_dir(&record.id).join("saves");
+        let mut worlds: Vec<String> = std::fs::read_dir(&saves)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|e| e.path().is_dir())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        worlds.sort();
+        Ok(worlds)
+    }
+
     /// Move an instance to another version of its flavor. A downgrade must be
     /// allowed explicitly — Minecraft cannot load saves written by a newer
     /// version. Only the record changes; files materialise at the next launch.

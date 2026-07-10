@@ -25,17 +25,30 @@ struct Index {
     items: Vec<InstalledContent>,
 }
 
-/// The managed directory name for an installable kind; modpacks and datapacks
-/// are not single-file installs.
+/// The directory name for an installable kind. Mods/resourcepacks/shaders have
+/// a flat managed dir mirrored into `data/`; a datapack's `datapacks` dir lives
+/// inside a world instead (see [`datapack_path`]). Modpacks are not single-file
+/// installs.
 pub(crate) fn kind_dir(kind: ContentKind) -> Result<&'static str> {
     match kind {
         ContentKind::Mod => Ok("mods"),
         ContentKind::ResourcePack => Ok("resourcepacks"),
         ContentKind::Shader => Ok("shaders"),
-        ContentKind::Modpack | ContentKind::DataPack => {
-            bail!("{kind:?} content cannot be installed as a single file")
-        }
+        ContentKind::DataPack => Ok("datapacks"),
+        ContentKind::Modpack => bail!("modpack content cannot be installed as a single file"),
     }
+}
+
+/// A datapack's file path: `data/<world>/datapacks/<file>`, where `world` is
+/// the world dir relative to `data/` (`world` for a server's `level-name`,
+/// `saves/<name>` for an instance's save). Datapacks load from inside a world,
+/// so — unlike other kinds — the file lives under `data/` with no separate
+/// managed copy, and is therefore already covered by the world's backups.
+pub(crate) fn datapack_path(data_dir: &Path, item: &InstalledContent) -> PathBuf {
+    data_dir
+        .join(&item.world)
+        .join("datapacks")
+        .join(&item.filename)
 }
 
 pub(crate) fn load(entry_dir: &Path) -> Vec<InstalledContent> {
@@ -73,10 +86,15 @@ pub(crate) fn mirror(source: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Re-mirror every indexed file whose `data/` copy is missing.
+/// Re-mirror every indexed file whose `data/` copy is missing. Datapacks are
+/// skipped: they live inside the world (under `data/`), so a backup restore
+/// brings them back with the world — there is no managed copy to heal from.
 pub(crate) fn sync(entry_dir: &Path, data_dir: &Path) -> Result<()> {
     let mut healed = 0u32;
     for item in load(entry_dir) {
+        if item.kind == ContentKind::DataPack {
+            continue;
+        }
         let managed = managed_path(entry_dir, &item)?;
         let dest = data_path(data_dir, &item)?;
         if managed.is_file() && !dest.exists() {
@@ -91,15 +109,17 @@ pub(crate) fn sync(entry_dir: &Path, data_dir: &Path) -> Result<()> {
 }
 
 /// Delete an item's managed file and its `data/` mirror (either may already be
-/// gone).
+/// gone). A datapack has no managed copy — only its in-world file.
 pub(crate) fn remove_files(entry_dir: &Path, data_dir: &Path, item: &InstalledContent) {
-    for path in [
-        managed_path(entry_dir, item).ok(),
-        data_path(data_dir, item).ok(),
-    ]
-    .into_iter()
-    .flatten()
-    {
+    let paths = if item.kind == ContentKind::DataPack {
+        vec![Some(datapack_path(data_dir, item))]
+    } else {
+        vec![
+            managed_path(entry_dir, item).ok(),
+            data_path(data_dir, item).ok(),
+        ]
+    };
+    for path in paths.into_iter().flatten() {
         if let Err(e) = std::fs::remove_file(&path) {
             if e.kind() != std::io::ErrorKind::NotFound {
                 tracing::warn!(path = %path.display(), error = %e, "cannot remove content file");
@@ -180,6 +200,11 @@ pub(crate) fn untracked(
     kind: ContentKind,
     items: &[InstalledContent],
 ) -> Vec<String> {
+    // Datapacks live under per-world dirs, not one flat dir; there is no single
+    // place to scan for strays, so none are reported.
+    if kind == ContentKind::DataPack {
+        return Vec::new();
+    }
     let Ok(dir) = kind_dir(kind) else {
         return Vec::new();
     };
@@ -288,7 +313,21 @@ mod tests {
             "resourcepacks"
         );
         assert_eq!(kind_dir(ContentKind::Shader).unwrap(), "shaders");
+        assert_eq!(kind_dir(ContentKind::DataPack).unwrap(), "datapacks");
         assert!(kind_dir(ContentKind::Modpack).is_err());
-        assert!(kind_dir(ContentKind::DataPack).is_err());
+    }
+
+    #[test]
+    fn datapack_path_lives_inside_the_world() {
+        let item = InstalledContent {
+            kind: ContentKind::DataPack,
+            world: "saves/my-world".to_string(),
+            filename: "terralith.zip".to_string(),
+            ..InstalledContent::default()
+        };
+        assert_eq!(
+            datapack_path(Path::new("/data"), &item),
+            Path::new("/data/saves/my-world/datapacks/terralith.zip")
+        );
     }
 }

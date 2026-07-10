@@ -489,6 +489,15 @@ fn read_property(path: &Path, key: &str) -> Option<String> {
         .map(|(_, v)| v)
 }
 
+/// The server's world directory name (`level-name`, default `world`), read from
+/// `server.properties` in `data_dir`. This is where the server keeps its world,
+/// and so where datapacks install.
+pub(crate) fn level_name(data_dir: &Path) -> String {
+    read_property(&data_dir.join(PROPERTIES), "level-name")
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| "world".to_string())
+}
+
 // Both the game and rcon listeners bind all interfaces, so probe the same way.
 fn can_bind(port: u16) -> bool {
     std::net::TcpListener::bind(("0.0.0.0", port)).is_ok()
