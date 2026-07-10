@@ -148,8 +148,6 @@ async fn add(
     Ok(())
 }
 
-/// Run one content-add job (into the spec's world, if any), rendering its
-/// progress, and return what it installed.
 async fn install_spec(
     client: &Client,
     entry: EntryKind,

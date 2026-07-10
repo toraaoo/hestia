@@ -156,12 +156,13 @@ hestia instance modded shader add <slug>
 ```
 
 Datapacks load from inside a save world, so an instance datapack names the
-world(s) it goes into. Omit `--world` on a terminal to multi-select from the
-instance's worlds (space toggles, enter confirms); `--world` is repeatable for
-scripts. The same datapack can live in several worlds at once:
+world(s) it goes into. Run `datapack add` with no arguments for the interactive
+two-step flow — **search the datapack, then select the world(s)** (space
+toggles, enter confirms). For scripts, pass the slug and a repeatable `--world`.
+The same datapack can live in several worlds at once:
 
 ```bash
-hestia instance modded datapack add terralith                    # search, then pick worlds
+hestia instance modded datapack add                # 1) search a datapack  2) select world(s)
 hestia instance modded datapack add terralith --world Alpha --world Beta
 hestia instance modded datapack add --file ./pack.zip --world Alpha
 hestia instance modded datapack list      # installed datapacks, with their world
