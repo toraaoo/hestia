@@ -127,6 +127,11 @@ enum InstanceAction {
         #[command(subcommand)]
         cmd: ContentCmd,
     },
+    /// Install, list, remove, or update the instance's datapacks (into a world)
+    Datapack {
+        #[command(subcommand)]
+        cmd: ContentCmd,
+    },
     /// Move the instance to another version (prompts for anything omitted)
     Update {
         /// Target game version (prompts when omitted)
@@ -211,6 +216,16 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
         }
         InstanceAction::Shader { cmd } => {
             content::run_entry(client, EntryKind::Instance, ContentKind::Shader, &name, cmd).await
+        }
+        InstanceAction::Datapack { cmd } => {
+            content::run_entry(
+                client,
+                EntryKind::Instance,
+                ContentKind::DataPack,
+                &name,
+                cmd,
+            )
+            .await
         }
         InstanceAction::Update {
             version,

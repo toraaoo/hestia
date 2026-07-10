@@ -114,6 +114,11 @@ enum ServerAction {
         #[command(subcommand)]
         cmd: ContentCmd,
     },
+    /// Install, list, remove, or update the server's datapacks
+    Datapack {
+        #[command(subcommand)]
+        cmd: ContentCmd,
+    },
     /// Move the server to another version (prompts for anything omitted)
     Update {
         /// Target game version (prompts when omitted)
@@ -182,6 +187,16 @@ async fn run_action(client: Client, name: String, action: ServerAction) -> Resul
         ServerAction::Backup { cmd } => backup::run(&client, &name, cmd).await,
         ServerAction::Mod { cmd } => {
             content::run_entry(&client, EntryKind::Server, ContentKind::Mod, &name, cmd).await
+        }
+        ServerAction::Datapack { cmd } => {
+            content::run_entry(
+                &client,
+                EntryKind::Server,
+                ContentKind::DataPack,
+                &name,
+                cmd,
+            )
+            .await
         }
         ServerAction::Update {
             version,

@@ -33,6 +33,11 @@ pub enum ContentCmd {
         file: Option<String>,
         #[arg(long, help = "Override the stored filename (url/file installs)")]
         filename: Option<String>,
+        #[arg(
+            long,
+            help = "For a datapack on an instance: the save world to install into (prompts when omitted)"
+        )]
+        world: Option<String>,
     },
     /// Installed content of this kind
     #[command(visible_alias = "ls")]
@@ -64,9 +69,10 @@ pub async fn run_entry(
             version,
             file,
             filename,
+            world,
         } => {
             add(
-                client, entry, kind, reference, item, version, file, filename,
+                client, entry, kind, reference, item, version, file, filename, world,
             )
             .await
         }
@@ -86,6 +92,7 @@ async fn add(
     version: Option<String>,
     file: Option<String>,
     filename: Option<String>,
+    world: Option<String>,
 ) -> Result<()> {
     let (id, name) = resolve_entry(client, entry, reference).await?;
 
@@ -95,6 +102,11 @@ async fn add(
         version: version.unwrap_or_default(),
         ..ContentAddSpec::default()
     };
+    // A datapack loads from inside a world; an instance has many, so name one
+    // (a server uses its single level-name world, resolved daemon-side).
+    if kind == ContentKind::DataPack && matches!(entry, EntryKind::Instance) {
+        spec.world = pick_world(client, &id, world).await?;
+    }
     if let Some(path) = file {
         spec.path = std::fs::canonicalize(&path)
             .with_context(|| format!("cannot read {path}"))?
@@ -259,6 +271,21 @@ fn pick_installed(items: Vec<InstalledContent>) -> Result<String> {
     } else {
         chosen.project_id.clone()
     })
+}
+
+/// Choose the save world for an instance datapack: the given `--world` when
+/// present, otherwise an interactive pick over the instance's worlds (which
+/// errors when stdin is not a terminal, so scripts must pass `--world`).
+async fn pick_world(client: &Client, id: &str, world: Option<String>) -> Result<String> {
+    if let Some(world) = world.filter(|w| !w.is_empty()) {
+        return Ok(world);
+    }
+    let worlds = client.instance().worlds(id).await?;
+    if worlds.is_empty() {
+        bail!("no save worlds yet — launch the instance and create a world first");
+    }
+    let index = ui::select("select a world", &worlds).context("pass --world to name the world")?;
+    Ok(worlds[index].clone())
 }
 
 /// Resolve a known server/instance reference to its `(id, name)`.
