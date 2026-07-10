@@ -379,12 +379,10 @@ fn resolve_external(path: &Path, spec: &ProcessSpec) -> PathBuf {
 }
 
 fn open_log(path: &Path) -> std::io::Result<std::fs::File> {
-    let file = std::fs::OpenOptions::new()
+    std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(path)?;
-    file.set_len(0)?;
-    Ok(file)
+        .open(path)
 }
 
 fn prepare_stdio(spec: &ProcessSpec, proc_dir: &Path) -> std::io::Result<PreparedIo> {
@@ -392,6 +390,7 @@ fn prepare_stdio(spec: &ProcessSpec, proc_dir: &Path) -> std::io::Result<Prepare
     let (log_path, err_path) = log_paths(spec, proc_dir);
     match &spec.log {
         LogSource::Capture => {
+            let tail_from = std::fs::metadata(&log_path).map(|m| m.len()).unwrap_or(0);
             let file = open_log(&log_path)?;
             let err = file.try_clone()?;
             Ok(PreparedIo {
@@ -399,7 +398,7 @@ fn prepare_stdio(spec: &ProcessSpec, proc_dir: &Path) -> std::io::Result<Prepare
                 err: err.into(),
                 log_path,
                 err_path,
-                tail_from: 0,
+                tail_from,
             })
         }
         LogSource::File(_) => {
