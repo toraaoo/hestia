@@ -249,6 +249,10 @@ pub struct InstalledContent {
     pub sha1: String,
     pub url: String,
     pub installed_unix: i64,
+    /// For datapacks: the world directory (relative to the entry's `data/`)
+    /// the file lives in — datapacks load from inside a world, not a flat dir.
+    /// Empty for every other kind.
+    pub world: String,
 }
 
 /// The installed items of one kind, plus filenames found in the entry's game
@@ -273,6 +277,10 @@ pub struct ContentAddSpec {
     pub url: String,
     pub path: String,
     pub filename: String,
+    /// For a datapack on an instance: the save world to install into (the game
+    /// loads datapacks from inside a world). Ignored for other kinds; a server
+    /// uses its single `level-name` world.
+    pub world: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]

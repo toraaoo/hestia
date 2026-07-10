@@ -126,6 +126,20 @@ pub struct InstanceRef {
     pub instance: String,
 }
 
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceWorldsResult {
+    /// Save-world folder names under the instance's `data/saves/`, sorted.
+    pub worlds: Vec<String>,
+}
+
+pub struct InstanceWorlds;
+impl Contract for InstanceWorlds {
+    const CHANNEL: &'static str = "instance.worlds";
+    type Params = InstanceRef;
+    type Result = InstanceWorldsResult;
+}
+
 pub struct InstanceRemove;
 impl Contract for InstanceRemove {
     const CHANNEL: &'static str = "instance.remove";
