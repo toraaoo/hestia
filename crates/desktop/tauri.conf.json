@@ -21,9 +21,21 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNENjExOURFRjg3QjFGMjUKUldRbEgzdjQzaGxoUFc4SzZjQ3N1V3VIRWQxSnJ4eWNXZHdUcis3ZFlQdGZDcGZDYk1ZcWMreDUK",
+      "endpoints": [
+        "https://github.com/toraaoo/hestia/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "category": "Game",
     "shortDescription": "Fast, lightweight Minecraft launcher",
     "longDescription": "Hestia is a cross-platform Minecraft launcher. The desktop app is a thin client that drives the bundled hestiad daemon over a local socket.",
