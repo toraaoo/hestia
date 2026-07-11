@@ -160,7 +160,11 @@ pub enum ProvisionPhase {
 
 /// Progress for a provisioning job. `current`/`total` are bytes for a
 /// single-artifact phase and completed/total counts for `Libraries`/`Assets`;
-/// a phase with unknown extent reports `0/0`.
+/// a phase with unknown extent reports `0/0`. A phase made of several units
+/// (a content batch installing many projects) also carries which unit this
+/// progress belongs to: `item` (1-based) of `items` — `items` may grow while
+/// the job runs, as dependency resolution discovers more work. Both are zero
+/// for a single-unit phase.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
 pub struct ProvisionProgress {
@@ -169,6 +173,14 @@ pub struct ProvisionProgress {
     pub total: u64,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub detail: String,
+    #[serde(skip_serializing_if = "u64_is_zero")]
+    pub item: u64,
+    #[serde(skip_serializing_if = "u64_is_zero")]
+    pub items: u64,
+}
+
+fn u64_is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 #[cfg(test)]

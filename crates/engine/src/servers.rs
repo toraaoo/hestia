@@ -252,6 +252,7 @@ impl Servers {
             current: 0,
             total: 0,
             detail: "generating server.properties".into(),
+            ..ProvisionProgress::default()
         });
         if let Err(e) = self.generate_properties(record, java).await {
             tracing::warn!(id = %record.id, error = format!("{e:#}"), "server.properties generation failed");
@@ -337,6 +338,7 @@ impl Servers {
             current: 0,
             total: 0,
             detail: "regenerating server.properties".into(),
+            ..ProvisionProgress::default()
         });
         if let Err(e) = self.regenerate_properties(&record, java).await {
             tracing::warn!(id = %record.id, error = format!("{e:#}"), "server.properties regeneration failed");

@@ -305,7 +305,7 @@ fn backup_progress(current: u64, total: u64) -> ProvisionProgress {
         phase: ProvisionPhase::Backup,
         current,
         total,
-        detail: String::new(),
+        ..ProvisionProgress::default()
     }
 }
 

@@ -286,7 +286,7 @@ impl Engine {
             .map(|i| i.project_id)
             .filter(|p| !p.is_empty())
             .collect();
-        let loader = (kind == ContentKind::Mod).then(|| ctx.flavor.clone());
+        let loader = content_loader(kind, &ctx.flavor);
 
         // An explicitly named root installs even when already present (a
         // reinstall/re-pin); only duplicates within the batch collapse.
@@ -300,7 +300,7 @@ impl Engine {
                     continue;
                 }
             };
-            if project.kind != kind {
+            if !kind_matches(kind, project.kind) {
                 failures.push(failure(
                     &root.given,
                     &project.title,
@@ -327,6 +327,7 @@ impl Engine {
             });
         }
 
+        let mut finished = 0u64;
         while let Some(node) = queue.pop() {
             let versions = match self
                 .content
@@ -402,12 +403,20 @@ impl Engine {
                 }
             }
 
+            // Label each forwarded event with which unit of the batch this
+            // is: the queue length is live, so `items` grows as dependency
+            // resolution discovers more work.
             let title = node.project.title.clone();
+            let item = finished + 1;
+            let known = item + queue.len() as u64;
             let labeled = move |p: &ProvisionProgress| {
                 let mut progress = p.clone();
                 progress.detail = title.clone();
+                progress.item = item;
+                progress.items = known;
                 on_progress(&progress);
             };
+            labeled(&phase_progress(ProvisionPhase::Content));
             match self
                 .install_version_file(ctx, &node.project, &version, worlds, &labeled)
                 .await
@@ -417,6 +426,7 @@ impl Engine {
                     failures.push(failure(&node.given, &node.project.title, format!("{e:#}")))
                 }
             }
+            finished += 1;
         }
         (items, failures)
     }
@@ -490,7 +500,7 @@ impl Engine {
                 false => bail!("no installed item matches '{reference}'"),
             }
         }
-        let loader = (kind == ContentKind::Mod).then(|| ctx.flavor.clone());
+        let loader = content_loader(kind, &ctx.flavor);
 
         let mut updated = Vec::new();
         for item in targets {
@@ -586,6 +596,25 @@ struct Node {
     source: String,
     pin: String,
     project: ContentProject,
+}
+
+/// The loader filter a kind's version lookup needs: the entry's own loader
+/// for mods, and the `datapack` pseudo-loader for datapacks — Modrinth types
+/// datapacks as mods carrying that loader, so the filter is what selects the
+/// datapack file over a jar.
+fn content_loader(kind: ContentKind, flavor: &str) -> Option<String> {
+    match kind {
+        ContentKind::Mod => Some(flavor.to_string()),
+        ContentKind::DataPack => Some("datapack".to_string()),
+        _ => None,
+    }
+}
+
+/// Whether a fetched project satisfies the requested kind. Datapacks accept
+/// `Mod` projects: Modrinth has no datapack project type — a datapack is a
+/// mod-typed project whose versions carry the `datapack` loader.
+fn kind_matches(requested: ContentKind, project: ContentKind) -> bool {
+    requested == project || (requested == ContentKind::DataPack && project == ContentKind::Mod)
 }
 
 fn failure(

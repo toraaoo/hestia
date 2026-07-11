@@ -3,5 +3,7 @@
   "phase": "content",
   "current": 1024,
   "total": 4096,
-  "detail": "Sodium"
+  "detail": "Sodium",
+  "item": 2,
+  "items": 5
 }

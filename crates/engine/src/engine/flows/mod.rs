@@ -28,6 +28,7 @@ impl Engine {
                     current: jp.current,
                     total: jp.total,
                     detail: detail.clone(),
+                    ..ProvisionProgress::default()
                 });
             })
             .await?;
@@ -77,8 +78,6 @@ fn effective_name(name: &str, flavor: &str, version: &str) -> String {
 fn phase_progress(phase: ProvisionPhase) -> ProvisionProgress {
     ProvisionProgress {
         phase,
-        current: 0,
-        total: 0,
-        detail: String::new(),
+        ..ProvisionProgress::default()
     }
 }

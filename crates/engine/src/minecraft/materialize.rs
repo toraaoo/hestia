@@ -70,6 +70,7 @@ pub async fn ensure_artifact(
                     current: dp.downloaded,
                     total: dp.total,
                     detail: artifact.filename.clone(),
+                    ..ProvisionProgress::default()
                 });
             },
         )
@@ -236,6 +237,7 @@ fn report_count(
         current,
         total,
         detail: detail.to_string(),
+        ..ProvisionProgress::default()
     });
 }
 
