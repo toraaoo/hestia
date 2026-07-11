@@ -2,6 +2,7 @@
 //!
 //!   hestiad [serve]   run the daemon: bind the endpoint, serve until signalled
 //!   hestiad ping      connect to a running daemon, report its identity
+//!   hestiad stop      ask a running daemon to stop; supervised processes keep running
 //!
 //! main() only bootstraps: CLI parsing, logging init, and dispatch. The serve
 //! loop lives in server.rs; every channel lives in services.rs.
@@ -43,6 +44,8 @@ enum Command {
     Serve,
     /// Check that a running daemon is reachable
     Ping,
+    /// Stop a running daemon; supervised processes keep running
+    Stop,
 }
 
 fn main() -> ExitCode {
@@ -65,6 +68,10 @@ fn main() -> ExitCode {
             let _guard = common::init_logging(level, None);
             rt.block_on(run_ping())
         }
+        Some(Command::Stop) => {
+            let _guard = common::init_logging(level, None);
+            rt.block_on(run_stop())
+        }
         _ => {
             // The long-lived daemon also logs to a rotating, compressed file, since
             // clients detach its stderr.
@@ -75,6 +82,28 @@ fn main() -> ExitCode {
         }
     };
     ExitCode::from(code as u8)
+}
+
+async fn run_stop() -> i32 {
+    match client::Client::connect(false).await {
+        Ok(client) => match client.daemon().stop(false).await {
+            Ok(_) => {
+                println!("hestiad stopping");
+                0
+            }
+            Err(e) => {
+                eprintln!("hestiad stop: {e}");
+                1
+            }
+        },
+        // No reachable daemon means there is nothing to stop — succeed so
+        // scripted callers (e.g. the Windows installer) can treat this as
+        // idempotent.
+        Err(_) => {
+            println!("hestiad is not running");
+            0
+        }
+    }
 }
 
 async fn run_ping() -> i32 {
