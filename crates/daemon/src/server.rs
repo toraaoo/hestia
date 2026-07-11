@@ -35,6 +35,7 @@ pub async fn run_daemon(log_path: std::path::PathBuf) -> i32 {
     let router = Arc::new(make_router());
 
     tracing::info!("hestiad listening on {}", endpoint.display());
+    crate::tray::spawn();
     tokio::select! {
         _ = accept_loop(listener, router, runtime.clone()) => {}
         _ = runtime.stopped() => tracing::info!("stop requested"),

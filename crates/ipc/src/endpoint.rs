@@ -34,6 +34,13 @@ fn endpoint_override() -> Option<PathBuf> {
     }
 }
 
+/// Whether `HESTIA_SOCK` redirects the endpoint away from the per-user
+/// default. A daemon on an overridden endpoint (tests, side-by-side runs) is
+/// not the user session's daemon and must not act like it.
+pub fn is_overridden() -> bool {
+    endpoint_override().is_some()
+}
+
 /// The default daemon endpoint. Both the daemon (bind) and clients (connect)
 /// resolve the same path here.
 #[cfg(unix)]

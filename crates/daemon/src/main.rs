@@ -11,6 +11,7 @@ mod autostart;
 mod runtime;
 mod server;
 mod services;
+mod tray;
 
 use std::process::ExitCode;
 
