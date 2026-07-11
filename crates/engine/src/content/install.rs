@@ -1,5 +1,5 @@
 //! The per-entry installed-content store: files live in the entry root's
-//! managed kind directories (`<entry>/mods/`, `resourcepacks/`, `shaders/`)
+//! managed kind directories (`<entry>/mods/`, `resourcepacks/`, `shaderpacks/`)
 //! beside a `content.json` index recording each item's provenance, and are
 //! mirrored (hardlink, else copy) into the entry's `data/` game directory —
 //! the managed tree is hestia's registry, `data/` is what the game loads. A
@@ -25,15 +25,16 @@ struct Index {
     items: Vec<InstalledContent>,
 }
 
-/// The directory name for an installable kind. Mods/resourcepacks/shaders have
-/// a flat managed dir mirrored into `data/`; a datapack's `datapacks` dir lives
-/// inside a world instead (see [`datapack_path`]). Modpacks are not single-file
-/// installs.
+/// The directory name for an installable kind — the game's own load-dir name
+/// (`shaderpacks`, as Iris/OptiFine read), so the managed dir and its `data/`
+/// mirror stay symmetric. Mods/resourcepacks/shaders have a flat managed dir
+/// mirrored into `data/`; a datapack's `datapacks` dir lives inside a world
+/// instead (see [`datapack_path`]). Modpacks are not single-file installs.
 pub(crate) fn kind_dir(kind: ContentKind) -> Result<&'static str> {
     match kind {
         ContentKind::Mod => Ok("mods"),
         ContentKind::ResourcePack => Ok("resourcepacks"),
-        ContentKind::Shader => Ok("shaders"),
+        ContentKind::Shader => Ok("shaderpacks"),
         ContentKind::DataPack => Ok("datapacks"),
         ContentKind::Modpack => bail!("modpack content cannot be installed as a single file"),
     }
@@ -312,7 +313,7 @@ mod tests {
             kind_dir(ContentKind::ResourcePack).unwrap(),
             "resourcepacks"
         );
-        assert_eq!(kind_dir(ContentKind::Shader).unwrap(), "shaders");
+        assert_eq!(kind_dir(ContentKind::Shader).unwrap(), "shaderpacks");
         assert_eq!(kind_dir(ContentKind::DataPack).unwrap(), "datapacks");
         assert!(kind_dir(ContentKind::Modpack).is_err());
     }

@@ -244,7 +244,7 @@ fn instance_backup_excludes() -> Vec<String> {
         "logs".into(),
         "mods".into(),
         "resourcepacks".into(),
-        "shaders".into(),
+        "shaderpacks".into(),
     ]
 }
 

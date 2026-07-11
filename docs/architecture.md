@@ -265,7 +265,8 @@ The subsystems behind the aggregate:
   the entry root records each installed item's provenance
   (`InstalledContent`: kind, source, project/version ids, filename, sha1, and —
   for datapacks — the world it lives in); the file itself lands in the managed
-  kind directory (`<entry>/mods/`, `resourcepacks/`, `shaders/`) and is
+  kind directory (`<entry>/mods/`, `resourcepacks/`, `shaderpacks/` — the
+  game's own load-dir names, so the mirror is symmetric) and is
   **mirrored** (hardlink, else copy) into the game dir's matching directory.
   **Datapacks are the exception** — they load from inside a world, not a flat
   dir, so a datapack installs *straight into* `data/<level-name>/datapacks/` (a
@@ -297,8 +298,8 @@ The subsystems behind the aggregate:
   file; the hestia-managed ports/rcon keys are rejected — see the decision
   note below). An entry directory holds the record beside `data/`, the game's
   own working directory; the root is reserved for the managed content
-  directories (`mods/` for servers / `mods/`, `resourcepacks/`, `shaders/` for
-  instances, `backups/`) and the `content.json` install index, each created on
+  directories (`mods/` for servers / `mods/`, `resourcepacks/`, `shaderpacks/`
+  for instances, `backups/`) and the `content.json` install index, each created on
   demand — see the decision note below:
 
   ```
@@ -306,7 +307,7 @@ The subsystems behind the aggregate:
   ├── server.json             ├── instance.json
   ├── content.json            ├── content.json
   ├── mods/ backups/          ├── mods/ resourcepacks/
-  │                           │   shaders/ backups/
+  │                           │   shaderpacks/ backups/
   └── data/                   └── data/
       jar, libraries/,            saves, options, logs,
       eula.txt,                   mods/ (mirror) —
@@ -320,7 +321,7 @@ The subsystems behind the aggregate:
   skips what the launcher re-materialises (the server jar, `libraries/`,
   `logs/`, `cache/` — docker-mc-backup's default exclude set — plus the managed
   content mirror `mods/`; instances skip `logs/` and the mirrors `mods/`,
-  `resourcepacks/`, `shaders/`) and writes through a `.part` temp file; restore
+  `resourcepacks/`, `shaderpacks/`) and writes through a `.part` temp file; restore
   extracts into a
   staging directory, carries the skipped names over from the current tree
   (they belong to the record's *current* version), and swaps — a failure
@@ -377,7 +378,7 @@ The subsystems behind the aggregate:
 > provenance in `content.json`, then hardlinked/copied into `data/mods/` (what
 > the game loads). The managed copy — not the one in `data/` — is the source of
 > truth, which pays off three ways: (1) a backup restore swaps `data/` but the
-> managed dirs live outside it, so `mods/`/`resourcepacks/`/`shaders/` are added
+> managed dirs live outside it, so `mods/`/`resourcepacks/`/`shaderpacks/` are added
 > to the backup exclude/preserve set and a `sync` pass re-mirrors them at the
 > next start/launch (`server_launch_plan`, `prepare_instance`) — restore heals
 > itself and archives stay world-focused; (2) provenance survives, so `update`
