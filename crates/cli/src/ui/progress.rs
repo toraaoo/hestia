@@ -378,7 +378,10 @@ fn provision_noun(phase: ProvisionPhase) -> &'static str {
 /// the socket in bursts (one per chunk, several within microseconds), so a
 /// per-event instantaneous rate is dominated by intra-burst spikes and wildly
 /// overstates throughput; averaging each ≥`RATE_WINDOW` span weights fast and
-/// stalled periods by their real duration.
+/// stalled periods by their real duration. A counter that goes backwards is a
+/// new stream: the previous stream's rate is discarded, and nothing shows
+/// until the new one has sustained a full window — a file served instantly
+/// from the local cache never displays a speed at all.
 #[derive(Default)]
 struct RateMeter {
     window: Option<(Instant, u64)>,
@@ -406,8 +409,10 @@ impl RateMeter {
                     self.window = Some((now, current));
                 }
             }
-            // First observation, or the counter went backwards (a new file).
-            _ => self.window = Some((now, current)),
+            _ => {
+                self.per_second = 0.0;
+                self.window = Some((now, current));
+            }
         }
         self.per_second
     }
@@ -448,9 +453,18 @@ mod tests {
         let start = Instant::now();
         let mut meter = RateMeter::default();
         meter.observe_at(start, 100_000);
-        meter.observe_at(start + Duration::from_secs(1), 200_000);
-        // A new file restarts the byte counter; no negative/huge sample.
+        let flowing = meter.observe_at(start + Duration::from_secs(1), 200_000);
+        assert!(flowing > 0.0);
         let rate = meter.observe_at(start + Duration::from_secs(2), 1_000);
-        assert!((0.0..=100_000.0).contains(&rate));
+        assert_eq!(rate, 0.0);
+    }
+
+    #[test]
+    fn instant_transfer_never_reports_a_rate() {
+        let start = Instant::now();
+        let mut meter = RateMeter::default();
+        meter.observe_at(start, 0);
+        let rate = meter.observe_at(start + Duration::from_millis(40), 5_000_000);
+        assert_eq!(rate, 0.0);
     }
 }
