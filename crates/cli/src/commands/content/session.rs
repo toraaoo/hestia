@@ -44,11 +44,14 @@ pub struct Target {
     pub name: String,
     /// An instance's save worlds, for the datapack world picker.
     pub worlds: Vec<String>,
+    /// What the entry already has of this kind, for the installed markers.
+    pub installed: Vec<InstalledContent>,
 }
 
-/// What the session resolved to; `None` when the user quit without installing.
+/// What the session resolved to; `None` when the user quit without applying.
 pub struct SessionReport {
     pub items: Vec<InstalledContent>,
+    pub removed: Vec<InstalledContent>,
     pub failures: Vec<ContentFailure>,
     pub error: Option<String>,
 }
@@ -74,6 +77,7 @@ enum AppEvent {
     Progress(ProvisionProgress),
     Done {
         items: Vec<InstalledContent>,
+        removed: Vec<InstalledContent>,
         failures: Vec<ContentFailure>,
     },
     Failed {
@@ -132,31 +136,80 @@ async fn drive(
                 }
             }
             Request::Install { spec } => {
-                let InstallSpec { target, spec } = spec;
-                let progress = events.clone();
-                let result = match target {
-                    InstallTarget::Server(id) => {
-                        client
-                            .server()
-                            .content_add(&id, spec, move |p| {
-                                let _ = progress.send(AppEvent::Progress(p.clone()));
-                            })
-                            .await
+                let InstallSpec {
+                    target,
+                    spec,
+                    removals,
+                } = spec;
+                let mut removed = Vec::new();
+                let mut failures = Vec::new();
+                for removal in removals {
+                    let result = match &target {
+                        InstallTarget::Server(id) => {
+                            client
+                                .server()
+                                .content_remove(id, spec.kind, &removal.key, &removal.worlds)
+                                .await
+                        }
+                        InstallTarget::Instance(id) => {
+                            client
+                                .instance()
+                                .content_remove(id, spec.kind, &removal.key, &removal.worlds)
+                                .await
+                        }
+                    };
+                    match result {
+                        Ok(()) => removed.extend(removal.records),
+                        Err(e) => failures.push(ContentFailure {
+                            item: removal.key,
+                            title: removal
+                                .records
+                                .first()
+                                .map(|r| r.title.clone())
+                                .unwrap_or_default(),
+                            message: e.to_string(),
+                        }),
                     }
-                    InstallTarget::Instance(id) => {
-                        client
-                            .instance()
-                            .content_add(&id, spec, move |p| {
-                                let _ = progress.send(AppEvent::Progress(p.clone()));
-                            })
-                            .await
+                }
+                if spec.items.is_empty() {
+                    AppEvent::Done {
+                        items: Vec::new(),
+                        removed,
+                        failures,
                     }
-                };
-                match result {
-                    Ok((items, failures)) => AppEvent::Done { items, failures },
-                    Err(e) => AppEvent::Failed {
-                        message: e.to_string(),
-                    },
+                } else {
+                    let progress = events.clone();
+                    let result = match &target {
+                        InstallTarget::Server(id) => {
+                            client
+                                .server()
+                                .content_add(id, spec, move |p| {
+                                    let _ = progress.send(AppEvent::Progress(p.clone()));
+                                })
+                                .await
+                        }
+                        InstallTarget::Instance(id) => {
+                            client
+                                .instance()
+                                .content_add(id, spec, move |p| {
+                                    let _ = progress.send(AppEvent::Progress(p.clone()));
+                                })
+                                .await
+                        }
+                    };
+                    match result {
+                        Ok((items, add_failures)) => {
+                            failures.extend(add_failures);
+                            AppEvent::Done {
+                                items,
+                                removed,
+                                failures,
+                            }
+                        }
+                        Err(e) => AppEvent::Failed {
+                            message: e.to_string(),
+                        },
+                    }
                 }
             }
         };
@@ -174,6 +227,24 @@ enum InstallTarget {
 struct InstallSpec {
     target: InstallTarget,
     spec: ContentAddSpec,
+    removals: Vec<Removal>,
+}
+
+/// One removal to perform: the key `content.remove` takes (the project id),
+/// the save worlds narrowing it (empty clears every copy), and the index
+/// entries it clears, carried along for the report.
+struct Removal {
+    key: String,
+    worlds: Vec<String>,
+    records: Vec<InstalledContent>,
+}
+
+/// An installed project staged for removal. `worlds` narrows an instance
+/// datapack to some of the save worlds holding it (bare folder names); empty
+/// clears every copy.
+struct StagedRemoval {
+    project_id: String,
+    worlds: Vec<String>,
 }
 
 /// One checked project with its (optional) version pin.
@@ -201,6 +272,14 @@ enum Overlay {
         picker: Option<(Picker, Vec<ContentVersion>)>,
     },
     Worlds(SelectList, Vec<String>),
+    /// Narrow a staged datapack removal to some of the worlds holding it —
+    /// opened pre-checked with all of them; unchecking every world cancels
+    /// the removal.
+    RemoveWorlds {
+        project: String,
+        list: SelectList,
+        names: Vec<String>,
+    },
 }
 
 struct ContentSession {
@@ -221,6 +300,9 @@ struct ContentSession {
     total: u32,
     list: ListState,
     chosen: Vec<Chosen>,
+    /// The third state of an installed row's space cycle:
+    /// keep → reinstall → remove.
+    removals: Vec<StagedRemoval>,
     worlds: Vec<String>,
 
     details: HashMap<String, ContentProject>,
@@ -253,6 +335,7 @@ impl ContentSession {
             total: 0,
             list: ListState::default(),
             chosen: Vec::new(),
+            removals: Vec::new(),
             worlds: Vec::new(),
             details: HashMap::new(),
             detail_requested: HashSet::new(),
@@ -334,11 +417,127 @@ impl ContentSession {
         self.chosen.iter().any(|c| c.project.id == project_id)
     }
 
+    /// The target's index entries for a project — several for a datapack
+    /// installed into more than one world, at most one otherwise. Local
+    /// imports carry no project id and cannot be matched to a hit.
+    fn installed_entries(&self, project: &ContentProject) -> Vec<&InstalledContent> {
+        let Some(target) = self.target.as_ref() else {
+            return Vec::new();
+        };
+        target
+            .installed
+            .iter()
+            .filter(|i| {
+                !i.project_id.is_empty() && i.project_id == project.id && i.source == project.source
+            })
+            .collect()
+    }
+
+    /// The index entries a staged removal clears — every copy, narrowed to
+    /// the staged worlds when the removal was scoped.
+    fn staged_records(&self, staged: &StagedRemoval) -> Vec<&InstalledContent> {
+        let Some(target) = self.target.as_ref() else {
+            return Vec::new();
+        };
+        target
+            .installed
+            .iter()
+            .filter(|i| {
+                i.project_id == staged.project_id
+                    && (staged.worlds.is_empty()
+                        || staged
+                            .worlds
+                            .iter()
+                            .any(|w| world_name(&i.world) == Some(w.as_str())))
+            })
+            .collect()
+    }
+
+    /// The browse-time "already installed" marker: the installed version —
+    /// or, for an instance's datapacks (installed per world), the worlds the
+    /// pack is in, which is what "installed" precisely means for that kind.
+    fn installed_label(&self, project: &ContentProject) -> Option<String> {
+        let entries = self.installed_entries(project);
+        let first = entries.first()?;
+        if self.instance_datapacks() {
+            let worlds: Vec<&str> = entries
+                .iter()
+                .filter_map(|i| world_name(&i.world))
+                .collect();
+            return Some(format!("in {}", worlds.join(", ")));
+        }
+        Some(first.version_number.clone())
+    }
+
+    /// The review-time marker: what this install overwrites. For an
+    /// instance's datapacks that is the overlap between the picked target
+    /// worlds and the worlds already holding the pack — empty overlap means
+    /// the install only adds fresh copies, so there is nothing to flag.
+    fn review_marker(&self, project: &ContentProject) -> Option<String> {
+        let entries = self.installed_entries(project);
+        let first = entries.first()?;
+        if self.instance_datapacks() {
+            let overlap: Vec<&str> = self
+                .worlds
+                .iter()
+                .filter_map(|picked| {
+                    entries
+                        .iter()
+                        .find(|i| world_name(&i.world) == Some(picked.as_str()))
+                        .and_then(|i| world_name(&i.world))
+                })
+                .collect();
+            if overlap.is_empty() {
+                return None;
+            }
+            return Some(format!("replaces the copy in {}", overlap.join(", ")));
+        }
+        Some(format!("replaces {}", first.version_number))
+    }
+
+    fn instance_datapacks(&self) -> bool {
+        self.base.kind == ContentKind::DataPack
+            && matches!(
+                self.target,
+                Some(Target {
+                    entry: EntryKind::Instance,
+                    ..
+                })
+            )
+    }
+
+    fn is_removing(&self, project_id: &str) -> bool {
+        self.removals.iter().any(|r| r.project_id == project_id)
+    }
+
+    fn has_changes(&self) -> bool {
+        !self.chosen.is_empty() || !self.removals.is_empty()
+    }
+
+    /// Space on a row. A plain row toggles in and out of the batch; an
+    /// installed row cycles keep → reinstall → remove → keep. Staging the
+    /// removal of a datapack held by several worlds opens the world list,
+    /// pre-checked, to narrow which copies go.
     fn toggle_chosen(&mut self) {
         let Some(hit) = self.highlighted().cloned() else {
             return;
         };
-        if let Some(pos) = self.chosen.iter().position(|c| c.project.id == hit.id) {
+        let installed = !self.installed_entries(&hit).is_empty();
+        let chosen_pos = self.chosen.iter().position(|c| c.project.id == hit.id);
+        if installed {
+            if let Some(pos) = chosen_pos {
+                self.chosen.remove(pos);
+                self.stage_removal(&hit);
+            } else if let Some(pos) = self.removals.iter().position(|r| r.project_id == hit.id) {
+                self.removals.remove(pos);
+            } else {
+                self.chosen.push(Chosen {
+                    project: hit,
+                    version_id: String::new(),
+                    version_label: "latest".to_string(),
+                });
+            }
+        } else if let Some(pos) = chosen_pos {
             self.chosen.remove(pos);
         } else {
             self.chosen.push(Chosen {
@@ -349,7 +548,31 @@ impl ContentSession {
         }
     }
 
+    fn stage_removal(&mut self, hit: &ContentProject) {
+        let worlds: Vec<String> = self
+            .installed_entries(hit)
+            .iter()
+            .filter_map(|i| world_name(&i.world))
+            .map(str::to_string)
+            .collect();
+        self.removals.push(StagedRemoval {
+            project_id: hit.id.clone(),
+            worlds: Vec::new(),
+        });
+        if self.instance_datapacks() && worlds.len() > 1 {
+            let count = worlds.len();
+            self.overlay = Some(Overlay::RemoveWorlds {
+                project: hit.id.clone(),
+                list: SelectList::new(worlds.clone()).with_checked(0..count),
+                names: worlds,
+            });
+        }
+    }
+
+    /// Pinning a version stages an install, whatever state the row was in —
+    /// a removal-staged row flips back to installing the picked version.
     fn pin_version(&mut self, project: &ContentProject, version: &ContentVersion) {
+        self.removals.retain(|r| r.project_id != project.id);
         match self.chosen.iter_mut().find(|c| c.project.id == project.id) {
             Some(chosen) => {
                 chosen.version_id = version.id.clone();
@@ -388,15 +611,7 @@ impl ContentSession {
     }
 
     fn needs_worlds(&self) -> bool {
-        self.base.kind == ContentKind::DataPack
-            && matches!(
-                self.target,
-                Some(Target {
-                    entry: EntryKind::Instance,
-                    ..
-                })
-            )
-            && self.worlds.is_empty()
+        self.instance_datapacks() && !self.chosen.is_empty() && self.worlds.is_empty()
     }
 
     fn install(&mut self) {
@@ -410,6 +625,15 @@ impl ContentSession {
                 project: c.project.id.clone(),
                 version: c.version_id.clone(),
                 ..ContentAddItem::default()
+            })
+            .collect();
+        let removals = self
+            .removals
+            .iter()
+            .map(|staged| Removal {
+                key: staged.project_id.clone(),
+                worlds: staged.worlds.clone(),
+                records: self.staged_records(staged).into_iter().cloned().collect(),
             })
             .collect();
         let spec = ContentAddSpec {
@@ -426,6 +650,7 @@ impl ContentSession {
             spec: InstallSpec {
                 target: install_target,
                 spec,
+                removals,
             },
         });
         self.mode = Mode::Installing { progress: None };
@@ -459,10 +684,14 @@ impl ContentSession {
                 }
                 Focus::List => {
                     if self.target.is_some() {
-                        if self.chosen.is_empty() {
+                        let plain = self
+                            .highlighted()
+                            .map(|hit| self.installed_entries(hit).is_empty())
+                            .unwrap_or(false);
+                        if !self.has_changes() && plain {
                             self.toggle_chosen();
                         }
-                        if !self.chosen.is_empty() {
+                        if self.has_changes() {
                             self.mode = Mode::Review { cursor: 0 };
                         }
                     } else if let Some(hit) = self.highlighted().cloned() {
@@ -502,8 +731,9 @@ impl ContentSession {
                 }
             }
             KeyCode::Down => {
+                let last = (self.chosen.len() + self.removals.len()).saturating_sub(1);
                 self.mode = Mode::Review {
-                    cursor: (cursor + 1).min(self.chosen.len().saturating_sub(1)),
+                    cursor: (cursor + 1).min(last),
                 }
             }
             KeyCode::Char('v') => {
@@ -525,12 +755,15 @@ impl ContentSession {
             KeyCode::Char(' ') | KeyCode::Delete => {
                 if cursor < self.chosen.len() {
                     self.chosen.remove(cursor);
+                } else if cursor - self.chosen.len() < self.removals.len() {
+                    self.removals.remove(cursor - self.chosen.len());
                 }
-                if self.chosen.is_empty() {
+                if !self.has_changes() {
                     self.mode = Mode::Browse;
                 } else {
+                    let last = self.chosen.len() + self.removals.len() - 1;
                     self.mode = Mode::Review {
-                        cursor: cursor.min(self.chosen.len() - 1),
+                        cursor: cursor.min(last),
                     };
                 }
             }
@@ -586,6 +819,34 @@ impl ContentSession {
                 _ => {
                     list.on_key(&key);
                     self.overlay = Some(Overlay::Worlds(list, names));
+                }
+            },
+            Overlay::RemoveWorlds {
+                project,
+                mut list,
+                names,
+            } => match key.code {
+                KeyCode::Esc => {}
+                KeyCode::Enter => {
+                    let picked: Vec<String> =
+                        list.checked().iter().map(|&i| names[i].clone()).collect();
+                    if picked.is_empty() {
+                        self.removals.retain(|r| r.project_id != project);
+                    } else if picked.len() < names.len() {
+                        if let Some(staged) =
+                            self.removals.iter_mut().find(|r| r.project_id == project)
+                        {
+                            staged.worlds = picked;
+                        }
+                    }
+                }
+                _ => {
+                    list.on_key(&key);
+                    self.overlay = Some(Overlay::RemoveWorlds {
+                        project,
+                        list,
+                        names,
+                    });
                 }
             },
         }
@@ -654,9 +915,14 @@ impl Screen for ContentSession {
                     *current = Some(progress);
                 }
             }
-            AppEvent::Done { items, failures } => {
+            AppEvent::Done {
+                items,
+                removed,
+                failures,
+            } => {
                 self.mode = Mode::Report(SessionReport {
                     items,
+                    removed,
                     failures,
                     error: None,
                 });
@@ -665,6 +931,7 @@ impl Screen for ContentSession {
                 Mode::Installing { .. } => {
                     self.mode = Mode::Report(SessionReport {
                         items: Vec::new(),
+                        removed: Vec::new(),
                         failures: Vec::new(),
                         error: Some(message),
                     });
@@ -719,7 +986,7 @@ impl Screen for ContentSession {
                 let cursor = *cursor;
                 self.draw_review(frame, cursor)
             }
-            Mode::Installing { progress } => draw_working(frame, "installing", progress.as_ref()),
+            Mode::Installing { progress } => draw_working(frame, "applying", progress.as_ref()),
             Mode::Report(report) => draw_report(frame, report),
         }
         if self.overlay.is_some() {
@@ -783,7 +1050,7 @@ impl ContentSession {
         let hint = match (self.target.is_some(), &self.focus) {
             (_, Focus::Search) => "type to search · ↓ results · esc quit",
             (true, Focus::List) => {
-                "↑/↓ move · space select · v version · pgup/pgdn description · enter review · esc quit"
+                "↑/↓ move · space toggle · v version · pgup/pgdn description · enter review · esc quit"
             }
             (false, Focus::List) => "↑/↓ move · enter versions · pgup/pgdn description · esc quit",
         };
@@ -813,12 +1080,17 @@ impl ContentSession {
             .map(|hit| {
                 let mut spans = Vec::new();
                 if with_boxes {
-                    let mark = if self.is_chosen(&hit.id) {
-                        "[x] "
+                    let installed = !self.installed_entries(hit).is_empty();
+                    let mark = if installed && self.is_removing(&hit.id) {
+                        Span::styled("[-] ", Style::default().fg(Color::Red))
+                    } else if installed && !self.is_chosen(&hit.id) {
+                        Span::styled("[✓] ", Style::default().fg(Color::Green))
+                    } else if self.is_chosen(&hit.id) {
+                        Span::raw("[x] ")
                     } else {
-                        "[ ] "
+                        Span::raw("[ ] ")
                     };
-                    spans.push(Span::raw(mark));
+                    spans.push(mark);
                 }
                 spans.push(Span::raw(hit.title.clone()));
                 spans.push(Span::styled(
@@ -876,8 +1148,14 @@ impl ContentSession {
                 ),
                 dim,
             ),
-            Line::raw(""),
         ];
+        if let Some(label) = self.installed_label(project) {
+            lines.push(Line::styled(
+                format!("✓ installed {label}"),
+                Style::default().fg(Color::Green),
+            ));
+        }
+        lines.push(Line::raw(""));
         for line in project.description.split('\n') {
             lines.push(Line::raw(line.to_string()));
         }
@@ -916,11 +1194,18 @@ impl ContentSession {
             .as_ref()
             .map(|t| t.name.clone())
             .unwrap_or_default();
+        let mut what = Vec::new();
+        if !self.chosen.is_empty() {
+            what.push(format!("install {}", self.chosen.len()));
+        }
+        if !self.removals.is_empty() {
+            what.push(format!("remove {}", self.removals.len()));
+        }
         frame.render_widget(
             Paragraph::new(Line::styled(
                 format!(
-                    "review · install {} {} into '{name}'",
-                    self.chosen.len(),
+                    "review · {} {} for '{name}'",
+                    what.join(", "),
                     kind_plural(self.base.kind)
                 ),
                 Style::default()
@@ -934,16 +1219,49 @@ impl ContentSession {
             .chosen
             .iter()
             .map(|c| {
-                ListItem::new(Line::from(vec![
+                let mut spans = vec![
+                    Span::styled("+ ", Style::default().fg(Color::Green)),
                     Span::raw(c.project.title.clone()),
                     Span::styled(
                         format!("  {}", c.version_label),
                         Style::default().fg(Color::DarkGray),
                     ),
-                ]))
+                ];
+                if let Some(marker) = self.review_marker(&c.project) {
+                    spans.push(Span::styled(
+                        format!("  {marker}"),
+                        Style::default().fg(Color::Yellow),
+                    ));
+                }
+                ListItem::new(Line::from(spans))
             })
             .collect();
-        if self.base.kind == ContentKind::DataPack && self.target.is_some() {
+        for staged in &self.removals {
+            let records = self.staged_records(staged);
+            let title = records
+                .first()
+                .map(|r| r.title.clone())
+                .unwrap_or_else(|| staged.project_id.clone());
+            let what = if self.instance_datapacks() {
+                let worlds: Vec<&str> = records
+                    .iter()
+                    .filter_map(|r| world_name(&r.world))
+                    .collect();
+                format!("remove (in {})", worlds.join(", "))
+            } else {
+                let version = records
+                    .first()
+                    .map(|r| r.version_number.clone())
+                    .unwrap_or_default();
+                format!("remove {version}")
+            };
+            rows.push(ListItem::new(Line::from(vec![
+                Span::styled("- ", Style::default().fg(Color::Red)),
+                Span::raw(title),
+                Span::styled(format!("  {what}"), Style::default().fg(Color::Yellow)),
+            ])));
+        }
+        if self.base.kind == ContentKind::DataPack && !self.chosen.is_empty() {
             let worlds = if self.worlds.is_empty() {
                 match self.needs_worlds() {
                     true => "worlds: (none picked — w to pick)".to_string(),
@@ -967,9 +1285,9 @@ impl ContentSession {
         frame.render_stateful_widget(list, body, &mut state);
 
         let hint = if self.base.kind == ContentKind::DataPack {
-            "enter install · v version · w worlds · space remove · esc back"
+            "enter apply · v version · w worlds · space drop · esc back"
         } else {
-            "enter install · v version · space remove · esc back"
+            "enter apply · v version · space drop · esc back"
         };
         frame.render_widget(
             Paragraph::new(Line::from(hint)).style(Style::default().fg(Color::DarkGray)),
@@ -1022,6 +1340,23 @@ impl ContentSession {
                     hint,
                 );
             }
+            Some(Overlay::RemoveWorlds { list, .. }) => {
+                let block = Block::bordered()
+                    .border_style(Style::default().fg(Color::DarkGray))
+                    .title("remove from world(s)");
+                let inner = block.inner(area);
+                frame.render_widget(block, area);
+                let [list_area, hint] =
+                    Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(inner);
+                list.render(frame, list_area);
+                frame.render_widget(
+                    Paragraph::new(Line::from(
+                        "space toggle · enter confirm · none = keep · esc every copy",
+                    ))
+                    .style(Style::default().fg(Color::DarkGray)),
+                    hint,
+                );
+            }
             None => {}
         }
     }
@@ -1050,6 +1385,12 @@ fn draw_report(frame: &mut Frame, report: &SessionReport) {
             item.title, item.version_number
         )));
     }
+    for item in &report.removed {
+        let where_ = world_name(&item.world)
+            .map(|w| format!(" from {w}"))
+            .unwrap_or_default();
+        lines.push(Line::raw(format!("removed {}{where_}", item.title)));
+    }
     for failure in &report.failures {
         let label = if failure.title.is_empty() {
             &failure.item
@@ -1069,7 +1410,7 @@ fn draw_report(frame: &mut Frame, report: &SessionReport) {
     }
     if lines.is_empty() {
         lines.push(Line::styled(
-            "nothing installed",
+            "no changes applied",
             Style::default().fg(Color::DarkGray),
         ));
     }
@@ -1079,6 +1420,14 @@ fn draw_report(frame: &mut Frame, report: &SessionReport) {
             .style(Style::default().fg(Color::DarkGray)),
         footer,
     );
+}
+
+/// A world's folder name — the last component of the stored path
+/// (`saves/<name>` for an instance, the level-name dir for a server), which
+/// is also how the world picker and `Target::worlds` name it.
+fn world_name(world: &str) -> Option<&str> {
+    let name = world.rsplit('/').next().unwrap_or(world);
+    (!name.is_empty()).then_some(name)
 }
 
 fn version_picker(versions: &[ContentVersion]) -> (Picker, Vec<ContentVersion>) {

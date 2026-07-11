@@ -33,6 +33,21 @@ impl SelectList {
         self
     }
 
+    /// Checkbox mode with a set of indices already checked.
+    pub fn with_checked(mut self, indices: impl IntoIterator<Item = usize>) -> Self {
+        let len = self.items.len();
+        self.checked = Some(indices.into_iter().filter(|i| *i < len).collect());
+        self
+    }
+
+    /// Exactly the checked indices, sorted — empty when nothing is checked,
+    /// without [`Self::chosen`]'s highlight fallback.
+    pub fn checked(&self) -> Vec<usize> {
+        let mut checked: Vec<usize> = self.checked.iter().flatten().copied().collect();
+        checked.sort_unstable();
+        checked
+    }
+
     pub fn selected(&self) -> usize {
         self.state.selected().unwrap_or(0)
     }

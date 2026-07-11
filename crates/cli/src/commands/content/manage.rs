@@ -145,7 +145,7 @@ async fn add(
         ..ContentAddSpec::default()
     };
     let (installed, failures) = install_spec(client, entry, &info.id, spec).await?;
-    show_install_report(&info.name, &installed, &failures)
+    show_install_report(&info.name, &installed, &[], &failures)
 }
 
 /// The interactive install path: the fullscreen search → review → install
@@ -166,6 +166,10 @@ async fn add_session(
     } else {
         Vec::new()
     };
+    let (installed, _) = match entry {
+        EntryKind::Server => client.server().content_list(&info.id, kind).await?,
+        EntryKind::Instance => client.instance().content_list(&info.id, kind).await?,
+    };
     let base = SearchQuery {
         kind,
         loader: (kind == ContentKind::Mod).then(|| info.flavor.clone()),
@@ -178,6 +182,7 @@ async fn add_session(
         id: info.id.clone(),
         name: info.name.clone(),
         worlds,
+        installed,
     };
     match session::run(client, base, Some(target)).await? {
         None => ui::show(View::note("cancelled")),
@@ -185,16 +190,17 @@ async fn add_session(
             if let Some(error) = report.error {
                 bail!(error);
             }
-            show_install_report(&info.name, &report.items, &report.failures)
+            show_install_report(&info.name, &report.items, &report.removed, &report.failures)
         }
     }
 }
 
-/// Print what a batch installed and what failed; errors (a non-zero exit)
-/// when nothing landed at all.
+/// Print what a batch installed, removed, and failed; errors (a non-zero
+/// exit) when nothing landed at all.
 pub(super) fn show_install_report(
     name: &str,
     installed: &[InstalledContent],
+    removed: &[InstalledContent],
     failures: &[ContentFailure],
 ) -> Result<()> {
     for content in installed {
@@ -207,6 +213,16 @@ pub(super) fn show_install_report(
             content.title, content.filename
         )))?;
     }
+    for content in removed {
+        let where_ = match world_label(content) {
+            Some(world) => format!("'{name}' ({world})"),
+            None => format!("'{name}'"),
+        };
+        ui::show(View::line(format!(
+            "removed {} ({}) from {where_}",
+            content.title, content.filename
+        )))?;
+    }
     for failure in failures {
         let label = if failure.title.is_empty() {
             failure.item.clone()
@@ -215,10 +231,10 @@ pub(super) fn show_install_report(
         };
         ui::show(View::note(format!("failed {label}: {}", failure.message)))?;
     }
-    if installed.is_empty() {
+    if installed.is_empty() && removed.is_empty() {
         match failures.is_empty() {
-            true => ui::show(View::note("nothing installed")),
-            false => bail!("nothing installed"),
+            true => ui::show(View::note("no changes applied")),
+            false => bail!("no changes applied"),
         }
     } else {
         Ok(())

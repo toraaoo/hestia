@@ -403,7 +403,9 @@ The subsystems behind the aggregate:
 > (`level-name`, read from `server.properties`); an instance has many, so the
 > install names one or more — repeatable `--world`, or an interactive
 > multi-select over `instance.worlds`. The index keys a datapack by world, so
-> the same one coexists across several worlds and removing it clears every copy.
+> the same one coexists across several worlds; a removal clears every copy
+> unless narrowed to named worlds (`remove --world`, or the session's
+> pre-checked world list when unchecking a multi-world pack).
 > The client-side support flag is waived for datapacks: they run on a world's
 > server side, including a client's integrated server, so a source marking a
 > datapack client-unsupported must not block installing it on an instance.
