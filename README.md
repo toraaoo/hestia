@@ -28,9 +28,11 @@ it's just as comfortable from a terminal as from a window.
 > page URL, or a local file, with required dependencies pulled in and a `data/`
 > mirror that survives backup/restore (datapacks install straight into their
 > world, which the world backup already covers). Vanilla and Fabric are the
-> shipped flavors, Modrinth the shipped content source. Still to come:
-> installing a whole modpack, wiring the stock Tauri desktop shell to the
-> daemon, and a functional tray.
+> shipped flavors, Modrinth the shipped content source. A **system tray**
+> accompanies every serving daemon — status, start/restart, a start-at-login
+> toggle, quit. Still to come: installing a whole modpack, wiring the stock
+> Tauri desktop shell to the daemon, and the tray's left-click launching the
+> desktop app.
 
 ## Front-ends
 
@@ -40,7 +42,8 @@ Hestia is one daemon-backed core with several ways to drive it:
   users.
 - **Desktop** (`hestia-desktop`) — a Tauri shell hosting a web UI. Scaffolded; the
   frontend is a stock template not yet wired to the daemon.
-- **Tray** — a resident system-tray helper (placeholder; not yet ported).
+- **Tray** (`tray`) — a resident system-tray helper spawned alongside the
+  daemon: status, quick actions (start/restart, autostart, quit).
 
 ## Project layout
 
@@ -61,7 +64,7 @@ hestia/
 │   ├── engine/                config·cache·download·java·accounts   (daemon-only)
 │   ├── cli/                   bin: hestia   (clap)
 │   ├── daemon/                bin: hestiad  (router, services, supervisor)
-│   ├── tray/                  bin: tray     (placeholder)
+│   ├── tray/                  bin: tray     (tray-icon + tao)
 │   └── desktop/               bin: hestia-desktop (Tauri v2 shell)
 ├── frontend/                  desktop UI (React + Vite + TS) — self-contained
 └── docs/                      architecture, contributing

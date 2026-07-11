@@ -20,10 +20,11 @@ socket on POSIX, a named pipe on Windows):
 |-----------|------------------|-----------|-----------------------|----------------------------|
 | CLI       | `hestia`         | `cli`     | clap + ratatui        | shipped                    |
 | Desktop   | `hestia-desktop` | `desktop` | Tauri v2 + React/Vite | stock shell, not yet wired |
-| Tray      | `tray`           | `tray`    | native per-platform   | placeholder                |
+| Tray      | `tray`           | `tray`    | tray-icon + tao       | shipped                    |
 
 The daemon (`hestiad`) is the resident core. The CLI is the first-class,
-fully-wired front-end; the desktop and tray are scaffolds (see
+fully-wired front-end; the tray accompanies every serving daemon with quick
+actions; the desktop is a scaffold (see
 [Front-ends](#front-ends-cli-desktop-tray)).
 
 ## The crate graph
@@ -41,7 +42,7 @@ engine  → config·cache·download·java·accounts·minecraft·content    → p
 cli     → bin hestia          (clap + ratatui presentation)        → client, common, proto
 daemon  → bin hestiad         (router, services, supervisor)       → engine, proto, ipc, common, client
 desktop → bin hestia-desktop  (Tauri v2 shell)                     → (tauri)                 (+ frontend/)
-tray    → bin tray            (placeholder)
+tray    → bin tray            (tray-icon + tao)                   → client, common, ipc
 ```
 
 - **`proto`** and **`ipc`** together form the socket boundary — the one seam the
@@ -71,7 +72,9 @@ tray    → bin tray            (placeholder)
 - `sha1`/`sha2`, `tar`+`flate2`, `zip` — in-process checksums and archive
   extraction (no shelling out to system tools).
 - [Tauri v2](https://tauri.app/) + [React](https://react.dev/)/[Vite](https://vitejs.dev/)
-  (built with [Bun](https://bun.sh/)) — desktop.
+  (built with [Bun](https://bun.sh/)) — desktop; its
+  [tray-icon](https://github.com/tauri-apps/tray-icon) +
+  [tao](https://github.com/tauri-apps/tao) crates — the system tray.
 
 ## The socket boundary
 
@@ -474,7 +477,9 @@ supervises launched processes, and manages autostart. The only crate that links
   outbound mpsc channel drained by a writer task, so a streaming channel
   (`events.subscribe`) is an ordinary handler that pushes onto that channel. The
   loop runs under `tokio::select!` against a stop request (`daemon.stop`) and an OS
-  signal (SIGTERM / Ctrl-C).
+  signal (SIGTERM / Ctrl-C). Once listening, it spawns the tray helper
+  (`tray.rs`) — best-effort, detached, skipped on a headless session or an
+  endpoint override.
 - **`runtime/`** — the daemon's long-lived collaborators in one place, the
   anti-churn seam a new subsystem hangs off (mirroring the engine's aggregate):
     - **`Runtime`** (`runtime/mod.rs`) — holds the `Engine`, the `EventHub`, the
@@ -742,8 +747,32 @@ See [contributing.md](contributing.md) for the intended `#[tauri::command]` reci
 
 ### Tray (`tray`)
 
-A resident system-tray helper (daemon status + a start-at-login toggle). A
-single-file placeholder; not yet ported.
+A resident system-tray helper, built on Tauri's own tray crates
+([tray-icon](https://github.com/tauri-apps/tray-icon) + a
+[tao](https://github.com/tauri-apps/tao) event loop; gtk/StatusNotifier on
+Linux, native on Windows) and wearing the desktop app's icon (embedded from
+`crates/desktop/icons/` at build time, so both front-ends share one face). The
+menu is a status header (version + running/stopped), a start/restart action, a
+start-at-login toggle bound to the reserved `autostart` config key, and a quit
+that stops the daemon too (supervised workloads keep running, as with any
+daemon stop). A worker thread polls the daemon every two seconds over the
+client SDK and reports state changes to the event loop; menu actions travel the
+other way over an mpsc channel, so the UI thread never blocks on the socket.
+Left-click is deliberately inert for now — it will launch the desktop app once
+the shell is wired to the daemon.
+
+> **The daemon spawns the tray; the tray outlives the daemon.** `hestiad`
+> spawns the tray on every serve (detached, like every workload), so the tray
+> is simply always there when the daemon is — including a login autostart. It
+> deliberately does *not* die with the daemon: a stopped daemon is exactly when
+> the tray is most useful (the greyed status plus a start action), so only its
+> own Quit removes it. The spawn is best-effort and unconditional — a headless
+> session (no `DISPLAY`/`WAYLAND_DISPLAY`), a missing binary, or a
+> `HESTIA_SOCK` override (tests and side-by-side daemons are not the user
+> session's daemon) means no tray, and a duplicate spawn after a daemon restart
+> is absorbed by the tray itself: it takes an exclusive lock on
+> `tray.lock` in the transport runtime dir (flock on POSIX, a no-sharing open
+> on Windows) and exits at startup when another instance holds it.
 
 ## What's built vs. pending
 
@@ -769,14 +798,16 @@ datapacks on instances, from a platform project, a source page URL, or a local
 file, with required dependencies resolved and a `data/` mirror that heals across
 backups (datapacks install into their world, which the world backup already
 covers); the kind-first browse and management CLI (`hestia mod search`,
-`instance <name> mod add|list|remove|update`, `hestia search`); and the CLI
-front-end over all of it.
+`instance <name> mod add|list|remove|update`, `hestia search`); the CLI
+front-end over all of it; and the system tray (spawned by every serving
+daemon, quick actions for start/restart/autostart/quit).
 
 **Pending:** natives-classifier extraction for pre-1.19 clients (the resolver
 skips legacy `natives-<os>` classifier libraries, so old versions launch
 without their LWJGL natives) and the legacy (virtual) asset layout; installing
 a resolved modpack (its files and `overrides/`, e.g. `instance create
---modpack`); wiring the desktop shell to the daemon; and a functional tray.
+--modpack`); wiring the desktop shell to the daemon; and the tray's
+left-click launching the desktop app.
 
 > **Server provisioning is front-loaded by design.** A server is a long-lived,
 > repeatedly-started thing, often driven headless/scripted — `create` pays the
