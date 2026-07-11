@@ -12,7 +12,8 @@ use client::Client;
 
 use client::proto::content::SearchQuery;
 
-use super::format::{kind_plural, source_label};
+use super::entry::ContentEntry;
+use super::format::{kind_plural, source_label, world_name};
 use super::{session, EntryKind, PAGE};
 use crate::ui::{self, ProvisionReporter, View};
 
@@ -166,10 +167,9 @@ async fn add_session(
     } else {
         Vec::new()
     };
-    let (installed, _) = match entry {
-        EntryKind::Server => client.server().content_list(&info.id, kind).await?,
-        EntryKind::Instance => client.instance().content_list(&info.id, kind).await?,
-    };
+    let (installed, _) = ContentEntry::new(client, entry, info.id.clone())
+        .list(kind)
+        .await?;
     let base = SearchQuery {
         kind,
         loader: (kind == ContentKind::Mod).then(|| info.flavor.clone()),
@@ -204,7 +204,7 @@ pub(super) fn show_install_report(
     failures: &[ContentFailure],
 ) -> Result<()> {
     for content in installed {
-        let where_ = match world_label(content) {
+        let where_ = match world_name(&content.world) {
             Some(world) => format!("'{name}' ({world})"),
             None => format!("'{name}'"),
         };
@@ -214,7 +214,7 @@ pub(super) fn show_install_report(
         )))?;
     }
     for content in removed {
-        let where_ = match world_label(content) {
+        let where_ = match world_name(&content.world) {
             Some(world) => format!("'{name}' ({world})"),
             None => format!("'{name}'"),
         };
@@ -249,30 +249,16 @@ pub(super) async fn install_spec(
 ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
     let reporter = Arc::new(ProvisionReporter::new());
     let progress = reporter.clone();
-    let result = match entry {
-        EntryKind::Server => {
-            client
-                .server()
-                .content_add(id, spec, move |p| progress.update(p))
-                .await
-        }
-        EntryKind::Instance => {
-            client
-                .instance()
-                .content_add(id, spec, move |p| progress.update(p))
-                .await
-        }
-    };
+    let result = ContentEntry::new(client, entry, id)
+        .add(spec, move |p| progress.update(p))
+        .await;
     reporter.finish();
     Ok(result?)
 }
 
 async fn list(client: &Client, entry: EntryKind, kind: ContentKind, reference: &str) -> Result<()> {
     let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
-    let (items, untracked) = match entry {
-        EntryKind::Server => client.server().content_list(&id, kind).await?,
-        EntryKind::Instance => client.instance().content_list(&id, kind).await?,
-    };
+    let (items, untracked) = ContentEntry::new(client, entry, id).list(kind).await?;
     if items.is_empty() && untracked.is_empty() {
         return ui::show(View::note(format!("no {} installed", kind_plural(kind))));
     }
@@ -284,7 +270,7 @@ async fn list(client: &Client, entry: EntryKind, kind: ContentKind, reference: &
                     vec![
                         i.title.clone(),
                         i.version_number.clone(),
-                        world_label(i).unwrap_or("-").to_string(),
+                        world_name(&i.world).unwrap_or("-").to_string(),
                         source_label(i),
                     ]
                 })
@@ -325,31 +311,16 @@ async fn remove(
     world: Vec<String>,
 ) -> Result<()> {
     let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
+    let handle = ContentEntry::new(client, entry, id);
     let worlds: Vec<String> = world.into_iter().filter(|w| !w.is_empty()).collect();
     let item = match item {
         Some(item) => item,
         None => {
-            let (items, _) = match entry {
-                EntryKind::Server => client.server().content_list(&id, kind).await?,
-                EntryKind::Instance => client.instance().content_list(&id, kind).await?,
-            };
+            let (items, _) = handle.list(kind).await?;
             pick_installed(items)?
         }
     };
-    match entry {
-        EntryKind::Server => {
-            client
-                .server()
-                .content_remove(&id, kind, &item, &worlds)
-                .await?
-        }
-        EntryKind::Instance => {
-            client
-                .instance()
-                .content_remove(&id, kind, &item, &worlds)
-                .await?
-        }
-    }
+    handle.remove(kind, &item, &worlds).await?;
     let where_ = if worlds.is_empty() {
         format!("'{name}'")
     } else {
@@ -366,25 +337,15 @@ async fn update(
     item: Option<String>,
 ) -> Result<()> {
     let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
+    let handle = ContentEntry::new(client, entry, id);
     let target = item.unwrap_or_default();
 
     let reporter = Arc::new(ProvisionReporter::new());
     let progress = reporter.clone();
     let updated = {
-        let result = match entry {
-            EntryKind::Server => {
-                client
-                    .server()
-                    .content_update(&id, kind, &target, move |p| progress.update(p))
-                    .await
-            }
-            EntryKind::Instance => {
-                client
-                    .instance()
-                    .content_update(&id, kind, &target, move |p| progress.update(p))
-                    .await
-            }
-        };
+        let result = handle
+            .update(kind, &target, move |p| progress.update(p))
+            .await;
         reporter.finish();
         result?
     };
@@ -434,13 +395,6 @@ async fn pick_worlds(client: &Client, id: &str, world: Vec<String>) -> Result<Ve
     let picks = ui::multi_select("select world(s)", &worlds)
         .context("pass --world to name the world(s)")?;
     Ok(picks.into_iter().map(|i| worlds[i].clone()).collect())
-}
-
-/// A datapack's world shown as its folder name (the last path component of the
-/// stored `saves/<world>`); `None` for content that has no world.
-fn world_label(content: &InstalledContent) -> Option<&str> {
-    let world = content.world.rsplit('/').next().unwrap_or(&content.world);
-    (!world.is_empty()).then_some(world)
 }
 
 /// What a content command needs to know about its entry.

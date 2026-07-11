@@ -5,9 +5,12 @@
 pub mod input;
 pub mod list;
 pub mod log;
+pub mod modal;
 pub mod picker;
+pub mod reader;
 pub mod working;
 
 pub use input::TextInput;
 pub use list::SelectList;
 pub use picker::{Picker, PickerItem};
+pub use reader::ScrollText;

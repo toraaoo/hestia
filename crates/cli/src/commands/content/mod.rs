@@ -6,6 +6,7 @@
 //! interactively; piped invocations must pass it.
 
 mod browse;
+mod entry;
 mod format;
 mod manage;
 mod session;
