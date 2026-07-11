@@ -16,6 +16,7 @@ mod java;
 mod minecraft;
 mod registry;
 mod servers;
+mod sync;
 
 pub use accounts::{Accounts, LoginChallenge};
 pub use backup::BackupSettings;
@@ -29,3 +30,4 @@ pub use java::{Java, JavaInstallOutcome};
 pub use minecraft::launch::{JavaSettings, LaunchPlan};
 pub use minecraft::Minecraft;
 pub use servers::{RconConfig, ServerRecord, Servers};
+pub use sync::Sync;

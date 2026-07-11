@@ -106,6 +106,7 @@ impl Engine {
             anyhow::bail!("server '{}' is still provisioning", record.name);
         }
         let record = self.servers.ensure_start_config(&record.id)?;
+        self.sync.apply(&self.servers.data_dir(&record.id), true)?;
         install::sync(
             &self.servers.server_dir(&record.id),
             &self.servers.data_dir(&record.id),

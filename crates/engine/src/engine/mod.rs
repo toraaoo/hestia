@@ -21,6 +21,7 @@ use crate::instances::Instances;
 use crate::java::Java;
 use crate::minecraft::Minecraft;
 use crate::servers::Servers;
+use crate::sync::Sync;
 
 /// Everything a server create needs from the caller — the engine-side input to
 /// `provision_server` (EULA assertion and job ids are daemon concerns).
@@ -54,6 +55,7 @@ pub struct Engine {
     content: Content,
     servers: Servers,
     instances: Instances,
+    sync: Sync,
     // One backup or restore per entry at a time: two archives of the same
     // data would interleave the rcon save-off/save-on dance.
     backups_active: Mutex<HashSet<String>>,
@@ -69,6 +71,7 @@ impl Engine {
         let accounts = Accounts::new(data_home.join("accounts.json"));
         let servers = Servers::new(data_home.join("servers"));
         let instances = Instances::new(data_home.join("instances"));
+        let sync = Sync::new(data_home.join("shared"));
         Engine {
             data_home: Mutex::new(data_home),
             config,
@@ -79,6 +82,7 @@ impl Engine {
             content: Content::new(),
             servers,
             instances,
+            sync,
             backups_active: Mutex::new(HashSet::new()),
         }
     }
@@ -99,6 +103,7 @@ impl Engine {
         self.accounts.reload(resolved.join("accounts.json"));
         self.servers.reload(resolved.join("servers"));
         self.instances.reload(resolved.join("instances"));
+        self.sync.reload(resolved.join("shared"));
         *self.data_home.lock().unwrap() = resolved.clone();
         tracing::info!(home = %resolved.display(), "engine data home changed");
         Ok(resolved)
@@ -134,5 +139,9 @@ impl Engine {
 
     pub fn instances(&self) -> &Instances {
         &self.instances
+    }
+
+    pub fn sync(&self) -> &Sync {
+        &self.sync
     }
 }

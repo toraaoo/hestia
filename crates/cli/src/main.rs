@@ -163,6 +163,11 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::config::ConfigCmd,
     },
+    /// Settings/configs shared across servers and instances
+    Sync {
+        #[command(subcommand)]
+        cmd: commands::sync::SyncCmd,
+    },
     /// Daemon lifecycle
     Daemon {
         #[command(subcommand)]
@@ -286,6 +291,7 @@ async fn dispatch(command: Command) -> anyhow::Result<()> {
         Command::Sources => commands::content::run_sources().await,
         Command::Cache { cmd } => commands::cache::run(cmd).await,
         Command::Config { cmd } => commands::config::run(cmd).await,
+        Command::Sync { cmd } => commands::sync::run(cmd).await,
         Command::Daemon { cmd } => commands::daemon::run(cmd).await,
     }
 }
