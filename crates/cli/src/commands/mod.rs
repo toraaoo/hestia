@@ -14,6 +14,7 @@ pub mod play;
 pub mod process;
 pub mod server;
 pub mod sync;
+pub mod update;
 mod wizard;
 
 use anyhow::{Context, Result};
