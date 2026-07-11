@@ -99,7 +99,12 @@ fn drive<S: Screen>(
     screen: &mut S,
     mut events: Option<UnboundedReceiver<S::Event>>,
 ) -> Result<S::Outcome> {
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stderr()))?;
+    // Stderr is unbuffered and the backend queues one write per changed cell
+    // run; buffering makes each frame reach the terminal as a single flush
+    // instead of a visible cell-by-cell repaint. 64 KiB holds a worst-case
+    // full styled redraw, so no frame splits mid-buffer.
+    let writer = io::BufWriter::with_capacity(64 * 1024, io::stderr());
+    let mut terminal = Terminal::new(CrosstermBackend::new(writer))?;
     let mut dirty = true;
     loop {
         let mut disconnected = false;
