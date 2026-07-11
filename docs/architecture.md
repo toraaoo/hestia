@@ -422,6 +422,23 @@ The subsystems behind the aggregate:
 > what is actually in use. The layout change is not migrated: pre-`data/`
 > entries must be recreated (or their game files moved into `data/` by hand).
 
+> **Rename re-slugs the id and moves the directory.** The `id` is not just a
+> display alias — it is the directory name (`servers/<id>/`), the supervisor's
+> process key (`server-<id>`), the port-claim and content in-flight key, and
+> how the on-disk process records are keyed. So a rename cannot be a cheap
+> field write: it re-derives the id from the new name (the same `slugify` as
+> create), moves the entry directory, and rewrites the record, carrying the
+> ports, rcon, JVM/backup settings, and all game data along untouched. It is
+> refused unless the entry is stopped and free of any in-flight
+> backup/update/content job (and, for a server, not still provisioning) —
+> exactly the guards `remove` already uses, because both re-key or delete the
+> tree a running process and its records point at. After the move the daemon
+> `discard`s the old process id so no stale supervisor state survives under a
+> key that no longer resolves. The alternative — a stable id with only the
+> display name mutable — was rejected: it leaves the on-disk slug frozen at the
+> original name, so `servers/smp/` lingers long after the server is called
+> `cozy`, and the directory stops being a legible name for what it holds.
+
 > **Backups follow docker-mc-backup, minus what the launcher already owns.**
 > The reference behaviour (itzg/docker-mc-backup) is: pause world writes over
 > RCON (`save-off`, `save-all flush`), tar the data, `save-on` guaranteed by
@@ -558,11 +575,14 @@ supervises launched processes, and manages autostart. The only crate that links
   picks the default account launches use; `list` reports it),
   `process.start|stop|list|status|logs`, `events.subscribe`,
   `server.flavors|versions|resolve`,
-  `server.create|update|list|status|remove|start|stop|logs|command` (create
+  `server.create|update|rename|list|status|remove|start|stop|logs|command`
+  (create
   requires the caller to assert EULA acceptance; update refuses a running or
   still-creating server and, without `allow_downgrade`, a downgrade — a
   front-end updates a running server by explicitly stopping and restarting it
-  around the job, the CLI's confirmed stop-update-start;
+  around the job, the CLI's confirmed stop-update-start; rename re-slugs the id
+  and moves the directory, refused while running or busy — see the decision
+  note below;
   start/stop/status/logs are thin over
   the supervisor, merging the stored record with live process state; command
   relays one console command over the running server's rcon channel),
@@ -572,7 +592,8 @@ supervises launched processes, and manages autostart. The only crate that links
   `server.backup.create|list|restore|remove` (create archives a running
   server live; restore refuses a running or busy server and verifies the
   backup exists before answering with the job id), and the `instance.*`
-  counterparts: `flavors|versions|resolve|create|update|list|remove|worlds`
+  counterparts:
+  `flavors|versions|resolve|create|update|rename|list|remove|worlds`
   (`worlds` lists a client's save worlds for the datapack picker), plus
   `instance.launch|stop|logs` (`logs` is thin over the supervisor, like the
   server's), `instance.backup.create|list|restore|remove` (create and

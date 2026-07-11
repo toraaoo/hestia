@@ -147,6 +147,22 @@ impl Contract for InstanceRemove {
     type Result = Empty;
 }
 
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceRenameParams {
+    /// The instance to rename, by its current name or id.
+    pub instance: String,
+    /// The new display name; the id (directory slug) is re-derived from it.
+    pub name: String,
+}
+
+pub struct InstanceRename;
+impl Contract for InstanceRename {
+    const CHANNEL: &'static str = "instance.rename";
+    type Params = InstanceRenameParams;
+    type Result = InstanceInfo;
+}
+
 pub struct InstanceStop;
 impl Contract for InstanceStop {
     const CHANNEL: &'static str = "instance.stop";

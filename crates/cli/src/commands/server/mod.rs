@@ -146,6 +146,11 @@ enum ServerAction {
         )]
         restart: bool,
     },
+    /// Rename the server (moves its directory; must be stopped)
+    Rename {
+        /// The new display name
+        new_name: String,
+    },
     /// Delete the server (its jar, world and all)
     #[command(visible_alias = "rm")]
     Remove,
@@ -210,6 +215,7 @@ async fn run_action(client: Client, name: String, action: ServerAction) -> Resul
             downgrade,
             restart,
         } => update::run(&client, name, version, loader, downgrade, restart).await,
+        ServerAction::Rename { new_name } => lifecycle::rename(&client, &name, &new_name).await,
         ServerAction::Remove => lifecycle::remove(&client, &name).await,
     }
 }

@@ -71,6 +71,17 @@ pub(super) async fn remove(client: &Client, instance: &str) -> Result<()> {
     ui::show(View::line(format!("instance '{instance}' removed")))
 }
 
+pub(super) async fn rename(client: &Client, instance: &str, new_name: &str) -> Result<()> {
+    let info = {
+        let _spinner = Spinner::start(format!("renaming '{instance}'"));
+        client.instance().rename(instance, new_name).await?
+    };
+    ui::show(View::line(format!(
+        "instance '{instance}' renamed to '{}' (id {})",
+        info.name, info.id
+    )))
+}
+
 pub(crate) async fn logs(
     client: &Client,
     instance: &str,

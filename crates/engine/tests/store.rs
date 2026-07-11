@@ -98,6 +98,40 @@ fn servers_store_round_trips_records() {
 }
 
 #[test]
+fn server_rename_reslugs_and_moves_the_directory() {
+    let dir = temp_dir("server-rename");
+    let servers = Servers::new(dir.join("servers"));
+    let profile = ServerProfile {
+        flavor: "vanilla".into(),
+        game_version: "1.21.1".into(),
+        ..Default::default()
+    };
+    let created = servers.create("Old Name", profile.clone(), None).unwrap();
+    let port = created.game_port;
+    let other = servers.create("Keeper", profile, None).unwrap();
+
+    // Renaming onto another entry's name (or its slug) is refused.
+    assert!(servers.rename("old-name", "Keeper").is_err());
+    assert!(servers.rename("old-name", &other.id).is_err());
+
+    let renamed = servers.rename("old-name", "New Name").unwrap();
+    assert_eq!(renamed.id, "new-name");
+    assert_eq!(renamed.name, "New Name");
+    assert_eq!(renamed.game_port, port, "the claimed port moves with it");
+    assert!(servers.server_dir("new-name").is_dir());
+    assert!(!servers.server_dir("old-name").exists());
+    assert!(servers.get("old-name").is_none());
+    assert_eq!(servers.get("New Name").unwrap().id, "new-name");
+
+    // A rename that leaves the slug unchanged just rewrites the record.
+    let recased = servers.rename("new-name", "new  name").unwrap();
+    assert_eq!(recased.id, "new-name");
+    assert_eq!(recased.name, "new  name");
+    assert!(servers.rename("missing", "Whatever").is_err());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn instances_store_round_trips_records() {
     let dir = temp_dir("instances");
     let instances = Instances::new(dir.join("instances"));
@@ -132,6 +166,44 @@ fn instances_store_round_trips_records() {
 
     assert!(instances.remove("modded").unwrap());
     assert!(instances.list().is_empty());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn instance_rename_reslugs_and_moves_the_directory() {
+    let dir = temp_dir("instance-rename");
+    let instances = Instances::new(dir.join("instances"));
+    let record = instances
+        .create(
+            "Old Pack",
+            InstanceProfile {
+                flavor: "fabric".into(),
+                game_version: "1.21.1".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    instances.config_set(&record.id, "memory", "4G").unwrap();
+    instances
+        .create("Keeper", InstanceProfile::default())
+        .unwrap();
+
+    assert!(instances.rename("old-pack", "Keeper").is_err());
+
+    let renamed = instances.rename("old-pack", "New Pack").unwrap();
+    assert_eq!(renamed.id, "new-pack");
+    assert_eq!(renamed.name, "New Pack");
+    assert!(instances.instance_dir("new-pack").is_dir());
+    assert!(!instances.instance_dir("old-pack").exists());
+    assert_eq!(
+        instances
+            .config_get("new-pack", "memory")
+            .unwrap()
+            .as_deref(),
+        Some("4G"),
+        "JVM settings move with the record"
+    );
+    assert!(instances.rename("missing", "Whatever").is_err());
     std::fs::remove_dir_all(&dir).ok();
 }
 

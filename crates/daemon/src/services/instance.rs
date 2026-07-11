@@ -6,14 +6,14 @@ use proto::instance::{
     InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList, InstanceConfigListResult,
     InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch,
     InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLogs, InstanceRemove,
-    InstanceResolve, InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions,
-    InstanceWorlds, InstanceWorldsResult,
+    InstanceRename, InstanceResolve, InstanceStop, InstanceUpdate, InstanceUpdateResult,
+    InstanceVersions, InstanceWorlds, InstanceWorldsResult,
 };
 use proto::minecraft::{ConfigEntry, FlavorsResult, VersionsResult};
 use proto::process::ProcessLogsResult;
 use proto::Empty;
 
-use super::guards::{ensure_no_backup, find_instance, is_running};
+use super::guards::{ensure_no_backup, ensure_no_content, find_instance, is_running};
 use crate::runtime::{instance_process_id, Channels, ServiceError};
 
 pub(super) fn register(on: &mut Channels<'_>) {
@@ -133,6 +133,36 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .discard(&instance_process_id(&record.id));
         tracing::info!(instance = %record.id, name = %record.name, "instance removed");
         Ok(Empty {})
+    });
+
+    on.handle::<InstanceRename, _, _>(|p, ctx| async move {
+        if p.name.trim().is_empty() {
+            return Err(ServiceError::bad_request("a new name is required"));
+        }
+        let record = find_instance(&ctx, &p.instance)?;
+        let process_id = instance_process_id(&record.id);
+        if is_running(&ctx, &process_id) {
+            return Err(ServiceError::bad_request(format!(
+                "instance '{}' is running; stop it first",
+                record.name
+            )));
+        }
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
+        ensure_no_content(&ctx, &process_id, &record.name)?;
+        let renamed = ctx
+            .runtime
+            .engine()
+            .instances()
+            .rename(&record.id, &p.name)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+        ctx.runtime.processes().discard(&process_id);
+        tracing::info!(
+            old_id = %record.id,
+            id = %renamed.id,
+            name = %renamed.name,
+            "instance renamed"
+        );
+        Ok(ctx.runtime.instance_view(renamed))
     });
 
     on.handle::<InstanceLaunch, _, _>(|p, ctx| async move {

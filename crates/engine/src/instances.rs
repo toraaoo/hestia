@@ -141,6 +141,39 @@ impl Instances {
         Ok(record.jvm.entries())
     }
 
+    /// Rename an instance: re-slug its id from `new_name`, move its directory,
+    /// and rewrite the record. JVM settings and the game directory move with it
+    /// untouched. The caller guarantees the instance is stopped and not busy. A
+    /// rename that leaves the id unchanged touches the record alone.
+    pub fn rename(&self, reference: &str, new_name: &str) -> Result<InstanceRecord> {
+        let mut record = self
+            .get(reference)
+            .with_context(|| format!("unknown instance: {reference}"))?;
+        let old_id = record.id.clone();
+        let new_id = registry::slugify(new_name)?;
+        if self
+            .list()
+            .iter()
+            .any(|r| r.id != old_id && (r.id == new_id || r.name == new_name))
+        {
+            bail!("an instance named '{new_name}' already exists");
+        }
+        if new_id != old_id {
+            let from = self.instance_dir(&old_id);
+            let to = self.instance_dir(&new_id);
+            if to.exists() {
+                bail!("an instance directory '{new_id}' already exists");
+            }
+            std::fs::rename(&from, &to)
+                .with_context(|| format!("cannot move {} to {}", from.display(), to.display()))?;
+        }
+        record.id = new_id.clone();
+        record.name = new_name.to_string();
+        registry::write_record(&self.instance_dir(&new_id), RECORD, &record)?;
+        tracing::info!(old_id, id = %new_id, name = %new_name, "instance renamed");
+        Ok(record)
+    }
+
     /// Delete an instance's directory (record, saves and all). Returns false
     /// when no instance matches.
     pub fn remove(&self, reference: &str) -> Result<bool> {

@@ -15,8 +15,8 @@ use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo,
     InstanceLaunch, InstanceLaunchParams, InstanceList, InstanceLogs, InstanceLogsParams,
-    InstanceRef, InstanceRemove, InstanceResolve, InstanceStop, InstanceUpdate,
-    InstanceUpdateParams, InstanceVersions, InstanceWorlds,
+    InstanceRef, InstanceRemove, InstanceRename, InstanceRenameParams, InstanceResolve,
+    InstanceStop, InstanceUpdate, InstanceUpdateParams, InstanceVersions, InstanceWorlds,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams,
@@ -137,6 +137,17 @@ impl Instance<'_> {
             .call::<InstanceRemove>(&instance_ref(instance))
             .await?;
         Ok(())
+    }
+
+    /// Rename a stopped instance; the id (directory slug) is re-derived from
+    /// the new name. Returns the updated record, whose `id` and `name` reflect
+    /// the rename.
+    pub async fn rename(&self, instance: &str, name: &str) -> Result<InstanceInfo, IpcError> {
+        let params = InstanceRenameParams {
+            instance: instance.to_string(),
+            name: name.to_string(),
+        };
+        self.session.call::<InstanceRename>(&params).await
     }
 
     pub async fn stop(&self, instance: &str) -> Result<(), IpcError> {

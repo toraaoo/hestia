@@ -152,6 +152,11 @@ enum InstanceAction {
         )]
         downgrade: bool,
     },
+    /// Rename the instance (moves its directory; must be stopped)
+    Rename {
+        /// The new display name
+        new_name: String,
+    },
     /// Delete the instance (its saves and all)
     #[command(visible_alias = "rm")]
     Remove,
@@ -248,6 +253,7 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             loader,
             downgrade,
         } => update::run(client, name, version, loader, downgrade).await,
+        InstanceAction::Rename { new_name } => lifecycle::rename(client, &name, &new_name).await,
         InstanceAction::Remove => lifecycle::remove(client, &name).await,
     }
 }

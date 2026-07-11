@@ -380,6 +380,41 @@ impl Servers {
         Ok(record)
     }
 
+    /// Rename a server: re-slug its id from `new_name`, move its directory, and
+    /// rewrite the record. Ports, rcon, JVM/backup settings, and the data on
+    /// disk move with the directory untouched. The caller guarantees the server
+    /// is stopped and not busy. A rename that leaves the id unchanged (only the
+    /// display casing/punctuation differs) touches the record alone.
+    pub fn rename(&self, reference: &str, new_name: &str) -> Result<ServerRecord> {
+        let _claims = self.claims.lock().unwrap();
+        let mut record = self
+            .get(reference)
+            .with_context(|| format!("unknown server: {reference}"))?;
+        let old_id = record.id.clone();
+        let new_id = registry::slugify(new_name)?;
+        if self
+            .list()
+            .iter()
+            .any(|r| r.id != old_id && (r.id == new_id || r.name == new_name))
+        {
+            bail!("a server named '{new_name}' already exists");
+        }
+        if new_id != old_id {
+            let from = self.server_dir(&old_id);
+            let to = self.server_dir(&new_id);
+            if to.exists() {
+                bail!("a server directory '{new_id}' already exists");
+            }
+            std::fs::rename(&from, &to)
+                .with_context(|| format!("cannot move {} to {}", from.display(), to.display()))?;
+        }
+        record.id = new_id.clone();
+        record.name = new_name.to_string();
+        registry::write_record(&self.server_dir(&new_id), RECORD, &record)?;
+        tracing::info!(old_id, id = %new_id, name = %new_name, "server renamed");
+        Ok(record)
+    }
+
     /// Delete a server's directory (jar, world and all). Returns false when no
     /// server matches.
     pub fn remove(&self, reference: &str) -> Result<bool> {

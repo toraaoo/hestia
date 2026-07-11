@@ -16,9 +16,9 @@ use proto::process::ProcessLogLine;
 use proto::server::{
     ServerCommand, ServerCommandParams, ServerConfigGet, ServerConfigGetParams, ServerConfigList,
     ServerConfigSet, ServerConfigSetParams, ServerCreate, ServerCreateParams, ServerFlavors,
-    ServerInfo, ServerList, ServerLogs, ServerLogsParams, ServerRef, ServerRemove, ServerResolve,
-    ServerStart, ServerStartResult, ServerStatus, ServerStop, ServerUpdate, ServerUpdateParams,
-    ServerVersions,
+    ServerInfo, ServerList, ServerLogs, ServerLogsParams, ServerRef, ServerRemove, ServerRename,
+    ServerRenameParams, ServerResolve, ServerStart, ServerStartResult, ServerStatus, ServerStop,
+    ServerUpdate, ServerUpdateParams, ServerVersions,
 };
 use serde_json::Value;
 
@@ -132,6 +132,17 @@ impl Server<'_> {
             .call::<ServerRemove>(&server_ref(server))
             .await?;
         Ok(())
+    }
+
+    /// Rename a stopped server; the id (directory slug) is re-derived from the
+    /// new name. Returns the updated record, whose `id` and `name` reflect the
+    /// rename.
+    pub async fn rename(&self, server: &str, name: &str) -> Result<ServerInfo, IpcError> {
+        let params = ServerRenameParams {
+            server: server.to_string(),
+            name: name.to_string(),
+        };
+        self.session.call::<ServerRename>(&params).await
     }
 
     pub async fn start(&self, server: &str) -> Result<ServerStartResult, IpcError> {

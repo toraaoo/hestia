@@ -153,6 +153,22 @@ impl Contract for ServerRemove {
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
+pub struct ServerRenameParams {
+    /// The server to rename, by its current name or id.
+    pub server: String,
+    /// The new display name; the id (directory slug) is re-derived from it.
+    pub name: String,
+}
+
+pub struct ServerRename;
+impl Contract for ServerRename {
+    const CHANNEL: &'static str = "server.rename";
+    type Params = ServerRenameParams;
+    type Result = ServerInfo;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
 pub struct ServerStartResult {
     pub process_id: String,
     pub pid: u32,

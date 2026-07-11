@@ -7,12 +7,15 @@ use proto::process::{LogSource, ProcessLogsResult, ProcessSpec, RestartPolicy};
 use proto::server::{
     ServerCommand, ServerCommandResult, ServerConfigGet, ServerConfigGetResult, ServerConfigList,
     ServerConfigListResult, ServerConfigSet, ServerCreate, ServerCreateResult, ServerFlavors,
-    ServerList, ServerListResult, ServerLogs, ServerRemove, ServerResolve, ServerStart,
-    ServerStartResult, ServerStatus, ServerStop, ServerUpdate, ServerUpdateResult, ServerVersions,
+    ServerList, ServerListResult, ServerLogs, ServerRemove, ServerRename, ServerResolve,
+    ServerStart, ServerStartResult, ServerStatus, ServerStop, ServerUpdate, ServerUpdateResult,
+    ServerVersions,
 };
 use proto::Empty;
 
-use super::guards::{ensure_no_backup, find_server, is_running};
+use super::guards::{
+    ensure_no_backup, ensure_no_content, ensure_no_update, find_server, is_running,
+};
 use crate::runtime::{server_process_id, Channels, ServiceError, StartError};
 
 pub(super) fn register(on: &mut Channels<'_>) {
@@ -121,6 +124,43 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .discard(&server_process_id(&record.id));
         tracing::info!(server = %record.id, name = %record.name, "server removed");
         Ok(Empty {})
+    });
+
+    on.handle::<ServerRename, _, _>(|p, ctx| async move {
+        if p.name.trim().is_empty() {
+            return Err(ServiceError::bad_request("a new name is required"));
+        }
+        let record = find_server(&ctx, &p.server)?;
+        let process_id = server_process_id(&record.id);
+        if is_running(&ctx, &process_id) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is running; stop it first",
+                record.name
+            )));
+        }
+        if ctx.runtime.server_creates().in_flight(&record.name) {
+            return Err(ServiceError::bad_request(format!(
+                "server '{}' is still being created",
+                record.name
+            )));
+        }
+        ensure_no_update(&ctx, &record.id, &record.name)?;
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
+        ensure_no_content(&ctx, &process_id, &record.name)?;
+        let renamed = ctx
+            .runtime
+            .engine()
+            .servers()
+            .rename(&record.id, &p.name)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+        ctx.runtime.processes().discard(&process_id);
+        tracing::info!(
+            old_id = %record.id,
+            id = %renamed.id,
+            name = %renamed.name,
+            "server renamed"
+        );
+        Ok(ctx.runtime.server_view(renamed))
     });
 
     on.handle::<ServerStart, _, _>(|p, ctx| async move {
