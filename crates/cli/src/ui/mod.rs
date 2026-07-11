@@ -10,6 +10,7 @@
 //! `View`s.
 
 pub(crate) mod components;
+pub(crate) mod markdown;
 mod progress;
 mod render;
 pub(crate) mod session;

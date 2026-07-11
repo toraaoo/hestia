@@ -883,8 +883,7 @@ impl ContentSession {
         }
         if !project.body.is_empty() {
             lines.push(Line::raw(""));
-            let body = tui_markdown::from_str(&project.body);
-            lines.extend(body.lines.into_iter().map(line_to_static));
+            lines.extend(crate::ui::markdown::render(&project.body));
         }
 
         let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
@@ -1096,19 +1095,6 @@ fn version_picker(versions: &[ContentVersion]) -> (Picker, Vec<ContentVersion>) 
         })
         .collect();
     (Picker::new(items), versions.to_vec())
-}
-
-/// Detach a rendered markdown line from the source text it borrows, so the
-/// detail pane can hold it while the session mutates its own state.
-fn line_to_static(line: Line<'_>) -> Line<'static> {
-    let spans: Vec<Span<'static>> = line
-        .spans
-        .into_iter()
-        .map(|s| Span::styled(s.content.into_owned(), s.style))
-        .collect();
-    Line::from(spans)
-        .style(line.style)
-        .alignment(line.alignment.unwrap_or(ratatui::layout::Alignment::Left))
 }
 
 fn centered(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
