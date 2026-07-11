@@ -691,7 +691,7 @@ token — the entry name — is captured and re-parsed by a `no_binary_name`
 clap help and validation while the catalogue verbs stay ordinary subcommands.
 On top of that sit two deliberate cross-cutting shortcuts: `hestia play
 [instance]`, the launcher's single most common action (picks interactively when
-several instances exist); and verb-first `hestia start|stop|restart|logs
+several instances exist); and verb-first `hestia start|stop|restart|logs|rename
 <name>`, which resolve a name across *both* the server and instance registries
 and dispatch to the right handler (a name that matches both asks the caller to
 qualify it) — so day-to-day driving need not recall which kind an entry is, nor
@@ -709,7 +709,8 @@ stay aligned with the wire channels (`remove`, not `delete`).
 > went — easy to get wrong and hard to remember. Fixing the name to one slot
 > (`server <name> <action>`) removes that guesswork and lets each per-entry
 > verb drop its own entry argument. The two exceptions to noun-first are
-> earned, not sloppy: `play` and the `start`/`stop`/`restart`/`logs` shortcuts
+> earned, not sloppy: `play` and the `start`/`stop`/`restart`/`logs`/`rename`
+> shortcuts
 > are the actions taken often enough that making the user first pick the right
 > noun (and remember `launch` ≠ `start`) is the friction worth paying a
 > cross-registry name lookup to avoid. Everything scriptable still has an

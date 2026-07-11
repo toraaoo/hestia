@@ -1,4 +1,4 @@
-//! Top-level lifecycle shortcuts: `hestia start|stop|restart|logs <name>`.
+//! Top-level lifecycle shortcuts: `hestia start|stop|restart|logs|rename <name>`.
 //!
 //! A server and an instance are driven the same way day to day, but they live
 //! in separate registries with different verbs (`server start` vs `instance
@@ -87,6 +87,14 @@ pub async fn logs(name: String, tail: Option<usize>, follow: bool) -> Result<()>
     match resolve(&client, &name).await? {
         Target::Server => server::lifecycle::logs(&client, &name, tail, follow).await,
         Target::Instance => instance::lifecycle::logs(&client, &name, tail, follow).await,
+    }
+}
+
+pub async fn rename(name: String, new_name: String) -> Result<()> {
+    let client = connect().await?;
+    match resolve(&client, &name).await? {
+        Target::Server => server::lifecycle::rename(&client, &name, &new_name).await,
+        Target::Instance => instance::lifecycle::rename(&client, &name, &new_name).await,
     }
 }
 

@@ -17,8 +17,8 @@ hestia server smp config set memory 4G
 ```
 
 Two cross-cutting shortcuts sit on top: `hestia play` (the happy path) and the
-verb-first `hestia start|stop|restart|logs <name>`, which resolve a name across
-both servers and instances so you need not recall which kind it is.
+verb-first `hestia start|stop|restart|logs|rename <name>`, which resolve a name
+across both servers and instances so you need not recall which kind it is.
 
 Conventions: anything a `create` needs but wasn't given is prompted for on a
 terminal (piped invocations must pass the flag); `ls`/`rm` alias every

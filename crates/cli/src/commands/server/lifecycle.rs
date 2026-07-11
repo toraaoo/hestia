@@ -52,7 +52,7 @@ pub(super) async fn remove(client: &Client, server: &str) -> Result<()> {
     ui::show(View::line(format!("server '{server}' removed")))
 }
 
-pub(super) async fn rename(client: &Client, server: &str, new_name: &str) -> Result<()> {
+pub(crate) async fn rename(client: &Client, server: &str, new_name: &str) -> Result<()> {
     let info = {
         let _spinner = Spinner::start(format!("renaming '{server}'"));
         client.server().rename(server, new_name).await?

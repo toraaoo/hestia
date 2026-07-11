@@ -108,6 +108,13 @@ enum Command {
         #[arg(short, long, help = "Keep streaming new output until Ctrl-C")]
         follow: bool,
     },
+    /// Rename a server or instance by name (must be stopped)
+    Rename {
+        /// Server or instance name or id
+        target: String,
+        /// The new display name
+        new_name: String,
+    },
     /// Browse mods on a content source
     Mod {
         #[command(subcommand)]
@@ -238,6 +245,7 @@ async fn dispatch(command: Command) -> anyhow::Result<()> {
             tail,
             follow,
         } => commands::lifecycle::logs(target, tail, follow).await,
+        Command::Rename { target, new_name } => commands::lifecycle::rename(target, new_name).await,
         Command::Mod { cmd } => {
             commands::content::run_browse(client::proto::content::ContentKind::Mod, cmd).await
         }
