@@ -11,6 +11,7 @@ pub mod lifecycle;
 mod mc;
 pub mod play;
 pub mod server;
+pub mod update;
 mod wizard;
 
 use anyhow::{Context, Result};

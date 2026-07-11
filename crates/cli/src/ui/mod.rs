@@ -22,7 +22,7 @@ use std::sync::OnceLock;
 use anyhow::{anyhow, bail, Result};
 
 pub use components::PickerItem;
-pub use progress::{InstallReporter, ProvisionReporter, Spinner};
+pub use progress::{DownloadReporter, InstallReporter, ProvisionReporter, Spinner};
 pub use session::console::ConsoleEvent;
 pub use view::View;
 

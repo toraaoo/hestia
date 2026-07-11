@@ -68,6 +68,32 @@ What it adds over stock:
   directory, install mode, and components; downgrades take the stock
   uninstall-first path.
 
+## Auto-updates
+
+The desktop app ships `tauri-plugin-updater`, polling
+`https://github.com/toraaoo/hestia/releases/latest/download/latest.json`. On a
+`v*` tag, the release workflow's `manifest` job composes `latest.json` from the
+signed NSIS setup (`windows-x86_64`) and AppImage (`linux-x86_64`) and attaches
+it to the Release. On Windows the update runs the NSIS installer passively, so
+the custom template's remembered install dir + components apply.
+
+Updater artifacts are signed (`bundle.createUpdaterArtifacts`); the public key
+lives in `tauri.conf.json`, and CI signs with two repository secrets:
+
+- `TAURI_SIGNING_PRIVATE_KEY` — the private key (generated with
+  `cargo tauri signer generate`; **losing it means shipped apps can no longer
+  accept updates**).
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — its password (empty if the key has
+  none).
+
+Local `scripts/package.sh` runs without the key and simply skips the
+signatures/updater artifacts.
+
+The **portable archives** are the same four binaries (`hestia`, `hestiad`,
+`tray`, `hestia-desktop`) plus `LICENSE`/`README`, packed flat by
+[`scripts/package.sh`](../scripts/package.sh) — Tauri has no portable target, so
+this is a plain `tar`/`Compress-Archive` step.
+
 ## Runtime dependency: the system WebView
 
 The desktop binary needs a system WebView — **WebView2** on Windows (present by

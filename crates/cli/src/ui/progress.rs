@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
+use client::proto::download::DownloadProgress;
 use client::proto::java::{JavaInstallPhase, JavaInstallProgress};
 use client::proto::minecraft::{ProvisionPhase, ProvisionProgress};
 use ratatui::crossterm::cursor::{Hide, MoveToColumn, Show};
@@ -237,6 +238,58 @@ fn download_detail(progress: &JavaInstallProgress, rate: f64) -> String {
 /// gauge on a terminal, one line per phase when stderr is redirected. Byte
 /// phases (java, jars) show sizes and throughput; count phases (libraries,
 /// assets) show completed/total.
+/// Reports a plain byte download (the self-update installer): a live gauge
+/// on a terminal, one announcement line when stderr is redirected.
+pub struct DownloadReporter {
+    animator: Option<Animator>,
+    rate: Mutex<RateMeter>,
+    label: &'static str,
+}
+
+impl DownloadReporter {
+    pub fn new(label: &'static str) -> Self {
+        let animator = Animator::start(View::Spinner(label.into()));
+        if animator.is_none() {
+            eprintln!("{label}");
+        }
+        Self {
+            animator,
+            rate: Mutex::new(RateMeter::default()),
+            label,
+        }
+    }
+
+    pub fn update(&self, progress: &DownloadProgress) {
+        let Some(animator) = &self.animator else {
+            return;
+        };
+        let rate = self.rate.lock().unwrap().observe(progress.downloaded);
+        let current = human_bytes(progress.downloaded);
+        let total = if progress.total > 0 {
+            human_bytes(progress.total)
+        } else {
+            "?".to_string()
+        };
+        let detail = if rate > 0.0 {
+            format!("{current} / {total} · {}/s", human_bytes(rate as u64))
+        } else {
+            format!("{current} / {total}")
+        };
+        animator.set(View::Gauge {
+            label: self.label,
+            ratio: count_ratio(progress.downloaded, progress.total),
+            detail,
+        });
+    }
+
+    /// Clear the gauge so a following message prints on a clean line.
+    pub fn finish(&self) {
+        if let Some(animator) = &self.animator {
+            animator.stop();
+        }
+    }
+}
+
 pub struct ProvisionReporter {
     animator: Option<Animator>,
     rate: Mutex<RateMeter>,
