@@ -149,9 +149,9 @@ hestia instance modded config set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
 hestia instance modded logs -n 50 # captured output — the newest running session
                                  #   (-f opens the fullscreen log session; piped
                                  #   it streams plainly)
-hestia instance modded info      # the record and each running session
-hestia instance modded stop      # kill every running session of the instance
-hestia instance modded restart   # stop, then launch again
+hestia instance modded info      # the record and each running session (handles)
+hestia instance modded stop      # kill every session (--session <h> targets one)
+hestia instance modded restart   # stop, then launch again (--session <h> for one)
 hestia instance modded rename mp # rename (stopped): re-slugs the id and moves
                                  #   its directory; saves move with it
 hestia instance modded remove    # delete the instance (its saves and all)
@@ -167,14 +167,27 @@ pass `--new-session`.
 hestia play modded               # session 1
 hestia play modded               # refused: "already running; pass --new-session"
 hestia play modded --new-session # session 2, running alongside session 1
-hestia instance modded info      # shows every running session
+hestia instance modded info      # lists each session with its handle, pid, state
 ```
 
 Each session writes its own log (`<instance>/logs/session-N.log`), so their
-output never interleaves. `logs` targets the newest running session; `stop`
-stops **all** of the instance's sessions. Sessions share one `data/`, so
-Minecraft's own `session.lock` arbitrates a singleplayer world (a second session
-can't open the same world). Servers stay single — a world has one writer.
+output never interleaves. By default `logs` targets the newest running session
+and `stop` stops **all** of the instance's sessions — target one with
+`--session <handle>` (the handle is the short number `info` shows, or the full
+process id):
+
+```bash
+hestia instance modded stop --session 1      # stop just session 1
+hestia instance modded logs --session 2 -f   # follow session 2's output
+hestia instance modded restart --session 1   # replace session 1 (others keep running)
+
+hestia stop modded --session 1               # the shortcuts take it too
+hestia logs modded --session 2 -f
+```
+
+Sessions share one `data/`, so Minecraft's own `session.lock` arbitrates a
+singleplayer world (a second session can't open the same world). Servers stay
+single — a world has one writer, so `--session` is an instance-only flag.
 
 ### Content on an instance
 

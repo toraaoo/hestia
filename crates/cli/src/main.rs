@@ -88,6 +88,8 @@ enum Command {
     Stop {
         /// Server or instance name or id
         target: String,
+        #[arg(long, help = "Target one instance session by its handle; default all")]
+        session: Option<String>,
     },
     /// Restart a server or instance by name
     Restart {
@@ -100,6 +102,8 @@ enum Command {
         account: Option<String>,
         #[arg(short, long, help = "Return immediately instead of attaching")]
         detach: bool,
+        #[arg(long, help = "Restart one instance session by its handle; default all")]
+        session: Option<String>,
     },
     /// Tail a server or instance's captured output by name
     Logs {
@@ -109,6 +113,11 @@ enum Command {
         tail: Option<usize>,
         #[arg(short, long, help = "Keep streaming new output until Ctrl-C")]
         follow: bool,
+        #[arg(
+            long,
+            help = "Target one instance session by its handle; default newest"
+        )]
+        session: Option<String>,
     },
     /// Rename a server or instance by name (must be stopped)
     Rename {
@@ -242,17 +251,19 @@ async fn dispatch(command: Command) -> anyhow::Result<()> {
             account,
             detach,
         } => commands::lifecycle::start(target, account, detach).await,
-        Command::Stop { target } => commands::lifecycle::stop(target).await,
+        Command::Stop { target, session } => commands::lifecycle::stop(target, session).await,
         Command::Restart {
             target,
             account,
             detach,
-        } => commands::lifecycle::restart(target, account, detach).await,
+            session,
+        } => commands::lifecycle::restart(target, session, account, detach).await,
         Command::Logs {
             target,
             tail,
             follow,
-        } => commands::lifecycle::logs(target, tail, follow).await,
+            session,
+        } => commands::lifecycle::logs(target, session, tail, follow).await,
         Command::Rename { target, new_name } => commands::lifecycle::rename(target, new_name).await,
         Command::Mod { cmd } => {
             commands::content::run_browse(client::proto::content::ContentKind::Mod, cmd).await

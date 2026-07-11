@@ -90,16 +90,27 @@ enum InstanceAction {
         #[arg(long, help = "Launch another session even if one is already running")]
         new_session: bool,
     },
-    /// Kill every running session of the instance
-    Stop,
+    /// Kill the instance's sessions (all, or one with --session)
+    Stop {
+        #[arg(
+            long,
+            help = "Target one session by its handle (see `info`); default all"
+        )]
+        session: Option<String>,
+    },
     /// Stop the running instance and launch it again
     Restart {
         #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
         account: Option<String>,
         #[arg(short, long, help = "Return immediately instead of following the logs")]
         detach: bool,
+        #[arg(
+            long,
+            help = "Restart one session by its handle (see `info`); default all"
+        )]
+        session: Option<String>,
     },
-    /// The instance's record and process state
+    /// The instance's record and running sessions
     Info,
     /// Captured instance output
     Logs {
@@ -107,6 +118,11 @@ enum InstanceAction {
         tail: Option<usize>,
         #[arg(short, long, help = "Keep streaming new output until Ctrl-C")]
         follow: bool,
+        #[arg(
+            long,
+            help = "Target one session by its handle (see `info`); default newest"
+        )]
+        session: Option<String>,
     },
     /// Get, set, or list settings (memory, jvm-args)
     Config {
@@ -209,11 +225,16 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             )
             .await
         }
-        InstanceAction::Stop => lifecycle::stop(client, &name).await,
-        InstanceAction::Restart { account, detach } => {
+        InstanceAction::Stop { session } => lifecycle::stop(client, &name, session).await,
+        InstanceAction::Restart {
+            account,
+            detach,
+            session,
+        } => {
             lifecycle::restart(
                 client,
                 &name,
+                session,
                 account.as_deref().unwrap_or_default(),
                 detach,
             )
@@ -226,7 +247,11 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             };
             entry::show_info(info)
         }
-        InstanceAction::Logs { tail, follow } => lifecycle::logs(client, &name, tail, follow).await,
+        InstanceAction::Logs {
+            tail,
+            follow,
+            session,
+        } => lifecycle::logs(client, &name, session, tail, follow).await,
         InstanceAction::Config { cmd } => config::run(client, &name, cmd).await,
         InstanceAction::Backup { cmd } => backup::run(client, &name, cmd).await,
         InstanceAction::Mod { cmd } => {

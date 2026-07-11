@@ -37,6 +37,49 @@ pub(super) fn running_process(info: &InstanceInfo) -> Option<ProcessInfo> {
         .cloned()
 }
 
+/// Fetch one instance by name or id.
+pub(super) async fn fetch(client: &Client, reference: &str) -> Result<InstanceInfo> {
+    client
+        .instance()
+        .list()
+        .await?
+        .into_iter()
+        .find(|i| i.id == reference || i.name == reference)
+        .with_context(|| format!("no instance matches '{reference}'"))
+}
+
+/// The short handle for a session: the sequence suffix of its process id
+/// (`instance-modded_2` → `2`), which is what the user targets with `--session`.
+pub(super) fn session_handle(process: &ProcessInfo) -> &str {
+    process.id.rsplit('_').next().unwrap_or(&process.id)
+}
+
+/// Resolve a `--session` argument (the short handle or the full process id)
+/// against an instance's sessions, returning the full process id.
+pub(super) fn resolve_session(info: &InstanceInfo, input: &str) -> Result<String> {
+    info.sessions
+        .iter()
+        .find(|s| s.id == input || session_handle(s) == input)
+        .map(|s| s.id.clone())
+        .with_context(|| {
+            let running: Vec<&str> = info
+                .sessions
+                .iter()
+                .filter(|s| s.state == ProcessState::Running)
+                .map(session_handle)
+                .collect();
+            let listed = if running.is_empty() {
+                "none running".to_string()
+            } else {
+                running.join(", ")
+            };
+            format!(
+                "instance '{}' has no session '{input}' (running: {listed})",
+                info.name
+            )
+        })
+}
+
 pub(super) async fn list(client: &Client) -> Result<()> {
     let instances = client.instance().list().await?;
     if instances.is_empty() {
@@ -73,5 +116,20 @@ pub(super) fn show_info(info: &InstanceInfo) -> Result<()> {
         ),
         ("java", info.java_major.to_string()),
         ("state", mc::sessions_label(&info.sessions)),
-    ]))
+    ]))?;
+    if !info.sessions.is_empty() {
+        let rows = info
+            .sessions
+            .iter()
+            .map(|s| {
+                vec![
+                    session_handle(s).to_string(),
+                    s.pid.to_string(),
+                    format!("{:?}", s.state).to_lowercase(),
+                ]
+            })
+            .collect();
+        ui::show(View::table("sessions", ["SESSION", "PID", "STATE"], rows))?;
+    }
+    Ok(())
 }

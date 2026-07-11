@@ -59,22 +59,34 @@ pub async fn start(name: String, account: Option<String>, detach: bool) -> Resul
     }
 }
 
-pub async fn stop(name: String) -> Result<()> {
+pub async fn stop(name: String, session: Option<String>) -> Result<()> {
     let client = connect().await?;
     match resolve(&client, &name).await? {
-        Target::Server => server::lifecycle::stop(&client, &name).await,
-        Target::Instance => instance::lifecycle::stop(&client, &name).await,
+        Target::Server => {
+            reject_server_session(&session)?;
+            server::lifecycle::stop(&client, &name).await
+        }
+        Target::Instance => instance::lifecycle::stop(&client, &name, session).await,
     }
 }
 
-pub async fn restart(name: String, account: Option<String>, detach: bool) -> Result<()> {
+pub async fn restart(
+    name: String,
+    session: Option<String>,
+    account: Option<String>,
+    detach: bool,
+) -> Result<()> {
     let client = connect().await?;
     match resolve(&client, &name).await? {
-        Target::Server => server::console::restart_attached(client, &name, detach).await,
+        Target::Server => {
+            reject_server_session(&session)?;
+            server::console::restart_attached(client, &name, detach).await
+        }
         Target::Instance => {
             instance::lifecycle::restart(
                 &client,
                 &name,
+                session,
                 account.as_deref().unwrap_or_default(),
                 detach,
             )
@@ -83,12 +95,28 @@ pub async fn restart(name: String, account: Option<String>, detach: bool) -> Res
     }
 }
 
-pub async fn logs(name: String, tail: Option<usize>, follow: bool) -> Result<()> {
+pub async fn logs(
+    name: String,
+    session: Option<String>,
+    tail: Option<usize>,
+    follow: bool,
+) -> Result<()> {
     let client = connect().await?;
     match resolve(&client, &name).await? {
-        Target::Server => server::lifecycle::logs(&client, &name, tail, follow).await,
-        Target::Instance => instance::lifecycle::logs(&client, &name, tail, follow).await,
+        Target::Server => {
+            reject_server_session(&session)?;
+            server::lifecycle::logs(&client, &name, tail, follow).await
+        }
+        Target::Instance => instance::lifecycle::logs(&client, &name, session, tail, follow).await,
     }
+}
+
+/// A server runs a single process, so `--session` is meaningless for one.
+fn reject_server_session(session: &Option<String>) -> Result<()> {
+    if session.is_some() {
+        bail!("--session applies to instances only; a server runs a single process");
+    }
+    Ok(())
 }
 
 pub async fn rename(name: String, new_name: String) -> Result<()> {

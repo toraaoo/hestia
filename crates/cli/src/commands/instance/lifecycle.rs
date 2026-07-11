@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
+use client::proto::process::ProcessState;
 use client::{Client, ProcessEvent};
 
 use super::entry;
@@ -47,26 +48,60 @@ pub async fn launch(
         .await
 }
 
-pub(crate) async fn stop(client: &Client, instance: &str) -> Result<()> {
+pub(crate) async fn stop(client: &Client, instance: &str, session: Option<String>) -> Result<()> {
+    let target = resolve_session(client, instance, &session).await?;
     {
         let _spinner = Spinner::start(format!("stopping '{instance}'"));
-        client.instance().stop(instance, None).await?;
+        client.instance().stop(instance, target.clone()).await?;
     }
-    ui::show(View::line(format!("instance '{instance}' stopped")))
+    match target {
+        Some(id) => ui::show(View::line(format!(
+            "instance '{instance}' session {} stopped",
+            session_label(&id)
+        ))),
+        None => ui::show(View::line(format!("instance '{instance}' stopped"))),
+    }
 }
 
 pub(crate) async fn restart(
     client: &Client,
     instance: &str,
+    session: Option<String>,
     account: &str,
     detach: bool,
 ) -> Result<()> {
+    let target = resolve_session(client, instance, &session).await?;
     {
         let _spinner = Spinner::start(format!("stopping '{instance}'"));
-        client.instance().stop(instance, None).await?;
-        wait_until_stopped(client, instance).await?;
+        client.instance().stop(instance, target.clone()).await?;
+        match &target {
+            Some(id) => wait_until_session_stopped(client, instance, id).await?,
+            None => wait_until_stopped(client, instance).await?,
+        }
     }
-    launch(client, instance, account, false, detach).await
+    // Restarting one session leaves the others running, so its relaunch must opt
+    // into a concurrent session; a full restart stopped everything first.
+    launch(client, instance, account, target.is_some(), detach).await
+}
+
+/// Resolve an optional `--session` handle to a full process id against the live
+/// instance; `None` stays `None` (all sessions / newest).
+async fn resolve_session(
+    client: &Client,
+    instance: &str,
+    session: &Option<String>,
+) -> Result<Option<String>> {
+    match session {
+        Some(input) => {
+            let info = entry::fetch(client, instance).await?;
+            Ok(Some(entry::resolve_session(&info, input)?))
+        }
+        None => Ok(None),
+    }
+}
+
+fn session_label(process_id: &str) -> &str {
+    process_id.rsplit('_').next().unwrap_or(process_id)
 }
 
 pub(super) async fn remove(client: &Client, instance: &str) -> Result<()> {
@@ -91,23 +126,23 @@ pub(crate) async fn rename(client: &Client, instance: &str, new_name: &str) -> R
 pub(crate) async fn logs(
     client: &Client,
     instance: &str,
+    session: Option<String>,
     tail: Option<usize>,
     follow: bool,
 ) -> Result<()> {
-    let lines = client.instance().logs(instance, None, tail).await?;
+    let target = resolve_session(client, instance, &session).await?;
+    let lines = client
+        .instance()
+        .logs(instance, target.clone(), tail)
+        .await?;
     if follow && ui::interactive_output() {
-        let instances = client.instance().list().await?;
-        let info = instances
-            .iter()
-            .find(|i| i.id == instance || i.name == instance)
-            .with_context(|| format!("no instance matches '{instance}'"))?;
-        let process = entry::running_process(info)
-            .with_context(|| format!("instance '{}' is not running", info.name))?;
+        let info = entry::fetch(client, instance).await?;
+        let process_id = follow_target(&info, &target)?;
         let backfill = lines.into_iter().map(|l| l.line).collect();
         return crate::commands::lifecycle::log_session(
             client,
             &info.name,
-            &process.id,
+            &process_id,
             backfill,
             "instance",
         )
@@ -120,20 +155,32 @@ pub(crate) async fn logs(
         ui::show(View::line(line.line))?;
     }
     if follow {
-        follow_logs(client, instance).await?;
+        let info = entry::fetch(client, instance).await?;
+        follow_logs(client, &info, &target).await?;
     }
     Ok(())
 }
 
-async fn follow_logs(client: &Client, instance: &str) -> Result<()> {
-    let instances = client.instance().list().await?;
-    let info = instances
-        .iter()
-        .find(|i| i.id == instance || i.name == instance)
-        .with_context(|| format!("no instance matches '{instance}'"))?;
-    let process = entry::running_process(info)
-        .with_context(|| format!("instance '{}' is not running", info.name))?;
-    let mut events = client.process().subscribe(&process.id).await?;
+/// The process id to follow: the named session, else the newest running one.
+fn follow_target(
+    info: &client::proto::instance::InstanceInfo,
+    target: &Option<String>,
+) -> Result<String> {
+    match target {
+        Some(id) => Ok(id.clone()),
+        None => entry::running_process(info)
+            .map(|p| p.id)
+            .with_context(|| format!("instance '{}' is not running", info.name)),
+    }
+}
+
+async fn follow_logs(
+    client: &Client,
+    info: &client::proto::instance::InstanceInfo,
+    target: &Option<String>,
+) -> Result<()> {
+    let process_id = follow_target(info, target)?;
+    let mut events = client.process().subscribe(&process_id).await?;
     while let Some(event) = events.recv().await {
         match event {
             ProcessEvent::Output(line) => ui::show(View::line(line.line))?,
@@ -145,8 +192,8 @@ async fn follow_logs(client: &Client, instance: &str) -> Result<()> {
     Ok(())
 }
 
-/// Poll until the instance's process has exited, so a restart's `launch` does
-/// not race the old game.
+/// Poll until no session of the instance is running, so a restart's `launch`
+/// does not race the old game.
 async fn wait_until_stopped(client: &Client, instance: &str) -> Result<()> {
     for _ in 0..30 {
         let instances = client.instance().list().await?;
@@ -160,4 +207,24 @@ async fn wait_until_stopped(client: &Client, instance: &str) -> Result<()> {
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
     bail!("instance '{instance}' did not stop in time");
+}
+
+/// Poll until one specific session has exited (its siblings keep running).
+async fn wait_until_session_stopped(
+    client: &Client,
+    instance: &str,
+    session_id: &str,
+) -> Result<()> {
+    for _ in 0..30 {
+        let info = entry::fetch(client, instance).await?;
+        let still_running = info
+            .sessions
+            .iter()
+            .any(|s| s.id == session_id && s.state == ProcessState::Running);
+        if !still_running {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    bail!("instance '{instance}' session did not stop in time");
 }
