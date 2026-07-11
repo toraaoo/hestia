@@ -14,9 +14,9 @@ use std::time::{Duration, Instant};
 use client::proto::java::{JavaInstallPhase, JavaInstallProgress};
 use client::proto::minecraft::{ProvisionPhase, ProvisionProgress};
 use ratatui::crossterm::cursor::{Hide, MoveToColumn, Show};
-use ratatui::crossterm::execute;
-use ratatui::crossterm::style::Stylize;
+use ratatui::crossterm::style::{Print, Stylize};
 use ratatui::crossterm::terminal::{Clear, ClearType};
+use ratatui::crossterm::{execute, queue};
 
 use super::render::human_bytes;
 
@@ -81,17 +81,32 @@ fn run(view: Arc<Mutex<View>>, stop: Arc<AtomicBool>) {
     let _ = execute!(err, Hide);
     let mut step = 0usize;
     while !stop.load(Ordering::Relaxed) {
-        {
+        let rendered = {
             let view = view.lock().unwrap();
-            let spin = FRAMES[step % FRAMES.len()].cyan();
-            let _ = execute!(err, MoveToColumn(0), Clear(ClearType::CurrentLine));
-            let _ = write!(err, "{spin} {}", line(&view));
-            let _ = err.flush();
-        }
+            line(&view)
+        };
+        let spin = FRAMES[step % FRAMES.len()].cyan();
+        // One buffered frame, flushed once: overwrite from column 0 and erase
+        // only the tail. Clear-then-redraw across separate writes lets the
+        // terminal paint the blank in between — visible as flicker.
+        let mut frame = Vec::new();
+        let _ = queue!(
+            frame,
+            MoveToColumn(0),
+            Print(spin),
+            Print(" "),
+            Print(rendered),
+            Clear(ClearType::UntilNewLine)
+        );
+        let _ = err.write_all(&frame);
+        let _ = err.flush();
         step = step.wrapping_add(1);
         thread::sleep(TICK);
     }
-    let _ = execute!(err, MoveToColumn(0), Clear(ClearType::CurrentLine), Show);
+    let mut frame = Vec::new();
+    let _ = queue!(frame, MoveToColumn(0), Clear(ClearType::CurrentLine), Show);
+    let _ = err.write_all(&frame);
+    let _ = err.flush();
 }
 
 /// The line after the spinner frame: plain text (no escape codes — the line
