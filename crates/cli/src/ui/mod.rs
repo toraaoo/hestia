@@ -120,6 +120,21 @@ pub fn console(
     )
 }
 
+/// Run a read-only log session: fullscreen live output, scrollable, no input
+/// line. Blocking until detach (returns `None`, the workload keeps running)
+/// or a `Closed` event, whose message it returns. Requires an interactive
+/// terminal.
+pub fn log_session(
+    title: &str,
+    backfill: Vec<String>,
+    events: tokio::sync::mpsc::UnboundedReceiver<ConsoleEvent>,
+) -> Result<Option<String>> {
+    if !is_interactive() {
+        bail!("no interactive terminal");
+    }
+    session::run(session::logs::LogScreen::new(title, backfill), Some(events))
+}
+
 /// Render a byte count in human units (KB, MB, …).
 pub fn human_bytes(bytes: u64) -> String {
     render::human_bytes(bytes)

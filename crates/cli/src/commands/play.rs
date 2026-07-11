@@ -6,13 +6,19 @@ use anyhow::{bail, Result};
 use crate::commands::instance;
 use crate::ui;
 
-pub async fn run(reference: Option<String>, account: Option<String>) -> Result<()> {
+pub async fn run(reference: Option<String>, account: Option<String>, detach: bool) -> Result<()> {
     let client = super::connect().await?;
     let reference = match reference {
         Some(reference) => reference,
         None => pick_instance(&client).await?,
     };
-    instance::launch(&client, &reference, account.as_deref().unwrap_or_default()).await
+    instance::launch(
+        &client,
+        &reference,
+        account.as_deref().unwrap_or_default(),
+        detach,
+    )
+    .await
 }
 
 async fn pick_instance(client: &client::Client) -> Result<String> {

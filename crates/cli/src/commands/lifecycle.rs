@@ -6,9 +6,10 @@
 //! common actions do not force the caller to first recall which kind a name is.
 
 use anyhow::{bail, Result};
-use client::Client;
+use client::{Client, ProcessEvent};
 
 use super::{connect, instance, server};
+use crate::ui::{self, ConsoleEvent, View};
 
 enum Target {
     Server,
@@ -41,12 +42,21 @@ async fn resolve(client: &Client, name: &str) -> Result<Target> {
     }
 }
 
-pub async fn start(name: String, account: Option<String>) -> Result<()> {
+pub async fn start(name: String, account: Option<String>, detach: bool) -> Result<()> {
     let client = connect().await?;
     match resolve(&client, &name).await? {
-        Target::Server => server::lifecycle::start(&client, &name).await,
+        Target::Server => {
+            server::lifecycle::start(&client, &name).await?;
+            server::console::maybe_attach(client, &name, detach).await
+        }
         Target::Instance => {
-            instance::launch(&client, &name, account.as_deref().unwrap_or_default()).await
+            instance::launch(
+                &client,
+                &name,
+                account.as_deref().unwrap_or_default(),
+                detach,
+            )
+            .await
         }
     }
 }
@@ -59,13 +69,21 @@ pub async fn stop(name: String) -> Result<()> {
     }
 }
 
-pub async fn restart(name: String, account: Option<String>) -> Result<()> {
+pub async fn restart(name: String, account: Option<String>, detach: bool) -> Result<()> {
     let client = connect().await?;
     match resolve(&client, &name).await? {
-        Target::Server => server::lifecycle::restart(&client, &name).await,
+        Target::Server => {
+            server::lifecycle::restart(&client, &name).await?;
+            server::console::maybe_attach(client, &name, detach).await
+        }
         Target::Instance => {
-            instance::lifecycle::restart(&client, &name, account.as_deref().unwrap_or_default())
-                .await
+            instance::lifecycle::restart(
+                &client,
+                &name,
+                account.as_deref().unwrap_or_default(),
+                detach,
+            )
+            .await
         }
     }
 }
@@ -75,5 +93,39 @@ pub async fn logs(name: String, tail: Option<usize>, follow: bool) -> Result<()>
     match resolve(&client, &name).await? {
         Target::Server => server::lifecycle::logs(&client, &name, tail, follow).await,
         Target::Instance => instance::lifecycle::logs(&client, &name, tail, follow).await,
+    }
+}
+
+/// Run the read-only fullscreen log session over a running process: feed the
+/// backfill, subscribe to its output, and stream until detach or exit. Prints
+/// the plain outcome after the terminal is restored, so the shell keeps a
+/// record.
+pub(crate) async fn log_session(
+    client: &Client,
+    name: &str,
+    process_id: &str,
+    backfill: Vec<String>,
+    noun: &str,
+) -> Result<()> {
+    let mut events = client.process().subscribe(process_id).await?;
+    let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
+    let forward = tokio::spawn(async move {
+        while let Some(event) = events.recv().await {
+            let message = match event {
+                ProcessEvent::Output(line) => ConsoleEvent::Output(line.line),
+                ProcessEvent::Exit(_) => ConsoleEvent::Closed("stopped".to_string()),
+            };
+            if event_tx.send(message).is_err() {
+                break;
+            }
+        }
+    });
+    let title = format!("{name} — logs");
+    let closed =
+        tokio::task::spawn_blocking(move || ui::log_session(&title, backfill, event_rx)).await??;
+    forward.abort();
+    match closed {
+        Some(message) => ui::show(View::note(format!("{noun} '{name}' {message}"))),
+        None => ui::show(View::note(format!("detached — '{name}' still running"))),
     }
 }

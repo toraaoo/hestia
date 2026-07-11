@@ -46,6 +46,8 @@ enum Command {
         instance: Option<String>,
         #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
         account: Option<String>,
+        #[arg(short, long, help = "Return immediately instead of following the logs")]
+        detach: bool,
     },
     /// Minecraft accounts (Microsoft sign-in, switching)
     #[command(visible_alias = "auth")]
@@ -77,6 +79,8 @@ enum Command {
             help = "Account name or uuid for an instance (default: the switched-to account)"
         )]
         account: Option<String>,
+        #[arg(short, long, help = "Return immediately instead of attaching")]
+        detach: bool,
     },
     /// Stop a running server or instance by name
     Stop {
@@ -92,6 +96,8 @@ enum Command {
             help = "Account name or uuid for an instance (default: the switched-to account)"
         )]
         account: Option<String>,
+        #[arg(short, long, help = "Return immediately instead of attaching")]
+        detach: bool,
     },
     /// Tail a server or instance's captured output by name
     Logs {
@@ -207,14 +213,26 @@ fn main() -> ExitCode {
 
 async fn dispatch(command: Command) -> anyhow::Result<()> {
     match command {
-        Command::Play { instance, account } => commands::play::run(instance, account).await,
+        Command::Play {
+            instance,
+            account,
+            detach,
+        } => commands::play::run(instance, account, detach).await,
         Command::Account { cmd } => commands::account::run(cmd).await,
         Command::Java { cmd } => commands::java::run(cmd).await,
         Command::Server { cmd } => commands::server::run(cmd).await,
         Command::Instance { cmd } => commands::instance::run(cmd).await,
-        Command::Start { target, account } => commands::lifecycle::start(target, account).await,
+        Command::Start {
+            target,
+            account,
+            detach,
+        } => commands::lifecycle::start(target, account, detach).await,
         Command::Stop { target } => commands::lifecycle::stop(target).await,
-        Command::Restart { target, account } => commands::lifecycle::restart(target, account).await,
+        Command::Restart {
+            target,
+            account,
+            detach,
+        } => commands::lifecycle::restart(target, account, detach).await,
         Command::Logs {
             target,
             tail,

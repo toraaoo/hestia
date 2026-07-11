@@ -53,6 +53,20 @@ pub(crate) async fn logs(
     follow: bool,
 ) -> Result<()> {
     let lines = client.server().logs(server, tail).await?;
+    if follow && ui::is_interactive() {
+        let info = client.server().status(server).await?;
+        let process = entry::running_process(&info)
+            .with_context(|| format!("server '{}' is not running", info.name))?;
+        let backfill = lines.into_iter().map(|l| l.line).collect();
+        return crate::commands::lifecycle::log_session(
+            client,
+            &info.name,
+            &process.id,
+            backfill,
+            "server",
+        )
+        .await;
+    }
     if lines.is_empty() && !follow {
         return ui::show(View::note("no output captured (has it been started?)"));
     }
@@ -79,6 +93,22 @@ async fn follow_logs(client: &Client, server: &str) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Poll until the server's process reports running, so an attach right after
+/// `start` does not race the spawn.
+pub(crate) async fn wait_until_running(client: &Client, server: &str) -> Result<()> {
+    for _ in 0..20 {
+        let info = client.server().status(server).await?;
+        let running = info
+            .process
+            .is_some_and(|p| p.state == ProcessState::Running);
+        if running {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    bail!("server '{server}' did not report running in time");
 }
 
 /// Poll until the server's process has exited, so a restart's `start` does not

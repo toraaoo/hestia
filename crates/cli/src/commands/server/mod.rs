@@ -9,7 +9,7 @@
 
 mod backup;
 mod config;
-mod console;
+pub(crate) mod console;
 mod create;
 mod entry;
 pub(crate) mod lifecycle;
@@ -73,12 +73,18 @@ struct ServerEntry {
 
 #[derive(Subcommand)]
 enum ServerAction {
-    /// Start the server under the daemon's supervisor
-    Start,
+    /// Start the server and attach its console
+    Start {
+        #[arg(short, long, help = "Return immediately instead of attaching")]
+        detach: bool,
+    },
     /// Stop the running server
     Stop,
-    /// Stop the running server and start it again
-    Restart,
+    /// Stop the running server, start it again, and attach its console
+    Restart {
+        #[arg(short, long, help = "Return immediately instead of attaching")]
+        detach: bool,
+    },
     /// The server's record merged with its live process state
     Status,
     /// Captured server output
@@ -170,9 +176,15 @@ pub async fn run(cmd: ServerCmd) -> Result<()> {
 
 async fn run_action(client: Client, name: String, action: ServerAction) -> Result<()> {
     match action {
-        ServerAction::Start => lifecycle::start(&client, &name).await,
+        ServerAction::Start { detach } => {
+            lifecycle::start(&client, &name).await?;
+            console::maybe_attach(client, &name, detach).await
+        }
         ServerAction::Stop => lifecycle::stop(&client, &name).await,
-        ServerAction::Restart => lifecycle::restart(&client, &name).await,
+        ServerAction::Restart { detach } => {
+            lifecycle::restart(&client, &name).await?;
+            console::maybe_attach(client, &name, detach).await
+        }
         ServerAction::Status => {
             let info = client.server().status(&name).await?;
             entry::show_status(&info)

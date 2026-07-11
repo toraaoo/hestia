@@ -9,7 +9,18 @@ use crate::ui::{self, View};
 
 /// Attach an interactive console to a running server: its live output above
 /// an input line; Esc detaches without touching the server.
-pub(super) async fn attach(client: Client, server: &str) -> Result<()> {
+/// Attach after a start/restart: wait for the process to report running,
+/// then hand over to the console. A detach flag or a piped invocation skips
+/// it, keeping today's one-line behavior.
+pub(crate) async fn maybe_attach(client: Client, server: &str, detach: bool) -> Result<()> {
+    if detach || !ui::is_interactive() {
+        return Ok(());
+    }
+    super::lifecycle::wait_until_running(&client, server).await?;
+    attach(client, server).await
+}
+
+pub(crate) async fn attach(client: Client, server: &str) -> Result<()> {
     if !ui::is_interactive() {
         bail!("attach needs an interactive terminal (use `server logs -f` and `server command`)");
     }

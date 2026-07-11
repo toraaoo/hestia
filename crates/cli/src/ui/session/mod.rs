@@ -6,6 +6,7 @@
 //! to keys, mouse, ticks, and injected app events.
 
 pub mod console;
+pub mod logs;
 pub mod pager;
 pub mod prompt;
 mod terminal;

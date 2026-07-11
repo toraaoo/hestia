@@ -85,6 +85,8 @@ enum InstanceAction {
     Launch {
         #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
         account: Option<String>,
+        #[arg(short, long, help = "Return immediately instead of following the logs")]
+        detach: bool,
     },
     /// Kill the running instance
     Stop,
@@ -92,6 +94,8 @@ enum InstanceAction {
     Restart {
         #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
         account: Option<String>,
+        #[arg(short, long, help = "Return immediately instead of following the logs")]
+        detach: bool,
     },
     /// The instance's record and process state
     Info,
@@ -184,12 +188,24 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
 
 async fn run_action(client: &Client, name: String, action: InstanceAction) -> Result<()> {
     match action {
-        InstanceAction::Launch { account } => {
-            launch(client, &name, account.as_deref().unwrap_or_default()).await
+        InstanceAction::Launch { account, detach } => {
+            launch(
+                client,
+                &name,
+                account.as_deref().unwrap_or_default(),
+                detach,
+            )
+            .await
         }
         InstanceAction::Stop => lifecycle::stop(client, &name).await,
-        InstanceAction::Restart { account } => {
-            lifecycle::restart(client, &name, account.as_deref().unwrap_or_default()).await
+        InstanceAction::Restart { account, detach } => {
+            lifecycle::restart(
+                client,
+                &name,
+                account.as_deref().unwrap_or_default(),
+                detach,
+            )
+            .await
         }
         InstanceAction::Info => {
             let instances = client.instance().list().await?;

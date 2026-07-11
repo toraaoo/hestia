@@ -10,8 +10,10 @@ use client::{Client, ProcessEvent};
 use super::entry;
 use crate::ui::{self, ProvisionReporter, Spinner, View};
 
-/// Launch `reference`, rendering preparation progress; shared with `hestia play`.
-pub async fn launch(client: &Client, reference: &str, account: &str) -> Result<()> {
+/// Launch `reference`, rendering preparation progress, then attach a
+/// read-only log session (unless detached or piped); shared with
+/// `hestia play`.
+pub async fn launch(client: &Client, reference: &str, account: &str, detach: bool) -> Result<()> {
     let reporter = Arc::new(ProvisionReporter::new());
     let progress = reporter.clone();
     let result = client
@@ -19,10 +21,23 @@ pub async fn launch(client: &Client, reference: &str, account: &str) -> Result<(
         .launch(reference, account, move |p| progress.update(p))
         .await;
     reporter.finish();
-    let (_, pid) = result?;
+    let (process_id, pid) = result?;
     ui::show(View::line(format!(
         "instance '{reference}' launched (pid {pid})"
-    )))
+    )))?;
+    if detach || !ui::is_interactive() {
+        return Ok(());
+    }
+    let backfill = client
+        .instance()
+        .logs(reference, Some(100))
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|l| l.line)
+        .collect();
+    crate::commands::lifecycle::log_session(client, reference, &process_id, backfill, "instance")
+        .await
 }
 
 pub(crate) async fn stop(client: &Client, instance: &str) -> Result<()> {
@@ -33,13 +48,18 @@ pub(crate) async fn stop(client: &Client, instance: &str) -> Result<()> {
     ui::show(View::line(format!("instance '{instance}' stopped")))
 }
 
-pub(crate) async fn restart(client: &Client, instance: &str, account: &str) -> Result<()> {
+pub(crate) async fn restart(
+    client: &Client,
+    instance: &str,
+    account: &str,
+    detach: bool,
+) -> Result<()> {
     {
         let _spinner = Spinner::start(format!("stopping '{instance}'"));
         client.instance().stop(instance).await?;
         wait_until_stopped(client, instance).await?;
     }
-    launch(client, instance, account).await
+    launch(client, instance, account, detach).await
 }
 
 pub(super) async fn remove(client: &Client, instance: &str) -> Result<()> {
@@ -57,6 +77,24 @@ pub(crate) async fn logs(
     follow: bool,
 ) -> Result<()> {
     let lines = client.instance().logs(instance, tail).await?;
+    if follow && ui::is_interactive() {
+        let instances = client.instance().list().await?;
+        let info = instances
+            .iter()
+            .find(|i| i.id == instance || i.name == instance)
+            .with_context(|| format!("no instance matches '{instance}'"))?;
+        let process = entry::running_process(info)
+            .with_context(|| format!("instance '{}' is not running", info.name))?;
+        let backfill = lines.into_iter().map(|l| l.line).collect();
+        return crate::commands::lifecycle::log_session(
+            client,
+            &info.name,
+            &process.id,
+            backfill,
+            "instance",
+        )
+        .await;
+    }
     if lines.is_empty() && !follow {
         return ui::show(View::note("no output captured (has it been launched?)"));
     }
