@@ -109,8 +109,8 @@ hestia server smp logs -n 50     # captured output (-f opens the fullscreen
 hestia server smp status         # the record merged with live process state
 hestia server smp stop           # stop the running server
 hestia server smp restart        # stop, then start again
-hestia server smp rename cozy    # rename (stopped): re-slugs the id and moves
-                                 #   its directory; ports and data move with it
+hestia server smp rename cozy    # rename (stopped): rewrites the display name;
+                                 #   the id, directory, ports and data stay put
 hestia server smp remove         # delete the server (its jar, world and all)
 hestia server smp mod add <slug> # servers take mods (fabric/plugin flavors)
 hestia server smp datapack add <slug>   # datapacks install into the server's world
@@ -152,8 +152,8 @@ hestia instance modded logs -n 50 # captured output — the newest running sessi
 hestia instance modded info      # the record and each running session (handles)
 hestia instance modded stop      # kill every session (--session <h> targets one)
 hestia instance modded restart   # stop, then launch again (--session <h> for one)
-hestia instance modded rename mp # rename (stopped): re-slugs the id and moves
-                                 #   its directory; saves move with it
+hestia instance modded rename mp # rename (stopped): rewrites the display name;
+                                 #   the id, directory and saves stay put
 hestia instance modded remove    # delete the instance (its saves and all)
 ```
 

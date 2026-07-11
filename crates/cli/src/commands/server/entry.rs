@@ -18,7 +18,7 @@ pub(super) fn pick_server(
     if let Some(reference) = provided {
         return servers
             .into_iter()
-            .find(|s| s.id == reference || s.name == reference)
+            .find(|s| client::proto::naming::reference_matches(&reference, &s.id, &s.name))
             .with_context(|| format!("no server matches '{reference}'"));
     }
     let labels: Vec<String> = servers

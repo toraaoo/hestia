@@ -153,13 +153,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .servers()
             .rename(&record.id, &p.name)
             .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
-        ctx.runtime.processes().discard(&process_id);
-        tracing::info!(
-            old_id = %record.id,
-            id = %renamed.id,
-            name = %renamed.name,
-            "server renamed"
-        );
+        tracing::info!(id = %renamed.id, name = %renamed.name, "server renamed");
         Ok(ctx.runtime.server_view(renamed))
     });
 

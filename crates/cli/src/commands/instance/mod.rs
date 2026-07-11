@@ -242,7 +242,10 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
         }
         InstanceAction::Info => {
             let instances = client.instance().list().await?;
-            let Some(info) = instances.iter().find(|i| i.id == name || i.name == name) else {
+            let Some(info) = instances
+                .iter()
+                .find(|i| client::proto::naming::reference_matches(&name, &i.id, &i.name))
+            else {
                 bail!("no instance matches '{name}'");
             };
             entry::show_info(info)

@@ -15,6 +15,7 @@ pub mod health;
 pub mod instance;
 pub mod java;
 pub mod minecraft;
+pub mod naming;
 pub mod process;
 pub mod server;
 pub mod sync;

@@ -24,13 +24,13 @@ async fn resolve(client: &Client, name: &str) -> Result<Target> {
         .list()
         .await?
         .iter()
-        .any(|s| s.id == name || s.name == name);
+        .any(|s| client::proto::naming::reference_matches(name, &s.id, &s.name));
     let is_instance = client
         .instance()
         .list()
         .await?
         .iter()
-        .any(|i| i.id == name || i.name == name);
+        .any(|i| client::proto::naming::reference_matches(name, &i.id, &i.name));
     match (is_server, is_instance) {
         (true, false) => Ok(Target::Server),
         (false, true) => Ok(Target::Instance),

@@ -454,22 +454,35 @@ The subsystems behind the aggregate:
 > (`shared/servers/` vs `shared/instances/`, each with its own defaults). The
 > two never mix; there is deliberately no cross-kind sharing.
 
-> **Rename re-slugs the id and moves the directory.** The `id` is not just a
-> display alias — it is the directory name (`servers/<id>/`), the supervisor's
-> process key (`server-<id>`), the port-claim and content in-flight key, and
-> how the on-disk process records are keyed. So a rename cannot be a cheap
-> field write: it re-derives the id from the new name (the same `slugify` as
-> create), moves the entry directory, and rewrites the record, carrying the
-> ports, rcon, JVM/backup settings, and all game data along untouched. It is
-> refused unless the entry is stopped and free of any in-flight
-> backup/update/content job (and, for a server, not still provisioning) —
-> exactly the guards `remove` already uses, because both re-key or delete the
-> tree a running process and its records point at. After the move the daemon
-> `discard`s the old process id so no stale supervisor state survives under a
-> key that no longer resolves. The alternative — a stable id with only the
-> display name mutable — was rejected: it leaves the on-disk slug frozen at the
-> original name, so `servers/smp/` lingers long after the server is called
-> `cozy`, and the directory stops being a legible name for what it holds.
+> **The id is a stable, slug-tagged token; rename is a metadata write.** The
+> `id` is the directory name (`servers/<id>/`), the supervisor's process key
+> (`server-<id>`), the port-claim and content in-flight key, and how the
+> on-disk process records are keyed — so it must never change once an entry
+> exists, or a running process and every record pointing at it are orphaned.
+> It is minted once at create as `<slug>-<suffix>`: `slugify(name)` for
+> legibility (the id still reads like the entry on disk and in logs), tagged
+> with eight hex chars from the random tail of a UUIDv7 for a stable, unique
+> discriminator. The suffix is what lets two different names that slug alike
+> coexist — and it is drawn from the uuid's *random* section, not its
+> millisecond prefix, so ids minted back-to-back don't share a tag. `rename`
+> then rewrites the record's `name` field and nothing else: the directory,
+> ports, rcon, JVM/backup settings, and game data are already keyed by the
+> stable id, so none of them move. A front-end targets an entry by its **name**,
+> never the opaque id: a reference resolves by exact id *or* any spelling that
+> slugs to the display name (`My Server`, `my-server`, `MY  SERVER` all hit the
+> one server named "My Server"), so the CLI need not echo the suffix back at the
+> user. That rule — `proto::naming::reference_matches` — lives in `proto`, the
+> same no-drift seam the wire payloads use, so the daemon (`get`) and every
+> front-end resolve a reference identically. It is unambiguous only because two
+> entries may not reduce to the same slug (`Modded` and `modded` are the same
+> entry — `name_taken` rejects the second). The rejected
+> alternative was the old scheme — id *equals* the slug, so a rename re-slugs,
+> moves the directory, re-keys the process records, and `discard`s the old
+> process id. That made a rename a tree-moving operation guarded like `remove`;
+> a stable id makes it a label edit. The one cost — the slug half of the id
+> reflects the *birth* name, so `servers/smp-3f9a2c7d/` lingers after the entry
+> is renamed `cozy` — is cosmetic: the record and every listing carry the live
+> name, and the id was never a name to begin with.
 
 > **Backups follow docker-mc-backup, minus what the launcher already owns.**
 > The reference behaviour (itzg/docker-mc-backup) is: pause world writes over
@@ -702,8 +715,8 @@ supervises launched processes, and manages autostart. The only crate that links
 > the safety rail is the default. Under the hood `instance-<id>` is no longer a
 > single supervisor key — it splits into an *entry key* (`instance-<id>`, still
 > the unit for the backup/update/content/rename guards and their in-flight sets) and
-> a per-launch *session key* (`instance-<id>_<seq>`). Ids are slugs (`[a-z0-9-]`,
-> never `_`), so a session prefix `instance-<id>_` can't collide across
+> a per-launch *session key* (`instance-<id>_<seq>`). Ids are `[a-z0-9-]` (a
+> slug plus a hex tag), never `_`, so a session prefix `instance-<id>_` can't collide across
 > instances; every former singular lookup (status, stop, logs, running-check)
 > becomes a prefix query over the supervisor's flat table, so the supervisor and
 > its on-disk records need no change — each session just gets a distinct id.

@@ -199,7 +199,7 @@ async fn wait_until_stopped(client: &Client, instance: &str) -> Result<()> {
         let instances = client.instance().list().await?;
         let running = instances
             .iter()
-            .filter(|i| i.id == instance || i.name == instance)
+            .filter(|i| client::proto::naming::reference_matches(instance, &i.id, &i.name))
             .any(|i| entry::running_process(i).is_some());
         if !running {
             return Ok(());

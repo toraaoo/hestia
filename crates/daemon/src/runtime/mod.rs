@@ -42,8 +42,8 @@ pub fn instance_process_id(id: &str) -> String {
 }
 
 /// The supervisor process key for one launch (session) of an instance. An id
-/// never contains `_` (slugs are `[a-z0-9-]`), so the `_` separator keeps the
-/// prefix `instance-<id>_` unambiguous across instances.
+/// never contains `_` (it is a slug plus a hex tag, all `[a-z0-9-]`), so the
+/// `_` separator keeps the prefix `instance-<id>_` unambiguous across instances.
 pub fn instance_session_id(id: &str, seq: u32) -> String {
     format!("instance-{id}_{seq}")
 }

@@ -153,13 +153,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .instances()
             .rename(&record.id, &p.name)
             .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
-        ctx.runtime.discard_instance_sessions(&record.id);
-        tracing::info!(
-            old_id = %record.id,
-            id = %renamed.id,
-            name = %renamed.name,
-            "instance renamed"
-        );
+        tracing::info!(id = %renamed.id, name = %renamed.name, "instance renamed");
         Ok(ctx.runtime.instance_view(renamed))
     });
 

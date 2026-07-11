@@ -435,7 +435,7 @@ async fn resolve_entry(client: &Client, entry: EntryKind, reference: &str) -> Re
     };
     entries
         .into_iter()
-        .find(|e| e.id == reference || e.name == reference)
+        .find(|e| client::proto::naming::reference_matches(reference, &e.id, &e.name))
         .with_context(|| format!("no {} matches '{reference}'", entry.noun()))
 }
 

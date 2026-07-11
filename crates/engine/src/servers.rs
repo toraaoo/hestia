@@ -103,11 +103,11 @@ impl Servers {
         records
     }
 
-    /// Find one server by id or name.
+    /// Find one server by id or name (any spelling that slugs the same).
     pub fn get(&self, reference: &str) -> Option<ServerRecord> {
         self.list()
             .into_iter()
-            .find(|r| r.id == reference || r.name == reference)
+            .find(|r| proto::naming::reference_matches(reference, &r.id, &r.name))
     }
 
     /// Register a new server: allocate its id from the name, claim its game
@@ -118,10 +118,10 @@ impl Servers {
         profile: ServerProfile,
         port: Option<u16>,
     ) -> Result<ServerRecord> {
-        let id = registry::slugify(name)?;
-        if self.get(&id).is_some() || self.get(name).is_some() {
+        if registry::name_taken(name, self.list().iter().map(|r| r.name.as_str())) {
             bail!("a server named '{name}' already exists");
         }
+        let id = registry::allocate_id(name, |id| self.get(id).is_some())?;
         let _claims = self.claims.lock().unwrap();
         let game_port = self.claim_game_port(port)?;
         let record = ServerRecord {
@@ -380,38 +380,27 @@ impl Servers {
         Ok(record)
     }
 
-    /// Rename a server: re-slug its id from `new_name`, move its directory, and
-    /// rewrite the record. Ports, rcon, JVM/backup settings, and the data on
-    /// disk move with the directory untouched. The caller guarantees the server
-    /// is stopped and not busy. A rename that leaves the id unchanged (only the
-    /// display casing/punctuation differs) touches the record alone.
+    /// Rename a server: rewrite the record's display name. The id is stable, so
+    /// the directory, ports, rcon, and JVM/backup settings stay put — only the
+    /// name field changes. The caller guarantees the server is stopped and not
+    /// busy.
     pub fn rename(&self, reference: &str, new_name: &str) -> Result<ServerRecord> {
         let _claims = self.claims.lock().unwrap();
         let mut record = self
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
-        let old_id = record.id.clone();
-        let new_id = registry::slugify(new_name)?;
-        if self
-            .list()
-            .iter()
-            .any(|r| r.id != old_id && (r.id == new_id || r.name == new_name))
-        {
+        if registry::name_taken(
+            new_name,
+            self.list()
+                .iter()
+                .filter(|r| r.id != record.id)
+                .map(|r| r.name.as_str()),
+        ) {
             bail!("a server named '{new_name}' already exists");
         }
-        if new_id != old_id {
-            let from = self.server_dir(&old_id);
-            let to = self.server_dir(&new_id);
-            if to.exists() {
-                bail!("a server directory '{new_id}' already exists");
-            }
-            std::fs::rename(&from, &to)
-                .with_context(|| format!("cannot move {} to {}", from.display(), to.display()))?;
-        }
-        record.id = new_id.clone();
         record.name = new_name.to_string();
-        registry::write_record(&self.server_dir(&new_id), RECORD, &record)?;
-        tracing::info!(old_id, id = %new_id, name = %new_name, "server renamed");
+        registry::write_record(&self.server_dir(&record.id), RECORD, &record)?;
+        tracing::info!(id = %record.id, name = %new_name, "server renamed");
         Ok(record)
     }
 

@@ -65,18 +65,18 @@ impl Instances {
         records
     }
 
-    /// Find one instance by id or name.
+    /// Find one instance by id or name (any spelling that slugs the same).
     pub fn get(&self, reference: &str) -> Option<InstanceRecord> {
         self.list()
             .into_iter()
-            .find(|r| r.id == reference || r.name == reference)
+            .find(|r| proto::naming::reference_matches(reference, &r.id, &r.name))
     }
 
     pub fn create(&self, name: &str, profile: InstanceProfile) -> Result<InstanceRecord> {
-        let id = registry::slugify(name)?;
-        if self.get(&id).is_some() || self.get(name).is_some() {
+        if registry::name_taken(name, self.list().iter().map(|r| r.name.as_str())) {
             bail!("an instance named '{name}' already exists");
         }
+        let id = registry::allocate_id(name, |id| self.get(id).is_some())?;
         let record = InstanceRecord {
             id: id.clone(),
             name: name.to_string(),
@@ -141,36 +141,26 @@ impl Instances {
         Ok(record.jvm.entries())
     }
 
-    /// Rename an instance: re-slug its id from `new_name`, move its directory,
-    /// and rewrite the record. JVM settings and the game directory move with it
-    /// untouched. The caller guarantees the instance is stopped and not busy. A
-    /// rename that leaves the id unchanged touches the record alone.
+    /// Rename an instance: rewrite the record's display name. The id is stable,
+    /// so the directory, JVM settings, and game data stay put — only the name
+    /// field changes. The caller guarantees the instance is stopped and not
+    /// busy.
     pub fn rename(&self, reference: &str, new_name: &str) -> Result<InstanceRecord> {
         let mut record = self
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
-        let old_id = record.id.clone();
-        let new_id = registry::slugify(new_name)?;
-        if self
-            .list()
-            .iter()
-            .any(|r| r.id != old_id && (r.id == new_id || r.name == new_name))
-        {
+        if registry::name_taken(
+            new_name,
+            self.list()
+                .iter()
+                .filter(|r| r.id != record.id)
+                .map(|r| r.name.as_str()),
+        ) {
             bail!("an instance named '{new_name}' already exists");
         }
-        if new_id != old_id {
-            let from = self.instance_dir(&old_id);
-            let to = self.instance_dir(&new_id);
-            if to.exists() {
-                bail!("an instance directory '{new_id}' already exists");
-            }
-            std::fs::rename(&from, &to)
-                .with_context(|| format!("cannot move {} to {}", from.display(), to.display()))?;
-        }
-        record.id = new_id.clone();
         record.name = new_name.to_string();
-        registry::write_record(&self.instance_dir(&new_id), RECORD, &record)?;
-        tracing::info!(old_id, id = %new_id, name = %new_name, "instance renamed");
+        registry::write_record(&self.instance_dir(&record.id), RECORD, &record)?;
+        tracing::info!(id = %record.id, name = %new_name, "instance renamed");
         Ok(record)
     }
 

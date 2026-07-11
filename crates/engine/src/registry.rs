@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{bail, Context, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use uuid::Uuid;
 
 pub(crate) fn now_unix() -> i64 {
     SystemTime::now()
@@ -16,26 +17,48 @@ pub(crate) fn now_unix() -> i64 {
         .unwrap_or(0)
 }
 
-/// Reduce a display name to a filesystem-safe id: lowercase alphanumeric runs
-/// joined by single dashes.
-pub(crate) fn slugify(name: &str) -> Result<String> {
-    let mut slug = String::new();
-    let mut gap = false;
-    for c in name.chars() {
-        if c.is_ascii_alphanumeric() {
-            if gap && !slug.is_empty() {
-                slug.push('-');
-            }
-            gap = false;
-            slug.push(c.to_ascii_lowercase());
-        } else {
-            gap = true;
+/// Allocate a stable entry id: the name's slug tagged with a short random
+/// suffix (`smp-3f9a2c7d`), retried against `taken` on the astronomically rare
+/// clash. The slug keeps the id legible on disk and in logs; the suffix is what
+/// makes the id unique and *stable*, so a rename is a metadata write — it never
+/// has to move the directory or re-key the process. The id stays `[a-z0-9-]`,
+/// never `_`, which the session-key scheme (`instance-<id>_<seq>`) reserves.
+pub(crate) fn allocate_id(name: &str, taken: impl Fn(&str) -> bool) -> Result<String> {
+    for _ in 0..8 {
+        let id = format!("{}-{}", slugify(name)?, short_tag());
+        if !taken(&id) {
+            return Ok(id);
         }
     }
-    if slug.is_empty() {
-        bail!("name '{name}' has no usable characters");
+    bail!("could not allocate a unique id for '{name}'");
+}
+
+/// Eight hex chars from the random tail of a UUIDv7 (not its time prefix, so
+/// ids minted in the same millisecond do not share a tag).
+fn short_tag() -> String {
+    Uuid::now_v7().simple().to_string()[24..32].to_string()
+}
+
+/// True when `name` collides with an existing entry's display name once both
+/// are slugged — two entries must not reduce to the same slug, or a bare-name
+/// reference would be ambiguous (`Modded` and `modded` are the same entry).
+pub(crate) fn name_taken<'a>(name: &str, existing: impl IntoIterator<Item = &'a str>) -> bool {
+    let Ok(slug) = slugify(name) else {
+        return false;
+    };
+    existing
+        .into_iter()
+        .any(|other| slugify(other).map(|s| s == slug).unwrap_or(false))
+}
+
+/// Reduce a display name to a filesystem-safe slug (the shared rule lives in
+/// `proto::naming`). The slug prefixes an id but is no longer an id on its own —
+/// [`allocate_id`] tags it with a stable suffix.
+pub(crate) fn slugify(name: &str) -> Result<String> {
+    match proto::naming::slugify(name) {
+        Some(slug) => Ok(slug),
+        None => bail!("name '{name}' has no usable characters"),
     }
-    Ok(slug)
 }
 
 pub(crate) fn read_record<T: DeserializeOwned>(dir: &Path, file: &str) -> Option<T> {

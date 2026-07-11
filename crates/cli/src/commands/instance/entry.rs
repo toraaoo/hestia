@@ -19,7 +19,7 @@ pub(super) fn pick_instance(
     if let Some(reference) = provided {
         return instances
             .into_iter()
-            .find(|i| i.id == reference || i.name == reference)
+            .find(|i| client::proto::naming::reference_matches(&reference, &i.id, &i.name))
             .with_context(|| format!("no instance matches '{reference}'"));
     }
     let labels: Vec<String> = instances
@@ -37,14 +37,14 @@ pub(super) fn running_process(info: &InstanceInfo) -> Option<ProcessInfo> {
         .cloned()
 }
 
-/// Fetch one instance by name or id.
+/// Fetch one instance by name or id (any spelling that slugs the same).
 pub(super) async fn fetch(client: &Client, reference: &str) -> Result<InstanceInfo> {
     client
         .instance()
         .list()
         .await?
         .into_iter()
-        .find(|i| i.id == reference || i.name == reference)
+        .find(|i| client::proto::naming::reference_matches(reference, &i.id, &i.name))
         .with_context(|| format!("no instance matches '{reference}'"))
 }
 
