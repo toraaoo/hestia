@@ -311,7 +311,7 @@ impl Engine {
                 ));
                 continue;
             }
-            if let Err(e) = side_gate(&project, ctx.side) {
+            if let Err(e) = side_gate(kind, &project, ctx.side) {
                 failures.push(failure(&root.given, &project.title, format!("{e:#}")));
                 continue;
             }
@@ -386,7 +386,7 @@ impl Engine {
                                 continue;
                             }
                         };
-                    if side_gate(&dep_project, ctx.side).is_err() {
+                    if side_gate(kind, &dep_project, ctx.side).is_err() {
                         tracing::warn!(
                             dependency = %dep_project.title,
                             of = %node.project.title,
@@ -418,7 +418,7 @@ impl Engine {
             };
             labeled(&phase_progress(ProvisionPhase::Content));
             match self
-                .install_version_file(ctx, &node.project, &version, worlds, &labeled)
+                .install_version_file(ctx, kind, &node.project, &version, worlds, &labeled)
                 .await
             {
                 Ok(mut installed) => items.append(&mut installed),
@@ -432,10 +432,13 @@ impl Engine {
     }
 
     /// Download a version's primary file into every target world (one entry
-    /// per world; non-datapack kinds pass the single empty world).
+    /// per world; non-datapack kinds pass the single empty world). `kind` is
+    /// the *requested* kind, not the project's: Modrinth types datapacks as
+    /// mod projects, so `project.kind` would route a datapack into `mods/`.
     async fn install_version_file(
         &self,
         ctx: &EntryContent,
+        kind: ContentKind,
         project: &ContentProject,
         version: &proto::content::ContentVersion,
         worlds: &[String],
@@ -445,8 +448,7 @@ impl Engine {
         materialize::validate_filename(&file.artifact.filename)?;
         let mut installed = Vec::new();
         for world in worlds {
-            let (managed, data) =
-                content_targets(ctx, project.kind, world, &file.artifact.filename)?;
+            let (managed, data) = content_targets(ctx, kind, world, &file.artifact.filename)?;
             materialize::ensure_artifact(
                 Some(&self.cache),
                 &file.artifact,
@@ -459,7 +461,7 @@ impl Engine {
                 install::mirror(&managed, &data)?;
             }
             installed.push(InstalledContent {
-                kind: project.kind,
+                kind,
                 source: version.source.clone(),
                 project_id: project.id.clone(),
                 slug: project.slug.clone(),
@@ -541,6 +543,7 @@ impl Engine {
             let new_item = self
                 .install_version_file(
                     ctx,
+                    item.kind,
                     &project,
                     &version,
                     std::slice::from_ref(&item.world),
@@ -667,8 +670,10 @@ impl EntrySide {
 /// (`Unknown` passes — the platform did not say). Datapacks are exempt: they
 /// run on the server side of any world, including a client's integrated server,
 /// so a source's client-side flag must not block installing one on an instance.
-fn side_gate(project: &ContentProject, side: EntrySide) -> Result<()> {
-    if project.kind == ContentKind::DataPack {
+/// Judged by the *requested* kind — Modrinth types datapacks as mod projects,
+/// so `project.kind` would miss the exemption.
+fn side_gate(requested: ContentKind, project: &ContentProject, side: EntrySide) -> Result<()> {
+    if requested == ContentKind::DataPack {
         return Ok(());
     }
     let support = match side {
@@ -816,4 +821,47 @@ fn remove_content(ctx: &EntryContent, kind: ContentKind, reference: &str) -> Res
     }
     install::save(&ctx.entry_dir, kept)?;
     Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ctx() -> EntryContent {
+        EntryContent {
+            entry_dir: PathBuf::from("/entry"),
+            data_dir: PathBuf::from("/entry/data"),
+            game_version: "1.21.1".to_string(),
+            flavor: "fabric".to_string(),
+            side: EntrySide::Client,
+        }
+    }
+
+    #[test]
+    fn targets_route_by_requested_kind_not_project_kind() {
+        let (managed, data) =
+            content_targets(&ctx(), ContentKind::DataPack, "saves/world", "pack.zip").unwrap();
+        assert_eq!(
+            managed,
+            Path::new("/entry/data/saves/world/datapacks/pack.zip")
+        );
+        assert_eq!(managed, data);
+
+        let (managed, data) =
+            content_targets(&ctx(), ContentKind::Shader, "", "shader.zip").unwrap();
+        assert_eq!(managed, Path::new("/entry/shaderpacks/shader.zip"));
+        assert_eq!(data, Path::new("/entry/data/shaderpacks/shader.zip"));
+    }
+
+    #[test]
+    fn side_gate_waives_datapacks_by_requested_kind() {
+        // Modrinth types datapacks as mod projects, often client-unsupported.
+        let project = ContentProject {
+            kind: ContentKind::Mod,
+            client_side: SideSupport::Unsupported,
+            ..ContentProject::default()
+        };
+        assert!(side_gate(ContentKind::DataPack, &project, EntrySide::Client).is_ok());
+        assert!(side_gate(ContentKind::Mod, &project, EntrySide::Client).is_err());
+    }
 }
