@@ -86,8 +86,13 @@ mod backend {
     }
 
     fn schtasks(args: &[&str]) -> Result<std::process::Output> {
+        use std::os::windows::process::CommandExt;
+        // The daemon usually runs without a console; a console child would
+        // otherwise flash a window on every invocation.
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         std::process::Command::new("schtasks")
             .args(args)
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .context("failed to run schtasks")
     }
