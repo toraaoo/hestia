@@ -687,16 +687,46 @@ stay aligned with the wire channels (`remove`, not `delete`).
 
 **Presentation layer (`ui/`).** Commands **never print directly** — they build a
 `View` (`Line`, `Note`, `Detail`, `Table`) and hand it to `ui::show`, which owns
-all output. On a terminal it renders with **ratatui** (interactive select,
-scrollable pager for long tables, live install/download progress, the attach
-console — live output above an input line, fullscreen in the alternate screen
-so it follows terminal resizes and hands the shell back intact on detach);
-piped or redirected it degrades to plain text so output stays scriptable. `select`, `prompt`, `Spinner`,
-`InstallReporter`, `console`, and `human_bytes` round out the module.
-This is the seam for the planned TUI: bare `hestia` (no subcommand) currently
-prints help, but the intended end-state is a full-screen TUI driving the same
-`View`s (à la the claude/codex model — a bare invocation is interactive, a
-subcommand is scriptable).
+all output. Interactive surfaces run as **fullscreen sessions** on a small
+framework: `ui/session/` owns the terminal lifecycle (an RAII `TerminalGuard`
+for raw mode + the alternate screen, released on drop — panics included), the
+event loop (50 ms input poll, drain-before-redraw, dirty-flag drawing, resize
+re-wrap), and the 80×24 minimum-size notice; a surface implements the
+`Screen` trait (`draw`, `on_key`, `on_mouse`, `on_event`, `tick`) and composes
+`ui/components/` (`TextInput`, `SelectList`, `LogView`, the searchable
+`Picker`, the in-session progress gauge). Everything the CLI asks
+interactively runs this way — the prompt screens behind `select`/`input`/
+`confirm`, the searchable version picker, the table pager, the attach console,
+the read-only log session, and the multi-step command flows (the content
+browse→review→install session, the create wizards). A session with async
+inputs (daemon events, search results) is fed through an mpsc channel by a
+driver future the command runs alongside it (`Screen::Event`), and the outcome
+prints plainly to stdout after the terminal is restored, so the scrollback
+keeps a record. Piped or redirected, every surface degrades to plain text and
+widgets degrade to arguments, so output stays scriptable. This is the seam for
+the planned TUI: bare `hestia` (no subcommand) currently prints help, but the
+intended end-state is a full-screen TUI over the same `Screen`s and `View`s
+(à la the claude/codex model — a bare invocation is interactive, a subcommand
+is scriptable).
+
+> **Interaction is fullscreen; bare progress is one line.** The inline ratatui
+> viewport (a fixed-height strip above the cursor) could not follow terminal
+> resizes and left every widget fighting for rows, so it is gone: anything that
+> takes keys owns the whole alternate screen for exactly as long as it runs,
+> then hands the shell back intact. The deliberate exception is progress with
+> no interaction (`java install`, `backup create`, a detached start): flashing
+> the alternate screen for a spinner the user cannot act on is hostile, so the
+> `Spinner`/reporter API renders one stderr line rewritten in place (and terse
+> per-phase lines when redirected). Progress that happens *inside* a flow —
+> installing a reviewed content batch, provisioning from the create wizard —
+> renders in-session on the same screen that collected the decision.
+
+> **One event-callback slot per client `Session`.** `run_job` and `subscribe`
+> both claim the session's single event callback, so a session driver must
+> serialize event-driven calls: plain request/response calls (search, detail,
+> versions) may interleave freely, and the one job (`content.add`, the create,
+> a log subscription) runs by itself. The content session and the wizards
+> follow this rule; violating it silently drops events.
 
 ### Desktop (`desktop`) — hestia-desktop
 

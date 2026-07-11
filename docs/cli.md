@@ -54,7 +54,10 @@ Fully provisioned at create; run under the daemon; each server claims its own
 port, so several run side by side. Catalogue verbs take no entry:
 
 ```bash
-hestia server create             # interactive: flavor → version → EULA confirm
+hestia server create             # fullscreen wizard: flavor → version (type to
+                                 #   filter; Tab pulls snapshots in) → name →
+                                 #   settings (skippable) → confirm (EULA);
+                                 #   Esc steps back; flags prefill steps
 hestia server create vanilla 1.21.1 --eula -n smp   # scriptable (-l pins a
                                  #   loader, -p pins the game port, --memory 4G
                                  #   sets -Xms/-Xmx; --motd, --max-players,
@@ -93,11 +96,13 @@ hestia server smp config set backup-interval 6h  # archive the running server
                                  #   on a schedule (m/h/d units; empty
                                  #   disables); scheduled archives beyond
                                  #   backup-retention (default 7) are pruned
-hestia server smp start          # immediate spawn (already provisioned)
+hestia server smp start          # immediate spawn, then attaches the console
+                                 #   (-d/--detach returns immediately)
 hestia server smp attach         # interactive console: live logs, type to send
                                  #   commands, Esc detaches (alias: console)
 hestia server smp command say hi # one-shot console command (alias: cmd)
-hestia server smp logs -n 50     # captured output (-f keeps following)
+hestia server smp logs -n 50     # captured output (-f opens the fullscreen
+                                 #   log session; piped it streams plainly)
 hestia server smp status         # the record merged with live process state
 hestia server smp stop           # stop the running server
 hestia server smp restart        # stop, then start again
@@ -113,12 +118,15 @@ Clients; files materialise at first launch. Same shape: catalogue verbs take no
 entry, the rest are entry-first.
 
 ```bash
-hestia instance create           # interactive: flavor → version
+hestia instance create           # fullscreen wizard: flavor → version → name
+                                 #   → memory → confirm; Esc steps back
 hestia instance create fabric 1.21.1 -n modded --memory 4G
 hestia instance list             # managed instances and their state
 hestia instance versions [flavor] # game versions a flavor offers
 hestia instance flavors          # the available flavors
-hestia instance modded launch    # ensures java/client/libraries/assets, then runs
+hestia instance modded launch    # ensures java/client/libraries/assets, runs,
+                                 #   then follows the logs fullscreen
+                                 #   (-d/--detach returns immediately)
 hestia instance modded update 1.21.4  # move to another version (saves stay
                                  #   and are backed up automatically first;
                                  #   files download at the next launch; a
@@ -129,7 +137,8 @@ hestia instance modded backup list    # stored backups, newest first
 hestia instance modded backup restore # replace saves with a backup's content
 hestia instance modded backup remove <backup>
 hestia instance modded config set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
-hestia instance modded logs -n 50 # captured output (-f keeps following)
+hestia instance modded logs -n 50 # captured output (-f opens the fullscreen
+                                 #   log session; piped it streams plainly)
 hestia instance modded info      # the record and process state
 hestia instance modded stop      # kill the running instance
 hestia instance modded restart   # stop, then launch again
@@ -139,9 +148,14 @@ hestia instance modded remove    # delete the instance (its saves and all)
 ### Content on an instance
 
 Mods, resource packs, shaders, and datapacks install per entry. Every kind
-takes a project slug/id, a source page URL, or a local `--file`:
+takes a project slug/id, a source page URL, or a local `--file` — or, with no
+item on a terminal, opens the **fullscreen install session**: a boxed search
+bar over live results with a detail pane, space checks any number of items,
+`v` pins a version, Enter reviews the batch, and one confirm installs them all
+as a single job (failures report per item; the rest proceed):
 
 ```bash
+hestia instance modded mod add   # fullscreen search → select → review → install
 hestia instance modded mod add sodium      # install a mod (resolves required
                                  #   deps; --version pins one; the file is
                                  #   mirrored into the game dir at launch)
@@ -156,10 +170,11 @@ hestia instance modded shader add <slug>
 ```
 
 Datapacks load from inside a save world, so an instance datapack names the
-world(s) it goes into. Run `datapack add` with no arguments for the interactive
-two-step flow — **search the datapack, then select the world(s)** (space
-toggles, enter confirms). For scripts, pass the slug and a repeatable `--world`.
-The same datapack can live in several worlds at once:
+world(s) it goes into. Run `datapack add` with no arguments for the fullscreen
+session — search and check the datapacks, and the review step picks the
+world(s) (`w` reopens the picker; space toggles, enter confirms). For scripts,
+pass the slug and a repeatable `--world`. The same datapack can live in
+several worlds at once:
 
 ```bash
 hestia instance modded datapack add                # 1) search a datapack  2) select world(s)
@@ -176,11 +191,14 @@ One verb resolves a name across servers and instances, so you need not recall
 which kind it is (a name matching both asks you to qualify it).
 
 ```bash
-hestia play                      # launch an instance — one runs directly, several prompt a pick
-hestia start modded              # start a server or launch an instance
+hestia play                      # launch an instance — one runs directly, several
+                                 #   prompt a pick; follows the logs (-d skips)
+hestia start modded              # start a server (attaches its console) or launch
+                                 #   an instance (follows its logs); -d/--detach
+                                 #   returns immediately
 hestia stop modded               # stop whichever it is
-hestia restart modded            # restart whichever it is
-hestia logs modded -f            # follow its captured output
+hestia restart modded            # restart whichever it is (attaches like start)
+hestia logs modded -f            # follow its captured output fullscreen
 ```
 
 ## Content discovery
@@ -188,7 +206,10 @@ hestia logs modded -f            # follow its captured output
 Modrinth today; installs are per-entry (above).
 
 ```bash
-hestia search sodium             # quick mod search (alias for `mod search`)
+hestia search sodium             # quick mod search (alias for `mod search`) — on a
+                                 #   terminal it opens the fullscreen browser
+                                 #   (type to re-search, detail pane, Enter shows
+                                 #   versions); piped it prints one page
 hestia mod search sodium -l fabric -g 1.21.1   # filter by loader / version
 hestia modpack search "create"   # browse other kinds: modpack, resourcepack,
 hestia resourcepack search faithful            #   shader, datapack
