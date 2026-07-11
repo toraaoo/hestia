@@ -33,8 +33,9 @@ impl Contract for InstanceResolve {
     type Result = InstanceProfile;
 }
 
-/// A managed instance: the stored record plus, when launched, the supervised
-/// process snapshot.
+/// A managed instance: the stored record plus, when launched, its live sessions.
+/// An instance can run more than once concurrently (each launch is a session),
+/// so this is a list, not a single process.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
 pub struct InstanceInfo {
@@ -46,8 +47,8 @@ pub struct InstanceInfo {
     pub loader_version: Option<String>,
     pub java_major: i32,
     pub created_unix: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub process: Option<ProcessInfo>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sessions: Vec<ProcessInfo>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -163,10 +164,19 @@ impl Contract for InstanceRename {
     type Result = InstanceInfo;
 }
 
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceStopParams {
+    pub instance: String,
+    /// A specific session id to stop; all of the instance's sessions otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
+}
+
 pub struct InstanceStop;
 impl Contract for InstanceStop {
     const CHANNEL: &'static str = "instance.stop";
-    type Params = InstanceRef;
+    type Params = InstanceStopParams;
     type Result = Empty;
 }
 
@@ -174,6 +184,9 @@ impl Contract for InstanceStop {
 #[serde(default)]
 pub struct InstanceLogsParams {
     pub instance: String,
+    /// A specific session id; the newest running (else newest) session otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
     /// Return only the last `tail` lines when set; all buffered lines otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tail: Option<usize>,

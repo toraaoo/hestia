@@ -53,6 +53,20 @@ pub fn process_state_label(process: &Option<ProcessInfo>) -> String {
     }
 }
 
+/// State for an instance, which may have several concurrent sessions: the count
+/// of running ones, or `stopped`.
+pub fn sessions_label(sessions: &[ProcessInfo]) -> String {
+    let running = sessions
+        .iter()
+        .filter(|p| p.state == ProcessState::Running)
+        .count();
+    match running {
+        0 => "stopped".to_string(),
+        1 => "running".to_string(),
+        n => format!("running ({n} sessions)"),
+    }
+}
+
 /// Render backups (newest first) as an ID/KIND/SIZE/AGE table.
 pub fn show_backups(title: impl Into<String>, backups: Vec<BackupInfo>) -> Result<()> {
     let rows = backups

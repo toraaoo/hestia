@@ -34,8 +34,23 @@ pub fn server_process_id(id: &str) -> String {
     format!("server-{id}")
 }
 
+/// The instance *entry* key — the unit for the backup/content/update in-flight
+/// sets and the lifecycle guards. Not a supervisor process key: an instance can
+/// have many concurrent sessions, each keyed by `instance_session_id`.
 pub fn instance_process_id(id: &str) -> String {
     format!("instance-{id}")
+}
+
+/// The supervisor process key for one launch (session) of an instance. An id
+/// never contains `_` (slugs are `[a-z0-9-]`), so the `_` separator keeps the
+/// prefix `instance-<id>_` unambiguous across instances.
+pub fn instance_session_id(id: &str, seq: u32) -> String {
+    format!("instance-{id}_{seq}")
+}
+
+/// The prefix every session key of one instance shares.
+pub fn instance_session_prefix(id: &str) -> String {
+    format!("instance-{id}_")
 }
 
 pub fn server_info(
@@ -59,7 +74,7 @@ pub fn server_info(
 
 pub fn instance_info(
     record: InstanceRecord,
-    process: Option<proto::process::ProcessInfo>,
+    sessions: Vec<proto::process::ProcessInfo>,
 ) -> InstanceInfo {
     InstanceInfo {
         id: record.id,
@@ -69,7 +84,7 @@ pub fn instance_info(
         loader_version: record.profile.loader_version,
         java_major: record.profile.java_major,
         created_unix: record.created_unix,
-        process,
+        sessions,
     }
 }
 
@@ -131,8 +146,43 @@ impl Runtime {
     }
 
     pub fn instance_view(&self, record: InstanceRecord) -> InstanceInfo {
-        let process = self.processes.status(&instance_process_id(&record.id));
-        instance_info(record, process)
+        let sessions = self.instance_sessions(&record.id);
+        instance_info(record, sessions)
+    }
+
+    /// Every live session of an instance, newest first.
+    pub fn instance_sessions(&self, id: &str) -> Vec<proto::process::ProcessInfo> {
+        let prefix = instance_session_prefix(id);
+        let mut sessions: Vec<_> = self
+            .processes
+            .list()
+            .into_iter()
+            .filter(|p| p.id.starts_with(&prefix))
+            .collect();
+        sessions.sort_by_key(|s| std::cmp::Reverse(s.started_unix));
+        sessions
+    }
+
+    /// True while any session of the instance is still running.
+    pub fn instance_running(&self, id: &str) -> bool {
+        self.instance_sessions(id)
+            .iter()
+            .any(|p| p.state == proto::process::ProcessState::Running)
+    }
+
+    /// Stop every session of an instance; returns how many were signalled.
+    pub fn stop_instance_sessions(&self, id: &str) -> usize {
+        self.instance_sessions(id)
+            .into_iter()
+            .filter(|p| self.processes.stop(&p.id))
+            .count()
+    }
+
+    /// Discard the supervisor state of every session of an instance.
+    pub fn discard_instance_sessions(&self, id: &str) {
+        for session in self.instance_sessions(id) {
+            self.processes.discard(&session.id);
+        }
     }
 
     pub fn engine(&self) -> &Engine {
@@ -215,4 +265,30 @@ pub struct HandlerContext {
     // Carried on every request even though no handler consumes it yet.
     #[allow(dead_code)]
     pub peer: Peer,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{instance_session_id, instance_session_prefix};
+
+    #[test]
+    fn a_sessions_prefix_never_matches_a_similarly_named_instance() {
+        // Ids are slugs ([a-z0-9-]); using `_` as the session separator keeps
+        // one instance's session prefix from matching another's sessions.
+        let foo = instance_session_id("foo", 3);
+        let foo_two = instance_session_id("foo-2", 1);
+        assert!(foo.starts_with(&instance_session_prefix("foo")));
+        assert!(!foo_two.starts_with(&instance_session_prefix("foo")));
+        assert!(foo_two.starts_with(&instance_session_prefix("foo-2")));
+    }
+
+    #[test]
+    fn session_seq_parses_back_off_the_prefix() {
+        let id = instance_session_id("cozy", 7);
+        let seq: u32 = id
+            .strip_prefix(&instance_session_prefix("cozy"))
+            .and_then(|s| s.parse().ok())
+            .unwrap();
+        assert_eq!(seq, 7);
+    }
 }

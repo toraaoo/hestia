@@ -12,6 +12,7 @@ use crate::content::install;
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
 use crate::minecraft::launch::{self, InstancePaths, LaunchAccount, LaunchPlan};
+use crate::minecraft::log4j;
 use crate::minecraft::materialize::{self, OnProgress};
 
 impl Engine {
@@ -109,8 +110,9 @@ impl Engine {
         &self,
         reference: &str,
         account: &str,
+        session_seq: u32,
         on_progress: OnProgress<'_>,
-    ) -> Result<(InstanceRecord, LaunchPlan)> {
+    ) -> Result<(InstanceRecord, LaunchPlan, PathBuf)> {
         let record = self
             .instances
             .get(reference)
@@ -163,6 +165,17 @@ impl Engine {
         std::fs::create_dir_all(&natives_dir)
             .with_context(|| format!("cannot create {}", natives_dir.display()))?;
 
+        // Per-session logging lives under the instance root (not data/, so it is
+        // outside backups): each concurrent session gets its own file the
+        // supervisor can tail independently.
+        let session_dir = self.instances.instance_dir(&record.id).join("logs");
+        std::fs::create_dir_all(&session_dir)
+            .with_context(|| format!("cannot create {}", session_dir.display()))?;
+        let log_file = session_dir.join(format!("session-{session_seq}.log"));
+        let log_config = session_dir.join(format!("session-{session_seq}.xml"));
+        std::fs::write(&log_config, log4j::session_config(&log_file))
+            .with_context(|| format!("cannot write {}", log_config.display()))?;
+
         let plan = launch::instance_plan(
             &record.profile,
             &java,
@@ -172,11 +185,12 @@ impl Engine {
                 client_jar: &client_jar,
                 libraries_root: &libraries_root,
                 assets_root: &assets_root,
+                log_config: Some(&log_config),
             },
             &account,
             &record.jvm,
         );
-        Ok((record, plan))
+        Ok((record, plan, log_file))
     }
 
     async fn launch_account(&self, reference: &str) -> Result<LaunchAccount> {

@@ -31,7 +31,7 @@ pub async fn launch(client: &Client, reference: &str, account: &str, detach: boo
     }
     let backfill = client
         .instance()
-        .logs(reference, Some(100))
+        .logs(reference, Some(process_id.clone()), Some(100))
         .await
         .unwrap_or_default()
         .into_iter()
@@ -44,7 +44,7 @@ pub async fn launch(client: &Client, reference: &str, account: &str, detach: boo
 pub(crate) async fn stop(client: &Client, instance: &str) -> Result<()> {
     {
         let _spinner = Spinner::start(format!("stopping '{instance}'"));
-        client.instance().stop(instance).await?;
+        client.instance().stop(instance, None).await?;
     }
     ui::show(View::line(format!("instance '{instance}' stopped")))
 }
@@ -57,7 +57,7 @@ pub(crate) async fn restart(
 ) -> Result<()> {
     {
         let _spinner = Spinner::start(format!("stopping '{instance}'"));
-        client.instance().stop(instance).await?;
+        client.instance().stop(instance, None).await?;
         wait_until_stopped(client, instance).await?;
     }
     launch(client, instance, account, detach).await
@@ -88,7 +88,7 @@ pub(crate) async fn logs(
     tail: Option<usize>,
     follow: bool,
 ) -> Result<()> {
-    let lines = client.instance().logs(instance, tail).await?;
+    let lines = client.instance().logs(instance, None, tail).await?;
     if follow && ui::interactive_output() {
         let instances = client.instance().list().await?;
         let info = instances

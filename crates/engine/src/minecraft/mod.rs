@@ -4,6 +4,7 @@
 
 mod fabric;
 pub(crate) mod launch;
+pub(crate) mod log4j;
 pub(crate) mod materialize;
 mod meta;
 mod provider;

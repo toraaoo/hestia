@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 
 use engine::Engine;
 use proto::instance::{
@@ -8,14 +9,18 @@ use proto::instance::{
 use proto::minecraft::ProvisionProgress;
 use proto::process::{LogSource, ProcessSpec, RestartPolicy};
 
-use super::job::{job_id, topic_event, InFlight};
-use crate::runtime::{instance_process_id, EventHub, ProcessSupervisor, StartError};
+use super::job::{job_id, topic_event};
+use crate::runtime::{
+    instance_session_id, instance_session_prefix, EventHub, ProcessSupervisor, StartError,
+};
 
 pub struct InstanceLaunchManager {
     engine: Arc<Engine>,
     hub: Arc<EventHub>,
     processes: Arc<ProcessSupervisor>,
-    active: InFlight<String>,
+    /// Session ids reserved between seq allocation and the supervisor accepting
+    /// them, so two concurrent launches of one instance can't collide on a seq.
+    reserved: Arc<Mutex<HashSet<String>>>,
 }
 
 impl InstanceLaunchManager {
@@ -24,28 +29,25 @@ impl InstanceLaunchManager {
             engine,
             hub,
             processes,
-            active: InFlight::new(),
+            reserved: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
-    /// Prepare and spawn an instance off-thread, one launch per instance at a
-    /// time. Returns the job id, or `None` if that instance is already
-    /// launching.
+    /// Prepare and spawn a fresh session of an instance off-thread. Instances may
+    /// run several sessions at once, so this always launches — it does not refuse
+    /// a running instance. Returns the launch job id.
     pub fn start(&self, instance_id: String, account: String, id: String) -> Option<String> {
         let id = job_id(id, "instance-launch");
-        let Some(claim) = self.active.claim(instance_id.clone()) else {
-            tracing::debug!(instance = %instance_id, "instance launch already in flight");
-            return None;
-        };
+        let (session_id, seq) = self.reserve_session(&instance_id);
 
         let engine = self.engine.clone();
         let hub = self.hub.clone();
         let processes = self.processes.clone();
+        let reserved = self.reserved.clone();
         let job_id = id.clone();
-        tracing::info!(job = %id, instance = %instance_id, account = %account, "instance launch started");
+        tracing::info!(job = %id, instance = %instance_id, session = %session_id, account = %account, "instance launch started");
 
         tokio::spawn(async move {
-            let _claim = claim;
             let progress_hub = hub.clone();
             let progress_id = job_id.clone();
             let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> = Box::new(move |p| {
@@ -59,10 +61,14 @@ impl InstanceLaunchManager {
                 &engine,
                 &processes,
                 &instance_id,
+                &session_id,
+                seq,
                 &account,
                 on_progress.as_ref(),
             )
             .await;
+            // The supervisor now owns the id (or the launch failed) — release it.
+            reserved.lock().unwrap().remove(&session_id);
             match outcome {
                 Ok((process_id, pid)) => {
                     tracing::info!(job = %job_id, process = %process_id, pid, "instance launch done");
@@ -83,26 +89,52 @@ impl InstanceLaunchManager {
         });
         Some(id)
     }
+
+    /// Claim the next free session id for an instance under the reservation lock,
+    /// counting both live sessions and ids already reserved but not yet spawned.
+    fn reserve_session(&self, instance_id: &str) -> (String, u32) {
+        let prefix = instance_session_prefix(instance_id);
+        let mut reserved = self.reserved.lock().unwrap();
+        let live_max = self
+            .processes
+            .list()
+            .into_iter()
+            .filter_map(|p| {
+                p.id.strip_prefix(&prefix)
+                    .and_then(|s| s.parse::<u32>().ok())
+            })
+            .max();
+        let mut seq = live_max.map_or(1, |n| n + 1);
+        while reserved.contains(&instance_session_id(instance_id, seq)) {
+            seq += 1;
+        }
+        let session_id = instance_session_id(instance_id, seq);
+        reserved.insert(session_id.clone());
+        (session_id, seq)
+    }
 }
 
-/// Materialise the instance, then hand the plan to the supervisor.
+/// Materialise the instance, then hand the plan to the supervisor under the
+/// session's own id and per-session log file.
 async fn launch(
     engine: &Engine,
     processes: &ProcessSupervisor,
     instance_id: &str,
+    session_id: &str,
+    seq: u32,
     account: &str,
     on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
 ) -> Result<(String, u32), String> {
-    let (record, plan) = engine
-        .prepare_instance(instance_id, account, on_progress)
+    let (_record, plan, log_file) = engine
+        .prepare_instance(instance_id, account, seq, on_progress)
         .await
         .map_err(|e| format!("{e:#}"))?;
 
     let spec = ProcessSpec {
-        id: instance_process_id(&record.id),
+        id: session_id.to_string(),
         program: plan.program.to_string_lossy().into_owned(),
         args: plan.args,
-        log: LogSource::File(plan.cwd.join("logs").join("latest.log")),
+        log: LogSource::File(log_file),
         cwd: Some(plan.cwd),
         env: BTreeMap::new(),
         restart: RestartPolicy::Never,

@@ -31,9 +31,10 @@ pub(super) fn pick_instance(
 }
 
 pub(super) fn running_process(info: &InstanceInfo) -> Option<ProcessInfo> {
-    info.process
-        .clone()
-        .filter(|p| p.state == ProcessState::Running)
+    info.sessions
+        .iter()
+        .find(|p| p.state == ProcessState::Running)
+        .cloned()
 }
 
 pub(super) async fn list(client: &Client) -> Result<()> {
@@ -49,7 +50,7 @@ pub(super) async fn list(client: &Client) -> Result<()> {
                 i.flavor.clone(),
                 i.game_version.clone(),
                 i.loader_version.clone().unwrap_or_else(|| "-".into()),
-                mc::process_state_label(&i.process),
+                mc::sessions_label(&i.sessions),
             ]
         })
         .collect();
@@ -71,6 +72,6 @@ pub(super) fn show_info(info: &InstanceInfo) -> Result<()> {
             info.loader_version.clone().unwrap_or_else(|| "-".into()),
         ),
         ("java", info.java_major.to_string()),
-        ("state", mc::process_state_label(&info.process)),
+        ("state", mc::sessions_label(&info.sessions)),
     ]))
 }

@@ -13,7 +13,7 @@ use proto::minecraft::{ConfigEntry, FlavorsResult, VersionsResult};
 use proto::process::ProcessLogsResult;
 use proto::Empty;
 
-use super::guards::{ensure_no_backup, ensure_no_content, find_instance, is_running};
+use super::guards::{ensure_no_backup, ensure_no_content, find_instance};
 use crate::runtime::{instance_process_id, Channels, ServiceError};
 
 pub(super) fn register(on: &mut Channels<'_>) {
@@ -70,7 +70,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             return Err(ServiceError::bad_request("version is required"));
         }
         let record = find_instance(&ctx, &p.instance)?;
-        if is_running(&ctx, &instance_process_id(&record.id)) {
+        if ctx.runtime.instance_running(&record.id) {
             return Err(ServiceError::bad_request(format!(
                 "instance '{}' is running; stop it first",
                 record.name
@@ -116,7 +116,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<InstanceRemove, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
-        if is_running(&ctx, &instance_process_id(&record.id)) {
+        if ctx.runtime.instance_running(&record.id) {
             return Err(ServiceError::bad_request(format!(
                 "instance '{}' is running; stop it first",
                 record.name
@@ -128,9 +128,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .instances()
             .remove(&record.id)
             .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
-        ctx.runtime
-            .processes()
-            .discard(&instance_process_id(&record.id));
+        ctx.runtime.discard_instance_sessions(&record.id);
         tracing::info!(instance = %record.id, name = %record.name, "instance removed");
         Ok(Empty {})
     });
@@ -141,7 +139,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         }
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
-        if is_running(&ctx, &process_id) {
+        if ctx.runtime.instance_running(&record.id) {
             return Err(ServiceError::bad_request(format!(
                 "instance '{}' is running; stop it first",
                 record.name
@@ -155,7 +153,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .instances()
             .rename(&record.id, &p.name)
             .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
-        ctx.runtime.processes().discard(&process_id);
+        ctx.runtime.discard_instance_sessions(&record.id);
         tracing::info!(
             old_id = %record.id,
             id = %renamed.id,
@@ -167,12 +165,8 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<InstanceLaunch, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
-        if is_running(&ctx, &instance_process_id(&record.id)) {
-            return Err(ServiceError::bad_request(format!(
-                "instance '{}' is already running",
-                record.name
-            )));
-        }
+        // Instances may run several sessions at once, so a running instance is
+        // not refused; only an in-flight backup blocks a launch.
         ensure_no_backup(&ctx, &instance_process_id(&record.id), &record.name)?;
         match ctx
             .runtime
@@ -181,30 +175,55 @@ pub(super) fn register(on: &mut Channels<'_>) {
         {
             Some(id) => Ok(InstanceLaunchResult { id }),
             None => Err(ServiceError::bad_request(
-                "that instance is already launching",
+                "that instance could not be launched",
             )),
         }
     });
 
     on.handle::<InstanceStop, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
-        let process_id = instance_process_id(&record.id);
-        if !is_running(&ctx, &process_id) {
-            return Err(ServiceError::bad_request(format!(
-                "instance '{}' is not running",
-                record.name
-            )));
+        let sessions = ctx.runtime.instance_sessions(&record.id);
+        match p.session {
+            // Stop one named session, refusing an id that is not this instance's.
+            Some(session) => {
+                if !sessions.iter().any(|s| s.id == session) {
+                    return Err(ServiceError::not_found(format!(
+                        "instance '{}' has no session '{session}'",
+                        record.name
+                    )));
+                }
+                ctx.runtime.processes().stop(&session);
+            }
+            None => {
+                let stopped = ctx.runtime.stop_instance_sessions(&record.id);
+                if stopped == 0 {
+                    return Err(ServiceError::bad_request(format!(
+                        "instance '{}' is not running",
+                        record.name
+                    )));
+                }
+            }
         }
-        ctx.runtime.processes().stop(&process_id);
         Ok(Empty {})
     });
 
     on.handle::<InstanceLogs, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
-        let lines = ctx
-            .runtime
-            .processes()
-            .logs(&instance_process_id(&record.id), p.tail)
+        // A specific session, else the newest running one, else the newest.
+        let sessions = ctx.runtime.instance_sessions(&record.id);
+        let target = match &p.session {
+            Some(session) => sessions
+                .iter()
+                .find(|s| &s.id == session)
+                .map(|s| s.id.clone()),
+            None => sessions
+                .iter()
+                .find(|s| s.state == proto::process::ProcessState::Running)
+                .or_else(|| sessions.first())
+                .map(|s| s.id.clone()),
+        };
+        let lines = target
+            .and_then(|id| ctx.runtime.processes().logs(&id, p.tail))
             .unwrap_or_default();
         Ok(ProcessLogsResult { lines })
     });

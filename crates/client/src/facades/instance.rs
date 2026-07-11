@@ -16,7 +16,8 @@ use proto::instance::{
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo,
     InstanceLaunch, InstanceLaunchParams, InstanceList, InstanceLogs, InstanceLogsParams,
     InstanceRef, InstanceRemove, InstanceRename, InstanceRenameParams, InstanceResolve,
-    InstanceStop, InstanceUpdate, InstanceUpdateParams, InstanceVersions, InstanceWorlds,
+    InstanceStop, InstanceStopParams, InstanceUpdate, InstanceUpdateParams, InstanceVersions,
+    InstanceWorlds,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams,
@@ -150,20 +151,25 @@ impl Instance<'_> {
         self.session.call::<InstanceRename>(&params).await
     }
 
-    pub async fn stop(&self, instance: &str) -> Result<(), IpcError> {
-        self.session
-            .call::<InstanceStop>(&instance_ref(instance))
-            .await?;
+    /// Stop a session (when `session` is set) or all of the instance's sessions.
+    pub async fn stop(&self, instance: &str, session: Option<String>) -> Result<(), IpcError> {
+        let params = InstanceStopParams {
+            instance: instance.to_string(),
+            session,
+        };
+        self.session.call::<InstanceStop>(&params).await?;
         Ok(())
     }
 
     pub async fn logs(
         &self,
         instance: &str,
+        session: Option<String>,
         tail: Option<usize>,
     ) -> Result<Vec<ProcessLogLine>, IpcError> {
         let params = InstanceLogsParams {
             instance: instance.to_string(),
+            session,
             tail,
         };
         Ok(self.session.call::<InstanceLogs>(&params).await?.lines)

@@ -102,7 +102,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<InstanceBackupCreate, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
-        if is_running(&ctx, &instance_process_id(&record.id)) {
+        if ctx.runtime.instance_running(&record.id) {
             return Err(ServiceError::bad_request(format!(
                 "instance '{}' is running; stop it first",
                 record.name
@@ -136,7 +136,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             return Err(ServiceError::bad_request("backup is required"));
         }
         let record = find_instance(&ctx, &p.instance)?;
-        if is_running(&ctx, &instance_process_id(&record.id)) {
+        if ctx.runtime.instance_running(&record.id) {
             return Err(ServiceError::bad_request(format!(
                 "instance '{}' is running; stop it first",
                 record.name

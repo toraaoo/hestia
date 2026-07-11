@@ -144,6 +144,10 @@ pub struct InstancePaths<'a> {
     pub client_jar: &'a Path,
     pub libraries_root: &'a Path,
     pub assets_root: &'a Path,
+    /// A per-session Log4j2 config (`crate::minecraft::log4j`) redirecting the
+    /// game's own log to a private file; `None` keeps the version's default
+    /// (`logs/latest.log`).
+    pub log_config: Option<&'a Path>,
 }
 
 /// The server invocation, run from the server's data directory. A profile without a
@@ -199,6 +203,15 @@ pub fn instance_plan(
         args.push(vars["classpath"].clone());
     } else {
         args.extend(profile.jvm_args.iter().map(|a| substitute(a, &vars)));
+    }
+    // Per-session log routing sits in the JVM section, before the main class.
+    if let Some(config) = paths.log_config {
+        args.push(format!(
+            "{}{}",
+            super::log4j::CONFIG_PROPERTY,
+            config.to_string_lossy()
+        ));
+        args.push(super::log4j::NO_LOOKUPS_PROPERTY.to_string());
     }
     // User flags come last in the JVM section so they win over the manifest.
     args.extend(settings.flags());
@@ -385,6 +398,7 @@ mod tests {
             client_jar: Path::new("/versions/1.21.1/client.jar"),
             libraries_root: Path::new("/libraries"),
             assets_root: Path::new("/assets"),
+            log_config: None,
         };
         let plan = instance_plan(
             &profile,
@@ -406,6 +420,47 @@ mod tests {
     }
 
     #[test]
+    fn instance_plan_injects_log_config_before_main_class() {
+        let profile = InstanceProfile {
+            client: Artifact::default(),
+            main_class: "net.minecraft.client.main.Main".into(),
+            jvm_args: vec!["-cp".into(), "${classpath}".into()],
+            ..Default::default()
+        };
+        let log = Path::new("/inst/logs/session-2.log");
+        let paths = InstancePaths {
+            game_dir: Path::new("/inst"),
+            natives_dir: Path::new("/inst/natives"),
+            client_jar: Path::new("/versions/1.21.1/client.jar"),
+            libraries_root: Path::new("/libraries"),
+            assets_root: Path::new("/assets"),
+            log_config: Some(log),
+        };
+        let plan = instance_plan(
+            &profile,
+            Path::new("java"),
+            &paths,
+            &account(),
+            &JavaSettings::default(),
+        );
+        let main_at = plan
+            .args
+            .iter()
+            .position(|a| a == "net.minecraft.client.main.Main")
+            .expect("main class present");
+        let config_at = plan
+            .args
+            .iter()
+            .position(|a| a == "-Dlog4j.configurationFile=/inst/logs/session-2.log")
+            .expect("log config arg present");
+        assert!(config_at < main_at, "log config sits in the JVM section");
+        assert!(plan
+            .args
+            .iter()
+            .any(|a| a == "-Dlog4j2.formatMsgNoLookups=true"));
+    }
+
+    #[test]
     fn instance_plan_supplies_classpath_when_jvm_args_absent() {
         let profile = InstanceProfile {
             main_class: "net.minecraft.client.Minecraft".into(),
@@ -417,6 +472,7 @@ mod tests {
             client_jar: Path::new("/versions/old/client.jar"),
             libraries_root: Path::new("/libraries"),
             assets_root: Path::new("/assets"),
+            log_config: None,
         };
         let plan = instance_plan(
             &profile,
@@ -478,6 +534,7 @@ mod tests {
             client_jar: Path::new("/versions/1.21.1/client.jar"),
             libraries_root: Path::new("/libraries"),
             assets_root: Path::new("/assets"),
+            log_config: None,
         };
         let plan = instance_plan(
             &profile,
