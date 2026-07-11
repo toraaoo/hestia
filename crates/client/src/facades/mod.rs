@@ -18,6 +18,7 @@ mod profiles;
 mod server;
 mod skins;
 mod sync;
+mod update;
 
 pub use accounts::Accounts;
 pub use app::App;
@@ -33,3 +34,4 @@ pub use profiles::Profiles;
 pub use server::Server;
 pub use skins::Skins;
 pub use sync::Sync;
+pub use update::Update;

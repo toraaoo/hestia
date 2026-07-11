@@ -1415,6 +1415,7 @@ dependencies = [
  "getrandom 0.4.3",
  "junction",
  "libc",
+ "minisign-verify",
  "p256",
  "proto",
  "reqwest",

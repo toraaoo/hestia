@@ -19,6 +19,7 @@ mod profile;
 mod server;
 mod skins;
 mod sync;
+mod update;
 
 use crate::runtime::{Channels, Router};
 
@@ -41,6 +42,7 @@ pub fn make_router() -> Router {
     modpack::register(&mut on);
     profile::register(&mut on);
     sync::register(&mut on);
+    update::register(&mut on);
 
     router
 }

@@ -10,6 +10,7 @@ mod java;
 mod job;
 mod modpack;
 mod server;
+mod update;
 
 pub use backup::{BackupJob, BackupManager};
 pub use content::{ContentJob, ContentManager};
@@ -19,3 +20,4 @@ pub use java::JavaInstallManager;
 pub use job::Cancellations;
 pub use modpack::{ModpackJob, ModpackManager};
 pub use server::{ServerCreateManager, ServerUpdateManager};
+pub use update::UpdateManager;

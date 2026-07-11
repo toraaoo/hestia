@@ -27,6 +27,7 @@ use crate::profiles::Profiles;
 use crate::servers::Servers;
 use crate::skins::Skins;
 use crate::sync::Sync;
+use crate::update::Update;
 
 /// Everything a server create needs from the caller — the engine-side input to
 /// `provision_server` (EULA assertion and job ids are daemon concerns).
@@ -63,6 +64,7 @@ pub struct Engine {
     skins: Skins,
     sync: Sync,
     profiles: Profiles,
+    update: Update,
     processes: Arc<ProcessSupervisor>,
     // One backup or restore per entry at a time: two archives of the same
     // data would interleave the rcon save-off/save-on dance.
@@ -82,6 +84,7 @@ impl Engine {
         let skins = Skins::new(data_home.join("skins"));
         let sync = Sync::new(data_home.join("shared"));
         let profiles = Profiles::new(data_home.join("profiles"));
+        let update = Update::new(data_home.join("updates"));
         let processes = Arc::new(ProcessSupervisor::new(data_home.join("processes")));
         Engine {
             data_home: Mutex::new(data_home),
@@ -96,6 +99,7 @@ impl Engine {
             skins,
             sync,
             profiles,
+            update,
             processes,
             backups_active: Mutex::new(HashSet::new()),
         }
@@ -148,6 +152,7 @@ impl Engine {
         self.skins.reload(resolved.join("skins"));
         self.sync.reload(resolved.join("shared"));
         self.profiles.reload(resolved.join("profiles"));
+        self.update.reload(resolved.join("updates"));
         self.processes.reload(resolved.join("processes"));
         *self.data_home.lock().unwrap() = resolved.clone();
         tracing::info!(home = %resolved.display(), "engine data home changed");
@@ -199,6 +204,10 @@ impl Engine {
 
     pub fn processes(&self) -> &Arc<ProcessSupervisor> {
         &self.processes
+    }
+
+    pub fn update(&self) -> &Update {
+        &self.update
     }
 
     pub fn profiles(&self) -> &Profiles {

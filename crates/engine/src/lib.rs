@@ -23,6 +23,7 @@ mod registry;
 mod servers;
 mod skins;
 mod sync;
+mod update;
 mod usage;
 
 pub use accounts::{Accounts, LoginChallenge, ReauthRequired};
@@ -43,3 +44,4 @@ pub use profiles::Profiles;
 pub use servers::{RconConfig, ServerPhase, ServerRecord, Servers};
 pub use skins::Skins;
 pub use sync::Sync;
+pub use update::Update;
