@@ -13,3 +13,14 @@ path = "src/main.rs"
 [dependencies]
 client = { workspace = true }
 common = { workspace = true }
+ipc = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde_json = { workspace = true }
+tray-icon = { workspace = true }
+tao = { workspace = true }
+png = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
