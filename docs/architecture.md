@@ -289,12 +289,15 @@ The subsystems behind the aggregate:
   step.
 - **`sync`** (`Sync`) — shared settings/configs: a small set of game-relative
   files/folders (`options.txt` key-merged, `servers.dat`, `config/`) propagated
-  across servers and instances through a persistent `<data_home>/shared/` store.
-  Copy-based, not symlinked: each entry keeps its own copy under `data/`, and
-  `apply` reconciles it with the store newest-wins at every start/launch (hooked
-  into `server_launch_plan`/`prepare_instance`, before the content re-mirror).
-  The managed content dirs and `saves/` are rejected as targets at the edge —
-  see the decision note below.
+  across entries through a persistent `<data_home>/shared/` store. Copy-based,
+  not symlinked: each entry keeps its own copy under `data/`, and `apply`
+  reconciles it with the store newest-wins at every start/launch (hooked into
+  `server_launch_plan`/`prepare_instance`, before the content re-mirror).
+  Targets **and the store are kept separate per kind** (`shared/servers/`,
+  `shared/instances/`, each with its own `targets.json` and defaults): a server
+  syncs different files than a client and must not share its mod `config/` with
+  one. The managed content dirs and `saves/` are rejected as targets at the edge
+  — see the decision note below.
 - **`servers`** / **`instances`** (`Servers`, `Instances`) — the persistent
   stores, one directory per entry beside a JSON record (`servers/<id>/server.json`
   holding the resolved profile snapshot; the disk is the registry, as with
@@ -445,6 +448,11 @@ The subsystems behind the aggregate:
 > dirs and `saves/` are rejected as targets (the content system shares content;
 > worlds belong to backups). Pack selection (`options.txt`'s `resourcePacks`)
 > stays entry-local — merged like Pandora's, but never pushed to the store.
+> Unlike Pandora (client-only), Hestia manages **servers and instances**, whose
+> syncable files differ — a server has no `options.txt`, and its mod `config/`
+> is not a client's — so targets and the physical store are split per kind
+> (`shared/servers/` vs `shared/instances/`, each with its own defaults). The
+> two never mix; there is deliberately no cross-kind sharing.
 
 > **Rename re-slugs the id and moves the directory.** The `id` is not just a
 > display alias — it is the directory name (`servers/<id>/`), the supervisor's
@@ -624,9 +632,9 @@ supervises launched processes, and manages autostart. The only crate that links
   one; `logs` targets the newest running or a named session — all thin over
   the supervisor), `instance.backup.create|list|restore|remove` (create and
   restore require the instance stopped), and `instance.config.get|set|list`
-  (`memory`/`jvm-args` only). Plus `sync.get|set` — the global shared-config
-  target set (`set` validates each path: relative, no `..` escape, not a
-  launcher-managed dir). Plus
+  (`memory`/`jvm-args` only). Plus `sync.get|set` — the per-kind shared-config
+  target sets (`get` returns both kinds; `set` takes a `kind` and validates each
+  path: relative, no `..` escape, not a launcher-managed dir). Plus
   `content.sources|search|project|versions|modpack.resolve` — thin over the
   engine's content registry (an empty `source` selects the default; search,
   project, and versions are plain request/response, and `modpack.resolve`

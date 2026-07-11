@@ -15,8 +15,10 @@ impl Sync<'_> {
 
     pub async fn set(
         &self,
+        kind: proto::sync::SyncKind,
         targets: proto::sync::SyncTargets,
     ) -> Result<proto::sync::SyncConfig, IpcError> {
-        self.session.call::<proto::sync::SyncSet>(&targets).await
+        let params = proto::sync::SyncSetParams { kind, targets };
+        self.session.call::<proto::sync::SyncSet>(&params).await
     }
 }

@@ -8,6 +8,11 @@
 //! (which archive `data/`) stay intact. Convergence is emergent — the first
 //! entry to launch seeds the store, later entries inherit it.
 //!
+//! Targets and the store are **kept separate per entry kind** (`shared/servers/`,
+//! `shared/instances/`): unlike Pandora (client-only), Hestia manages both, and a
+//! server syncs different files than a client (a server has no `options.txt`) —
+//! and a server's mod `config/` must never bleed into a client's.
+//!
 //! Scope is settings/config only. The launcher-managed content directories
 //! (`mods/`, `resourcepacks/`, `shaderpacks/`) are off-limits (the content system
 //! already shares those), and so is `saves/` (worlds belong to the backup
@@ -20,7 +25,7 @@ use std::sync::Mutex;
 use std::time::SystemTime;
 
 use anyhow::{bail, Context, Result};
-use proto::sync::SyncTargets;
+use proto::sync::{SyncKind, SyncTargets};
 
 const TARGETS_FILE: &str = "targets.json";
 const OPTIONS_TXT: &str = "options.txt";
@@ -48,43 +53,51 @@ impl Sync {
         *self.dir.lock().unwrap() = dir;
     }
 
-    /// The shared store directory (`<data_home>/shared`).
+    /// The shared store root (`<data_home>/shared`).
     pub fn dir(&self) -> PathBuf {
         self.dir.lock().unwrap().clone()
     }
 
-    /// The current target set — the persisted file, or the built-in defaults
+    /// The per-kind store subdirectory (`shared/servers` / `shared/instances`).
+    fn kind_dir(&self, kind: SyncKind) -> PathBuf {
+        self.dir().join(match kind {
+            SyncKind::Server => "servers",
+            SyncKind::Instance => "instances",
+        })
+    }
+
+    /// A kind's current target set — the persisted file, or the built-in defaults
     /// when none has been written yet.
-    pub fn targets(&self) -> SyncTargets {
-        let path = self.dir().join(TARGETS_FILE);
+    pub fn targets(&self, kind: SyncKind) -> SyncTargets {
+        let path = self.kind_dir(kind).join(TARGETS_FILE);
         fs::read_to_string(&path)
             .ok()
             .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_else(default_targets)
+            .unwrap_or_else(|| default_targets(kind))
     }
 
-    /// Validate and persist a new target set. Each path must be relative, free of
-    /// `..` escapes, and outside the launcher-managed directories.
-    pub fn set_targets(&self, targets: SyncTargets) -> Result<SyncTargets> {
+    /// Validate and persist a kind's new target set. Each path must be relative,
+    /// free of `..` escapes, and outside the launcher-managed directories.
+    pub fn set_targets(&self, kind: SyncKind, targets: SyncTargets) -> Result<SyncTargets> {
         for path in targets.files.iter().chain(targets.folders.iter()) {
             validate_target(path)?;
         }
-        let dir = self.dir();
+        let dir = self.kind_dir(kind);
         fs::create_dir_all(&dir).with_context(|| format!("cannot create {}", dir.display()))?;
         let text = serde_json::to_string_pretty(&targets).expect("SyncTargets serializes");
         fs::write(dir.join(TARGETS_FILE), format!("{text}\n"))?;
         Ok(targets)
     }
 
-    /// Reconcile an entry's `data/` with the shared store, newest-wins per target.
-    /// Best-effort per target: a single failing file is logged and skipped rather
-    /// than failing the launch. A no-op when the entry has opted out.
-    pub fn apply(&self, data_dir: &Path, opted_in: bool) -> Result<()> {
+    /// Reconcile an entry's `data/` with its kind's shared store, newest-wins per
+    /// target. Best-effort per target: a single failing file is logged and skipped
+    /// rather than failing the launch. A no-op when the entry has opted out.
+    pub fn apply(&self, data_dir: &Path, kind: SyncKind, opted_in: bool) -> Result<()> {
         if !opted_in {
             return Ok(());
         }
-        let targets = self.targets();
-        let shared = self.dir();
+        let targets = self.targets(kind);
+        let shared = self.kind_dir(kind);
         fs::create_dir_all(&shared).ok();
 
         for rel in &targets.files {
@@ -109,12 +122,21 @@ impl Sync {
     }
 }
 
-fn default_targets() -> SyncTargets {
-    SyncTargets {
-        files: [OPTIONS_TXT.to_string(), "servers.dat".to_string()]
-            .into_iter()
-            .collect(),
-        folders: ["config".to_string()].into_iter().collect(),
+/// The built-in targets for a kind. Both share mod `config/`; only a client has
+/// `options.txt` (keybinds/video) and `servers.dat` (the multiplayer list).
+fn default_targets(kind: SyncKind) -> SyncTargets {
+    let folders = ["config".to_string()].into_iter().collect();
+    match kind {
+        SyncKind::Server => SyncTargets {
+            files: Default::default(),
+            folders,
+        },
+        SyncKind::Instance => SyncTargets {
+            files: [OPTIONS_TXT.to_string(), "servers.dat".to_string()]
+                .into_iter()
+                .collect(),
+            folders,
+        },
     }
 }
 
@@ -312,10 +334,13 @@ mod tests {
         let base = temp_dir("seed");
         let shared = base.join("shared");
         let data = base.join("data");
-        fs::create_dir_all(&shared).unwrap();
-        fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
+        let store = shared.join("instances");
+        fs::create_dir_all(&store).unwrap();
+        fs::write(store.join("options.txt"), "guiScale:3\n").unwrap();
 
-        Sync::new(shared).apply(&data, true).unwrap();
+        Sync::new(shared)
+            .apply(&data, SyncKind::Instance, true)
+            .unwrap();
 
         let seeded = fs::read_to_string(data.join("options.txt")).unwrap();
         assert!(seeded.contains("guiScale:3"));
@@ -334,9 +359,11 @@ mod tests {
         )
         .unwrap();
 
-        Sync::new(shared.clone()).apply(&data, true).unwrap();
+        Sync::new(shared.clone())
+            .apply(&data, SyncKind::Instance, true)
+            .unwrap();
 
-        let stored = fs::read_to_string(shared.join("options.txt")).unwrap();
+        let stored = fs::read_to_string(shared.join("instances").join("options.txt")).unwrap();
         assert!(stored.contains("guiScale:2"));
         assert!(
             !stored.contains("resourcePacks"),
@@ -356,11 +383,42 @@ mod tests {
         fs::create_dir_all(data.join("config")).unwrap();
         fs::write(data.join("config").join("mod.toml"), "x=1").unwrap();
 
-        Sync::new(shared.clone()).apply(&data, true).unwrap();
+        Sync::new(shared.clone())
+            .apply(&data, SyncKind::Server, true)
+            .unwrap();
 
         assert_eq!(
-            fs::read_to_string(shared.join("config").join("mod.toml")).unwrap(),
+            fs::read_to_string(shared.join("servers").join("config").join("mod.toml")).unwrap(),
             "x=1"
+        );
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn server_and_instance_stores_do_not_mix() {
+        let base = temp_dir("kindsplit");
+        let shared = base.join("shared");
+        let server_data = base.join("srv");
+        let instance_data = base.join("inst");
+        let sync = Sync::new(shared.clone());
+
+        fs::create_dir_all(server_data.join("config")).unwrap();
+        fs::write(server_data.join("config").join("mod.toml"), "side=server").unwrap();
+        fs::create_dir_all(instance_data.join("config")).unwrap();
+        fs::write(instance_data.join("config").join("mod.toml"), "side=client").unwrap();
+
+        sync.apply(&server_data, SyncKind::Server, true).unwrap();
+        sync.apply(&instance_data, SyncKind::Instance, true)
+            .unwrap();
+
+        // The client's config is untouched by the server sync (separate stores).
+        assert_eq!(
+            fs::read_to_string(instance_data.join("config").join("mod.toml")).unwrap(),
+            "side=client"
+        );
+        assert_eq!(
+            fs::read_to_string(shared.join("servers").join("config").join("mod.toml")).unwrap(),
+            "side=server"
         );
         fs::remove_dir_all(&base).ok();
     }
@@ -373,9 +431,11 @@ mod tests {
         fs::create_dir_all(&data).unwrap();
         fs::write(data.join("options.txt"), "guiScale:1\n").unwrap();
 
-        Sync::new(shared.clone()).apply(&data, false).unwrap();
+        Sync::new(shared.clone())
+            .apply(&data, SyncKind::Instance, false)
+            .unwrap();
 
-        assert!(!shared.join("options.txt").exists());
+        assert!(!shared.join("instances").join("options.txt").exists());
         fs::remove_dir_all(&base).ok();
     }
 }
