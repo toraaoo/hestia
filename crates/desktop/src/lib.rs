@@ -29,6 +29,8 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(Bridge::default())
         .setup(|app| {
             if is_quit_signal(&std::env::args().collect::<Vec<_>>()) {
@@ -57,7 +59,9 @@ pub fn run() {
             commands::diagnostics::crash_report,
             commands::diagnostics::crash_list,
             commands::diagnostics::crash_read,
-            commands::diagnostics::crash_clear
+            commands::diagnostics::crash_clear,
+            commands::update::update_check,
+            commands::update::update_install
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
