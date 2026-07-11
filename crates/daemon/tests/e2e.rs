@@ -61,6 +61,7 @@ async fn spawn_daemon_at(home: std::path::PathBuf, cleanup: bool) -> (Daemon, Cl
         .arg("serve")
         .env("HESTIA_SOCK", &sock)
         .env("HESTIA_HOME", &home)
+        .env("HESTIA_NO_TRAY", "1")
         .spawn()
         .expect("spawn hestiad");
 
