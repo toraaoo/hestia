@@ -20,8 +20,8 @@ use ratatui::crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent,
 };
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Style};
-use ratatui::text::Line;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::{Frame, Terminal};
 use tokio::sync::mpsc::error::TryRecvError;
@@ -174,6 +174,31 @@ fn drive<S: Screen>(
 pub fn is_cancel(key: &KeyEvent) -> bool {
     matches!(key.code, KeyCode::Esc | KeyCode::Char('q'))
         || (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL))
+}
+
+/// The one-line header the log sessions share: a cyan title on the left and a
+/// dim right-aligned hint that flips to the scroll position while scrolled up
+/// from the tail, else shows the screen's own key hints.
+pub(super) fn log_header(frame: &mut Frame, area: Rect, title: &str, scroll: usize, actions: &str) {
+    let hint = if scroll > 0 {
+        format!("scrolled ↑{scroll} · ↓ follows")
+    } else {
+        actions.to_string()
+    };
+    let hint = Span::styled(hint, Style::default().fg(Color::DarkGray));
+    let [title_area, hint_area] =
+        Layout::horizontal([Constraint::Min(0), Constraint::Length(hint.width() as u16)])
+            .areas(area);
+    frame.render_widget(
+        Paragraph::new(Span::styled(
+            title.to_string(),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
+        title_area,
+    );
+    frame.render_widget(Paragraph::new(hint), hint_area);
 }
 
 fn draw_too_small(frame: &mut Frame, area: Rect) {

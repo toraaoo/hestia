@@ -3,14 +3,11 @@
 //! workload; Esc/q/Ctrl-C hand the terminal back and leave it running.
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
-use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::Span;
-use ratatui::widgets::Paragraph;
+use ratatui::layout::{Constraint, Layout};
 use ratatui::Frame;
 
 use super::console::ConsoleEvent;
-use super::{Flow, Screen};
+use super::{log_header, Flow, Screen};
 use crate::ui::components::log::{Kind, LogView};
 
 const WHEEL: usize = 3;
@@ -44,7 +41,13 @@ impl Screen for LogScreen {
     fn draw(&mut self, frame: &mut Frame) {
         let rows =
             Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(frame.area());
-        draw_header(frame, rows[0], &self.title, self.log.scroll());
+        log_header(
+            frame,
+            rows[0],
+            &self.title,
+            self.log.scroll(),
+            "Esc detach · ↑/↓ scroll",
+        );
         self.log.render(frame, rows[1]);
     }
 
@@ -82,26 +85,4 @@ impl Screen for LogScreen {
         }
         Flow::Continue
     }
-}
-
-fn draw_header(frame: &mut Frame, area: Rect, title: &str, scroll: usize) {
-    let hint = if scroll > 0 {
-        format!("scrolled ↑{scroll} · ↓ follows")
-    } else {
-        "Esc detach · ↑/↓ scroll".to_string()
-    };
-    let hint = Span::styled(hint, Style::default().fg(Color::DarkGray));
-    let [title_area, hint_area] =
-        Layout::horizontal([Constraint::Min(0), Constraint::Length(hint.width() as u16)])
-            .areas(area);
-    frame.render_widget(
-        Paragraph::new(Span::styled(
-            title.to_string(),
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        )),
-        title_area,
-    );
-    frame.render_widget(Paragraph::new(hint), hint_area);
 }

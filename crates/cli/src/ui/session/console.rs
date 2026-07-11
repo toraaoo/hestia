@@ -4,13 +4,13 @@
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
 
-use super::{Flow, Screen};
+use super::{log_header, Flow, Screen};
 use crate::ui::components::log::{Kind, LogView};
 use crate::ui::components::TextInput;
 
@@ -61,7 +61,13 @@ impl Screen for ConsoleScreen {
             Constraint::Length(1),
         ])
         .split(frame.area());
-        draw_header(frame, rows[0], &self.title, self.log.scroll());
+        log_header(
+            frame,
+            rows[0],
+            &self.title,
+            self.log.scroll(),
+            "Enter send · Esc detach · ↑/↓ scroll",
+        );
         self.log.render(frame, rows[1]);
         draw_input(frame, rows[2], &self.input);
     }
@@ -111,28 +117,6 @@ impl Screen for ConsoleScreen {
         }
         Flow::Continue
     }
-}
-
-fn draw_header(frame: &mut Frame, area: Rect, title: &str, scroll: usize) {
-    let hint = if scroll > 0 {
-        format!("scrolled ↑{scroll} · ↓ follows")
-    } else {
-        "Enter send · Esc detach · ↑/↓ scroll".to_string()
-    };
-    let hint = Span::styled(hint, Style::default().fg(Color::DarkGray));
-    let [title_area, hint_area] =
-        Layout::horizontal([Constraint::Min(0), Constraint::Length(hint.width() as u16)])
-            .areas(area);
-    frame.render_widget(
-        Paragraph::new(Span::styled(
-            title.to_string(),
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        )),
-        title_area,
-    );
-    frame.render_widget(Paragraph::new(hint), hint_area);
 }
 
 fn draw_input(frame: &mut Frame, area: Rect, input: &TextInput) {
