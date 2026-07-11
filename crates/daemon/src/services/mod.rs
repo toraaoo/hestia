@@ -15,6 +15,7 @@ mod java;
 mod lifecycle;
 mod process;
 mod server;
+mod update;
 
 use crate::runtime::{Channels, Router};
 
@@ -33,6 +34,7 @@ pub fn make_router() -> Router {
     instance::register(&mut on);
     backup::register(&mut on);
     content::register(&mut on);
+    update::register(&mut on);
 
     router
 }

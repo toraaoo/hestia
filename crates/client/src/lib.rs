@@ -7,6 +7,7 @@ mod spawn;
 
 pub use facades::{
     Accounts, App, Cache, Config, Content, Daemon, Instance, Java, Process, ProcessEvent, Server,
+    Update,
 };
 pub use ipc::errors::IpcError;
 pub use session::{job_id, Session};
@@ -89,6 +90,12 @@ impl Client {
 
     pub fn java(&self) -> Java<'_> {
         Java {
+            session: &self.session,
+        }
+    }
+
+    pub fn update(&self) -> Update<'_> {
+        Update {
             session: &self.session,
         }
     }

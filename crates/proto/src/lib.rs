@@ -17,5 +17,6 @@ pub mod java;
 pub mod minecraft;
 pub mod process;
 pub mod server;
+pub mod update;
 
 pub use contract::{Contract, Empty, Topic};

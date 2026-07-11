@@ -9,6 +9,7 @@ mod instance;
 mod java;
 mod job;
 mod server;
+mod update;
 
 pub use backup::{BackupJob, BackupManager};
 pub use content::{ContentJob, ContentManager};
@@ -16,3 +17,4 @@ pub use download::DownloadManager;
 pub use instance::InstanceLaunchManager;
 pub use java::JavaInstallManager;
 pub use server::{ServerCreateManager, ServerUpdateManager};
+pub use update::UpdateManager;

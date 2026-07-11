@@ -14,6 +14,7 @@ mod java;
 mod jobs;
 mod process;
 mod server;
+mod update;
 
 pub use accounts::Accounts;
 pub use app::App;
@@ -25,3 +26,4 @@ pub use instance::Instance;
 pub use java::Java;
 pub use process::{Process, ProcessEvent};
 pub use server::Server;
+pub use update::Update;
