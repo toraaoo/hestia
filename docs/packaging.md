@@ -28,14 +28,45 @@ The desktop app is the product; the daemon, tray, and CLI ride along as Tauri
 Each is built with the target-triple suffix Tauri requires
 (`hestiad-x86_64-unknown-linux-gnu`, …) and staged into `crates/desktop/binaries/`
 by [`scripts/sidecars.sh`](../scripts/sidecars.sh); the bundler strips the suffix
-on install. Every installer and every bundle installs the **full set** — there is
-no component picker. `deb`/`rpm` are monolithic; NSIS and MSI use the stock Tauri
-installers.
+on install. `deb`/`rpm`/AppImage and the MSI install the **full set** with no
+component picker; the NSIS installer is customized — see below.
 
-The **portable archives** are the same four binaries (`hestia`, `hestiad`,
-`tray`, `hestia-desktop`) plus `LICENSE`/`README`, packed flat by
-[`scripts/package.sh`](../scripts/package.sh) — Tauri has no portable target, so
-this is a plain `tar`/`Compress-Archive` step.
+## The NSIS installer
+
+Windows uses a **custom NSIS template**
+([`crates/desktop/windows/installer.nsi`](../crates/desktop/windows/installer.nsi)),
+a fork of tauri-bundler's stock template rendered with the same handlebars
+context. It must track the pinned tauri-cli version (`2.10.1`, both locally and
+in [`release.yml`](../.github/workflows/release.yml)) — re-diff the fork against
+upstream's `crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi` when
+bumping.
+
+What it adds over stock:
+
+- **Components page** — *Hestia core* (`hestiad` + `tray`, required),
+  *Desktop app*, and *CLI* (both checked by default, deselectable). Choices are
+  persisted in the uninstall registry key and become the defaults for the next
+  run — and the effective selection for silent/passive updates. Deselecting a
+  previously installed component on an update removes it.
+- **Install mode `both`** — per-user or all-users, chosen at install time
+  (`bundle.windows.nsis.installMode` in `tauri.conf.json`), remembered for
+  updates and uninstall.
+- **CLI on PATH** — the CLI component appends the install directory to the
+  user or machine `PATH` (matching the install mode) and removes it on
+  uninstall or deselection.
+- **Graceful daemon handling** — before files are swapped, a running `hestiad`
+  is asked to stop via `hestiad stop` (supervised game servers keep running —
+  the daemon re-adopts them on its next start) and only killed if it lingers;
+  the tray is stopped too. If the daemon was running, the installer restarts
+  it afterwards (unelevated, hidden window).
+- **Data survives uninstall** — `%APPDATA%\Hestia` (instances, servers,
+  worlds, accounts) is only removed when the uninstaller's *delete app data*
+  box is explicitly ticked. Uninstall also drops the `Hestia Daemon`
+  autostart scheduled task.
+- **Update-friendly** — running a newer setup over an existing install
+  upgrades in place (no uninstall detour), reusing the recorded install
+  directory, install mode, and components; downgrades take the stock
+  uninstall-first path.
 
 ## Runtime dependency: the system WebView
 

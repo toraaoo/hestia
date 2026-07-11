@@ -463,8 +463,10 @@ The resident core: it owns the IPC endpoint, routes requests to handlers,
 supervises launched processes, and manages autostart. The only crate that links
 `engine`.
 
-- **`main.rs`** — bootstrap only: clap parsing (`serve`, the default, or `ping`),
-  logging init (a rotated file for the long-lived daemon; stderr for `ping`), and
+- **`main.rs`** — bootstrap only: clap parsing (`serve`, the default, `ping`, or
+  `stop` — a graceful self-stop that leaves supervised processes running, letting
+  the Windows installer quiesce the daemon without the optional CLI), logging
+  init (a rotated file for the long-lived daemon; stderr for the one-shots), and
   dispatch.
 - **`server.rs`** — the serve loop: `bind` the endpoint, then `accept` connections,
   rejecting any peer that is not `authorized()`. Each connection gets an id and an
