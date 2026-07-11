@@ -24,8 +24,7 @@ pub fn draw_working(frame: &mut Frame, label: &str, progress: Option<&ProvisionP
     ])
     .areas(gauge_row);
     let ratio = progress
-        .filter(|p| p.total > 0)
-        .map(|p| (p.current as f64 / p.total as f64).clamp(0.0, 1.0))
+        .map(crate::ui::progress::overall_ratio)
         .unwrap_or(0.0);
     frame.render_widget(
         Gauge::default()

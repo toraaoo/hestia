@@ -263,7 +263,7 @@ impl ProvisionReporter {
                 let rate = self.rate.lock().unwrap().observe(progress.current);
                 View::Gauge {
                     label: gauge_label(progress.phase),
-                    ratio: count_ratio(progress.current, progress.total),
+                    ratio: overall_ratio(progress),
                     detail: bytes_detail(progress, rate),
                 }
             }
@@ -299,6 +299,19 @@ fn count_ratio(current: u64, total: u64) -> f64 {
         (current as f64 / total as f64).clamp(0.0, 1.0)
     } else {
         0.0
+    }
+}
+
+/// The gauge ratio for a progress event. A multi-unit phase (`items > 0`)
+/// fills monotonically across the whole batch — completed units plus the
+/// current unit's byte fraction — so cached or instant units still advance
+/// the bar instead of leaving it stuck at a per-file reset.
+pub(crate) fn overall_ratio(progress: &ProvisionProgress) -> f64 {
+    let unit = count_ratio(progress.current, progress.total);
+    if progress.items > 0 {
+        ((progress.item.saturating_sub(1) as f64 + unit) / progress.items as f64).clamp(0.0, 1.0)
+    } else {
+        unit
     }
 }
 
