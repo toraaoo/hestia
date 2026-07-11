@@ -50,6 +50,11 @@ pub enum ContentCmd {
     Remove {
         /// Installed item (project id, slug, filename, or title)
         item: Option<String>,
+        #[arg(
+            long,
+            help = "For a datapack: only remove from this save world (repeatable; every copy when omitted)"
+        )]
+        world: Vec<String>,
     },
     /// Update platform content to its newest compatible version
     Update {
@@ -80,7 +85,9 @@ pub async fn run_entry(
             .await
         }
         ContentCmd::List => list(client, entry, kind, reference).await,
-        ContentCmd::Remove { item } => remove(client, entry, kind, reference, item).await,
+        ContentCmd::Remove { item, world } => {
+            remove(client, entry, kind, reference, item, world).await
+        }
         ContentCmd::Update { item } => update(client, entry, kind, reference, item).await,
     }
 }
@@ -299,8 +306,10 @@ async fn remove(
     kind: ContentKind,
     reference: &str,
     item: Option<String>,
+    world: Vec<String>,
 ) -> Result<()> {
     let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
+    let worlds: Vec<String> = world.into_iter().filter(|w| !w.is_empty()).collect();
     let item = match item {
         Some(item) => item,
         None => {
@@ -312,10 +321,25 @@ async fn remove(
         }
     };
     match entry {
-        EntryKind::Server => client.server().content_remove(&id, kind, &item).await?,
-        EntryKind::Instance => client.instance().content_remove(&id, kind, &item).await?,
+        EntryKind::Server => {
+            client
+                .server()
+                .content_remove(&id, kind, &item, &worlds)
+                .await?
+        }
+        EntryKind::Instance => {
+            client
+                .instance()
+                .content_remove(&id, kind, &item, &worlds)
+                .await?
+        }
     }
-    ui::show(View::line(format!("removed '{item}' from '{name}'")))
+    let where_ = if worlds.is_empty() {
+        format!("'{name}'")
+    } else {
+        format!("'{name}' ({})", worlds.join(", "))
+    };
+    ui::show(View::line(format!("removed '{item}' from {where_}")))
 }
 
 async fn update(

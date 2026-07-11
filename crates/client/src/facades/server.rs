@@ -298,16 +298,20 @@ impl Server<'_> {
         Ok((result.items, result.untracked))
     }
 
+    /// Uninstall one item. A non-empty `worlds` narrows a datapack removal
+    /// to those save worlds; empty clears every copy.
     pub async fn content_remove(
         &self,
         server: &str,
         kind: ContentKind,
         item: &str,
+        worlds: &[String],
     ) -> Result<(), IpcError> {
         let params = ServerContentRemoveParams {
             server: server.to_string(),
             kind,
             item: item.to_string(),
+            worlds: worlds.to_vec(),
         };
         self.session.call::<ServerContentRemove>(&params).await?;
         Ok(())

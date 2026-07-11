@@ -335,12 +335,15 @@ pub struct InstanceContentListParams {
     pub kind: ContentKind,
 }
 
+/// `worlds` narrows a datapack removal to those save worlds (empty removes
+/// every copy); it is rejected for the other kinds, which have no worlds.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
 pub struct ServerContentRemoveParams {
     pub server: String,
     pub kind: ContentKind,
     pub item: String,
+    pub worlds: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -349,6 +352,7 @@ pub struct InstanceContentRemoveParams {
     pub instance: String,
     pub kind: ContentKind,
     pub item: String,
+    pub worlds: Vec<String>,
 }
 
 /// `item` empty updates every platform-sourced item of the kind.

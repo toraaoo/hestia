@@ -72,15 +72,17 @@ impl Engine {
     }
 
     /// Uninstall one item (matched by project id, slug, filename, or title).
-    /// Returns false when nothing matches.
+    /// A non-empty `worlds` narrows a datapack removal to those save worlds;
+    /// empty clears every copy. Returns false when nothing matches.
     pub fn remove_server_content(
         &self,
         reference: &str,
         kind: ContentKind,
         item: &str,
+        worlds: &[String],
     ) -> Result<bool> {
         let (_, ctx) = self.server_content_ctx(reference)?;
-        remove_content(&ctx, kind, item)
+        remove_content(&ctx, kind, item, worlds)
     }
 
     pub fn remove_instance_content(
@@ -88,9 +90,10 @@ impl Engine {
         reference: &str,
         kind: ContentKind,
         item: &str,
+        worlds: &[String],
     ) -> Result<bool> {
         let (_, ctx) = self.instance_content_ctx(reference)?;
-        remove_content(&ctx, kind, item)
+        remove_content(&ctx, kind, item, worlds)
     }
 
     /// Move platform-sourced items to their newest compatible version — one
@@ -801,10 +804,21 @@ fn list_content(ctx: &EntryContent, kind: ContentKind) -> (Vec<InstalledContent>
     (items, untracked)
 }
 
-fn remove_content(ctx: &EntryContent, kind: ContentKind, reference: &str) -> Result<bool> {
-    let (removed, kept): (Vec<_>, Vec<_>) = install::load(&ctx.entry_dir)
-        .into_iter()
-        .partition(|i| i.kind == kind && install::matches(i, reference));
+fn remove_content(
+    ctx: &EntryContent,
+    kind: ContentKind,
+    reference: &str,
+    worlds: &[String],
+) -> Result<bool> {
+    if !worlds.is_empty() && kind != ContentKind::DataPack {
+        bail!("only datapacks are installed per world");
+    }
+    let (removed, kept): (Vec<_>, Vec<_>) =
+        install::load(&ctx.entry_dir).into_iter().partition(|i| {
+            i.kind == kind
+                && install::matches(i, reference)
+                && (worlds.is_empty() || worlds.iter().any(|w| world_matches(&i.world, w)))
+        });
     if removed.is_empty() {
         return Ok(false);
     }
@@ -821,6 +835,12 @@ fn remove_content(ctx: &EntryContent, kind: ContentKind, reference: &str) -> Res
     }
     install::save(&ctx.entry_dir, kept)?;
     Ok(true)
+}
+
+/// Whether an index entry's world path (`saves/<name>`, or a server's level
+/// dir) is the named world — callers name a world by its folder name.
+fn world_matches(world: &str, name: &str) -> bool {
+    world.rsplit('/').next().unwrap_or(world) == name
 }
 
 #[cfg(test)]

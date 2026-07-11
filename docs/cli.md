@@ -186,6 +186,7 @@ hestia instance modded datapack add terralith --world Alpha --world Beta
 hestia instance modded datapack add --file ./pack.zip --world Alpha
 hestia instance modded datapack list      # installed datapacks, with their world
 hestia instance modded datapack remove terralith   # removes it from every world
+hestia instance modded datapack remove terralith --world Alpha   # only that world's copy
 hestia instance modded datapack update [item]      # updates it in each world
 ```
 

@@ -2,10 +2,10 @@
 //! resolution) and the per-entry install surface for servers and instances.
 
 use proto::content::{
-    ContentJobResult, ContentListResult, ContentProjectGet, ContentSearch, ContentSources,
-    ContentVersions, InstanceContentAdd, InstanceContentList, InstanceContentRemove,
-    InstanceContentUpdate, ModpackResolve, ServerContentAdd, ServerContentList,
-    ServerContentRemove, ServerContentUpdate, SourcesResult,
+    ContentJobResult, ContentKind, ContentListResult, ContentProjectGet, ContentSearch,
+    ContentSources, ContentVersions, InstanceContentAdd, InstanceContentList,
+    InstanceContentRemove, InstanceContentUpdate, ModpackResolve, ServerContentAdd,
+    ServerContentList, ServerContentRemove, ServerContentUpdate, SourcesResult,
     VersionsResult as ContentVersionsResult,
 };
 use proto::Empty;
@@ -113,6 +113,11 @@ fn register_server(on: &mut Channels<'_>) {
         if p.item.is_empty() {
             return Err(ServiceError::bad_request("item is required"));
         }
+        if !p.worlds.is_empty() && p.kind != ContentKind::DataPack {
+            return Err(ServiceError::bad_request(
+                "only datapacks are installed per world",
+            ));
+        }
         let record = find_server(&ctx, &p.server)?;
         let process_id = server_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "server", &record.name)?;
@@ -121,7 +126,7 @@ fn register_server(on: &mut Channels<'_>) {
         match ctx
             .runtime
             .engine()
-            .remove_server_content(&record.id, p.kind, &p.item)
+            .remove_server_content(&record.id, p.kind, &p.item, &p.worlds)
         {
             Ok(true) => Ok(Empty {}),
             Ok(false) => Err(ServiceError::not_found(format!(
@@ -189,6 +194,11 @@ fn register_instance(on: &mut Channels<'_>) {
         if p.item.is_empty() {
             return Err(ServiceError::bad_request("item is required"));
         }
+        if !p.worlds.is_empty() && p.kind != ContentKind::DataPack {
+            return Err(ServiceError::bad_request(
+                "only datapacks are installed per world",
+            ));
+        }
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
@@ -197,7 +207,7 @@ fn register_instance(on: &mut Channels<'_>) {
         match ctx
             .runtime
             .engine()
-            .remove_instance_content(&record.id, p.kind, &p.item)
+            .remove_instance_content(&record.id, p.kind, &p.item, &p.worlds)
         {
             Ok(true) => Ok(Empty {}),
             Ok(false) => Err(ServiceError::not_found(format!(
