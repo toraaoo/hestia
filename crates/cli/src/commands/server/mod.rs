@@ -176,15 +176,9 @@ pub async fn run(cmd: ServerCmd) -> Result<()> {
 
 async fn run_action(client: Client, name: String, action: ServerAction) -> Result<()> {
     match action {
-        ServerAction::Start { detach } => {
-            lifecycle::start(&client, &name).await?;
-            console::maybe_attach(client, &name, detach).await
-        }
+        ServerAction::Start { detach } => console::start_attached(client, &name, detach).await,
         ServerAction::Stop => lifecycle::stop(&client, &name).await,
-        ServerAction::Restart { detach } => {
-            lifecycle::restart(&client, &name).await?;
-            console::maybe_attach(client, &name, detach).await
-        }
+        ServerAction::Restart { detach } => console::restart_attached(client, &name, detach).await,
         ServerAction::Status => {
             let info = client.server().status(&name).await?;
             entry::show_status(&info)

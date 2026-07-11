@@ -45,10 +45,7 @@ async fn resolve(client: &Client, name: &str) -> Result<Target> {
 pub async fn start(name: String, account: Option<String>, detach: bool) -> Result<()> {
     let client = connect().await?;
     match resolve(&client, &name).await? {
-        Target::Server => {
-            server::lifecycle::start(&client, &name).await?;
-            server::console::maybe_attach(client, &name, detach).await
-        }
+        Target::Server => server::console::start_attached(client, &name, detach).await,
         Target::Instance => {
             instance::launch(
                 &client,
@@ -72,10 +69,7 @@ pub async fn stop(name: String) -> Result<()> {
 pub async fn restart(name: String, account: Option<String>, detach: bool) -> Result<()> {
     let client = connect().await?;
     match resolve(&client, &name).await? {
-        Target::Server => {
-            server::lifecycle::restart(&client, &name).await?;
-            server::console::maybe_attach(client, &name, detach).await
-        }
+        Target::Server => server::console::restart_attached(client, &name, detach).await,
         Target::Instance => {
             instance::lifecycle::restart(
                 &client,

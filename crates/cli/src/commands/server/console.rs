@@ -7,19 +7,35 @@ use client::{Client, ProcessEvent};
 use super::entry;
 use crate::ui::{self, View};
 
-/// Attach an interactive console to a running server: its live output above
-/// an input line; Esc detaches without touching the server.
-/// Attach after a start/restart: wait for the process to report running,
-/// then hand over to the console. A detach flag or a piped invocation skips
-/// it, keeping today's one-line behavior.
-pub(crate) async fn maybe_attach(client: Client, server: &str, detach: bool) -> Result<()> {
-    if detach || !ui::is_interactive() {
-        return Ok(());
+/// Start the server, then attach its console. Detached (or piped) it prints
+/// the started line and returns; attaching prints nothing until the session
+/// ends — output written between the shell prompt and the alternate screen
+/// gets duplicated into scrollback by some terminals.
+pub(crate) async fn start_attached(client: Client, server: &str, detach: bool) -> Result<()> {
+    if detach || !ui::interactive_output() {
+        return super::lifecycle::start(&client, server).await;
     }
+    super::lifecycle::start_quiet(&client, server).await?;
     super::lifecycle::wait_until_running(&client, server).await?;
     attach(client, server).await
 }
 
+/// Stop, start again, and attach — the attach-path twin of
+/// `lifecycle::restart`.
+pub(crate) async fn restart_attached(client: Client, server: &str, detach: bool) -> Result<()> {
+    if detach || !ui::interactive_output() {
+        return super::lifecycle::restart(&client, server).await;
+    }
+    {
+        let _spinner = crate::ui::Spinner::start(format!("stopping '{server}'"));
+        client.server().stop(server).await?;
+        super::lifecycle::wait_until_stopped(&client, server).await?;
+    }
+    start_attached(client, server, false).await
+}
+
+/// Attach an interactive console to a running server: its live output above
+/// an input line; Esc detaches without touching the server.
 pub(crate) async fn attach(client: Client, server: &str) -> Result<()> {
     if !ui::is_interactive() {
         bail!("attach needs an interactive terminal (use `server logs -f` and `server command`)");

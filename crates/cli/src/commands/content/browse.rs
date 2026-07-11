@@ -82,7 +82,7 @@ pub async fn run_browse(kind: ContentKind, cmd: BrowseCmd) -> Result<()> {
                 limit: limit.clamp(1, 100),
                 offset,
             };
-            if ui::is_interactive() {
+            if ui::interactive_output() {
                 session::run(&client, base, None).await?;
                 return Ok(());
             }

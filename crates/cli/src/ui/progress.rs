@@ -27,7 +27,11 @@ const GAUGE_WIDTH: usize = 30;
 /// What the animator paints on the next tick.
 enum View {
     Spinner(String),
-    Download { ratio: f64, detail: String },
+    Gauge {
+        label: &'static str,
+        ratio: f64,
+        detail: String,
+    },
 }
 
 /// A background renderer that rewrites the current `View` onto one stderr
@@ -90,16 +94,22 @@ fn run(view: Arc<Mutex<View>>, stop: Arc<AtomicBool>) {
     let _ = execute!(err, MoveToColumn(0), Clear(ClearType::CurrentLine), Show);
 }
 
-/// The line after the spinner frame, truncated to the terminal width.
+/// The line after the spinner frame: plain text (no escape codes — the line
+/// is truncated by chars to the terminal width, and a sliced escape sequence
+/// garbles the whole row).
 fn line(view: &View) -> String {
     let text = match view {
         View::Spinner(label) => label.clone(),
-        View::Download { ratio, detail } => {
+        View::Gauge {
+            label,
+            ratio,
+            detail,
+        } => {
             let filled = ((ratio * GAUGE_WIDTH as f64).round() as usize).min(GAUGE_WIDTH);
             format!(
-                "downloading {}{} {:>3.0}% · {detail}",
-                "█".repeat(filled).cyan(),
-                "░".repeat(GAUGE_WIDTH - filled).dark_grey(),
+                "{label} {}{} {:>3.0}% · {detail}",
+                "█".repeat(filled),
+                "░".repeat(GAUGE_WIDTH - filled),
                 ratio * 100.0
             )
         }
@@ -107,7 +117,7 @@ fn line(view: &View) -> String {
     let width = ratatui::crossterm::terminal::size()
         .map(|(w, _)| w as usize)
         .unwrap_or(80);
-    match text.char_indices().nth(width.saturating_sub(2)) {
+    match text.char_indices().nth(width.saturating_sub(3)) {
         Some((byte, _)) => text[..byte].to_string(),
         None => text,
     }
@@ -167,7 +177,8 @@ impl InstallReporter {
         let view = match progress.phase {
             JavaInstallPhase::Downloading => {
                 let rate = self.rate.lock().unwrap().observe(progress.current);
-                View::Download {
+                View::Gauge {
+                    label: "downloading",
                     ratio: ratio(progress),
                     detail: download_detail(progress, rate),
                 }
@@ -250,7 +261,8 @@ impl ProvisionReporter {
             | ProvisionPhase::Client
             | ProvisionPhase::Content => {
                 let rate = self.rate.lock().unwrap().observe(progress.current);
-                View::Download {
+                View::Gauge {
+                    label: gauge_label(progress.phase),
                     ratio: count_ratio(progress.current, progress.total),
                     detail: bytes_detail(progress, rate),
                 }
@@ -258,7 +270,8 @@ impl ProvisionReporter {
             ProvisionPhase::Libraries | ProvisionPhase::Assets | ProvisionPhase::Backup
                 if progress.total > 0 =>
             {
-                View::Download {
+                View::Gauge {
+                    label: gauge_label(progress.phase),
                     ratio: count_ratio(progress.current, progress.total),
                     detail: format!(
                         "{} · {}/{}",
@@ -290,17 +303,36 @@ fn count_ratio(current: u64, total: u64) -> f64 {
 }
 
 fn bytes_detail(progress: &ProvisionProgress, rate: f64) -> String {
-    let current = human_bytes(progress.current);
+    let mut parts = Vec::new();
+    if progress.items > 0 {
+        parts.push(format!("{}/{}", progress.item, progress.items));
+    }
+    if progress.detail.is_empty() {
+        parts.push(provision_noun(progress.phase).to_string());
+    } else {
+        parts.push(progress.detail.clone());
+    }
     let total = if progress.total > 0 {
         human_bytes(progress.total)
     } else {
         "?".to_string()
     };
-    let mut detail = format!("{} · {current} / {total}", provision_noun(progress.phase));
+    parts.push(format!("{} / {total}", human_bytes(progress.current)));
     if rate > 0.0 {
-        detail.push_str(&format!(" · {}/s", human_bytes(rate as u64)));
+        parts.push(format!("{}/s", human_bytes(rate as u64)));
     }
-    detail
+    parts.join(" · ")
+}
+
+/// The word before a phase's gauge (`backing up ███…`, not `downloading` for
+/// everything).
+fn gauge_label(phase: ProvisionPhase) -> &'static str {
+    match phase {
+        ProvisionPhase::Backup => "backing up",
+        ProvisionPhase::Libraries => "libraries",
+        ProvisionPhase::Assets => "assets",
+        _ => "downloading",
+    }
 }
 
 fn provision_label(phase: ProvisionPhase) -> &'static str {

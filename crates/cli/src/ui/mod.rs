@@ -32,6 +32,16 @@ pub(crate) fn is_interactive() -> bool {
     *MODE.get_or_init(|| std::io::stdin().is_terminal() && std::io::stderr().is_terminal())
 }
 
+/// Whether a full session may own the invocation: [`is_interactive`] *and*
+/// stdout is a terminal. A piped stdout means the caller is consuming
+/// results, so result-producing flows (browse, wizards, log followers,
+/// attach-on-start) degrade to their plain forms — while argument prompts,
+/// which draw on stderr, may still ask.
+pub(crate) fn interactive_output() -> bool {
+    static MODE: OnceLock<bool> = OnceLock::new();
+    *MODE.get_or_init(|| is_interactive() && std::io::stdout().is_terminal())
+}
+
 /// Render a view: plainly to stdout, except tables too tall for the terminal,
 /// which page in a fullscreen session when interactive.
 pub fn show(view: View) -> Result<()> {

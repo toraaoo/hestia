@@ -100,7 +100,7 @@ async fn add(
     let info = resolve_entry(client, entry, reference).await?;
 
     if item.is_none() && file.is_none() {
-        if !ui::is_interactive() {
+        if !ui::interactive_output() {
             bail!("name an item to install (a project slug/id, a source URL, or --file)");
         }
         return add_session(client, entry, kind, info).await;

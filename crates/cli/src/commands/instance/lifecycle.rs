@@ -12,7 +12,9 @@ use crate::ui::{self, ProvisionReporter, Spinner, View};
 
 /// Launch `reference`, rendering preparation progress, then attach a
 /// read-only log session (unless detached or piped); shared with
-/// `hestia play`.
+/// `hestia play`. Attaching prints its outcome only after the session ends,
+/// so nothing lands in the shell between the prompt and the alternate screen
+/// (which some terminals duplicate into scrollback).
 pub async fn launch(client: &Client, reference: &str, account: &str, detach: bool) -> Result<()> {
     let reporter = Arc::new(ProvisionReporter::new());
     let progress = reporter.clone();
@@ -22,11 +24,10 @@ pub async fn launch(client: &Client, reference: &str, account: &str, detach: boo
         .await;
     reporter.finish();
     let (process_id, pid) = result?;
-    ui::show(View::line(format!(
-        "instance '{reference}' launched (pid {pid})"
-    )))?;
-    if detach || !ui::is_interactive() {
-        return Ok(());
+    if detach || !ui::interactive_output() {
+        return ui::show(View::line(format!(
+            "instance '{reference}' launched (pid {pid})"
+        )));
     }
     let backfill = client
         .instance()
@@ -77,7 +78,7 @@ pub(crate) async fn logs(
     follow: bool,
 ) -> Result<()> {
     let lines = client.instance().logs(instance, tail).await?;
-    if follow && ui::is_interactive() {
+    if follow && ui::interactive_output() {
         let instances = client.instance().list().await?;
         let info = instances
             .iter()

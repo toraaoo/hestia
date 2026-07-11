@@ -5,7 +5,6 @@
 //! session, ending on the created entry's summary.
 
 use std::collections::HashMap;
-use std::time::Instant;
 
 use anyhow::Result;
 use client::proto::instance::InstanceInfo;
@@ -50,30 +49,46 @@ pub enum FieldKind {
     Choice(&'static [&'static str]),
 }
 
-/// One settings row, prefilled from the command's flags; empty = the game's
-/// own default.
+/// One settings row, prefilled from the command's flags. An empty value is
+/// not sent — the entry keeps whatever its own default is; `hint` says where
+/// that default comes from (dim, in place of a value). Defaults the game owns
+/// are deliberately not spelled out here: they vary per version and only
+/// exist once that version's server generates its own file.
 #[derive(Clone)]
 pub struct Field {
     pub key: &'static str,
     pub label: &'static str,
+    pub hint: &'static str,
     pub kind: FieldKind,
     pub value: String,
 }
 
 impl Field {
-    pub fn text(key: &'static str, label: &'static str, value: Option<String>) -> Field {
+    pub fn text(
+        key: &'static str,
+        label: &'static str,
+        hint: &'static str,
+        value: Option<String>,
+    ) -> Field {
         Field {
             key,
             label,
+            hint,
             kind: FieldKind::Text,
             value: value.unwrap_or_default(),
         }
     }
 
-    pub fn number(key: &'static str, label: &'static str, value: Option<String>) -> Field {
+    pub fn number(
+        key: &'static str,
+        label: &'static str,
+        hint: &'static str,
+        value: Option<String>,
+    ) -> Field {
         Field {
             key,
             label,
+            hint,
             kind: FieldKind::Number,
             value: value.unwrap_or_default(),
         }
@@ -82,12 +97,14 @@ impl Field {
     pub fn choice(
         key: &'static str,
         label: &'static str,
+        hint: &'static str,
         options: &'static [&'static str],
         value: Option<String>,
     ) -> Field {
         Field {
             key,
             label,
+            hint,
             kind: FieldKind::Choice(options),
             value: value.unwrap_or_default(),
         }
@@ -220,7 +237,6 @@ enum Step {
     Settings,
     Confirm,
     Working,
-    Done,
 }
 
 const STEPS: [Step; 5] = [
@@ -238,7 +254,7 @@ fn step_label(step: Step) -> &'static str {
         Step::Name => "name",
         Step::Settings => "settings",
         Step::Confirm => "confirm",
-        Step::Working | Step::Done => "",
+        Step::Working => "",
     }
 }
 
@@ -260,8 +276,6 @@ struct WizardScreen {
     eula: bool,
     status: Option<String>,
     progress: Option<ProvisionProgress>,
-    started: Option<Instant>,
-    outcome: Option<WizardOutcome>,
 }
 
 impl WizardScreen {
@@ -284,8 +298,6 @@ impl WizardScreen {
             editing: None,
             status: None,
             progress: None,
-            started: None,
-            outcome: None,
         };
         let mut first = 0;
         if !screen.flavor.is_empty() {
@@ -303,8 +315,7 @@ impl WizardScreen {
     fn current(&self) -> Step {
         match self.step {
             i if i < STEPS.len() => STEPS[i],
-            i if i == STEPS.len() => Step::Working,
-            _ => Step::Done,
+            _ => Step::Working,
         }
     }
 
@@ -433,7 +444,6 @@ impl WizardScreen {
             }
         }
         self.progress = None;
-        self.started = Some(Instant::now());
         self.step = STEPS.len();
     }
 
@@ -501,12 +511,10 @@ impl Screen for WizardScreen {
                 }
             }
             AppEvent::ServerCreated(info) => {
-                self.outcome = Some(WizardOutcome::Server(info));
-                self.step = STEPS.len() + 1;
+                return Flow::Done(Some(WizardOutcome::Server(info)));
             }
             AppEvent::InstanceCreated(info) => {
-                self.outcome = Some(WizardOutcome::Instance(info));
-                self.step = STEPS.len() + 1;
+                return Flow::Done(Some(WizardOutcome::Instance(info)));
             }
             AppEvent::Failed { message } => match self.current() {
                 Step::Working => {
@@ -582,12 +590,6 @@ impl Screen for WizardScreen {
                 _ => {}
             },
             Step::Working => {}
-            Step::Done => {
-                if let Some(outcome) = self.outcome.take() {
-                    return Flow::Done(Some(outcome));
-                }
-                return Flow::Done(None);
-            }
         }
         Flow::Continue
     }
@@ -666,10 +668,6 @@ impl Screen for WizardScreen {
                 };
                 draw_working(frame, label, self.progress.as_ref());
             }
-            Step::Done => {
-                self.draw_done(frame, body);
-                hint(frame, footer, "press any key to close");
-            }
         }
     }
 }
@@ -726,7 +724,7 @@ impl WizardScreen {
                 spans.push(Span::raw(format!("{}▏", editing.text())));
             } else if field.value.is_empty() {
                 spans.push(Span::styled(
-                    "(default)",
+                    field.hint,
                     Style::default()
                         .fg(Color::DarkGray)
                         .add_modifier(Modifier::DIM),
@@ -797,51 +795,6 @@ impl WizardScreen {
                     false => Style::default().fg(Color::Yellow),
                 },
             ));
-        }
-        frame.render_widget(Paragraph::new(lines), area);
-    }
-
-    fn draw_done(&self, frame: &mut Frame, area: Rect) {
-        let dim = Style::default().fg(Color::DarkGray);
-        let mut lines = Vec::new();
-        match &self.outcome {
-            Some(WizardOutcome::Server(info)) => {
-                lines.push(Line::styled(
-                    format!("server '{}' created", info.name),
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                ));
-                lines.push(Line::raw(""));
-                lines.push(Line::from(vec![
-                    Span::styled("flavor   ", dim),
-                    Span::raw(format!("{} {}", info.flavor, info.game_version)),
-                ]));
-                if let Some(port) = info.game_port {
-                    lines.push(Line::from(vec![
-                        Span::styled("port     ", dim),
-                        Span::raw(port.to_string()),
-                    ]));
-                }
-                lines.push(Line::from(vec![
-                    Span::styled("java     ", dim),
-                    Span::raw(info.java_major.to_string()),
-                ]));
-            }
-            Some(WizardOutcome::Instance(info)) => {
-                lines.push(Line::styled(
-                    format!("instance '{}' created", info.name),
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                ));
-                lines.push(Line::raw(""));
-                lines.push(Line::from(vec![
-                    Span::styled("flavor   ", dim),
-                    Span::raw(format!("{} {}", info.flavor, info.game_version)),
-                ]));
-            }
-            None => lines.push(Line::raw("nothing created")),
         }
         frame.render_widget(Paragraph::new(lines), area);
     }

@@ -227,6 +227,13 @@ struct ContentSession {
     detail_requested: HashSet<String>,
     versions: HashMap<String, Vec<ContentVersion>>,
     status: Option<String>,
+
+    /// The detail pane's scroll offset (reset when the highlight moves) and
+    /// its geometry as of the last draw — what key clamping and mouse-wheel
+    /// hit-testing need between frames.
+    detail_scroll: u16,
+    detail_max_scroll: u16,
+    detail_area: Rect,
 }
 
 impl ContentSession {
@@ -251,6 +258,9 @@ impl ContentSession {
             detail_requested: HashSet::new(),
             versions: HashMap::new(),
             status: None,
+            detail_scroll: 0,
+            detail_max_scroll: 0,
+            detail_area: Rect::default(),
         };
         session.send_search(0);
         session
@@ -361,12 +371,20 @@ impl ContentSession {
         let current = self.list.selected().unwrap_or(0) as isize;
         let next = (current + delta).clamp(0, last) as usize;
         self.list.select(Some(next));
+        self.detail_scroll = 0;
         self.want_detail();
         if next + 3 >= self.hits.len() && (self.hits.len() as u32) < self.total && !self.searching()
         {
             let offset = self.hits.len() as u32;
             self.send_search(offset);
         }
+    }
+
+    fn scroll_detail(&mut self, delta: i32) {
+        self.detail_scroll = self
+            .detail_scroll
+            .saturating_add_signed(delta as i16)
+            .min(self.detail_max_scroll);
     }
 
     fn needs_worlds(&self) -> bool {
@@ -432,8 +450,8 @@ impl ContentSession {
                 }
                 Focus::List => self.step_list(1),
             },
-            KeyCode::PageUp => self.step_list(-10),
-            KeyCode::PageDown => self.step_list(10),
+            KeyCode::PageUp => self.scroll_detail(-10),
+            KeyCode::PageDown => self.scroll_detail(10),
             KeyCode::Enter => match self.focus {
                 Focus::Search => {
                     self.focus = Focus::List;
@@ -680,9 +698,14 @@ impl Screen for ContentSession {
 
     fn on_mouse(&mut self, mouse: MouseEvent) -> Flow<Self::Outcome> {
         if matches!(self.mode, Mode::Browse) && self.overlay.is_none() {
-            match mouse.kind {
-                MouseEventKind::ScrollUp => self.step_list(-3),
-                MouseEventKind::ScrollDown => self.step_list(3),
+            let over_detail = self
+                .detail_area
+                .contains(ratatui::layout::Position::new(mouse.column, mouse.row));
+            match (mouse.kind, over_detail) {
+                (MouseEventKind::ScrollUp, true) => self.scroll_detail(-3),
+                (MouseEventKind::ScrollDown, true) => self.scroll_detail(3),
+                (MouseEventKind::ScrollUp, false) => self.step_list(-3),
+                (MouseEventKind::ScrollDown, false) => self.step_list(3),
                 _ => {}
             }
         }
@@ -759,8 +782,10 @@ impl ContentSession {
 
         let hint = match (self.target.is_some(), &self.focus) {
             (_, Focus::Search) => "type to search · ↓ results · esc quit",
-            (true, Focus::List) => "↑/↓ move · space select · v version · enter review · esc quit",
-            (false, Focus::List) => "↑/↓ move · enter versions · esc quit",
+            (true, Focus::List) => {
+                "↑/↓ move · space select · v version · pgup/pgdn description · enter review · esc quit"
+            }
+            (false, Focus::List) => "↑/↓ move · enter versions · pgup/pgdn description · esc quit",
         };
         frame.render_widget(
             Paragraph::new(Line::from(hint)).style(Style::default().fg(Color::DarkGray)),
@@ -811,17 +836,20 @@ impl ContentSession {
         frame.render_stateful_widget(list, area, &mut self.list);
     }
 
-    fn draw_detail(&self, frame: &mut Frame, area: Rect) {
+    fn draw_detail(&mut self, frame: &mut Frame, area: Rect) {
         let block = Block::new()
             .borders(Borders::LEFT)
             .border_style(Style::default().fg(Color::DarkGray));
-        let inner = block.inner(area);
+        let inner = block.inner(area).inner(ratatui::layout::Margin {
+            horizontal: 1,
+            vertical: 0,
+        });
         frame.render_widget(block, area);
+        self.detail_area = inner;
         let Some(hit) = self.highlighted() else {
             return;
         };
-        let detail = self.details.get(&hit.id);
-        let project = detail.unwrap_or(hit);
+        let project = self.details.get(&hit.id).unwrap_or(hit);
 
         let dim = Style::default().fg(Color::DarkGray);
         let mut lines = vec![
@@ -855,17 +883,25 @@ impl ContentSession {
         }
         if !project.body.is_empty() {
             lines.push(Line::raw(""));
-            for line in project.body.split('\n').take(40) {
-                lines.push(Line::styled(line.to_string(), dim));
-            }
+            let body = tui_markdown::from_str(&project.body);
+            lines.extend(body.lines.into_iter().map(line_to_static));
         }
-        frame.render_widget(
-            Paragraph::new(lines).wrap(Wrap { trim: false }),
-            inner.inner(ratatui::layout::Margin {
-                horizontal: 1,
-                vertical: 0,
-            }),
-        );
+
+        let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
+        let total = paragraph.line_count(inner.width) as u16;
+        self.detail_max_scroll = total.saturating_sub(inner.height);
+        self.detail_scroll = self.detail_scroll.min(self.detail_max_scroll);
+        frame.render_widget(paragraph.scroll((self.detail_scroll, 0)), inner);
+        if self.detail_max_scroll > 0 {
+            let position = format!(" {}/{} ", self.detail_scroll, self.detail_max_scroll);
+            let corner = Rect {
+                x: inner.right().saturating_sub(position.len() as u16),
+                y: inner.y,
+                width: (position.len() as u16).min(inner.width),
+                height: 1,
+            };
+            frame.render_widget(Paragraph::new(Line::styled(position, dim)), corner);
+        }
     }
 
     fn draw_review(&self, frame: &mut Frame, cursor: usize) {
@@ -1060,6 +1096,19 @@ fn version_picker(versions: &[ContentVersion]) -> (Picker, Vec<ContentVersion>) 
         })
         .collect();
     (Picker::new(items), versions.to_vec())
+}
+
+/// Detach a rendered markdown line from the source text it borrows, so the
+/// detail pane can hold it while the session mutates its own state.
+fn line_to_static(line: Line<'_>) -> Line<'static> {
+    let spans: Vec<Span<'static>> = line
+        .spans
+        .into_iter()
+        .map(|s| Span::styled(s.content.into_owned(), s.style))
+        .collect();
+    Line::from(spans)
+        .style(line.style)
+        .alignment(line.alignment.unwrap_or(ratatui::layout::Alignment::Left))
 }
 
 fn centered(area: Rect, percent_x: u16, percent_y: u16) -> Rect {

@@ -18,7 +18,7 @@ pub(super) async fn run(
     name: Option<String>,
     memory: Option<String>,
 ) -> Result<()> {
-    if ui::is_interactive() && !(flavor.is_some() && version.is_some()) {
+    if ui::interactive_output() && !(flavor.is_some() && version.is_some()) {
         return run_wizard(client, flavor, version, loader, name, memory).await;
     }
     let flavors = {
@@ -82,7 +82,7 @@ async fn run_wizard(
         name,
         loader,
         eula: true,
-        fields: vec![Field::text("memory", "memory", memory)],
+        fields: vec![Field::text("memory", "memory", "JVM default", memory)],
         extra: Vec::new(),
     };
     match wizard::run(client, seed).await? {

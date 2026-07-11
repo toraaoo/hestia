@@ -34,7 +34,15 @@ pub fn draw_working(frame: &mut Frame, label: &str, progress: Option<&ProvisionP
             .label(format!("{label} · {:.0}%", ratio * 100.0)),
         gauge_area,
     );
-    let detail = progress.map(|p| p.detail.clone()).unwrap_or_default();
+    let detail = progress
+        .map(|p| {
+            if p.items > 0 {
+                format!("{}/{} · {}", p.item, p.items, p.detail)
+            } else {
+                p.detail.clone()
+            }
+        })
+        .unwrap_or_default();
     frame.render_widget(
         Paragraph::new(Line::styled(detail, Style::default().fg(Color::DarkGray))).centered(),
         detail_row,

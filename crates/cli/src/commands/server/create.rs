@@ -60,7 +60,7 @@ pub struct CreateArgs {
 
 pub(super) async fn run(client: &Client, args: CreateArgs) -> Result<()> {
     let all_given = args.flavor.is_some() && args.version.is_some() && args.eula;
-    if ui::is_interactive() && !all_given {
+    if ui::interactive_output() && !all_given {
         return run_wizard(client, args).await;
     }
     let flavors = {
@@ -137,27 +137,35 @@ async fn run_wizard(client: &Client, args: CreateArgs) -> Result<()> {
         loader: args.loader,
         eula: args.eula,
         fields: vec![
-            Field::text("memory", "memory", args.memory),
-            Field::number("port", "port", args.port.map(|p| p.to_string())),
-            Field::text("motd", "motd", args.motd),
+            Field::text("memory", "memory", "JVM default", args.memory),
+            Field::number(
+                "port",
+                "port",
+                "auto — lowest free from 25565",
+                args.port.map(|p| p.to_string()),
+            ),
+            Field::text("motd", "motd", "server default", args.motd),
             Field::number(
                 "max-players",
                 "max players",
+                "server default",
                 args.max_players.map(|n| n.to_string()),
             ),
             Field::choice(
                 "difficulty",
                 "difficulty",
+                "server default",
                 &["peaceful", "easy", "normal", "hard"],
                 args.difficulty,
             ),
             Field::choice(
                 "gamemode",
                 "gamemode",
+                "server default",
                 &["survival", "creative", "adventure", "spectator"],
                 args.gamemode,
             ),
-            Field::text("level-seed", "seed", args.seed),
+            Field::text("level-seed", "seed", "random", args.seed),
         ],
         extra,
     };

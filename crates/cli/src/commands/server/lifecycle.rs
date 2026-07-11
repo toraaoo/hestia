@@ -11,14 +11,20 @@ use super::entry;
 use crate::ui::{self, Spinner, View};
 
 pub(crate) async fn start(client: &Client, server: &str) -> Result<()> {
+    let pid = start_quiet(client, server).await?;
+    ui::show(View::line(format!("server '{server}' started (pid {pid})")))
+}
+
+/// Start without the stdout line — the attach path prints its outcome only
+/// after the console session ends, so nothing lands in the shell between the
+/// prompt and the alternate screen (which some terminals duplicate into
+/// scrollback).
+pub(crate) async fn start_quiet(client: &Client, server: &str) -> Result<u32> {
     let started = {
         let _spinner = Spinner::start(format!("starting '{server}'"));
         client.server().start(server).await?
     };
-    ui::show(View::line(format!(
-        "server '{server}' started (pid {})",
-        started.pid
-    )))
+    Ok(started.pid)
 }
 
 pub(crate) async fn stop(client: &Client, server: &str) -> Result<()> {
@@ -53,7 +59,7 @@ pub(crate) async fn logs(
     follow: bool,
 ) -> Result<()> {
     let lines = client.server().logs(server, tail).await?;
-    if follow && ui::is_interactive() {
+    if follow && ui::interactive_output() {
         let info = client.server().status(server).await?;
         let process = entry::running_process(&info)
             .with_context(|| format!("server '{}' is not running", info.name))?;
