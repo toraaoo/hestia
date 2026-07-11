@@ -30,7 +30,8 @@ overrides the data directory for an auto-spawned daemon.
 Microsoft sign-in; `auth` is an alias for `account`.
 
 ```bash
-hestia account login             # device-code flow — enter the shown code in a browser
+hestia account login             # device-code flow — opens the browser, the code
+                                 #   shown and copied to the clipboard
 hestia account login --sisu      # browser-redirect flow: sign in, paste the redirect back
 hestia account list              # signed-in accounts ('*' marks the one launches use)
 hestia account switch [name]     # pick the account launches use (prompts when omitted)
@@ -258,7 +259,7 @@ re-adopted by the next daemon.
 hestia daemon status             # is the daemon running, and what is it supervising
 hestia daemon start              # start it
 hestia daemon restart            # restart it (workloads survive)
-hestia daemon stop               # asks about running workloads on a terminal
+hestia daemon stop               # asks about running workloads (piped: --all/--keep)
 hestia daemon stop --all         # stop supervised processes too
 hestia daemon stop --keep        # leave them running (script-safe)
 ```

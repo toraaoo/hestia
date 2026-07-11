@@ -104,7 +104,7 @@ async fn pick_account(client: &Client) -> Result<String> {
             }
         })
         .collect();
-    let index = ui::select("switch launches to", &labels)?;
+    let index = ui::prompt_select("switch launches to", &labels)?;
     Ok(listing.accounts[index].uuid.clone())
 }
 
@@ -113,11 +113,16 @@ async fn device_code_login(client: &Client) -> Result<Account> {
         .accounts()
         .begin_login(LoginMethod::DeviceCode)
         .await?;
+    let copied = copy_clipboard(&flow.user_code);
+    let hint = if copied {
+        " (copied to the clipboard)"
+    } else {
+        ""
+    };
     ui::show(View::line(format!(
-        "To sign in, open\n\n  {}\n\nand enter the code\n\n  {}",
+        "To sign in, open\n\n  {}\n\nand enter the code\n\n  {}{hint}",
         flow.verification_uri, flow.user_code
     )))?;
-    let _ = ui::input("press Enter to open your browser", "");
     open_browser(&flow.verification_uri);
     let _spinner = Spinner::start("waiting for you to finish in the browser…");
     Ok(client.accounts().complete_login(&flow.id, "").await?)
@@ -129,19 +134,43 @@ async fn sisu_login(client: &Client) -> Result<Account> {
         "Open this URL in your browser and sign in:\n\n  {}",
         flow.url
     )))?;
-    let _ = ui::input("press Enter to open your browser", "");
     open_browser(&flow.url);
 
-    let pasted = ui::input(
-        "you'll land on a blank page — paste its full address (or the code)",
-        "",
-    )?;
+    let pasted = ui::prompt("you'll land on a blank page — paste its full address (or the code)")?;
     let code = extract_code(&pasted);
     if code.is_empty() {
         bail!("no authorization code was pasted");
     }
     let _spinner = Spinner::start("signing in…");
     Ok(client.accounts().complete_login(&flow.id, &code).await?)
+}
+
+/// Best-effort copy through the platform's own clipboard tool; returns whether
+/// one accepted the text.
+fn copy_clipboard(text: &str) -> bool {
+    let candidates: &[(&str, &[&str])] = if cfg!(target_os = "macos") {
+        &[("pbcopy", &[])]
+    } else if cfg!(windows) {
+        &[("clip", &[])]
+    } else {
+        &[("wl-copy", &[]), ("xclip", &["-selection", "clipboard"])]
+    };
+    for (program, args) in candidates {
+        let child = std::process::Command::new(program)
+            .args(*args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+        let Ok(mut child) = child else { continue };
+        let written = child.stdin.take().is_some_and(|mut stdin| {
+            std::io::Write::write_all(&mut stdin, text.as_bytes()).is_ok()
+        });
+        if written && matches!(child.wait(), Ok(status) if status.success()) {
+            return true;
+        }
+    }
+    false
 }
 
 fn open_browser(url: &str) {

@@ -98,15 +98,12 @@ async fn stop_choice(client: &Client, all: bool, keep: bool) -> Result<(bool, Ve
             running.join(", ")
         );
     }
-    let picked = ui::select(
-        &format!(
-            "{} still running ({}) — stop them too?",
-            summarize(&running),
-            running.join(", ")
-        ),
-        &["keep them running".into(), "stop them too".into()],
-    )?;
-    Ok((picked == 1, running))
+    let stop = ui::prompt_confirm(&format!(
+        "{} still running ({}) — stop them too?",
+        summarize(&running),
+        running.join(", ")
+    ))?;
+    Ok((stop, running))
 }
 
 async fn running_workloads(client: &Client) -> Result<Vec<String>> {

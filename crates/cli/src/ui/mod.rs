@@ -16,7 +16,7 @@ mod render;
 pub(crate) mod session;
 mod view;
 
-use std::io::IsTerminal;
+use std::io::{IsTerminal, Write};
 use std::sync::OnceLock;
 
 use anyhow::{anyhow, bail, Result};
@@ -100,6 +100,53 @@ pub fn pick(prompt: &str, items: Vec<PickerItem>) -> Result<usize> {
     }
     session::run(session::prompt::PickerScreen::new(prompt, items), None)?
         .ok_or_else(|| anyhow!("selection cancelled"))
+}
+
+/// Ask for one line inline on the current screen: the prompt goes to stderr
+/// and the reply is read from stdin — no session, so the exchange stays in
+/// the scrollback. Errors without an interactive terminal.
+pub fn prompt(text: &str) -> Result<String> {
+    if !is_interactive() {
+        bail!("no interactive terminal");
+    }
+    eprint!("{text}: ");
+    std::io::stderr().flush()?;
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line)?;
+    Ok(line.trim().to_string())
+}
+
+/// Ask a yes/no question inline: `[y/N]` appended to the prompt, defaulting
+/// to no. Errors without an interactive terminal.
+pub fn prompt_confirm(text: &str) -> Result<bool> {
+    let answer = prompt(&format!("{text} [y/N]"))?;
+    Ok(matches!(answer.to_lowercase().as_str(), "y" | "yes"))
+}
+
+/// Pick one of `items` inline: a numbered list on stderr, the number read
+/// from stdin (an empty answer cancels). Errors without an interactive
+/// terminal.
+pub fn prompt_select(text: &str, items: &[String]) -> Result<usize> {
+    if items.is_empty() {
+        bail!("nothing to select");
+    }
+    if !is_interactive() {
+        bail!("no interactive terminal; pass the choice as an argument");
+    }
+    eprintln!("{text}:");
+    for (index, item) in items.iter().enumerate() {
+        eprintln!("  {}. {item}", index + 1);
+    }
+    loop {
+        let answer = prompt(&format!("1-{}", items.len()))?;
+        if answer.is_empty() {
+            bail!("selection cancelled");
+        }
+        match answer.parse::<usize>() {
+            Ok(n) if (1..=items.len()).contains(&n) => return Ok(n - 1),
+            _ => eprintln!("enter a number between 1 and {}", items.len()),
+        }
+    }
 }
 
 /// Ask a yes/no question with labeled answers, returning `true` for `yes`.
