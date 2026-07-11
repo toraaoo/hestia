@@ -287,6 +287,14 @@ The subsystems behind the aggregate:
   `sync` pass re-mirrors any missing managed file at every start/launch (below).
   Installing a modpack's files and `overrides/` is the remaining materialize
   step.
+- **`sync`** (`Sync`) — shared settings/configs: a small set of game-relative
+  files/folders (`options.txt` key-merged, `servers.dat`, `config/`) propagated
+  across servers and instances through a persistent `<data_home>/shared/` store.
+  Copy-based, not symlinked: each entry keeps its own copy under `data/`, and
+  `apply` reconciles it with the store newest-wins at every start/launch (hooked
+  into `server_launch_plan`/`prepare_instance`, before the content re-mirror).
+  The managed content dirs and `saves/` are rejected as targets at the edge —
+  see the decision note below.
 - **`servers`** / **`instances`** (`Servers`, `Instances`) — the persistent
   stores, one directory per entry beside a JSON record (`servers/<id>/server.json`
   holding the resolved profile snapshot; the disk is the registry, as with
@@ -421,6 +429,22 @@ The subsystems behind the aggregate:
 > Directories appear on demand rather than at create, so a tree only shows
 > what is actually in use. The layout change is not migrated: pre-`data/`
 > entries must be recreated (or their game files moved into `data/` by hand).
+
+> **Shared settings/configs are copied, not symlinked.** Pandora shares files
+> across instances by symlinking whole folders (`saves`, `config`, …) into one
+> live directory. That model fights three things Hestia already decided: servers
+> run concurrently (two live processes on one symlinked `config/`/world corrupt
+> each other), the content system already owns `resourcepacks/`/`shaderpacks/`
+> (a symlink there would leak one entry's content to all), and backups archive
+> `data/` (a symlinked `saves` would be archived-through or clobbered on
+> restore). So `sync` is **copy-based**: each entry keeps its own physical copy
+> under `data/`, reconciled newest-wins with a persistent `shared/` store at
+> every start/launch. Nothing is live-shared, so concurrent writers are safe and
+> backups stay intact; the cost is that propagation is at-launch, not instant —
+> which settings don't need. Scope is settings/config only: the managed content
+> dirs and `saves/` are rejected as targets (the content system shares content;
+> worlds belong to backups). Pack selection (`options.txt`'s `resourcePacks`)
+> stays entry-local — merged like Pandora's, but never pushed to the store.
 
 > **Rename re-slugs the id and moves the directory.** The `id` is not just a
 > display alias — it is the directory name (`servers/<id>/`), the supervisor's
@@ -595,10 +619,14 @@ supervises launched processes, and manages autostart. The only crate that links
   counterparts:
   `flavors|versions|resolve|create|update|rename|list|remove|worlds`
   (`worlds` lists a client's save worlds for the datapack picker), plus
-  `instance.launch|stop|logs` (`logs` is thin over the supervisor, like the
-  server's), `instance.backup.create|list|restore|remove` (create and
+  `instance.launch|stop|logs` (launch never refuses a running instance —
+  each launch is a new session; `stop` fans out to every session or a named
+  one; `logs` targets the newest running or a named session — all thin over
+  the supervisor), `instance.backup.create|list|restore|remove` (create and
   restore require the instance stopped), and `instance.config.get|set|list`
-  (`memory`/`jvm-args` only). Plus
+  (`memory`/`jvm-args` only). Plus `sync.get|set` — the global shared-config
+  target set (`set` validates each path: relative, no `..` escape, not a
+  launcher-managed dir). Plus
   `content.sources|search|project|versions|modpack.resolve` — thin over the
   engine's content registry (an empty `source` selects the default; search,
   project, and versions are plain request/response, and `modpack.resolve`
@@ -658,6 +686,35 @@ supervises launched processes, and manages autostart. The only crate that links
 > the listener is network-reachable and the per-server random password is the
 > only barrier (it never appears in logs).
 
+> **An instance runs many sessions; a server runs one.** A client can be
+> launched more than once at a time, so `instance-<id>` is no longer a single
+> supervisor key — it splits into an *entry key* (`instance-<id>`, still the
+> unit for the backup/update/content/rename guards and their in-flight sets) and
+> a per-launch *session key* (`instance-<id>_<seq>`). Ids are slugs (`[a-z0-9-]`,
+> never `_`), so a session prefix `instance-<id>_` can't collide across
+> instances; every former singular lookup (status, stop, logs, running-check)
+> becomes a prefix query over the supervisor's flat table, so the supervisor and
+> its on-disk records need no change — each session just gets a distinct id.
+> `stop` fans out to every session (or a named one); `logs` targets the newest
+> running session (or a named one). Servers stay singular (`server-<id>`): a
+> world has one authoritative writer. Two sessions of one instance share its
+> single `data/` — Minecraft's own `session.lock` arbitrates a world, and each
+> session gets a private log (below) so their output never interleaves.
+
+> **Per-session logs come from a generated Log4j2 config, not a captured pipe.**
+> Sessions share one `data/`, so they would all write `logs/latest.log`. Rather
+> than capture each session's stdout (a pipe the daemon owns, which dies on a
+> daemon restart and can't be re-established for an adopted process — the same
+> constraint that made the console RCON), each launch is pointed at its own
+> generated config via `-Dlog4j.configurationFile`, writing to
+> `<instance>/logs/session-<seq>.log`. That is a real file the game writes, so
+> it survives a daemon restart and the supervisor tails it by `LogSource::File`
+> exactly as before. The generated config is Log4Shell-safe — `%m{nolookups}` in
+> the pattern plus a belt-and-suspenders `-Dlog4j2.formatMsgNoLookups=true` — so
+> overriding Mojang's bundled config never re-opens CVE-2021-44228 on the older
+> versions Mojang had patched. The log lives under the instance root, not
+> `data/`, so it stays out of backups.
+
 ## Front-ends: CLI, desktop, tray
 
 ### CLI (`cli`) — hestia
@@ -665,7 +722,7 @@ supervises launched processes, and manages autostart. The only crate that links
 A thin client over the daemon, built on clap's derive API. `main.rs` defines a
 `Command` enum — `play`, `account` (alias `auth`), `java`, `server`, `instance`,
 the cross-entry shortcuts `start`/`stop`/`restart`/`logs`, `cache`, `config`,
-`daemon` — each a module under `commands/` exposing a `Subcommand` enum and a
+`sync`, `daemon` — each a module under `commands/` exposing a `Subcommand` enum and a
 `run()`. A domain with many verbs is a directory whose `mod.rs` holds only that
 grammar and dispatch, with one file per verb group: `server/` and `instance/`
 split into `create`, `update`, `backup`, `config`, `lifecycle` (plus the
@@ -816,7 +873,11 @@ server on its own claimed port; start/stop/status/logs over the supervisor;
 a console over rcon — one-shot `command`, followed logs, interactive
 `attach`); instance management (create a
 record, launch materialises client/libraries/assets and spawns the game as the
-signed-in account); in-place version updates for both (downgrades gated
+signed-in account, and can run several concurrent sessions each with its own
+Log4j2-routed log); shared settings/configs across servers and instances
+(copy-based `sync`: `options.txt` merged, `config/` and others reconciled
+newest-wins with a `shared/` store at each start/launch); in-place version
+updates for both (downgrades gated
 behind an explicit confirmation, the existing data backed up automatically
 first); backups for both (on-demand archive/restore with live progress — a
 running server is archived under the RCON save-off dance — plus per-server
@@ -864,11 +925,14 @@ left-click launching the desktop app.
   are pinned so a wire change is caught.
 - `crates/engine/tests/` — `store` (config/cache/java/servers/instances
   persistence) and `auth_oracle` (the account sign-in state machine); launch-plan
-  assembly (classpath, placeholder substitution) is unit-tested in
-  `minecraft/launch.rs`, the Modrinth mapping and `.mrpack`/URL parsing in
-  `content/modrinth.rs`, and content version-pick / reference-matching in
-  `content/install.rs`.
-- `crates/daemon/tests/e2e.rs` — a client-to-daemon round trip over a real socket.
+  assembly (classpath, placeholder substitution, the per-session log-config
+  injection) is unit-tested in `minecraft/launch.rs`, the Log4Shell-safe
+  session config in `minecraft/log4j.rs`, the copy-based config reconciliation
+  and `options.txt` merge in `sync.rs`, the Modrinth mapping and `.mrpack`/URL
+  parsing in `content/modrinth.rs`, and content version-pick / reference-matching
+  in `content/install.rs`.
+- `crates/daemon/tests/e2e.rs` — a client-to-daemon round trip over a real
+  socket; the session-key prefix invariant is unit-tested in `runtime/mod.rs`.
 
 Run the fast core with `cargo build -p cli -p daemon`, then
 `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace`.
