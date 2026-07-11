@@ -50,6 +50,13 @@
           "libayatana-appindicator3-1"
         ]
       }
+    },
+    "windows": {
+      "nsis": {
+        "template": "windows/installer.nsi",
+        "installMode": "both",
+        "startMenuFolder": "Hestia"
+      }
     }
   }
 }
