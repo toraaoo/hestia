@@ -133,6 +133,9 @@ hestia instance flavors          # the available flavors
 hestia instance modded launch    # ensures java/client/libraries/assets, runs,
                                  #   then follows the logs fullscreen
                                  #   (-d/--detach returns immediately)
+hestia instance modded launch --new-session   # launch another session while one
+                                 #   is already running (default refuses — see
+                                 #   "Multiple sessions" below)
 hestia instance modded update 1.21.4  # move to another version (saves stay
                                  #   and are backed up automatically first;
                                  #   files download at the next launch; a
@@ -143,15 +146,35 @@ hestia instance modded backup list    # stored backups, newest first
 hestia instance modded backup restore # replace saves with a backup's content
 hestia instance modded backup remove <backup>
 hestia instance modded config set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
-hestia instance modded logs -n 50 # captured output (-f opens the fullscreen
-                                 #   log session; piped it streams plainly)
-hestia instance modded info      # the record and process state
-hestia instance modded stop      # kill the running instance
+hestia instance modded logs -n 50 # captured output — the newest running session
+                                 #   (-f opens the fullscreen log session; piped
+                                 #   it streams plainly)
+hestia instance modded info      # the record and each running session
+hestia instance modded stop      # kill every running session of the instance
 hestia instance modded restart   # stop, then launch again
 hestia instance modded rename mp # rename (stopped): re-slugs the id and moves
                                  #   its directory; saves move with it
 hestia instance modded remove    # delete the instance (its saves and all)
 ```
+
+### Multiple sessions
+
+An instance can run **more than one session at a time**, but it is off by
+default: `launch`/`play` refuse an instance that is already running unless you
+pass `--new-session`.
+
+```bash
+hestia play modded               # session 1
+hestia play modded               # refused: "already running; pass --new-session"
+hestia play modded --new-session # session 2, running alongside session 1
+hestia instance modded info      # shows every running session
+```
+
+Each session writes its own log (`<instance>/logs/session-N.log`), so their
+output never interleaves. `logs` targets the newest running session; `stop`
+stops **all** of the instance's sessions. Sessions share one `data/`, so
+Minecraft's own `session.lock` arbitrates a singleplayer world (a second session
+can't open the same world). Servers stay single — a world has one writer.
 
 ### Content on an instance
 
@@ -201,11 +224,13 @@ which kind it is (a name matching both asks you to qualify it).
 
 ```bash
 hestia play                      # launch an instance — one runs directly, several
-                                 #   prompt a pick; follows the logs (-d skips)
+                                 #   prompt a pick; follows the logs (-d skips).
+                                 #   --new-session runs another alongside a
+                                 #   running one (default refuses)
 hestia start modded              # start a server (attaches its console) or launch
                                  #   an instance (follows its logs); -d/--detach
                                  #   returns immediately
-hestia stop modded               # stop whichever it is
+hestia stop modded               # stop whichever it is (all sessions, for an instance)
 hestia restart modded            # restart whichever it is (attaches like start)
 hestia logs modded -f            # follow its captured output fullscreen
 ```
@@ -235,6 +260,36 @@ hestia cache info                # size and entry count
 hestia cache list                # cached blobs
 hestia cache clear               # evict everything
 ```
+
+## Shared settings/configs
+
+Settings and configs are shared across your entries automatically. Each entry
+keeps its **own copy** under `data/`; at every start/launch Hestia reconciles it
+with a shared store, newest edit wins (nothing is live-shared, so it is safe
+with concurrent processes and backups). It works out of the box — no setup.
+
+Targets are kept **separate per kind**: servers and instances have their own
+lists and their own store (`shared/servers/`, `shared/instances/`), because a
+server has no `options.txt` and its mod `config/` must not mix with a client's.
+Defaults: instances share `options.txt` (key-merged; pack selection stays
+per-instance), `servers.dat`, and `config/`; servers share `config/`.
+
+```bash
+hestia sync status               # the store path + each kind's targets
+
+hestia sync instance add screenshots --folder   # also share client screenshots
+hestia sync instance remove servers.dat          # keep each instance's list local
+hestia sync server add ops.json  # share an op list across your servers
+hestia sync server add config --folder           # (already a default)
+hestia sync instance remove <path>               # stop sharing a target
+```
+
+Paths are **game-relative** (relative to `data/`). `add` shares a file;
+`--folder` shares a whole directory (every file under it, synced per file).
+`..` escapes and the launcher-managed directories (`mods`, `resourcepacks`,
+`shaderpacks`, `saves`, `backups`) are rejected — the content system already
+shares content, and worlds belong to backups. Propagation is at start/launch,
+not instant.
 
 ## Configuration
 

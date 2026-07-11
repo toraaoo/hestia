@@ -48,6 +48,8 @@ enum Command {
         account: Option<String>,
         #[arg(short, long, help = "Return immediately instead of following the logs")]
         detach: bool,
+        #[arg(long, help = "Launch another session even if one is already running")]
+        new_session: bool,
     },
     /// Minecraft accounts (Microsoft sign-in, switching)
     #[command(visible_alias = "auth")]
@@ -229,7 +231,8 @@ async fn dispatch(command: Command) -> anyhow::Result<()> {
             instance,
             account,
             detach,
-        } => commands::play::run(instance, account, detach).await,
+            new_session,
+        } => commands::play::run(instance, account, new_session, detach).await,
         Command::Account { cmd } => commands::account::run(cmd).await,
         Command::Java { cmd } => commands::java::run(cmd).await,
         Command::Server { cmd } => commands::server::run(cmd).await,

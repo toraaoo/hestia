@@ -51,6 +51,7 @@ pub async fn start(name: String, account: Option<String>, detach: bool) -> Resul
                 &client,
                 &name,
                 account.as_deref().unwrap_or_default(),
+                false,
                 detach,
             )
             .await

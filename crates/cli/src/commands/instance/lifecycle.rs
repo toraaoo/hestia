@@ -15,12 +15,18 @@ use crate::ui::{self, ProvisionReporter, Spinner, View};
 /// `hestia play`. Attaching prints its outcome only after the session ends,
 /// so nothing lands in the shell between the prompt and the alternate screen
 /// (which some terminals duplicate into scrollback).
-pub async fn launch(client: &Client, reference: &str, account: &str, detach: bool) -> Result<()> {
+pub async fn launch(
+    client: &Client,
+    reference: &str,
+    account: &str,
+    new_session: bool,
+    detach: bool,
+) -> Result<()> {
     let reporter = Arc::new(ProvisionReporter::new());
     let progress = reporter.clone();
     let result = client
         .instance()
-        .launch(reference, account, move |p| progress.update(p))
+        .launch(reference, account, new_session, move |p| progress.update(p))
         .await;
     reporter.finish();
     let (process_id, pid) = result?;
@@ -60,7 +66,7 @@ pub(crate) async fn restart(
         client.instance().stop(instance, None).await?;
         wait_until_stopped(client, instance).await?;
     }
-    launch(client, instance, account, detach).await
+    launch(client, instance, account, false, detach).await
 }
 
 pub(super) async fn remove(client: &Client, instance: &str) -> Result<()> {

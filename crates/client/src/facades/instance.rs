@@ -279,6 +279,7 @@ impl Instance<'_> {
         &self,
         instance: &str,
         account: &str,
+        new_session: bool,
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
     ) -> Result<(String, u32), IpcError> {
         let id = job_id("instance-launch");
@@ -287,6 +288,7 @@ impl Instance<'_> {
             instance: instance.to_string(),
             account: account.to_string(),
             id: id.clone(),
+            new_session,
         };
         let payload = self
             .session

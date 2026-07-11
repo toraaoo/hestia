@@ -165,8 +165,14 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<InstanceLaunch, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
-        // Instances may run several sessions at once, so a running instance is
-        // not refused; only an in-flight backup blocks a launch.
+        // Concurrent sessions are opt-in: by default a running instance is
+        // refused, and `new_session` unlocks a second (or third) launch.
+        if !p.new_session && ctx.runtime.instance_running(&record.id) {
+            return Err(ServiceError::bad_request(format!(
+                "instance '{}' is already running; pass --new-session to run another",
+                record.name
+            )));
+        }
         ensure_no_backup(&ctx, &instance_process_id(&record.id), &record.name)?;
         match ctx
             .runtime

@@ -87,8 +87,10 @@ enum InstanceAction {
         account: Option<String>,
         #[arg(short, long, help = "Return immediately instead of following the logs")]
         detach: bool,
+        #[arg(long, help = "Launch another session even if one is already running")]
+        new_session: bool,
     },
-    /// Kill the running instance
+    /// Kill every running session of the instance
     Stop,
     /// Stop the running instance and launch it again
     Restart {
@@ -193,11 +195,16 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
 
 async fn run_action(client: &Client, name: String, action: InstanceAction) -> Result<()> {
     match action {
-        InstanceAction::Launch { account, detach } => {
+        InstanceAction::Launch {
+            account,
+            detach,
+            new_session,
+        } => {
             launch(
                 client,
                 &name,
                 account.as_deref().unwrap_or_default(),
+                new_session,
                 detach,
             )
             .await

@@ -627,10 +627,11 @@ supervises launched processes, and manages autostart. The only crate that links
   counterparts:
   `flavors|versions|resolve|create|update|rename|list|remove|worlds`
   (`worlds` lists a client's save worlds for the datapack picker), plus
-  `instance.launch|stop|logs` (launch never refuses a running instance —
-  each launch is a new session; `stop` fans out to every session or a named
-  one; `logs` targets the newest running or a named session — all thin over
-  the supervisor), `instance.backup.create|list|restore|remove` (create and
+  `instance.launch|stop|logs` (concurrent sessions are opt-in — `launch`
+  refuses a running instance unless `new_session` is set, then each launch is
+  a new session; `stop` fans out to every session or a named one; `logs`
+  targets the newest running or a named session — all thin over the
+  supervisor), `instance.backup.create|list|restore|remove` (create and
   restore require the instance stopped), and `instance.config.get|set|list`
   (`memory`/`jvm-args` only). Plus `sync.get|set` — the per-kind shared-config
   target sets (`get` returns both kinds; `set` takes a `kind` and validates each
@@ -695,9 +696,12 @@ supervises launched processes, and manages autostart. The only crate that links
 > only barrier (it never appears in logs).
 
 > **An instance runs many sessions; a server runs one.** A client can be
-> launched more than once at a time, so `instance-<id>` is no longer a single
-> supervisor key — it splits into an *entry key* (`instance-<id>`, still the
-> unit for the backup/update/content/rename guards and their in-flight sets) and
+> launched more than once at a time — **opt-in**: `launch` still refuses a
+> running instance by default, and the `new_session` param (`--new-session`)
+> unlocks a concurrent launch, so the common case stays a single session and
+> the safety rail is the default. Under the hood `instance-<id>` is no longer a
+> single supervisor key — it splits into an *entry key* (`instance-<id>`, still
+> the unit for the backup/update/content/rename guards and their in-flight sets) and
 > a per-launch *session key* (`instance-<id>_<seq>`). Ids are slugs (`[a-z0-9-]`,
 > never `_`), so a session prefix `instance-<id>_` can't collide across
 > instances; every former singular lookup (status, stop, logs, running-check)

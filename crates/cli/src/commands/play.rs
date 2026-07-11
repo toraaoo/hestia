@@ -6,7 +6,12 @@ use anyhow::{bail, Result};
 use crate::commands::instance;
 use crate::ui;
 
-pub async fn run(reference: Option<String>, account: Option<String>, detach: bool) -> Result<()> {
+pub async fn run(
+    reference: Option<String>,
+    account: Option<String>,
+    new_session: bool,
+    detach: bool,
+) -> Result<()> {
     let client = super::connect().await?;
     let reference = match reference {
         Some(reference) => reference,
@@ -16,6 +21,7 @@ pub async fn run(reference: Option<String>, account: Option<String>, detach: boo
         &client,
         &reference,
         account.as_deref().unwrap_or_default(),
+        new_session,
         detach,
     )
     .await

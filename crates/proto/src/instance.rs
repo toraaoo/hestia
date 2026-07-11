@@ -256,6 +256,10 @@ pub struct InstanceLaunchParams {
     pub account: String,
     /// Client-supplied job id; empty asks the daemon to allocate one.
     pub id: String,
+    /// Launch another session even when one is already running. Off by default:
+    /// a running instance is refused unless the caller opts into concurrency.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub new_session: bool,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
