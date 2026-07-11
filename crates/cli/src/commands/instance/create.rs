@@ -18,7 +18,12 @@ pub(super) async fn run(
     name: Option<String>,
     memory: Option<String>,
 ) -> Result<()> {
-    if ui::interactive_output() && !(flavor.is_some() && version.is_some()) {
+    let bare = flavor.is_none()
+        && version.is_none()
+        && loader.is_none()
+        && name.is_none()
+        && memory.is_none();
+    if bare && ui::interactive_output() {
         return run_wizard(client, flavor, version, loader, name, memory).await;
     }
     let flavors = {

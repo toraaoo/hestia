@@ -54,10 +54,12 @@ Fully provisioned at create; run under the daemon; each server claims its own
 port, so several run side by side. Catalogue verbs take no entry:
 
 ```bash
-hestia server create             # fullscreen wizard: flavor → version (type to
-                                 #   filter; Tab pulls snapshots in) → name →
-                                 #   settings (skippable) → confirm (EULA);
-                                 #   Esc steps back; flags prefill steps
+hestia server create             # bare: the fullscreen wizard — flavor →
+                                 #   version (type to filter; Tab pulls
+                                 #   snapshots in) → name → settings
+                                 #   (skippable) → confirm (EULA); Esc steps
+                                 #   back; any argument switches to the
+                                 #   flag-driven flow below
 hestia server create vanilla 1.21.1 --eula -n smp   # scriptable (-l pins a
                                  #   loader, -p pins the game port, --memory 4G
                                  #   sets -Xms/-Xmx; --motd, --max-players,
@@ -118,8 +120,9 @@ Clients; files materialise at first launch. Same shape: catalogue verbs take no
 entry, the rest are entry-first.
 
 ```bash
-hestia instance create           # fullscreen wizard: flavor → version → name
-                                 #   → memory → confirm; Esc steps back
+hestia instance create           # bare: the fullscreen wizard — flavor →
+                                 #   version → name → memory → confirm; any
+                                 #   argument switches to the flag-driven flow
 hestia instance create fabric 1.21.1 -n modded --memory 4G
 hestia instance list             # managed instances and their state
 hestia instance versions [flavor] # game versions a flavor offers
@@ -206,10 +209,11 @@ hestia logs modded -f            # follow its captured output fullscreen
 Modrinth today; installs are per-entry (above).
 
 ```bash
-hestia search sodium             # quick mod search (alias for `mod search`) — on a
-                                 #   terminal it opens the fullscreen browser
-                                 #   (type to re-search, detail pane, Enter shows
-                                 #   versions); piped it prints one page
+hestia mod search                # bare, on a terminal: the fullscreen browser
+                                 #   (type to search, detail pane, Enter shows
+                                 #   versions); filters below seed it
+hestia search sodium             # with a query: prints results (alias for
+                                 #   `mod search`)
 hestia mod search sodium -l fabric -g 1.21.1   # filter by loader / version
 hestia modpack search "create"   # browse other kinds: modpack, resourcepack,
 hestia resourcepack search faithful            #   shader, datapack

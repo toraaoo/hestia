@@ -58,9 +58,28 @@ pub struct CreateArgs {
     prop: Vec<String>,
 }
 
+impl CreateArgs {
+    /// No argument or flag at all — the caller asked for the interactive
+    /// wizard. Anything given selects the flag-driven path instead.
+    fn is_bare(&self) -> bool {
+        self.flavor.is_none()
+            && self.version.is_none()
+            && self.loader.is_none()
+            && self.name.is_none()
+            && !self.eula
+            && self.port.is_none()
+            && self.memory.is_none()
+            && self.motd.is_none()
+            && self.max_players.is_none()
+            && self.difficulty.is_none()
+            && self.gamemode.is_none()
+            && self.seed.is_none()
+            && self.prop.is_empty()
+    }
+}
+
 pub(super) async fn run(client: &Client, args: CreateArgs) -> Result<()> {
-    let all_given = args.flavor.is_some() && args.version.is_some() && args.eula;
-    if ui::interactive_output() && !all_given {
+    if args.is_bare() && ui::interactive_output() {
         return run_wizard(client, args).await;
     }
     let flavors = {

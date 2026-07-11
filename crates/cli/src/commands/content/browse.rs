@@ -71,6 +71,7 @@ pub async fn run_browse(kind: ContentKind, cmd: BrowseCmd) -> Result<()> {
             limit,
             offset,
         } => {
+            let bare_query = query.is_none();
             let base = SearchQuery {
                 source: source.unwrap_or_default(),
                 kind,
@@ -82,7 +83,7 @@ pub async fn run_browse(kind: ContentKind, cmd: BrowseCmd) -> Result<()> {
                 limit: limit.clamp(1, 100),
                 offset,
             };
-            if ui::interactive_output() {
+            if bare_query && ui::interactive_output() {
                 session::run(&client, base, None).await?;
                 return Ok(());
             }
