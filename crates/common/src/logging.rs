@@ -6,12 +6,54 @@
 
 use std::io;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::fmt::writer::{BoxMakeWriter, MakeWriterExt};
+use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::EnvFilter;
 
 use crate::rolling::{RollingLog, ACTIVE_NAME};
+
+static CONSOLE_MUTED: AtomicBool = AtomicBool::new(false);
+
+/// Gate the console sink while a fullscreen surface owns the terminal: a log
+/// line printed over the alternate screen corrupts it, and the emitter can be
+/// any dependency (a renderer's warning), not just our own code. Muted output
+/// is dropped — the file sink, when configured, keeps recording.
+pub fn set_console_muted(muted: bool) {
+    CONSOLE_MUTED.store(muted, Ordering::Relaxed);
+}
+
+/// The console sink: stderr, unless muted for a fullscreen session.
+#[derive(Clone, Copy)]
+struct GatedStderr;
+
+struct GatedStderrWriter(Option<io::Stderr>);
+
+impl io::Write for GatedStderrWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match &mut self.0 {
+            Some(stderr) => stderr.write(buf),
+            None => Ok(buf.len()),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match &mut self.0 {
+            Some(stderr) => stderr.flush(),
+            None => Ok(()),
+        }
+    }
+}
+
+impl<'a> MakeWriter<'a> for GatedStderr {
+    type Writer = GatedStderrWriter;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        GatedStderrWriter((!CONSOLE_MUTED.load(Ordering::Relaxed)).then(io::stderr))
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogLevel {
@@ -152,7 +194,7 @@ pub fn init_logging(console_level: LogLevel, file: Option<FileLog>) -> LogGuard 
             BoxMakeWriter::new(
                 file_writer
                     .with_max_level(file_level)
-                    .and(std::io::stderr.with_max_level(console)),
+                    .and(GatedStderr.with_max_level(console)),
             ),
             false,
             Some(guard),
@@ -163,7 +205,7 @@ pub fn init_logging(console_level: LogLevel, file: Option<FileLog>) -> LogGuard 
             Some(guard),
         ),
         (None, Some(console)) => (
-            BoxMakeWriter::new(std::io::stderr.with_max_level(console)),
+            BoxMakeWriter::new(GatedStderr.with_max_level(console)),
             true,
             None,
         ),

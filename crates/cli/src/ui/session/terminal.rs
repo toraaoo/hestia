@@ -28,12 +28,16 @@ impl TerminalGuard {
             let _ = disable_raw_mode();
             return Err(e.into());
         }
+        // Console log lines (any crate's tracing warning) drawn over the
+        // alternate screen corrupt it; the file sink keeps recording.
+        common::logging::set_console_muted(true);
         Ok(TerminalGuard { mouse })
     }
 }
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
+        common::logging::set_console_muted(false);
         let restored = if self.mouse {
             execute!(io::stderr(), DisableMouseCapture, LeaveAlternateScreen)
         } else {
