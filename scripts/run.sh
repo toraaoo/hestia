@@ -11,7 +11,8 @@ shift || true
 
 case "$target" in
   cli)     cargo run -p cli -- "$@" ;;
-  daemon)  cargo run -p daemon -- "$@" ;;
+  daemon)  cargo build -p tray
+           cargo run -p daemon -- "$@" ;;
   desktop) (cd crates/desktop && cargo tauri dev) ;;
   *) echo "usage: $0 [cli|daemon|desktop] [args]" >&2; exit 1 ;;
 esac

@@ -83,8 +83,8 @@ if ($Command -eq "dev") {
   # with the dev binaries on PATH. Forms with args (--desktop, one-shot CLI)
   # keep forwarding to dev.sh, which owns the Tauri/one-shot logic.
   if (-not $Rest) {
-    Write-Host "Building daemon + CLI (debug)"
-    cargo build -p daemon -p cli
+    Write-Host "Building daemon + tray + CLI (debug)"
+    cargo build -p daemon -p tray -p cli
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     $bindir = Join-Path (Get-Location) "target\debug"

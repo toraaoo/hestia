@@ -7,13 +7,11 @@
 #
 #   scripts/sidecars.sh                 # host target
 #   scripts/sidecars.sh <target-triple> # cross target (passed to cargo --target)
-#   scripts/sidecars.sh --ensure        # no-op if the staged set already exists
+#   scripts/sidecars.sh --ensure        # ensure the staged set is current
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ensure=0
 if [ "${1:-}" = "--ensure" ]; then
-  ensure=1
   shift
 fi
 
@@ -33,16 +31,6 @@ case "$triple" in
 esac
 
 dest="crates/desktop/binaries"
-
-if [ "$ensure" = 1 ]; then
-  staged=1
-  for bin in hestia hestiad tray; do
-    [ -f "$dest/$bin-$triple$ext" ] || staged=0
-  done
-  if [ "$staged" = 1 ]; then
-    exit 0
-  fi
-fi
 
 echo "building sidecars for $triple"
 cargo build --release "${target_args[@]}" -p cli -p daemon -p tray

@@ -29,7 +29,7 @@ stop_hestia
 # staged, or its build script fails on the missing resource paths.
 case "$target" in
   cli)     cargo build -p cli "$@" ;;
-  daemon)  cargo build -p daemon "$@" ;;
+  daemon)  cargo build -p daemon -p tray "$@" ;;
   desktop) scripts/sidecars.sh --ensure
            (cd crates/desktop && cargo tauri build "$@") ;;
   all)     scripts/sidecars.sh --ensure

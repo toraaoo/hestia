@@ -2,7 +2,7 @@
 #
 # dev.sh — a terminal-first dev shell for the CLI + daemon.
 #
-#   scripts/dev.sh                  build daemon + CLI (debug), open a subshell
+#   scripts/dev.sh                  build daemon, tray + CLI (debug), open a subshell
 #                                   with `hestia`/`hestiad` on PATH
 #   scripts/dev.sh <hestia-args>    build, then run `hestia <args>` once
 #   scripts/dev.sh --desktop [args] the Tauri desktop shell with frontend HMR
@@ -45,8 +45,8 @@ if [ "${1:-}" = "--desktop" ]; then
     exec cargo tauri dev "$@"
 fi
 
-log "Building daemon + CLI (debug)"
-cargo build -p daemon -p cli
+log "Building daemon + tray + CLI (debug)"
+cargo build -p daemon -p tray -p cli
 bindir="$PWD/target/debug"
 
 # One-shot: `dev.sh java list` runs the CLI once and exits.
