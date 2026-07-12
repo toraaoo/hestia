@@ -1,14 +1,11 @@
 import { Link, Outlet, createRootRoute, useRouterState } from "@tanstack/react-router";
-import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import type { Instance } from "@/lib/types";
-import { useLauncherStore } from "@/lib/store";
-import { backdropVariants, pageVariants, popVariants } from "@/lib/motion";
-import { TitleBar } from "@/components/TitleBar";
-import { Sidebar } from "@/components/Sidebar";
-import { PlayBar } from "@/components/PlayBar";
-import { ProgressBar } from "@/components/ui/ProgressBar";
+import { MotionConfig, motion } from "framer-motion";
+import { pageVariants } from "@/lib/motion";
+import { TitleBar } from "@/components/layout/TitleBar";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { PlayBar } from "@/components/layout/PlayBar";
+import { LaunchOverlay } from "@/components/layout/LaunchOverlay";
 import { Button } from "@/components/ui/Button";
-import logoEmber from "@/assets/brand/logo-ember.svg";
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -17,7 +14,6 @@ export const Route = createRootRoute({
 });
 
 function RootLayout() {
-  const launching = useLauncherStore((s) => s.launching);
   const section = useRouterState({ select: (s) => s.location.pathname.split("/")[1] });
   return (
     <MotionConfig reducedMotion="user">
@@ -40,39 +36,9 @@ function RootLayout() {
             <PlayBar />
           </div>
         </div>
-        <AnimatePresence>{launching && <LaunchOverlay instance={launching} />}</AnimatePresence>
+        <LaunchOverlay />
       </div>
     </MotionConfig>
-  );
-}
-
-function LaunchOverlay({ instance }: { instance: Instance }) {
-  return (
-    <motion.div
-      variants={backdropVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="absolute inset-0 z-50 flex items-center justify-center bg-ink-950/78 backdrop-blur-xs"
-    >
-      <motion.div
-        variants={popVariants}
-        className="w-95 rounded-xl bg-surface-1 p-7 text-center shadow-xl"
-      >
-        <img
-          src={logoEmber}
-          alt=""
-          className="mx-auto mb-3.5 size-14 animate-flicker rounded-sm motion-reduce:animate-none"
-        />
-        <div className="mb-1.5 font-hero text-lg text-text-1 font-crisp">
-          Launching {instance.name}
-        </div>
-        <div className="mb-4 font-mono text-xs text-text-3">
-          {instance.loader} · {instance.version}
-        </div>
-        <ProgressBar indeterminate showPct={false} />
-      </motion.div>
-    </motion.div>
   );
 }
 

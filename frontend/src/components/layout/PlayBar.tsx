@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useLauncherStore, useSelectedInstance } from "@/lib/store";
+import { usePlay, useSelectedInstance } from "@/data";
 import { loaderTone } from "@/lib/format";
 import { SNAP } from "@/lib/motion";
 import { Badge } from "@/components/ui/Badge";
@@ -11,7 +11,7 @@ import { Tile } from "@/components/ui/Tile";
 /** Slim selected-instance play bar pinned under the content column. */
 export function PlayBar() {
   const instance = useSelectedInstance();
-  const play = useLauncherStore((s) => s.play);
+  const play = usePlay();
   const navigate = useNavigate();
 
   if (!instance) return null;

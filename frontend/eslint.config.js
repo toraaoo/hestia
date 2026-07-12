@@ -25,6 +25,9 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-confusing-void-expression": ["error", { ignoreArrowShorthand: true }],
       "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
+      // Underscore-prefixed params mark seams the mock data layer deliberately
+      // ignores; the daemon-backed implementations will use them.
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
   {

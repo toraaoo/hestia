@@ -1,7 +1,6 @@
 import type { ComponentType } from "react";
 import { Link } from "@tanstack/react-router";
-import { useLauncherStore } from "@/lib/store";
-import { MOCK_ACCOUNT } from "@/lib/mock";
+import { useAccount, useInstances, useServerRunning } from "@/data";
 import { Badge } from "@/components/ui/Badge";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { Tile } from "@/components/ui/Tile";
@@ -30,8 +29,9 @@ const SECTIONS: Section[] = [
 ];
 
 export function Sidebar() {
-  const instances = useLauncherStore((s) => s.instances);
-  const serverRunning = useLauncherStore((s) => s.serverRunning);
+  const instances = useInstances();
+  const serverRunning = useServerRunning();
+  const account = useAccount();
   const pinned = instances.filter((i) => i.pinned);
   const onlineServers = Object.values(serverRunning).filter(Boolean).length;
 
@@ -101,8 +101,8 @@ export function Sidebar() {
       <button className="mx-2.5 mb-3 flex items-center gap-2.5 rounded-lg bg-surface-2 p-3 shadow-card-flat transition-colors duration-100 hover:bg-surface-hover">
         <Tile tile="tile-grass" className="size-7.5" />
         <span className="flex min-w-0 flex-1 flex-col text-left">
-          <span className="text-sm font-semibold text-text-1">{MOCK_ACCOUNT.name}</span>
-          <span className="text-xs text-text-3">{MOCK_ACCOUNT.kind}</span>
+          <span className="text-sm font-semibold text-text-1">{account.name}</span>
+          <span className="text-xs text-text-3">{account.kind}</span>
         </span>
         <CaretUpIcon size={15} className="text-text-3" />
       </button>

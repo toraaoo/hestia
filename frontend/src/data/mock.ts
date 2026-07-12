@@ -271,5 +271,3 @@ export const MOCK_DISCOVER: ContentProject[] = [
       "A level-of-detail renderer that lets you see incredibly far with a minimal performance cost.",
   },
 ];
-
-export const MOCK_ACCOUNT = { name: "Steve_Builds", kind: "Microsoft account" };
