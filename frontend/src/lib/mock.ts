@@ -1,0 +1,268 @@
+import type { ContentProject, Instance, InstalledMod, LogLine, Server, WorldSave } from "./types";
+
+export const MOCK_INSTANCES: Instance[] = [
+  {
+    id: "sky",
+    name: "SkyBlock Reborn",
+    tile: "tile-sky",
+    loader: "Fabric",
+    version: "1.21.5",
+    lastPlayed: "2h ago",
+    playtime: "48h",
+    running: false,
+    pinned: true,
+    modCount: 48,
+    worldCount: 3,
+    sizeOnDisk: "1.2 GB",
+    memoryGb: 6,
+    description:
+      "A curated skyblock questline with 48 hand-picked mods for performance, quality-of-life, and progression. Built on Fabric 1.21.5.",
+  },
+  {
+    id: "rlc",
+    name: "RLCraft",
+    tile: "tile-forge",
+    loader: "Forge",
+    version: "1.12.2",
+    lastPlayed: "yesterday",
+    playtime: "112h",
+    running: true,
+    pinned: true,
+    modCount: 214,
+    worldCount: 2,
+    sizeOnDisk: "3.8 GB",
+    memoryGb: 8,
+    description:
+      "The infamous hardcore survival modpack. Thirst, temperature, and things that will absolutely kill you. Forge 1.12.2, 214 mods.",
+  },
+  {
+    id: "create",
+    name: "Create: A&B",
+    tile: "tile-grass",
+    loader: "Quilt",
+    version: "1.20.1",
+    lastPlayed: "3d ago",
+    playtime: "31h",
+    running: false,
+    pinned: true,
+    modCount: 96,
+    worldCount: 1,
+    sizeOnDisk: "2.1 GB",
+    memoryGb: 6,
+    description:
+      "Create: Above & Beyond — a tech-progression pack centered on the Create mod. Automate everything. Quilt 1.20.1.",
+  },
+  {
+    id: "van",
+    name: "Vanilla",
+    tile: "tile-diamond",
+    loader: "Vanilla",
+    version: "1.21.5",
+    lastPlayed: "1w ago",
+    playtime: "9h",
+    running: false,
+    pinned: false,
+    modCount: 0,
+    worldCount: 4,
+    sizeOnDisk: "420 MB",
+    memoryGb: 4,
+    description:
+      "Clean vanilla 1.21.5 — no mods, just Minecraft as shipped. Great for testing worlds and snapshots.",
+  },
+  {
+    id: "ocean",
+    name: "Oceanblock",
+    tile: "tile-ocean",
+    loader: "NeoForge",
+    version: "1.21.1",
+    lastPlayed: "2w ago",
+    playtime: "22h",
+    running: false,
+    pinned: false,
+    modCount: 130,
+    worldCount: 1,
+    sizeOnDisk: "2.6 GB",
+    memoryGb: 6,
+    description:
+      "An underwater twist on skyblock. Start on a single island surrounded by ocean. NeoForge 1.21.1, 130 mods.",
+  },
+  {
+    id: "end",
+    name: "End Remastered",
+    tile: "tile-end",
+    loader: "Fabric",
+    version: "1.21.5",
+    lastPlayed: "Never",
+    playtime: "0h",
+    running: false,
+    pinned: false,
+    modCount: 62,
+    worldCount: 0,
+    sizeOnDisk: "1.4 GB",
+    memoryGb: 6,
+    description:
+      "Reimagines the End dimension with new biomes, structures, and a harder dragon fight. Fabric 1.21.5, 62 mods.",
+  },
+];
+
+export const MOCK_SERVERS: Server[] = [
+  {
+    id: "smp",
+    name: "Hearth SMP",
+    tile: "tile-grass",
+    port: 25565,
+    version: "Fabric 1.21.5",
+    players: 4,
+    maxPlayers: 20,
+    ramGb: 3.2,
+    ramMaxGb: 6,
+    tps: 19.9,
+    uptime: "6h 12m",
+  },
+  {
+    id: "cre",
+    name: "Creative Plots",
+    tile: "tile-sky",
+    port: 25566,
+    version: "Paper 1.21.5",
+    players: 1,
+    maxPlayers: 50,
+    ramGb: 1.8,
+    ramMaxGb: 4,
+    tps: 20.0,
+    uptime: "2d 4h",
+  },
+  {
+    id: "mod",
+    name: "RLCraft Realm",
+    tile: "tile-forge",
+    port: 25567,
+    version: "Forge 1.12.2",
+    players: 0,
+    maxPlayers: 10,
+    ramGb: 0,
+    ramMaxGb: 8,
+    tps: 0,
+    uptime: "—",
+  },
+  {
+    id: "tst",
+    name: "Test World",
+    tile: "tile-end",
+    port: 25568,
+    version: "Vanilla 1.21.5",
+    players: 0,
+    maxPlayers: 8,
+    ramGb: 0,
+    ramMaxGb: 2,
+    tps: 0,
+    uptime: "—",
+  },
+];
+
+export const MOCK_RUNNING_SERVERS: Record<string, boolean> = {
+  smp: true,
+  cre: true,
+  mod: false,
+  tst: false,
+};
+
+export const MOCK_MODS: InstalledMod[] = [
+  { name: "Sodium", tile: "tile-diamond", summary: "Rendering engine · 0.6.4", enabled: true },
+  { name: "Fabric API", tile: "tile-grass", summary: "Library · 0.115.0", enabled: true },
+  { name: "Iris Shaders", tile: "tile-ocean", summary: "Shaders · 1.8.1", enabled: true },
+  { name: "REI", tile: "tile-forge", summary: "Recipe viewer · 16.0.760", enabled: true },
+  { name: "Mod Menu", tile: "tile-sky", summary: "UI · 11.0.3", enabled: false },
+  { name: "Lithium", tile: "tile-end", summary: "Optimization · 0.14.4", enabled: true },
+];
+
+export const MOCK_WORLDS: WorldSave[] = [
+  { name: "Main Save", tile: "tile-grass", summary: "Survival · Day 214 · 1.2 GB" },
+  { name: "Creative Flat", tile: "tile-sky", summary: "Creative · Day 12 · 210 MB" },
+  { name: "Hardcore Run", tile: "tile-nether", summary: "Hardcore · Day 3 · 84 MB" },
+];
+
+export const MOCK_GAME_LOG: LogLine[] = [
+  ["12:04:18", "INFO", "Environment: authHost=auth.hestia, accountsHost=api"],
+  ["12:04:19", "INFO", "Loading Fabric 0.16.14 for Minecraft 1.21.5"],
+  ["12:04:20", "INFO", "Loading 48 mods:"],
+  ["12:04:20", "INFO", "  - sodium 0.6.4, fabric-api 0.115.0, iris 1.8.1"],
+  ["12:04:22", "INFO", "Backend library: LWJGL 3.3.3"],
+  ["12:04:24", "WARN", 'Mod "modmenu" is disabled; skipping'],
+  ["12:04:25", "INFO", "Reloading ResourceManager: vanilla, fabric, sodium"],
+  ["12:04:28", "INFO", "OpenAL initialized on device: Speakers"],
+  ["12:04:29", "INFO", "Created: 1024x512x0 minecraft:textures/atlas/blocks.png"],
+  ["12:04:31", "INFO", "Sound engine started. Setting user: Steve_Builds"],
+];
+
+export const MOCK_SERVER_LOG: LogLine[] = [
+  ["12:04:18", "INFO", "Starting minecraft server version 1.21.5"],
+  ["12:04:18", "INFO", "Loading properties"],
+  ["12:04:19", "INFO", 'Preparing level "world"'],
+  ["12:04:21", "INFO", "Preparing spawn area: 84%"],
+  ["12:04:22", "INFO", 'Done (3.812s)! For help, type "help"'],
+  ["12:05:40", "INFO", "Steve_Builds joined the game"],
+  ["12:05:41", "INFO", "Steve_Builds[/127.0.0.1:54122] logged in at (128.5, 64.0, -210.5)"],
+  ["12:11:02", "WARN", "Can't keep up! Is the server overloaded? Running 2140ms behind"],
+  ["12:12:36", "INFO", "AlexCrafts joined the game"],
+  ["12:14:50", "INFO", "<Steve_Builds> anyone got spare iron?"],
+];
+
+export const MOCK_DISCOVER: ContentProject[] = [
+  {
+    name: "Sodium",
+    author: "jellysquid3",
+    tile: "tile-diamond",
+    downloads: 48_000_000,
+    likes: 9_200,
+    source: "modrinth",
+    loaders: ["Fabric", "Quilt"],
+    description:
+      "A modern rendering engine that massively improves frame rates and reduces micro-stutter.",
+  },
+  {
+    name: "JEI",
+    author: "mezz",
+    tile: "tile-forge",
+    downloads: 310_000_000,
+    source: "curseforge",
+    loaders: ["Forge"],
+    installed: true,
+    description: "Just Enough Items — view items, recipes, and uses for everything in your pack.",
+  },
+  {
+    name: "Iris Shaders",
+    author: "coderbot",
+    tile: "tile-ocean",
+    downloads: 28_000_000,
+    likes: 7_400,
+    source: "modrinth",
+    loaders: ["Fabric"],
+    description:
+      "Modern shader support for Fabric. Compatible with Sodium and most OptiFine shaderpacks.",
+  },
+  {
+    name: "Create",
+    author: "simibubi",
+    tile: "tile-grass",
+    downloads: 92_000_000,
+    likes: 15_000,
+    source: "curseforge",
+    loaders: ["Forge", "Fabric"],
+    description:
+      "Building tools and aesthetic technology — rotating contraptions, trains, and automation.",
+  },
+  {
+    name: "Distant Horizons",
+    author: "jeseibel",
+    tile: "tile-end",
+    downloads: 6_100_000,
+    likes: 4_200,
+    source: "modrinth",
+    loaders: ["Fabric", "NeoForge"],
+    description:
+      "A level-of-detail renderer that lets you see incredibly far with a minimal performance cost.",
+  },
+];
+
+export const MOCK_ACCOUNT = { name: "Steve_Builds", kind: "Microsoft account" };

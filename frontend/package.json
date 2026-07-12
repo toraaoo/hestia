@@ -5,22 +5,44 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build && tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "preview": "vite preview",
     "tauri": "tauri"
   },
   "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/noto-sans": "^5.2.10",
+    "@phosphor-icons/react": "^2.1.10",
+    "@tanstack/react-router": "^1.170.17",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.2",
+    "@tanstack/eslint-plugin-router": "^1.162.0",
+    "@tanstack/router-plugin": "^1.168.19",
+    "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^6.0.2",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.5",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "tailwindcss": "^4.3.2",
     "typescript": "~6.0.3",
-    "vite": "^8.0.16",
-    "@tauri-apps/cli": "^2"
+    "typescript-eslint": "^8.63.0",
+    "vite": "^8.1.4"
   }
 }
