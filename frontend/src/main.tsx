@@ -11,7 +11,10 @@ import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/700.css";
 import "./styles/index.css";
 
+import { installDesktopBehaviors } from "./lib/desktop";
 import { routeTree } from "./routeTree.gen";
+
+installDesktopBehaviors();
 
 const router = createRouter({ routeTree, defaultPreload: "intent" });
 

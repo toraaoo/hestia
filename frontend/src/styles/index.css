@@ -197,6 +197,11 @@
     color: var(--color-on-hearth);
   }
 
+  /* Native apps only signal focus during keyboard nav; a mouse click leaves
+     no lingering ring. :focus-visible carries the keyboard case below. */
+  :focus {
+    outline: none;
+  }
   :focus-visible {
     outline: none;
     box-shadow: var(--shadow-ring);
