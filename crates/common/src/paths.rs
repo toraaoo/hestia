@@ -1,7 +1,6 @@
 //! Per-user data-directory resolution — the single source of truth for "where
 //! Hestia's data lives", linked by the daemon (via the engine) and every client.
 
-use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -18,6 +17,8 @@ fn env_path(name: &str) -> Option<PathBuf> {
 /// Resolved at runtime so relocating the repo never needs a rebuild.
 #[cfg(debug_assertions)]
 fn dev_data_home() -> Option<PathBuf> {
+    use std::ffi::OsStr;
+
     let exe = std::env::current_exe().ok()?;
     let target = exe
         .ancestors()
