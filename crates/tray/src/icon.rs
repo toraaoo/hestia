@@ -1,10 +1,9 @@
-//! The tray icon: the desktop app's own icon, embedded at build time so the
-//! tray and the desktop shell wear the same face.
+//! The tray icon: a transparent, high-resolution crop of the Ember mark.
 
 use anyhow::{ensure, Context, Result};
 use tray_icon::Icon;
 
-const ICON_PNG: &[u8] = include_bytes!("../../desktop/icons/32x32.png");
+const ICON_PNG: &[u8] = include_bytes!("../assets/ember-block.png");
 
 pub fn load() -> Result<Icon> {
     let decoder = png::Decoder::new(std::io::Cursor::new(ICON_PNG));
