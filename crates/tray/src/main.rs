@@ -100,6 +100,7 @@ fn build_tray(menu: &TrayMenu, icon: tray_icon::Icon) -> tray_icon::Result<TrayI
         .with_icon(icon)
         .with_menu(Box::new(menu.menu().clone()))
         .with_menu_on_left_click(false)
+        .with_title(common::app::NAME)
         .with_tooltip(common::app::NAME)
         .build()
 }
