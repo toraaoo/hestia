@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ServerDetail } from "@/features/servers/ServerDetail";
+import { ServerDetailLayout } from "@/features/servers/ServerDetailLayout";
 
 export const Route = createFileRoute("/servers/$serverId")({
-  component: ServerDetail,
+  component: ServerDetailLayout,
 });

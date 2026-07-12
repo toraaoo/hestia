@@ -33,7 +33,7 @@ src/
 ├── features/        one folder per screen domain
 │   ├── library/     LibraryScreen, InstanceCard, InstanceRow
 │   ├── instance/    InstanceLayout, Hero, one component per tab route
-│   ├── servers/     ServersLayout (rail), ServerDetail (console), NoServers
+│   ├── servers/     ServersLayout (rail), ServerDetailLayout + ServerConsole, NoServers
 │   ├── discover/    DiscoverScreen, ProjectRow
 │   ├── settings/    SettingsScreen
 │   └── skins/       SkinsScreen (placeholder)

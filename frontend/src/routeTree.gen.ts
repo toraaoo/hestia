@@ -15,8 +15,9 @@ import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as ServersRouteRouteImport } from './routes/servers/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServersIndexRouteImport } from './routes/servers/index'
-import { Route as ServersServerIdRouteImport } from './routes/servers/$serverId'
+import { Route as ServersServerIdRouteRouteImport } from './routes/servers/$serverId/route'
 import { Route as InstanceInstanceIdRouteRouteImport } from './routes/instance/$instanceId/route'
+import { Route as ServersServerIdIndexRouteImport } from './routes/servers/$serverId/index'
 import { Route as InstanceInstanceIdIndexRouteImport } from './routes/instance/$instanceId/index'
 import { Route as InstanceInstanceIdWorldsRouteImport } from './routes/instance/$instanceId/worlds'
 import { Route as InstanceInstanceIdSettingsRouteImport } from './routes/instance/$instanceId/settings'
@@ -54,7 +55,7 @@ const ServersIndexRoute = ServersIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ServersRouteRoute,
 } as any)
-const ServersServerIdRoute = ServersServerIdRouteImport.update({
+const ServersServerIdRouteRoute = ServersServerIdRouteRouteImport.update({
   id: '/$serverId',
   path: '/$serverId',
   getParentRoute: () => ServersRouteRoute,
@@ -63,6 +64,11 @@ const InstanceInstanceIdRouteRoute = InstanceInstanceIdRouteRouteImport.update({
   id: '/instance/$instanceId',
   path: '/instance/$instanceId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ServersServerIdIndexRoute = ServersServerIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ServersServerIdRouteRoute,
 } as any)
 const InstanceInstanceIdIndexRoute = InstanceInstanceIdIndexRouteImport.update({
   id: '/',
@@ -105,7 +111,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/skins': typeof SkinsRoute
   '/instance/$instanceId': typeof InstanceInstanceIdRouteRouteWithChildren
-  '/servers/$serverId': typeof ServersServerIdRoute
+  '/servers/$serverId': typeof ServersServerIdRouteRouteWithChildren
   '/servers/': typeof ServersIndexRoute
   '/instance/$instanceId/logs': typeof InstanceInstanceIdLogsRoute
   '/instance/$instanceId/mods': typeof InstanceInstanceIdModsRoute
@@ -113,13 +119,13 @@ export interface FileRoutesByFullPath {
   '/instance/$instanceId/settings': typeof InstanceInstanceIdSettingsRoute
   '/instance/$instanceId/worlds': typeof InstanceInstanceIdWorldsRoute
   '/instance/$instanceId/': typeof InstanceInstanceIdIndexRoute
+  '/servers/$serverId/': typeof ServersServerIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/discover': typeof DiscoverRoute
   '/settings': typeof SettingsRoute
   '/skins': typeof SkinsRoute
-  '/servers/$serverId': typeof ServersServerIdRoute
   '/servers': typeof ServersIndexRoute
   '/instance/$instanceId/logs': typeof InstanceInstanceIdLogsRoute
   '/instance/$instanceId/mods': typeof InstanceInstanceIdModsRoute
@@ -127,6 +133,7 @@ export interface FileRoutesByTo {
   '/instance/$instanceId/settings': typeof InstanceInstanceIdSettingsRoute
   '/instance/$instanceId/worlds': typeof InstanceInstanceIdWorldsRoute
   '/instance/$instanceId': typeof InstanceInstanceIdIndexRoute
+  '/servers/$serverId': typeof ServersServerIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -136,7 +143,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/skins': typeof SkinsRoute
   '/instance/$instanceId': typeof InstanceInstanceIdRouteRouteWithChildren
-  '/servers/$serverId': typeof ServersServerIdRoute
+  '/servers/$serverId': typeof ServersServerIdRouteRouteWithChildren
   '/servers/': typeof ServersIndexRoute
   '/instance/$instanceId/logs': typeof InstanceInstanceIdLogsRoute
   '/instance/$instanceId/mods': typeof InstanceInstanceIdModsRoute
@@ -144,6 +151,7 @@ export interface FileRoutesById {
   '/instance/$instanceId/settings': typeof InstanceInstanceIdSettingsRoute
   '/instance/$instanceId/worlds': typeof InstanceInstanceIdWorldsRoute
   '/instance/$instanceId/': typeof InstanceInstanceIdIndexRoute
+  '/servers/$serverId/': typeof ServersServerIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -162,13 +170,13 @@ export interface FileRouteTypes {
     | '/instance/$instanceId/settings'
     | '/instance/$instanceId/worlds'
     | '/instance/$instanceId/'
+    | '/servers/$serverId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/discover'
     | '/settings'
     | '/skins'
-    | '/servers/$serverId'
     | '/servers'
     | '/instance/$instanceId/logs'
     | '/instance/$instanceId/mods'
@@ -176,6 +184,7 @@ export interface FileRouteTypes {
     | '/instance/$instanceId/settings'
     | '/instance/$instanceId/worlds'
     | '/instance/$instanceId'
+    | '/servers/$serverId'
   id:
     | '__root__'
     | '/'
@@ -192,6 +201,7 @@ export interface FileRouteTypes {
     | '/instance/$instanceId/settings'
     | '/instance/$instanceId/worlds'
     | '/instance/$instanceId/'
+    | '/servers/$serverId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -251,7 +261,7 @@ declare module '@tanstack/react-router' {
       id: '/servers/$serverId'
       path: '/$serverId'
       fullPath: '/servers/$serverId'
-      preLoaderRoute: typeof ServersServerIdRouteImport
+      preLoaderRoute: typeof ServersServerIdRouteRouteImport
       parentRoute: typeof ServersRouteRoute
     }
     '/instance/$instanceId': {
@@ -260,6 +270,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/instance/$instanceId'
       preLoaderRoute: typeof InstanceInstanceIdRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/servers/$serverId/': {
+      id: '/servers/$serverId/'
+      path: '/'
+      fullPath: '/servers/$serverId/'
+      preLoaderRoute: typeof ServersServerIdIndexRouteImport
+      parentRoute: typeof ServersServerIdRouteRoute
     }
     '/instance/$instanceId/': {
       id: '/instance/$instanceId/'
@@ -306,13 +323,24 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ServersServerIdRouteRouteChildren {
+  ServersServerIdIndexRoute: typeof ServersServerIdIndexRoute
+}
+
+const ServersServerIdRouteRouteChildren: ServersServerIdRouteRouteChildren = {
+  ServersServerIdIndexRoute: ServersServerIdIndexRoute,
+}
+
+const ServersServerIdRouteRouteWithChildren =
+  ServersServerIdRouteRoute._addFileChildren(ServersServerIdRouteRouteChildren)
+
 interface ServersRouteRouteChildren {
-  ServersServerIdRoute: typeof ServersServerIdRoute
+  ServersServerIdRouteRoute: typeof ServersServerIdRouteRouteWithChildren
   ServersIndexRoute: typeof ServersIndexRoute
 }
 
 const ServersRouteRouteChildren: ServersRouteRouteChildren = {
-  ServersServerIdRoute: ServersServerIdRoute,
+  ServersServerIdRouteRoute: ServersServerIdRouteRouteWithChildren,
   ServersIndexRoute: ServersIndexRoute,
 }
 

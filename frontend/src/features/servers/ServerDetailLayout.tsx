@@ -1,23 +1,18 @@
-import { getRouteApi } from "@tanstack/react-router";
-import { orNotFound } from "@/lib/router";
-import { useIsServerRunning, useServer, useServerLog, useSetServerRunning } from "@/data";
-import { LogLines } from "@/components/ui/LogView";
+import { Outlet } from "@tanstack/react-router";
+import { useIsServerRunning, useSetServerRunning } from "@/data";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Panel } from "@/components/ui/Panel";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Stat } from "@/components/ui/Stat";
 import { Tile } from "@/components/ui/Tile";
-import { CloseIcon, MenuIcon, PlayIcon, ReloadIcon } from "@/components/icons";
+import { CloseIcon, PlayIcon, ReloadIcon } from "@/components/icons";
+import { useCurrentServer } from "./current";
 
-const route = getRouteApi("/servers/$serverId");
-
-export function ServerDetail() {
-  const { serverId } = route.useParams();
-  const server = orNotFound(useServer(serverId));
-  const isUp = useIsServerRunning(serverId);
+/** Layout route for /servers/$serverId: header + live stats; sub-views are child routes. */
+export function ServerDetailLayout() {
+  const server = useCurrentServer();
+  const isUp = useIsServerRunning(server.id);
   const setRunning = useSetServerRunning();
-  const log = useServerLog(serverId);
 
   return (
     <section className="flex min-w-0 flex-1 flex-col gap-3.5">
@@ -74,37 +69,7 @@ export function ServerDetail() {
         </div>
       </div>
 
-      <Panel
-        variant="inset"
-        className="flex min-h-0 flex-1 flex-col"
-        title={
-          <>
-            <MenuIcon size={13} />
-            Console
-          </>
-        }
-        actions={
-          <button className="text-xs font-semibold text-text-3 hover:text-hearth-400">Clear</button>
-        }
-      >
-        <div className="min-h-25 flex-1 overflow-y-auto p-3.5 font-mono text-xs leading-relaxed">
-          {isUp ? (
-            <LogLines lines={log} />
-          ) : (
-            <div className="font-body text-sm text-text-3">
-              Server is stopped. Press Start to boot it up.
-            </div>
-          )}
-        </div>
-        <div className="flex h-11 shrink-0 items-center gap-2 border-t border-border-2 bg-ink-950 px-3.5">
-          <span className="font-mono text-sm text-hearth-400">&gt;</span>
-          <input
-            disabled={!isUp}
-            placeholder={isUp ? "Type a command (e.g. /weather clear)…" : "Server offline"}
-            className="flex-1 bg-transparent font-mono text-xs text-text-1 outline-none placeholder:text-text-3"
-          />
-        </div>
-      </Panel>
+      <Outlet />
     </section>
   );
 }
