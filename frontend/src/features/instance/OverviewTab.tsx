@@ -1,4 +1,3 @@
-import type { Instance } from "@/lib/types";
 import { useInstanceLog } from "@/data";
 import { LogLines } from "@/components/ui/LogView";
 import { Button } from "@/components/ui/Button";
@@ -7,8 +6,10 @@ import { Panel } from "@/components/ui/Panel";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Stat } from "@/components/ui/Stat";
 import { DuplicateIcon, ExportIcon, FolderIcon } from "@/components/icons";
+import { useCurrentInstance } from "./current";
 
-export function OverviewTab({ instance }: { instance: Instance }) {
+export function OverviewTab() {
+  const instance = useCurrentInstance();
   const log = useInstanceLog(instance.id);
 
   return (

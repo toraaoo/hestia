@@ -1,10 +1,11 @@
-import type { Instance } from "@/lib/types";
 import { useInstanceLog } from "@/data";
 import { LogLines } from "@/components/ui/LogView";
 import { Panel } from "@/components/ui/Panel";
 import { CopyIcon, MenuIcon } from "@/components/icons";
+import { useCurrentInstance } from "./current";
 
-export function LogsTab({ instance }: { instance: Instance }) {
+export function LogsTab() {
+  const instance = useCurrentInstance();
   const log = useInstanceLog(instance.id);
 
   return (

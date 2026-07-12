@@ -1,10 +1,11 @@
 import { useState } from "react";
-import type { Instance } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Field, RangeInput, Select, TextInput } from "@/components/ui/form";
 import { TrashIcon } from "@/components/icons";
+import { useCurrentInstance } from "./current";
 
-export function SettingsTab({ instance }: { instance: Instance }) {
+export function SettingsTab() {
+  const instance = useCurrentInstance();
   const [memory, setMemory] = useState(instance.memoryGb);
 
   return (

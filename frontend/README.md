@@ -26,11 +26,13 @@ the client SDK later replaces the hook internals, not the components.
 
 ```
 src/
-├── routes/          file-based routes — thin: each wires a feature screen
-│   └── __root.tsx   app shell: titlebar, sidebar, play bar, launch overlay
+├── routes/          file-based routes — thin: each wires a feature component
+│   ├── __root.tsx   app shell: titlebar, sidebar, play bar, launch overlay
+│   └── instance/$instanceId/   layout route (hero + tab bar) with one child
+│                    route per tab, so tabs are real, deep-linkable paths
 ├── features/        one folder per screen domain
 │   ├── library/     LibraryScreen, InstanceCard, InstanceRow
-│   ├── instance/    InstanceScreen, Hero, one file per tab
+│   ├── instance/    InstanceLayout, Hero, one component per tab route
 │   ├── servers/     ServersLayout (rail), ServerDetail (console), NoServers
 │   ├── discover/    DiscoverScreen, ProjectRow
 │   ├── settings/    SettingsScreen

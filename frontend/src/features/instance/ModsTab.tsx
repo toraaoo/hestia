@@ -1,12 +1,13 @@
-import type { Instance } from "@/lib/types";
 import { useInstanceMods } from "@/data";
 import { Button, IconButton } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Tile } from "@/components/ui/Tile";
 import { Toggle } from "@/components/ui/Toggle";
 import { PlusIcon, TrashIcon } from "@/components/icons";
+import { useCurrentInstance } from "./current";
 
-export function ModsTab({ instance }: { instance: Instance }) {
+export function ModsTab() {
+  const instance = useCurrentInstance();
   const { mods, toggleMod } = useInstanceMods(instance.id);
 
   return (

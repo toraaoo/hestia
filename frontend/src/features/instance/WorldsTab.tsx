@@ -1,10 +1,11 @@
-import type { Instance } from "@/lib/types";
 import { useInstanceWorlds } from "@/data";
 import { Button } from "@/components/ui/Button";
 import { Tile } from "@/components/ui/Tile";
 import { PlayIcon } from "@/components/icons";
+import { useCurrentInstance } from "./current";
 
-export function WorldsTab({ instance }: { instance: Instance }) {
+export function WorldsTab() {
+  const instance = useCurrentInstance();
   const worlds = useInstanceWorlds(instance.id);
 
   return (

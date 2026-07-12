@@ -1,17 +1,19 @@
 import { useState } from "react";
+import { getRouteApi } from "@tanstack/react-router";
 import { useContentSearch, useInstances } from "@/data";
 import type { Loader } from "@/lib/types";
 import { TopBar } from "@/components/layout/TopBar";
 import { SearchField } from "@/components/ui/SearchField";
 import { Overline } from "@/components/ui/Overline";
 import { Panel } from "@/components/ui/Panel";
-import { Tabs } from "@/components/ui/Tabs";
+import { TabButton, Tabs } from "@/components/ui/Tabs";
 import { Tile } from "@/components/ui/Tile";
 import { CheckLabel } from "@/components/ui/form";
 import { CaretDownIcon } from "@/components/icons";
 import { ProjectRow } from "./ProjectRow";
+import type { ContentKind } from "./tabs";
 
-type ContentKind = "mods" | "modpacks" | "resourcepacks" | "shaders";
+const route = getRouteApi("/discover");
 
 const TABS = [
   { id: "mods", label: "Mods", count: 1284 },
@@ -23,8 +25,12 @@ const TABS = [
 const FILTER_LOADERS: Loader[] = ["Fabric", "Quilt", "Forge", "NeoForge"];
 
 export function DiscoverScreen() {
-  const [tab, setTab] = useState<ContentKind>("mods");
+  const tab = route.useSearch({ select: (s) => s.tab ?? "mods" });
+  const navigate = route.useNavigate();
   const [query, setQuery] = useState("");
+
+  const setTab = (next: ContentKind) => void navigate({ search: { tab: next }, replace: true });
+
   const [loaders, setLoaders] = useState<Record<string, boolean>>({
     Fabric: true,
     Quilt: false,
@@ -47,7 +53,17 @@ export function DiscoverScreen() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-6 pt-5 pb-10">
-          <Tabs items={TABS} value={tab} onChange={setTab} className="mb-4" />
+          <Tabs className="mb-4">
+            {TABS.map(({ id, label, count }) => (
+              <TabButton
+                key={id}
+                label={label}
+                count={count}
+                active={tab === id}
+                onClick={() => setTab(id)}
+              />
+            ))}
+          </Tabs>
 
           <div className="flex items-start gap-5">
             <Panel as="aside" className="flex w-50 shrink-0 flex-col gap-5 p-4">
