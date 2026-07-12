@@ -1,12 +1,12 @@
 import { useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useLauncherStore, useSelectedInstance } from "../lib/store";
-import { loaderTone } from "../lib/format";
-import { SNAP } from "../lib/motion";
-import { Badge } from "./ui/Badge";
-import { Button } from "./ui/Button";
-import { PlayButton } from "./ui/PlayButton";
-import { Tile } from "./ui/Tile";
+import { useLauncherStore, useSelectedInstance } from "@/lib/store";
+import { loaderTone } from "@/lib/format";
+import { SNAP } from "@/lib/motion";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { PlayButton } from "@/components/ui/PlayButton";
+import { Tile } from "@/components/ui/Tile";
 
 /** Slim selected-instance play bar pinned under the content column. */
 export function PlayBar() {

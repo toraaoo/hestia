@@ -1,5 +1,5 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
-import { CaretDownIcon } from "../icons";
+import { CaretDownIcon } from "@/components/icons";
 
 export function Field({
   label,

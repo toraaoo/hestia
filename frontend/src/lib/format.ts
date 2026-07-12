@@ -1,5 +1,5 @@
-import type { BadgeTone } from "../components/ui/Badge";
-import type { Loader } from "./types";
+import type { BadgeTone } from "@/components/ui/Badge";
+import type { Loader } from "@/lib/types";
 
 export function formatCount(n: number): string {
   if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";

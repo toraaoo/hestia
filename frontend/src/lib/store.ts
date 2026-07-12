@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { Instance, LibraryView, Server } from "./types";
-import { MOCK_INSTANCES, MOCK_RUNNING_SERVERS, MOCK_SERVERS } from "./mock";
+import type { Instance, LibraryView, Server } from "@/lib/types";
+import { MOCK_INSTANCES, MOCK_RUNNING_SERVERS, MOCK_SERVERS } from "@/lib/mock";
 
 const LAUNCH_DURATION_MS = 2600;
 

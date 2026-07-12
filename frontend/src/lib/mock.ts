@@ -1,4 +1,11 @@
-import type { ContentProject, Instance, InstalledMod, LogLine, Server, WorldSave } from "./types";
+import type {
+  ContentProject,
+  Instance,
+  InstalledMod,
+  LogLine,
+  Server,
+  WorldSave,
+} from "@/lib/types";
 
 export const MOCK_INSTANCES: Instance[] = [
   {

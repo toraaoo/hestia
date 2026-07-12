@@ -1,4 +1,4 @@
-import type { LogLine, LogLevel } from "../lib/types";
+import type { LogLine, LogLevel } from "@/lib/types";
 
 const LEVELS: Record<LogLevel, string> = {
   INFO: "text-grass-400",

@@ -1,14 +1,14 @@
 import { Link, Outlet, createRootRoute, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import type { Instance } from "../lib/types";
-import { useLauncherStore } from "../lib/store";
-import { backdropVariants, pageVariants, popVariants } from "../lib/motion";
-import { TitleBar } from "../components/TitleBar";
-import { Sidebar } from "../components/Sidebar";
-import { PlayBar } from "../components/PlayBar";
-import { ProgressBar } from "../components/ui/ProgressBar";
-import { Button } from "../components/ui/Button";
-import logoEmber from "../assets/brand/logo-ember.svg";
+import type { Instance } from "@/lib/types";
+import { useLauncherStore } from "@/lib/store";
+import { backdropVariants, pageVariants, popVariants } from "@/lib/motion";
+import { TitleBar } from "@/components/TitleBar";
+import { Sidebar } from "@/components/Sidebar";
+import { PlayBar } from "@/components/PlayBar";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { Button } from "@/components/ui/Button";
+import logoEmber from "@/assets/brand/logo-ember.svg";
 
 export const Route = createRootRoute({
   component: RootLayout,

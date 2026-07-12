@@ -1,21 +1,21 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import type { ContentProject, Loader } from "../lib/types";
-import { riseVariants } from "../lib/motion";
-import { TILES } from "../lib/tiles";
-import { MOCK_DISCOVER, MOCK_INSTANCES } from "../lib/mock";
-import { formatCount, loaderTone } from "../lib/format";
-import { TopBar } from "../components/TopBar";
-import { SearchField } from "../components/ui/SearchField";
-import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
-import { Overline } from "../components/ui/Overline";
-import { Panel } from "../components/ui/Panel";
-import { Tabs } from "../components/ui/Tabs";
-import { Tile } from "../components/ui/Tile";
-import { CheckLabel } from "../components/ui/form";
-import { CaretDownIcon } from "../components/icons";
+import type { ContentProject, Loader } from "@/lib/types";
+import { riseVariants } from "@/lib/motion";
+import { TILES } from "@/lib/tiles";
+import { MOCK_DISCOVER, MOCK_INSTANCES } from "@/lib/mock";
+import { formatCount, loaderTone } from "@/lib/format";
+import { TopBar } from "@/components/TopBar";
+import { SearchField } from "@/components/ui/SearchField";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Overline } from "@/components/ui/Overline";
+import { Panel } from "@/components/ui/Panel";
+import { Tabs } from "@/components/ui/Tabs";
+import { Tile } from "@/components/ui/Tile";
+import { CheckLabel } from "@/components/ui/form";
+import { CaretDownIcon } from "@/components/icons";
 
 export const Route = createFileRoute("/discover")({
   component: Discover,

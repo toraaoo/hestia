@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "../../lib/cn";
+import { cn } from "@/lib/cn";
 
 /** Small uppercase group label for side cards and filter groups. */
 export function Overline({

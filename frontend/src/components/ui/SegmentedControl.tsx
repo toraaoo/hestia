@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { cn } from "../../lib/cn";
+import { cn } from "@/lib/cn";
 
 interface SegmentedOption<T extends string> {
   value: T;

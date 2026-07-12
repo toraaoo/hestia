@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { CloseIcon, CornersOutIcon, MinusIcon, SquareIcon } from "./icons";
-import logoEmber from "../assets/brand/logo-ember.svg";
+import { CloseIcon, CornersOutIcon, MinusIcon, SquareIcon } from "@/components/icons";
+import logoEmber from "@/assets/brand/logo-ember.svg";
 
 const inTauri = "__TAURI_INTERNALS__" in window;
 

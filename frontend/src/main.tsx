@@ -9,10 +9,10 @@ import "@fontsource/noto-sans/700.css";
 import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/700.css";
-import "./styles/index.css";
+import "@/styles/index.css";
 
-import { installDesktopBehaviors } from "./lib/desktop";
-import { routeTree } from "./routeTree.gen";
+import { installDesktopBehaviors } from "@/lib/desktop";
+import { routeTree } from "@/routeTree.gen";
 
 installDesktopBehaviors();
 

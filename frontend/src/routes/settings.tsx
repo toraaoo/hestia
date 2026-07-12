@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { TopBar } from "../components/TopBar";
-import { SectionHeading } from "../components/ui/SectionHeading";
-import { CheckLabel, Field, RangeInput, Select, TextInput } from "../components/ui/form";
-import logoEmber from "../assets/brand/logo-ember.svg";
+import { TopBar } from "@/components/TopBar";
+import { SectionHeading } from "@/components/ui/SectionHeading";
+import { CheckLabel, Field, RangeInput, Select, TextInput } from "@/components/ui/form";
+import logoEmber from "@/assets/brand/logo-ember.svg";
 
 export const Route = createFileRoute("/settings")({
   component: Settings,

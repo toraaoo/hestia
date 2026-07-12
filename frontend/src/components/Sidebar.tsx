@@ -1,10 +1,10 @@
 import type { ComponentType } from "react";
 import { Link } from "@tanstack/react-router";
-import { useLauncherStore } from "../lib/store";
-import { MOCK_ACCOUNT } from "../lib/mock";
-import { Badge } from "./ui/Badge";
-import { StatusDot } from "./ui/StatusDot";
-import { Tile } from "./ui/Tile";
+import { useLauncherStore } from "@/lib/store";
+import { MOCK_ACCOUNT } from "@/lib/mock";
+import { Badge } from "@/components/ui/Badge";
+import { StatusDot } from "@/components/ui/StatusDot";
+import { Tile } from "@/components/ui/Tile";
 import {
   CaretUpIcon,
   GridIcon,
@@ -13,7 +13,7 @@ import {
   ServerIcon,
   SlidersIcon,
   UserIcon,
-} from "./icons";
+} from "@/components/icons";
 
 interface Section {
   to: "/" | "/discover" | "/servers" | "/skins" | "/settings";

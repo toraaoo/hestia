@@ -1,11 +1,11 @@
 import { Link, Outlet, createFileRoute } from "@tanstack/react-router";
-import { useLauncherStore } from "../../lib/store";
-import { TopBar } from "../../components/TopBar";
-import { Button } from "../../components/ui/Button";
-import { Panel } from "../../components/ui/Panel";
-import { StatusDot } from "../../components/ui/StatusDot";
-import { Tile } from "../../components/ui/Tile";
-import { PlusIcon } from "../../components/icons";
+import { useLauncherStore } from "@/lib/store";
+import { TopBar } from "@/components/TopBar";
+import { Button } from "@/components/ui/Button";
+import { Panel } from "@/components/ui/Panel";
+import { StatusDot } from "@/components/ui/StatusDot";
+import { Tile } from "@/components/ui/Tile";
+import { PlusIcon } from "@/components/icons";
 
 export const Route = createFileRoute("/servers")({
   component: ServersLayout,

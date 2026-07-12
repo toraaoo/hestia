@@ -1,6 +1,6 @@
-import { cn } from "../../lib/cn";
-import { TILES } from "../../lib/tiles";
-import type { TileName } from "../../lib/types";
+import { cn } from "@/lib/cn";
+import { TILES } from "@/lib/tiles";
+import type { TileName } from "@/lib/types";
 
 interface TileProps {
   tile: TileName;

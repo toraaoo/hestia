@@ -1,19 +1,19 @@
 import { useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import type { Instance } from "../lib/types";
-import { SNAP, riseVariants } from "../lib/motion";
-import { TILES } from "../lib/tiles";
-import { useLauncherStore } from "../lib/store";
-import { loaderTone } from "../lib/format";
-import { TopBar } from "../components/TopBar";
-import { SearchField } from "../components/ui/SearchField";
-import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
-import { SectionHeading } from "../components/ui/SectionHeading";
-import { SegmentedControl } from "../components/ui/SegmentedControl";
-import { Tile } from "../components/ui/Tile";
-import { CaretRightIcon, GridIcon, PlayIcon, PlusIcon, ViewListIcon } from "../components/icons";
+import type { Instance } from "@/lib/types";
+import { SNAP, riseVariants } from "@/lib/motion";
+import { TILES } from "@/lib/tiles";
+import { useLauncherStore } from "@/lib/store";
+import { loaderTone } from "@/lib/format";
+import { TopBar } from "@/components/TopBar";
+import { SearchField } from "@/components/ui/SearchField";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { SectionHeading } from "@/components/ui/SectionHeading";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { Tile } from "@/components/ui/Tile";
+import { CaretRightIcon, GridIcon, PlayIcon, PlusIcon, ViewListIcon } from "@/components/icons";
 
 export const Route = createFileRoute("/")({
   component: Library,

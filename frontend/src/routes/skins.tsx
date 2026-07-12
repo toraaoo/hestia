@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { TopBar } from "../components/TopBar";
-import { UserIcon } from "../components/icons";
+import { TopBar } from "@/components/TopBar";
+import { UserIcon } from "@/components/icons";
 
 export const Route = createFileRoute("/skins")({
   component: Skins,

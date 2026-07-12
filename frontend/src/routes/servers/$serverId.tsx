@@ -1,15 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useLauncherStore } from "../../lib/store";
-import { MOCK_SERVER_LOG } from "../../lib/mock";
-import { orNotFound } from "../../lib/router";
-import { LogLines } from "../../components/LogView";
-import { Badge } from "../../components/ui/Badge";
-import { Button } from "../../components/ui/Button";
-import { Panel } from "../../components/ui/Panel";
-import { ProgressBar } from "../../components/ui/ProgressBar";
-import { Stat } from "../../components/ui/Stat";
-import { Tile } from "../../components/ui/Tile";
-import { CloseIcon, MenuIcon, PlayIcon, ReloadIcon } from "../../components/icons";
+import { useLauncherStore } from "@/lib/store";
+import { MOCK_SERVER_LOG } from "@/lib/mock";
+import { orNotFound } from "@/lib/router";
+import { LogLines } from "@/components/LogView";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Panel } from "@/components/ui/Panel";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { Stat } from "@/components/ui/Stat";
+import { Tile } from "@/components/ui/Tile";
+import { CloseIcon, MenuIcon, PlayIcon, ReloadIcon } from "@/components/icons";
 
 export const Route = createFileRoute("/servers/$serverId")({
   component: ServerDetail,

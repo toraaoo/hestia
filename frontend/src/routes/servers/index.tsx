@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useLauncherStore } from "../../lib/store";
+import { useLauncherStore } from "@/lib/store";
 
 export const Route = createFileRoute("/servers/")({
   beforeLoad: () => {

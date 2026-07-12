@@ -1,23 +1,23 @@
 import { useEffect, useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import type { Instance } from "../../lib/types";
-import { TILES } from "../../lib/tiles";
-import { useLauncherStore } from "../../lib/store";
-import { MOCK_GAME_LOG, MOCK_MODS, MOCK_WORLDS } from "../../lib/mock";
-import { loaderTone } from "../../lib/format";
-import { orNotFound } from "../../lib/router";
-import { LogLines } from "../../components/LogView";
-import { Badge } from "../../components/ui/Badge";
-import { Button, IconButton } from "../../components/ui/Button";
-import { Overline } from "../../components/ui/Overline";
-import { Panel } from "../../components/ui/Panel";
-import { PlayButton } from "../../components/ui/PlayButton";
-import { SectionHeading } from "../../components/ui/SectionHeading";
-import { Stat } from "../../components/ui/Stat";
-import { Tabs, type TabItem } from "../../components/ui/Tabs";
-import { Tile } from "../../components/ui/Tile";
-import { Toggle } from "../../components/ui/Toggle";
-import { Field, RangeInput, Select, TextInput } from "../../components/ui/form";
+import type { Instance } from "@/lib/types";
+import { TILES } from "@/lib/tiles";
+import { useLauncherStore } from "@/lib/store";
+import { MOCK_GAME_LOG, MOCK_MODS, MOCK_WORLDS } from "@/lib/mock";
+import { loaderTone } from "@/lib/format";
+import { orNotFound } from "@/lib/router";
+import { LogLines } from "@/components/LogView";
+import { Badge } from "@/components/ui/Badge";
+import { Button, IconButton } from "@/components/ui/Button";
+import { Overline } from "@/components/ui/Overline";
+import { Panel } from "@/components/ui/Panel";
+import { PlayButton } from "@/components/ui/PlayButton";
+import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Stat } from "@/components/ui/Stat";
+import { Tabs, type TabItem } from "@/components/ui/Tabs";
+import { Tile } from "@/components/ui/Tile";
+import { Toggle } from "@/components/ui/Toggle";
+import { Field, RangeInput, Select, TextInput } from "@/components/ui/form";
 import {
   ArrowLeftIcon,
   CopyIcon,
@@ -28,7 +28,7 @@ import {
   PlayIcon,
   PlusIcon,
   TrashIcon,
-} from "../../components/icons";
+} from "@/components/icons";
 
 export const Route = createFileRoute("/instance/$instanceId")({
   component: InstancePage,

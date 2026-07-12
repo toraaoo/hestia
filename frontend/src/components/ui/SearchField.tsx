@@ -1,4 +1,4 @@
-import { SearchIcon } from "../icons";
+import { SearchIcon } from "@/components/icons";
 
 interface SearchFieldProps {
   value: string;

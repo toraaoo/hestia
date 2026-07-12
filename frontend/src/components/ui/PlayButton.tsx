@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes } from "react";
-import { cn } from "../../lib/cn";
-import { PlayIcon } from "../icons";
+import { cn } from "@/lib/cn";
+import { PlayIcon } from "@/components/icons";
 
 /** The big grass launch action (48px hero-type button with the pixel bevel). */
 export function PlayButton({
