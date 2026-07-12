@@ -46,7 +46,7 @@ fn main() -> ExitCode {
 
     tracing::info!(version = common::app::VERSION, "tray starting");
 
-    let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
+    let event_loop = build_event_loop();
 
     let menu_proxy = event_loop.create_proxy();
     MenuEvent::set_event_handler(Some(move |event| {
@@ -103,4 +103,20 @@ fn build_tray(menu: &TrayMenu, icon: tray_icon::Icon) -> tray_icon::Result<TrayI
         .with_title(common::app::NAME)
         .with_tooltip(common::app::NAME)
         .build()
+}
+
+#[cfg(target_os = "linux")]
+fn build_event_loop() -> tao::event_loop::EventLoop<UserEvent> {
+    use tao::platform::unix::EventLoopBuilderExtUnix;
+
+    glib::set_application_name(common::app::NAME);
+
+    let mut builder = EventLoopBuilder::<UserEvent>::with_user_event();
+    builder.with_app_id(common::app::ID);
+    builder.build()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn build_event_loop() -> tao::event_loop::EventLoop<UserEvent> {
+    EventLoopBuilder::<UserEvent>::with_user_event().build()
 }

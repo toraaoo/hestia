@@ -24,3 +24,6 @@ png = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+glib = { workspace = true }

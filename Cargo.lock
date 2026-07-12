@@ -5745,6 +5745,7 @@ dependencies = [
  "anyhow",
  "client",
  "common",
+ "glib",
  "ipc",
  "libc",
  "png 0.18.1",
