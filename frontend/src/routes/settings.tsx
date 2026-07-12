@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { TopBar } from "../components/TopBar";
+import { SectionHeading } from "../components/ui/SectionHeading";
 import { CheckLabel, Field, RangeInput, Select, TextInput } from "../components/ui/form";
 import logoEmber from "../assets/brand/logo-ember.svg";
 
@@ -17,7 +18,7 @@ function Settings() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-6 pt-5 pb-10">
           <div className="flex max-w-160 flex-col gap-5">
-            <SectionTitle>General</SectionTitle>
+            <SectionHeading title="General" className="mb-0" />
             <div className="grid grid-cols-2 gap-4">
               <Field label="Theme">
                 <Select value="Dark (Hearth)" />
@@ -30,7 +31,7 @@ function Settings() {
               <TextInput defaultValue="~/.hestia/instances" className="font-mono" />
             </Field>
 
-            <SectionTitle gap>Java & Performance</SectionTitle>
+            <SectionHeading title="Java & Performance" className="mt-7 mb-0" />
             <Field
               label="Java runtime"
               hint="Auto-managed. Hestia downloads the right JDK per instance."
@@ -56,7 +57,7 @@ function Settings() {
               />
             </Field>
 
-            <SectionTitle gap>On launch</SectionTitle>
+            <SectionHeading title="On launch" className="mt-7 mb-0" />
             <CheckLabel defaultChecked>Keep the launcher open while a game runs</CheckLabel>
             <CheckLabel>Close the launcher when a game starts</CheckLabel>
             <CheckLabel defaultChecked>Check for mod updates on startup</CheckLabel>
@@ -69,13 +70,5 @@ function Settings() {
         </div>
       </div>
     </>
-  );
-}
-
-function SectionTitle({ children, gap = false }: { children: React.ReactNode; gap?: boolean }) {
-  return (
-    <h2 className={`font-hero text-base text-text-1 font-crisp ${gap ? "mt-7" : ""}`}>
-      {children}
-    </h2>
   );
 }

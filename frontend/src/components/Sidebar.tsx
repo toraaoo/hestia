@@ -1,9 +1,10 @@
 import type { ComponentType } from "react";
 import { Link } from "@tanstack/react-router";
-import { TILES } from "../lib/tiles";
 import { useLauncherStore } from "../lib/store";
 import { MOCK_ACCOUNT } from "../lib/mock";
 import { Badge } from "./ui/Badge";
+import { StatusDot } from "./ui/StatusDot";
+import { Tile } from "./ui/Tile";
 import {
   CaretUpIcon,
   GridIcon,
@@ -49,7 +50,7 @@ export function Sidebar() {
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <span className="absolute inset-y-2 -left-3 w-0.75 rounded-r-xs bg-hearth-500 shadow-[0_0_8px_var(--color-hearth-500)]" />
+                  <span className="absolute inset-y-2 -left-3 w-0.75 rounded-r-xs bg-hearth-500 shadow-glow-accent" />
                 )}
                 <SectionIcon size={18} />
                 <span>{label}</span>
@@ -85,30 +86,20 @@ export function Sidebar() {
             activeProps={{ className: "bg-surface-3" }}
             inactiveProps={{ className: "hover:bg-surface-hover" }}
           >
-            <img
-              src={TILES[inst.tile]}
-              alt=""
-              className="size-6.5 shrink-0 rounded-sm object-cover shadow-tile pixelated"
-            />
+            <Tile tile={inst.tile} className="size-6.5" />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-medium text-text-1">{inst.name}</span>
               <span className="text-xs text-text-3">
                 {inst.loader} · {inst.version}
               </span>
             </span>
-            {inst.running && (
-              <span className="size-1.75 shrink-0 rounded-full bg-grass-500 shadow-[0_0_6px_var(--color-grass-500)]" />
-            )}
+            {inst.running && <StatusDot on size="sm" />}
           </Link>
         ))}
       </nav>
 
       <button className="mx-2.5 mb-3 flex items-center gap-2.5 rounded-lg bg-surface-2 p-3 shadow-card-flat transition-colors duration-100 hover:bg-surface-hover">
-        <img
-          src={TILES["tile-grass"]}
-          alt=""
-          className="size-7.5 rounded-sm shadow-tile pixelated"
-        />
+        <Tile tile="tile-grass" className="size-7.5" />
         <span className="flex min-w-0 flex-1 flex-col text-left">
           <span className="text-sm font-semibold text-text-1">{MOCK_ACCOUNT.name}</span>
           <span className="text-xs text-text-3">{MOCK_ACCOUNT.kind}</span>

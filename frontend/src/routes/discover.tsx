@@ -10,6 +10,10 @@ import { TopBar } from "../components/TopBar";
 import { SearchField } from "../components/ui/SearchField";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { Overline } from "../components/ui/Overline";
+import { Panel } from "../components/ui/Panel";
+import { Tabs } from "../components/ui/Tabs";
+import { Tile } from "../components/ui/Tile";
 import { CheckLabel } from "../components/ui/form";
 import { CaretDownIcon } from "../components/icons";
 
@@ -17,17 +21,19 @@ export const Route = createFileRoute("/discover")({
   component: Discover,
 });
 
+type ContentKind = "mods" | "modpacks" | "resourcepacks" | "shaders";
+
 const TABS = [
-  ["mods", "Mods", 1284],
-  ["modpacks", "Modpacks", 412],
-  ["resourcepacks", "Resource Packs", 806],
-  ["shaders", "Shaders", 91],
+  { id: "mods", label: "Mods", count: 1284 },
+  { id: "modpacks", label: "Modpacks", count: 412 },
+  { id: "resourcepacks", label: "Resource Packs", count: 806 },
+  { id: "shaders", label: "Shaders", count: 91 },
 ] as const;
 
 const FILTER_LOADERS: Loader[] = ["Fabric", "Quilt", "Forge", "NeoForge"];
 
 function Discover() {
-  const [tab, setTab] = useState<(typeof TABS)[number][0]>("mods");
+  const [tab, setTab] = useState<ContentKind>("mods");
   const [query, setQuery] = useState("");
   const [loaders, setLoaders] = useState<Record<string, boolean>>({
     Fabric: true,
@@ -54,42 +60,22 @@ function Discover() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-6 pt-5 pb-10">
-          <div className="mb-4 flex gap-0.5 border-b border-border-2">
-            {TABS.map(([id, label, count]) => (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className={`relative h-9.5 px-3 text-sm font-semibold transition-colors duration-100 ${
-                  tab === id ? "text-text-1" : "text-text-3 hover:text-text-1"
-                }`}
-              >
-                {label}
-                <span className="ml-1.5 text-xs font-medium text-text-3">{count}</span>
-                {tab === id && (
-                  <span className="absolute inset-x-1.5 -bottom-px h-0.75 rounded-t-xs bg-hearth-500" />
-                )}
-              </button>
-            ))}
-          </div>
+          <Tabs items={TABS} value={tab} onChange={setTab} className="mb-4" />
 
           <div className="flex items-start gap-5">
-            <aside className="flex w-50 shrink-0 flex-col gap-5 rounded-lg bg-surface-2 p-4 shadow-card-flat">
+            <Panel as="aside" className="flex w-50 shrink-0 flex-col gap-5 p-4">
               <div className="flex flex-col gap-2.5">
-                <span className="text-xs font-bold tracking-wider text-text-3 uppercase">
-                  Install to
-                </span>
+                <Overline>Install to</Overline>
                 {target && (
                   <button className="flex items-center gap-2.5 rounded-sm bg-surface-inset px-2.5 py-2 shadow-bevel-inset">
-                    <img src={TILES[target.tile]} alt="" className="size-6 rounded-xs pixelated" />
+                    <Tile tile={target.tile} className="size-6 rounded-xs" />
                     <span className="text-sm font-semibold text-text-1">{target.name}</span>
                     <CaretDownIcon size={14} className="ml-auto text-text-3" />
                   </button>
                 )}
               </div>
               <div className="flex flex-col gap-2.5">
-                <span className="text-xs font-bold tracking-wider text-text-3 uppercase">
-                  Loaders
-                </span>
+                <Overline>Loaders</Overline>
                 {FILTER_LOADERS.map((loader) => (
                   <CheckLabel
                     key={loader}
@@ -101,16 +87,14 @@ function Discover() {
                 ))}
               </div>
               <div className="flex flex-col gap-2.5">
-                <span className="text-xs font-bold tracking-wider text-text-3 uppercase">
-                  Source
-                </span>
+                <Overline>Source</Overline>
                 {["Modrinth", "CurseForge"].map((source) => (
                   <CheckLabel key={source} defaultChecked>
                     {source}
                   </CheckLabel>
                 ))}
               </div>
-            </aside>
+            </Panel>
 
             <div className="flex min-w-0 flex-1 flex-col gap-2.5">
               {results.map((project, i) => (

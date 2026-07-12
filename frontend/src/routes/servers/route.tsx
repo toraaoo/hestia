@@ -1,8 +1,10 @@
 import { Link, Outlet, createFileRoute } from "@tanstack/react-router";
-import { TILES } from "../../lib/tiles";
 import { useLauncherStore } from "../../lib/store";
 import { TopBar } from "../../components/TopBar";
 import { Button } from "../../components/ui/Button";
+import { Panel } from "../../components/ui/Panel";
+import { StatusDot } from "../../components/ui/StatusDot";
+import { Tile } from "../../components/ui/Tile";
 import { PlusIcon } from "../../components/icons";
 
 export const Route = createFileRoute("/servers")({
@@ -24,7 +26,7 @@ function ServersLayout() {
 
       <div className="flex min-h-0 flex-1 flex-col px-6 py-5">
         <div className="flex min-h-0 flex-1 items-stretch gap-4.5">
-          <aside className="flex w-57.5 shrink-0 flex-col gap-1.5 overflow-y-auto rounded-lg bg-surface-2 p-2 shadow-card-flat">
+          <Panel as="aside" className="flex w-57.5 shrink-0 flex-col gap-1.5 overflow-y-auto p-2">
             {servers.map((server) => (
               <Link
                 key={server.id}
@@ -34,25 +36,15 @@ function ServersLayout() {
                 activeProps={{ className: "bg-surface-3" }}
                 inactiveProps={{ className: "hover:bg-surface-hover" }}
               >
-                <img
-                  src={TILES[server.tile]}
-                  alt=""
-                  className="size-8.5 rounded-sm shadow-tile pixelated"
-                />
+                <Tile tile={server.tile} className="size-8.5" />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-sm font-semibold text-text-1">{server.name}</span>
                   <span className="font-mono text-xs text-text-3">:{server.port}</span>
                 </span>
-                <span
-                  className={`size-2.25 shrink-0 rounded-full ${
-                    running[server.id]
-                      ? "bg-grass-500 shadow-[0_0_7px_var(--color-grass-500)]"
-                      : "bg-ink-500"
-                  }`}
-                />
+                <StatusDot on={running[server.id] ?? false} />
               </Link>
             ))}
-          </aside>
+          </Panel>
 
           <Outlet />
         </div>

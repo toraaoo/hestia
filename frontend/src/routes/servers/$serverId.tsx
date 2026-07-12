@@ -1,11 +1,14 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
-import { TILES } from "../../lib/tiles";
+import { createFileRoute } from "@tanstack/react-router";
 import { useLauncherStore } from "../../lib/store";
 import { MOCK_SERVER_LOG } from "../../lib/mock";
+import { orNotFound } from "../../lib/router";
 import { LogLines } from "../../components/LogView";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { Panel } from "../../components/ui/Panel";
 import { ProgressBar } from "../../components/ui/ProgressBar";
+import { Stat } from "../../components/ui/Stat";
+import { Tile } from "../../components/ui/Tile";
 import { CloseIcon, MenuIcon, PlayIcon, ReloadIcon } from "../../components/icons";
 
 export const Route = createFileRoute("/servers/$serverId")({
@@ -14,17 +17,14 @@ export const Route = createFileRoute("/servers/$serverId")({
 
 function ServerDetail() {
   const { serverId } = Route.useParams();
-  const server = useLauncherStore((s) => s.servers.find((x) => x.id === serverId));
+  const server = orNotFound(useLauncherStore((s) => s.servers.find((x) => x.id === serverId)));
   const isUp = useLauncherStore((s) => s.serverRunning[serverId] ?? false);
   const setRunning = useLauncherStore((s) => s.setServerRunning);
-
-  // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router catches its own non-Error marker
-  if (!server) throw notFound();
 
   return (
     <section className="flex min-w-0 flex-1 flex-col gap-3.5">
       <div className="flex items-center gap-3.5">
-        <img src={TILES[server.tile]} alt="" className="size-13 rounded-lg shadow-tile pixelated" />
+        <Tile tile={server.tile} rounded="lg" className="size-13" />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex items-center gap-2.5">
             <h2 className="font-hero text-xl text-text-1 font-crisp">{server.name}</h2>
@@ -53,9 +53,18 @@ function ServerDetail() {
       </div>
 
       <div className="flex items-stretch gap-3">
-        <Stat label="Players" value={`${isUp ? server.players : 0}/${server.maxPlayers}`} />
-        <Stat label="TPS" value={isUp ? server.tps.toFixed(1) : "—"} accent={isUp} />
-        <Stat label="Uptime" value={isUp ? server.uptime : "—"} />
+        <Stat
+          label="Players"
+          value={`${isUp ? server.players : 0}/${server.maxPlayers}`}
+          className="min-w-23 shrink-0"
+        />
+        <Stat
+          label="TPS"
+          value={isUp ? server.tps.toFixed(1) : "—"}
+          accent={isUp}
+          className="min-w-23 shrink-0"
+        />
+        <Stat label="Uptime" value={isUp ? server.uptime : "—"} className="min-w-23 shrink-0" />
         <div className="flex flex-1 flex-col justify-center rounded-lg bg-surface-2 px-4 py-3 shadow-card-flat">
           <ProgressBar
             value={isUp ? server.ramGb : 0}
@@ -67,13 +76,19 @@ function ServerDetail() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-surface-inset shadow-bevel-inset">
-        <div className="flex items-center gap-2.5 border-b border-border-2 bg-ink-950 px-3.5 py-2.5 text-xs font-semibold text-text-3">
-          <MenuIcon size={13} />
-          Console
-          <div className="flex-1" />
+      <Panel
+        variant="inset"
+        className="flex min-h-0 flex-1 flex-col"
+        title={
+          <>
+            <MenuIcon size={13} />
+            Console
+          </>
+        }
+        actions={
           <button className="text-xs font-semibold text-text-3 hover:text-hearth-400">Clear</button>
-        </div>
+        }
+      >
         <div className="min-h-25 flex-1 overflow-y-auto p-3.5 font-mono text-xs leading-relaxed">
           {isUp ? (
             <LogLines lines={MOCK_SERVER_LOG} />
@@ -83,7 +98,7 @@ function ServerDetail() {
             </div>
           )}
         </div>
-        <div className="flex h-11 items-center gap-2 border-t border-border-2 bg-ink-950 px-3.5">
+        <div className="flex h-11 shrink-0 items-center gap-2 border-t border-border-2 bg-ink-950 px-3.5">
           <span className="font-mono text-sm text-hearth-400">&gt;</span>
           <input
             disabled={!isUp}
@@ -91,26 +106,7 @@ function ServerDetail() {
             className="flex-1 bg-transparent font-mono text-xs text-text-1 outline-none placeholder:text-text-3"
           />
         </div>
-      </div>
+      </Panel>
     </section>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  accent = false,
-}: {
-  label: string;
-  value: string;
-  accent?: boolean;
-}) {
-  return (
-    <div className="flex min-w-23 shrink-0 flex-col gap-1 rounded-lg bg-surface-2 px-4 py-3 shadow-card-flat">
-      <span className={`font-hero text-lg font-crisp ${accent ? "text-grass-400" : "text-text-1"}`}>
-        {value}
-      </span>
-      <span className="text-xs text-text-3">{label}</span>
-    </div>
   );
 }

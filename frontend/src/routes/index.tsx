@@ -5,11 +5,14 @@ import type { Instance } from "../lib/types";
 import { SNAP, riseVariants } from "../lib/motion";
 import { TILES } from "../lib/tiles";
 import { useLauncherStore } from "../lib/store";
+import { loaderTone } from "../lib/format";
 import { TopBar } from "../components/TopBar";
 import { SearchField } from "../components/ui/SearchField";
 import { Badge } from "../components/ui/Badge";
-import { loaderTone } from "../lib/format";
 import { Button } from "../components/ui/Button";
+import { SectionHeading } from "../components/ui/SectionHeading";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { Tile } from "../components/ui/Tile";
 import { CaretRightIcon, GridIcon, PlayIcon, PlusIcon, ViewListIcon } from "../components/icons";
 
 export const Route = createFileRoute("/")({
@@ -17,6 +20,11 @@ export const Route = createFileRoute("/")({
 });
 
 type LoaderFilter = "all" | "fabric" | "forge";
+
+const VIEW_OPTIONS = [
+  { value: "grid", title: "Grid", icon: GridIcon },
+  { value: "list", title: "List", icon: ViewListIcon },
+] as const;
 
 function Library() {
   const instances = useLauncherStore((s) => s.instances);
@@ -41,25 +49,7 @@ function Library() {
     <>
       <TopBar title="Library">
         <SearchField value={query} onChange={setQuery} placeholder="Search your instances" />
-        <div className="flex gap-0.5 rounded-sm bg-surface-2 p-0.75 shadow-card-flat">
-          {(
-            [
-              ["grid", "Grid", GridIcon],
-              ["list", "List", ViewListIcon],
-            ] as const
-          ).map(([mode, title, ModeIcon]) => (
-            <button
-              key={mode}
-              title={title}
-              onClick={() => setView(mode)}
-              className={`flex h-7.5 w-8 items-center justify-center rounded-xs ${
-                view === mode ? "bg-surface-active text-text-1" : "text-text-3 hover:text-text-1"
-              }`}
-            >
-              <ModeIcon size={15} />
-            </button>
-          ))}
-        </div>
+        <SegmentedControl options={VIEW_OPTIONS} value={view} onChange={setView} />
         <Link to="/discover">
           <Button variant="primary">
             <PlusIcon size={15} />
@@ -72,6 +62,7 @@ function Library() {
         <div className="px-6 pt-5 pb-10">
           <SectionHeading
             title="Your Servers"
+            className="mt-1.5"
             action={
               <Link
                 to="/servers"
@@ -95,11 +86,7 @@ function Library() {
                   params={{ serverId: server.id }}
                   className="flex w-68 items-center gap-3 rounded-lg bg-surface-2 p-3 text-left shadow-card-rest transition-[box-shadow,transform] duration-100 ease-snap hover:-translate-y-0.5 hover:shadow-card-hover"
                 >
-                  <img
-                    src={TILES[server.tile]}
-                    alt=""
-                    className="size-9.5 rounded-sm shadow-tile pixelated"
-                  />
+                  <Tile tile={server.tile} className="size-9.5" />
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="truncate text-sm font-semibold text-text-1">
                       {server.name}
@@ -124,8 +111,7 @@ function Library() {
             </Link>
           </div>
 
-          <div className="mt-8 mb-3.5 flex items-center gap-3">
-            <h2 className="font-hero text-base tracking-wide text-text-1 font-crisp">Instances</h2>
+          <SectionHeading title="Instances" className="mt-8">
             <div className="ml-2 flex gap-1.5">
               {(["all", "fabric", "forge"] as const).map((f) => (
                 <Button
@@ -139,7 +125,7 @@ function Library() {
                 </Button>
               ))}
             </div>
-          </div>
+          </SectionHeading>
 
           {view === "grid" ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
@@ -164,16 +150,6 @@ function Library() {
         </div>
       </div>
     </>
-  );
-}
-
-function SectionHeading({ title, action }: { title: string; action?: React.ReactNode }) {
-  return (
-    <div className="mt-1.5 mb-3.5 flex items-center gap-3">
-      <h2 className="font-hero text-base tracking-wide text-text-1 font-crisp">{title}</h2>
-      <div className="flex-1" />
-      {action}
-    </div>
   );
 }
 
@@ -261,11 +237,7 @@ function InstanceRow({
         aria-label={instance.name}
         className="absolute inset-0 z-1"
       />
-      <img
-        src={TILES[instance.tile]}
-        alt=""
-        className="size-11.5 rounded-sm object-cover shadow-tile pixelated"
-      />
+      <Tile tile={instance.tile} className="size-11.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="text-base font-semibold text-text-1">{instance.name}</span>
         <div className="flex items-center gap-2">

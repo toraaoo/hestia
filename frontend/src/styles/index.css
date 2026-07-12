@@ -123,6 +123,8 @@
     0 0 0 1px rgb(0 0 0 / 0.5);
   --shadow-bevel-btn: inset 0 2px 0 rgb(255 255 255 / 0.22), inset 0 -3px 0 rgb(0 0 0 / 0.28);
   --shadow-glow-hearth: 0 0 0 1px var(--color-hearth-500), 0 0 14px 0 rgb(245 124 18 / 0.45);
+  --shadow-glow-grass: 0 0 7px var(--color-grass-500);
+  --shadow-glow-accent: 0 0 8px var(--color-hearth-500);
   --shadow-ring: 0 0 0 2px var(--color-ink-900), 0 0 0 4px var(--color-hearth-500);
 
   /* ---- motion (snappy game-UI; no bouncy float) ---- */
