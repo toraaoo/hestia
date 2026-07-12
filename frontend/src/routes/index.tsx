@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { motion } from "framer-motion";
 import type { Instance } from "../lib/types";
+import { SNAP, riseVariants } from "../lib/motion";
 import { TILES } from "../lib/tiles";
 import { useLauncherStore } from "../lib/store";
 import { TopBar } from "../components/TopBar";
@@ -80,29 +82,38 @@ function Library() {
             }
           />
           <div className="flex flex-wrap gap-3">
-            {onlineServers.map((server) => (
-              <Link
+            {onlineServers.map((server, i) => (
+              <motion.div
                 key={server.id}
-                to="/servers/$serverId"
-                params={{ serverId: server.id }}
-                className="flex w-68 items-center gap-3 rounded-lg bg-surface-2 p-3 text-left shadow-card-rest transition-[box-shadow,transform] duration-100 ease-snap hover:-translate-y-0.5 hover:shadow-card-hover"
+                variants={riseVariants}
+                custom={i}
+                initial="initial"
+                animate="animate"
               >
-                <img
-                  src={TILES[server.tile]}
-                  alt=""
-                  className="size-9.5 rounded-sm shadow-tile pixelated"
-                />
-                <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="truncate text-sm font-semibold text-text-1">{server.name}</span>
-                  <span className="flex items-center gap-2 text-xs text-text-3">
-                    <Badge tone="success" dot>
-                      Online
-                    </Badge>
-                    {server.players}/{server.maxPlayers} players
+                <Link
+                  to="/servers/$serverId"
+                  params={{ serverId: server.id }}
+                  className="flex w-68 items-center gap-3 rounded-lg bg-surface-2 p-3 text-left shadow-card-rest transition-[box-shadow,transform] duration-100 ease-snap hover:-translate-y-0.5 hover:shadow-card-hover"
+                >
+                  <img
+                    src={TILES[server.tile]}
+                    alt=""
+                    className="size-9.5 rounded-sm shadow-tile pixelated"
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="truncate text-sm font-semibold text-text-1">
+                      {server.name}
+                    </span>
+                    <span className="flex items-center gap-2 text-xs text-text-3">
+                      <Badge tone="success" dot>
+                        Online
+                      </Badge>
+                      {server.players}/{server.maxPlayers} players
+                    </span>
                   </span>
-                </span>
-                <CaretRightIcon size={16} className="text-text-3" />
-              </Link>
+                  <CaretRightIcon size={16} className="text-text-3" />
+                </Link>
+              </motion.div>
             ))}
             <Link
               to="/servers"
@@ -132,8 +143,8 @@ function Library() {
 
           {view === "grid" ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
-              {list.map((inst) => (
-                <InstanceCard key={inst.id} instance={inst} onPlay={play} />
+              {list.map((inst, i) => (
+                <InstanceCard key={inst.id} instance={inst} onPlay={play} index={i} />
               ))}
               <Link
                 to="/discover"
@@ -145,8 +156,8 @@ function Library() {
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {list.map((inst) => (
-                <InstanceRow key={inst.id} instance={inst} onPlay={play} />
+              {list.map((inst, i) => (
+                <InstanceRow key={inst.id} instance={inst} onPlay={play} index={i} />
               ))}
             </div>
           )}
@@ -166,9 +177,25 @@ function SectionHeading({ title, action }: { title: string; action?: React.React
   );
 }
 
-function InstanceCard({ instance, onPlay }: { instance: Instance; onPlay: (i: Instance) => void }) {
+function InstanceCard({
+  instance,
+  onPlay,
+  index,
+}: {
+  instance: Instance;
+  onPlay: (i: Instance) => void;
+  index: number;
+}) {
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-lg bg-surface-2 shadow-card-rest transition-[box-shadow,transform] duration-100 ease-snap hover:-translate-y-0.75 hover:shadow-card-hover">
+    <motion.div
+      variants={riseVariants}
+      custom={index}
+      initial="initial"
+      animate="animate"
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.12, ease: SNAP }}
+      className="group relative flex flex-col overflow-hidden rounded-lg bg-surface-2 shadow-card-rest transition-shadow duration-100 hover:shadow-card-hover"
+    >
       <Link
         to="/instance/$instanceId"
         params={{ instanceId: instance.id }}
@@ -207,13 +234,27 @@ function InstanceCard({ instance, onPlay }: { instance: Instance; onPlay: (i: In
           {instance.lastPlayed === "Never" ? "Never played" : `Last played ${instance.lastPlayed}`}
         </span>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-function InstanceRow({ instance, onPlay }: { instance: Instance; onPlay: (i: Instance) => void }) {
+function InstanceRow({
+  instance,
+  onPlay,
+  index,
+}: {
+  instance: Instance;
+  onPlay: (i: Instance) => void;
+  index: number;
+}) {
   return (
-    <div className="relative flex items-center gap-3.5 rounded-lg bg-surface-2 px-3.5 py-2.5 shadow-card-rest transition-shadow duration-100 hover:shadow-card-hover">
+    <motion.div
+      variants={riseVariants}
+      custom={index}
+      initial="initial"
+      animate="animate"
+      className="relative flex items-center gap-3.5 rounded-lg bg-surface-2 px-3.5 py-2.5 shadow-card-rest transition-shadow duration-100 hover:shadow-card-hover"
+    >
       <Link
         to="/instance/$instanceId"
         params={{ instanceId: instance.id }}
@@ -252,6 +293,6 @@ function InstanceRow({ instance, onPlay }: { instance: Instance; onPlay: (i: Ins
           Play
         </Button>
       </div>
-    </div>
+    </motion.div>
   );
 }

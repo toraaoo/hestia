@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { motion } from "framer-motion";
 import type { ContentProject, Loader } from "../lib/types";
+import { riseVariants } from "../lib/motion";
 import { TILES } from "../lib/tiles";
 import { MOCK_DISCOVER, MOCK_INSTANCES } from "../lib/mock";
 import { formatCount, loaderTone } from "../lib/format";
@@ -111,8 +113,8 @@ function Discover() {
             </aside>
 
             <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-              {results.map((project) => (
-                <ProjectRow key={project.name} project={project} />
+              {results.map((project, i) => (
+                <ProjectRow key={project.name} project={project} index={i} />
               ))}
             </div>
           </div>
@@ -122,9 +124,15 @@ function Discover() {
   );
 }
 
-function ProjectRow({ project }: { project: ContentProject }) {
+function ProjectRow({ project, index }: { project: ContentProject; index: number }) {
   return (
-    <div className="flex gap-3.5 rounded-sm bg-surface-2 p-3.5 shadow-outline-dark transition-colors duration-100 hover:bg-surface-hover">
+    <motion.div
+      variants={riseVariants}
+      custom={index}
+      initial="initial"
+      animate="animate"
+      className="flex gap-3.5 rounded-sm bg-surface-2 p-3.5 shadow-outline-dark transition-colors duration-100 hover:bg-surface-hover"
+    >
       <div className="flex size-15 shrink-0 items-center justify-center overflow-hidden rounded-xs bg-surface-inset shadow-outline-dark">
         <img src={TILES[project.tile]} alt="" className="size-full object-cover pixelated" />
       </div>
@@ -160,6 +168,6 @@ function ProjectRow({ project }: { project: ContentProject }) {
           </Button>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

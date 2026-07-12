@@ -1,6 +1,8 @@
-import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
+import { Link, Outlet, createRootRoute, useRouterState } from "@tanstack/react-router";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import type { Instance } from "../lib/types";
 import { useLauncherStore } from "../lib/store";
+import { backdropVariants, pageVariants, popVariants } from "../lib/motion";
 import { TitleBar } from "../components/TitleBar";
 import { Sidebar } from "../components/Sidebar";
 import { PlayBar } from "../components/PlayBar";
@@ -16,27 +18,47 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const launching = useLauncherStore((s) => s.launching);
+  const section = useRouterState({ select: (s) => s.location.pathname.split("/")[1] });
   return (
-    <div className="relative flex h-full flex-col bg-app text-text-1">
-      <TitleBar />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <main className="flex min-h-0 flex-1 flex-col">
-            <Outlet />
-          </main>
-          <PlayBar />
+    <MotionConfig reducedMotion="user">
+      <div className="relative flex h-full flex-col bg-app text-text-1">
+        <TitleBar />
+        <div className="flex min-h-0 flex-1">
+          <Sidebar />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <main className="flex min-h-0 flex-1 flex-col">
+              <motion.div
+                key={section}
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                <Outlet />
+              </motion.div>
+            </main>
+            <PlayBar />
+          </div>
         </div>
+        <AnimatePresence>{launching && <LaunchOverlay instance={launching} />}</AnimatePresence>
       </div>
-      {launching && <LaunchOverlay instance={launching} />}
-    </div>
+    </MotionConfig>
   );
 }
 
 function LaunchOverlay({ instance }: { instance: Instance }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-ink-950/78 backdrop-blur-xs">
-      <div className="w-95 rounded-xl bg-surface-1 p-7 text-center shadow-xl">
+    <motion.div
+      variants={backdropVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="absolute inset-0 z-50 flex items-center justify-center bg-ink-950/78 backdrop-blur-xs"
+    >
+      <motion.div
+        variants={popVariants}
+        className="w-95 rounded-xl bg-surface-1 p-7 text-center shadow-xl"
+      >
         <img
           src={logoEmber}
           alt=""
@@ -49,8 +71,8 @@ function LaunchOverlay({ instance }: { instance: Instance }) {
           {instance.loader} · {instance.version}
         </div>
         <ProgressBar indeterminate showPct={false} />
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
