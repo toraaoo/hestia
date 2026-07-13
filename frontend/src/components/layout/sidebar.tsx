@@ -44,8 +44,8 @@ export function Sidebar() {
             to={to}
             activeOptions={{ exact: to === "/" }}
             className="relative flex w-full items-center gap-3 rounded-sm px-2.5 py-2 text-left text-sm font-medium transition-colors duration-100 ease-snap"
-            activeProps={{ className: "bg-surface-3 text-text-1" }}
-            inactiveProps={{ className: "text-text-2 hover:bg-surface-hover hover:text-text-1" }}
+            activeProps={{ className: "bg-surface-3 text-fg-1" }}
+            inactiveProps={{ className: "text-fg-2 hover:bg-surface-hover hover:text-fg-1" }}
           >
             {({ isActive }) => (
               <>
@@ -66,12 +66,12 @@ export function Sidebar() {
           </Link>
         ))}
 
-        <div className="flex items-center px-2.5 pt-4 pb-1.5 text-xs font-semibold tracking-wider text-text-3 uppercase">
+        <div className="flex items-center px-2.5 pt-4 pb-1.5 text-xs font-semibold tracking-wider text-fg-3 uppercase">
           Pinned
           <Link
             to="/discover"
             title="New instance"
-            className="ml-auto flex text-text-3 hover:text-hearth-400"
+            className="ml-auto flex text-fg-3 hover:text-hearth-400"
           >
             <PlusIcon size={14} />
           </Link>
@@ -88,8 +88,8 @@ export function Sidebar() {
           >
             <Tile tile={inst.tile} className="size-6.5" />
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-medium text-text-1">{inst.name}</span>
-              <span className="text-xs text-text-3">
+              <span className="truncate text-sm font-medium text-fg-1">{inst.name}</span>
+              <span className="text-xs text-fg-3">
                 {inst.loader} · {inst.version}
               </span>
             </span>
@@ -101,10 +101,10 @@ export function Sidebar() {
       <button className="mx-2.5 mb-3 flex items-center gap-2.5 rounded-lg bg-surface-2 p-3 shadow-card-flat transition-colors duration-100 hover:bg-surface-hover">
         <Tile tile="tile-grass" className="size-7.5" />
         <span className="flex min-w-0 flex-1 flex-col text-left">
-          <span className="text-sm font-semibold text-text-1">{account.name}</span>
-          <span className="text-xs text-text-3">{account.kind}</span>
+          <span className="text-sm font-semibold text-fg-1">{account.name}</span>
+          <span className="text-xs text-fg-3">{account.kind}</span>
         </span>
-        <CaretUpIcon size={15} className="text-text-3" />
+        <CaretUpIcon size={15} className="text-fg-3" />
       </button>
     </aside>
   );

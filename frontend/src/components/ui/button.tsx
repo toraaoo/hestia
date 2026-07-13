@@ -7,10 +7,10 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-surface-3 text-text-1 shadow-card-flat hover:bg-surface-hover",
+        default: "bg-surface-3 text-fg-1 shadow-card-flat hover:bg-surface-hover",
         primary: "bg-hearth-500 text-on-hearth hover:brightness-107",
         play: "bg-grass-500 text-on-grass shadow-bevel-btn hover:brightness-108 active:translate-y-px",
-        ghost: "bg-transparent text-text-2 hover:bg-surface-hover hover:text-text-1",
+        ghost: "bg-transparent text-fg-2 hover:bg-surface-hover hover:text-fg-1",
         danger:
           "bg-transparent text-tnt-400 shadow-[inset_0_0_0_1px_var(--color-tnt-700)] hover:bg-tnt-500/16",
       },
@@ -60,8 +60,8 @@ function IconButton({ quiet = false, active = false, className, ...props }: Icon
         active
           ? "bg-surface-active text-hearth-400"
           : quiet
-            ? "bg-transparent text-text-2 hover:bg-surface-hover hover:text-text-1"
-            : "bg-surface-3 text-text-2 shadow-card-flat hover:bg-surface-hover hover:text-text-1",
+            ? "bg-transparent text-fg-2 hover:bg-surface-hover hover:text-fg-1"
+            : "bg-surface-3 text-fg-2 shadow-card-flat hover:bg-surface-hover hover:text-fg-1",
         className,
       )}
       {...props}

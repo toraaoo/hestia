@@ -29,8 +29,8 @@ export function ModsTab() {
           >
             <Tile tile={mod.tile} className="size-10" />
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-text-1">{mod.name}</div>
-              <div className="mt-0.5 text-xs text-text-3">{mod.summary}</div>
+              <div className="text-sm font-semibold text-fg-1">{mod.name}</div>
+              <div className="mt-0.5 text-xs text-fg-3">{mod.summary}</div>
             </div>
             <div className="flex items-center gap-2">
               <IconButton quiet title="Remove">

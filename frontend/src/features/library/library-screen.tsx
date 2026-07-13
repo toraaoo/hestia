@@ -84,23 +84,21 @@ export function LibraryScreen() {
                 >
                   <Tile tile={server.tile} className="size-9.5" />
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="truncate text-sm font-semibold text-text-1">
-                      {server.name}
-                    </span>
-                    <span className="flex items-center gap-2 text-xs text-text-3">
+                    <span className="truncate text-sm font-semibold text-fg-1">{server.name}</span>
+                    <span className="flex items-center gap-2 text-xs text-fg-3">
                       <Badge tone="success" dot>
                         Online
                       </Badge>
                       {server.players}/{server.maxPlayers} players
                     </span>
                   </span>
-                  <CaretRightIcon size={16} className="text-text-3" />
+                  <CaretRightIcon size={16} className="text-fg-3" />
                 </Link>
               </motion.div>
             ))}
             <Link
               to="/servers"
-              className="flex w-68 items-center justify-center gap-2 rounded-lg bg-surface-2 p-3 text-sm font-semibold text-text-3 shadow-card-rest transition-[box-shadow,transform] duration-100 ease-snap hover:-translate-y-0.5 hover:shadow-card-hover"
+              className="flex w-68 items-center justify-center gap-2 rounded-lg bg-surface-2 p-3 text-sm font-semibold text-fg-3 shadow-card-rest transition-[box-shadow,transform] duration-100 ease-snap hover:-translate-y-0.5 hover:shadow-card-hover"
             >
               <PlusIcon size={16} />
               Host a server
@@ -130,7 +128,7 @@ export function LibraryScreen() {
               ))}
               <Link
                 to="/discover"
-                className="flex min-h-45 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border-1 text-sm font-semibold text-text-3 transition-colors duration-100 ease-snap hover:border-hearth-500 hover:text-hearth-400"
+                className="flex min-h-45 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border-1 text-sm font-semibold text-fg-3 transition-colors duration-100 ease-snap hover:border-hearth-500 hover:text-hearth-400"
               >
                 <PlusIcon size={26} />
                 New instance

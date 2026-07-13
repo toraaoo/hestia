@@ -23,12 +23,12 @@ function Stat({ value, label, size = "md", accent = false, className, ...props }
         className={cn(
           "font-hero font-crisp",
           size === "lg" ? "text-xl" : "text-lg",
-          accent ? "text-grass-400" : "text-text-1",
+          accent ? "text-grass-400" : "text-fg-1",
         )}
       >
         {value}
       </span>
-      <span className="text-xs text-text-3">{label}</span>
+      <span className="text-xs text-fg-3">{label}</span>
     </div>
   );
 }

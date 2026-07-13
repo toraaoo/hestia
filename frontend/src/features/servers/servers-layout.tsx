@@ -34,8 +34,8 @@ export function ServersLayout() {
               >
                 <Tile tile={server.tile} className="size-8.5" />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate text-sm font-semibold text-text-1">{server.name}</span>
-                  <span className="font-mono text-xs text-text-3">:{server.port}</span>
+                  <span className="truncate text-sm font-semibold text-fg-1">{server.name}</span>
+                  <span className="font-mono text-xs text-fg-3">:{server.port}</span>
                 </span>
                 <StatusDot on={running[server.id] ?? false} />
               </Link>

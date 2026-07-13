@@ -7,7 +7,7 @@ const badgeVariants = cva(
   {
     variants: {
       tone: {
-        neutral: "bg-surface-3 text-text-2",
+        neutral: "bg-surface-3 text-fg-2",
         success: "bg-grass-500/22 text-grass-400",
         warning: "bg-gold-500/22 text-gold-400",
         danger: "bg-tnt-500/22 text-tnt-400",

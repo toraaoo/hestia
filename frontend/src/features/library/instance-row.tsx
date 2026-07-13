@@ -31,7 +31,7 @@ export function InstanceRow({ instance, onPlay, index }: InstanceRowProps) {
       />
       <Tile tile={instance.tile} className="size-11.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-base font-semibold text-text-1">{instance.name}</span>
+        <span className="text-base font-semibold text-fg-1">{instance.name}</span>
         <div className="flex items-center gap-2">
           <Badge tone={loaderTone(instance.loader)}>{instance.loader}</Badge>
           <Badge>{instance.version}</Badge>
@@ -40,7 +40,7 @@ export function InstanceRow({ instance, onPlay, index }: InstanceRowProps) {
               Running
             </Badge>
           )}
-          <span className="text-xs text-text-3">
+          <span className="text-xs text-fg-3">
             {instance.modCount} mods ·{" "}
             {instance.lastPlayed === "Never" ? "never played" : instance.lastPlayed}
           </span>

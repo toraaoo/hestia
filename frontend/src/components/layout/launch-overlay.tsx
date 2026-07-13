@@ -27,10 +27,10 @@ export function LaunchOverlay() {
               alt=""
               className="mx-auto mb-3.5 size-14 animate-flicker rounded-sm motion-reduce:animate-none"
             />
-            <div className="mb-1.5 font-hero text-lg text-text-1 font-crisp">
+            <div className="mb-1.5 font-hero text-lg text-fg-1 font-crisp">
               Launching {launching.name}
             </div>
-            <div className="mb-4 font-mono text-xs text-text-3">
+            <div className="mb-4 font-mono text-xs text-fg-3">
               {launching.loader} · {launching.version}
             </div>
             <ProgressBar indeterminate showPct={false} />

@@ -67,18 +67,18 @@ function InstancePicker({ selectedId }: { selectedId: string }) {
       <DropdownMenuTrigger className="group flex w-64 items-center gap-3 rounded-md py-1 pr-2 pl-1 outline-hidden transition-colors duration-100 ease-snap hover:bg-surface-hover">
         <Tile tile={current.tile} className="size-11" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
-          <span className="text-xs text-text-3">Selected</span>
-          <span className="truncate text-base font-bold text-text-1">{current.name}</span>
+          <span className="text-xs text-fg-3">Selected</span>
+          <span className="truncate text-base font-bold text-fg-1">{current.name}</span>
         </span>
         <CaretUpIcon
           size={14}
           className={cn(
-            "shrink-0 rotate-180 text-text-3 transition-transform duration-150 ease-snap",
+            "shrink-0 rotate-180 text-fg-3 transition-transform duration-150 ease-snap",
             "group-data-[popup-open]:rotate-0",
           )}
         />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="w-72">
+      <DropdownMenuContent side="top" align="start">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Instances</DropdownMenuLabel>
           {instances.map((inst) => (
@@ -89,8 +89,8 @@ function InstancePicker({ selectedId }: { selectedId: string }) {
             >
               <Tile tile={inst.tile} className="size-8" />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium text-text-1">{inst.name}</span>
-                <span className="text-xs text-text-3">
+                <span className="truncate text-sm font-medium text-fg-1">{inst.name}</span>
+                <span className="text-xs text-fg-3">
                   {inst.loader} · {inst.version}
                 </span>
               </span>

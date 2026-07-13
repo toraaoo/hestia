@@ -213,13 +213,13 @@ export function SettingsScreen() {
                       <FormControl>
                         <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
-                      <FormLabel className="font-normal text-text-2">{label}</FormLabel>
+                      <FormLabel className="font-normal text-fg-2">{label}</FormLabel>
                     </FormItem>
                   )}
                 />
               ))}
 
-              <div className="mt-1 flex items-center gap-2.5 border-t border-border-2 pt-4.5 text-xs text-text-3">
+              <div className="mt-1 flex items-center gap-2.5 border-t border-border-2 pt-4.5 text-xs text-fg-3">
                 <img src={logoEmber} alt="" className="size-4.5 rounded-xs" />
                 Hestia 0.0.1 · latest
               </div>

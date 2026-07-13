@@ -12,9 +12,9 @@ function LogLines({ lines }: { lines: readonly LogLine[] }) {
     <>
       {lines.map(([time, level, message], i) => (
         <div key={i} data-slot="log-line" className="flex gap-2 whitespace-pre-wrap">
-          <span className="shrink-0 text-text-3">[{time}]</span>
+          <span className="shrink-0 text-fg-3">[{time}]</span>
           <span className={cn("shrink-0", LEVELS[level])}>[{level}]</span>
-          <span className="text-text-2">{message}</span>
+          <span className="text-fg-2">{message}</span>
         </div>
       ))}
     </>

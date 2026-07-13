@@ -73,8 +73,8 @@ export function DiscoverScreen() {
                 {target && (
                   <button className="flex items-center gap-2.5 rounded-sm bg-surface-inset px-2.5 py-2 shadow-bevel-inset">
                     <Tile tile={target.tile} className="size-6 rounded-xs" />
-                    <span className="text-sm font-semibold text-text-1">{target.name}</span>
-                    <CaretDownIcon size={14} className="ml-auto text-text-3" />
+                    <span className="text-sm font-semibold text-fg-1">{target.name}</span>
+                    <CaretDownIcon size={14} className="ml-auto text-fg-3" />
                   </button>
                 )}
               </div>
@@ -130,7 +130,7 @@ function FilterCheck({
         defaultChecked={defaultChecked}
         onCheckedChange={onCheckedChange}
       />
-      <Label htmlFor={id} className="font-normal text-text-2">
+      <Label htmlFor={id} className="font-normal text-fg-2">
         {label}
       </Label>
     </div>

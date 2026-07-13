@@ -53,12 +53,12 @@ export function InstanceCard({ instance, onPlay, index }: InstanceCardProps) {
         </div>
       </div>
       <div className="flex flex-col gap-2 p-3">
-        <span className="truncate text-sm font-semibold text-text-1">{instance.name}</span>
+        <span className="truncate text-sm font-semibold text-fg-1">{instance.name}</span>
         <div className="flex items-center gap-1.5">
           <Badge tone={loaderTone(instance.loader)}>{instance.loader}</Badge>
           <Badge>{instance.version}</Badge>
         </div>
-        <span className="text-xs text-text-3">
+        <span className="text-xs text-fg-3">
           {instance.lastPlayed === "Never" ? "Never played" : `Last played ${instance.lastPlayed}`}
         </span>
       </div>

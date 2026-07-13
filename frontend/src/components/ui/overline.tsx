@@ -6,7 +6,7 @@ function Overline({ className, ...props }: ComponentProps<"span">) {
   return (
     <span
       data-slot="overline"
-      className={cn("text-xs font-bold tracking-wider text-text-3 uppercase", className)}
+      className={cn("text-xs font-bold tracking-wider text-fg-3 uppercase", className)}
       {...props}
     />
   );

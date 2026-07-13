@@ -28,9 +28,7 @@ export function InstanceLayout() {
             <ArrowLeftIcon size={18} />
           </IconButton>
         </Link>
-        <span className="font-hero text-base text-text-1 font-crisp">
-          Library / {instance.name}
-        </span>
+        <span className="font-hero text-base text-fg-1 font-crisp">Library / {instance.name}</span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

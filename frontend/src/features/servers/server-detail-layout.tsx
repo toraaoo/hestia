@@ -20,12 +20,12 @@ export function ServerDetailLayout() {
         <Tile tile={server.tile} rounded="lg" className="size-13" />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex items-center gap-2.5">
-            <h2 className="font-hero text-xl text-text-1 font-crisp">{server.name}</h2>
+            <h2 className="font-hero text-xl text-fg-1 font-crisp">{server.name}</h2>
             <Badge tone={isUp ? "success" : "neutral"} dot>
               {isUp ? "Running" : "Stopped"}
             </Badge>
           </div>
-          <span className="font-mono text-xs text-text-3">
+          <span className="font-mono text-xs text-fg-3">
             localhost:{server.port} · {server.version}
           </span>
         </div>

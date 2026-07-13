@@ -57,9 +57,9 @@ function ProgressBar({
       {...props}
     >
       {(label != null || showPct) && (
-        <div className="flex items-baseline justify-between gap-3 font-pixel text-xs tracking-wide text-text-2 uppercase font-crisp">
+        <div className="flex items-baseline justify-between gap-3 font-pixel text-xs tracking-wide text-fg-2 uppercase font-crisp">
           <span>{label}</span>
-          {showPct && !indeterminate && <span className="text-text-1">{Math.round(pct)}%</span>}
+          {showPct && !indeterminate && <span className="text-fg-1">{Math.round(pct)}%</span>}
         </div>
       )}
       <div

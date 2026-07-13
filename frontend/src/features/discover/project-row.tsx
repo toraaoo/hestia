@@ -23,10 +23,10 @@ export function ProjectRow({ project, index }: { project: ContentProject; index:
           <span className="font-pixel text-sm leading-tight tracking-wide font-crisp">
             {project.name}
           </span>
-          <span className="text-xs text-text-3">by {project.author}</span>
+          <span className="text-xs text-fg-3">by {project.author}</span>
         </div>
-        <div className="line-clamp-2 text-xs leading-normal text-text-2">{project.description}</div>
-        <div className="mt-0.5 flex items-center gap-3.5 text-xs text-text-3">
+        <div className="line-clamp-2 text-xs leading-normal text-fg-2">{project.description}</div>
+        <div className="mt-0.5 flex items-center gap-3.5 text-xs text-fg-3">
           <span>⬇ {formatCount(project.downloads)}</span>
           {project.likes != null && <span>♥ {formatCount(project.likes)}</span>}
           <span className="capitalize">◆ {project.source}</span>

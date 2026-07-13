@@ -46,7 +46,7 @@ export function TitleBar() {
 
       <div data-tauri-drag-region className="flex w-58 items-center gap-2.5 px-4">
         <img src={logoEmber} alt="" className="pointer-events-none size-4.5 rounded-xs" />
-        <span className="pointer-events-none font-hero text-sm leading-none tracking-wide text-text-2 font-crisp">
+        <span className="pointer-events-none font-hero text-sm leading-none tracking-wide text-fg-2 font-crisp">
           HESTIA
         </span>
       </div>
@@ -57,21 +57,21 @@ export function TitleBar() {
         <button
           aria-label="Minimize"
           onClick={() => control("minimize")}
-          className="flex w-12 items-center justify-center text-text-3 transition-colors duration-100 hover:bg-surface-hover hover:text-text-1"
+          className="flex w-12 items-center justify-center text-fg-3 transition-colors duration-100 hover:bg-surface-hover hover:text-fg-1"
         >
           <MinusIcon size={14} />
         </button>
         <button
           aria-label={maximized ? "Restore" : "Maximize"}
           onClick={() => control("maximize")}
-          className="flex w-12 items-center justify-center text-text-3 transition-colors duration-100 hover:bg-surface-hover hover:text-text-1"
+          className="flex w-12 items-center justify-center text-fg-3 transition-colors duration-100 hover:bg-surface-hover hover:text-fg-1"
         >
           {maximized ? <CornersOutIcon size={13} /> : <SquareIcon size={12} />}
         </button>
         <button
           aria-label="Close"
           onClick={() => control("close")}
-          className="flex w-12 items-center justify-center text-text-3 transition-colors duration-100 hover:bg-tnt-500 hover:text-white"
+          className="flex w-12 items-center justify-center text-fg-3 transition-colors duration-100 hover:bg-tnt-500 hover:text-white"
         >
           <CloseIcon size={14} />
         </button>

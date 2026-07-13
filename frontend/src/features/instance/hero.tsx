@@ -20,7 +20,7 @@ export function Hero({ instance, onPlay }: { instance: Instance; onPlay: (i: Ins
         className="relative size-24 shadow-md shadow-outline-dark"
       />
       <div className="relative flex min-w-0 flex-1 flex-col gap-2.5 pb-1">
-        <h1 className="font-hero text-3xl leading-none tracking-wide text-text-1 font-crisp">
+        <h1 className="font-hero text-3xl leading-none tracking-wide text-fg-1 font-crisp">
           {instance.name}
         </h1>
         <div className="flex items-center gap-2">

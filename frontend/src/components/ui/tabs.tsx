@@ -21,7 +21,7 @@ const UNDERLINE_CLASS = "absolute inset-x-2 -bottom-px h-0.75 rounded-t-xs bg-he
 
 function TabCount({ count }: { count?: number }) {
   if (count == null) return null;
-  return <span className="ml-1.5 text-xs font-medium text-text-3">{count}</span>;
+  return <span className="ml-1.5 text-xs font-medium text-fg-3">{count}</span>;
 }
 
 interface TabAnchorProps extends ComponentPropsWithRef<"a"> {
@@ -36,10 +36,7 @@ function TabAnchor({ label, count, className: _ignored, ...rest }: TabAnchorProp
       {...rest}
       role="tab"
       data-slot="tab"
-      className={cn(
-        TAB_CLASS,
-        "group text-text-3 hover:text-text-1 data-[status=active]:text-text-1",
-      )}
+      className={cn(TAB_CLASS, "group text-fg-3 hover:text-fg-1 data-[status=active]:text-fg-1")}
     >
       {label}
       <TabCount count={count} />
@@ -67,7 +64,7 @@ export function TabButton({ label, count, active, onClick }: TabButtonProps) {
       data-slot="tab"
       aria-selected={active}
       onClick={onClick}
-      className={cn(TAB_CLASS, active ? "text-text-1" : "text-text-3 hover:text-text-1")}
+      className={cn(TAB_CLASS, active ? "text-fg-1" : "text-fg-3 hover:text-fg-1")}
     >
       {label}
       <TabCount count={count} />

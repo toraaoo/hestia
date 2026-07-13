@@ -17,7 +17,7 @@ function RootLayout() {
   const section = useRouterState({ select: (s) => s.location.pathname.split("/")[1] });
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative flex h-full flex-col bg-app text-text-1">
+      <div className="relative flex h-full flex-col bg-app text-fg-1">
         <TitleBar />
         <div className="flex min-h-0 flex-1">
           <Sidebar />
@@ -45,8 +45,8 @@ function RootLayout() {
 function NotFound() {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
-      <span className="font-hero text-xl text-text-1 font-crisp">Nothing here</span>
-      <p className="text-sm text-text-3">That page doesn't exist.</p>
+      <span className="font-hero text-xl text-fg-1 font-crisp">Nothing here</span>
+      <p className="text-sm text-fg-3">That page doesn't exist.</p>
       <Link to="/">
         <Button variant="primary">Back to Library</Button>
       </Link>
@@ -57,8 +57,8 @@ function NotFound() {
 function RouteError({ error }: { error: Error }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
-      <span className="font-hero text-xl text-text-1 font-crisp">Something went wrong</span>
-      <p className="max-w-100 text-center font-mono text-xs text-text-3">{error.message}</p>
+      <span className="font-hero text-xl text-fg-1 font-crisp">Something went wrong</span>
+      <p className="max-w-100 text-center font-mono text-xs text-fg-3">{error.message}</p>
       <Link to="/">
         <Button variant="primary">Back to Library</Button>
       </Link>

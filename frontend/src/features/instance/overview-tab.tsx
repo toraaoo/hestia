@@ -15,7 +15,7 @@ export function OverviewTab() {
   return (
     <div className="grid grid-cols-[1fr_16.25rem] items-start gap-5.5">
       <div>
-        <p className="mb-4.5 text-sm leading-relaxed text-text-2">{instance.description}</p>
+        <p className="mb-4.5 text-sm leading-relaxed text-fg-2">{instance.description}</p>
         <div className="mb-5 grid grid-cols-3 gap-3">
           {(
             [
@@ -47,8 +47,8 @@ export function OverviewTab() {
             ] as const
           ).map(([key, value]) => (
             <div key={key} className="flex justify-between gap-2.5 py-1.5 text-sm">
-              <span className="text-text-3">{key}</span>
-              <span className="font-medium text-text-1">{value}</span>
+              <span className="text-fg-3">{key}</span>
+              <span className="font-medium text-fg-1">{value}</span>
             </div>
           ))}
         </Panel>

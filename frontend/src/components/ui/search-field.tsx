@@ -19,12 +19,12 @@ function SearchField({ value, onChange, placeholder, wide = false, className }: 
         className,
       )}
     >
-      <SearchIcon size={15} className="shrink-0 text-text-3" />
+      <SearchIcon size={15} className="shrink-0 text-fg-3" />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-transparent text-sm text-text-1 outline-none placeholder:text-text-3"
+        className="w-full bg-transparent text-sm text-fg-1 outline-none placeholder:text-fg-3"
       />
     </label>
   );

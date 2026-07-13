@@ -88,10 +88,10 @@
   --color-surface-hover: var(--color-ink-650);
   --color-surface-active: var(--color-ink-600);
   --color-surface-inset: var(--color-ink-950);
-  --color-text-1: var(--color-ink-50);
-  --color-text-2: var(--color-ink-200);
-  --color-text-3: var(--color-ink-300);
-  --color-text-disabled: var(--color-ink-400);
+  --color-fg-1: var(--color-ink-50);
+  --color-fg-2: var(--color-ink-200);
+  --color-fg-3: var(--color-ink-300);
+  --color-fg-disabled: var(--color-ink-400);
   --color-on-hearth: #2a1400;
   --color-on-grass: #16330f;
   --color-border-1: var(--color-ink-600);
@@ -162,7 +162,7 @@
   body {
     margin: 0;
     background: var(--color-app);
-    color: var(--color-text-1);
+    color: var(--color-fg-1);
     font-family: var(--font-body);
     font-size: 14px;
     line-height: 1.5;
@@ -343,19 +343,19 @@
 /* shadcn token layer, sourced from Hestia's palette (dark-only app). */
 :root {
   --background: var(--color-app);
-  --foreground: var(--color-text-1);
+  --foreground: var(--color-fg-1);
   --card: var(--color-surface-1);
-  --card-foreground: var(--color-text-1);
+  --card-foreground: var(--color-fg-1);
   --popover: var(--color-surface-2);
-  --popover-foreground: var(--color-text-1);
+  --popover-foreground: var(--color-fg-1);
   --primary: var(--color-hearth-500);
   --primary-foreground: var(--color-on-hearth);
   --secondary: var(--color-surface-3);
-  --secondary-foreground: var(--color-text-1);
+  --secondary-foreground: var(--color-fg-1);
   --muted: var(--color-surface-2);
-  --muted-foreground: var(--color-text-3);
+  --muted-foreground: var(--color-fg-3);
   --accent: var(--color-surface-hover);
-  --accent-foreground: var(--color-text-1);
+  --accent-foreground: var(--color-fg-1);
   --destructive: var(--color-tnt-500);
   --border: var(--color-border-1);
   --input: var(--color-border-1);
@@ -367,30 +367,30 @@
   --chart-5: var(--color-tnt-500);
   --radius: 0.625rem;
   --sidebar: var(--color-chrome);
-  --sidebar-foreground: var(--color-text-2);
+  --sidebar-foreground: var(--color-fg-2);
   --sidebar-primary: var(--color-hearth-500);
   --sidebar-primary-foreground: var(--color-on-hearth);
   --sidebar-accent: var(--color-surface-hover);
-  --sidebar-accent-foreground: var(--color-text-1);
+  --sidebar-accent-foreground: var(--color-fg-1);
   --sidebar-border: var(--color-border-2);
   --sidebar-ring: var(--color-hearth-500);
 }
 
 .dark {
   --background: var(--color-app);
-  --foreground: var(--color-text-1);
+  --foreground: var(--color-fg-1);
   --card: var(--color-surface-1);
-  --card-foreground: var(--color-text-1);
+  --card-foreground: var(--color-fg-1);
   --popover: var(--color-surface-2);
-  --popover-foreground: var(--color-text-1);
+  --popover-foreground: var(--color-fg-1);
   --primary: var(--color-hearth-500);
   --primary-foreground: var(--color-on-hearth);
   --secondary: var(--color-surface-3);
-  --secondary-foreground: var(--color-text-1);
+  --secondary-foreground: var(--color-fg-1);
   --muted: var(--color-surface-2);
-  --muted-foreground: var(--color-text-3);
+  --muted-foreground: var(--color-fg-3);
   --accent: var(--color-surface-hover);
-  --accent-foreground: var(--color-text-1);
+  --accent-foreground: var(--color-fg-1);
   --destructive: var(--color-tnt-500);
   --border: var(--color-border-1);
   --input: var(--color-border-1);
@@ -401,11 +401,11 @@
   --chart-4: var(--color-gold-500);
   --chart-5: var(--color-tnt-500);
   --sidebar: var(--color-chrome);
-  --sidebar-foreground: var(--color-text-2);
+  --sidebar-foreground: var(--color-fg-2);
   --sidebar-primary: var(--color-hearth-500);
   --sidebar-primary-foreground: var(--color-on-hearth);
   --sidebar-accent: var(--color-surface-hover);
-  --sidebar-accent-foreground: var(--color-text-1);
+  --sidebar-accent-foreground: var(--color-fg-1);
   --sidebar-border: var(--color-border-2);
   --sidebar-ring: var(--color-hearth-500);
 }

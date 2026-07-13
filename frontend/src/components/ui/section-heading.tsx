@@ -23,7 +23,7 @@ function SectionHeading({
       className={cn("mb-3.5 flex items-center gap-3", className)}
       {...props}
     >
-      <Tag className="font-hero text-base tracking-wide text-text-1 font-crisp">{title}</Tag>
+      <Tag className="font-hero text-base tracking-wide text-fg-1 font-crisp">{title}</Tag>
       {children}
       <div className="flex-1" />
       {action}

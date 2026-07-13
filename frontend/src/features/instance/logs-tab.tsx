@@ -18,7 +18,7 @@ export function LogsTab() {
         </>
       }
       actions={
-        <button className="text-text-3 hover:text-hearth-400" title="Copy">
+        <button className="text-fg-3 hover:text-hearth-400" title="Copy">
           <CopyIcon size={13} />
         </button>
       }

@@ -34,7 +34,7 @@ function SegmentedControl<T extends string>({
           onClick={() => onChange(option)}
           className={cn(
             "flex h-7.5 w-8 items-center justify-center rounded-xs outline-hidden",
-            option === value ? "bg-surface-active text-text-1" : "text-text-3 hover:text-text-1",
+            option === value ? "bg-surface-active text-fg-1" : "text-fg-3 hover:text-fg-1",
           )}
         >
           <OptionIcon size={15} />

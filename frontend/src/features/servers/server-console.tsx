@@ -20,14 +20,14 @@ export function ServerConsole() {
         </>
       }
       actions={
-        <button className="text-xs font-semibold text-text-3 hover:text-hearth-400">Clear</button>
+        <button className="text-xs font-semibold text-fg-3 hover:text-hearth-400">Clear</button>
       }
     >
       <div className="min-h-25 flex-1 overflow-y-auto p-3.5 font-mono text-xs leading-relaxed">
         {isUp ? (
           <LogLines lines={log} />
         ) : (
-          <div className="font-body text-sm text-text-3">
+          <div className="font-body text-sm text-fg-3">
             Server is stopped. Press Start to boot it up.
           </div>
         )}
@@ -37,7 +37,7 @@ export function ServerConsole() {
         <input
           disabled={!isUp}
           placeholder={isUp ? "Type a command (e.g. /weather clear)…" : "Server offline"}
-          className="flex-1 bg-transparent font-mono text-xs text-text-1 outline-none placeholder:text-text-3"
+          className="flex-1 bg-transparent font-mono text-xs text-fg-1 outline-none placeholder:text-fg-3"
         />
       </div>
     </Panel>
