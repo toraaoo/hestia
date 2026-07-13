@@ -14,7 +14,57 @@ const isEditable = (target: EventTarget | null): boolean => {
   return node.tagName === "INPUT" || node.tagName === "TEXTAREA" || node.isContentEditable;
 };
 
+// Form fields are the only focusable things in the app; everything else is
+// chrome. The Base UI controls that render as buttons/divs count as fields.
+const FORM_FIELD =
+  "input, textarea, select, [contenteditable='true'], " +
+  "[data-slot='checkbox'], [data-slot='switch'], [data-slot='select-trigger'], [data-slot='slider-thumb']";
+
+const formFields = (): HTMLElement[] =>
+  Array.from(document.querySelectorAll<HTMLElement>(FORM_FIELD)).filter(
+    (el) => !el.matches(":disabled") && el.offsetParent !== null,
+  );
+
 export function installDesktopBehaviors(): void {
+  // Chrome (buttons, links, tabs, the sidebar, window controls) never takes
+  // focus: a click must not move focus off a form field, and Tab walks form
+  // fields only — never the chrome. Popups are untouched: Base UI focuses
+  // them programmatically and handles its own keys before these listeners.
+  window.addEventListener("mousedown", (e) => {
+    const chrome =
+      e.target instanceof Element
+        ? e.target.closest("a, button, [role='button'], [role='tab'], [tabindex]")
+        : null;
+    if (chrome && !chrome.closest(FORM_FIELD) && !chrome.closest("label")) e.preventDefault();
+  });
+
+  // Base UI focuses triggers programmatically (after click, and again when a
+  // popup closes) — the mousedown guard can't stop that, so any focus landing
+  // on chrome is blurred on arrival. Popup internals are exempt: menus paint
+  // hover/keyboard highlight through focus and must keep it.
+  window.addEventListener("focusin", (e) => {
+    const el = e.target as HTMLElement;
+    if (el.closest(FORM_FIELD)) return;
+    if (
+      el.closest("[role='menu'], [role='menuitem'], [role='listbox'], [role='dialog'], [popover]")
+    )
+      return;
+    el.blur();
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab" || e.defaultPrevented) return;
+    e.preventDefault();
+    const fields = formFields();
+    if (fields.length === 0) return;
+    const current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const index = current ? fields.indexOf(current) : -1;
+    const next = e.shiftKey
+      ? fields[index <= 0 ? fields.length - 1 : index - 1]
+      : fields[(index + 1) % fields.length];
+    next?.focus();
+  });
+
   // A ghost drag-image and a webview that navigates when a file is dropped on
   // it are never wanted — kill them in every build.
   window.addEventListener("dragstart", (e) => {
