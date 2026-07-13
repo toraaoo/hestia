@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
@@ -78,24 +79,26 @@ function InstancePicker({ selectedId }: { selectedId: string }) {
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-72">
-        <DropdownMenuLabel>Instances</DropdownMenuLabel>
-        {instances.map((inst) => (
-          <DropdownMenuItem
-            key={inst.id}
-            onClick={() => select(inst.id)}
-            className="gap-2.5 py-1.5"
-          >
-            <Tile tile={inst.tile} className="size-8" />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-medium text-text-1">{inst.name}</span>
-              <span className="text-xs text-text-3">
-                {inst.loader} · {inst.version}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Instances</DropdownMenuLabel>
+          {instances.map((inst) => (
+            <DropdownMenuItem
+              key={inst.id}
+              onClick={() => select(inst.id)}
+              className="gap-2.5 py-1.5"
+            >
+              <Tile tile={inst.tile} className="size-8" />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-sm font-medium text-text-1">{inst.name}</span>
+                <span className="text-xs text-text-3">
+                  {inst.loader} · {inst.version}
+                </span>
               </span>
-            </span>
-            {inst.running && <StatusDot on size="sm" />}
-            {inst.id === selectedId && <CheckIcon size={15} className="text-hearth-400" />}
-          </DropdownMenuItem>
-        ))}
+              {inst.running && <StatusDot on size="sm" />}
+              {inst.id === selectedId && <CheckIcon size={15} className="text-hearth-400" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
