@@ -43,7 +43,7 @@ export function PlayBar() {
         <Badge tone={loaderTone(instance.loader)}>{instance.loader}</Badge>
         <Badge>{instance.version}</Badge>
       </div>
-      <Button variant="ghost" onClick={open}>
+      <Button variant="ghost" onClick={open} className="h-12">
         Manage
       </Button>
       <Button variant="play" size="lg" onClick={() => play(instance)} className="min-w-45 px-8">
