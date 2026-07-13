@@ -37,7 +37,7 @@ export function Hero({ instance, onPlay }: { instance: Instance; onPlay: (i: Ins
         <IconButton title="Open folder">
           <FolderIcon size={18} />
         </IconButton>
-        <Button variant="play" onClick={() => onPlay(instance)}>
+        <Button variant="play" size="lg" onClick={() => onPlay(instance)}>
           <PlayIcon size={16} weight="fill" />
           PLAY
         </Button>

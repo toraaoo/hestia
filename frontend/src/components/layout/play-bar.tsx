@@ -46,7 +46,7 @@ export function PlayBar() {
       <Button variant="ghost" onClick={open}>
         Manage
       </Button>
-      <Button variant="play" onClick={() => play(instance)} className="min-w-45 px-8">
+      <Button variant="play" size="lg" onClick={() => play(instance)} className="min-w-45 px-8">
         <PlayIcon size={16} weight="fill" />
         PLAY
       </Button>

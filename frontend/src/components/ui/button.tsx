@@ -15,17 +15,12 @@ const buttonVariants = cva(
           "bg-transparent text-tnt-400 shadow-[inset_0_0_0_1px_var(--color-tnt-700)] hover:bg-tnt-500/16",
       },
       size: {
+        /* Hero-type box for primary launch actions (DS --control-h-lg). */
+        lg: "h-12 gap-2.5 px-6 font-hero text-lg tracking-wide font-crisp",
         md: "h-9 px-4 text-sm",
         sm: "h-7 px-3 text-xs",
       },
     },
-    /* The grass launch action is a bigger, hero-type box regardless of size. */
-    compoundVariants: [
-      {
-        variant: "play",
-        class: "h-12 gap-2.5 rounded-sm px-6 font-hero text-lg tracking-wide font-crisp",
-      },
-    ],
     defaultVariants: { variant: "default", size: "md" },
   },
 );
