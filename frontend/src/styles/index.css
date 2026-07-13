@@ -182,6 +182,17 @@
     @apply bg-background text-foreground;
   }
 
+  /* Desktop-shell feel: the webview never paints native focus rings or tap
+     highlights on chrome (buttons, links, tabs). Form fields are unaffected —
+     their focus styles are ring/border utilities, not the UA outline. */
+  :focus {
+    outline: none;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   input,
   textarea {
     -webkit-user-select: text;
