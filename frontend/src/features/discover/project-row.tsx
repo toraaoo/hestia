@@ -13,9 +13,9 @@ export function ProjectRow({ project, index }: { project: ContentProject; index:
       custom={index}
       initial="initial"
       animate="animate"
-      className="flex gap-3.5 rounded-sm bg-surface-2 p-3.5 shadow-outline-dark transition-colors duration-100 hover:bg-surface-hover"
+      className="flex gap-sm rounded-sm bg-surface-2 p-sm shadow-outline-dark transition-colors duration-100 hover:bg-surface-hover"
     >
-      <div className="flex aspect-square shrink-0 self-stretch items-center justify-center overflow-hidden rounded-sm bg-surface-inset shadow-outline-dark">
+      <div className="flex aspect-square shrink-0 items-center justify-center self-stretch overflow-hidden rounded-sm bg-surface-inset shadow-outline-dark">
         <img src={TILES[project.tile]} alt="" className="size-full object-cover pixelated" />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -26,7 +26,7 @@ export function ProjectRow({ project, index }: { project: ContentProject; index:
           <span className="text-xs text-fg-3">by {project.author}</span>
         </div>
         <div className="line-clamp-2 text-xs leading-normal text-fg-2">{project.description}</div>
-        <div className="mt-0.5 flex items-center gap-3.5 text-xs text-fg-3">
+        <div className="mt-0.5 flex items-center gap-sm text-xs text-fg-3">
           <span>⬇ {formatCount(project.downloads)}</span>
           {project.likes != null && <span>♥ {formatCount(project.likes)}</span>}
           <span className="capitalize">◆ {project.source}</span>

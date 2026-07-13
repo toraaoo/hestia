@@ -23,7 +23,7 @@ export function LogsTab() {
         </button>
       }
     >
-      <div className="max-h-90 overflow-y-auto p-3.5 font-mono text-xs leading-relaxed">
+      <div className="max-h-90 overflow-y-auto p-sm font-mono text-xs leading-relaxed">
         <LogLines lines={log} />
       </div>
     </Panel>

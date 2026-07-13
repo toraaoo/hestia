@@ -80,7 +80,7 @@ export function LibraryScreen() {
                 <Link
                   to="/servers/$serverId"
                   params={{ serverId: server.id }}
-                  className="flex w-68 items-center gap-3 rounded-sm bg-surface-2 p-3.5 text-left shadow-outline-dark transition-colors duration-200 ease-soft hover:bg-surface-hover"
+                  className="flex w-68 items-center gap-sm rounded-sm bg-surface-2 p-sm text-left shadow-outline-dark transition-colors duration-200 ease-soft hover:bg-surface-hover"
                 >
                   <Tile tile={server.tile} className="size-9.5" />
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -98,14 +98,14 @@ export function LibraryScreen() {
             ))}
             <Link
               to="/servers"
-              className="flex w-68 items-center justify-center gap-2 rounded-sm border border-dashed border-border-1 p-3.5 text-sm font-semibold text-fg-3 transition-colors duration-200 ease-soft hover:border-hearth-500 hover:text-hearth-400"
+              className="flex w-68 items-center justify-center gap-2 rounded-sm border border-dashed border-border-1 p-sm text-sm font-semibold text-fg-3 transition-colors duration-200 ease-soft hover:border-hearth-500 hover:text-hearth-400"
             >
               <PlusIcon size={16} />
               Host a server
             </Link>
           </div>
 
-          <SectionHeading title="Instances" className="mt-8">
+          <SectionHeading title="Instances" className="mt-7">
             <div className="ml-2 flex gap-1.5">
               {(["all", "fabric", "forge"] as const).map((f) => (
                 <Button
@@ -135,7 +135,7 @@ export function LibraryScreen() {
               </Link>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-xs">
               {list.map((inst, i) => (
                 <InstanceRow key={inst.id} instance={inst} onPlay={play} index={i} />
               ))}

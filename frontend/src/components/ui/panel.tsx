@@ -35,7 +35,7 @@ function Panel({
   return (
     <Tag data-slot="panel" className={cn(panelVariants({ variant }), className)} {...props}>
       {(title != null || actions != null) && (
-        <div className="flex shrink-0 items-center gap-2.5 border-b border-border-2 bg-ink-950 px-3.5 py-2.5 text-xs font-semibold text-fg-3">
+        <div className="flex shrink-0 items-center gap-2.5 border-b border-border-2 bg-ink-950 px-sm py-2.5 text-xs font-semibold text-fg-3">
           <span className="flex flex-1 items-center gap-2.5 truncate">{title}</span>
           {actions}
         </div>

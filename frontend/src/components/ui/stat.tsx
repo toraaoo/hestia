@@ -14,7 +14,7 @@ function Stat({ value, label, size = "md", accent = false, className, ...props }
     <div
       data-slot="stat"
       className={cn(
-        "flex flex-col gap-1 rounded-sm bg-surface-2 p-3.5 shadow-outline-dark",
+        "flex flex-col gap-1 rounded-sm bg-surface-2 p-sm shadow-outline-dark",
         className,
       )}
       {...props}

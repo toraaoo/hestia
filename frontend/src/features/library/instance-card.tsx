@@ -50,7 +50,7 @@ export function InstanceCard({ instance, onPlay, index }: InstanceCardProps) {
           </button>
         </div>
       </div>
-      <div className="flex flex-col gap-2 p-3.5">
+      <div className="flex flex-col gap-2 p-sm">
         <span className="truncate text-sm font-semibold text-fg-1">{instance.name}</span>
         <div className="flex items-center gap-1.5">
           <Badge tone={loaderTone(instance.loader)}>{instance.loader}</Badge>

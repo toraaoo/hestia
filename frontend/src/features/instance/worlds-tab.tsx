@@ -9,11 +9,11 @@ export function WorldsTab() {
   const worlds = useInstanceWorlds(instance.id);
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-xs">
       {worlds.map((world) => (
         <div
           key={world.name}
-          className="flex items-center gap-3 rounded-sm bg-surface-2 p-3.5 shadow-outline-dark"
+          className="flex items-center gap-sm rounded-sm bg-surface-2 p-sm shadow-outline-dark"
         >
           <Tile tile={world.tile} className="size-10" />
           <div className="min-w-0 flex-1">

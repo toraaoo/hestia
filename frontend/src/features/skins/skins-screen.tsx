@@ -7,7 +7,7 @@ export function SkinsScreen() {
     <>
       <TopBar title="Skins" />
       <div className="flex min-h-0 flex-1 items-center justify-center">
-        <div className="flex flex-col items-center gap-3.5 pb-16 text-center">
+        <div className="flex flex-col items-center gap-sm pb-16 text-center">
           <div className="flex size-16 items-center justify-center rounded-sm bg-surface-2 text-fg-3 shadow-outline-dark">
             <UserIcon size={28} />
           </div>

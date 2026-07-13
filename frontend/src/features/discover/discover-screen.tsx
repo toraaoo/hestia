@@ -54,7 +54,7 @@ export function DiscoverScreen() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-6 pt-5 pb-10">
-          <Tabs className="mb-4">
+          <Tabs className="mb-3.5">
             {TABS.map(({ id, label, count }) => (
               <TabButton
                 key={id}
@@ -67,8 +67,8 @@ export function DiscoverScreen() {
           </Tabs>
 
           <div className="flex items-start gap-5">
-            <Panel as="aside" className="flex w-50 shrink-0 flex-col gap-5 p-4">
-              <div className="flex flex-col gap-2.5">
+            <Panel as="aside" className="flex w-50 shrink-0 flex-col gap-5 p-sm">
+              <div className="flex flex-col gap-xs">
                 <Overline>Install to</Overline>
                 {target && (
                   <button className="flex items-center gap-2.5 rounded-sm bg-surface-inset px-2.5 py-2 shadow-bevel-inset">
@@ -78,7 +78,7 @@ export function DiscoverScreen() {
                   </button>
                 )}
               </div>
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-xs">
                 <Overline>Loaders</Overline>
                 {FILTER_LOADERS.map((loader) => (
                   <FilterCheck
@@ -89,7 +89,7 @@ export function DiscoverScreen() {
                   />
                 ))}
               </div>
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-xs">
                 <Overline>Source</Overline>
                 {["Modrinth", "CurseForge"].map((source) => (
                   <FilterCheck key={source} label={source} defaultChecked />
@@ -97,7 +97,7 @@ export function DiscoverScreen() {
               </div>
             </Panel>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+            <div className="flex min-w-0 flex-1 flex-col gap-xs">
               {results.map((project, i) => (
                 <ProjectRow key={project.name} project={project} index={i} />
               ))}

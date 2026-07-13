@@ -21,7 +21,7 @@ export function ServersLayout() {
       </TopBar>
 
       <div className="flex min-h-0 flex-1 flex-col px-6 py-5">
-        <div className="flex min-h-0 flex-1 items-stretch gap-4.5">
+        <div className="flex min-h-0 flex-1 items-stretch gap-4">
           <Panel as="aside" className="flex w-57.5 shrink-0 flex-col gap-1.5 overflow-y-auto p-2">
             {servers.map((server) => (
               <Link

@@ -69,157 +69,163 @@ export function SettingsScreen() {
         <div className="px-6 pt-5 pb-10">
           <Form {...form}>
             <form
-              className="flex max-w-160 flex-col gap-5"
+              className="flex max-w-160 flex-col"
               onSubmit={(e) => void form.handleSubmit(onSubmit)(e)}
             >
-              <SectionHeading title="General" className="mb-0" />
-              <div className="grid grid-cols-2 gap-4">
+              <SectionHeading title="General" />
+              <div className="flex flex-col gap-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="theme"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Theme</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {THEMES.map((t) => (
+                              <SelectItem key={t} value={t}>
+                                {t}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="language"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Language</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {LANGUAGES.map((l) => (
+                              <SelectItem key={l} value={l}>
+                                {l}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={form.control}
-                  name="theme"
+                  name="gameDir"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Theme</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {THEMES.map((t) => (
-                            <SelectItem key={t} value={t}>
-                              {t}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="language"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Language</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {LANGUAGES.map((l) => (
-                            <SelectItem key={l} value={l}>
-                              {l}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Default game directory</FormLabel>
+                      <FormControl>
+                        <Input className="font-mono" {...field} />
+                      </FormControl>
+                      <FormDescription>Where new instances are created.</FormDescription>
                     </FormItem>
                   )}
                 />
               </div>
-              <FormField
-                control={form.control}
-                name="gameDir"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Default game directory</FormLabel>
-                    <FormControl>
-                      <Input className="font-mono" {...field} />
-                    </FormControl>
-                    <FormDescription>Where new instances are created.</FormDescription>
-                  </FormItem>
-                )}
-              />
 
-              <SectionHeading title="Java & Performance" className="mt-7 mb-0" />
-              <FormField
-                control={form.control}
-                name="javaRuntime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Java runtime</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {RUNTIMES.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {r}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Auto-managed. Hestia downloads the right JDK per instance.
-                    </FormDescription>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="memory"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Default allocated memory — {memory} GB</FormLabel>
-                    <FormControl>
-                      <Slider
-                        min={2}
-                        max={24}
-                        step={1}
-                        value={[field.value]}
-                        onValueChange={(v) => field.onChange(Array.isArray(v) ? v[0] : v)}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Your system has 32 GB. Instances can override this individually.
-                    </FormDescription>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="jvmArgs"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Default JVM arguments</FormLabel>
-                    <FormControl>
-                      <Input className="font-mono" {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              <SectionHeading title="On launch" className="mt-7 mb-0" />
-              {(
-                [
-                  ["keepOpen", "Keep the launcher open while a game runs"],
-                  ["closeOnStart", "Close the launcher when a game starts"],
-                  ["checkUpdates", "Check for mod updates on startup"],
-                ] as const
-              ).map(([name, label]) => (
+              <SectionHeading title="Java & Performance" className="mt-7" />
+              <div className="flex flex-col gap-5">
                 <FormField
-                  key={name}
                   control={form.control}
-                  name={name}
+                  name="javaRuntime"
                   render={({ field }) => (
-                    <FormItem className="flex-row items-center gap-2.5">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <FormLabel className="font-normal text-fg-2">{label}</FormLabel>
+                    <FormItem>
+                      <FormLabel>Java runtime</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {RUNTIMES.map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {r}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Auto-managed. Hestia downloads the right JDK per instance.
+                      </FormDescription>
                     </FormItem>
                   )}
                 />
-              ))}
+                <FormField
+                  control={form.control}
+                  name="memory"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Default allocated memory — {memory} GB</FormLabel>
+                      <FormControl>
+                        <Slider
+                          min={2}
+                          max={24}
+                          step={1}
+                          value={[field.value]}
+                          onValueChange={(v) => field.onChange(Array.isArray(v) ? v[0] : v)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Your system has 32 GB. Instances can override this individually.
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="jvmArgs"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Default JVM arguments</FormLabel>
+                      <FormControl>
+                        <Input className="font-mono" {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              <div className="mt-1 flex items-center gap-2.5 border-t border-border-2 pt-4.5 text-xs text-fg-3">
+              <SectionHeading title="On launch" className="mt-7" />
+              <div className="flex flex-col gap-5">
+                {(
+                  [
+                    ["keepOpen", "Keep the launcher open while a game runs"],
+                    ["closeOnStart", "Close the launcher when a game starts"],
+                    ["checkUpdates", "Check for mod updates on startup"],
+                  ] as const
+                ).map(([name, label]) => (
+                  <FormField
+                    key={name}
+                    control={form.control}
+                    name={name}
+                    render={({ field }) => (
+                      <FormItem className="flex-row items-center gap-2.5">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <FormLabel className="font-normal text-fg-2">{label}</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+
+              <div className="mt-6 flex items-center gap-2.5 border-t border-border-2 pt-4 text-xs text-fg-3">
                 <img src={logoEmber} alt="" className="size-4.5 rounded-sm" />
                 Hestia 0.0.1 · latest
               </div>

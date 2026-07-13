@@ -149,7 +149,7 @@ export function SettingsTab() {
             </FormItem>
           )}
         />
-        <div className="mt-0.5 border-t border-border-2 pt-4.5">
+        <div className="mt-0.5 border-t border-border-2 pt-4">
           <Button type="button" variant="danger">
             <TrashIcon size={15} /> Delete instance
           </Button>

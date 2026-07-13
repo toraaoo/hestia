@@ -23,7 +23,7 @@ export function ServerConsole() {
         <button className="text-xs font-semibold text-fg-3 hover:text-hearth-400">Clear</button>
       }
     >
-      <div className="min-h-25 flex-1 overflow-y-auto p-3.5 font-mono text-xs leading-relaxed">
+      <div className="min-h-25 flex-1 overflow-y-auto p-sm font-mono text-xs leading-relaxed">
         {isUp ? (
           <LogLines lines={log} />
         ) : (
@@ -32,7 +32,7 @@ export function ServerConsole() {
           </div>
         )}
       </div>
-      <div className="flex h-11 shrink-0 items-center gap-2 border-t border-border-2 bg-ink-950 px-3.5">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-t border-border-2 bg-ink-950 px-sm">
         <span className="font-mono text-sm text-hearth-400">&gt;</span>
         <input
           disabled={!isUp}

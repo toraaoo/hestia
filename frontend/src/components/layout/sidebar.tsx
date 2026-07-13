@@ -98,7 +98,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <button className="mx-2.5 mb-3 flex items-center gap-2.5 rounded-sm bg-surface-2 p-3.5 shadow-outline-dark transition-colors duration-100 hover:bg-surface-hover">
+      <button className="mx-2.5 mb-3 flex items-center gap-sm rounded-sm bg-surface-2 p-sm shadow-outline-dark transition-colors duration-100 hover:bg-surface-hover">
         <Tile tile="tile-grass" className="size-7.5" />
         <span className="flex min-w-0 flex-1 flex-col text-left">
           <span className="text-sm font-semibold text-fg-1">{account.name}</span>

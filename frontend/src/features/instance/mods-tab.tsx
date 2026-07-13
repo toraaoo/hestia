@@ -21,11 +21,11 @@ export function ModsTab() {
           </Button>
         }
       />
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-xs">
         {mods.map((mod, i) => (
           <div
             key={mod.name}
-            className="flex items-center gap-3 rounded-sm bg-surface-2 p-3.5 shadow-outline-dark"
+            className="flex items-center gap-sm rounded-sm bg-surface-2 p-sm shadow-outline-dark"
           >
             <Tile tile={mod.tile} className="size-10" />
             <div className="min-w-0 flex-1">
