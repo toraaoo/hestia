@@ -15,7 +15,7 @@ export function ProjectRow({ project, index }: { project: ContentProject; index:
       animate="animate"
       className="flex gap-3.5 rounded-sm bg-surface-2 p-3.5 shadow-outline-dark transition-colors duration-100 hover:bg-surface-hover"
     >
-      <div className="flex size-15 shrink-0 items-center justify-center overflow-hidden rounded-xs bg-surface-inset shadow-outline-dark">
+      <div className="flex size-15 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-surface-inset shadow-outline-dark">
         <img src={TILES[project.tile]} alt="" className="size-full object-cover pixelated" />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">

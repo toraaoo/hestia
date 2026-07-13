@@ -23,7 +23,7 @@ const buttonVariants = cva(
     compoundVariants: [
       {
         variant: "play",
-        class: "h-12 gap-2.5 rounded-lg px-6.5 font-hero text-lg tracking-wide font-crisp",
+        class: "h-12 gap-2.5 rounded-sm px-6.5 font-hero text-lg tracking-wide font-crisp",
       },
     ],
     defaultVariants: { variant: "default", size: "md" },

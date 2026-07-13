@@ -7,20 +7,14 @@ import { riseVariants } from "@/lib/motion";
 import { TopBar } from "@/components/layout/top-bar";
 import { SearchField } from "@/components/ui/search-field";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Tile } from "@/components/ui/tile";
 import { CaretRightIcon, GridIcon, PlusIcon, ViewListIcon } from "@/components/icons";
 import { InstanceCard } from "./instance-card";
 import { InstanceRow } from "./instance-row";
 
 type LoaderFilter = "all" | "fabric" | "forge";
-
-const VIEW_OPTIONS = [
-  { value: "grid", title: "Grid", icon: GridIcon },
-  { value: "list", title: "List", icon: ViewListIcon },
-] as const;
 
 export function LibraryScreen() {
   const instances = useInstances();
@@ -45,7 +39,13 @@ export function LibraryScreen() {
     <>
       <TopBar title="Library">
         <SearchField value={query} onChange={setQuery} placeholder="Search your instances" />
-        <SegmentedControl options={VIEW_OPTIONS} value={view} onChange={setView} />
+        <IconButton
+          quiet
+          title={view === "grid" ? "Switch to list view" : "Switch to grid view"}
+          onClick={() => setView(view === "grid" ? "list" : "grid")}
+        >
+          {view === "grid" ? <GridIcon size={16} /> : <ViewListIcon size={16} />}
+        </IconButton>
         <Link to="/discover">
           <Button variant="primary">
             <PlusIcon size={15} />
@@ -80,7 +80,7 @@ export function LibraryScreen() {
                 <Link
                   to="/servers/$serverId"
                   params={{ serverId: server.id }}
-                  className="flex w-68 items-center gap-3 rounded-lg bg-surface-2 p-3 text-left shadow-card-rest transition-[box-shadow,transform] duration-100 ease-snap hover:-translate-y-0.5 hover:shadow-card-hover"
+                  className="flex w-68 items-center gap-3 rounded-sm bg-surface-2 p-3.5 text-left shadow-outline-dark transition-colors duration-200 ease-soft hover:bg-surface-hover"
                 >
                   <Tile tile={server.tile} className="size-9.5" />
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -98,7 +98,7 @@ export function LibraryScreen() {
             ))}
             <Link
               to="/servers"
-              className="flex w-68 items-center justify-center gap-2 rounded-lg bg-surface-2 p-3 text-sm font-semibold text-fg-3 shadow-card-rest transition-[box-shadow,transform] duration-100 ease-snap hover:-translate-y-0.5 hover:shadow-card-hover"
+              className="flex w-68 items-center justify-center gap-2 rounded-sm border border-dashed border-border-1 p-3.5 text-sm font-semibold text-fg-3 transition-colors duration-200 ease-soft hover:border-hearth-500 hover:text-hearth-400"
             >
               <PlusIcon size={16} />
               Host a server
@@ -128,7 +128,7 @@ export function LibraryScreen() {
               ))}
               <Link
                 to="/discover"
-                className="flex min-h-45 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border-1 text-sm font-semibold text-fg-3 transition-colors duration-100 ease-snap hover:border-hearth-500 hover:text-hearth-400"
+                className="flex min-h-45 flex-col items-center justify-center gap-3 rounded-sm border border-dashed border-border-1 text-sm font-semibold text-fg-3 transition-colors duration-200 ease-soft hover:border-hearth-500 hover:text-hearth-400"
               >
                 <PlusIcon size={26} />
                 New instance

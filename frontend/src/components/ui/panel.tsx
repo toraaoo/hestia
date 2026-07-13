@@ -2,10 +2,10 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { type VariantProps, cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const panelVariants = cva("overflow-hidden rounded-lg", {
+const panelVariants = cva("overflow-hidden rounded-sm", {
   variants: {
     variant: {
-      flat: "bg-surface-2 shadow-card-flat",
+      flat: "bg-surface-2 shadow-outline-dark",
       inset: "bg-surface-inset shadow-bevel-inset",
     },
   },

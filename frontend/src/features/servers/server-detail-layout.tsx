@@ -17,7 +17,7 @@ export function ServerDetailLayout() {
   return (
     <section className="flex min-w-0 flex-1 flex-col gap-3.5">
       <div className="flex items-center gap-3.5">
-        <Tile tile={server.tile} rounded="lg" className="size-13" />
+        <Tile tile={server.tile} className="size-13" />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex items-center gap-2.5">
             <h2 className="font-hero text-xl text-fg-1 font-crisp">{server.name}</h2>
@@ -58,7 +58,7 @@ export function ServerDetailLayout() {
           className="min-w-23 shrink-0"
         />
         <Stat label="Uptime" value={isUp ? server.uptime : "—"} className="min-w-23 shrink-0" />
-        <div className="flex flex-1 flex-col justify-center rounded-lg bg-surface-2 px-4 py-3 shadow-card-flat">
+        <div className="flex flex-1 flex-col justify-center rounded-sm bg-surface-2 p-3.5 shadow-outline-dark">
           <ProgressBar
             value={isUp ? server.ramGb : 0}
             max={server.ramMaxGb}

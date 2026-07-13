@@ -133,6 +133,8 @@
 
   /* ---- motion (snappy game-UI; no bouncy float) ---- */
   --ease-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* gentler settle for state changes that should read as soft, not snappy */
+  --ease-soft: cubic-bezier(0.33, 1, 0.68, 1);
   --animate-flicker: flicker 1.1s steps(2, end) infinite;
 
   @keyframes flicker {
@@ -169,6 +171,9 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow: hidden;
+    /* WebKit-based Tauri webviews (WebKitGTK / WebView2) honour selection only
+       via the prefixed property; the unprefixed one alone leaves text draggable. */
+    -webkit-user-select: none;
     user-select: none;
     cursor: default;
     @apply bg-background text-foreground;
@@ -176,6 +181,7 @@
 
   input,
   textarea {
+    -webkit-user-select: text;
     user-select: text;
     cursor: text;
   }
@@ -229,6 +235,13 @@
   :focus-visible {
     outline: none;
     box-shadow: var(--shadow-ring);
+  }
+  /* Text fields match :focus-visible even on a plain mouse click (per spec), so
+     the amber glow ring reads as harsh there — they signal focus with just the
+     border shift from the field's own focus-visible:border-ring. */
+  [data-slot="input"]:focus-visible,
+  textarea:focus-visible {
+    box-shadow: none;
   }
   * {
     @apply border-border outline-ring/50;

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import type { Instance } from "@/lib/types";
-import { SNAP, riseVariants } from "@/lib/motion";
+import { riseVariants } from "@/lib/motion";
 import { TILES } from "@/lib/tiles";
 import { loaderTone } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -20,9 +20,7 @@ export function InstanceCard({ instance, onPlay, index }: InstanceCardProps) {
       custom={index}
       initial="initial"
       animate="animate"
-      whileHover={{ y: -3 }}
-      transition={{ duration: 0.12, ease: SNAP }}
-      className="group relative flex flex-col overflow-hidden rounded-lg bg-surface-2 shadow-card-rest transition-shadow duration-100 hover:shadow-card-hover"
+      className="group relative flex flex-col overflow-hidden rounded-sm bg-surface-2 shadow-outline-dark"
     >
       <Link
         to="/instance/$instanceId"
@@ -42,17 +40,17 @@ export function InstanceCard({ instance, onPlay, index }: InstanceCardProps) {
             </Badge>
           </div>
         )}
-        <div className="pointer-events-none absolute inset-0 z-2 flex items-center justify-center bg-ink-950/50 opacity-0 transition-opacity duration-100 group-hover:opacity-100">
+        <div className="pointer-events-none absolute inset-0 z-2 flex items-center justify-center opacity-0 transition-opacity duration-200 ease-soft group-hover:opacity-100">
           <button
             title="Play"
             onClick={() => onPlay(instance)}
-            className="pointer-events-auto flex size-13 items-center justify-center rounded-full bg-grass-500 text-on-grass shadow-lg transition-[transform,filter] duration-100 ease-snap hover:scale-108 hover:brightness-108"
+            className="pointer-events-auto flex size-11 items-center justify-center rounded-sm bg-black/45 text-white backdrop-blur-sm transition-colors duration-200 ease-soft hover:bg-black/60"
           >
-            <PlayIcon size={22} weight="fill" />
+            <PlayIcon size={18} weight="fill" />
           </button>
         </div>
       </div>
-      <div className="flex flex-col gap-2 p-3">
+      <div className="flex flex-col gap-2 p-3.5">
         <span className="truncate text-sm font-semibold text-fg-1">{instance.name}</span>
         <div className="flex items-center gap-1.5">
           <Badge tone={loaderTone(instance.loader)}>{instance.loader}</Badge>

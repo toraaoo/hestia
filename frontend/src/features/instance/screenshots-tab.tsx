@@ -15,7 +15,7 @@ export function ScreenshotsTab() {
       {SHOT_TILES.map((tile) => (
         <div
           key={tile}
-          className="aspect-video overflow-hidden rounded-lg bg-size-[22px_22px] shadow-card-flat pixelated"
+          className="aspect-video overflow-hidden rounded-sm bg-size-[22px_22px] shadow-outline-dark pixelated"
           style={{ backgroundImage: `url(${TILES[tile]})` }}
         />
       ))}

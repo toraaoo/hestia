@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import { SearchIcon } from "@/components/icons";
 
 interface SearchFieldProps {
@@ -7,26 +8,39 @@ interface SearchFieldProps {
   placeholder: string;
   wide?: boolean;
   className?: string;
+  onSubmit?: () => void;
 }
 
-function SearchField({ value, onChange, placeholder, wide = false, className }: SearchFieldProps) {
+function SearchField({
+  value,
+  onChange,
+  placeholder,
+  wide = false,
+  className,
+  onSubmit,
+}: SearchFieldProps) {
   return (
-    <label
+    <form
+      role="search"
       data-slot="search-field"
-      className={cn(
-        "flex h-9 items-center gap-2 rounded-sm bg-surface-2 px-3 shadow-card-flat",
-        wide ? "w-90" : "w-64",
-        className,
-      )}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit?.();
+      }}
+      className={cn("relative", wide ? "w-90" : "w-64", className)}
     >
-      <SearchIcon size={15} className="shrink-0 text-fg-3" />
-      <input
+      <SearchIcon
+        size={15}
+        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3"
+      />
+      <Input
+        type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-transparent text-sm text-fg-1 outline-none placeholder:text-fg-3"
+        className="h-9 rounded-sm pl-8.5 text-sm"
       />
-    </label>
+    </form>
   );
 }
 

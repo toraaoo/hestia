@@ -16,7 +16,7 @@ export function Hero({ instance, onPlay }: { instance: Instance; onPlay: (i: Ins
       <div className="absolute inset-x-0 top-0 h-37.5 bg-gradient-to-b from-ink-900/40 to-app" />
       <Tile
         tile={instance.tile}
-        rounded="lg"
+
         className="relative size-24 shadow-md shadow-outline-dark"
       />
       <div className="relative flex min-w-0 flex-1 flex-col gap-2.5 pb-1">

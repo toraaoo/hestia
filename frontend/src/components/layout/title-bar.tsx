@@ -45,7 +45,7 @@ export function TitleBar() {
       />
 
       <div data-tauri-drag-region className="flex w-58 items-center gap-2.5 px-4">
-        <img src={logoEmber} alt="" className="pointer-events-none size-4.5 rounded-xs" />
+        <img src={logoEmber} alt="" className="pointer-events-none size-4.5 rounded-sm" />
         <span className="pointer-events-none font-hero text-sm leading-none tracking-wide text-fg-2 font-crisp">
           HESTIA
         </span>

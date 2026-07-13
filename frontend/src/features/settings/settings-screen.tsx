@@ -220,7 +220,7 @@ export function SettingsScreen() {
               ))}
 
               <div className="mt-1 flex items-center gap-2.5 border-t border-border-2 pt-4.5 text-xs text-fg-3">
-                <img src={logoEmber} alt="" className="size-4.5 rounded-xs" />
+                <img src={logoEmber} alt="" className="size-4.5 rounded-sm" />
                 Hestia 0.0.1 · latest
               </div>
             </form>

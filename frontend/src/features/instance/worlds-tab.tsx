@@ -13,7 +13,7 @@ export function WorldsTab() {
       {worlds.map((world) => (
         <div
           key={world.name}
-          className="flex items-center gap-3 rounded-lg bg-surface-2 px-3.5 py-3 shadow-card-flat"
+          className="flex items-center gap-3 rounded-sm bg-surface-2 p-3.5 shadow-outline-dark"
         >
           <Tile tile={world.tile} className="size-10" />
           <div className="min-w-0 flex-1">

@@ -21,7 +21,7 @@ export function InstanceRow({ instance, onPlay, index }: InstanceRowProps) {
       custom={index}
       initial="initial"
       animate="animate"
-      className="relative flex items-center gap-3.5 rounded-lg bg-surface-2 px-3.5 py-2.5 shadow-card-rest transition-shadow duration-100 hover:shadow-card-hover"
+      className="relative flex items-center gap-3.5 rounded-sm bg-surface-2 p-3.5 shadow-outline-dark transition-colors duration-200 ease-soft hover:bg-surface-hover"
     >
       <Link
         to="/instance/$instanceId"
