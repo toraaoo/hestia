@@ -8,6 +8,7 @@ export {
   CaretDownIcon,
   CaretRightIcon,
   CaretUpIcon,
+  CheckIcon,
   CopyIcon,
   CopySimpleIcon as DuplicateIcon,
   CornersOutIcon,

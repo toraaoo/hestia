@@ -175,6 +175,23 @@
     cursor: text;
   }
 
+  /* Non-text inputs are controls, not fields — they take a pointer, not a caret. */
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  input[type="color"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="file"] {
+    cursor: pointer;
+  }
+
+  input[type="range"]:disabled,
+  input[type="checkbox"]:disabled,
+  input[type="radio"]:disabled {
+    cursor: not-allowed;
+  }
+
   button {
     cursor: pointer;
   }

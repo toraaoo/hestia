@@ -1,5 +1,5 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
-import { CaretDownIcon } from "@/components/icons";
+import { CaretDownIcon, CheckIcon } from "@/components/icons";
 
 export function Field({
   label,
@@ -40,11 +40,23 @@ export function Select({ value }: { value: string }) {
 
 export function CheckLabel({
   children,
+  className = "",
   ...rest
 }: InputHTMLAttributes<HTMLInputElement> & { children: ReactNode }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-2">
-      <input type="checkbox" className="size-4 accent-hearth-500" {...rest} />
+    <label className="group flex w-fit cursor-pointer items-center gap-2.5 text-sm text-text-2">
+      <span className="relative grid size-4 shrink-0 place-items-center">
+        <input
+          type="checkbox"
+          className={`peer size-4 cursor-pointer appearance-none rounded-xs bg-surface-inset shadow-bevel-inset transition-colors checked:bg-hearth-500 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+          {...rest}
+        />
+        <CheckIcon
+          weight="bold"
+          size={12}
+          className="pointer-events-none absolute text-on-hearth opacity-0 transition-opacity peer-checked:opacity-100"
+        />
+      </span>
       {children}
     </label>
   );
