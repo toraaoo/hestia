@@ -1,11 +1,11 @@
 import { Link, Outlet, createRootRoute, useRouterState } from "@tanstack/react-router";
 import { MotionConfig, motion } from "framer-motion";
 import { pageVariants } from "@/lib/motion";
-import { TitleBar } from "@/components/layout/TitleBar";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { PlayBar } from "@/components/layout/PlayBar";
-import { LaunchOverlay } from "@/components/layout/LaunchOverlay";
-import { Button } from "@/components/ui/Button";
+import { TitleBar } from "@/components/layout/title-bar";
+import { Sidebar } from "@/components/layout/sidebar";
+import { PlayBar } from "@/components/layout/play-bar";
+import { LaunchOverlay } from "@/components/layout/launch-overlay";
+import { Button } from "@/components/ui/button";
 
 export const Route = createRootRoute({
   component: RootLayout,

@@ -3,6 +3,10 @@
    design-system tokens (dark theme only, near-black surfaces).
    ============================================================ */
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 @font-face {
   font-family: "Minecraft Seven";
@@ -167,6 +171,7 @@
     overflow: hidden;
     user-select: none;
     cursor: default;
+    @apply bg-background text-foreground;
   }
 
   input,
@@ -224,6 +229,12 @@
   :focus-visible {
     outline: none;
     box-shadow: var(--shadow-ring);
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
   }
 }
 
@@ -284,4 +295,117 @@
 
 @utility pixelated {
   image-rendering: pixelated;
+}
+
+@theme inline {
+  --font-heading: var(--font-hero);
+  --font-sans: var(--font-body);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* shadcn token layer, sourced from Hestia's palette (dark-only app). */
+:root {
+  --background: var(--color-app);
+  --foreground: var(--color-text-1);
+  --card: var(--color-surface-1);
+  --card-foreground: var(--color-text-1);
+  --popover: var(--color-surface-2);
+  --popover-foreground: var(--color-text-1);
+  --primary: var(--color-hearth-500);
+  --primary-foreground: var(--color-on-hearth);
+  --secondary: var(--color-surface-3);
+  --secondary-foreground: var(--color-text-1);
+  --muted: var(--color-surface-2);
+  --muted-foreground: var(--color-text-3);
+  --accent: var(--color-surface-hover);
+  --accent-foreground: var(--color-text-1);
+  --destructive: var(--color-tnt-500);
+  --border: var(--color-border-1);
+  --input: var(--color-border-1);
+  --ring: var(--color-hearth-500);
+  --chart-1: var(--color-hearth-500);
+  --chart-2: var(--color-diamond-500);
+  --chart-3: var(--color-grass-500);
+  --chart-4: var(--color-gold-500);
+  --chart-5: var(--color-tnt-500);
+  --radius: 0.625rem;
+  --sidebar: var(--color-chrome);
+  --sidebar-foreground: var(--color-text-2);
+  --sidebar-primary: var(--color-hearth-500);
+  --sidebar-primary-foreground: var(--color-on-hearth);
+  --sidebar-accent: var(--color-surface-hover);
+  --sidebar-accent-foreground: var(--color-text-1);
+  --sidebar-border: var(--color-border-2);
+  --sidebar-ring: var(--color-hearth-500);
+}
+
+.dark {
+  --background: var(--color-app);
+  --foreground: var(--color-text-1);
+  --card: var(--color-surface-1);
+  --card-foreground: var(--color-text-1);
+  --popover: var(--color-surface-2);
+  --popover-foreground: var(--color-text-1);
+  --primary: var(--color-hearth-500);
+  --primary-foreground: var(--color-on-hearth);
+  --secondary: var(--color-surface-3);
+  --secondary-foreground: var(--color-text-1);
+  --muted: var(--color-surface-2);
+  --muted-foreground: var(--color-text-3);
+  --accent: var(--color-surface-hover);
+  --accent-foreground: var(--color-text-1);
+  --destructive: var(--color-tnt-500);
+  --border: var(--color-border-1);
+  --input: var(--color-border-1);
+  --ring: var(--color-hearth-500);
+  --chart-1: var(--color-hearth-500);
+  --chart-2: var(--color-diamond-500);
+  --chart-3: var(--color-grass-500);
+  --chart-4: var(--color-gold-500);
+  --chart-5: var(--color-tnt-500);
+  --sidebar: var(--color-chrome);
+  --sidebar-foreground: var(--color-text-2);
+  --sidebar-primary: var(--color-hearth-500);
+  --sidebar-primary-foreground: var(--color-on-hearth);
+  --sidebar-accent: var(--color-surface-hover);
+  --sidebar-accent-foreground: var(--color-text-1);
+  --sidebar-border: var(--color-border-2);
+  --sidebar-ring: var(--color-hearth-500);
 }

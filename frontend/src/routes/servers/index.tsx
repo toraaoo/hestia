@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { getFirstServerId } from "@/data";
-import { NoServers } from "@/features/servers/NoServers";
+import { NoServers } from "@/features/servers/no-servers";
 
 export const Route = createFileRoute("/servers/")({
   beforeLoad: () => {

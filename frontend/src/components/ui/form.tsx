@@ -1,67 +1,143 @@
-import type { InputHTMLAttributes, ReactNode } from "react";
-import { CaretDownIcon, CheckIcon } from "@/components/icons";
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import {
+  Controller,
+  type ControllerProps,
+  type FieldPath,
+  type FieldValues,
+  FormProvider,
+  useFormContext,
+  useFormState,
+} from "react-hook-form";
 
-export function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-}) {
+import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
+
+const Form = FormProvider;
+
+interface FormFieldContextValue<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+> {
+  name: TName;
+}
+
+const FormFieldContext = React.createContext<FormFieldContextValue>({} as FormFieldContextValue);
+
+function FormField<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+>({ ...props }: ControllerProps<TFieldValues, TName>) {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-sm font-semibold text-text-1">{label}</span>
-      {children}
-      {hint && <span className="text-xs text-text-3">{hint}</span>}
-    </div>
+    <FormFieldContext.Provider value={{ name: props.name }}>
+      <Controller {...props} />
+    </FormFieldContext.Provider>
   );
 }
 
-export function TextInput({ className = "", ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+function useFormField() {
+  const fieldContext = React.useContext(FormFieldContext);
+  const itemContext = React.useContext(FormItemContext);
+  const { getFieldState } = useFormContext();
+  const formState = useFormState({ name: fieldContext.name });
+  const fieldState = getFieldState(fieldContext.name, formState);
+
+  const { id } = itemContext;
+
+  return {
+    id,
+    name: fieldContext.name,
+    formItemId: `${id}-form-item`,
+    formDescriptionId: `${id}-form-item-description`,
+    formMessageId: `${id}-form-item-message`,
+    ...fieldState,
+  };
+}
+
+interface FormItemContextValue {
+  id: string;
+}
+
+const FormItemContext = React.createContext<FormItemContextValue>({} as FormItemContextValue);
+
+function FormItem({ className, ...props }: React.ComponentProps<"div">) {
+  const id = React.useId();
+
   return (
-    <input
-      className={`h-9 rounded-sm bg-surface-inset px-3 text-sm text-text-1 shadow-bevel-inset outline-none ${className}`}
-      {...rest}
+    <FormItemContext.Provider value={{ id }}>
+      <div data-slot="form-item" className={cn("grid gap-2", className)} {...props} />
+    </FormItemContext.Provider>
+  );
+}
+
+function FormLabel({ className, ...props }: React.ComponentProps<typeof Label>) {
+  const { error, formItemId } = useFormField();
+
+  return (
+    <Label
+      data-slot="form-label"
+      data-error={!!error}
+      className={cn("text-text-1 data-[error=true]:text-destructive", className)}
+      htmlFor={formItemId}
+      {...props}
     />
   );
 }
 
-/** Static select facade — becomes a real dropdown once wired to the daemon. */
-export function Select({ value }: { value: string }) {
+function FormControl({ ...props }: React.ComponentProps<typeof Slot>) {
+  const { error, formItemId, formDescriptionId, formMessageId } = useFormField();
+
   return (
-    <button className="flex h-9 items-center justify-between rounded-sm bg-surface-inset px-3 text-sm text-text-1 shadow-bevel-inset">
-      {value}
-      <CaretDownIcon size={15} className="text-text-3" />
-    </button>
+    <Slot
+      data-slot="form-control"
+      id={formItemId}
+      aria-describedby={!error ? formDescriptionId : `${formDescriptionId} ${formMessageId}`}
+      aria-invalid={!!error}
+      {...props}
+    />
   );
 }
 
-export function CheckLabel({
-  children,
-  className = "",
-  ...rest
-}: InputHTMLAttributes<HTMLInputElement> & { children: ReactNode }) {
+function FormDescription({ className, ...props }: React.ComponentProps<"p">) {
+  const { formDescriptionId } = useFormField();
+
   return (
-    <label className="group flex w-fit cursor-pointer items-center gap-2.5 text-sm text-text-2">
-      <span className="relative grid size-4 shrink-0 place-items-center">
-        <input
-          type="checkbox"
-          className={`peer size-4 cursor-pointer appearance-none rounded-xs bg-surface-inset shadow-bevel-inset transition-colors checked:bg-hearth-500 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
-          {...rest}
-        />
-        <CheckIcon
-          weight="bold"
-          size={12}
-          className="pointer-events-none absolute text-on-hearth opacity-0 transition-opacity peer-checked:opacity-100"
-        />
-      </span>
-      {children}
-    </label>
+    <p
+      data-slot="form-description"
+      id={formDescriptionId}
+      className={cn("text-xs text-text-3", className)}
+      {...props}
+    />
   );
 }
 
-export function RangeInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input type="range" className="w-full accent-hearth-500" {...props} />;
+function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
+  const { error, formMessageId } = useFormField();
+  const body = error ? (error.message ?? "") : props.children;
+
+  if (!body) {
+    return null;
+  }
+
+  return (
+    <p
+      data-slot="form-message"
+      id={formMessageId}
+      className={cn("text-sm text-destructive", className)}
+      {...props}
+    >
+      {body}
+    </p>
+  );
 }
+
+export {
+  useFormField,
+  Form,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormDescription,
+  FormMessage,
+  FormField,
+};

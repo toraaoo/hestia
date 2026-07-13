@@ -1,4 +1,4 @@
-import type { BadgeTone } from "@/components/ui/Badge";
+import type { BadgeTone } from "@/components/ui/badge";
 import type { Loader } from "@/lib/types";
 
 export function formatCount(n: number): string {

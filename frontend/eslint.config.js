@@ -39,6 +39,14 @@ export default tseslint.config(
     },
   },
   {
+    // shadcn/ui primitives co-export cva variants and hooks (buttonVariants,
+    // useFormField) beside their component — the registry convention.
+    files: ["src/components/ui/**"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
+  {
     files: ["*.config.js", "*.config.ts"],
     extends: [tseslint.configs.disableTypeChecked],
   },
