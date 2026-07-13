@@ -2,9 +2,9 @@ import type { Instance } from "@/lib/types";
 import { TILES } from "@/lib/tiles";
 import { loaderTone } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
-import { Button, IconButton } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Tile } from "@/components/ui/tile";
-import { FolderIcon, PlayIcon } from "@/components/icons";
+import { PlayIcon } from "@/components/icons";
 
 export function Hero({ instance, onPlay }: { instance: Instance; onPlay: (i: Instance) => void }) {
   return (
@@ -33,10 +33,7 @@ export function Hero({ instance, onPlay }: { instance: Instance; onPlay: (i: Ins
           )}
         </div>
       </div>
-      <div className="relative flex items-center gap-2.5 pb-1">
-        <IconButton title="Open folder">
-          <FolderIcon size={18} />
-        </IconButton>
+      <div className="relative flex items-center pb-1">
         <Button variant="play" size="lg" onClick={() => onPlay(instance)}>
           <PlayIcon size={16} weight="fill" />
           PLAY
