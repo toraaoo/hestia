@@ -45,7 +45,7 @@ export function ServerDetailLayout() {
         </div>
       </div>
 
-      <div className="flex items-stretch gap-3">
+      <div className="flex items-stretch gap-sm">
         <Stat
           label="Players"
           value={`${isUp ? server.players : 0}/${server.maxPlayers}`}

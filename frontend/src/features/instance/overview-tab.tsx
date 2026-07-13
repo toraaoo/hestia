@@ -13,10 +13,10 @@ export function OverviewTab() {
   const log = useInstanceLog(instance.id);
 
   return (
-    <div className="grid grid-cols-[1fr_16.25rem] items-start gap-5">
+    <div className="grid grid-cols-[1fr_16.25rem] items-start gap-sm">
       <div>
         <p className="mb-4 text-sm leading-relaxed text-fg-2">{instance.description}</p>
-        <div className="mb-5 grid grid-cols-3 gap-3">
+        <div className="mb-5 grid grid-cols-3 gap-sm">
           {(
             [
               [instance.playtime, "Total playtime"],
@@ -35,7 +35,7 @@ export function OverviewTab() {
         </Panel>
       </div>
 
-      <div className="flex flex-col gap-xs">
+      <div className="flex flex-col gap-sm">
         <Panel className="p-sm">
           <Overline className="mb-2.5 block">Details</Overline>
           {(
@@ -54,7 +54,7 @@ export function OverviewTab() {
         </Panel>
         <Panel className="p-sm">
           <Overline className="mb-2.5 block">Quick actions</Overline>
-          <div className="flex flex-col gap-xs">
+          <div className="flex flex-col gap-sm">
             <Button variant="ghost" className="justify-start">
               <FolderIcon size={16} /> Open folder
             </Button>

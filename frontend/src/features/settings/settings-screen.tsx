@@ -74,7 +74,7 @@ export function SettingsScreen() {
             >
               <SectionHeading title="General" />
               <div className="flex flex-col gap-5">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-sm">
                   <FormField
                     control={form.control}
                     name="theme"

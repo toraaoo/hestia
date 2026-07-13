@@ -9,7 +9,7 @@ export function WorldsTab() {
   const worlds = useInstanceWorlds(instance.id);
 
   return (
-    <div className="flex flex-col gap-xs">
+    <div className="flex flex-col gap-sm">
       {worlds.map((world) => (
         <div
           key={world.name}

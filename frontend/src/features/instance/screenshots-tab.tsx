@@ -11,7 +11,7 @@ const SHOT_TILES = [
 
 export function ScreenshotsTab() {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-sm">
       {SHOT_TILES.map((tile) => (
         <div
           key={tile}

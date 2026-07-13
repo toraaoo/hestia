@@ -27,8 +27,7 @@
   --color-*: initial;
 
   /* ---- semantic spacing (4px grid per the DS spacing tokens) ---- */
-  --spacing-xs: 0.5rem; /* 8px — rows stacked in a list */
-  --spacing-sm: 0.75rem; /* 12px — card body padding, icon-row gaps */
+  --spacing-sm: 0.75rem; /* 12px — card padding + every block-level flex/grid gap */
 
   /* ---- raw neutrals (deep charcoal ladder) ---- */
   --color-ink-950: #0e0e0e;

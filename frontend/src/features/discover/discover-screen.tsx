@@ -66,9 +66,9 @@ export function DiscoverScreen() {
             ))}
           </Tabs>
 
-          <div className="flex items-start gap-5">
-            <Panel as="aside" className="flex w-50 shrink-0 flex-col gap-5 p-sm">
-              <div className="flex flex-col gap-xs">
+          <div className="flex items-start gap-sm">
+            <Panel as="aside" className="flex w-50 shrink-0 flex-col gap-sm p-sm">
+              <div className="flex flex-col gap-sm">
                 <Overline>Install to</Overline>
                 {target && (
                   <button className="flex items-center gap-2.5 rounded-sm bg-surface-inset px-2.5 py-2 shadow-bevel-inset">
@@ -78,7 +78,7 @@ export function DiscoverScreen() {
                   </button>
                 )}
               </div>
-              <div className="flex flex-col gap-xs">
+              <div className="flex flex-col gap-sm">
                 <Overline>Loaders</Overline>
                 {FILTER_LOADERS.map((loader) => (
                   <FilterCheck
@@ -89,7 +89,7 @@ export function DiscoverScreen() {
                   />
                 ))}
               </div>
-              <div className="flex flex-col gap-xs">
+              <div className="flex flex-col gap-sm">
                 <Overline>Source</Overline>
                 {["Modrinth", "CurseForge"].map((source) => (
                   <FilterCheck key={source} label={source} defaultChecked />
@@ -97,7 +97,7 @@ export function DiscoverScreen() {
               </div>
             </Panel>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-xs">
+            <div className="flex min-w-0 flex-1 flex-col gap-sm">
               {results.map((project, i) => (
                 <ProjectRow key={project.name} project={project} index={i} />
               ))}

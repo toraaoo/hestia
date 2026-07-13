@@ -21,7 +21,7 @@ export function ModsTab() {
           </Button>
         }
       />
-      <div className="flex flex-col gap-xs">
+      <div className="flex flex-col gap-sm">
         {mods.map((mod, i) => (
           <div
             key={mod.name}

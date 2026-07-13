@@ -68,7 +68,7 @@ export function LibraryScreen() {
               </Link>
             }
           />
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-sm">
             {onlineServers.map((server, i) => (
               <motion.div
                 key={server.id}
@@ -122,20 +122,20 @@ export function LibraryScreen() {
           </SectionHeading>
 
           {view === "grid" ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-sm">
               {list.map((inst, i) => (
                 <InstanceCard key={inst.id} instance={inst} onPlay={play} index={i} />
               ))}
               <Link
                 to="/discover"
-                className="flex min-h-45 flex-col items-center justify-center gap-3 rounded-sm border border-dashed border-border-1 text-sm font-semibold text-fg-3 transition-colors duration-200 ease-soft hover:border-hearth-500 hover:text-hearth-400"
+                className="flex min-h-45 flex-col items-center justify-center gap-sm rounded-sm border border-dashed border-border-1 text-sm font-semibold text-fg-3 transition-colors duration-200 ease-soft hover:border-hearth-500 hover:text-hearth-400"
               >
                 <PlusIcon size={26} />
                 New instance
               </Link>
             </div>
           ) : (
-            <div className="flex flex-col gap-xs">
+            <div className="flex flex-col gap-sm">
               {list.map((inst, i) => (
                 <InstanceRow key={inst.id} instance={inst} onPlay={play} index={i} />
               ))}

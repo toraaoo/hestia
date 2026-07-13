@@ -44,7 +44,7 @@ function RootLayout() {
 
 function NotFound() {
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-sm">
       <span className="font-hero text-xl text-fg-1 font-crisp">Nothing here</span>
       <p className="text-sm text-fg-3">That page doesn't exist.</p>
       <Link to="/">
@@ -56,7 +56,7 @@ function NotFound() {
 
 function RouteError({ error }: { error: Error }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-sm">
       <span className="font-hero text-xl text-fg-1 font-crisp">Something went wrong</span>
       <p className="max-w-100 text-center font-mono text-xs text-fg-3">{error.message}</p>
       <Link to="/">

@@ -8,7 +8,7 @@ import { FolderIcon, PlayIcon } from "@/components/icons";
 
 export function Hero({ instance, onPlay }: { instance: Instance; onPlay: (i: Instance) => void }) {
   return (
-    <div className="relative flex items-end gap-4 px-6 pt-5">
+    <div className="relative flex items-end gap-sm px-6 pt-5">
       <div
         className="absolute inset-x-0 top-0 h-37.5 bg-size-[34px_34px] opacity-50 pixelated"
         style={{ backgroundImage: `url(${TILES[instance.tile]})` }}

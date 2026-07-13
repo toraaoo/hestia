@@ -35,7 +35,7 @@ export function PlayBar() {
       initial={{ y: 24, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.26, ease: SNAP }}
-      className="flex h-18 shrink-0 items-center gap-4 border-t border-border-1 bg-chrome pr-5 pl-4"
+      className="flex h-18 shrink-0 items-center gap-sm border-t border-border-1 bg-chrome pr-5 pl-4"
     >
       <InstancePicker selectedId={instance.id} />
       <div className="flex-1" />
