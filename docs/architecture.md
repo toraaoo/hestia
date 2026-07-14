@@ -19,12 +19,12 @@ socket on POSIX, a named pipe on Windows):
 | Front-end | Binary           | Crate     | Stack                 | State                      |
 |-----------|------------------|-----------|-----------------------|----------------------------|
 | CLI       | `hestia`         | `cli`     | clap + ratatui        | shipped                    |
-| Desktop   | `hestia-desktop` | `desktop` | Tauri v2 + React/Vite | stock shell, not yet wired |
+| Desktop   | `hestia-desktop` | `desktop` | Tauri v2 + React/Vite | daemon-wired; UI pending   |
 | Tray      | `tray`           | `tray`    | tray-icon + tao       | shipped                    |
 
 The daemon (`hestiad`) is the resident core. The CLI is the first-class,
 fully-wired front-end; the tray accompanies every serving daemon with quick
-actions; the desktop is a scaffold (see
+actions; the desktop is wired to the daemon but its UI is not built yet (see
 [Front-ends](#front-ends-cli-desktop-tray)).
 
 ## The crate graph
@@ -844,12 +844,53 @@ is scriptable).
 
 ### Desktop (`desktop`) — hestia-desktop
 
-A Tauri v2 shell hosting the React frontend in the root `frontend/`. **Today it is
-the stock Tauri template** (a `greet` command in `lib.rs`) — the shell is
-scaffolded but not yet wired to the daemon over the client SDK. The design rule,
-once wired, is the same one-way boundary as the CLI: the shell owns windows and
-IPC, and reaches launcher logic only through `client` (never by linking `engine`).
-See [contributing.md](contributing.md) for the intended `#[tauri::command]` recipe.
+A Tauri v2 shell hosting the React frontend in the root `frontend/`, wired to
+the daemon through the same one-way boundary as the CLI: the shell reaches
+launcher logic only through `client` (never by linking `engine`). The wiring
+is one seam, `src/bridge.rs`: a shared `Client` held as Tauri managed state
+(lazily connected, auto-spawning `hestiad` on the first call — the sidecar
+binary sits beside the exe, exactly where `client::spawn` looks), a single
+generic `ipc_call(channel, payload, timeout_ms)` command forwarding through
+the session's public `call_raw`, and event forwarding: on connect the bridge
+claims the session's one event-callback slot, subscribes to *every* daemon
+event (`events.subscribe` with an empty id), and re-emits each as a
+`hestia:event` webview event. A watcher task notices a lost daemon between
+calls, emits `hestia:connection` transitions, and passively reconnects (no
+auto-spawn — a deliberately stopped daemon stays stopped; an explicit
+frontend call spawns it again).
+
+The typed surface lives in the frontend, `frontend/src/api/`: `core/` (the
+`ipc_call` wrapper with the SDK's timeout defaults, the event bus, and a
+`runJob` driver mirroring `Session::run_job` — client-generated job id,
+subscribe-before-start), `types/` (hand-mirrored `proto` types, one file per
+proto module, wire-faithful snake_case), and one module per domain mirroring
+the client facades. Over it sits `frontend/src/queries/` — TanStack Query
+bindings: a hierarchical key factory keyed by stable entry ids (never the
+renameable display name), entity-scoped hooks (`useServer(id)` is the status
+query spread with the entry's bound actions — plain async functions that
+invalidate on settle, not one mutation hook per verb; detail queries seed
+from the list cache, and `useTask` adds pending/progress state where a
+component wants it), and
+event-driven invalidation (terminal daemon topics map to key prefixes, so
+lists stay fresh without polling; a reconnect invalidates everything). The
+desktop signs in over the **sisu** flow: `account.login.begin` returns the
+Microsoft URL for the shell to open, `account.login.complete` redeems the
+redirect's OAuth code.
+
+> **The desktop bridge is one generic command, not a facade mirror.** The
+> intended recipe used to be one `#[tauri::command]` per feature calling a
+> client facade — a placeholder written before the shell was wired. Mirroring
+> ~80 channels as Tauri commands would add a third naming seam (proto channel
+> → Rust command → TS wrapper) that can drift from both sides while adding no
+> safety: `invoke()` results are untyped JSON regardless, and the daemon
+> already validates every payload through the wire contract (`bad_request`,
+> `unknown_channel`). So the Rust shell is a thin pipe and the typed layer
+> lives once, in TS, where the frontend consumes it — adding a channel to the
+> desktop is a TS one-liner, no recompile. Forwarding *all* events over one
+> subscription likewise sidesteps the SDK's one-callback-slot constraint: the
+> desktop needs many concurrent listeners (several jobs, live logs, list
+> invalidation), so multiplexing by topic and job id moves into the frontend's
+> event bus, where many subscribers are natural.
 
 ### Tray (`tray`)
 
@@ -865,7 +906,7 @@ daemon stop). A worker thread polls the daemon every two seconds over the
 client SDK and reports state changes to the event loop; menu actions travel the
 other way over an mpsc channel, so the UI thread never blocks on the socket.
 Left-click is deliberately inert for now — it will launch the desktop app once
-the shell is wired to the daemon.
+the app has a UI to show.
 
 > **The daemon spawns the tray; the tray outlives the daemon.** `hestiad`
 > spawns the tray on every serve (detached, like every workload), so the tray
@@ -921,8 +962,9 @@ daemon, quick actions for start/restart/autostart/quit).
 skips legacy `natives-<os>` classifier libraries, so old versions launch
 without their LWJGL natives) and the legacy (virtual) asset layout; installing
 a resolved modpack (its files and `overrides/`, e.g. `instance create
---modpack`); wiring the desktop shell to the daemon; and the tray's
-left-click launching the desktop app.
+--modpack`); the desktop UI over the wired shell (the daemon bridge and typed
+API/hooks layer are in place; pages are not); and the tray's left-click
+launching the desktop app.
 
 > **Server provisioning is front-loaded by design.** A server is a long-lived,
 > repeatedly-started thing, often driven headless/scripted — `create` pays the

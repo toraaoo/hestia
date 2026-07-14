@@ -30,9 +30,10 @@ it's just as comfortable from a terminal as from a window.
 > world, which the world backup already covers). Vanilla and Fabric are the
 > shipped flavors, Modrinth the shipped content source. A **system tray**
 > accompanies every serving daemon — status, start/restart, a start-at-login
-> toggle, quit. Still to come: installing a whole modpack, wiring the stock
-> Tauri desktop shell to the daemon, and the tray's left-click launching the
-> desktop app.
+> toggle, quit. The **desktop shell** talks to the daemon through a generic
+> Tauri IPC bridge with a typed TS API layer (React Query hooks included).
+> Still to come: installing a whole modpack, the desktop UI itself, and the
+> tray's left-click launching the desktop app.
 
 ## Front-ends
 
@@ -40,8 +41,9 @@ Hestia is one daemon-backed core with several ways to drive it:
 
 - **CLI** (`hestia`) — scriptable command-line interface for automation and power
   users.
-- **Desktop** (`hestia-desktop`) — a Tauri shell hosting a web UI. Scaffolded; the
-  frontend is a stock template not yet wired to the daemon.
+- **Desktop** (`hestia-desktop`) — a Tauri shell hosting a web UI. Wired to the
+  daemon through a generic IPC bridge with a typed TS API layer; the UI itself
+  is not built yet.
 - **Tray** (`tray`) — a resident system-tray helper spawned alongside the
   daemon: status, quick actions (start/restart, autostart, quit).
 

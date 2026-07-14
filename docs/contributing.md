@@ -42,7 +42,7 @@ the shipped end-to-end reference (`hestia config get home` round-trips
 | Daemon channel  | `crates/daemon/src/services/<domain>.rs`      | one `on.handle::<C>(…)` in that domain's `register()` |
 | Client facade   | `crates/client/src/facades/<domain>.rs`       | a one-liner over `Session::call::<C>()`               |
 | CLI command     | `crates/cli/src/commands/<domain>.rs` (or `<domain>/`) | a `clap` `Subcommand` + a `run()`, wired in `main.rs` |
-| Desktop command | `crates/desktop/src/` (Tauri)                 | a `#[tauri::command]` in `generate_handler!`          |
+| Desktop API     | `frontend/src/api/<domain>.ts`                | a typed function over the generic `ipc_call` bridge  |
 
 ---
 
@@ -306,37 +306,49 @@ Add `pub mod instance;` to `crates/cli/src/commands/mod.rs`.
 
 ---
 
-## Add a desktop command (Tauri)
+## Add a desktop API method
 
-> **Current state:** `crates/desktop` is the stock Tauri v2 template — a `greet`
-> command in `lib.rs`, not yet wired to the daemon. The recipe below is the
-> intended pattern once the shell is connected: the desktop reaches launcher logic
-> only through `client` (never by linking `engine`), exactly like the CLI.
+The desktop's Rust side is a fixed, generic bridge (`crates/desktop/src/bridge.rs`
+— one `ipc_call` command over the shared client, plus event forwarding); it never
+grows per feature. A desktop feature is TypeScript in `frontend/src/api/` (and,
+usually, a hook in `frontend/src/queries/`) — the desktop's equivalent of a
+client facade method. See the decision note in
+[architecture.md](architecture.md#desktop-desktop--hestia-desktop).
 
-A desktop feature is a `#[tauri::command]` that calls a `client` facade, plus the
-frontend code that invokes it. Keep the commands in one module (e.g. `api.rs`) and
-register them in `generate_handler!`:
+**1. The typed function**, in the domain's module (`frontend/src/api/<domain>.ts`),
+with any payload types mirrored from `proto` in `frontend/src/api/types/<domain>.ts`
+(wire-faithful snake_case):
 
-```rust
-// crates/desktop/src/api.rs
-#[tauri::command]
-pub async fn instance_list() -> Result<Vec<serde_json::Value>, String> {
-    let client = client::Client::connect(true).await.map_err(|e| e.to_string())?;
-    let instances = client.instance().list().await.map_err(|e| e.to_string())?;
-    Ok(instances.into_iter().map(|i| serde_json::json!(i)).collect())
+```ts
+// frontend/src/api/instance.ts
+export async function list(): Promise<InstanceInfo[]> {
+	const result = await call<{ instances: InstanceInfo[] }>("instance.list");
+	return result.instances;
 }
 ```
 
-```rust
-// crates/desktop/src/lib.rs
-tauri::Builder::default ()
-.invoke_handler(tauri::generate_handler![api::instance_list])
-// ...
-```
+Use `tryCall` when a `not_found` should surface as `null`, pass `{ timeoutMs }`
+for a long call (mirror the Rust facade's `call_with_timeout` values), and wrap a
+progress-streaming operation in `runJob` (`core/jobs.ts`) with its
+progress/done/error topics — see `server.create` or `java.install`.
 
-The frontend calls it with Tauri's `invoke("instance_list")`. Wiring the shell to
-the daemon (a shared client/session, event forwarding) is itself pending work —
-see [architecture.md](architecture.md).
+**2. The hook**, in `frontend/src/queries/use-<domain>.ts`. Hooks are
+**entity-scoped**: `useServer(id)` returns the entry's status query spread
+together with every action bound to it (`server.start()`,
+`server.backup.create(onProgress?)`, …), composed from an actions-only core
+(`useServerActions(id)`) so pure-action call sites skip the query
+subscription. Entries are keyed by their **stable id** (from the list data),
+never the display name — the wire resolves either, but a rename must not
+strand a cache key. A new verb is one bound one-liner in the domain's actions maker,
+invalidating through the shared `sweeper` on settle; a read that isn't the
+entity's own status gets its own `useQuery` hook (`useServerLogs`) over a key
+from `keys.ts`. When a component wants `isPending`/`progress`/`error`, wrap
+the bound action in `useTask` — it injects its own progress callback into any
+job-backed action. If a daemon event should refresh a query, add its terminal
+topic to the map in `queries/invalidation.ts`.
+
+A brand-new domain adds one module file per layer plus its `export * as <domain>`
+line in `frontend/src/api/index.ts` — nothing in the Rust shell changes.
 
 ---
 
