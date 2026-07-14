@@ -1,11 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from '@tanstack/react-router';
 
-export const Route = createFileRoute("/")({ component: Home });
+export const Route = createFileRoute('/')({ component: Home });
 
 function Home() {
-	return (
-		<main className="flex min-h-screen items-center justify-center">
-			<h1 className="text-2xl font-semibold text-neutral-900">Hestia</h1>
-		</main>
-	);
+  return (
+    <main className="flex min-h-screen items-center justify-center">
+      <h1 className="text-2xl font-semibold text-neutral-900">Hestia</h1>
+    </main>
+  );
 }
