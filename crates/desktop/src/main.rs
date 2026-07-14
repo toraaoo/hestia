@@ -6,5 +6,6 @@ fn main() {
     #[cfg(target_os = "linux")]
     std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
 
+    let _log_guard = common::init_logging(common::LogLevel::Warn, None);
     desktop::run();
 }

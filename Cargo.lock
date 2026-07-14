@@ -1127,11 +1127,15 @@ dependencies = [
 name = "desktop"
 version = "0.0.1"
 dependencies = [
+ "client",
+ "common",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
