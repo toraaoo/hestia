@@ -1,16 +1,29 @@
 #!/bin/sh
 #
-# Format staged Rust code before it is committed. Managed by husky-rs, which
+# Format/lint staged code before it is committed. Managed by husky-rs, which
 # points core.hooksPath here on `cargo test`. Skip with `git commit --no-verify`.
 set -e
 
-staged=$(git diff --cached --name-only --diff-filter=ACM -- '*.rs')
-[ -z "$staged" ] && exit 0
+# --- Rust: rustfmt the staged Rust files, then re-stage them ---
+rust_staged=$(git diff --cached --name-only --diff-filter=ACM -- '*.rs')
+if [ -n "$rust_staged" ]; then
+    cargo fmt --all
+    printf '%s\n' "$rust_staged" | while IFS= read -r file; do
+        [ -f "$file" ] && git add -- "$file"
+    done
+fi
 
-cargo fmt --all
-
-# Re-stage the Rust files that were part of this commit so rustfmt's changes
-# are included, without picking up unrelated edits.
-printf '%s\n' "$staged" | while IFS= read -r file; do
-    [ -f "$file" ] && git add -- "$file"
-done
+# --- Frontend: biome-check the staged frontend files, then re-stage them ---
+fe_staged=$(git diff --cached --name-only --diff-filter=ACM -- 'frontend/')
+if [ -n "$fe_staged" ]; then
+    if [ -x frontend/node_modules/.bin/biome ]; then
+        rel=$(printf '%s\n' "$fe_staged" | while IFS= read -r f; do printf '%s\n' "${f#frontend/}"; done)
+        (cd frontend && printf '%s\n' "$rel" | xargs -r node_modules/.bin/biome check --write \
+            --files-ignore-unknown=true --no-errors-on-unmatched)
+        printf '%s\n' "$fe_staged" | while IFS= read -r file; do
+            [ -f "$file" ] && git add -- "$file"
+        done
+    else
+        echo "husky: frontend deps not installed (frontend/node_modules), skipping biome check" >&2
+    fi
+fi
