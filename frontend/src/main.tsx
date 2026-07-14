@@ -1,34 +1,17 @@
+import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { RouterProvider, createRouter } from "@tanstack/react-router";
 
-import "@fontsource/noto-sans/400.css";
-import "@fontsource/noto-sans/500.css";
-import "@fontsource/noto-sans/600.css";
-import "@fontsource/noto-sans/700.css";
-import "@fontsource/jetbrains-mono/400.css";
-import "@fontsource/jetbrains-mono/500.css";
-import "@fontsource/jetbrains-mono/700.css";
-import "@/styles/index.css";
+import { getRouter } from "./router";
+import "./styles.css";
 
-import { installDesktopBehaviors } from "@/lib/desktop";
-import { routeTree } from "@/routeTree.gen";
+const router = getRouter();
 
-installDesktopBehaviors();
-
-const router = createRouter({ routeTree, defaultPreload: "intent" });
-
-declare module "@tanstack/react-router" {
-  interface Register {
-    router: typeof router;
-  }
+const rootElement = document.getElementById("app");
+if (rootElement && !rootElement.innerHTML) {
+	createRoot(rootElement).render(
+		<StrictMode>
+			<RouterProvider router={router} />
+		</StrictMode>,
+	);
 }
-
-const root = document.getElementById("root");
-if (!root) throw new Error("missing #root element");
-
-createRoot(root).render(
-  <StrictMode>
-    <RouterProvider router={router} />
-  </StrictMode>,
-);

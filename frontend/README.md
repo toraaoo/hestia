@@ -1,66 +1,213 @@
-# Hestia desktop frontend
+Welcome to your new TanStack Start app! 
 
-The web UI hosted by the Tauri shell (`crates/desktop`). Implements the approved
-Hestia design system — dark-only, hearth amber on near-black, Minecraft Seven/Ten
-pixel type — as a Tailwind v4 theme (`src/styles/index.css`).
+# Getting Started
 
-Screens currently render from typed mock fixtures shaped after the daemon's
-`proto` types. All domain data flows through the hooks in `src/data/` — screens
-never touch the fixtures or the domain store directly — so wiring `hestiad` over
-the client SDK later replaces the hook internals, not the components.
-
-## Stack
-
-- React 19 + TypeScript, built with Vite (Bun as the package manager);
-  `@/` aliases `src/`
-- Tailwind CSS v4 (CSS-first theme, no config file)
-- TanStack Router (file-based routes in `src/routes/`, tree generated to
-  `src/routeTree.gen.ts`)
-- Zustand (the global UI store in `src/stores/`, the private domain store
-  behind `src/data/`)
-- Phosphor icons behind the `src/components/icons.ts` alias seam
-- Self-hosted fonts: Minecraft Seven/Ten (OFL, from the design system) +
-  Noto Sans / JetBrains Mono via Fontsource
-
-## Layout
-
-```
-src/
-├── routes/          file-based routes — thin: each wires a feature component
-│   ├── __root.tsx   app shell: titlebar, sidebar, play bar, launch overlay
-│   └── instance/$instanceId/   layout route (hero + tab bar) with one child
-│                    route per tab, so tabs are real, deep-linkable paths
-├── features/        one folder per screen domain
-│   ├── library/     LibraryScreen, InstanceCard, InstanceRow
-│   ├── instance/    InstanceLayout, Hero, one component per tab route
-│   ├── servers/     ServersLayout (rail), ServerDetailLayout + ServerConsole, NoServers
-│   ├── discover/    DiscoverScreen, ProjectRow
-│   ├── settings/    SettingsScreen
-│   └── skins/       SkinsScreen (placeholder)
-├── components/
-│   ├── layout/      window chrome: TitleBar, TopBar, Sidebar, PlayBar, LaunchOverlay
-│   ├── ui/          design-system primitives: Button, Badge, Panel, Tabs,
-│   │                PlayButton, Stat, SectionHeading, StatusDot, Tile, …
-│   └── icons.ts     Phosphor aliases (the swappable icon seam)
-├── data/            the data-access seam: domain hooks (useInstances, useServer,
-│                    useInstanceMods, …) over a private store + mock fixtures;
-│                    daemon wiring replaces these internals only
-├── stores/          global client state (selection, launch overlay, view prefs)
-├── lib/             view-model types, cn/format/motion/router/tiles helpers
-├── styles/          index.css — the design-system theme (@theme tokens)
-└── assets/          brand SVGs, pixel tiles, fonts (from the design system)
-```
-
-## Scripts
+To run this application:
 
 ```bash
-bun run dev           # Vite dev server (port 1420, used by `cargo tauri dev`)
-bun run build         # production build + typecheck
-bun run typecheck     # tsc --noEmit
-bun run lint          # ESLint (typescript-eslint strict, type-checked)
-bun run format        # Prettier (with Tailwind class sorting)
+bun install
+bun --bun run dev
 ```
 
-The window is frameless (`decorations: false` in `tauri.conf.json`); the in-app
-titlebar provides drag + min/max/close via `@tauri-apps/api`. In a plain browser
-those controls no-op, so `bun run dev` works standalone for UI work.
+# Building For Production
+
+To build this application for production:
+
+```bash
+bun --bun run build
+```
+
+## Testing
+
+This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+
+```bash
+bun --bun run test
+```
+
+## Styling
+
+This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+
+### Removing Tailwind CSS
+
+If you prefer not to use Tailwind CSS:
+
+1. Remove the demo pages in `src/routes/demo/`
+2. Replace the Tailwind import in `src/styles.css` with your own styles
+3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
+4. Uninstall the packages: `bun install @tailwindcss/vite tailwindcss -D`
+
+## Linting & Formatting
+
+This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
+
+
+```bash
+bun --bun run lint
+bun --bun run format
+bun --bun run check
+```
+
+
+# Paraglide i18n
+
+This add-on wires up ParaglideJS for localized routing and message formatting.
+
+- Messages live in `project.inlang/messages`.
+- URLs are localized through the Paraglide Vite plugin and router `rewrite` hooks.
+- Run the dev server or build to regenerate the `src/paraglide` outputs.
+
+
+
+## Routing
+
+This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
+
+### Adding A Route
+
+To add a new route to your application just add a new file in the `./src/routes` directory.
+
+TanStack will automatically generate the content of the route file for you.
+
+Now that you have two routes you can use a `Link` component to navigate between them.
+
+### Adding Links
+
+To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
+
+```tsx
+import { Link } from "@tanstack/react-router";
+```
+
+Then anywhere in your JSX you can use it like so:
+
+```tsx
+<Link to="/about">About</Link>
+```
+
+This will create a link that will navigate to the `/about` route.
+
+More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
+
+### Using A Layout
+
+In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
+
+Here is an example layout that includes a header:
+
+```tsx
+import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+
+export const Route = createRootRoute({
+  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { title: 'My App' },
+    ],
+  }),
+  shellComponent: ({ children }) => (
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <header>
+          <nav>
+            <Link to="/">Home</Link>
+            <Link to="/about">About</Link>
+          </nav>
+        </header>
+        {children}
+        <Scripts />
+      </body>
+    </html>
+  ),
+})
+```
+
+More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
+
+## Server Functions
+
+TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
+
+```tsx
+import { createServerFn } from '@tanstack/react-start'
+
+const getServerTime = createServerFn({
+  method: 'GET',
+}).handler(async () => {
+  return new Date().toISOString()
+})
+
+// Use in a component
+function MyComponent() {
+  const [time, setTime] = useState('')
+  
+  useEffect(() => {
+    getServerTime().then(setTime)
+  }, [])
+  
+  return <div>Server time: {time}</div>
+}
+```
+
+## API Routes
+
+You can create API routes by using the `server` property in your route definitions:
+
+```tsx
+import { createFileRoute } from '@tanstack/react-router'
+import { json } from '@tanstack/react-start'
+
+export const Route = createFileRoute('/api/hello')({
+  server: {
+    handlers: {
+      GET: () => json({ message: 'Hello, World!' }),
+    },
+  },
+})
+```
+
+## Data Fetching
+
+There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
+
+For example:
+
+```tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/people')({
+  loader: async () => {
+    const response = await fetch('https://swapi.dev/api/people')
+    return response.json()
+  },
+  component: PeopleComponent,
+})
+
+function PeopleComponent() {
+  const data = Route.useLoaderData()
+  return (
+    <ul>
+      {data.results.map((person) => (
+        <li key={person.name}>{person.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
+
+# Demo files
+
+Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
+
+# Learn More
+
+You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
+
+For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).

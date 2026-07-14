@@ -9,240 +9,38 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SkinsRouteImport } from './routes/skins'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as DiscoverRouteImport } from './routes/discover'
-import { Route as ServersRouteRouteImport } from './routes/servers/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ServersIndexRouteImport } from './routes/servers/index'
-import { Route as ServersServerIdRouteRouteImport } from './routes/servers/$serverId/route'
-import { Route as InstanceInstanceIdRouteRouteImport } from './routes/instance/$instanceId/route'
-import { Route as ServersServerIdIndexRouteImport } from './routes/servers/$serverId/index'
-import { Route as InstanceInstanceIdIndexRouteImport } from './routes/instance/$instanceId/index'
-import { Route as InstanceInstanceIdWorldsRouteImport } from './routes/instance/$instanceId/worlds'
-import { Route as InstanceInstanceIdSettingsRouteImport } from './routes/instance/$instanceId/settings'
-import { Route as InstanceInstanceIdScreenshotsRouteImport } from './routes/instance/$instanceId/screenshots'
-import { Route as InstanceInstanceIdModsRouteImport } from './routes/instance/$instanceId/mods'
-import { Route as InstanceInstanceIdLogsRouteImport } from './routes/instance/$instanceId/logs'
 
-const SkinsRoute = SkinsRouteImport.update({
-  id: '/skins',
-  path: '/skins',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DiscoverRoute = DiscoverRouteImport.update({
-  id: '/discover',
-  path: '/discover',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ServersRouteRoute = ServersRouteRouteImport.update({
-  id: '/servers',
-  path: '/servers',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ServersIndexRoute = ServersIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ServersRouteRoute,
-} as any)
-const ServersServerIdRouteRoute = ServersServerIdRouteRouteImport.update({
-  id: '/$serverId',
-  path: '/$serverId',
-  getParentRoute: () => ServersRouteRoute,
-} as any)
-const InstanceInstanceIdRouteRoute = InstanceInstanceIdRouteRouteImport.update({
-  id: '/instance/$instanceId',
-  path: '/instance/$instanceId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ServersServerIdIndexRoute = ServersServerIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ServersServerIdRouteRoute,
-} as any)
-const InstanceInstanceIdIndexRoute = InstanceInstanceIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => InstanceInstanceIdRouteRoute,
-} as any)
-const InstanceInstanceIdWorldsRoute =
-  InstanceInstanceIdWorldsRouteImport.update({
-    id: '/worlds',
-    path: '/worlds',
-    getParentRoute: () => InstanceInstanceIdRouteRoute,
-  } as any)
-const InstanceInstanceIdSettingsRoute =
-  InstanceInstanceIdSettingsRouteImport.update({
-    id: '/settings',
-    path: '/settings',
-    getParentRoute: () => InstanceInstanceIdRouteRoute,
-  } as any)
-const InstanceInstanceIdScreenshotsRoute =
-  InstanceInstanceIdScreenshotsRouteImport.update({
-    id: '/screenshots',
-    path: '/screenshots',
-    getParentRoute: () => InstanceInstanceIdRouteRoute,
-  } as any)
-const InstanceInstanceIdModsRoute = InstanceInstanceIdModsRouteImport.update({
-  id: '/mods',
-  path: '/mods',
-  getParentRoute: () => InstanceInstanceIdRouteRoute,
-} as any)
-const InstanceInstanceIdLogsRoute = InstanceInstanceIdLogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
-  getParentRoute: () => InstanceInstanceIdRouteRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/servers': typeof ServersRouteRouteWithChildren
-  '/discover': typeof DiscoverRoute
-  '/settings': typeof SettingsRoute
-  '/skins': typeof SkinsRoute
-  '/instance/$instanceId': typeof InstanceInstanceIdRouteRouteWithChildren
-  '/servers/$serverId': typeof ServersServerIdRouteRouteWithChildren
-  '/servers/': typeof ServersIndexRoute
-  '/instance/$instanceId/logs': typeof InstanceInstanceIdLogsRoute
-  '/instance/$instanceId/mods': typeof InstanceInstanceIdModsRoute
-  '/instance/$instanceId/screenshots': typeof InstanceInstanceIdScreenshotsRoute
-  '/instance/$instanceId/settings': typeof InstanceInstanceIdSettingsRoute
-  '/instance/$instanceId/worlds': typeof InstanceInstanceIdWorldsRoute
-  '/instance/$instanceId/': typeof InstanceInstanceIdIndexRoute
-  '/servers/$serverId/': typeof ServersServerIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/discover': typeof DiscoverRoute
-  '/settings': typeof SettingsRoute
-  '/skins': typeof SkinsRoute
-  '/servers': typeof ServersIndexRoute
-  '/instance/$instanceId/logs': typeof InstanceInstanceIdLogsRoute
-  '/instance/$instanceId/mods': typeof InstanceInstanceIdModsRoute
-  '/instance/$instanceId/screenshots': typeof InstanceInstanceIdScreenshotsRoute
-  '/instance/$instanceId/settings': typeof InstanceInstanceIdSettingsRoute
-  '/instance/$instanceId/worlds': typeof InstanceInstanceIdWorldsRoute
-  '/instance/$instanceId': typeof InstanceInstanceIdIndexRoute
-  '/servers/$serverId': typeof ServersServerIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/servers': typeof ServersRouteRouteWithChildren
-  '/discover': typeof DiscoverRoute
-  '/settings': typeof SettingsRoute
-  '/skins': typeof SkinsRoute
-  '/instance/$instanceId': typeof InstanceInstanceIdRouteRouteWithChildren
-  '/servers/$serverId': typeof ServersServerIdRouteRouteWithChildren
-  '/servers/': typeof ServersIndexRoute
-  '/instance/$instanceId/logs': typeof InstanceInstanceIdLogsRoute
-  '/instance/$instanceId/mods': typeof InstanceInstanceIdModsRoute
-  '/instance/$instanceId/screenshots': typeof InstanceInstanceIdScreenshotsRoute
-  '/instance/$instanceId/settings': typeof InstanceInstanceIdSettingsRoute
-  '/instance/$instanceId/worlds': typeof InstanceInstanceIdWorldsRoute
-  '/instance/$instanceId/': typeof InstanceInstanceIdIndexRoute
-  '/servers/$serverId/': typeof ServersServerIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/servers'
-    | '/discover'
-    | '/settings'
-    | '/skins'
-    | '/instance/$instanceId'
-    | '/servers/$serverId'
-    | '/servers/'
-    | '/instance/$instanceId/logs'
-    | '/instance/$instanceId/mods'
-    | '/instance/$instanceId/screenshots'
-    | '/instance/$instanceId/settings'
-    | '/instance/$instanceId/worlds'
-    | '/instance/$instanceId/'
-    | '/servers/$serverId/'
+  fullPaths: '/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/discover'
-    | '/settings'
-    | '/skins'
-    | '/servers'
-    | '/instance/$instanceId/logs'
-    | '/instance/$instanceId/mods'
-    | '/instance/$instanceId/screenshots'
-    | '/instance/$instanceId/settings'
-    | '/instance/$instanceId/worlds'
-    | '/instance/$instanceId'
-    | '/servers/$serverId'
-  id:
-    | '__root__'
-    | '/'
-    | '/servers'
-    | '/discover'
-    | '/settings'
-    | '/skins'
-    | '/instance/$instanceId'
-    | '/servers/$serverId'
-    | '/servers/'
-    | '/instance/$instanceId/logs'
-    | '/instance/$instanceId/mods'
-    | '/instance/$instanceId/screenshots'
-    | '/instance/$instanceId/settings'
-    | '/instance/$instanceId/worlds'
-    | '/instance/$instanceId/'
-    | '/servers/$serverId/'
+  to: '/'
+  id: '__root__' | '/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ServersRouteRoute: typeof ServersRouteRouteWithChildren
-  DiscoverRoute: typeof DiscoverRoute
-  SettingsRoute: typeof SettingsRoute
-  SkinsRoute: typeof SkinsRoute
-  InstanceInstanceIdRouteRoute: typeof InstanceInstanceIdRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/skins': {
-      id: '/skins'
-      path: '/skins'
-      fullPath: '/skins'
-      preLoaderRoute: typeof SkinsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/discover': {
-      id: '/discover'
-      path: '/discover'
-      fullPath: '/discover'
-      preLoaderRoute: typeof DiscoverRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/servers': {
-      id: '/servers'
-      path: '/servers'
-      fullPath: '/servers'
-      preLoaderRoute: typeof ServersRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -250,135 +48,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/servers/': {
-      id: '/servers/'
-      path: '/'
-      fullPath: '/servers/'
-      preLoaderRoute: typeof ServersIndexRouteImport
-      parentRoute: typeof ServersRouteRoute
-    }
-    '/servers/$serverId': {
-      id: '/servers/$serverId'
-      path: '/$serverId'
-      fullPath: '/servers/$serverId'
-      preLoaderRoute: typeof ServersServerIdRouteRouteImport
-      parentRoute: typeof ServersRouteRoute
-    }
-    '/instance/$instanceId': {
-      id: '/instance/$instanceId'
-      path: '/instance/$instanceId'
-      fullPath: '/instance/$instanceId'
-      preLoaderRoute: typeof InstanceInstanceIdRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/servers/$serverId/': {
-      id: '/servers/$serverId/'
-      path: '/'
-      fullPath: '/servers/$serverId/'
-      preLoaderRoute: typeof ServersServerIdIndexRouteImport
-      parentRoute: typeof ServersServerIdRouteRoute
-    }
-    '/instance/$instanceId/': {
-      id: '/instance/$instanceId/'
-      path: '/'
-      fullPath: '/instance/$instanceId/'
-      preLoaderRoute: typeof InstanceInstanceIdIndexRouteImport
-      parentRoute: typeof InstanceInstanceIdRouteRoute
-    }
-    '/instance/$instanceId/worlds': {
-      id: '/instance/$instanceId/worlds'
-      path: '/worlds'
-      fullPath: '/instance/$instanceId/worlds'
-      preLoaderRoute: typeof InstanceInstanceIdWorldsRouteImport
-      parentRoute: typeof InstanceInstanceIdRouteRoute
-    }
-    '/instance/$instanceId/settings': {
-      id: '/instance/$instanceId/settings'
-      path: '/settings'
-      fullPath: '/instance/$instanceId/settings'
-      preLoaderRoute: typeof InstanceInstanceIdSettingsRouteImport
-      parentRoute: typeof InstanceInstanceIdRouteRoute
-    }
-    '/instance/$instanceId/screenshots': {
-      id: '/instance/$instanceId/screenshots'
-      path: '/screenshots'
-      fullPath: '/instance/$instanceId/screenshots'
-      preLoaderRoute: typeof InstanceInstanceIdScreenshotsRouteImport
-      parentRoute: typeof InstanceInstanceIdRouteRoute
-    }
-    '/instance/$instanceId/mods': {
-      id: '/instance/$instanceId/mods'
-      path: '/mods'
-      fullPath: '/instance/$instanceId/mods'
-      preLoaderRoute: typeof InstanceInstanceIdModsRouteImport
-      parentRoute: typeof InstanceInstanceIdRouteRoute
-    }
-    '/instance/$instanceId/logs': {
-      id: '/instance/$instanceId/logs'
-      path: '/logs'
-      fullPath: '/instance/$instanceId/logs'
-      preLoaderRoute: typeof InstanceInstanceIdLogsRouteImport
-      parentRoute: typeof InstanceInstanceIdRouteRoute
-    }
   }
 }
-
-interface ServersServerIdRouteRouteChildren {
-  ServersServerIdIndexRoute: typeof ServersServerIdIndexRoute
-}
-
-const ServersServerIdRouteRouteChildren: ServersServerIdRouteRouteChildren = {
-  ServersServerIdIndexRoute: ServersServerIdIndexRoute,
-}
-
-const ServersServerIdRouteRouteWithChildren =
-  ServersServerIdRouteRoute._addFileChildren(ServersServerIdRouteRouteChildren)
-
-interface ServersRouteRouteChildren {
-  ServersServerIdRouteRoute: typeof ServersServerIdRouteRouteWithChildren
-  ServersIndexRoute: typeof ServersIndexRoute
-}
-
-const ServersRouteRouteChildren: ServersRouteRouteChildren = {
-  ServersServerIdRouteRoute: ServersServerIdRouteRouteWithChildren,
-  ServersIndexRoute: ServersIndexRoute,
-}
-
-const ServersRouteRouteWithChildren = ServersRouteRoute._addFileChildren(
-  ServersRouteRouteChildren,
-)
-
-interface InstanceInstanceIdRouteRouteChildren {
-  InstanceInstanceIdLogsRoute: typeof InstanceInstanceIdLogsRoute
-  InstanceInstanceIdModsRoute: typeof InstanceInstanceIdModsRoute
-  InstanceInstanceIdScreenshotsRoute: typeof InstanceInstanceIdScreenshotsRoute
-  InstanceInstanceIdSettingsRoute: typeof InstanceInstanceIdSettingsRoute
-  InstanceInstanceIdWorldsRoute: typeof InstanceInstanceIdWorldsRoute
-  InstanceInstanceIdIndexRoute: typeof InstanceInstanceIdIndexRoute
-}
-
-const InstanceInstanceIdRouteRouteChildren: InstanceInstanceIdRouteRouteChildren =
-  {
-    InstanceInstanceIdLogsRoute: InstanceInstanceIdLogsRoute,
-    InstanceInstanceIdModsRoute: InstanceInstanceIdModsRoute,
-    InstanceInstanceIdScreenshotsRoute: InstanceInstanceIdScreenshotsRoute,
-    InstanceInstanceIdSettingsRoute: InstanceInstanceIdSettingsRoute,
-    InstanceInstanceIdWorldsRoute: InstanceInstanceIdWorldsRoute,
-    InstanceInstanceIdIndexRoute: InstanceInstanceIdIndexRoute,
-  }
-
-const InstanceInstanceIdRouteRouteWithChildren =
-  InstanceInstanceIdRouteRoute._addFileChildren(
-    InstanceInstanceIdRouteRouteChildren,
-  )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ServersRouteRoute: ServersRouteRouteWithChildren,
-  DiscoverRoute: DiscoverRoute,
-  SettingsRoute: SettingsRoute,
-  SkinsRoute: SkinsRoute,
-  InstanceInstanceIdRouteRoute: InstanceInstanceIdRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

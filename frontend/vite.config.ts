@@ -1,41 +1,37 @@
-import { fileURLToPath, URL } from "node:url";
-import process from "node:process";
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import tailwindcss from "@tailwindcss/vite";
+import { devtools } from "@tanstack/devtools-vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
+import viteReact from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+// Tauri drives the frontend: it opens a webview at `server` in dev and bundles
+// the static `build.outDir` (dist) in release. There is no Node server at
+// runtime, so this is a plain client SPA.
 const host = process.env.TAURI_DEV_HOST;
 
-// https://vite.dev/config/
-export default defineConfig(() => ({
-  plugins: [tanstackRouter({ target: "react" }), react(), tailwindcss()],
+const config = defineConfig({
+	plugins: [
+		devtools(),
+		paraglideVitePlugin({
+			project: "./project.inlang",
+			outdir: "./src/paraglide",
+			strategy: ["url", "baseLocale"],
+		}),
+		tanstackRouter({ target: "react", autoCodeSplitting: true }),
+		viteReact(),
+		tailwindcss(),
+	],
 
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
-  },
+	// Tauri expects a fixed port (tauri.conf.json `devUrl`) and its own console.
+	clearScreen: false,
+	server: {
+		port: 1420,
+		strictPort: true,
+		host: host || false,
+		hmr: host ? { protocol: "ws", host, port: 1421 } : undefined,
+	},
+});
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
-  clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
-  server: {
-    port: 1420,
-    strictPort: true,
-    host: host || false,
-    hmr: host
-      ? {
-          protocol: "ws",
-          host,
-          port: 1421,
-        }
-      : undefined,
-    watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
-    },
-  },
-}));
+export default config;
