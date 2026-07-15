@@ -1,3 +1,5 @@
+import { fileURLToPath, URL } from 'node:url';
+
 import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import tailwindcss from '@tailwindcss/vite';
 import { devtools } from '@tanstack/devtools-vite';
@@ -23,6 +25,14 @@ const config = defineConfig({
     viteReact(),
     tailwindcss(),
   ],
+
+  // `@/*` and `#/*` map to `src/*` (mirrors tsconfig paths + components.json).
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '#': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
 
   // Tauri expects a fixed port (tauri.conf.json `devUrl`) and its own console.
   clearScreen: false,

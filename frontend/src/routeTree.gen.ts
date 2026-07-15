@@ -9,50 +9,227 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteRouteImport } from './routes/_app/route'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppServersIndexRouteImport } from './routes/_app/servers/index'
+import { Route as AppInstancesIndexRouteImport } from './routes/_app/instances/index'
+import { Route as AppBrowseIndexRouteImport } from './routes/_app/browse/index'
+import { Route as AppServersIdRouteImport } from './routes/_app/servers/$id'
+import { Route as AppInstancesIdRouteImport } from './routes/_app/instances/$id'
+import { Route as AppBrowseIdRouteImport } from './routes/_app/browse/$id'
 
-const IndexRoute = IndexRouteImport.update({
+const AppRouteRoute = AppRouteRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppServersIndexRoute = AppServersIndexRouteImport.update({
+  id: '/servers/',
+  path: '/servers/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppInstancesIndexRoute = AppInstancesIndexRouteImport.update({
+  id: '/instances/',
+  path: '/instances/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBrowseIndexRoute = AppBrowseIndexRouteImport.update({
+  id: '/browse/',
+  path: '/browse/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppServersIdRoute = AppServersIdRouteImport.update({
+  id: '/servers/$id',
+  path: '/servers/$id',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppInstancesIdRoute = AppInstancesIdRouteImport.update({
+  id: '/instances/$id',
+  path: '/instances/$id',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBrowseIdRoute = AppBrowseIdRouteImport.update({
+  id: '/browse/$id',
+  path: '/browse/$id',
+  getParentRoute: () => AppRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
+  '/browse/$id': typeof AppBrowseIdRoute
+  '/instances/$id': typeof AppInstancesIdRoute
+  '/servers/$id': typeof AppServersIdRoute
+  '/browse/': typeof AppBrowseIndexRoute
+  '/instances/': typeof AppInstancesIndexRoute
+  '/servers/': typeof AppServersIndexRoute
+  '/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
+  '/browse/$id': typeof AppBrowseIdRoute
+  '/instances/$id': typeof AppInstancesIdRoute
+  '/servers/$id': typeof AppServersIdRoute
+  '/browse': typeof AppBrowseIndexRoute
+  '/instances': typeof AppInstancesIndexRoute
+  '/servers': typeof AppServersIndexRoute
+  '/settings': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteRouteWithChildren
+  '/_app/': typeof AppIndexRoute
+  '/_app/browse/$id': typeof AppBrowseIdRoute
+  '/_app/instances/$id': typeof AppInstancesIdRoute
+  '/_app/servers/$id': typeof AppServersIdRoute
+  '/_app/browse/': typeof AppBrowseIndexRoute
+  '/_app/instances/': typeof AppInstancesIndexRoute
+  '/_app/servers/': typeof AppServersIndexRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/browse/$id'
+    | '/instances/$id'
+    | '/servers/$id'
+    | '/browse/'
+    | '/instances/'
+    | '/servers/'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/browse/$id'
+    | '/instances/$id'
+    | '/servers/$id'
+    | '/browse'
+    | '/instances'
+    | '/servers'
+    | '/settings'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/_app/'
+    | '/_app/browse/$id'
+    | '/_app/instances/$id'
+    | '/_app/servers/$id'
+    | '/_app/browse/'
+    | '/_app/instances/'
+    | '/_app/servers/'
+    | '/_app/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRouteRoute: typeof AppRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/servers/': {
+      id: '/_app/servers/'
+      path: '/servers'
+      fullPath: '/servers/'
+      preLoaderRoute: typeof AppServersIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/instances/': {
+      id: '/_app/instances/'
+      path: '/instances'
+      fullPath: '/instances/'
+      preLoaderRoute: typeof AppInstancesIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/browse/': {
+      id: '/_app/browse/'
+      path: '/browse'
+      fullPath: '/browse/'
+      preLoaderRoute: typeof AppBrowseIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/servers/$id': {
+      id: '/_app/servers/$id'
+      path: '/servers/$id'
+      fullPath: '/servers/$id'
+      preLoaderRoute: typeof AppServersIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/instances/$id': {
+      id: '/_app/instances/$id'
+      path: '/instances/$id'
+      fullPath: '/instances/$id'
+      preLoaderRoute: typeof AppInstancesIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/browse/$id': {
+      id: '/_app/browse/$id'
+      path: '/browse/$id'
+      fullPath: '/browse/$id'
+      preLoaderRoute: typeof AppBrowseIdRouteImport
+      parentRoute: typeof AppRouteRoute
     }
   }
 }
 
+interface AppRouteRouteChildren {
+  AppIndexRoute: typeof AppIndexRoute
+  AppBrowseIdRoute: typeof AppBrowseIdRoute
+  AppInstancesIdRoute: typeof AppInstancesIdRoute
+  AppServersIdRoute: typeof AppServersIdRoute
+  AppBrowseIndexRoute: typeof AppBrowseIndexRoute
+  AppInstancesIndexRoute: typeof AppInstancesIndexRoute
+  AppServersIndexRoute: typeof AppServersIndexRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+}
+
+const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppIndexRoute: AppIndexRoute,
+  AppBrowseIdRoute: AppBrowseIdRoute,
+  AppInstancesIdRoute: AppInstancesIdRoute,
+  AppServersIdRoute: AppServersIdRoute,
+  AppBrowseIndexRoute: AppBrowseIndexRoute,
+  AppInstancesIndexRoute: AppInstancesIndexRoute,
+  AppServersIndexRoute: AppServersIndexRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
+}
+
+const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
+  AppRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRouteRoute: AppRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

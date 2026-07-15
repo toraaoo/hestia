@@ -8,6 +8,11 @@
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: 'Montserrat Variable', sans-serif;
+    /* Accent adapted from the Hestia logo (assets/logo-ember.svg). Additive —
+     * the shadcn base palette below is untouched. Used sparingly. */
+    --color-ember: #f57c12;
+    --color-ember-foreground: #1a1005;
+    --color-amber: #f0a048;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -127,4 +132,10 @@
   html {
     @apply font-sans;
     }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
 }

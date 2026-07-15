@@ -1,0 +1,37 @@
+/**
+ * The Hestia mark: an isometric cube with an "H" cut into each visible face,
+ * lit like an ember. Geometry is taken verbatim from `assets/logo-ember.svg`;
+ * only the rounded packaging rect is dropped so it sits on the launcher's own
+ * sharp surfaces.
+ */
+export function Logo({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 240 240"
+      className={className}
+      role="img"
+      aria-label="Hestia"
+      fill="none"
+    >
+      <polygon points="120,66 178,95 120,124 62,95" fill="#F0A048" />
+      <polygon points="62,95 120,124 120,186 62,157" fill="#F57C12" />
+      <polygon points="120,124 178,95 178,157 120,186" fill="#D9650A" />
+      <g
+        transform="translate(0.7,0.7)"
+        stroke="#8A3C05"
+        strokeWidth="6.5"
+        strokeLinejoin="miter"
+        fill="none"
+      >
+        <polyline points="93.3,95 120,81.6 146.7,95 120,108.4 103.7,100.2 120,92 127.4,95.7" />
+        <polyline points="76.4,148.8 76.4,117.6 105.6,132.2 105.6,163.4 87.8,154.5 87.8,135.4 95.9,139.5" />
+        <polyline points="134.4,163.4 134.4,132.2 163.6,117.6 163.6,148.8 145.8,157.7 145.8,138.7 153.9,134.6" />
+      </g>
+      <g stroke="#FFF3E0" strokeWidth="6.5" strokeLinejoin="miter" fill="none">
+        <polyline points="93.3,95 120,81.6 146.7,95 120,108.4 103.7,100.2 120,92 127.4,95.7" />
+        <polyline points="76.4,148.8 76.4,117.6 105.6,132.2 105.6,163.4 87.8,154.5 87.8,135.4 95.9,139.5" />
+        <polyline points="134.4,163.4 134.4,132.2 163.6,117.6 163.6,148.8 145.8,157.7 145.8,138.7 153.9,134.6" />
+      </g>
+    </svg>
+  );
+}
