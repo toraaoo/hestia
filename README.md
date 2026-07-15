@@ -152,6 +152,8 @@ pointer (`config set home`) → the platform default (`~/.hestia`, or
 - **[docs/architecture.md](docs/architecture.md)** — the target graph and the
   daemon/engine boundary.
 - **[docs/contributing.md](docs/contributing.md)** — conventions and recipes.
+- **[docs/hooks.md](docs/hooks.md)** — the desktop UI's queries layer: hook
+  usage for frontend development.
 
 ## License
 

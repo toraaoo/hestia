@@ -886,9 +886,10 @@ reconnect invalidates everything. Streaming is hooks too: `useConnection()`
 (daemon connection state), `useDaemonEvent(topic, handler)`, and log hooks
 that accumulate `process.output` events onto the fetched tail
 (`useServerLogs(id, { follow: true })`), so components never touch the event
-bus. The desktop signs in over the **sisu** flow: `account.login.begin`
-returns the Microsoft URL for the shell to open, `account.login.complete`
-redeems the redirect's OAuth code.
+bus. [hooks.md](hooks.md) is the layer's usage guide — patterns, the job
+store, and the full hook inventory. The desktop signs in over the **sisu**
+flow: `account.login.begin` returns the Microsoft URL for the shell to open,
+`account.login.complete` redeems the redirect's OAuth code.
 
 > **The desktop bridge is one generic command, not a facade mirror.** The
 > intended recipe used to be one `#[tauri::command]` per feature calling a

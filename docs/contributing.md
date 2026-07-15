@@ -313,7 +313,9 @@ The desktop's Rust side is a fixed, generic bridge (`crates/desktop/src/bridge.r
 grows per feature. A desktop feature is TypeScript in `frontend/src/api/` (and,
 usually, a hook in `frontend/src/queries/`) — the desktop's equivalent of a
 client facade method. See the decision note in
-[architecture.md](architecture.md#desktop-desktop--hestia-desktop).
+[architecture.md](architecture.md#desktop-desktop--hestia-desktop);
+[hooks.md](hooks.md) is the usage guide for *consuming* the queries layer
+(patterns, the job store, the full hook inventory).
 
 **1. The typed function**, in the domain's module (`frontend/src/api/<domain>.ts`),
 with any payload types mirrored from `proto` in `frontend/src/api/types/<domain>.ts`
