@@ -332,20 +332,48 @@ for a long call (mirror the Rust facade's `call_with_timeout` values), and wrap 
 progress-streaming operation in `runJob` (`core/jobs.ts`) with its
 progress/done/error topics — see `server.create` or `java.install`.
 
-**2. The hook**, in `frontend/src/queries/use-<domain>.ts`. Hooks are
-**entity-scoped**: `useServer(id)` returns the entry's status query spread
-together with every action bound to it (`server.start()`,
-`server.backup.create(onProgress?)`, …), composed from an actions-only core
-(`useServerActions(id)`) so pure-action call sites skip the query
-subscription. Entries are keyed by their **stable id** (from the list data),
-never the display name — the wire resolves either, but a rename must not
-strand a cache key. A new verb is one bound one-liner in the domain's actions maker,
-invalidating through the shared `sweeper` on settle; a read that isn't the
-entity's own status gets its own `useQuery` hook (`useServerLogs`) over a key
-from `keys.ts`. When a component wants `isPending`/`progress`/`error`, wrap
-the bound action in `useTask` — it injects its own progress callback into any
-job-backed action. If a daemon event should refresh a query, add its terminal
-topic to the map in `queries/invalidation.ts`.
+**2. The query bindings**, in the domain's `frontend/src/queries/<domain>.ts` —
+every API function gets a factory entry and a thin hook, so the layer stays
+1:1 with the API. A read is a `queryOptions` maker in `<domain>Queries` (its
+key from `keys.ts` — per-entry keys take the **stable id**, never the display
+name, and nest under `detail(id)` so one sweep refreshes the whole entry)
+plus a one-line `useQuery` hook. A write is a `mutation({ mutationKey,
+mutationFn, invalidates })` maker in `<domain>Mutations` plus a one-line
+`useMutation` hook — `invalidates` declares the key prefixes swept on settle:
+
+```ts
+// frontend/src/queries/instance.ts
+export const instanceQueries = {
+	list: () =>
+		queryOptions({ queryKey: keys.instances.list(), queryFn: () => api.list() }),
+};
+
+export const instanceMutations = {
+	rename: (id: string) =>
+		mutation<InstanceInfo, string>({
+			mutationKey: [...keys.instances.detail(id), "rename"],
+			mutationFn: (name) => api.rename(id, name),
+			invalidates: () => [keys.instances.all],
+		}),
+};
+
+export function useInstances() {
+	return useQuery(instanceQueries.list());
+}
+export function useRenameInstance(id: string) {
+	return useMutation(instanceMutations.rename(id));
+}
+```
+
+A progress-streaming operation is a `jobMutation({ mutationKey, meta, run,
+invalidates })` consumed through `useJobMutation` — the run registers in the
+global job store (so `useJobs`/`useEntryJobs` and any activity surface see
+it, outliving the component) and the hook's result adds `progress`/`job` for
+the inline case; see `serverMutations.create` or `javaMutations.install`.
+Factories are the source of truth: a route loader preloads through them
+(`context.queryClient.ensureQueryData(serverQueries.list())`). If a daemon
+event should refresh a query, add its terminal topic to the map in
+`queries/invalidation.ts`.
 
 A brand-new domain adds one module file per layer plus its `export * as <domain>`
 line in `frontend/src/api/index.ts` — nothing in the Rust shell changes.

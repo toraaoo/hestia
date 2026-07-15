@@ -864,18 +864,31 @@ The typed surface lives in the frontend, `frontend/src/api/`: `core/` (the
 `runJob` driver mirroring `Session::run_job` — client-generated job id,
 subscribe-before-start), `types/` (hand-mirrored `proto` types, one file per
 proto module, wire-faithful snake_case), and one module per domain mirroring
-the client facades. Over it sits `frontend/src/queries/` — TanStack Query
-bindings: a hierarchical key factory keyed by stable entry ids (never the
-renameable display name), entity-scoped hooks (`useServer(id)` is the status
-query spread with the entry's bound actions — plain async functions that
-invalidate on settle, not one mutation hook per verb; detail queries seed
-from the list cache, and `useTask` adds pending/progress state where a
-component wants it), and
-event-driven invalidation (terminal daemon topics map to key prefixes, so
-lists stay fresh without polling; a reconnect invalidates everything). The
-desktop signs in over the **sisu** flow: `account.login.begin` returns the
-Microsoft URL for the shell to open, `account.login.complete` redeems the
-redirect's OAuth code.
+the client facades. Over it sits `frontend/src/queries/` — the TanStack Query
+layer, one module per domain mirroring the API namespaces **1:1** so the UI
+only renders. Each domain exports its **factories** —
+`queryOptions`/mutation-options makers (`serverQueries.detail(id)`,
+`serverMutations.start(id)`), the single source of truth a router loader can
+preload through — plus a **thin hook per API function** over them
+(`useServer(id)`, `useStartServer(id)`); keys come from one hierarchical
+factory keyed by stable entry ids (never the renameable display name), with
+an entry's sub-resources nested under its `detail(id)` prefix so one sweep
+refreshes the whole entry, and detail queries seed from the list cache.
+Long-running operations are **job mutations**: every one routes through a
+global job store (`useJobs`/`useEntryJobs` — an activity surface sees every
+in-flight job with live progress, surviving unmount and navigation), and
+`useJobMutation` adds the local view (`progress`/`job` on the mutation
+result). Freshness is belt-and-suspenders: mutations invalidate their own
+key prefixes on settle (declared as data in each factory), and
+`queries/invalidation.ts` maps terminal daemon topics to key prefixes so
+changes made by the CLI, the tray, or a schedule land without polling — a
+reconnect invalidates everything. Streaming is hooks too: `useConnection()`
+(daemon connection state), `useDaemonEvent(topic, handler)`, and log hooks
+that accumulate `process.output` events onto the fetched tail
+(`useServerLogs(id, { follow: true })`), so components never touch the event
+bus. The desktop signs in over the **sisu** flow: `account.login.begin`
+returns the Microsoft URL for the shell to open, `account.login.complete`
+redeems the redirect's OAuth code.
 
 > **The desktop bridge is one generic command, not a facade mirror.** The
 > intended recipe used to be one `#[tauri::command]` per feature calling a
