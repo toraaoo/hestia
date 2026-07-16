@@ -38,7 +38,7 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
       search
       searchPlaceholder="Search Modrinth"
     >
-      <div className="mb-4 flex flex-wrap gap-1.5">
+      <div className="mb-5 flex flex-wrap gap-1.5">
         <Link to="/browse" className={chipClass(!kind)}>
           All
         </Link>
