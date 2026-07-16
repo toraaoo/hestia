@@ -37,6 +37,12 @@ interface NavItem {
 const nav: NavItem[] = [
   { to: '/', label: 'Library', icon: PackageIcon, match: ['/'] },
   {
+    to: '/browse',
+    label: 'Browse content',
+    icon: StorefrontIcon,
+    match: ['/browse'],
+  },
+  {
     to: '/instances',
     label: 'Instances',
     icon: CubeIcon,
@@ -47,12 +53,6 @@ const nav: NavItem[] = [
     label: 'Servers',
     icon: HardDrivesIcon,
     match: ['/servers'],
-  },
-  {
-    to: '/browse',
-    label: 'Browse content',
-    icon: StorefrontIcon,
-    match: ['/browse'],
   },
   {
     to: '/skins',
