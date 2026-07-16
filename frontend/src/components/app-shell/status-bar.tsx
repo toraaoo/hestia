@@ -1,6 +1,6 @@
 import { DownloadSimpleIcon } from '@phosphor-icons/react';
 
-import { Progress, ProgressTrack } from '@/components/ui/progress';
+import { Progress } from '@/components/ui/progress';
 import { StatusDot } from '@/components/ui/status-dot';
 import { daemon } from '@/lib/mock';
 
@@ -18,9 +18,7 @@ export function StatusBar() {
       <div className="ml-auto flex items-center gap-2">
         <DownloadSimpleIcon className="size-3.5" />
         <span>Installing Sodium</span>
-        <Progress value={jobProgress} className="w-28">
-          <ProgressTrack />
-        </Progress>
+        <Progress value={jobProgress} className="w-28" />
         <span className="font-mono tabular-nums">{jobProgress}%</span>
       </div>
     </footer>
