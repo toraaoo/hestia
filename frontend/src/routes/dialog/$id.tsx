@@ -3,7 +3,13 @@ import { isTauri } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { dialogEvent } from '@/dialogs/bridge';
@@ -30,6 +36,17 @@ function DialogWindow() {
   const [box, setBox] = useState<{ payload: unknown } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const settled = useRef(false);
+
+  const close = useCallback(async (result?: unknown) => {
+    if (settled.current) return;
+    settled.current = true;
+    const view = getCurrentWebviewWindow();
+    await emit(
+      dialogEvent('result', view.label),
+      result === undefined ? {} : { result },
+    );
+    await view.close();
+  }, []);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -78,28 +95,22 @@ function DialogWindow() {
         fitWindow().catch(() => {});
       });
       observer.observe(el);
-    })().catch(() => {});
+    })().catch((cause) => {
+      // A window that cannot fit or show would sit invisible while the
+      // opener is disabled — cancel instead so the opener recovers.
+      console.error('[dialogs] fit pass failed, closing:', cause);
+      close();
+    });
 
     return () => {
       disposed = true;
       observer?.disconnect();
     };
-  }, [ready]);
+  }, [ready, close]);
 
   if (!entry || !box) {
     return <div className="h-screen w-screen bg-background" />;
   }
-
-  const close = async (result?: unknown) => {
-    if (settled.current) return;
-    settled.current = true;
-    const view = getCurrentWebviewWindow();
-    await emit(
-      dialogEvent('result', view.label),
-      result === undefined ? {} : { result },
-    );
-    await view.close();
-  };
 
   const Content = entry.Content;
   return (

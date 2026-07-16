@@ -21,7 +21,7 @@ import { isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { type ComponentType, useEffect, useRef } from 'react';
+import { type ComponentType, useEffect, useRef, useState } from 'react';
 
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { type DialogResultEnvelope, dialogEvent } from '@/dialogs/bridge';
@@ -60,6 +60,13 @@ export interface WindowDialogProps<P, R> {
   onResult?: (result: R) => void;
 }
 
+/**
+ * Once a sub-window fails to come up (denied capability, load failure),
+ * every dialog degrades to the in-page overlay for the rest of the session
+ * instead of re-trying a broken path per open.
+ */
+let subWindowsUnavailable = false;
+
 export function windowDialog<P, R>(
   id: string,
   Content: ComponentType<WindowDialogContentProps<P, R>>,
@@ -73,10 +80,20 @@ export function windowDialog<P, R>(
   });
 
   function WindowDialog(props: WindowDialogProps<P, R>) {
-    return isTauri() ? (
-      <SubWindowHost id={id} options={options} {...props} />
-    ) : (
-      <InPageHost Content={Content} options={options} {...props} />
+    const [fallback, setFallback] = useState(subWindowsUnavailable);
+    if (!isTauri() || fallback) {
+      return <InPageHost Content={Content} options={options} {...props} />;
+    }
+    return (
+      <SubWindowHost
+        id={id}
+        options={options}
+        onFallback={() => {
+          subWindowsUnavailable = true;
+          setFallback(true);
+        }}
+        {...props}
+      />
     );
   }
   WindowDialog.displayName = `WindowDialog(${id})`;
@@ -111,10 +128,16 @@ function InPageHost<P, R>({
   );
 }
 
+/** How long the sub-window gets to load and announce itself ready. */
+const READY_TIMEOUT_MS = 3000;
+
 /**
  * Renders nothing; while `open`, a sub-window at `/dialog/<id>` carries the
- * content. The opener is disabled for modality and re-enabled when the
- * dialog settles — including an OS-level close (the destroyed event).
+ * content. The opener is disabled for modality once the window exists and
+ * re-enabled when the dialog settles — including an OS-level close (the
+ * destroyed event). Any failure to come up (creation error, load timeout)
+ * reports through `onFallback` so the dialog reopens in-page instead of
+ * silently disappearing.
  */
 function SubWindowHost<P, R>({
   id,
@@ -123,9 +146,14 @@ function SubWindowHost<P, R>({
   onOpenChange,
   payload,
   onResult,
-}: WindowDialogProps<P, R> & { id: string; options: WindowDialogOptions<P> }) {
-  const latest = useRef({ payload, onResult, onOpenChange });
-  latest.current = { payload, onResult, onOpenChange };
+  onFallback,
+}: WindowDialogProps<P, R> & {
+  id: string;
+  options: WindowDialogOptions<P>;
+  onFallback: () => void;
+}) {
+  const latest = useRef({ payload, onResult, onOpenChange, onFallback });
+  latest.current = { payload, onResult, onOpenChange, onFallback };
 
   useEffect(() => {
     if (!open) return;
@@ -134,10 +162,12 @@ function SubWindowHost<P, R>({
     const opener = getCurrentWindow();
     const unlistens: UnlistenFn[] = [];
     let view: WebviewWindow | undefined;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
     let disposed = false;
     let settled = false;
 
     const release = () => {
+      clearTimeout(watchdog);
       for (const unlisten of unlistens) unlisten();
       unlistens.length = 0;
       opener.setEnabled(true).catch(() => {});
@@ -152,9 +182,22 @@ function SubWindowHost<P, R>({
       latest.current.onOpenChange(false);
     };
 
+    const fail = (cause: unknown) => {
+      if (settled) return;
+      settled = true;
+      release();
+      view?.close().catch(() => {});
+      console.error(
+        `[dialogs] sub-window for "${id}" failed, falling back to the in-page dialog:`,
+        cause,
+      );
+      if (!disposed) latest.current.onFallback();
+    };
+
     (async () => {
       unlistens.push(
         await listen(dialogEvent('ready', label), () => {
+          clearTimeout(watchdog);
           emit(dialogEvent('init', label), latest.current.payload);
         }),
       );
@@ -184,10 +227,16 @@ function SubWindowHost<P, R>({
         skipTaskbar: true,
         decorations: false,
       });
-      view.once('tauri://error', () => settle());
+      view.once('tauri://error', (event) => fail(event.payload));
       view.once('tauri://destroyed', () => settle());
-      opener.setEnabled(false).catch(() => {});
-    })();
+      view.once('tauri://created', () => {
+        if (!settled) opener.setEnabled(false).catch(() => {});
+      });
+      watchdog = setTimeout(
+        () => fail(`no ready signal within ${READY_TIMEOUT_MS}ms`),
+        READY_TIMEOUT_MS,
+      );
+    })().catch(fail);
 
     return () => {
       disposed = true;
