@@ -1,19 +1,21 @@
 import type { Icon } from '@phosphor-icons/react';
 import { CaretRightIcon } from '@phosphor-icons/react';
-import { Link } from '@tanstack/react-router';
+import { Link, type LinkProps } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
 /** Breadcrumb + banner hero: parent link, big icon, name, badges, actions. */
 export function DetailHero({
   parentLabel,
   parentTo,
+  parentParams,
   icon: Icon,
   name,
   badges,
   actions,
 }: {
   parentLabel: string;
-  parentTo: '/instances' | '/servers' | '/browse';
+  parentTo: LinkProps['to'];
+  parentParams?: LinkProps['params'];
   icon: Icon;
   name: string;
   badges: ReactNode;
@@ -22,7 +24,11 @@ export function DetailHero({
   return (
     <div className="border-b border-border">
       <div className="flex items-center gap-1.5 px-5 py-2 text-xs text-muted-foreground">
-        <Link to={parentTo} className="hover:text-foreground">
+        <Link
+          to={parentTo}
+          params={parentParams}
+          className="hover:text-foreground"
+        >
           {parentLabel}
         </Link>
         <CaretRightIcon className="size-3" />

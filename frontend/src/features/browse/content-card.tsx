@@ -5,6 +5,7 @@ import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { kindInfo } from '@/features/browse/kinds';
 import type { ContentProject } from '@/features/browse/mock';
 import { compact } from '@/lib/format';
 
@@ -13,8 +14,8 @@ export function ContentCard({ project }: { project: ContentProject }) {
 
   return (
     <Link
-      to="/browse/$id"
-      params={{ id: project.id }}
+      to="/browse/$kind/$id"
+      params={{ kind: kindInfo[project.kind].slug, id: project.id }}
       className="group block outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
       <Card size="sm" className="transition-colors group-hover:bg-muted/40">

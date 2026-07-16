@@ -18,7 +18,8 @@ import { Route as AppInstancesIndexRouteImport } from './routes/_app/instances/i
 import { Route as AppBrowseIndexRouteImport } from './routes/_app/browse/index'
 import { Route as AppServersIdRouteImport } from './routes/_app/servers/$id'
 import { Route as AppInstancesIdRouteImport } from './routes/_app/instances/$id'
-import { Route as AppBrowseIdRouteImport } from './routes/_app/browse/$id'
+import { Route as AppBrowseKindIndexRouteImport } from './routes/_app/browse/$kind/index'
+import { Route as AppBrowseKindIdRouteImport } from './routes/_app/browse/$kind/$id'
 
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
@@ -64,15 +65,19 @@ const AppInstancesIdRoute = AppInstancesIdRouteImport.update({
   path: '/instances/$id',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppBrowseIdRoute = AppBrowseIdRouteImport.update({
-  id: '/browse/$id',
-  path: '/browse/$id',
+const AppBrowseKindIndexRoute = AppBrowseKindIndexRouteImport.update({
+  id: '/browse/$kind/',
+  path: '/browse/$kind/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBrowseKindIdRoute = AppBrowseKindIdRouteImport.update({
+  id: '/browse/$kind/$id',
+  path: '/browse/$kind/$id',
   getParentRoute: () => AppRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/browse/$id': typeof AppBrowseIdRoute
   '/instances/$id': typeof AppInstancesIdRoute
   '/servers/$id': typeof AppServersIdRoute
   '/browse/': typeof AppBrowseIndexRoute
@@ -80,10 +85,11 @@ export interface FileRoutesByFullPath {
   '/servers/': typeof AppServersIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/skins/': typeof AppSkinsIndexRoute
+  '/browse/$kind/$id': typeof AppBrowseKindIdRoute
+  '/browse/$kind/': typeof AppBrowseKindIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
-  '/browse/$id': typeof AppBrowseIdRoute
   '/instances/$id': typeof AppInstancesIdRoute
   '/servers/$id': typeof AppServersIdRoute
   '/browse': typeof AppBrowseIndexRoute
@@ -91,12 +97,13 @@ export interface FileRoutesByTo {
   '/servers': typeof AppServersIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/skins': typeof AppSkinsIndexRoute
+  '/browse/$kind/$id': typeof AppBrowseKindIdRoute
+  '/browse/$kind': typeof AppBrowseKindIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteRouteWithChildren
   '/_app/': typeof AppIndexRoute
-  '/_app/browse/$id': typeof AppBrowseIdRoute
   '/_app/instances/$id': typeof AppInstancesIdRoute
   '/_app/servers/$id': typeof AppServersIdRoute
   '/_app/browse/': typeof AppBrowseIndexRoute
@@ -104,12 +111,13 @@ export interface FileRoutesById {
   '/_app/servers/': typeof AppServersIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/skins/': typeof AppSkinsIndexRoute
+  '/_app/browse/$kind/$id': typeof AppBrowseKindIdRoute
+  '/_app/browse/$kind/': typeof AppBrowseKindIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/browse/$id'
     | '/instances/$id'
     | '/servers/$id'
     | '/browse/'
@@ -117,10 +125,11 @@ export interface FileRouteTypes {
     | '/servers/'
     | '/settings/'
     | '/skins/'
+    | '/browse/$kind/$id'
+    | '/browse/$kind/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/browse/$id'
     | '/instances/$id'
     | '/servers/$id'
     | '/browse'
@@ -128,11 +137,12 @@ export interface FileRouteTypes {
     | '/servers'
     | '/settings'
     | '/skins'
+    | '/browse/$kind/$id'
+    | '/browse/$kind'
   id:
     | '__root__'
     | '/_app'
     | '/_app/'
-    | '/_app/browse/$id'
     | '/_app/instances/$id'
     | '/_app/servers/$id'
     | '/_app/browse/'
@@ -140,6 +150,8 @@ export interface FileRouteTypes {
     | '/_app/servers/'
     | '/_app/settings/'
     | '/_app/skins/'
+    | '/_app/browse/$kind/$id'
+    | '/_app/browse/$kind/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -211,11 +223,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInstancesIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/browse/$id': {
-      id: '/_app/browse/$id'
-      path: '/browse/$id'
-      fullPath: '/browse/$id'
-      preLoaderRoute: typeof AppBrowseIdRouteImport
+    '/_app/browse/$kind/': {
+      id: '/_app/browse/$kind/'
+      path: '/browse/$kind'
+      fullPath: '/browse/$kind/'
+      preLoaderRoute: typeof AppBrowseKindIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/browse/$kind/$id': {
+      id: '/_app/browse/$kind/$id'
+      path: '/browse/$kind/$id'
+      fullPath: '/browse/$kind/$id'
+      preLoaderRoute: typeof AppBrowseKindIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
   }
@@ -223,7 +242,6 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
-  AppBrowseIdRoute: typeof AppBrowseIdRoute
   AppInstancesIdRoute: typeof AppInstancesIdRoute
   AppServersIdRoute: typeof AppServersIdRoute
   AppBrowseIndexRoute: typeof AppBrowseIndexRoute
@@ -231,11 +249,12 @@ interface AppRouteRouteChildren {
   AppServersIndexRoute: typeof AppServersIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppSkinsIndexRoute: typeof AppSkinsIndexRoute
+  AppBrowseKindIdRoute: typeof AppBrowseKindIdRoute
+  AppBrowseKindIndexRoute: typeof AppBrowseKindIndexRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppIndexRoute: AppIndexRoute,
-  AppBrowseIdRoute: AppBrowseIdRoute,
   AppInstancesIdRoute: AppInstancesIdRoute,
   AppServersIdRoute: AppServersIdRoute,
   AppBrowseIndexRoute: AppBrowseIndexRoute,
@@ -243,6 +262,8 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppServersIndexRoute: AppServersIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppSkinsIndexRoute: AppSkinsIndexRoute,
+  AppBrowseKindIdRoute: AppBrowseKindIdRoute,
+  AppBrowseKindIndexRoute: AppBrowseKindIndexRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(

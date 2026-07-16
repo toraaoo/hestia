@@ -1,30 +1,27 @@
-import { useState } from 'react';
+import { Link } from '@tanstack/react-router';
 
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
 import { ContentCard } from '@/features/browse/content-card';
+import { contentKinds, kindInfo } from '@/features/browse/kinds';
 import { contentProjects } from '@/features/browse/mock';
 import type { ContentKind } from '@/lib/mock';
 import { cn } from '@/lib/utils';
 
-type Filter = 'all' | ContentKind;
+const chipClass = (active: boolean) =>
+  cn(
+    'border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring',
+    active
+      ? 'border-transparent bg-primary text-primary-foreground'
+      : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+  );
 
-const filters: { value: Filter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'mod', label: 'Mods' },
-  { value: 'modpack', label: 'Modpacks' },
-  { value: 'resourcepack', label: 'Resource packs' },
-  { value: 'shader', label: 'Shaders' },
-  { value: 'datapack', label: 'Datapacks' },
-];
-
-export function BrowsePage() {
+export function BrowsePage({ kind }: { kind?: ContentKind }) {
   const { query } = useSearch();
-  const [kind, setKind] = useState<Filter>('all');
 
   const q = query.trim().toLowerCase();
   const results = contentProjects.filter((p) => {
-    if (kind !== 'all' && p.kind !== kind) return false;
+    if (kind && p.kind !== kind) return false;
     if (!q) return true;
     return (
       p.title.toLowerCase().includes(q) ||
@@ -42,20 +39,18 @@ export function BrowsePage() {
       searchPlaceholder="Search Modrinth"
     >
       <div className="mb-4 flex flex-wrap gap-1.5">
-        {filters.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            onClick={() => setKind(f.value)}
-            className={cn(
-              'border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring',
-              kind === f.value
-                ? 'border-transparent bg-primary text-primary-foreground'
-                : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
+        <Link to="/browse" className={chipClass(!kind)}>
+          All
+        </Link>
+        {contentKinds.map((k) => (
+          <Link
+            key={k}
+            to="/browse/$kind"
+            params={{ kind: kindInfo[k].slug }}
+            className={chipClass(kind === k)}
           >
-            {f.label}
-          </button>
+            {kindInfo[k].label}
+          </Link>
         ))}
       </div>
 
