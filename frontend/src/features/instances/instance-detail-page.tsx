@@ -18,13 +18,14 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   BackupList,
-  ContentList,
+  ContentSection,
   SideCard,
   StatCard,
 } from '@/features/entries/detail';
 import { getInstance } from '@/features/entries/mock';
 import { InstanceSettingsForm } from '@/features/entries/settings-forms';
 import { agoLabel } from '@/lib/format';
+import type { ContentKind } from '@/lib/mock';
 
 export type InstanceTab =
   | 'overview'
@@ -34,14 +35,26 @@ export type InstanceTab =
   | 'logs'
   | 'settings';
 
+/** The content kinds an instance takes (see `instance.content.add`). */
+export const instanceContentKinds: ContentKind[] = [
+  'mod',
+  'resourcepack',
+  'shader',
+  'datapack',
+];
+
 export function InstanceDetailPage({
   id,
   tab,
   onTabChange,
+  contentKind,
+  onContentKindChange,
 }: {
   id: string;
   tab: InstanceTab;
   onTabChange: (tab: InstanceTab) => void;
+  contentKind?: ContentKind;
+  onContentKindChange: (kind?: ContentKind) => void;
 }) {
   const inst = getInstance(id);
 
@@ -184,13 +197,18 @@ export function InstanceDetailPage({
         </TabsContent>
 
         <TabsContent value="content" className="p-5">
-          <div className="mb-3 flex justify-end">
-            <Button size="sm" variant="outline" data-icon="inline-start">
-              <PlusIcon weight="bold" />
-              Add content
-            </Button>
-          </div>
-          <ContentList items={inst.content} />
+          <ContentSection
+            items={inst.content}
+            kinds={instanceContentKinds}
+            kind={contentKind}
+            onKindChange={onContentKindChange}
+            action={
+              <Button size="sm" variant="outline" data-icon="inline-start">
+                <PlusIcon weight="bold" />
+                Add content
+              </Button>
+            }
+          />
         </TabsContent>
 
         <TabsContent value="worlds" className="p-5">
@@ -209,7 +227,7 @@ export function InstanceDetailPage({
         </TabsContent>
 
         <TabsContent value="backups" className="p-5">
-          <div className="mb-3 flex justify-end">
+          <div className="mb-5 flex justify-end">
             <Button size="sm" variant="outline" data-icon="inline-start">
               <PlusIcon weight="bold" />
               Create backup

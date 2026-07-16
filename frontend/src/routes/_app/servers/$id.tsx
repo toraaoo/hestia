@@ -3,22 +3,34 @@ import { createFileRoute } from '@tanstack/react-router';
 import {
   ServerDetailPage,
   type ServerTab,
+  serverContentKinds,
 } from '@/features/servers/server-detail-page';
+import type { ContentKind } from '@/lib/mock';
 
 const tabs: ServerTab[] = ['console', 'content', 'backups', 'settings'];
 
 export const Route = createFileRoute('/_app/servers/$id')({
-  validateSearch: (search: Record<string, unknown>): { tab?: ServerTab } => ({
-    tab: tabs.includes(search.tab as ServerTab)
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tab?: ServerTab; kind?: ContentKind } => {
+    const tab = tabs.includes(search.tab as ServerTab)
       ? (search.tab as ServerTab)
-      : undefined,
-  }),
+      : undefined;
+    return {
+      tab,
+      kind:
+        tab === 'content' &&
+        serverContentKinds.includes(search.kind as ContentKind)
+          ? (search.kind as ContentKind)
+          : undefined,
+    };
+  },
   component: RouteComponent,
 });
 
 function RouteComponent() {
   const { id } = Route.useParams();
-  const { tab = 'overview' } = Route.useSearch();
+  const { tab = 'overview', kind } = Route.useSearch();
   const navigate = Route.useNavigate();
 
   return (
@@ -28,6 +40,13 @@ function RouteComponent() {
       onTabChange={(next) =>
         navigate({
           search: next === 'overview' ? {} : { tab: next },
+          replace: true,
+        })
+      }
+      contentKind={kind}
+      onContentKindChange={(next) =>
+        navigate({
+          search: { tab: 'content', kind: next },
           replace: true,
         })
       }

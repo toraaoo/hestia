@@ -1,12 +1,15 @@
 import { DotsThreeIcon, TrashIcon } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 
+import { chipClass } from '@/components/chip';
 import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { kindInfo } from '@/features/browse/kinds';
 import type { Backup, InstalledContent } from '@/features/entries/mock';
 import { agoLabel, bytes } from '@/lib/format';
+import type { ContentKind } from '@/lib/mock';
 
 /** A big number + label tile for an overview row. */
 export function StatCard({
@@ -39,6 +42,57 @@ export function SideCard({
       </div>
       <div className="p-3">{children}</div>
     </div>
+  );
+}
+
+/** The content tab body: kind filter chips + the filtered install list. */
+export function ContentSection({
+  items,
+  kinds,
+  kind,
+  onKindChange,
+  action,
+}: {
+  items: InstalledContent[];
+  kinds: ContentKind[];
+  kind?: ContentKind;
+  onKindChange: (kind?: ContentKind) => void;
+  action?: ReactNode;
+}) {
+  const filtered = kind ? items.filter((c) => c.kind === kind) : items;
+  const count = (k: ContentKind) => items.filter((c) => c.kind === k).length;
+
+  return (
+    <>
+      <div className="mb-5 flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          className={chipClass(!kind)}
+          onClick={() => onKindChange(undefined)}
+        >
+          All
+        </button>
+        {kinds.map((k) => (
+          <button
+            key={k}
+            type="button"
+            className={chipClass(kind === k)}
+            onClick={() => onKindChange(k)}
+          >
+            {kindInfo[k].label}
+            <span className="ml-1.5 font-mono text-[10px] opacity-60">
+              {count(k)}
+            </span>
+          </button>
+        ))}
+        {action && <div className="ml-auto">{action}</div>}
+      </div>
+      {filtered.length === 0 && kind ? (
+        <Empty>No {kindInfo[kind].label.toLowerCase()} installed.</Empty>
+      ) : (
+        <ContentList items={filtered} />
+      )}
+    </>
   );
 }
 

@@ -1,20 +1,12 @@
 import { Link } from '@tanstack/react-router';
 
 import { useSearch } from '@/components/app-shell/search-context';
+import { chipClass } from '@/components/chip';
 import { Page } from '@/components/page';
 import { ContentCard } from '@/features/browse/content-card';
 import { contentKinds, kindInfo } from '@/features/browse/kinds';
 import { contentProjects } from '@/features/browse/mock';
 import type { ContentKind } from '@/lib/mock';
-import { cn } from '@/lib/utils';
-
-const chipClass = (active: boolean) =>
-  cn(
-    'border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring',
-    active
-      ? 'border-transparent bg-primary text-primary-foreground'
-      : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
-  );
 
 export function BrowsePage({ kind }: { kind?: ContentKind }) {
   const { query } = useSearch();

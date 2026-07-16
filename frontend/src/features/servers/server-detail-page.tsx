@@ -16,13 +16,14 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   BackupList,
-  ContentList,
+  ContentSection,
   SideCard,
   StatCard,
 } from '@/features/entries/detail';
 import { getServer } from '@/features/entries/mock';
 import { ServerSettingsForm } from '@/features/entries/settings-forms';
 import { agoLabel } from '@/lib/format';
+import type { ContentKind } from '@/lib/mock';
 
 const consoleLines = [
   '[12:04:21] [Server thread/INFO]: Starting minecraft server version 1.21.4',
@@ -39,14 +40,21 @@ export type ServerTab =
   | 'backups'
   | 'settings';
 
+/** The content kinds a server takes (see `server.content.add`). */
+export const serverContentKinds: ContentKind[] = ['mod', 'datapack'];
+
 export function ServerDetailPage({
   id,
   tab,
   onTabChange,
+  contentKind,
+  onContentKindChange,
 }: {
   id: string;
   tab: ServerTab;
   onTabChange: (tab: ServerTab) => void;
+  contentKind?: ContentKind;
+  onContentKindChange: (kind?: ContentKind) => void;
 }) {
   const server = getServer(id);
 
@@ -193,17 +201,22 @@ export function ServerDetailPage({
         </TabsContent>
 
         <TabsContent value="content" className="p-5">
-          <div className="mb-3 flex justify-end">
-            <Button size="sm" variant="outline" data-icon="inline-start">
-              <PlusIcon weight="bold" />
-              Add content
-            </Button>
-          </div>
-          <ContentList items={server.content} />
+          <ContentSection
+            items={server.content}
+            kinds={serverContentKinds}
+            kind={contentKind}
+            onKindChange={onContentKindChange}
+            action={
+              <Button size="sm" variant="outline" data-icon="inline-start">
+                <PlusIcon weight="bold" />
+                Add content
+              </Button>
+            }
+          />
         </TabsContent>
 
         <TabsContent value="backups" className="p-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-5 flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
               {server.backup_interval
                 ? `Scheduled every ${server.backup_interval}, keeping ${server.backup_retention}`
