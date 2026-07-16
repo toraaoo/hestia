@@ -2,19 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import { isTauri } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { dialogEvent } from '@/dialogs/bridge';
 import { getDialog } from '@/dialogs/registry';
-import { cn } from '@/lib/utils';
 
 import '@/dialogs';
 
@@ -25,16 +17,15 @@ export const Route = createFileRoute('/dialog/$id')({
 /**
  * The surface a dialog sub-window renders: the registered content inside the
  * same `DialogContent` as the in-page overlay, so Escape, backdrop and the
- * close button behave identically. The window starts hidden at a measuring
- * size; once the payload arrives and the box is laid out, the window is
- * fitted to it, centered and shown — the dialog's own layout is the single
- * source of size (see `MEASURE_VIEWPORT` in `window-dialog.tsx`).
+ * close button behave identically. The window was created at the content's
+ * measured size (see `Measurer` in `window-dialog.tsx`), so the box simply
+ * fills the viewport; the payload arrives over the bridge handshake after
+ * the page announces itself ready.
  */
 function DialogWindow() {
   const { id } = Route.useParams();
   const entry = getDialog(id);
   const [box, setBox] = useState<{ payload: unknown } | null>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
   const settled = useRef(false);
 
   const close = useCallback(async (result?: unknown) => {
@@ -66,50 +57,8 @@ function DialogWindow() {
     };
   }, []);
 
-  const ready = box !== null;
-  useLayoutEffect(() => {
-    if (!ready || !isTauri()) return;
-    const el = contentRef.current;
-    if (!el) return;
-
-    const window = getCurrentWindow();
-    let disposed = false;
-    let observer: ResizeObserver | undefined;
-
-    // offsetWidth/Height ignore the open animation's transform scale, so the
-    // measurement is stable even mid-animation.
-    const fitWindow = () =>
-      window.setSize(new LogicalSize(el.offsetWidth, el.offsetHeight));
-
-    (async () => {
-      await Promise.race([
-        document.fonts.ready,
-        new Promise((resolve) => setTimeout(resolve, 300)),
-      ]);
-      if (disposed) return;
-      await fitWindow();
-      await window.center();
-      await window.show();
-      await window.setFocus();
-      observer = new ResizeObserver(() => {
-        fitWindow().catch(() => {});
-      });
-      observer.observe(el);
-    })().catch((cause) => {
-      // A window that cannot fit or show would sit invisible while the
-      // opener is disabled — cancel instead so the opener recovers.
-      console.error('[dialogs] fit pass failed, closing:', cause);
-      close();
-    });
-
-    return () => {
-      disposed = true;
-      observer?.disconnect();
-    };
-  }, [ready, close]);
-
   if (!entry || !box) {
-    return <div className="h-screen w-screen bg-background" />;
+    return <div className="h-screen w-screen bg-popover" />;
   }
 
   const Content = entry.Content;
@@ -120,13 +69,7 @@ function DialogWindow() {
         if (!open) close();
       }}
     >
-      <DialogContent
-        ref={contentRef}
-        className={cn(
-          'top-0 left-0 max-w-none translate-x-0 translate-y-0',
-          entry.options.contentClassName,
-        )}
-      >
+      <DialogContent className="top-0 left-0 h-screen w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto sm:max-w-none">
         <div data-tauri-drag-region className="absolute inset-x-0 top-0 h-6" />
         <Content payload={box.payload} close={close} />
       </DialogContent>
