@@ -1,6 +1,7 @@
 import {
   ArrowCounterClockwiseIcon,
   CheckIcon,
+  DotsThreeIcon,
   PencilSimpleIcon,
   PlusIcon,
   TrashIcon,
@@ -14,6 +15,13 @@ import { Page, Section } from '@/components/launcher/page';
 import { SkinBody, SkinModel } from '@/components/launcher/skin-render';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { Skin } from '@/lib/mock';
 import { customSkins, defaultSkins, equippedSkinId, getCape } from '@/lib/mock';
 import { readTextureFile } from '@/lib/skin';
@@ -57,6 +65,11 @@ function SkinsPage() {
       setCustom((skins) => [skin, ...skins]);
       setSelectedId(skin.id);
     }
+  };
+
+  const equip = (id: string) => {
+    setEquippedId(id);
+    setSelectedId(id);
   };
 
   const removeSkin = (id: string) => {
@@ -120,6 +133,7 @@ function SkinsPage() {
                     selected={skin.id === selected.id}
                     equipped={skin.id === equippedId}
                     onSelect={() => setSelectedId(skin.id)}
+                    onEquip={() => equip(skin.id)}
                     onEdit={() => setModal({ skin })}
                     onRemove={() => removeSkin(skin.id)}
                   />
@@ -137,6 +151,7 @@ function SkinsPage() {
                   selected={skin.id === selected.id}
                   equipped={skin.id === equippedId}
                   onSelect={() => setSelectedId(skin.id)}
+                  onEquip={() => equip(skin.id)}
                 />
               ))}
             </SkinGrid>
@@ -246,6 +261,7 @@ function SkinCard({
   selected,
   equipped,
   onSelect,
+  onEquip,
   onEdit,
   onRemove,
 }: {
@@ -253,6 +269,7 @@ function SkinCard({
   selected: boolean;
   equipped: boolean;
   onSelect: () => void;
+  onEquip: () => void;
   onEdit?: () => void;
   onRemove?: () => void;
 }) {
@@ -260,9 +277,11 @@ function SkinCard({
     <div
       className={cn(
         'group relative border transition-colors',
-        selected
-          ? 'border-ember bg-muted/60'
-          : 'border-border hover:border-ember/40',
+        equipped
+          ? 'border-ember'
+          : selected
+            ? 'border-foreground/30 hover:border-ember/40'
+            : 'border-border hover:border-ember/40',
       )}
     >
       <button
@@ -287,40 +306,41 @@ function SkinCard({
         </div>
       </button>
 
-      {equipped && (
-        <Badge
-          variant="secondary"
-          className="absolute top-1.5 left-1.5 gap-1 bg-background/80 backdrop-blur-sm"
-        >
-          <CheckIcon weight="bold" className="size-3 text-ember" />
-          Equipped
-        </Badge>
-      )}
-
-      {onEdit && (
-        <div className="absolute top-1.5 right-1.5 flex gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-          <Button
-            variant="secondary"
-            size="icon-sm"
-            aria-label="Edit skin"
-            className="bg-background/80 backdrop-blur-sm"
-            onClick={onEdit}
-          >
-            <PencilSimpleIcon className="size-3.5" />
-          </Button>
-          {onRemove && (
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
             <Button
               variant="secondary"
               size="icon-sm"
-              aria-label="Delete skin"
-              className="bg-background/80 backdrop-blur-sm"
-              onClick={onRemove}
+              aria-label="Skin actions"
+              className="absolute top-1.5 right-1.5 bg-background/80 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
             >
-              <TrashIcon className="size-3.5" />
+              <DotsThreeIcon weight="bold" className="size-3.5" />
             </Button>
+          }
+        />
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem disabled={equipped} onClick={onEquip}>
+            <CheckIcon />
+            {equipped ? 'Equipped' : 'Equip'}
+          </DropdownMenuItem>
+          {onEdit && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onEdit}>
+                <PencilSimpleIcon />
+                Edit
+              </DropdownMenuItem>
+              {onRemove && (
+                <DropdownMenuItem variant="destructive" onClick={onRemove}>
+                  <TrashIcon />
+                  Delete
+                </DropdownMenuItem>
+              )}
+            </>
           )}
-        </div>
-      )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

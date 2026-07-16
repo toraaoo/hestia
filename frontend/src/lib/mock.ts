@@ -530,36 +530,28 @@ export interface Skin {
   source: 'default' | 'custom';
 }
 
-const defaultSkinNames = [
-  'Steve',
-  'Alex',
-  'Ari',
-  'Efe',
-  'Kai',
-  'Makena',
-  'Noor',
-  'Sunny',
-  'Zuri',
+/** Each default character with its canonical model, as the vanilla launcher presents them. */
+const defaultSkinModels: [string, SkinVariant][] = [
+  ['Steve', 'classic'],
+  ['Alex', 'slim'],
+  ['Ari', 'classic'],
+  ['Efe', 'slim'],
+  ['Kai', 'classic'],
+  ['Makena', 'slim'],
+  ['Noor', 'slim'],
+  ['Sunny', 'classic'],
+  ['Zuri', 'classic'],
 ];
 
-export const defaultSkins: Skin[] = defaultSkinNames.flatMap((name) => {
+export const defaultSkins: Skin[] = defaultSkinModels.map(([name, variant]) => {
   const slug = name.toLowerCase();
-  return [
-    {
-      id: `default-${slug}`,
-      name,
-      variant: 'classic' as const,
-      texture: `/skins/${slug}.png`,
-      source: 'default' as const,
-    },
-    {
-      id: `default-${slug}-slim`,
-      name,
-      variant: 'slim' as const,
-      texture: `/skins/${slug}-slim.png`,
-      source: 'default' as const,
-    },
-  ];
+  return {
+    id: `default-${slug}`,
+    name,
+    variant,
+    texture: `/skins/${slug}${variant === 'slim' ? '-slim' : ''}.png`,
+    source: 'default',
+  };
 });
 
 export const customSkins: Skin[] = [
