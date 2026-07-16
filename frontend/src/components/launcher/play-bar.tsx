@@ -90,6 +90,7 @@ export function PlayBar() {
       <Button
         variant="ghost"
         size="sm"
+        nativeButton={false}
         render={<Link to="/instances/$id" params={{ id: sel.id }} />}
       >
         Manage
