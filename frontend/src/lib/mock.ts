@@ -498,6 +498,92 @@ export const contentProjects: ContentProject[] = [
 export const getProject = (id: string) =>
   contentProjects.find((p) => p.id === id);
 
+export type SkinVariant = 'classic' | 'slim';
+
+/** A cape the account owns, from the Mojang profile. */
+export interface Cape {
+  id: string;
+  name: string;
+  texture: string;
+}
+
+export const capes: Cape[] = [
+  { id: 'vanilla', name: 'Vanilla', texture: '/capes/vanilla.png' },
+  { id: 'home', name: 'Home', texture: '/capes/home.png' },
+  {
+    id: 'cherry-blossom',
+    name: 'Cherry Blossom',
+    texture: '/capes/cherry-blossom.png',
+  },
+];
+
+export const getCape = (id?: string) => capes.find((c) => c.id === id);
+
+/** A skin in the library: bundled defaults plus the user's saved skins. */
+export interface Skin {
+  id: string;
+  name: string;
+  variant: SkinVariant;
+  /** URL or data URL of the 64x64 skin texture. */
+  texture: string;
+  cape_id?: string;
+  source: 'default' | 'custom';
+}
+
+const defaultSkinNames = [
+  'Steve',
+  'Alex',
+  'Ari',
+  'Efe',
+  'Kai',
+  'Makena',
+  'Noor',
+  'Sunny',
+  'Zuri',
+];
+
+export const defaultSkins: Skin[] = defaultSkinNames.flatMap((name) => {
+  const slug = name.toLowerCase();
+  return [
+    {
+      id: `default-${slug}`,
+      name,
+      variant: 'classic' as const,
+      texture: `/skins/${slug}.png`,
+      source: 'default' as const,
+    },
+    {
+      id: `default-${slug}-slim`,
+      name,
+      variant: 'slim' as const,
+      texture: `/skins/${slug}-slim.png`,
+      source: 'default' as const,
+    },
+  ];
+});
+
+export const customSkins: Skin[] = [
+  {
+    id: 'custom-adventurer',
+    name: 'Adventurer',
+    variant: 'classic',
+    texture: '/skins/zuri.png',
+    cape_id: 'vanilla',
+    source: 'custom',
+  },
+  {
+    id: 'custom-netherborn',
+    name: 'Netherborn',
+    variant: 'slim',
+    texture: '/skins/efe-slim.png',
+    cape_id: 'home',
+    source: 'custom',
+  },
+];
+
+/** The skin currently applied to the signed-in account. */
+export const equippedSkinId = 'custom-adventurer';
+
 /** An installed Java runtime, from `java.list`. */
 export interface JavaRuntime {
   vendor: string;

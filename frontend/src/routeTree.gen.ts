@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppSkinsIndexRouteImport } from './routes/_app/skins/index'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppServersIndexRouteImport } from './routes/_app/servers/index'
 import { Route as AppInstancesIndexRouteImport } from './routes/_app/instances/index'
@@ -26,6 +27,11 @@ const AppRouteRoute = AppRouteRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSkinsIndexRoute = AppSkinsIndexRouteImport.update({
+  id: '/skins/',
+  path: '/skins/',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/instances/': typeof AppInstancesIndexRoute
   '/servers/': typeof AppServersIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
+  '/skins/': typeof AppSkinsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/instances': typeof AppInstancesIndexRoute
   '/servers': typeof AppServersIndexRoute
   '/settings': typeof AppSettingsIndexRoute
+  '/skins': typeof AppSkinsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/_app/instances/': typeof AppInstancesIndexRoute
   '/_app/servers/': typeof AppServersIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
+  '/_app/skins/': typeof AppSkinsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/instances/'
     | '/servers/'
     | '/settings/'
+    | '/skins/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/instances'
     | '/servers'
     | '/settings'
+    | '/skins'
   id:
     | '__root__'
     | '/_app'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/_app/instances/'
     | '/_app/servers/'
     | '/_app/settings/'
+    | '/_app/skins/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -148,6 +160,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/skins/': {
+      id: '/_app/skins/'
+      path: '/skins'
+      fullPath: '/skins/'
+      preLoaderRoute: typeof AppSkinsIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/settings/': {
@@ -211,6 +230,7 @@ interface AppRouteRouteChildren {
   AppInstancesIndexRoute: typeof AppInstancesIndexRoute
   AppServersIndexRoute: typeof AppServersIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppSkinsIndexRoute: typeof AppSkinsIndexRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
@@ -222,6 +242,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppInstancesIndexRoute: AppInstancesIndexRoute,
   AppServersIndexRoute: AppServersIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppSkinsIndexRoute: AppSkinsIndexRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(

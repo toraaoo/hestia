@@ -8,6 +8,7 @@ import {
   PlusIcon,
   SignOutIcon,
   StorefrontIcon,
+  TShirtIcon,
 } from '@phosphor-icons/react';
 import { Link, useLocation } from '@tanstack/react-router';
 
@@ -51,6 +52,12 @@ const nav: NavItem[] = [
     label: 'Browse content',
     icon: StorefrontIcon,
     match: ['/browse'],
+  },
+  {
+    to: '/skins',
+    label: 'Skins',
+    icon: TShirtIcon,
+    match: ['/skins'],
   },
 ];
 
