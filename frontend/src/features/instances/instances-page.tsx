@@ -1,12 +1,11 @@
 import { PlusIcon } from '@phosphor-icons/react';
-import { useState } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import {
   EntryCollection,
-  FlavorFilter,
+  FilterMenu,
   filterCards,
   instanceCards,
   instanceFlavors,
@@ -14,10 +13,18 @@ import {
   ViewToggle,
 } from '@/features/entries/collection';
 
-export function InstancesPage() {
+export function InstancesPage({
+  view,
+  flavor,
+  onViewChange,
+  onFlavorChange,
+}: {
+  view: View;
+  flavor: string;
+  onViewChange: (view: View) => void;
+  onFlavorChange: (flavor: string) => void;
+}) {
   const { query } = useSearch();
-  const [view, setView] = useState<View>('grid');
-  const [flavor, setFlavor] = useState('all');
   const cards = filterCards(instanceCards, query, flavor);
 
   return (
@@ -28,12 +35,17 @@ export function InstancesPage() {
       searchPlaceholder="Search instances"
       actions={
         <>
-          <FlavorFilter
-            value={flavor}
-            onChange={setFlavor}
-            flavors={instanceFlavors}
+          <FilterMenu
+            groups={[
+              {
+                label: 'Flavor',
+                flavors: instanceFlavors,
+                value: flavor,
+                onChange: onFlavorChange,
+              },
+            ]}
           />
-          <ViewToggle view={view} onView={setView} />
+          <ViewToggle view={view} onView={onViewChange} />
           <Button size="sm" data-icon="inline-start">
             <PlusIcon weight="bold" />
             New instance

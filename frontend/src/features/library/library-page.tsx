@@ -1,13 +1,12 @@
 import { PlusIcon } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
-import { useState } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import {
   EntryCollection,
-  FlavorFilter,
+  FilterMenu,
   filterCards,
   instanceCards,
   instanceFlavors,
@@ -17,14 +16,25 @@ import {
   ViewToggle,
 } from '@/features/entries/collection';
 
-export function LibraryPage() {
+export function LibraryPage({
+  view,
+  serverFlavor,
+  instanceFlavor,
+  onViewChange,
+  onServerFlavorChange,
+  onInstanceFlavorChange,
+}: {
+  view: View;
+  serverFlavor: string;
+  instanceFlavor: string;
+  onViewChange: (view: View) => void;
+  onServerFlavorChange: (flavor: string) => void;
+  onInstanceFlavorChange: (flavor: string) => void;
+}) {
   const { query } = useSearch();
-  const [view, setView] = useState<View>('grid');
-  const [instFlavor, setInstFlavor] = useState('all');
-  const [srvFlavor, setSrvFlavor] = useState('all');
 
-  const srv = filterCards(serverCards, query, srvFlavor);
-  const inst = filterCards(instanceCards, query, instFlavor);
+  const srv = filterCards(serverCards, query, serverFlavor);
+  const inst = filterCards(instanceCards, query, instanceFlavor);
 
   return (
     <Page
@@ -34,7 +44,7 @@ export function LibraryPage() {
       searchPlaceholder="Search library"
       actions={
         <>
-          <ViewToggle view={view} onView={setView} />
+          <ViewToggle view={view} onView={onViewChange} />
           <Button size="sm" data-icon="inline-start">
             <PlusIcon weight="bold" />
             New
@@ -48,10 +58,15 @@ export function LibraryPage() {
           count={srv.length}
           action={
             <div className="flex items-center gap-3">
-              <FlavorFilter
-                value={srvFlavor}
-                onChange={setSrvFlavor}
-                flavors={serverFlavors}
+              <FilterMenu
+                groups={[
+                  {
+                    label: 'Flavor',
+                    flavors: serverFlavors,
+                    value: serverFlavor,
+                    onChange: onServerFlavorChange,
+                  },
+                ]}
               />
               <Link
                 to="/servers"
@@ -73,11 +88,24 @@ export function LibraryPage() {
           title="Instances"
           count={inst.length}
           action={
-            <FlavorFilter
-              value={instFlavor}
-              onChange={setInstFlavor}
-              flavors={instanceFlavors}
-            />
+            <div className="flex items-center gap-3">
+              <FilterMenu
+                groups={[
+                  {
+                    label: 'Flavor',
+                    flavors: instanceFlavors,
+                    value: instanceFlavor,
+                    onChange: onInstanceFlavorChange,
+                  },
+                ]}
+              />
+              <Link
+                to="/instances"
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Manage all
+              </Link>
+            </div>
           }
         >
           <EntryCollection

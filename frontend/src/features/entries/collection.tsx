@@ -1,6 +1,22 @@
-import { PlusIcon, RowsIcon, SquaresFourIcon } from '@phosphor-icons/react';
+import {
+  FunnelSimpleIcon,
+  PlusIcon,
+  RowsIcon,
+  SquaresFourIcon,
+} from '@phosphor-icons/react';
+import { Fragment } from 'react';
 
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   EntryCard,
   type EntryCardData,
@@ -58,33 +74,56 @@ export function filterCards(
   });
 }
 
-/** A single-select flavor filter (All + each flavor), shared by list views. */
-export function FlavorFilter({
-  value,
-  onChange,
-  flavors,
-}: {
-  value: string;
-  onChange: (v: string) => void;
+export type FlavorGroup = {
+  label: string;
   flavors: string[];
-}) {
+  value: string;
+  onChange: (flavor: string) => void;
+};
+
+/** All flavor filters merged into one funnel-icon dropdown, shared by list views. */
+export function FilterMenu({ groups }: { groups: FlavorGroup[] }) {
+  const filtered = groups.some((g) => g.value !== 'all');
   return (
-    <ToggleGroup
-      variant="outline"
-      size="sm"
-      value={[value]}
-      onValueChange={(vals: string[]) => {
-        const next = vals[vals.length - 1];
-        if (next) onChange(next);
-      }}
-    >
-      <ToggleGroupItem value="all">All</ToggleGroupItem>
-      {flavors.map((f) => (
-        <ToggleGroupItem key={f} value={f} className="capitalize">
-          {f}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Filter by flavor"
+            className={cn(filtered ? 'text-ember' : 'text-muted-foreground')}
+          >
+            <FunnelSimpleIcon weight={filtered ? 'bold' : 'regular'} />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end" className="w-44">
+        {groups.map((group, i) => (
+          <Fragment key={group.label}>
+            {i > 0 && <DropdownMenuSeparator />}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={group.value}
+                onValueChange={(value) => group.onChange(String(value))}
+              >
+                <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                {group.flavors.map((f) => (
+                  <DropdownMenuRadioItem
+                    key={f}
+                    value={f}
+                    className="capitalize"
+                  >
+                    {f}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuGroup>
+          </Fragment>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -99,17 +138,16 @@ export function ViewToggle({
   const next: View = view === 'grid' ? 'list' : 'grid';
   const Icon = next === 'list' ? RowsIcon : SquaresFourIcon;
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="icon"
       aria-label={`Switch to ${next} view`}
       title={`Switch to ${next} view`}
       onClick={() => onView(next)}
-      className={cn(
-        'flex size-8 items-center justify-center border border-border text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring',
-      )}
+      className="text-muted-foreground"
     >
       <Icon className="size-4" />
-    </button>
+    </Button>
   );
 }
 

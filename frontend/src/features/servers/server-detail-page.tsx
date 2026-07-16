@@ -32,7 +32,22 @@ const consoleLines = [
   '[12:19:44] [Server thread/INFO]: <toraaoo> anyone near spawn?',
 ];
 
-export function ServerDetailPage({ id }: { id: string }) {
+export type ServerTab =
+  | 'overview'
+  | 'console'
+  | 'content'
+  | 'backups'
+  | 'settings';
+
+export function ServerDetailPage({
+  id,
+  tab,
+  onTabChange,
+}: {
+  id: string;
+  tab: ServerTab;
+  onTabChange: (tab: ServerTab) => void;
+}) {
   const server = getServer(id);
 
   if (!server) {
@@ -95,7 +110,11 @@ export function ServerDetailPage({ id }: { id: string }) {
         }
       />
 
-      <Tabs defaultValue="overview" className="gap-0 p-0">
+      <Tabs
+        value={tab}
+        onValueChange={(value) => onTabChange(value as ServerTab)}
+        className="gap-0 p-0"
+      >
         <TabsList
           variant="line"
           className="h-auto gap-4 border-b border-border px-5"

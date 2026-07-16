@@ -26,7 +26,23 @@ import { getInstance } from '@/features/entries/mock';
 import { InstanceSettingsForm } from '@/features/entries/settings-forms';
 import { agoLabel } from '@/lib/format';
 
-export function InstanceDetailPage({ id }: { id: string }) {
+export type InstanceTab =
+  | 'overview'
+  | 'content'
+  | 'worlds'
+  | 'backups'
+  | 'logs'
+  | 'settings';
+
+export function InstanceDetailPage({
+  id,
+  tab,
+  onTabChange,
+}: {
+  id: string;
+  tab: InstanceTab;
+  onTabChange: (tab: InstanceTab) => void;
+}) {
   const inst = getInstance(id);
 
   if (!inst) {
@@ -83,7 +99,11 @@ export function InstanceDetailPage({ id }: { id: string }) {
         }
       />
 
-      <Tabs defaultValue="overview" className="gap-0 p-0">
+      <Tabs
+        value={tab}
+        onValueChange={(value) => onTabChange(value as InstanceTab)}
+        className="gap-0 p-0"
+      >
         <TabsList
           variant="line"
           className="h-auto gap-4 border-b border-border px-5"
