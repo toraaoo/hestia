@@ -1,8 +1,8 @@
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
 import { useCanGoBack, useRouter } from '@tanstack/react-router';
 
-import { Logo } from '@/components/launcher/logo';
-import { WindowControls } from '@/components/launcher/window-controls';
+import { Logo } from '@/components/app-shell/logo';
+import { WindowControls } from '@/components/app-shell/window-controls';
 import { cn } from '@/lib/utils';
 
 /**

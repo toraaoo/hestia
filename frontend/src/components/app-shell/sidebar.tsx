@@ -22,7 +22,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StatusDot } from '@/components/ui/status-dot';
-import { account, accounts, pinnedInstances } from '@/lib/mock';
+import { pinnedInstances } from '@/features/entries/mock';
+import { account, accounts } from '@/lib/mock';
 import { cn } from '@/lib/utils';
 
 interface NavItem {

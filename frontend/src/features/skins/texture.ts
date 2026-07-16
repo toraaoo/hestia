@@ -5,7 +5,7 @@
  * blits so a grid of dozens never spins up dozens of WebGL contexts.
  */
 
-import type { SkinVariant } from '@/lib/mock';
+import type { SkinVariant } from '@/features/skins/mock';
 
 const textures = new Map<string, Promise<HTMLImageElement>>();
 

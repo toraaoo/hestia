@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { SkinViewer, WalkingAnimation } from 'skinview3d';
 
-import type { SkinVariant } from '@/lib/mock';
+import type { SkinVariant } from '@/features/skins/mock';
 import {
   BODY_H,
   BODY_W,
@@ -10,7 +10,7 @@ import {
   drawCapeFront,
   drawSkinFront,
   loadTexture,
-} from '@/lib/skin';
+} from '@/features/skins/texture';
 import { cn } from '@/lib/utils';
 
 /** Flat front view of a full skin — the cheap render for library cards. */

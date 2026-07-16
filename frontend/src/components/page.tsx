@@ -1,7 +1,7 @@
 import { MagnifyingGlassIcon } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 
-import { useSearch } from '@/components/launcher/search-context';
+import { useSearch } from '@/components/app-shell/search-context';
 import { Input } from '@/components/ui/input';
 
 /**

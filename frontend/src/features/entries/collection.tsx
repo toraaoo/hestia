@@ -1,13 +1,13 @@
 import { PlusIcon, RowsIcon, SquaresFourIcon } from '@phosphor-icons/react';
 
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   EntryCard,
   type EntryCardData,
   EntryRow,
-} from '@/components/launcher/entry-card';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+} from '@/features/entries/entry-card';
+import { instances, servers } from '@/features/entries/mock';
 import { agoLabel } from '@/lib/format';
-import { instances, servers } from '@/lib/mock';
 import { cn } from '@/lib/utils';
 
 export type View = 'grid' | 'list';

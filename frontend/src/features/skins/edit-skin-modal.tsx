@@ -1,7 +1,5 @@
 import { UploadSimpleIcon, XIcon } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
-
-import { CapeFront, SkinModel } from '@/components/launcher/skin-render';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,9 +12,10 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import type { Cape, Skin, SkinVariant } from '@/lib/mock';
-import { capes, getCape } from '@/lib/mock';
-import { readTextureFile } from '@/lib/skin';
+import type { Cape, Skin, SkinVariant } from '@/features/skins/mock';
+import { capes, getCape } from '@/features/skins/mock';
+import { CapeFront, SkinModel } from '@/features/skins/skin-render';
+import { readTextureFile } from '@/features/skins/texture';
 import { cn } from '@/lib/utils';
 
 export interface SkinDraft {

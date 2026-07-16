@@ -1,12 +1,12 @@
 import { DownloadSimpleIcon, HeartIcon, PlusIcon } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
 
-import { contentIcon, contentKindLabel } from '@/components/launcher/icons';
+import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import type { ContentProject } from '@/features/browse/mock';
 import { compact } from '@/lib/format';
-import type { ContentProject } from '@/lib/mock';
 
 export function ContentCard({ project }: { project: ContentProject }) {
   const Icon = contentIcon(project.kind);

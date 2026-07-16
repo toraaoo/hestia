@@ -2,7 +2,7 @@ import { CaretUpDownIcon, PlayIcon } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { entryIcon } from '@/components/launcher/icons';
+import { entryIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StatusDot } from '@/components/ui/status-dot';
-import { featured, instances, pinnedInstances } from '@/lib/mock';
+import { featured, instances, pinnedInstances } from '@/features/entries/mock';
 
 /**
  * The always-present quick-play strip along the bottom of the library. The

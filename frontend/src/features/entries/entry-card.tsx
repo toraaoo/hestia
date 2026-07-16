@@ -1,7 +1,7 @@
 import { PlayIcon, PowerIcon } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
 
-import { entryIcon } from '@/components/launcher/icons';
+import { entryIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
