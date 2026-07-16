@@ -8,8 +8,8 @@ import {
 import { createFileRoute } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
 
-import type { SkinDraft } from '@/components/launcher/edit-skin-modal';
-import { EditSkinModal } from '@/components/launcher/edit-skin-modal';
+import type { SkinDraft } from '@/components/launcher/edit-skin-dialog';
+import { EditSkinDialog } from '@/components/launcher/edit-skin-dialog';
 import { Page, Section } from '@/components/launcher/page';
 import { SkinBody, SkinModel } from '@/components/launcher/skin-render';
 import { Badge } from '@/components/ui/badge';
@@ -44,7 +44,7 @@ function SkinsPage() {
 
   const saveDraft = (draft: SkinDraft) => {
     if (modal?.skin) {
-      const id = modal.skin.id;
+      const { id } = modal.skin;
       setCustom((skins) =>
         skins.map((s) => (s.id === id ? { ...s, ...draft } : s)),
       );
@@ -144,14 +144,13 @@ function SkinsPage() {
         </div>
       </div>
 
-      <EditSkinModal
+      <EditSkinDialog
         open={modal !== null}
         onOpenChange={(open) => {
           if (!open) setModal(null);
         }}
-        skin={modal?.skin ?? null}
-        initialTexture={modal?.texture}
-        onSave={saveDraft}
+        payload={modal ?? undefined}
+        onResult={saveDraft}
       />
     </Page>
   );

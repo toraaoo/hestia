@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as DialogIdRouteImport } from './routes/dialog/$id'
 import { Route as AppSkinsIndexRouteImport } from './routes/_app/skins/index'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppServersIndexRouteImport } from './routes/_app/servers/index'
@@ -28,6 +29,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRouteRoute,
+} as any)
+const DialogIdRoute = DialogIdRouteImport.update({
+  id: '/dialog/$id',
+  path: '/dialog/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppSkinsIndexRoute = AppSkinsIndexRouteImport.update({
   id: '/skins/',
@@ -72,6 +78,7 @@ const AppBrowseIdRoute = AppBrowseIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/dialog/$id': typeof DialogIdRoute
   '/browse/$id': typeof AppBrowseIdRoute
   '/instances/$id': typeof AppInstancesIdRoute
   '/servers/$id': typeof AppServersIdRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/skins/': typeof AppSkinsIndexRoute
 }
 export interface FileRoutesByTo {
+  '/dialog/$id': typeof DialogIdRoute
   '/': typeof AppIndexRoute
   '/browse/$id': typeof AppBrowseIdRoute
   '/instances/$id': typeof AppInstancesIdRoute
@@ -95,6 +103,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteRouteWithChildren
+  '/dialog/$id': typeof DialogIdRoute
   '/_app/': typeof AppIndexRoute
   '/_app/browse/$id': typeof AppBrowseIdRoute
   '/_app/instances/$id': typeof AppInstancesIdRoute
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/dialog/$id'
     | '/browse/$id'
     | '/instances/$id'
     | '/servers/$id'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/skins/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/dialog/$id'
     | '/'
     | '/browse/$id'
     | '/instances/$id'
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/dialog/$id'
     | '/_app/'
     | '/_app/browse/$id'
     | '/_app/instances/$id'
@@ -144,6 +156,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRouteRoute: typeof AppRouteRouteWithChildren
+  DialogIdRoute: typeof DialogIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -161,6 +174,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
+    }
+    '/dialog/$id': {
+      id: '/dialog/$id'
+      path: '/dialog/$id'
+      fullPath: '/dialog/$id'
+      preLoaderRoute: typeof DialogIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/skins/': {
       id: '/_app/skins/'
@@ -251,6 +271,7 @@ const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   AppRouteRoute: AppRouteRouteWithChildren,
+  DialogIdRoute: DialogIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
