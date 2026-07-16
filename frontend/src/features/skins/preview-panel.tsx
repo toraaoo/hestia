@@ -1,4 +1,4 @@
-import { ArrowCounterClockwiseIcon, CheckIcon } from '@phosphor-icons/react';
+import { CheckIcon } from '@phosphor-icons/react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,12 +11,10 @@ export function PreviewPanel({
   skin,
   previewing,
   onApply,
-  onReset,
 }: {
   skin: Skin;
   previewing: boolean;
   onApply: () => void;
-  onReset: () => void;
 }) {
   const cape = getCape(skin.cape_id);
 
@@ -51,26 +49,15 @@ export function PreviewPanel({
 
         <div className="mt-3 flex gap-1.5">
           {previewing ? (
-            <>
-              <Button
-                size="sm"
-                data-icon="inline-start"
-                className="flex-1 bg-ember text-ember-foreground hover:bg-ember/90"
-                onClick={onApply}
-              >
-                <CheckIcon weight="bold" />
-                Apply
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                data-icon="inline-start"
-                onClick={onReset}
-              >
-                <ArrowCounterClockwiseIcon />
-                Reset
-              </Button>
-            </>
+            <Button
+              size="sm"
+              data-icon="inline-start"
+              className="flex-1 bg-ember text-ember-foreground hover:bg-ember/90"
+              onClick={onApply}
+            >
+              <CheckIcon weight="bold" />
+              Apply
+            </Button>
           ) : (
             <p className="text-xs text-muted-foreground">
               This skin is equipped on your account.

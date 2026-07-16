@@ -98,7 +98,6 @@ export function SkinsPage() {
           skin={selected}
           previewing={previewing}
           onApply={() => setEquippedId(selected.id)}
-          onReset={() => setSelectedId(equippedId)}
         />
 
         <div className="min-w-0 flex-1 space-y-8">
