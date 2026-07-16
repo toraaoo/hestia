@@ -30,22 +30,22 @@ export function PlayBar() {
   );
 
   return (
-    <div className="flex items-center gap-3 border-t border-border bg-sidebar px-4 py-2.5">
+    <div className="flex h-[76px] items-center gap-3 border-t border-border bg-sidebar px-4">
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
             <button
               type="button"
-              className="flex items-center gap-3 pr-2 text-left outline-none focus-visible:ring-1 focus-visible:ring-ring aria-expanded:bg-muted/40"
+              className="-ml-2 flex h-14 w-72 items-center gap-3 px-2 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset aria-expanded:bg-muted"
             >
-              <span className="grid size-9 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
-                <Icon className="size-5" />
+              <span className="grid size-11 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
+                <Icon className="size-6" />
               </span>
-              <span className="min-w-0">
+              <span className="min-w-0 flex-1 leading-tight">
                 <span className="block text-[11px] tracking-wide text-muted-foreground uppercase">
                   Quick play
                 </span>
-                <span className="block truncate text-sm font-medium">
+                <span className="block truncate text-base font-medium">
                   {sel.name}
                 </span>
               </span>

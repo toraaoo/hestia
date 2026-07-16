@@ -86,7 +86,7 @@ export function Sidebar() {
         <PinnedSection pathname={pathname} />
       </div>
 
-      <div className="flex flex-col gap-0.5 border-t border-border p-2">
+      <div className="flex h-[108px] flex-col gap-0.5 border-t border-border p-2">
         <NavLink
           item={{
             to: '/settings',
