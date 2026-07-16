@@ -4,7 +4,6 @@ import {
   PlusIcon,
   PowerIcon,
 } from '@phosphor-icons/react';
-
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { entryIcon } from '@/components/icons';
@@ -179,10 +178,10 @@ export function ServerDetailPage({
           </div>
         </TabsContent>
 
-        <TabsContent value="console" className="p-5">
+        <TabsContent value="console" className="flex min-h-0 flex-col p-5">
           {server.running ? (
-            <div className="flex flex-col gap-2">
-              <div className="h-72 space-y-0.5 overflow-y-auto border border-border bg-card p-3 font-mono text-[11px] text-muted-foreground">
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto border border-border bg-card p-3 font-mono text-[11px] text-muted-foreground">
                 {consoleLines.map((line) => (
                   <div key={line}>{line}</div>
                 ))}
@@ -192,9 +191,6 @@ export function ServerDetailPage({
                   placeholder="Enter a server command, e.g. say hello"
                   className="font-mono"
                 />
-                <Button type="submit" size="sm">
-                  Send
-                </Button>
               </form>
             </div>
           ) : (

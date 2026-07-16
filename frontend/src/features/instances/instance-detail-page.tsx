@@ -28,6 +28,14 @@ import { InstanceSettingsForm } from '@/features/entries/settings-forms';
 import { agoLabel } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
 
+const logLines = [
+  '[12:31:08] [main/INFO]: Setting user: toraaoo',
+  '[12:31:11] [Render thread/INFO]: OpenGL initialized, GL version 4.6',
+  '[12:31:14] [Render thread/INFO]: Loaded 12 mods',
+  '[12:31:19] [Render thread/INFO]: Reloading ResourceManager',
+  '[12:31:22] [Render thread/INFO]: Created: 1024x512 textures-atlas',
+];
+
 export type InstanceTab =
   | 'overview'
   | 'content'
@@ -238,8 +246,16 @@ export function InstanceDetailPage({
           <BackupList backups={inst.backups} />
         </TabsContent>
 
-        <TabsContent value="logs" className="p-5">
-          <Empty>Launch this instance to stream its log here.</Empty>
+        <TabsContent value="logs" className="flex min-h-0 flex-col p-5">
+          {inst.running ? (
+            <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto border border-border bg-card p-3 font-mono text-[11px] text-muted-foreground">
+              {logLines.map((line) => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
+          ) : (
+            <Empty>Launch this instance to stream its log here.</Empty>
+          )}
         </TabsContent>
 
         <TabsContent value="settings" className="p-5">
