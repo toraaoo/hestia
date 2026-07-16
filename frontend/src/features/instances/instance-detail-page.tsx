@@ -23,6 +23,7 @@ import {
   StatCard,
 } from '@/features/entries/detail';
 import { getInstance } from '@/features/entries/mock';
+import { ResourceCards } from '@/features/entries/resource-panel';
 import { InstanceSettingsForm } from '@/features/entries/settings-forms';
 import { agoLabel } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
@@ -115,7 +116,7 @@ export function InstanceDetailPage({
       <Tabs
         value={tab}
         onValueChange={(value) => onTabChange(value as InstanceTab)}
-        className="gap-0 p-0"
+        className="min-h-0 flex-1 gap-0 p-0"
       >
         <TabsList variant="line" className="h-auto gap-6 px-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -135,9 +136,9 @@ export function InstanceDetailPage({
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="p-5">
-          <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
-            <div className="space-y-5">
+        <TabsContent value="overview" className="flex flex-col p-5">
+          <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_260px]">
+            <div className="flex flex-col gap-5">
               <p className="max-w-2xl text-sm leading-relaxed text-foreground/90">
                 A {inst.flavor} {inst.game_version} instance with{' '}
                 {inst.content.length} mods across {inst.worlds.length} worlds.
@@ -147,6 +148,7 @@ export function InstanceDetailPage({
                 <StatCard value={inst.worlds.length} label="Worlds" />
                 <StatCard value={inst.memory} label="Memory" />
               </div>
+              <ResourceCards id={inst.id} />
             </div>
 
             <div className="space-y-4">

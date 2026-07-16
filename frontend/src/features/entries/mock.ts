@@ -42,6 +42,9 @@ export interface Instance {
   last_played_unix: number;
   running: boolean;
   sessions: number;
+  cpu_pct: number;
+  mem_used_mb: number;
+  disk_bytes: number;
   content: InstalledContent[];
   worlds: string[];
   backups: Backup[];
@@ -60,6 +63,9 @@ export const instances: Instance[] = [
     last_played_unix: hoursAgo(2),
     running: true,
     sessions: 1,
+    cpu_pct: 47,
+    mem_used_mb: 4280,
+    disk_bytes: 3_200_000_000,
     content: [
       {
         id: 'sodium',
@@ -134,6 +140,9 @@ export const instances: Instance[] = [
     last_played_unix: daysAgo(4),
     running: false,
     sessions: 0,
+    cpu_pct: 0,
+    mem_used_mb: 0,
+    disk_bytes: 640_000_000,
     content: [],
     worlds: ['Survival'],
     backups: [],
@@ -150,6 +159,9 @@ export const instances: Instance[] = [
     last_played_unix: daysAgo(23),
     running: false,
     sessions: 0,
+    cpu_pct: 0,
+    mem_used_mb: 0,
+    disk_bytes: 2_800_000_000,
     content: [
       {
         id: 'create',
@@ -191,6 +203,9 @@ export const instances: Instance[] = [
     last_played_unix: daysAgo(58),
     running: false,
     sessions: 0,
+    cpu_pct: 0,
+    mem_used_mb: 0,
+    disk_bytes: 120_000_000,
     content: [],
     worlds: [],
     backups: [],
@@ -217,6 +232,9 @@ export interface Server {
   created_unix: number;
   ready: boolean;
   running: boolean;
+  cpu_pct: number;
+  mem_used_mb: number;
+  disk_bytes: number;
   port?: number;
   rcon_port?: number;
   players: number;
@@ -239,6 +257,9 @@ export const servers: Server[] = [
     created_unix: daysAgo(88),
     ready: true,
     running: true,
+    cpu_pct: 34,
+    mem_used_mb: 2610,
+    disk_bytes: 890_000_000,
     port: 25565,
     rcon_port: 25575,
     players: 3,
@@ -289,6 +310,9 @@ export const servers: Server[] = [
     created_unix: daysAgo(60),
     ready: true,
     running: false,
+    cpu_pct: 0,
+    mem_used_mb: 0,
+    disk_bytes: 1_400_000_000,
     port: 25566,
     players: 0,
     max_players: 40,
@@ -327,6 +351,9 @@ export const servers: Server[] = [
     created_unix: daysAgo(14),
     ready: false,
     running: false,
+    cpu_pct: 0,
+    mem_used_mb: 0,
+    disk_bytes: 210_000_000,
     players: 0,
     max_players: 10,
     motd: 'One life.',
@@ -339,6 +366,26 @@ export const servers: Server[] = [
 
 export const getInstance = (id: string) => instances.find((i) => i.id === id);
 export const getServer = (id: string) => servers.find((s) => s.id === id);
+
+/** The live-metric slice of an entry, keyed by id across both stores. */
+export interface EntryResources {
+  running: boolean;
+  cpu_pct: number;
+  mem_used_mb: number;
+  memory: string;
+  disk_bytes: number;
+}
+
+/**
+ * Resolves an entry's resource usage by id — the mock stand-in for the daemon's
+ * per-process metrics, which a server and an instance expose the same way.
+ */
+export function getEntryResources(id: string): EntryResources | undefined {
+  const entry = getServer(id) ?? getInstance(id);
+  if (!entry) return undefined;
+  const { running, cpu_pct, mem_used_mb, memory, disk_bytes } = entry;
+  return { running, cpu_pct, mem_used_mb, memory, disk_bytes };
+}
 
 /** The world resumed by the library's "continue playing". */
 export const featured = instances[0];

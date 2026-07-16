@@ -21,6 +21,7 @@ import {
   StatCard,
 } from '@/features/entries/detail';
 import { getServer } from '@/features/entries/mock';
+import { ResourceCards } from '@/features/entries/resource-panel';
 import { ServerSettingsForm } from '@/features/entries/settings-forms';
 import { agoLabel } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
@@ -121,7 +122,7 @@ export function ServerDetailPage({
       <Tabs
         value={tab}
         onValueChange={(value) => onTabChange(value as ServerTab)}
-        className="gap-0 p-0"
+        className="min-h-0 flex-1 gap-0 p-0"
       >
         <TabsList variant="line" className="h-auto gap-6 px-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -137,9 +138,9 @@ export function ServerDetailPage({
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="p-5">
-          <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
-            <div className="space-y-5">
+        <TabsContent value="overview" className="flex flex-col p-5">
+          <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_260px]">
+            <div className="flex flex-col gap-5">
               <p className="max-w-2xl text-sm leading-relaxed text-foreground/90">
                 {server.motd}
               </p>
@@ -151,6 +152,7 @@ export function ServerDetailPage({
                 <StatCard value={server.memory} label="Memory" />
                 <StatCard value={server.content.length} label="Content" />
               </div>
+              <ResourceCards id={server.id} />
             </div>
 
             <div className="space-y-4">

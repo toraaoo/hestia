@@ -20,14 +20,11 @@ import {
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import type { Instance, Server } from '@/features/entries/mock';
+import { memGb } from '@/lib/format';
 
 const MC_VERSIONS = ['1.21.4', '1.21.1', '1.20.1', '1.19.2'];
 const LOADERS = ['vanilla', 'fabric'];
 const INTERVALS = ['', '6h', '12h', '1d'];
-
-function memGb(memory: string) {
-  return Number.parseInt(memory, 10) || 4;
-}
 
 function DangerZone({
   removeLabel,

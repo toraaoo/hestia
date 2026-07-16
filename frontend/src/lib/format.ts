@@ -23,6 +23,11 @@ export function bytes(n: number): string {
   return `${value.toFixed(value < 10 && unit > 0 ? 1 : 0)} ${units[unit]}`;
 }
 
+/** Gigabytes parsed from a memory setting like `4G` (defaults to 4). */
+export function memGb(memory: string): number {
+  return Number.parseInt(memory, 10) || 4;
+}
+
 export function compact(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
