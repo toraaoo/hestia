@@ -12,14 +12,14 @@
  * The content component renders ordinary `DialogHeader`/`DialogFooter`
  * composition and settles through `close(result?)`. A sub-window is a
  * separate webview process, so the content is registered by id and rendered
- * there from the same bundle (the `/dialog/$id` route); only `payload` and
- * the result cross the boundary, which is why both must be serializable —
- * handlers like `onResult` stay in the opening window.
+ * there from the same bundle (the `/dialog` page, kept pre-warmed by
+ * `dialogs/pool.ts`); only `payload` and the result cross the boundary,
+ * which is why both must be serializable — handlers like `onResult` stay in
+ * the opening window.
  */
 
 import { isTauri } from '@tauri-apps/api/core';
-import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   type ComponentType,
@@ -32,6 +32,11 @@ import { createPortal } from 'react-dom';
 
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { type DialogResultEnvelope, dialogEvent } from '@/dialogs/bridge';
+import {
+  spawnDialogWindow,
+  takeDialogWindow,
+  warmDialogPool,
+} from '@/dialogs/pool';
 import { registerDialog } from '@/dialogs/registry';
 import { cn } from '@/lib/utils';
 
@@ -131,8 +136,8 @@ function InPageHost<P, R>({
   );
 }
 
-/** How long the sub-window gets to load and announce itself ready. */
-const READY_TIMEOUT_MS = 10_000;
+/** How long the sub-window gets to mount the dialog and show itself. */
+const SHOWN_TIMEOUT_MS = 10_000;
 
 /**
  * The size-affecting classes of `DialogContent`, replicated for the hidden
@@ -189,11 +194,11 @@ function Measurer<P, R>({
 }
 
 /**
- * Renders only the measuring pass; once sized, a sub-window at
- * `/dialog/<id>` carries the content. The opener is disabled for modality
- * once the window exists and re-enabled when the dialog settles — including
- * an OS-level close (the destroyed event). Any failure to come up (creation
- * error, load timeout) reports through `onFallback` so the dialog reopens
+ * Renders only the measuring pass; once sized, the pooled (or cold-spawned)
+ * sub-window carries the content. The opener is disabled for modality once
+ * the window shows and re-enabled when the dialog settles — including an
+ * OS-level close (the destroyed event). Any failure to come up (creation
+ * error, show timeout) reports through `onFallback` so the dialog reopens
  * in-page instead of silently disappearing.
  */
 function SubWindowHost<P, R>({
@@ -216,16 +221,20 @@ function SubWindowHost<P, R>({
   latest.current = { payload, onResult, onOpenChange, onFallback };
 
   useEffect(() => {
+    warmDialogPool();
+  }, []);
+
+  useEffect(() => {
     if (!open) setSize(null);
   }, [open]);
 
   useEffect(() => {
     if (!open || !size) return;
 
-    const label = `dialog-${id}-${Math.random().toString(36).slice(2, 10)}`;
+    const entry = takeDialogWindow() ?? spawnDialogWindow();
+    const { label, view } = entry;
     const opener = getCurrentWindow();
     const unlistens: UnlistenFn[] = [];
-    let view: WebviewWindow | undefined;
     let watchdog: ReturnType<typeof setTimeout> | undefined;
     let disposed = false;
     let settled = false;
@@ -234,7 +243,9 @@ function SubWindowHost<P, R>({
       clearTimeout(watchdog);
       for (const unlisten of unlistens) unlisten();
       unlistens.length = 0;
+      entry.release();
       opener.setEnabled(true).catch(() => {});
+      warmDialogPool();
     };
 
     const settle = (result?: R) => {
@@ -250,7 +261,7 @@ function SubWindowHost<P, R>({
       if (settled) return;
       settled = true;
       release();
-      view?.close().catch(() => {});
+      view.close().catch(() => {});
       console.error(
         `[dialogs] sub-window for "${id}" failed, falling back to the in-page dialog:`,
         cause,
@@ -260,9 +271,9 @@ function SubWindowHost<P, R>({
 
     (async () => {
       unlistens.push(
-        await listen(dialogEvent('ready', label), () => {
+        await listen(dialogEvent('shown', label), () => {
           clearTimeout(watchdog);
-          emit(dialogEvent('init', label), latest.current.payload);
+          if (!settled) opener.setEnabled(false).catch(() => {});
         }),
       );
       unlistens.push(
@@ -271,36 +282,30 @@ function SubWindowHost<P, R>({
           (event) => settle(event.payload.result as R | undefined),
         ),
       );
+      view.once('tauri://error', (event) => fail(event.payload));
+      view.once('tauri://destroyed', () => settle());
       if (disposed) return release();
 
+      watchdog = setTimeout(
+        () => fail(`no shown signal within ${SHOWN_TIMEOUT_MS}ms`),
+        SHOWN_TIMEOUT_MS,
+      );
+      await entry.whenReady;
+      if (disposed || settled) return;
+
       const { title } = options;
-      view = new WebviewWindow(label, {
-        url: `/dialog/${id}`,
+      entry.init({
+        dialog: id,
+        payload: latest.current.payload,
         title:
           (typeof title === 'function' && latest.current.payload !== undefined
-            ? title(latest.current.payload)
+            ? title(latest.current.payload as P)
             : typeof title === 'string'
               ? title
               : undefined) ?? 'Hestia',
-        parent: 'main',
         width: size.width,
         height: size.height,
-        center: true,
-        resizable: false,
-        minimizable: false,
-        maximizable: false,
-        skipTaskbar: true,
-        decorations: false,
       });
-      view.once('tauri://error', (event) => fail(event.payload));
-      view.once('tauri://destroyed', () => settle());
-      view.once('tauri://created', () => {
-        if (!settled) opener.setEnabled(false).catch(() => {});
-      });
-      watchdog = setTimeout(
-        () => fail(`no ready signal within ${READY_TIMEOUT_MS}ms`),
-        READY_TIMEOUT_MS,
-      );
     })().catch(fail);
 
     return () => {
@@ -308,7 +313,7 @@ function SubWindowHost<P, R>({
       if (settled) return;
       settled = true;
       release();
-      view?.close().catch(() => {});
+      view.close().catch(() => {});
     };
   }, [open, size, id, options]);
 
