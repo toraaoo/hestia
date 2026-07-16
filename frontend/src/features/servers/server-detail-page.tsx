@@ -115,10 +115,7 @@ export function ServerDetailPage({
         onValueChange={(value) => onTabChange(value as ServerTab)}
         className="gap-0 p-0"
       >
-        <TabsList
-          variant="line"
-          className="h-auto gap-4 border-b border-border px-5"
-        >
+        <TabsList variant="line" className="h-auto gap-6 px-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="console">Console</TabsTrigger>
           <TabsTrigger value="content">

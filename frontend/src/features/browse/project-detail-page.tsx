@@ -75,10 +75,7 @@ export function ProjectDetailPage({
         onValueChange={(value) => onTabChange(value as ProjectTab)}
         className="gap-0 p-0"
       >
-        <TabsList
-          variant="line"
-          className="h-auto gap-4 border-b border-border px-5"
-        >
+        <TabsList variant="line" className="h-auto gap-6 px-5">
           <TabsTrigger value="description">Description</TabsTrigger>
           <TabsTrigger value="versions">Versions</TabsTrigger>
         </TabsList>
