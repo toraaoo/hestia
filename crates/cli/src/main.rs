@@ -174,7 +174,7 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::config::ConfigCmd,
     },
-    /// Settings/configs shared across servers and instances
+    /// Settings/configs shared across instances
     Sync {
         #[command(subcommand)]
         cmd: commands::sync::SyncCmd,

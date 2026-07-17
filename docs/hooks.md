@@ -341,7 +341,7 @@ marks a job mutation — pair with `useJobMutation` semantics above.
 | `useRemoveSkin()` | `skin.remove` | `key: string` |
 | `useEquipCape()` / `useClearCape()` | `cape.equip\|clear` | `{ cape, account? }` / `{ account? }?` |
 | `useSyncConfig()` | `sync.get` | — |
-| `useSetSyncTargets()` | `sync.set` | `{ kind, targets }` |
+| `useSetSyncTargets()` | `sync.set` | `SyncTargets` |
 | `useStartDownload()` *(job)* | `download.start` | `Omit<DownloadSpec, 'id'>` |
 
 ## Extending the layer

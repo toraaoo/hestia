@@ -303,15 +303,13 @@ The subsystems behind the aggregate:
   step.
 - **`sync`** (`Sync`) — shared settings/configs: a small set of game-relative
   files/folders (`options.txt` key-merged, `servers.dat`, `config/`) propagated
-  across entries through a persistent `<data_home>/shared/` store. Copy-based,
-  not symlinked: each entry keeps its own copy under `data/`, and `apply`
-  reconciles it with the store newest-wins at every start/launch (hooked into
-  `server_launch_plan`/`prepare_instance`, before the content re-mirror).
-  Targets **and the store are kept separate per kind** (`shared/servers/`,
-  `shared/instances/`, each with its own `targets.json` and defaults): a server
-  syncs different files than a client and must not share its mod `config/` with
-  one. The managed content dirs and `saves/` are rejected as targets at the edge
-  — see the decision note below.
+  across instances through a persistent `<data_home>/shared/` store (one flat
+  store, one `targets.json`). Copy-based, not symlinked: each instance keeps
+  its own copy under `data/`, and `apply` reconciles it with the store
+  newest-wins at every launch (hooked into `prepare_instance`, before the
+  content re-mirror). Sync is **instance-only**: servers are deliberately
+  decoupled from it. The managed content dirs and `saves/` are rejected as
+  targets at the edge — see the decision note below.
 - **`servers`** / **`instances`** (`Servers`, `Instances`) — the persistent
   stores, one directory per entry beside a JSON record (`servers/<id>/server.json`
   holding the resolved profile snapshot; the disk is the registry, as with
@@ -479,11 +477,12 @@ The subsystems behind the aggregate:
 > dirs and `saves/` are rejected as targets (the content system shares content;
 > worlds belong to backups). Pack selection (`options.txt`'s `resourcePacks`)
 > stays entry-local — merged like Pandora's, but never pushed to the store.
-> Unlike Pandora (client-only), Hestia manages **servers and instances**, whose
-> syncable files differ — a server has no `options.txt`, and its mod `config/`
-> is not a client's — so targets and the physical store are split per kind
-> (`shared/servers/` vs `shared/instances/`, each with its own defaults). The
-> two never mix; there is deliberately no cross-kind sharing.
+> Sync is **instance-only, like Pandora (client-only)**: it is a client-side
+> quality-of-life feature, and servers are decoupled from it entirely. A
+> server's shareable state is its own `server.config.*` keys and
+> `server.properties` — per-server infrastructure, never a cross-entry store
+> (concurrent live servers must not share writable config). The store is one
+> flat `<data_home>/shared/` with one `targets.json`.
 
 > **The id is a stable, slug-tagged token; rename is a metadata write.** The
 > `id` is the directory name (`servers/<id>/`), the supervisor's process key
@@ -680,9 +679,9 @@ supervises launched processes, and manages autostart. The only crate that links
   targets the newest running or a named session — all thin over the
   supervisor), `instance.backup.create|list|restore|remove` (create and
   restore require the instance stopped), and `instance.config.get|set|list`
-  (`memory`/`jvm-args` only). Plus `sync.get|set` — the per-kind shared-config
-  target sets (`get` returns both kinds; `set` takes a `kind` and validates each
-  path: relative, no `..` escape, not a launcher-managed dir). Plus
+  (`memory`/`jvm-args` only). Plus `sync.get|set` — the instance-only
+  shared-config target set (`set` validates each path: relative, no `..`
+  escape, not a launcher-managed dir). Plus
   `content.sources|search|project|versions|modpack.resolve` — thin over the
   engine's content registry (an empty `source` selects the default; search,
   project, and versions are plain request/response, and `modpack.resolve`
@@ -991,9 +990,9 @@ a console over rcon — one-shot `command`, followed logs, interactive
 `attach`); instance management (create a
 record, launch materialises client/libraries/assets and spawns the game as the
 signed-in account, and can run several concurrent sessions each with its own
-Log4j2-routed log); shared settings/configs across servers and instances
-(copy-based `sync`: `options.txt` merged, `config/` and others reconciled
-newest-wins with a `shared/` store at each start/launch); in-place version
+Log4j2-routed log); shared settings/configs across instances
+(copy-based `sync`, instance-only: `options.txt` merged, `config/` and others
+reconciled newest-wins with a `shared/` store at each launch); in-place version
 updates for both (downgrades gated
 behind an explicit confirmation, the existing data backed up automatically
 first); backups for both (on-demand archive/restore with live progress — a

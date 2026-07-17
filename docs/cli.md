@@ -276,33 +276,31 @@ hestia cache clear               # evict everything
 
 ## Shared settings/configs
 
-Settings and configs are shared across your entries automatically. Each entry
-keeps its **own copy** under `data/`; at every start/launch Hestia reconciles it
-with a shared store, newest edit wins (nothing is live-shared, so it is safe
-with concurrent processes and backups). It works out of the box — no setup.
+Settings and configs are shared across your instances automatically. Each
+instance keeps its **own copy** under `data/`; at every launch Hestia
+reconciles it with a shared store, newest edit wins (nothing is live-shared,
+so it is safe with concurrent processes). It works out of the box — no setup.
 
-Targets are kept **separate per kind**: servers and instances have their own
-lists and their own store (`shared/servers/`, `shared/instances/`), because a
-server has no `options.txt` and its mod `config/` must not mix with a client's.
-Defaults: instances share `options.txt` (key-merged; pack selection stays
-per-instance), `servers.dat`, and `config/`; servers share `config/`.
+Sync is **instance-only**: a server's configuration is per-server
+infrastructure, managed through `server <name> config …` and
+`server.properties`, and is never shared. Defaults: instances share
+`options.txt` (key-merged; pack selection stays per-instance), `servers.dat`,
+and `config/`.
 
 ```bash
-hestia sync status               # the store path + each kind's targets
+hestia sync status               # the store path + the current targets
 
-hestia sync instance add screenshots --folder   # also share client screenshots
-hestia sync instance remove servers.dat          # keep each instance's list local
-hestia sync server add ops.json  # share an op list across your servers
-hestia sync server add config --folder           # (already a default)
-hestia sync instance remove <path>               # stop sharing a target
+hestia sync add screenshots --folder   # also share client screenshots
+hestia sync remove servers.dat         # keep each instance's list local
+hestia sync remove <path>              # stop sharing a target
 ```
 
 Paths are **game-relative** (relative to `data/`). `add` shares a file;
 `--folder` shares a whole directory (every file under it, synced per file).
 `..` escapes and the launcher-managed directories (`mods`, `resourcepacks`,
 `shaderpacks`, `saves`, `backups`) are rejected — the content system already
-shares content, and worlds belong to backups. Propagation is at start/launch,
-not instant.
+shares content, and worlds belong to backups. Propagation is at launch, not
+instant.
 
 ## Configuration
 

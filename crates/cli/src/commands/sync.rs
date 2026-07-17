@@ -1,33 +1,18 @@
-//! `hestia sync …` — the settings/configs shared across servers and instances.
-//! Targets are game-relative paths kept separate per kind (`sync server …` /
-//! `sync instance …`); each entry keeps its own copy, reconciled newest-wins
-//! with its kind's shared store at every start/launch.
+//! `hestia sync …` — the settings/configs shared across instances. Targets are
+//! game-relative paths; each instance keeps its own copy, reconciled newest-wins
+//! with the shared store at every launch.
 
 use anyhow::Result;
 use clap::Subcommand;
-use client::proto::sync::{SyncKind, SyncTargets};
+use client::proto::sync::SyncTargets;
 
 use crate::ui::{self, View};
 
 #[derive(Subcommand)]
 pub enum SyncCmd {
-    /// The shared store and each kind's targets
+    /// The shared store and its targets
     #[command(alias = "list", alias = "ls")]
     Status,
-    /// What servers share
-    Server {
-        #[command(subcommand)]
-        cmd: EditCmd,
-    },
-    /// What instances share
-    Instance {
-        #[command(subcommand)]
-        cmd: EditCmd,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum EditCmd {
     /// Share a file (or a whole folder with `--folder`)
     Add {
         /// Game-relative path, e.g. `options.txt` or `config`
@@ -47,8 +32,8 @@ pub enum EditCmd {
 pub async fn run(cmd: SyncCmd) -> Result<()> {
     match cmd {
         SyncCmd::Status => status().await,
-        SyncCmd::Server { cmd } => edit(SyncKind::Server, "server", cmd).await,
-        SyncCmd::Instance { cmd } => edit(SyncKind::Instance, "instance", cmd).await,
+        SyncCmd::Add { path, folder } => add(path, folder).await,
+        SyncCmd::Remove { path } => remove(path).await,
     }
 }
 
@@ -59,15 +44,13 @@ async fn status() -> Result<()> {
         "shared store",
         config.shared_dir.display().to_string(),
     )]))?;
-    render(&config.servers, "servers")?;
-    render(&config.instances, "instances")
+    render(&config.targets)
 }
 
-fn render(targets: &SyncTargets, noun: &str) -> Result<()> {
+fn render(targets: &SyncTargets) -> Result<()> {
     if targets.files.is_empty() && targets.folders.is_empty() {
-        return ui::show(View::note(format!("{noun}: no sync targets")));
+        return ui::show(View::note("no sync targets"));
     }
-    ui::show(View::line(format!("{noun}:")))?;
     let mut rows: Vec<Vec<String>> = Vec::new();
     for path in &targets.folders {
         rows.push(vec!["folder".to_string(), path.clone()]);
@@ -75,40 +58,31 @@ fn render(targets: &SyncTargets, noun: &str) -> Result<()> {
     for path in &targets.files {
         rows.push(vec!["file".to_string(), path.clone()]);
     }
-    ui::show(View::table(noun, ["KIND", "PATH"], rows))
+    ui::show(View::table("Sync targets", ["KIND", "PATH"], rows))
 }
 
-async fn edit(kind: SyncKind, noun: &str, cmd: EditCmd) -> Result<()> {
+async fn add(path: String, folder: bool) -> Result<()> {
     let client = super::connect().await?;
-    let mut targets = current(&client, kind).await?;
-    match cmd {
-        EditCmd::Add { path, folder } => {
-            let added = if folder {
-                targets.folders.insert(path.clone())
-            } else {
-                targets.files.insert(path.clone())
-            };
-            if !added {
-                return ui::show(View::note(format!("{noun}s already share '{path}'")));
-            }
-            client.sync().set(kind, targets).await?;
-            ui::show(View::line(format!("{noun}s now share '{path}'")))
-        }
-        EditCmd::Remove { path } => {
-            let removed = targets.files.remove(&path) || targets.folders.remove(&path);
-            if !removed {
-                return ui::show(View::note(format!("{noun}s do not share '{path}'")));
-            }
-            client.sync().set(kind, targets).await?;
-            ui::show(View::line(format!("{noun}s no longer share '{path}'")))
-        }
+    let mut targets = client.sync().get().await?.targets;
+    let added = if folder {
+        targets.folders.insert(path.clone())
+    } else {
+        targets.files.insert(path.clone())
+    };
+    if !added {
+        return ui::show(View::note(format!("instances already share '{path}'")));
     }
+    client.sync().set(targets).await?;
+    ui::show(View::line(format!("instances now share '{path}'")))
 }
 
-async fn current(client: &client::Client, kind: SyncKind) -> Result<SyncTargets> {
-    let config = client.sync().get().await?;
-    Ok(match kind {
-        SyncKind::Server => config.servers,
-        SyncKind::Instance => config.instances,
-    })
+async fn remove(path: String) -> Result<()> {
+    let client = super::connect().await?;
+    let mut targets = client.sync().get().await?.targets;
+    let removed = targets.files.remove(&path) || targets.folders.remove(&path);
+    if !removed {
+        return ui::show(View::note(format!("instances do not share '{path}'")));
+    }
+    client.sync().set(targets).await?;
+    ui::show(View::line(format!("instances no longer share '{path}'")))
 }
