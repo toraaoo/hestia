@@ -18,7 +18,7 @@ use proto::content::{
 };
 use proto::daemon::{DaemonStatusResult, DaemonStopParams};
 use proto::download::DownloadSpec;
-use proto::instance::InstanceInfo;
+use proto::instance::{InstanceInfo, InstanceLaunchParams, InstanceProfileListResult};
 use proto::java::{JavaInstallProgress, JavaRuntime};
 use proto::minecraft::ProvisionProgress;
 use proto::process::{ProcessExitEvent, ProcessInfo, ProcessOutputEvent, ProcessSpec};
@@ -97,6 +97,16 @@ golden!(
 );
 golden!(server_info, ServerInfo, "server_info.json");
 golden!(instance_info, InstanceInfo, "instance_info.json");
+golden!(
+    instance_launch_params,
+    InstanceLaunchParams,
+    "instance_launch_params.json"
+);
+golden!(
+    instance_profile_list_result,
+    InstanceProfileListResult,
+    "instance_profile_list_result.json"
+);
 golden!(backup_info, BackupInfo, "backup_info.json");
 golden!(
     provision_progress,

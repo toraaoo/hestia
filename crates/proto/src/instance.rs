@@ -247,6 +247,106 @@ impl Contract for InstanceConfigList {
     type Result = InstanceConfigListResult;
 }
 
+/// A named selection over the instance's installed content pool (mods,
+/// resourcepacks, shaders — never datapacks). Members are pool filenames, the
+/// one index field always present and unique. No profile active = every pool
+/// item is mirrored.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct Profile {
+    pub name: String,
+    pub members: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceProfileListResult {
+    /// The active profile's name; empty when none is active.
+    pub active: String,
+    pub profiles: Vec<Profile>,
+}
+
+pub struct InstanceProfileList;
+impl Contract for InstanceProfileList {
+    const CHANNEL: &'static str = "instance.profile.list";
+    type Params = InstanceRef;
+    type Result = InstanceProfileListResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceProfileCreateParams {
+    pub instance: String,
+    pub name: String,
+    /// Start with every selectable pool item as a member; off creates empty.
+    pub seed_from_pool: bool,
+}
+
+pub struct InstanceProfileCreate;
+impl Contract for InstanceProfileCreate {
+    const CHANNEL: &'static str = "instance.profile.create";
+    type Params = InstanceProfileCreateParams;
+    type Result = Profile;
+}
+
+/// Names one profile of one instance (remove / use).
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceProfileRef {
+    pub instance: String,
+    pub name: String,
+}
+
+/// Removing the active profile clears the active selection.
+pub struct InstanceProfileRemove;
+impl Contract for InstanceProfileRemove {
+    const CHANNEL: &'static str = "instance.profile.remove";
+    type Params = InstanceProfileRef;
+    type Result = Empty;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceProfileRenameParams {
+    pub instance: String,
+    pub name: String,
+    pub new_name: String,
+}
+
+pub struct InstanceProfileRename;
+impl Contract for InstanceProfileRename {
+    const CHANNEL: &'static str = "instance.profile.rename";
+    type Params = InstanceProfileRenameParams;
+    type Result = Profile;
+}
+
+/// An empty `name` clears the active profile.
+pub struct InstanceProfileUse;
+impl Contract for InstanceProfileUse {
+    const CHANNEL: &'static str = "instance.profile.use";
+    type Params = InstanceProfileRef;
+    type Result = Empty;
+}
+
+/// `add`/`remove` are pool references (project id, slug, filename, or title),
+/// resolved server-side; one that matches nothing — or only a datapack — is a
+/// `bad_request`.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceProfileEditParams {
+    pub instance: String,
+    pub name: String,
+    pub add: Vec<String>,
+    pub remove: Vec<String>,
+}
+
+pub struct InstanceProfileEdit;
+impl Contract for InstanceProfileEdit {
+    const CHANNEL: &'static str = "instance.profile.edit";
+    type Params = InstanceProfileEditParams;
+    type Result = Profile;
+}
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
 pub struct InstanceLaunchParams {
@@ -260,6 +360,11 @@ pub struct InstanceLaunchParams {
     /// a running instance is refused unless the caller opts into concurrency.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub new_session: bool,
+    /// A profile override for this launch only: empty uses the active profile,
+    /// the literal `none` launches with no profile. `none` (and empty) are
+    /// therefore reserved as profile names.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub profile: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]

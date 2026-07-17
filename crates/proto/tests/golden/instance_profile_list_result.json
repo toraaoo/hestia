@@ -1,0 +1,13 @@
+{
+  "active": "performance",
+  "profiles": [
+    {
+      "name": "performance",
+      "members": ["sodium-fabric.jar", "lithium-fabric.jar"]
+    },
+    {
+      "name": "showcase",
+      "members": []
+    }
+  ]
+}
