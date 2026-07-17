@@ -149,6 +149,11 @@ export interface InstalledContent {
   installed_unix: number;
   /** For datapacks: the world the file lives in; empty for other kinds. */
   world: string;
+  /**
+   * Who put the item in the pool: empty = user-installed; a global profile
+   * apply tags its installs `profile:<name>`.
+   */
+  origin: string;
 }
 
 export interface ContentList {

@@ -179,6 +179,25 @@ export const instanceMutations = {
           api.profiles.edit(id, name, add, remove),
         invalidates: () => [keys.instances.profiles(id)],
       }),
+    /**
+     * Apply a global profile into the pool — a content job; installs are
+     * tagged with the profile and never removed by a later apply.
+     */
+    apply: (id: string) =>
+      jobMutation<ContentDone, string>({
+        mutationKey: [...keys.instances.content(id), 'profile-apply'],
+        meta: (profile) => ({
+          kind: 'profile.apply',
+          label: `apply ${profile}`,
+          entry: { kind: 'instance', id },
+        }),
+        run: (profile, onProgress) =>
+          api.profiles.apply(id, profile, onProgress),
+        invalidates: () => [
+          keys.instances.content(id),
+          keys.instances.profiles(id),
+        ],
+      }),
   },
   content: {
     /** Instances take mods, resourcepacks, shaders, and datapacks. */
@@ -341,6 +360,11 @@ export function useUseInstanceProfile(id: string) {
 
 export function useEditInstanceProfile(id: string) {
   return useMutation(instanceMutations.profiles.edit(id));
+}
+
+/** Apply a global profile into the instance's pool (a content job). */
+export function useApplyInstanceProfile(id: string) {
+  return useJobMutation(instanceMutations.profiles.apply(id));
 }
 
 export function useAddInstanceContent(id: string) {

@@ -213,6 +213,27 @@ export const profiles = {
   ): Promise<ContentProfile> {
     return call('instance.profile.edit', { instance, name, add, remove });
   },
+
+  /**
+   * Apply a **global** profile into the instance's pool — a content job:
+   * references not already present install at their newest compatible
+   * version, tagged `profile:<name>`; incompatible ones come back as
+   * failures. Applying never removes de-listed content. Refused on a running
+   * or busy instance.
+   */
+  apply(
+    instance: string,
+    profile: string,
+    onProgress?: OnProgress,
+  ): Promise<ContentDone> {
+    const id = jobId('profile-apply');
+    return runJob<ContentDone>({
+      id,
+      topics: { done: 'content.done', error: 'content.error' },
+      onProgress,
+      start: () => call('instance.profile.apply', { instance, profile, id }),
+    });
+  },
 };
 
 export const content = {

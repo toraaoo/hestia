@@ -9,6 +9,7 @@ export type * from './instance';
 export type * from './java';
 export type * from './minecraft';
 export type * from './process';
+export type * from './profile';
 export type * from './server';
 export type * from './skins';
 export type * from './sync';

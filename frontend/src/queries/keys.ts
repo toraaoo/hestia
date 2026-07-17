@@ -93,6 +93,10 @@ export const keys = {
     profiles: (id: string) =>
       [...keys.instances.detail(id), 'profiles'] as const,
   },
+  profiles: {
+    all: ['profiles'] as const,
+    list: () => [...keys.profiles.all, 'list'] as const,
+  },
   content: {
     all: ['content'] as const,
     sources: () => [...keys.content.all, 'sources'] as const,
