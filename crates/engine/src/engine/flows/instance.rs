@@ -155,7 +155,7 @@ impl Engine {
         let game_dir = self.instances.data_dir(&record.id);
         std::fs::create_dir_all(&game_dir)
             .with_context(|| format!("cannot create {}", game_dir.display()))?;
-        self.sync.apply(&game_dir, true)?;
+        self.sync.apply(&game_dir)?;
         install::sync(&self.instances.instance_dir(&record.id), &game_dir)?;
         let natives_dir = meta.join("natives").join(&record.profile.game_version);
         std::fs::create_dir_all(&natives_dir)
