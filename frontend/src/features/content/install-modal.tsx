@@ -318,6 +318,11 @@ function WizardBody({
   const index = Math.min(stepIndex, steps.length - 1);
   const stepId = steps[index];
 
+  // The pick step's search/filter lives up here so its bar can sit pinned in
+  // the StepForm header, outside the scrolling list.
+  const [pickSearch, setPickSearch] = useState('');
+  const [pickFilter, setPickFilter] = useState('all');
+
   const versions = useMemo(() => (proj ? projectVersions(proj) : []), [proj]);
   const deps = useMemo(
     () => (proj ? resolveDependencies(proj.id) : []),
@@ -401,13 +406,71 @@ function WizardBody({
           onGroupSubmit={next}
         >
           {(group: { handleSubmit: () => void }) => (
-            <StepForm onSubmit={group.handleSubmit} footer={nav}>
+            <StepForm
+              onSubmit={group.handleSubmit}
+              header={
+                mode === 'browse' ? (
+                  <FilterBar
+                    search={pickSearch}
+                    onSearch={setPickSearch}
+                    placeholder={m['search.targets']()}
+                    chips={[
+                      {
+                        label: m['label.all'](),
+                        active: pickFilter === 'all',
+                        onClick: () => setPickFilter('all'),
+                      },
+                      {
+                        label: m['nav.servers'](),
+                        active: pickFilter === 'server',
+                        onClick: () => setPickFilter('server'),
+                      },
+                      {
+                        label: m['nav.instances'](),
+                        active: pickFilter === 'instance',
+                        onClick: () => setPickFilter('instance'),
+                      },
+                      {
+                        label: m['profiles.nav'](),
+                        active: pickFilter === 'profile',
+                        onClick: () => setPickFilter('profile'),
+                      },
+                    ]}
+                  />
+                ) : (
+                  target && (
+                    <FilterBar
+                      search={pickSearch}
+                      onSearch={setPickSearch}
+                      placeholder={m['search.modrinth']()}
+                      chips={[
+                        {
+                          label: m['label.all'](),
+                          active: pickFilter === 'all',
+                          onClick: () => setPickFilter('all'),
+                        },
+                        ...ACCEPTS[target.type]
+                          .filter((k) => targetTakesKind(target, k))
+                          .map((k) => ({
+                            label: kindInfo[k].label(),
+                            active: pickFilter === k,
+                            onClick: () => setPickFilter(k),
+                          })),
+                      ]}
+                    />
+                  )
+                )
+              }
+              footer={nav}
+            >
               {mode === 'browse' && proj ? (
                 <form.AppField name="pick.targetId">
                   {(field: FieldApi<string>) => (
                     <TargetStep
                       kind={proj.kind}
                       targets={targetsFor(proj.kind)}
+                      search={pickSearch}
+                      type={pickFilter as 'all' | Target['type']}
                       selectedId={field.state.value}
                       errors={fieldErrors(field)}
                       onSelect={(t) => {
@@ -422,8 +485,9 @@ function WizardBody({
                   <form.AppField name="pick.projectId">
                     {(field: FieldApi<string>) => (
                       <ContentStep
-                        entry={target}
                         projects={projectsFor(target)}
+                        search={pickSearch}
+                        kind={pickFilter as 'all' | ContentKind}
                         selectedId={field.state.value}
                         errors={fieldErrors(field)}
                         onSelect={(p) => {
@@ -548,10 +612,13 @@ function fieldErrors<T>(field: FieldApi<T>) {
  */
 function StepForm({
   onSubmit,
+  header,
   footer,
   children,
 }: {
   onSubmit: () => void;
+  /** Pinned above the scroll area (the pick steps' search/filter bar). */
+  header?: React.ReactNode;
   footer: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -564,7 +631,13 @@ function StepForm({
         onSubmit();
       }}
     >
-      <div className="max-h-[58vh] min-h-[18rem] overflow-x-hidden overflow-y-auto p-1">
+      {header && <div className="px-1 pt-1">{header}</div>}
+      <div
+        className={cn(
+          'max-h-[58vh] overflow-x-hidden overflow-y-auto p-1',
+          header ? 'min-h-[14rem]' : 'min-h-[18rem]',
+        )}
+      >
         {children}
       </div>
       {footer}
@@ -585,7 +658,7 @@ function FilterBar({
   chips?: { label: string; active: boolean; onClick: () => void }[];
 }) {
   return (
-    <div className="mb-3 flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2.5">
       <div className="relative">
         <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
         <Input
@@ -616,19 +689,20 @@ function FilterBar({
 function TargetStep({
   kind,
   targets,
+  search,
+  type,
   selectedId,
   errors,
   onSelect,
 }: {
   kind: ContentKind;
   targets: Target[];
+  search: string;
+  type: 'all' | Target['type'];
   selectedId: string;
   errors?: Array<{ message?: string }>;
   onSelect: (target: Target) => void;
 }) {
-  const [search, setSearch] = useState('');
-  const [type, setType] = useState<'all' | Target['type']>('all');
-
   const q = search.trim().toLowerCase();
   const shown = targets.filter((t) => {
     if (type !== 'all' && t.type !== type) return false;
@@ -637,28 +711,6 @@ function TargetStep({
 
   return (
     <div>
-      <FilterBar
-        search={search}
-        onSearch={setSearch}
-        placeholder={m['search.targets']()}
-        chips={[
-          {
-            label: m['label.all'](),
-            active: type === 'all',
-            onClick: () => setType('all'),
-          },
-          {
-            label: m['nav.servers'](),
-            active: type === 'server',
-            onClick: () => setType('server'),
-          },
-          {
-            label: m['nav.instances'](),
-            active: type === 'instance',
-            onClick: () => setType('instance'),
-          },
-        ]}
-      />
       {targets.length === 0 ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
           {m['content.no_target_for_kind']({
@@ -691,24 +743,20 @@ function TargetStep({
 }
 
 function ContentStep({
-  entry,
   projects,
+  search,
+  kind,
   selectedId,
   errors,
   onSelect,
 }: {
-  entry: Target;
   projects: ContentProject[];
+  search: string;
+  kind: 'all' | ContentKind;
   selectedId: string;
   errors?: Array<{ message?: string }>;
   onSelect: (project: ContentProject) => void;
 }) {
-  const [search, setSearch] = useState('');
-  const [kind, setKind] = useState<'all' | ContentKind>('all');
-
-  const kinds = ACCEPTS[entry.type].filter(
-    (k) => k !== 'mod' || entry.flavor === 'fabric',
-  );
   const q = search.trim().toLowerCase();
   const shown = projects.filter((p) => {
     if (kind !== 'all' && p.kind !== kind) return false;
@@ -721,23 +769,6 @@ function ContentStep({
 
   return (
     <div>
-      <FilterBar
-        search={search}
-        onSearch={setSearch}
-        placeholder={m['search.modrinth']()}
-        chips={[
-          {
-            label: m['label.all'](),
-            active: kind === 'all',
-            onClick: () => setKind('all'),
-          },
-          ...kinds.map((k) => ({
-            label: kindInfo[k].label(),
-            active: kind === k,
-            onClick: () => setKind(k),
-          })),
-        ]}
-      />
       {shown.length === 0 ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
           {m['browse.nothing_matches']()}
