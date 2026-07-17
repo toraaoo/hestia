@@ -90,6 +90,8 @@ export const keys = {
     content: (id: string) => [...keys.instances.detail(id), 'content'] as const,
     contentList: (id: string, kind: ContentKind) =>
       [...keys.instances.content(id), kind] as const,
+    profiles: (id: string) =>
+      [...keys.instances.detail(id), 'profiles'] as const,
   },
   content: {
     all: ['content'] as const,

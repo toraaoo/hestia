@@ -14,10 +14,12 @@ import type {
   ContentList,
 } from './types/content';
 import type {
+  ContentProfile,
   InstanceCreateParams,
   InstanceInfo,
   InstanceLaunchDone,
   InstanceLaunchParams,
+  InstanceProfiles,
   InstanceUpdateParams,
 } from './types/instance';
 import type {
@@ -151,6 +153,65 @@ export const config = {
       { instance },
     );
     return result.entries;
+  },
+};
+
+/**
+ * Per-instance content profiles: named selections over the installed pool,
+ * enforced by the launch-time mirror reconcile. CRUD applies at the next
+ * launch, so it is safe while the instance runs.
+ */
+export const profiles = {
+  list(instance: string): Promise<InstanceProfiles> {
+    return call('instance.profile.list', { instance });
+  },
+
+  /** Seeded with every selectable pool item unless `seedFromPool` is false. */
+  create(
+    instance: string,
+    name: string,
+    seedFromPool = true,
+  ): Promise<ContentProfile> {
+    return call('instance.profile.create', {
+      instance,
+      name,
+      seed_from_pool: seedFromPool,
+    });
+  },
+
+  /** Removing the active profile clears the active selection. */
+  async remove(instance: string, name: string): Promise<void> {
+    await call('instance.profile.remove', { instance, name });
+  },
+
+  rename(
+    instance: string,
+    name: string,
+    newName: string,
+  ): Promise<ContentProfile> {
+    return call('instance.profile.rename', {
+      instance,
+      name,
+      new_name: newName,
+    });
+  },
+
+  /** Sets the active profile; an empty `name` clears it. */
+  async use(instance: string, name: string): Promise<void> {
+    await call('instance.profile.use', { instance, name });
+  },
+
+  /**
+   * Add/remove members by pool reference (project id, slug, filename, or
+   * title); a reference that matches nothing — or only a datapack — errors.
+   */
+  edit(
+    instance: string,
+    name: string,
+    add: string[] = [],
+    remove: string[] = [],
+  ): Promise<ContentProfile> {
+    return call('instance.profile.edit', { instance, name, add, remove });
   },
 };
 

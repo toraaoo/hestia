@@ -42,10 +42,31 @@ export interface InstanceLaunchParams {
   account?: string;
   /** Launch another session even when one is already running. */
   new_session?: boolean;
+  /**
+   * A profile override for this launch only: empty uses the active profile,
+   * the literal `none` launches with no profile.
+   */
+  profile?: string;
 }
 
 export interface InstanceLaunchDone {
   id: string;
   process_id: string;
   pid: number;
+}
+
+/**
+ * A named selection over the instance's installed content pool (mods,
+ * resourcepacks, shaders — never datapacks). Members are pool filenames.
+ * No profile active = every pool item is mirrored.
+ */
+export interface ContentProfile {
+  name: string;
+  members: string[];
+}
+
+export interface InstanceProfiles {
+  /** The active profile's name; empty when none is active. */
+  active: string;
+  profiles: ContentProfile[];
 }

@@ -11,6 +11,7 @@ import type {
   ContentAddSpec,
   ContentDone,
   ContentKind,
+  ContentProfile,
   InstanceCreateParams,
   InstanceInfo,
   InstanceLaunchDone,
@@ -76,6 +77,12 @@ export const instanceQueries = {
       queryKey: keys.instances.contentList(id, kind),
       queryFn: () => api.content.list(id, kind),
     }),
+  /** The active profile name and every content profile of the instance. */
+  profiles: (id: string) =>
+    queryOptions({
+      queryKey: keys.instances.profiles(id),
+      queryFn: () => api.profiles.list(id),
+    }),
 };
 
 export const instanceMutations = {
@@ -131,6 +138,48 @@ export const instanceMutations = {
       mutationFn: ({ key, value }) => api.config.set(id, key, value),
       invalidates: () => [keys.instances.config(id)],
     }),
+  profiles: {
+    /** Seeded with every selectable pool item unless `seedFromPool` is false. */
+    create: (id: string) =>
+      mutation<ContentProfile, { name: string; seedFromPool?: boolean }>({
+        mutationKey: [...keys.instances.profiles(id), 'create'],
+        mutationFn: ({ name, seedFromPool }) =>
+          api.profiles.create(id, name, seedFromPool),
+        invalidates: () => [keys.instances.profiles(id)],
+      }),
+    /** Removing the active profile clears the active selection. */
+    remove: (id: string) =>
+      mutation<void, string>({
+        mutationKey: [...keys.instances.profiles(id), 'remove'],
+        mutationFn: (name) => api.profiles.remove(id, name),
+        invalidates: () => [keys.instances.profiles(id)],
+      }),
+    rename: (id: string) =>
+      mutation<ContentProfile, { name: string; newName: string }>({
+        mutationKey: [...keys.instances.profiles(id), 'rename'],
+        mutationFn: ({ name, newName }) =>
+          api.profiles.rename(id, name, newName),
+        invalidates: () => [keys.instances.profiles(id)],
+      }),
+    /** Sets the active profile (empty clears it); applied at the next launch. */
+    use: (id: string) =>
+      mutation<void, string>({
+        mutationKey: [...keys.instances.profiles(id), 'use'],
+        mutationFn: (name) => api.profiles.use(id, name),
+        invalidates: () => [keys.instances.profiles(id)],
+      }),
+    /** Add/remove members by pool reference. */
+    edit: (id: string) =>
+      mutation<
+        ContentProfile,
+        { name: string; add?: string[]; remove?: string[] }
+      >({
+        mutationKey: [...keys.instances.profiles(id), 'edit'],
+        mutationFn: ({ name, add, remove }) =>
+          api.profiles.edit(id, name, add, remove),
+        invalidates: () => [keys.instances.profiles(id)],
+      }),
+  },
   content: {
     /** Instances take mods, resourcepacks, shaders, and datapacks. */
     add: (id: string) =>
@@ -149,7 +198,11 @@ export const instanceMutations = {
         mutationKey: [...keys.instances.content(id), 'remove'],
         mutationFn: ({ kind, item, worlds }) =>
           api.content.remove(id, kind, item, worlds),
-        invalidates: () => [keys.instances.content(id)],
+        // A removal also drops the filename from every profile.
+        invalidates: () => [
+          keys.instances.content(id),
+          keys.instances.profiles(id),
+        ],
       }),
     /** `item` empty updates every platform-sourced item of the kind. */
     update: (id: string) =>
@@ -162,7 +215,11 @@ export const instanceMutations = {
         }),
         run: ({ kind, item }, onProgress) =>
           api.content.update(id, kind, item, onProgress),
-        invalidates: () => [keys.instances.content(id)],
+        // An update can change a member's filename in every profile.
+        invalidates: () => [
+          keys.instances.content(id),
+          keys.instances.profiles(id),
+        ],
       }),
   },
 };
@@ -259,6 +316,31 @@ export function useStopInstance(id: string) {
 
 export function useSetInstanceConfig(id: string) {
   return useMutation(instanceMutations.setConfig(id));
+}
+
+export function useInstanceProfiles(id: string) {
+  return useQuery(instanceQueries.profiles(id));
+}
+
+export function useCreateInstanceProfile(id: string) {
+  return useMutation(instanceMutations.profiles.create(id));
+}
+
+export function useRemoveInstanceProfile(id: string) {
+  return useMutation(instanceMutations.profiles.remove(id));
+}
+
+export function useRenameInstanceProfile(id: string) {
+  return useMutation(instanceMutations.profiles.rename(id));
+}
+
+/** Sets the active profile (empty clears it); applied at the next launch. */
+export function useUseInstanceProfile(id: string) {
+  return useMutation(instanceMutations.profiles.use(id));
+}
+
+export function useEditInstanceProfile(id: string) {
+  return useMutation(instanceMutations.profiles.edit(id));
 }
 
 export function useAddInstanceContent(id: string) {
