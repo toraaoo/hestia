@@ -1,12 +1,12 @@
 import { DotsThreeIcon, TrashIcon } from '@phosphor-icons/react';
 import { type ReactNode, useState } from 'react';
 
-import { chipClass } from '@/components/chip';
 import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { KindChips } from '@/features/content/kind-chips';
 import { kindInfo } from '@/features/content/kinds';
 import type { Backup, InstalledContent } from '@/features/entries/mock';
 import { agoLabel, bytes } from '@/lib/format';
@@ -66,33 +66,16 @@ export function ContentSection({
     setList((l) => l.filter((c) => c.id !== item.id));
 
   const filtered = kind ? list.filter((c) => c.kind === kind) : list;
-  const count = (k: ContentKind) => list.filter((c) => c.kind === k).length;
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          className={chipClass(!kind)}
-          onClick={() => onKindChange(undefined)}
-        >
-          {m['label.all']()}
-        </button>
-        {kinds.map((k) => (
-          <button
-            key={k}
-            type="button"
-            className={chipClass(kind === k)}
-            onClick={() => onKindChange(k)}
-          >
-            {kindInfo[k].label()}
-            <span className="ml-1.5 font-mono text-[10px] opacity-60">
-              {count(k)}
-            </span>
-          </button>
-        ))}
-        {action && <div className="ml-auto">{action}</div>}
-      </div>
+      <KindChips
+        kinds={kinds}
+        kind={kind}
+        onKindChange={onKindChange}
+        count={(k) => list.filter((c) => c.kind === k).length}
+        action={action}
+      />
       {filtered.length === 0 && kind ? (
         <Empty>
           {m['content.none_of_kind']({
@@ -129,6 +112,11 @@ export function ContentList({
                 {!c.enabled && (
                   <Badge variant="outline" className="shrink-0">
                     {m['content.disabled']()}
+                  </Badge>
+                )}
+                {c.origin && (
+                  <Badge variant="outline" className="shrink-0 font-mono">
+                    {m['profiles.origin_badge']({ name: c.origin })}
                   </Badge>
                 )}
                 {c.updatable && (

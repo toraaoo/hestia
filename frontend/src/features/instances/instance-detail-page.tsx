@@ -27,6 +27,7 @@ import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
 import { getInstance } from '@/features/entries/mock';
 import { ResourceCards } from '@/features/entries/resource-panel';
 import { InstanceSettingsForm } from '@/features/entries/settings-forms';
+import { ProfilesPanel } from '@/features/profiles/profiles-panel';
 import { agoLabel } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
@@ -42,6 +43,7 @@ const logLines = [
 export type InstanceTab =
   | 'overview'
   | 'content'
+  | 'profiles'
   | 'worlds'
   | 'logs'
   | 'settings';
@@ -153,6 +155,10 @@ export function InstanceDetailPage({
             {m['tab.content']()}
             <TabCount n={inst.content.length} />
           </TabsTrigger>
+          <TabsTrigger value="profiles">
+            {m['profiles.tab']()}
+            <TabCount n={inst.profiles.length} />
+          </TabsTrigger>
           <TabsTrigger value="worlds">
             {m['tab.worlds']()}
             <TabCount n={inst.worlds.length} />
@@ -254,6 +260,10 @@ export function InstanceDetailPage({
               </Button>
             }
           />
+        </TabsContent>
+
+        <TabsContent value="profiles" className="p-5">
+          <ProfilesPanel inst={inst} />
         </TabsContent>
 
         <TabsContent value="worlds" className="p-5">

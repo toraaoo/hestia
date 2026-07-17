@@ -14,9 +14,11 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppSkinsIndexRouteImport } from './routes/_app/skins/index'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppServersIndexRouteImport } from './routes/_app/servers/index'
+import { Route as AppProfilesIndexRouteImport } from './routes/_app/profiles/index'
 import { Route as AppInstancesIndexRouteImport } from './routes/_app/instances/index'
 import { Route as AppBrowseIndexRouteImport } from './routes/_app/browse/index'
 import { Route as AppServersIdRouteImport } from './routes/_app/servers/$id'
+import { Route as AppProfilesNameRouteImport } from './routes/_app/profiles/$name'
 import { Route as AppInstancesIdRouteImport } from './routes/_app/instances/$id'
 import { Route as AppBrowseKindIndexRouteImport } from './routes/_app/browse/$kind/index'
 import { Route as AppBrowseKindIdRouteImport } from './routes/_app/browse/$kind/$id'
@@ -45,6 +47,11 @@ const AppServersIndexRoute = AppServersIndexRouteImport.update({
   path: '/servers/',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppProfilesIndexRoute = AppProfilesIndexRouteImport.update({
+  id: '/profiles/',
+  path: '/profiles/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppInstancesIndexRoute = AppInstancesIndexRouteImport.update({
   id: '/instances/',
   path: '/instances/',
@@ -58,6 +65,11 @@ const AppBrowseIndexRoute = AppBrowseIndexRouteImport.update({
 const AppServersIdRoute = AppServersIdRouteImport.update({
   id: '/servers/$id',
   path: '/servers/$id',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppProfilesNameRoute = AppProfilesNameRouteImport.update({
+  id: '/profiles/$name',
+  path: '/profiles/$name',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppInstancesIdRoute = AppInstancesIdRouteImport.update({
@@ -79,9 +91,11 @@ const AppBrowseKindIdRoute = AppBrowseKindIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/instances/$id': typeof AppInstancesIdRoute
+  '/profiles/$name': typeof AppProfilesNameRoute
   '/servers/$id': typeof AppServersIdRoute
   '/browse/': typeof AppBrowseIndexRoute
   '/instances/': typeof AppInstancesIndexRoute
+  '/profiles/': typeof AppProfilesIndexRoute
   '/servers/': typeof AppServersIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/skins/': typeof AppSkinsIndexRoute
@@ -91,9 +105,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/instances/$id': typeof AppInstancesIdRoute
+  '/profiles/$name': typeof AppProfilesNameRoute
   '/servers/$id': typeof AppServersIdRoute
   '/browse': typeof AppBrowseIndexRoute
   '/instances': typeof AppInstancesIndexRoute
+  '/profiles': typeof AppProfilesIndexRoute
   '/servers': typeof AppServersIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/skins': typeof AppSkinsIndexRoute
@@ -105,9 +121,11 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteRouteWithChildren
   '/_app/': typeof AppIndexRoute
   '/_app/instances/$id': typeof AppInstancesIdRoute
+  '/_app/profiles/$name': typeof AppProfilesNameRoute
   '/_app/servers/$id': typeof AppServersIdRoute
   '/_app/browse/': typeof AppBrowseIndexRoute
   '/_app/instances/': typeof AppInstancesIndexRoute
+  '/_app/profiles/': typeof AppProfilesIndexRoute
   '/_app/servers/': typeof AppServersIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/skins/': typeof AppSkinsIndexRoute
@@ -119,9 +137,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/instances/$id'
+    | '/profiles/$name'
     | '/servers/$id'
     | '/browse/'
     | '/instances/'
+    | '/profiles/'
     | '/servers/'
     | '/settings/'
     | '/skins/'
@@ -131,9 +151,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/instances/$id'
+    | '/profiles/$name'
     | '/servers/$id'
     | '/browse'
     | '/instances'
+    | '/profiles'
     | '/servers'
     | '/settings'
     | '/skins'
@@ -144,9 +166,11 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_app/'
     | '/_app/instances/$id'
+    | '/_app/profiles/$name'
     | '/_app/servers/$id'
     | '/_app/browse/'
     | '/_app/instances/'
+    | '/_app/profiles/'
     | '/_app/servers/'
     | '/_app/settings/'
     | '/_app/skins/'
@@ -195,6 +219,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppServersIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/profiles/': {
+      id: '/_app/profiles/'
+      path: '/profiles'
+      fullPath: '/profiles/'
+      preLoaderRoute: typeof AppProfilesIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/instances/': {
       id: '/_app/instances/'
       path: '/instances'
@@ -214,6 +245,13 @@ declare module '@tanstack/react-router' {
       path: '/servers/$id'
       fullPath: '/servers/$id'
       preLoaderRoute: typeof AppServersIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/profiles/$name': {
+      id: '/_app/profiles/$name'
+      path: '/profiles/$name'
+      fullPath: '/profiles/$name'
+      preLoaderRoute: typeof AppProfilesNameRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/instances/$id': {
@@ -243,9 +281,11 @@ declare module '@tanstack/react-router' {
 interface AppRouteRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppInstancesIdRoute: typeof AppInstancesIdRoute
+  AppProfilesNameRoute: typeof AppProfilesNameRoute
   AppServersIdRoute: typeof AppServersIdRoute
   AppBrowseIndexRoute: typeof AppBrowseIndexRoute
   AppInstancesIndexRoute: typeof AppInstancesIndexRoute
+  AppProfilesIndexRoute: typeof AppProfilesIndexRoute
   AppServersIndexRoute: typeof AppServersIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppSkinsIndexRoute: typeof AppSkinsIndexRoute
@@ -256,9 +296,11 @@ interface AppRouteRouteChildren {
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppInstancesIdRoute: AppInstancesIdRoute,
+  AppProfilesNameRoute: AppProfilesNameRoute,
   AppServersIdRoute: AppServersIdRoute,
   AppBrowseIndexRoute: AppBrowseIndexRoute,
   AppInstancesIndexRoute: AppInstancesIndexRoute,
+  AppProfilesIndexRoute: AppProfilesIndexRoute,
   AppServersIndexRoute: AppServersIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppSkinsIndexRoute: AppSkinsIndexRoute,

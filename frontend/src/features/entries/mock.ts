@@ -15,6 +15,20 @@ export interface InstalledContent {
   version: string;
   enabled: boolean;
   updatable: boolean;
+  /** The global profile that installed it (`instance.profile.apply`), if any. */
+  origin?: string;
+}
+
+/**
+ * A named selection over an instance's installed pool, from
+ * `instance.profile.list`. Members reference content ids here (the wire keys
+ * them by filename); `captured` mirrors the profile owning its own settings
+ * store.
+ */
+export interface ContentProfile {
+  name: string;
+  members: string[];
+  captured: boolean;
 }
 
 /** A backup archive, from `backup.list`. */
@@ -47,6 +61,9 @@ export interface Instance {
   disk_bytes: number;
   content: InstalledContent[];
   worlds: string[];
+  /** The active content profile's name; empty when none is active. */
+  active_profile: string;
+  profiles: ContentProfile[];
 }
 
 export const instances: Instance[] = [
@@ -113,6 +130,19 @@ export const instances: Instance[] = [
       },
     ],
     worlds: ['New World', 'Skyblock Run', 'Creative Flats'],
+    active_profile: 'performance',
+    profiles: [
+      {
+        name: 'performance',
+        members: ['sodium', 'iris', 'fabric-api'],
+        captured: false,
+      },
+      {
+        name: 'showcase',
+        members: ['sodium', 'iris', 'fabric-api', 'complementary', 'faithful'],
+        captured: true,
+      },
+    ],
   },
   {
     id: 'vanilla-1214-a1b2c3d4',
@@ -130,6 +160,8 @@ export const instances: Instance[] = [
     disk_bytes: 640_000_000,
     content: [],
     worlds: ['Survival'],
+    active_profile: '',
+    profiles: [],
   },
   {
     id: 'create-above-77ffee11',
@@ -164,9 +196,12 @@ export const instances: Instance[] = [
         version: '15.3.0',
         enabled: true,
         updatable: false,
+        origin: 'qol',
       },
     ],
     worlds: ['Factory'],
+    active_profile: '',
+    profiles: [{ name: 'lightweight', members: ['create'], captured: false }],
   },
   {
     id: 'snapshot-lab-9090abab',
@@ -184,6 +219,8 @@ export const instances: Instance[] = [
     disk_bytes: 120_000_000,
     content: [],
     worlds: [],
+    active_profile: '',
+    profiles: [],
   },
 ];
 

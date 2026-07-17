@@ -7,7 +7,13 @@ import {
 } from '@/features/instances/instance-detail-page';
 import type { ContentKind } from '@/lib/mock';
 
-const tabs: InstanceTab[] = ['content', 'worlds', 'logs', 'settings'];
+const tabs: InstanceTab[] = [
+  'content',
+  'profiles',
+  'worlds',
+  'logs',
+  'settings',
+];
 
 export const Route = createFileRoute('/_app/instances/$id')({
   validateSearch: (
