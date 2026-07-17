@@ -87,24 +87,46 @@ pub(crate) fn mirror(source: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Re-mirror every indexed file whose `data/` copy is missing. Datapacks are
-/// skipped: they live inside the world (under `data/`), so a backup restore
-/// brings them back with the world — there is no managed copy to heal from.
-pub(crate) fn sync(entry_dir: &Path, data_dir: &Path) -> Result<()> {
+/// Reconcile the `data/` mirror with the index. With no `selection`, heal only:
+/// re-mirror every indexed file whose `data/` copy is missing. With a selection
+/// (a profile's member filenames), members are mirrored and tracked non-members
+/// have their `data/` copy removed (the managed copy stays) — untracked files
+/// are never touched. Datapacks are skipped either way: they live inside the
+/// world (under `data/`), so a backup restore brings them back with the world —
+/// there is no managed copy to heal from, and profiles never select them.
+pub(crate) fn sync(
+    entry_dir: &Path,
+    data_dir: &Path,
+    selection: Option<&HashSet<String>>,
+) -> Result<()> {
     let mut healed = 0u32;
+    let mut removed = 0u32;
     for item in load(entry_dir) {
         if item.kind == ContentKind::DataPack {
             continue;
         }
         let managed = managed_path(entry_dir, &item)?;
         let dest = data_path(data_dir, &item)?;
+        if selection.is_some_and(|members| !members.contains(&item.filename)) {
+            if dest.is_file() {
+                std::fs::remove_file(&dest)
+                    .with_context(|| format!("cannot remove {}", dest.display()))?;
+                removed += 1;
+            }
+            continue;
+        }
         if managed.is_file() && !dest.exists() {
             mirror(&managed, &dest)?;
             healed += 1;
         }
     }
-    if healed > 0 {
-        tracing::info!(entry = %entry_dir.display(), healed, "content mirrored into data dir");
+    if healed > 0 || removed > 0 {
+        tracing::info!(
+            entry = %entry_dir.display(),
+            healed,
+            removed,
+            "content mirror reconciled with data dir"
+        );
     }
     Ok(())
 }
@@ -316,6 +338,116 @@ mod tests {
         assert_eq!(kind_dir(ContentKind::Shader).unwrap(), "shaderpacks");
         assert_eq!(kind_dir(ContentKind::DataPack).unwrap(), "datapacks");
         assert!(kind_dir(ContentKind::Modpack).is_err());
+    }
+
+    fn temp_entry(tag: &str) -> (PathBuf, PathBuf) {
+        let entry = std::env::temp_dir().join(format!(
+            "hestia-install-test-{}-{}",
+            tag,
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&entry);
+        let data = entry.join("data");
+        std::fs::create_dir_all(&data).unwrap();
+        (entry, data)
+    }
+
+    fn tracked(kind: ContentKind, filename: &str) -> InstalledContent {
+        InstalledContent {
+            kind,
+            filename: filename.to_string(),
+            ..InstalledContent::default()
+        }
+    }
+
+    fn install_tracked(entry: &Path, data: &Path, item: &InstalledContent) {
+        let managed = managed_path(entry, item).unwrap();
+        std::fs::create_dir_all(managed.parent().unwrap()).unwrap();
+        std::fs::write(&managed, item.filename.as_bytes()).unwrap();
+        mirror(&managed, &data_path(data, item).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn sync_without_selection_heals_all_tracked_items() {
+        let (entry, data) = temp_entry("healall");
+        let items = vec![
+            tracked(ContentKind::Mod, "sodium.jar"),
+            tracked(ContentKind::ResourcePack, "cozy.zip"),
+        ];
+        for item in &items {
+            install_tracked(&entry, &data, item);
+        }
+        save(&entry, items.clone()).unwrap();
+        std::fs::remove_file(data.join("mods/sodium.jar")).unwrap();
+
+        sync(&entry, &data, None).unwrap();
+
+        assert!(data.join("mods/sodium.jar").is_file());
+        assert!(data.join("resourcepacks/cozy.zip").is_file());
+        std::fs::remove_dir_all(&entry).ok();
+    }
+
+    #[test]
+    fn sync_with_selection_mirrors_members_and_removes_non_members() {
+        let (entry, data) = temp_entry("selection");
+        let items = vec![
+            tracked(ContentKind::Mod, "sodium.jar"),
+            tracked(ContentKind::Mod, "lithium.jar"),
+            tracked(ContentKind::ResourcePack, "cozy.zip"),
+        ];
+        for item in &items {
+            install_tracked(&entry, &data, item);
+        }
+        save(&entry, items).unwrap();
+        std::fs::remove_file(data.join("mods/sodium.jar")).unwrap();
+        std::fs::write(data.join("mods").join("hand-dropped.jar"), "mine").unwrap();
+
+        let members: HashSet<String> = ["sodium.jar".to_string()].into_iter().collect();
+        sync(&entry, &data, Some(&members)).unwrap();
+
+        assert!(data.join("mods/sodium.jar").is_file(), "member mirrored");
+        assert!(
+            !data.join("mods/lithium.jar").exists(),
+            "non-member removed"
+        );
+        assert!(
+            !data.join("resourcepacks/cozy.zip").exists(),
+            "non-member resourcepack removed"
+        );
+        assert!(
+            data.join("mods/hand-dropped.jar").is_file(),
+            "untracked file untouched"
+        );
+        assert!(
+            entry.join("mods/lithium.jar").is_file(),
+            "managed copy stays"
+        );
+
+        // Clearing the selection mirrors everything back.
+        sync(&entry, &data, None).unwrap();
+        assert!(data.join("mods/lithium.jar").is_file());
+        assert!(data.join("resourcepacks/cozy.zip").is_file());
+        std::fs::remove_dir_all(&entry).ok();
+    }
+
+    #[test]
+    fn sync_selection_never_touches_datapacks() {
+        let (entry, data) = temp_entry("datapack");
+        let mut pack = tracked(ContentKind::DataPack, "terralith.zip");
+        pack.world = "saves/world".to_string();
+        let in_world = datapack_path(&data, &pack);
+        std::fs::create_dir_all(in_world.parent().unwrap()).unwrap();
+        std::fs::write(&in_world, "pack").unwrap();
+        save(&entry, vec![pack]).unwrap();
+
+        let empty: HashSet<String> = HashSet::new();
+        sync(&entry, &data, Some(&empty)).unwrap();
+
+        assert!(
+            in_world.is_file(),
+            "datapacks are outside profile selection"
+        );
+        std::fs::remove_dir_all(&entry).ok();
     }
 
     #[test]

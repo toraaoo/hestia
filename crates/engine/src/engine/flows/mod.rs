@@ -5,6 +5,7 @@
 mod backup;
 mod content;
 mod instance;
+mod profiles;
 mod server;
 mod skins;
 mod sync;

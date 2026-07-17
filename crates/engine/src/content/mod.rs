@@ -5,6 +5,7 @@
 
 pub(crate) mod install;
 mod modrinth;
+pub(crate) mod profiles;
 mod provider;
 
 use anyhow::{Context, Result};

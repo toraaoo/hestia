@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use proto::minecraft::{ConfigEntry, ProvisionPhase};
 
 use super::{effective_name, guard_downgrade};
-use crate::content::install;
+use crate::content::{install, profiles};
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
 use crate::minecraft::launch::{self, InstancePaths, LaunchAccount, LaunchPlan};
@@ -101,18 +101,29 @@ impl Engine {
 
     /// Materialise everything an instance launch needs — the Java runtime, the
     /// client jar, libraries, assets — and assemble the JVM invocation for the
-    /// given account (empty picks the sole signed-in one).
+    /// given account (empty picks the sole signed-in one). `profile` overrides
+    /// the active profile for this launch (`none` = no profile); `reconcile`
+    /// off skips the sync/mirror pass entirely — sessions are already running,
+    /// so the mirror is in use (jars are open, locked on Windows).
     pub async fn prepare_instance(
         &self,
         reference: &str,
         account: &str,
         session_seq: u32,
+        profile: &str,
+        reconcile: bool,
         on_progress: OnProgress<'_>,
     ) -> Result<(InstanceRecord, LaunchPlan, PathBuf)> {
         let record = self
             .instances
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
+        let entry_dir = self.instances.instance_dir(&record.id);
+        let selection = if reconcile {
+            profiles::selection(&entry_dir, profile)?
+        } else {
+            None
+        };
         let account = self.launch_account(account).await?;
 
         let java = self
@@ -155,8 +166,10 @@ impl Engine {
         let game_dir = self.instances.data_dir(&record.id);
         std::fs::create_dir_all(&game_dir)
             .with_context(|| format!("cannot create {}", game_dir.display()))?;
-        self.sync.apply(&game_dir)?;
-        install::sync(&self.instances.instance_dir(&record.id), &game_dir)?;
+        if reconcile {
+            self.sync.apply(&game_dir)?;
+            install::sync(&entry_dir, &game_dir, selection.as_ref())?;
+        }
         let natives_dir = meta.join("natives").join(&record.profile.game_version);
         std::fs::create_dir_all(&natives_dir)
             .with_context(|| format!("cannot create {}", natives_dir.display()))?;

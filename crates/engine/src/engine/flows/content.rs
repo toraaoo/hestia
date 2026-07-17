@@ -13,7 +13,7 @@ use proto::content::{
 use proto::minecraft::{ProvisionPhase, ProvisionProgress};
 
 use super::phase_progress;
-use crate::content::install;
+use crate::content::{install, profiles};
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
 use crate::minecraft::materialize::{self, OnProgress};
@@ -82,7 +82,7 @@ impl Engine {
         worlds: &[String],
     ) -> Result<bool> {
         let (_, ctx) = self.server_content_ctx(reference)?;
-        remove_content(&ctx, kind, item, worlds)
+        Ok(!remove_content(&ctx, kind, item, worlds)?.is_empty())
     }
 
     pub fn remove_instance_content(
@@ -93,7 +93,14 @@ impl Engine {
         worlds: &[String],
     ) -> Result<bool> {
         let (_, ctx) = self.instance_content_ctx(reference)?;
-        remove_content(&ctx, kind, item, worlds)
+        let removed = remove_content(&ctx, kind, item, worlds)?;
+        let gone: Vec<String> = removed
+            .iter()
+            .filter(|i| profiles::selectable(i.kind))
+            .map(|i| i.filename.clone())
+            .collect();
+        profiles::prune(&ctx.entry_dir, &gone)?;
+        Ok(!removed.is_empty())
     }
 
     /// Move platform-sourced items to their newest compatible version — one
@@ -118,7 +125,19 @@ impl Engine {
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
         let (_, ctx) = self.instance_content_ctx(reference)?;
-        self.update_content(&ctx, kind, item, on_progress).await
+        let before = install::load(&ctx.entry_dir);
+        let updated = self.update_content(&ctx, kind, item, on_progress).await?;
+        for new_item in &updated {
+            let old = before.iter().find(|i| {
+                i.kind == new_item.kind
+                    && i.project_id == new_item.project_id
+                    && i.world == new_item.world
+            });
+            if let Some(old) = old {
+                profiles::remap(&ctx.entry_dir, &old.filename, &new_item.filename)?;
+            }
+        }
+        Ok(updated)
     }
 
     fn server_content_ctx(&self, reference: &str) -> Result<(ServerRecord, EntryContent)> {
@@ -809,7 +828,7 @@ fn remove_content(
     kind: ContentKind,
     reference: &str,
     worlds: &[String],
-) -> Result<bool> {
+) -> Result<Vec<InstalledContent>> {
     if !worlds.is_empty() && kind != ContentKind::DataPack {
         bail!("only datapacks are installed per world");
     }
@@ -820,7 +839,7 @@ fn remove_content(
                 && (worlds.is_empty() || worlds.iter().any(|w| world_matches(&i.world, w)))
         });
     if removed.is_empty() {
-        return Ok(false);
+        return Ok(removed);
     }
     for item in &removed {
         install::remove_files(&ctx.entry_dir, &ctx.data_dir, item);
@@ -834,7 +853,7 @@ fn remove_content(
         );
     }
     install::save(&ctx.entry_dir, kept)?;
-    Ok(true)
+    Ok(removed)
 }
 
 /// Whether an index entry's world path (`saves/<name>`, or a server's level

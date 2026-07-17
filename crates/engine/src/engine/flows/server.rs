@@ -109,6 +109,7 @@ impl Engine {
         install::sync(
             &self.servers.server_dir(&record.id),
             &self.servers.data_dir(&record.id),
+            None,
         )?;
         let java = self.installed_java(record.profile.java_major)?;
         let plan = self.servers.launch_plan(&record, &java);
