@@ -4,8 +4,6 @@
  * backend.
  */
 
-import { getProject } from '@/features/content/mock';
-
 /** One project reference of a global profile. */
 export interface GlobalProfileEntry {
   source: string;
@@ -20,14 +18,6 @@ export interface GlobalProfileEntry {
 export interface GlobalProfile {
   name: string;
   entries: GlobalProfileEntry[];
-}
-
-/** The content kinds a profile's references resolve to, deduplicated. */
-export function profileKinds(profile: GlobalProfile) {
-  const kinds = profile.entries.map(
-    (e) => getProject(e.slug)?.kind ?? ('mod' as const),
-  );
-  return [...new Set(kinds)];
 }
 
 export const globalProfiles: GlobalProfile[] = [

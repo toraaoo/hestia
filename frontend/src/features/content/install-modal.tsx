@@ -56,6 +56,7 @@ import {
   type Server,
   servers,
 } from '@/features/entries/mock';
+import { type GlobalProfile, globalProfiles } from '@/features/profiles/mock';
 import { useAppForm } from '@/hooks/form';
 import { agoLabel } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
@@ -66,7 +67,7 @@ import { m } from '@/paraglide/messages.js';
 export interface Target {
   id: string;
   name: string;
-  type: 'server' | 'instance';
+  type: 'server' | 'instance' | 'profile';
   flavor: string;
   game_version: string;
   running: boolean;
@@ -93,19 +94,36 @@ export const instanceTarget = (i: Instance): Target => ({
   worlds: i.worlds,
 });
 
+/**
+ * A global profile as an install target: references, never jars — a profile
+ * has no version or loader of its own, so anything compatible can join it.
+ */
+export const profileTarget = (p: GlobalProfile): Target => ({
+  id: p.name,
+  name: p.name,
+  type: 'profile',
+  flavor: '',
+  game_version: '',
+  running: false,
+  worlds: [],
+});
+
 /** Which kinds each entry type accepts — mirrors the daemon's install surface. */
 const ACCEPTS: Record<Target['type'], ContentKind[]> = {
+  profile: ['mod', 'resourcepack', 'shader'],
   server: ['mod', 'datapack'],
   instance: ['mod', 'resourcepack', 'shader', 'datapack'],
 };
 
 /** A mod needs a loader; a vanilla entry cannot take one. */
 const targetTakesKind = (t: Target, kind: ContentKind): boolean =>
-  ACCEPTS[t.type].includes(kind) && (kind !== 'mod' || t.flavor === 'fabric');
+  ACCEPTS[t.type].includes(kind) &&
+  (kind !== 'mod' || t.flavor === 'fabric' || t.type === 'profile');
 
 const allTargets = (): Target[] => [
   ...servers.map(serverTarget),
   ...instances.map(instanceTarget),
+  ...globalProfiles.map(profileTarget),
 ];
 
 /** Every entry that can take this kind, across both stores. */
@@ -121,7 +139,11 @@ function projectsFor(target: Target): ContentProject[] {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const entryTypeLabel = (type: Target['type']): string =>
-  type === 'server' ? m['entry.type_server']() : m['entry.type_instance']();
+  type === 'server'
+    ? m['entry.type_server']()
+    : type === 'profile'
+      ? m['entry.type_profile']()
+      : m['entry.type_instance']();
 
 /**
  * The content install wizard, mirroring the daemon's `content.add`. Built on

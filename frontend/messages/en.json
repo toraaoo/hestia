@@ -141,7 +141,8 @@
   "stop_server_description": "The server shuts down and any connected players are disconnected.",
   "stop_instance_description": "The running game session is closed. Unsaved progress may be lost.",
   "stop_sessions_description": "All {count} running sessions are closed. Unsaved progress may be lost.",
-  "overview_summary": "A {flavor} {version} instance with {mods} mods across {worlds} worlds."
+  "overview_summary": "A {flavor} {version} instance with {mods} mods across {worlds} worlds.",
+  "type_profile": "profile"
  },
  "tab": {
   "overview": "Overview",
@@ -419,11 +420,8 @@
   "apply_title": "Apply a global profile",
   "apply_description": "References not yet installed are resolved for {version} and installed, tagged with the profile. Nothing is ever removed by an apply.",
   "apply_installed_by": "installed by {profile}",
-  "add_reference": "Add reference",
-  "add_reference_placeholder": "Search content to add…",
   "no_entries": "No references yet.",
   "origin_badge": "profile: {name}",
-  "search_empty": "No results for “{query}”.",
   "search_placeholder": "Search profiles",
   "none_match": "No profiles match.",
   "missing": "This profile does not exist."

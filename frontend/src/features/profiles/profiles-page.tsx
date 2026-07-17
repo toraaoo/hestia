@@ -4,7 +4,6 @@ import { useState } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
 import { Empty } from '@/components/empty';
-import { contentIcon } from '@/components/icons';
 import { Page } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,11 +17,10 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { KindChips } from '@/features/content/kind-chips';
-import { kindInfo } from '@/features/content/kinds';
 import { getProject } from '@/features/content/mock';
+import { type View, ViewToggle } from '@/features/entries/collection';
 import type { GlobalProfile } from '@/features/profiles/mock';
-import { globalProfiles, profileKinds } from '@/features/profiles/mock';
+import { globalProfiles } from '@/features/profiles/mock';
 import type { ContentKind } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
 
@@ -34,16 +32,16 @@ export const profileFilterKinds: ContentKind[] = [
 ];
 
 /**
- * The global profiles list: searchable, filterable by referenced kind, each
- * card opening its detail page. Local state over the mock — nothing talks to
- * a backend.
+ * The global profiles list: a grid/list of cards searchable by name, each
+ * opening its detail page. Local state over the mock — nothing talks to a
+ * backend.
  */
 export function ProfilesPage({
-  kind,
-  onKindChange,
+  view,
+  onViewChange,
 }: {
-  kind?: ContentKind;
-  onKindChange: (kind?: ContentKind) => void;
+  view: View;
+  onViewChange: (view: View) => void;
 }) {
   const { query } = useSearch();
   const navigate = useNavigate();
@@ -51,11 +49,7 @@ export function ProfilesPage({
   const [creating, setCreating] = useState(false);
 
   const q = query.trim().toLowerCase();
-  const filtered = profiles.filter(
-    (p) =>
-      (!q || p.name.includes(q) || p.entries.some((e) => e.slug.includes(q))) &&
-      (!kind || profileKinds(p).includes(kind)),
-  );
+  const filtered = profiles.filter((p) => !q || p.name.includes(q));
 
   return (
     <Page
@@ -64,31 +58,31 @@ export function ProfilesPage({
       search
       searchPlaceholder={m['profiles.search_placeholder']()}
       actions={
-        <Button
-          size="sm"
-          data-icon="inline-start"
-          onClick={() => setCreating(true)}
-        >
-          <PlusIcon weight="bold" />
-          {m['profiles.new_global']()}
-        </Button>
+        <>
+          <ViewToggle view={view} onView={onViewChange} />
+          <Button
+            size="sm"
+            data-icon="inline-start"
+            onClick={() => setCreating(true)}
+          >
+            <PlusIcon weight="bold" />
+            {m['profiles.new_global']()}
+          </Button>
+        </>
       }
     >
-      <KindChips
-        kinds={profileFilterKinds}
-        kind={kind}
-        onKindChange={onKindChange}
-        count={(k) =>
-          profiles.filter((p) => profileKinds(p).includes(k)).length
-        }
-      />
-
       {filtered.length === 0 ? (
         <Empty>
           {profiles.length === 0
             ? m['profiles.global_empty']()
             : m['profiles.none_match']()}
         </Empty>
+      ) : view === 'grid' ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+          {filtered.map((profile) => (
+            <ProfileCard key={profile.name} profile={profile} />
+          ))}
+        </div>
       ) : (
         <div className="divide-y divide-border border border-border">
           {filtered.map((profile) => (
@@ -112,8 +106,41 @@ export function ProfilesPage({
   );
 }
 
+function entrySummary(profile: GlobalProfile): string {
+  return (
+    profile.entries
+      .slice(0, 3)
+      .map((e) => getProject(e.slug)?.title ?? e.slug)
+      .join(' · ') || m['profiles.no_entries']()
+  );
+}
+
+function ProfileCard({ profile }: { profile: GlobalProfile }) {
+  return (
+    <Link
+      to="/profiles/$name"
+      params={{ name: profile.name }}
+      className="group flex flex-col gap-3 border border-border bg-card p-4 transition-colors outline-none hover:border-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="grid size-10 shrink-0 place-items-center bg-muted ring-1 ring-border">
+          <StackIcon className="size-5 text-muted-foreground" />
+        </span>
+        <Badge variant="outline" className="font-mono">
+          {m['profiles.entries_count']({ count: profile.entries.length })}
+        </Badge>
+      </div>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-medium">{profile.name}</div>
+        <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+          {entrySummary(profile)}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 function ProfileRow({ profile }: { profile: GlobalProfile }) {
-  const kinds = profileKinds(profile);
   return (
     <Link
       to="/profiles/$name"
@@ -128,25 +155,8 @@ function ProfileRow({ profile }: { profile: GlobalProfile }) {
           {profile.name}
         </span>
         <span className="block truncate font-mono text-[11px] text-muted-foreground">
-          {profile.entries
-            .slice(0, 4)
-            .map((e) => getProject(e.slug)?.title ?? e.slug)
-            .join(' · ') || m['profiles.no_entries']()}
+          {entrySummary(profile)}
         </span>
-      </span>
-      <span className="flex shrink-0 items-center gap-1.5">
-        {kinds.map((k) => {
-          const Icon = contentIcon(k);
-          return (
-            <span
-              key={k}
-              title={kindInfo[k].label()}
-              className="grid size-6 place-items-center bg-muted text-muted-foreground ring-1 ring-border"
-            >
-              <Icon className="size-3.5" />
-            </span>
-          );
-        })}
       </span>
       <Badge variant="outline" className="shrink-0 font-mono">
         {m['profiles.entries_count']({ count: profile.entries.length })}

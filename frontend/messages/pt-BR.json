@@ -141,7 +141,8 @@
   "stop_server_description": "O servidor será desligado e os jogadores conectados serão desconectados.",
   "stop_instance_description": "A sessão de jogo em execução será fechada. Progresso não salvo pode ser perdido.",
   "stop_sessions_description": "Todas as {count} sessões em execução serão fechadas. Progresso não salvo pode ser perdido.",
-  "overview_summary": "Uma instância {flavor} {version} com {mods} mods em {worlds} mundos."
+  "overview_summary": "Uma instância {flavor} {version} com {mods} mods em {worlds} mundos.",
+  "type_profile": "perfil"
  },
  "tab": {
   "overview": "Visão geral",
@@ -419,11 +420,8 @@
   "apply_title": "Aplicar um perfil global",
   "apply_description": "Referências ainda não instaladas são resolvidas para {version} e instaladas, marcadas com o perfil. Um apply nunca remove nada.",
   "apply_installed_by": "instalado por {profile}",
-  "add_reference": "Adicionar referência",
-  "add_reference_placeholder": "Busque conteúdo para adicionar…",
   "no_entries": "Nenhuma referência ainda.",
   "origin_badge": "perfil: {name}",
-  "search_empty": "Nenhum resultado para “{query}”.",
   "search_placeholder": "Buscar perfis",
   "none_match": "Nenhum perfil corresponde.",
   "missing": "Este perfil não existe."
