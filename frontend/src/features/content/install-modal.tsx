@@ -4,6 +4,7 @@ import {
   CheckIcon,
   MagnifyingGlassIcon,
 } from '@phosphor-icons/react';
+import { revalidateLogic } from '@tanstack/react-form';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { chipClass } from '@/components/chip';
@@ -27,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { FieldError } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Progress,
@@ -42,11 +44,19 @@ import {
   resolveDependencies,
 } from '@/features/content/mock';
 import {
+  installWizardDefaults,
+  installWizardSchema,
+  pickStepSchema,
+  reviewStepSchema,
+  worldsStepSchema,
+} from '@/features/content/schema';
+import {
   type Instance,
   instances,
   type Server,
   servers,
 } from '@/features/entries/mock';
+import { useAppForm } from '@/hooks/form';
 import { agoLabel } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
 import { cn } from '@/lib/utils';
@@ -92,12 +102,14 @@ const ACCEPTS: Record<Target['type'], ContentKind[]> = {
 const targetTakesKind = (t: Target, kind: ContentKind): boolean =>
   ACCEPTS[t.type].includes(kind) && (kind !== 'mod' || t.flavor === 'fabric');
 
+const allTargets = (): Target[] => [
+  ...servers.map(serverTarget),
+  ...instances.map(instanceTarget),
+];
+
 /** Every entry that can take this kind, across both stores. */
 function targetsFor(kind: ContentKind): Target[] {
-  return [
-    ...servers.map(serverTarget),
-    ...instances.map(instanceTarget),
-  ].filter((t) => targetTakesKind(t, kind));
+  return allTargets().filter((t) => targetTakesKind(t, kind));
 }
 
 /** The projects an entry can take — its accepted kinds, loader-aware for mods. */
@@ -108,13 +120,15 @@ function projectsFor(target: Target): ContentProject[] {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * The content install wizard, mirroring the daemon's `content.add`. It opens
- * either way round: from Browse a `project` is fixed and the user picks a target
- * entry; from an entry's page the `entry` is fixed and the user picks a project.
- * The version auto-resolves to the newest compatible build (changeable in the
- * review), datapacks on an instance choose their worlds, and required
- * dependencies are pulled in — then the install job plays as progress. Nothing
- * is persisted; the library is static mock data.
+ * The content install wizard, mirroring the daemon's `content.add`. Built on
+ * TanStack Form's multi-step wizard pattern — one `useAppForm` holds the
+ * selections (as ids) nested per step, each step is a `FormGroup` validating
+ * its own zod schema on "Next". It opens either way round: from Browse a
+ * `project` is fixed and the user picks a target entry; from an entry's page
+ * the `entry` is fixed and the user picks a project. The version auto-resolves
+ * to the newest compatible build (changeable in the review), datapacks on an
+ * instance choose their worlds, and required dependencies are pulled in — then
+ * the install job plays as progress. Nothing is persisted; mock data.
  */
 export function ContentInstallModal({
   project,
@@ -132,79 +146,51 @@ export function ContentInstallModal({
   const mode: 'browse' | 'entry' = project ? 'browse' : 'entry';
   const pickStep = mode === 'browse' ? 'target' : 'content';
 
-  const [proj, setProj] = useState<ContentProject | null>(project ?? null);
-  const [target, setTarget] = useState<Target | null>(entry ?? null);
-  const [version, setVersion] = useState<ContentVersion | null>(null);
-  const [worlds, setWorlds] = useState<string[]>([]);
   const [installing, setInstalling] = useState(false);
   const [phase, setPhase] = useState('');
   const [progress, setProgress] = useState(0);
+  const [stepIndex, setStepIndex] = useState(0);
 
-  const versions = useMemo(() => (proj ? projectVersions(proj) : []), [proj]);
-  const deps = useMemo(
-    () => (proj ? resolveDependencies(proj.id) : []),
-    [proj],
-  );
-  const resolved = version ?? versions[0];
+  const form = useAppForm({
+    defaultValues: installWizardDefaults({
+      projectId: project?.id ?? '',
+      targetId: entry?.id ?? '',
+      versionId: versionId ?? '',
+    }),
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: installWizardSchema(mode) },
+    onSubmit: async ({ value }) => {
+      const proj = contentProjects.find((p) => p.id === value.pick.projectId);
+      if (!proj) return;
+      const files = [proj, ...resolveDependencies(proj.id)];
+      setInstalling(true);
+      setPhase('Resolving dependencies');
+      setProgress(4);
+      await sleep(600);
+      for (let i = 0; i < files.length; i++) {
+        setPhase(`Downloading ${files[i].title}`);
+        setProgress(Math.round(((i + 1) / (files.length + 1)) * 90) + 4);
+        await sleep(650);
+      }
+      setPhase('Mirroring into data/');
+      setProgress(97);
+      await sleep(500);
+      setPhase('Ready');
+      setProgress(100);
+      await sleep(400);
+      onOpenChange(false);
+      setInstalling(false);
+    },
+  });
 
-  const needsWorlds = proj?.kind === 'datapack' && target?.type === 'instance';
-  const steps: readonly string[] = needsWorlds
-    ? [pickStep, 'worlds', 'review']
-    : [pickStep, 'review'];
-  const [step, setStep] = useState<string>(pickStep);
-
+  // Reset everything each time the modal opens for a fresh source/entry.
   useEffect(() => {
     if (!open) return;
-    setProj(project ?? null);
-    setTarget(entry ?? null);
-    setVersion(null);
-    setWorlds([]);
     setInstalling(false);
     setProgress(0);
-    setStep(pickStep);
-  }, [open, project, entry, pickStep]);
-
-  // A preselected version (Browse's per-version Install) becomes the choice.
-  useEffect(() => {
-    if (open && versionId && versions.length) {
-      setVersion(versions.find((v) => v.id === versionId) ?? null);
-    }
-  }, [open, versionId, versions]);
-
-  const stepIndex = steps.indexOf(step);
-  const back = () => setStep(steps[Math.max(0, stepIndex - 1)]);
-  const next = () => setStep(steps[Math.min(steps.length - 1, stepIndex + 1)]);
-
-  const canAdvance =
-    step === 'target'
-      ? !!target
-      : step === 'content'
-        ? !!proj
-        : step === 'worlds'
-          ? worlds.length > 0
-          : true;
-
-  const install = async () => {
-    if (!proj) return;
-    setInstalling(true);
-    const files = [proj, ...deps];
-    setPhase('Resolving dependencies');
-    setProgress(4);
-    await sleep(600);
-    for (let i = 0; i < files.length; i++) {
-      setPhase(`Downloading ${files[i].title}`);
-      setProgress(Math.round(((i + 1) / (files.length + 1)) * 90) + 4);
-      await sleep(650);
-    }
-    setPhase('Mirroring into data/');
-    setProgress(97);
-    await sleep(500);
-    setPhase('Ready');
-    setProgress(100);
-    await sleep(400);
-    onOpenChange(false);
-    setInstalling(false);
-  };
+    setStepIndex(0);
+    form.reset();
+  }, [open, form]);
 
   const Icon =
     mode === 'browse' && project
@@ -223,127 +209,340 @@ export function ContentInstallModal({
       }}
     >
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Icon className="size-4.5 text-muted-foreground" />
-            {title}
-          </DialogTitle>
-          <DialogDescription>
-            {installing
-              ? 'Installing…'
-              : step === 'target'
-                ? 'Choose where this content is installed.'
-                : step === 'content'
-                  ? 'Choose the content to install.'
-                  : step === 'worlds'
-                    ? 'Choose the worlds to add this datapack to.'
-                    : 'Review and install.'}
-          </DialogDescription>
-        </DialogHeader>
+        <form.Subscribe
+          selector={(s) =>
+            [s.values.pick.projectId, s.values.pick.targetId] as const
+          }
+        >
+          {([projectId, targetId]) => {
+            const proj =
+              contentProjects.find((p) => p.id === projectId) ?? null;
+            const target = allTargets().find((t) => t.id === targetId) ?? null;
+            const needsWorlds =
+              proj?.kind === 'datapack' && target?.type === 'instance';
+            const steps: string[] = needsWorlds
+              ? [pickStep, 'worlds', 'review']
+              : [pickStep, 'review'];
 
-        <div className="max-h-[58vh] min-h-[18rem] overflow-x-hidden overflow-y-auto p-1">
-          {installing ? (
-            <div className="flex min-h-[18rem] flex-col justify-center px-1">
-              <Progress value={progress}>
-                <ProgressLabel>{phase}</ProgressLabel>
-                <ProgressValue />
-              </Progress>
-            </div>
-          ) : step === 'target' && project ? (
-            <TargetStep
-              kind={project.kind}
-              targets={targetsFor(project.kind)}
-              selected={target}
-              onSelect={(t) => {
-                setTarget(t);
-                setWorlds([]);
-              }}
-            />
-          ) : step === 'content' && entry ? (
-            <ContentStep
-              entry={entry}
-              projects={projectsFor(entry)}
-              selected={proj}
-              onSelect={(p) => {
-                setProj(p);
-                setVersion(null);
-                setWorlds([]);
-              }}
-            />
-          ) : step === 'worlds' ? (
-            <div className="flex flex-col gap-1.5">
-              {target?.worlds.length ? (
-                target.worlds.map((w) => (
-                  <WorldRow
-                    key={w}
-                    world={w}
-                    checked={worlds.includes(w)}
-                    onToggle={(on) =>
-                      setWorlds((prev) =>
-                        on ? [...prev, w] : prev.filter((x) => x !== w),
-                      )
-                    }
-                  />
-                ))
-              ) : (
-                <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-                  This instance has no worlds yet.
-                </p>
-              )}
-            </div>
-          ) : (
-            proj &&
-            resolved && (
-              <ReviewStep
-                project={proj}
-                versions={versions}
-                version={resolved}
-                explicit={version}
-                onVersion={setVersion}
+            return (
+              <WizardBody
+                form={form}
+                mode={mode}
+                pickStep={pickStep}
+                steps={steps}
+                proj={proj}
                 target={target}
-                worlds={needsWorlds ? worlds : undefined}
-                deps={deps}
+                needsWorlds={needsWorlds}
+                Icon={Icon}
+                title={title}
+                installing={installing}
+                phase={phase}
+                progress={progress}
+                stepIndex={stepIndex}
+                setStepIndex={setStepIndex}
+                onCancel={() => onOpenChange(false)}
               />
-            )
-          )}
-        </div>
-
-        {!installing && (
-          <DialogFooter className="items-center">
-            <StepDots steps={steps} active={stepIndex} className="mr-auto" />
-            {stepIndex === 0 ? (
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-            ) : (
-              <Button variant="outline" onClick={back} data-icon="inline-start">
-                <CaretLeftIcon />
-                Back
-              </Button>
-            )}
-
-            {step === 'review' ? (
-              <Button
-                className="bg-ember text-ember-foreground hover:bg-ember/90"
-                onClick={install}
-              >
-                Install
-              </Button>
-            ) : (
-              <Button
-                disabled={!canAdvance}
-                onClick={next}
-                data-icon="inline-end"
-                className="bg-ember text-ember-foreground hover:bg-ember/90"
-              >
-                Next
-                <CaretRightIcon />
-              </Button>
-            )}
-          </DialogFooter>
-        )}
+            );
+          }}
+        </form.Subscribe>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The step-driven body. Split out so the enclosing `form.Subscribe` recomputes
+ * the derived project/target/steps on every selection change.
+ */
+function WizardBody({
+  form,
+  mode,
+  pickStep,
+  steps,
+  proj,
+  target,
+  needsWorlds,
+  Icon,
+  title,
+  installing,
+  phase,
+  progress,
+  stepIndex,
+  setStepIndex,
+  onCancel,
+}: {
+  // biome-ignore lint/suspicious/noExplicitAny: the app form type is opaque here.
+  form: any;
+  mode: 'browse' | 'entry';
+  pickStep: string;
+  steps: string[];
+  proj: ContentProject | null;
+  target: Target | null;
+  needsWorlds: boolean;
+  Icon: typeof CheckIcon;
+  title: string;
+  installing: boolean;
+  phase: string;
+  progress: number;
+  stepIndex: number;
+  setStepIndex: (value: number) => void;
+  onCancel: () => void;
+}) {
+  // A selection change can drop the worlds step from under us; clamp the index.
+  const index = Math.min(stepIndex, steps.length - 1);
+  const stepId = steps[index];
+
+  const versions = useMemo(() => (proj ? projectVersions(proj) : []), [proj]);
+  const deps = useMemo(
+    () => (proj ? resolveDependencies(proj.id) : []),
+    [proj],
+  );
+
+  const back = () => setStepIndex(Math.max(0, index - 1));
+  const next = () => setStepIndex(Math.min(steps.length - 1, index + 1));
+
+  const hint = installing
+    ? 'Installing…'
+    : stepId === 'target'
+      ? 'Choose where this content is installed.'
+      : stepId === 'content'
+        ? 'Choose the content to install.'
+        : stepId === 'worlds'
+          ? 'Choose the worlds to add this datapack to.'
+          : 'Review and install.';
+
+  const nav = (
+    <DialogFooter className="items-center">
+      <StepDots steps={steps} active={index} className="mr-auto" />
+      {index === 0 ? (
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={back}
+          data-icon="inline-start"
+        >
+          <CaretLeftIcon />
+          Back
+        </Button>
+      )}
+      {stepId === 'review' ? (
+        <Button
+          type="submit"
+          className="bg-ember text-ember-foreground hover:bg-ember/90"
+        >
+          Install
+        </Button>
+      ) : (
+        <Button
+          type="submit"
+          data-icon="inline-end"
+          className="bg-ember text-ember-foreground hover:bg-ember/90"
+        >
+          Next
+          <CaretRightIcon />
+        </Button>
+      )}
+    </DialogFooter>
+  );
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Icon className="size-4.5 text-muted-foreground" />
+          {title}
+        </DialogTitle>
+        <DialogDescription>{hint}</DialogDescription>
+      </DialogHeader>
+
+      {installing ? (
+        <div className="min-h-[18rem] p-1">
+          <div className="flex min-h-[18rem] flex-col justify-center px-1">
+            <Progress value={progress}>
+              <ProgressLabel>{phase}</ProgressLabel>
+              <ProgressValue />
+            </Progress>
+          </div>
+        </div>
+      ) : stepId === pickStep ? (
+        <form.FormGroup
+          name="pick"
+          validators={{ onDynamic: pickStepSchema(mode) }}
+          onGroupSubmit={next}
+        >
+          {(group: { handleSubmit: () => void }) => (
+            <StepForm onSubmit={group.handleSubmit} footer={nav}>
+              {mode === 'browse' && proj ? (
+                <form.AppField name="pick.targetId">
+                  {(field: FieldApi<string>) => (
+                    <TargetStep
+                      kind={proj.kind}
+                      targets={targetsFor(proj.kind)}
+                      selectedId={field.state.value}
+                      errors={fieldErrors(field)}
+                      onSelect={(t) => {
+                        field.handleChange(t.id);
+                        form.setFieldValue('worlds.worlds', []);
+                      }}
+                    />
+                  )}
+                </form.AppField>
+              ) : (
+                target && (
+                  <form.AppField name="pick.projectId">
+                    {(field: FieldApi<string>) => (
+                      <ContentStep
+                        entry={target}
+                        projects={projectsFor(target)}
+                        selectedId={field.state.value}
+                        errors={fieldErrors(field)}
+                        onSelect={(p) => {
+                          field.handleChange(p.id);
+                          form.setFieldValue('review.versionId', '');
+                          form.setFieldValue('worlds.worlds', []);
+                        }}
+                      />
+                    )}
+                  </form.AppField>
+                )
+              )}
+            </StepForm>
+          )}
+        </form.FormGroup>
+      ) : stepId === 'worlds' ? (
+        <form.FormGroup
+          name="worlds"
+          validators={{ onDynamic: worldsStepSchema }}
+          onGroupSubmit={next}
+        >
+          {(group: { handleSubmit: () => void }) => (
+            <StepForm onSubmit={group.handleSubmit} footer={nav}>
+              <form.AppField name="worlds.worlds">
+                {(field: FieldApi<string[]>) => {
+                  const errors = fieldErrors(field);
+                  const worlds = field.state.value;
+                  return (
+                    <div className="flex flex-col gap-1.5">
+                      {target?.worlds.length ? (
+                        target.worlds.map((w) => (
+                          <WorldRow
+                            key={w}
+                            world={w}
+                            checked={worlds.includes(w)}
+                            onToggle={(on) =>
+                              field.handleChange(
+                                on
+                                  ? [...worlds, w]
+                                  : worlds.filter((x) => x !== w),
+                              )
+                            }
+                          />
+                        ))
+                      ) : (
+                        <p className="px-1 py-6 text-center text-xs text-muted-foreground">
+                          This instance has no worlds yet.
+                        </p>
+                      )}
+                      {errors && <FieldError errors={errors} />}
+                    </div>
+                  );
+                }}
+              </form.AppField>
+            </StepForm>
+          )}
+        </form.FormGroup>
+      ) : (
+        <form.FormGroup
+          name="review"
+          validators={{ onDynamic: reviewStepSchema }}
+          onGroupSubmit={() => form.handleSubmit()}
+        >
+          {(group: { handleSubmit: () => void }) =>
+            proj ? (
+              <StepForm onSubmit={group.handleSubmit} footer={nav}>
+                <form.AppField name="review.versionId">
+                  {(field: FieldApi<string>) => {
+                    const resolved =
+                      versions.find((v) => v.id === field.state.value) ??
+                      versions[0];
+                    return (
+                      resolved && (
+                        <ReviewStep
+                          project={proj}
+                          versions={versions}
+                          version={resolved}
+                          explicit={
+                            versions.find((v) => v.id === field.state.value) ??
+                            null
+                          }
+                          onVersion={(v) => field.handleChange(v?.id ?? '')}
+                          target={target}
+                          deps={deps}
+                          reviewWorlds={needsWorlds}
+                          form={form}
+                        />
+                      )
+                    );
+                  }}
+                </form.AppField>
+              </StepForm>
+            ) : (
+              <div className="min-h-[18rem]" />
+            )
+          }
+        </form.FormGroup>
+      )}
+    </>
+  );
+}
+
+type FieldApi<T> = {
+  name: string;
+  state: { value: T; meta: { isTouched: boolean; errors: unknown[] } };
+  handleChange: (value: T) => void;
+};
+
+/** A touched field's errors in the shape `FieldError` wants, or undefined. */
+function fieldErrors<T>(field: FieldApi<T>) {
+  const { isTouched, errors } = field.state.meta;
+  return isTouched && errors.length > 0
+    ? (errors as Array<{ message?: string }>)
+    : undefined;
+}
+
+/**
+ * A step's scrolling body wrapped in a `<form>` whose submit runs the group.
+ * The `footer` sits below the scroll area but inside the form, so the step
+ * nav stays pinned while only the body scrolls — and its submit button still
+ * drives the group.
+ */
+function StepForm({
+  onSubmit,
+  footer,
+  children,
+}: {
+  onSubmit: () => void;
+  footer: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <form
+      className="flex min-h-0 flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onSubmit();
+      }}
+    >
+      <div className="max-h-[58vh] min-h-[18rem] overflow-x-hidden overflow-y-auto p-1">
+        {children}
+      </div>
+      {footer}
+    </form>
   );
 }
 
@@ -391,12 +590,14 @@ function FilterBar({
 function TargetStep({
   kind,
   targets,
-  selected,
+  selectedId,
+  errors,
   onSelect,
 }: {
   kind: ContentKind;
   targets: Target[];
-  selected: Target | null;
+  selectedId: string;
+  errors?: Array<{ message?: string }>;
   onSelect: (target: Target) => void;
 }) {
   const [search, setSearch] = useState('');
@@ -451,12 +652,13 @@ function TargetStep({
               subtitle={`${t.type} · ${t.flavor} · ${t.game_version}`}
               badge={t.running ? 'Stop to install' : undefined}
               disabled={t.running}
-              selected={selected?.id === t.id}
+              selected={selectedId === t.id}
               onSelect={() => onSelect(t)}
             />
           ))}
         </div>
       )}
+      {errors && <FieldError className="mt-2" errors={errors} />}
     </div>
   );
 }
@@ -464,12 +666,14 @@ function TargetStep({
 function ContentStep({
   entry,
   projects,
-  selected,
+  selectedId,
+  errors,
   onSelect,
 }: {
   entry: Target;
   projects: ContentProject[];
-  selected: ContentProject | null;
+  selectedId: string;
+  errors?: Array<{ message?: string }>;
   onSelect: (project: ContentProject) => void;
 }) {
   const [search, setSearch] = useState('');
@@ -519,12 +723,13 @@ function ContentStep({
               icon={contentIcon(p.kind)}
               title={p.title}
               subtitle={`${contentKindLabel[p.kind]} · by ${p.author}`}
-              selected={selected?.id === p.id}
+              selected={selectedId === p.id}
               onSelect={() => onSelect(p)}
             />
           ))}
         </div>
       )}
+      {errors && <FieldError className="mt-2" errors={errors} />}
     </div>
   );
 }
@@ -614,8 +819,9 @@ function ReviewStep({
   explicit,
   onVersion,
   target,
-  worlds,
   deps,
+  reviewWorlds,
+  form,
 }: {
   project: ContentProject;
   versions: ContentVersion[];
@@ -623,19 +829,27 @@ function ReviewStep({
   explicit: ContentVersion | null;
   onVersion: (version: ContentVersion | null) => void;
   target: Target | null;
-  worlds?: string[];
   deps: ContentProject[];
+  reviewWorlds: boolean;
+  // biome-ignore lint/suspicious/noExplicitAny: the app form type is opaque here.
+  form: any;
 }) {
   return (
     <div className="flex flex-col gap-4 p-1">
       <div className="divide-y divide-border border border-border">
         <ReviewRow label="Content" value={project.title} />
         <ReviewRow label="Target" value={target?.name ?? '—'} />
-        {worlds && (
-          <ReviewRow
-            label="Worlds"
-            value={worlds.length ? worlds.join(', ') : 'none selected'}
-          />
+        {reviewWorlds && (
+          <form.Subscribe
+            selector={(s: WizardValues) => s.values.worlds.worlds}
+          >
+            {(worlds: string[]) => (
+              <ReviewRow
+                label="Worlds"
+                value={worlds.length ? worlds.join(', ') : 'none selected'}
+              />
+            )}
+          </form.Subscribe>
         )}
         <div className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
           <span className="text-xs text-muted-foreground">Version</span>
@@ -679,6 +893,8 @@ function ReviewStep({
     </div>
   );
 }
+
+type WizardValues = { values: { worlds: { worlds: string[] } } };
 
 /** The searchable version picker — a combobox so the review never resizes. */
 function VersionCombobox({

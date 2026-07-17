@@ -3,7 +3,7 @@ import {
   CaretRightIcon,
   MagnifyingGlassIcon,
 } from '@phosphor-icons/react';
-import { useForm } from '@tanstack/react-form';
+import { revalidateLogic } from '@tanstack/react-form';
 import { useEffect, useState } from 'react';
 
 import { entryIcon } from '@/components/icons';
@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { FieldError } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Progress,
@@ -26,20 +26,19 @@ import {
   ProgressValue,
 } from '@/components/ui/progress';
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import {
   type CatalogVersion,
   flavors,
   loaderVersions,
   versionsFor,
 } from '@/features/entries/catalog';
+import {
+  createWizardDefaults,
+  createWizardSchema,
+  detailsStepSchema,
+  flavorStepSchema,
+  versionStepSchema,
+} from '@/features/entries/schema';
+import { useAppForm } from '@/hooks/form';
 import { cn } from '@/lib/utils';
 
 type Kind = 'server' | 'instance';
@@ -51,9 +50,8 @@ const STEPS: Step[] = ['flavor', 'version', 'details'];
 const GAMEMODES = ['survival', 'creative', 'adventure', 'spectator'];
 const DIFFICULTIES = ['peaceful', 'easy', 'normal', 'hard'];
 
-/** Strip the browser's number-input spinner buttons. */
-const NO_SPINNER =
-  '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+const capitalized = (options: string[]) =>
+  options.map((o) => ({ value: o, label: o, className: 'capitalize' }));
 
 /** The create flow the daemon runs, faked as timed phases for the wizard. */
 const PHASES: Record<Kind, string[]> = {
@@ -77,9 +75,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * The New server / New instance wizard: flavor → version → details, mirroring
- * the CLI's interactive `create`. A server also gates on the EULA. Submitting
- * plays the daemon's provisioning phases as a progress bar — nothing is
- * persisted, the library is static mock data.
+ * the CLI's interactive `create`. Built on TanStack Form's multi-step wizard
+ * pattern — one `useAppForm` holds the whole value nested per step, each step
+ * is a `FormGroup` that validates only its own zod schema on "Next", and the
+ * final submit validates the composed schema. A server also gates on the EULA.
+ * Submitting plays the daemon's provisioning phases as a progress bar — nothing
+ * is persisted, the library is static mock data.
  */
 export function CreateEntryModal({
   kind,
@@ -97,22 +98,10 @@ export function CreateEntryModal({
   const [phase, setPhase] = useState('');
   const [progress, setProgress] = useState(0);
 
-  const form = useForm({
-    defaultValues: {
-      flavor: 'vanilla',
-      version: '',
-      loaderVersion: loaderVersions[0],
-      name: '',
-      memory: 4,
-      port: '',
-      motd: 'A Minecraft Server',
-      gamemode: 'survival',
-      difficulty: 'normal',
-      maxPlayers: '20',
-      pvp: true,
-      onlineMode: true,
-      eula: false,
-    },
+  const form = useAppForm({
+    defaultValues: createWizardDefaults(loaderVersions[0]),
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: createWizardSchema(kind) },
     onSubmit: async () => {
       setCreating(true);
       const phases = PHASES[kind];
@@ -140,8 +129,48 @@ export function CreateEntryModal({
   const Icon = entryIcon(kind);
   const noun = kind === 'server' ? 'server' : 'instance';
   const stepIndex = STEPS.indexOf(step);
-  const back = () => setStep(STEPS[Math.max(0, stepIndex - 1)]);
-  const next = () => setStep(STEPS[Math.min(STEPS.length - 1, stepIndex + 1)]);
+
+  const nav = (
+    <DialogFooter className="items-center">
+      <StepDots active={stepIndex} className="mr-auto" />
+      {stepIndex === 0 ? (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onOpenChange(false)}
+        >
+          Cancel
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setStep(STEPS[stepIndex - 1])}
+          data-icon="inline-start"
+        >
+          <CaretLeftIcon />
+          Back
+        </Button>
+      )}
+      {step === 'details' ? (
+        <Button
+          type="submit"
+          className="bg-ember text-ember-foreground hover:bg-ember/90"
+        >
+          Create {noun}
+        </Button>
+      ) : (
+        <Button
+          type="submit"
+          data-icon="inline-end"
+          className="bg-ember text-ember-foreground hover:bg-ember/90"
+        >
+          Next
+          <CaretRightIcon />
+        </Button>
+      )}
+    </DialogFooter>
+  );
 
   return (
     <Dialog
@@ -161,359 +190,352 @@ export function CreateEntryModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-[18rem] max-h-[58vh] overflow-x-hidden overflow-y-auto p-1">
-          {creating ? (
+        {creating ? (
+          <div className="min-h-[18rem] p-1">
             <div className="flex min-h-[18rem] flex-col justify-center px-1">
               <Progress value={progress}>
                 <ProgressLabel>{phase}</ProgressLabel>
                 <ProgressValue />
               </Progress>
             </div>
-          ) : step === 'flavor' ? (
-            <form.Field name="flavor">
-              {(field) => (
-                <div className="grid gap-2">
-                  {flavors.map((f) => (
-                    <FlavorOption
-                      key={f.id}
-                      name={f.name}
-                      summary={f.summary}
-                      selected={field.state.value === f.id}
-                      onSelect={() => {
-                        field.handleChange(f.id);
-                        form.setFieldValue('version', '');
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </form.Field>
-          ) : step === 'version' ? (
-            <form.Subscribe selector={(s) => s.values.flavor}>
-              {(flavor) => {
-                const q = search.trim().toLowerCase();
-                const list = versionsFor(flavor).filter((v) => {
-                  if (!showSnapshots && v.kind === 'snapshot') return false;
-                  if (q && !v.id.toLowerCase().includes(q)) return false;
-                  return true;
-                });
-                return (
-                  <div className="flex flex-col gap-3">
-                    <div className="relative">
-                      <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
-                      <Input
-                        className="pl-8"
-                        placeholder="Filter versions"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                    </div>
-
-                    {flavor === 'fabric' ? (
-                      <form.Field name="loaderVersion">
-                        {(field) => (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">
-                              Loader
-                            </span>
-                            <Select
-                              value={field.state.value}
-                              onValueChange={(v) => {
-                                if (v) field.handleChange(v);
-                              }}
-                            >
-                              <SelectTrigger size="sm" className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent
-                                align="start"
-                                alignItemWithTrigger={false}
-                              >
-                                <SelectGroup>
-                                  {loaderVersions.map((l) => (
-                                    <SelectItem key={l} value={l}>
-                                      {l}
-                                    </SelectItem>
-                                  ))}
-                                </SelectGroup>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                      </form.Field>
-                    ) : (
-                      <label
-                        htmlFor="wizard-snapshots"
-                        className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground"
-                      >
-                        <Checkbox
-                          id="wizard-snapshots"
-                          checked={showSnapshots}
-                          onCheckedChange={(c) => setShowSnapshots(c === true)}
-                        />
-                        Show snapshots
-                      </label>
-                    )}
-
-                    <form.Field name="version">
-                      {(field) => (
-                        <div className="max-h-52 divide-y divide-border overflow-y-auto border border-border">
-                          {list.length === 0 ? (
-                            <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                              No versions match.
-                            </p>
-                          ) : (
-                            list.map((v) => (
-                              <VersionRow
-                                key={v.id}
-                                version={v}
-                                selected={field.state.value === v.id}
-                                onSelect={() => field.handleChange(v.id)}
-                              />
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </form.Field>
-                  </div>
-                );
-              }}
-            </form.Subscribe>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <form.Subscribe
-                selector={(s) => [s.values.flavor, s.values.version] as const}
-              >
-                {([flavor, version]) => (
-                  <form.Field name="name">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>Name</FieldLabel>
-                        <Input
-                          id={field.name}
-                          value={field.state.value}
-                          placeholder={`${flavor}-${version}`}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                        <FieldDescription>
-                          Leave blank to use the flavor and version.
-                        </FieldDescription>
-                      </Field>
-                    )}
-                  </form.Field>
-                )}
-              </form.Subscribe>
-
-              <form.Field name="memory">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor={field.name}>
-                      Memory — {field.state.value} GB
-                    </FieldLabel>
-                    <Slider
-                      id={field.name}
-                      min={2}
-                      max={32}
-                      step={1}
-                      value={field.state.value}
-                      onValueChange={(v) =>
-                        field.handleChange(Array.isArray(v) ? v[0] : v)
-                      }
-                    />
-                  </Field>
-                )}
-              </form.Field>
-
-              {kind === 'server' && (
-                <>
-                  <SectionHeader>Server properties</SectionHeader>
-
-                  <form.Field name="motd">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>
-                          Message of the day
-                        </FieldLabel>
-                        <Input
-                          id={field.name}
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                      </Field>
-                    )}
-                  </form.Field>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <form.Field name="gamemode">
-                      {(field) => (
-                        <PropSelect
-                          id={field.name}
-                          label="Gamemode"
-                          value={field.state.value}
-                          options={GAMEMODES}
-                          onChange={field.handleChange}
-                        />
-                      )}
-                    </form.Field>
-
-                    <form.Field name="difficulty">
-                      {(field) => (
-                        <PropSelect
-                          id={field.name}
-                          label="Difficulty"
-                          value={field.state.value}
-                          options={DIFFICULTIES}
-                          onChange={field.handleChange}
-                        />
-                      )}
-                    </form.Field>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <form.Field name="maxPlayers">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor={field.name}>
-                            Max players
-                          </FieldLabel>
-                          <Input
-                            id={field.name}
-                            type="number"
-                            min={1}
-                            className={NO_SPINNER}
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                          />
-                        </Field>
-                      )}
-                    </form.Field>
-
-                    <form.Field name="port">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor={field.name}>Port</FieldLabel>
-                          <Input
-                            id={field.name}
-                            type="number"
-                            placeholder="auto"
-                            className={NO_SPINNER}
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                          />
-                          <FieldDescription>
-                            Blank picks the lowest free.
-                          </FieldDescription>
-                        </Field>
-                      )}
-                    </form.Field>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 pt-1">
-                    <form.Field name="pvp">
-                      {(field) => (
-                        <PropToggle
-                          id="prop-pvp"
-                          label="PVP"
-                          checked={field.state.value}
-                          onChange={field.handleChange}
-                        />
-                      )}
-                    </form.Field>
-                    <form.Field name="onlineMode">
-                      {(field) => (
-                        <PropToggle
-                          id="prop-online"
-                          label="Online mode"
-                          checked={field.state.value}
-                          onChange={field.handleChange}
-                        />
-                      )}
-                    </form.Field>
-                  </div>
-                </>
-              )}
-
-              {kind === 'server' && (
-                <form.Field name="eula">
+          </div>
+        ) : step === 'flavor' ? (
+          <form.FormGroup
+            name="flavor"
+            validators={{ onDynamic: flavorStepSchema }}
+            onGroupSubmit={() => setStep('version')}
+          >
+            {(group) => (
+              <StepForm onSubmit={group.handleSubmit} footer={nav}>
+                <form.AppField name="flavor.flavor">
                   {(field) => (
-                    <label
-                      htmlFor={field.name}
-                      className="flex cursor-pointer items-center gap-2.5 border border-border px-3 py-2.5"
-                    >
-                      <Checkbox
-                        id={field.name}
-                        checked={field.state.value}
-                        onCheckedChange={(c) => field.handleChange(c === true)}
-                      />
-                      <span className="text-xs text-muted-foreground">
-                        I accept the{' '}
-                        <a
-                          href="https://aka.ms/MinecraftEULA"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-foreground underline underline-offset-2"
-                        >
-                          Minecraft EULA
-                        </a>
-                        . A server won't start until you do.
-                      </span>
-                    </label>
+                    <div className="grid gap-2">
+                      {flavors.map((f) => (
+                        <FlavorOption
+                          key={f.id}
+                          name={f.name}
+                          summary={f.summary}
+                          selected={field.state.value === f.id}
+                          onSelect={() => {
+                            field.handleChange(f.id);
+                            form.setFieldValue('version.version', '');
+                          }}
+                        />
+                      ))}
+                    </div>
                   )}
-                </form.Field>
-              )}
-            </div>
-          )}
-        </div>
-
-        {!creating && (
-          <DialogFooter className="items-center">
-            <StepDots active={stepIndex} className="mr-auto" />
-            {stepIndex === 0 ? (
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-            ) : (
-              <Button variant="outline" onClick={back} data-icon="inline-start">
-                <CaretLeftIcon />
-                Back
-              </Button>
+                </form.AppField>
+              </StepForm>
             )}
+          </form.FormGroup>
+        ) : step === 'version' ? (
+          <form.FormGroup
+            name="version"
+            validators={{ onDynamic: versionStepSchema }}
+            onGroupSubmit={() => setStep('details')}
+          >
+            {(group) => (
+              <StepForm onSubmit={group.handleSubmit} footer={nav}>
+                <form.Subscribe selector={(s) => s.values.flavor.flavor}>
+                  {(flavor) => {
+                    const q = search.trim().toLowerCase();
+                    const list = versionsFor(flavor).filter((v) => {
+                      if (!showSnapshots && v.kind === 'snapshot') return false;
+                      if (q && !v.id.toLowerCase().includes(q)) return false;
+                      return true;
+                    });
+                    return (
+                      <div className="flex flex-col gap-3">
+                        <div className="relative">
+                          <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
+                          <Input
+                            className="pl-8"
+                            placeholder="Filter versions"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                          />
+                        </div>
 
-            {step === 'details' ? (
-              <form.Subscribe selector={(s) => s.values.eula}>
-                {(eula) => (
-                  <Button
-                    disabled={kind === 'server' && !eula}
-                    className="bg-ember text-ember-foreground hover:bg-ember/90"
-                    onClick={() => form.handleSubmit()}
-                  >
-                    Create {noun}
-                  </Button>
-                )}
-              </form.Subscribe>
-            ) : (
-              <form.Subscribe selector={(s) => s.values.version}>
-                {(version) => (
-                  <Button
-                    disabled={step === 'version' && !version}
-                    onClick={next}
-                    data-icon="inline-end"
-                    className="bg-ember text-ember-foreground hover:bg-ember/90"
-                  >
-                    Next
-                    <CaretRightIcon />
-                  </Button>
-                )}
-              </form.Subscribe>
+                        {flavor === 'fabric' ? (
+                          <form.AppField name="version.loaderVersion">
+                            {(field) => (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">
+                                  Loader
+                                </span>
+                                <field.SelectField
+                                  options={loaderVersions.map((l) => ({
+                                    value: l,
+                                    label: l,
+                                  }))}
+                                  triggerClassName="w-32"
+                                />
+                              </div>
+                            )}
+                          </form.AppField>
+                        ) : (
+                          <label
+                            htmlFor="wizard-snapshots"
+                            className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground"
+                          >
+                            <Checkbox
+                              id="wizard-snapshots"
+                              checked={showSnapshots}
+                              onCheckedChange={(c) =>
+                                setShowSnapshots(c === true)
+                              }
+                            />
+                            Show snapshots
+                          </label>
+                        )}
+
+                        <form.AppField name="version.version">
+                          {(field) => {
+                            const invalid =
+                              field.state.meta.isTouched &&
+                              field.state.meta.errors.length > 0;
+                            return (
+                              <div className="flex flex-col gap-1.5">
+                                <div className="max-h-52 divide-y divide-border overflow-y-auto border border-border">
+                                  {list.length === 0 ? (
+                                    <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                                      No versions match.
+                                    </p>
+                                  ) : (
+                                    list.map((v) => (
+                                      <VersionRow
+                                        key={v.id}
+                                        version={v}
+                                        selected={field.state.value === v.id}
+                                        onSelect={() =>
+                                          field.handleChange(v.id)
+                                        }
+                                      />
+                                    ))
+                                  )}
+                                </div>
+                                {invalid && (
+                                  <FieldError
+                                    errors={
+                                      field.state.meta.errors as Array<{
+                                        message?: string;
+                                      }>
+                                    }
+                                  />
+                                )}
+                              </div>
+                            );
+                          }}
+                        </form.AppField>
+                      </div>
+                    );
+                  }}
+                </form.Subscribe>
+              </StepForm>
             )}
-          </DialogFooter>
+          </form.FormGroup>
+        ) : (
+          <form.FormGroup
+            name="details"
+            validators={{ onDynamic: detailsStepSchema(kind) }}
+            onGroupSubmit={() => form.handleSubmit()}
+          >
+            {(group) => (
+              <StepForm onSubmit={group.handleSubmit} footer={nav}>
+                <div className="flex flex-col gap-4">
+                  <form.Subscribe
+                    selector={(s) =>
+                      [
+                        s.values.flavor.flavor,
+                        s.values.version.version,
+                      ] as const
+                    }
+                  >
+                    {([flavor, version]) => (
+                      <form.AppField name="details.name">
+                        {(field) => (
+                          <field.TextField
+                            label="Name"
+                            placeholder={`${flavor}-${version}`}
+                            description="Leave blank to use the flavor and version."
+                          />
+                        )}
+                      </form.AppField>
+                    )}
+                  </form.Subscribe>
+
+                  <form.AppField name="details.memory">
+                    {(field) => (
+                      <field.SliderField
+                        label="Memory"
+                        formatValue={(v) => `${v} GB`}
+                        min={2}
+                        max={32}
+                        step={1}
+                      />
+                    )}
+                  </form.AppField>
+
+                  {kind === 'server' && (
+                    <>
+                      <SectionHeader>Server properties</SectionHeader>
+
+                      <form.AppField name="details.motd">
+                        {(field) => (
+                          <field.TextField label="Message of the day" />
+                        )}
+                      </form.AppField>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <form.AppField name="details.gamemode">
+                          {(field) => (
+                            <field.SelectField
+                              label="Gamemode"
+                              options={capitalized(GAMEMODES)}
+                              triggerClassName="w-full capitalize"
+                            />
+                          )}
+                        </form.AppField>
+                        <form.AppField name="details.difficulty">
+                          {(field) => (
+                            <field.SelectField
+                              label="Difficulty"
+                              options={capitalized(DIFFICULTIES)}
+                              triggerClassName="w-full capitalize"
+                            />
+                          )}
+                        </form.AppField>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <form.AppField name="details.maxPlayers">
+                          {(field) => (
+                            <field.TextField
+                              label="Max players"
+                              type="number"
+                            />
+                          )}
+                        </form.AppField>
+                        <form.AppField name="details.port">
+                          {(field) => (
+                            <field.TextField
+                              label="Port"
+                              type="number"
+                              placeholder="auto"
+                              description="Blank picks the lowest free."
+                            />
+                          )}
+                        </form.AppField>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 pt-1">
+                        <form.AppField name="details.pvp">
+                          {(field) => (
+                            <PropToggle
+                              id="prop-pvp"
+                              label="PVP"
+                              checked={field.state.value}
+                              onChange={field.handleChange}
+                            />
+                          )}
+                        </form.AppField>
+                        <form.AppField name="details.onlineMode">
+                          {(field) => (
+                            <PropToggle
+                              id="prop-online"
+                              label="Online mode"
+                              checked={field.state.value}
+                              onChange={field.handleChange}
+                            />
+                          )}
+                        </form.AppField>
+                      </div>
+
+                      <form.AppField name="details.eula">
+                        {(field) => {
+                          const invalid =
+                            field.state.meta.isTouched &&
+                            field.state.meta.errors.length > 0;
+                          return (
+                            <div className="flex flex-col gap-1.5">
+                              <label
+                                htmlFor={field.name}
+                                className="flex cursor-pointer items-center gap-2.5 border border-border px-3 py-2.5"
+                              >
+                                <Checkbox
+                                  id={field.name}
+                                  checked={field.state.value}
+                                  onCheckedChange={(c) =>
+                                    field.handleChange(c === true)
+                                  }
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                  I accept the{' '}
+                                  <a
+                                    href="https://aka.ms/MinecraftEULA"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-foreground underline underline-offset-2"
+                                  >
+                                    Minecraft EULA
+                                  </a>
+                                  . A server won't start until you do.
+                                </span>
+                              </label>
+                              {invalid && (
+                                <FieldError
+                                  errors={
+                                    field.state.meta.errors as Array<{
+                                      message?: string;
+                                    }>
+                                  }
+                                />
+                              )}
+                            </div>
+                          );
+                        }}
+                      </form.AppField>
+                    </>
+                  )}
+                </div>
+              </StepForm>
+            )}
+          </form.FormGroup>
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * A step's scrolling body wrapped in a `<form>` whose submit runs the group.
+ * The `footer` sits below the scroll area but inside the form, so the step
+ * nav stays pinned while only the fields scroll — and its submit button still
+ * drives the group.
+ */
+function StepForm({
+  onSubmit,
+  footer,
+  children,
+}: {
+  onSubmit: () => void;
+  footer: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <form
+      className="flex min-h-0 flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onSubmit();
+      }}
+    >
+      <div className="min-h-[18rem] max-h-[58vh] overflow-x-hidden overflow-y-auto p-1">
+        {children}
+      </div>
+      {footer}
+    </form>
   );
 }
 
@@ -525,45 +547,6 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
       </span>
       <div className="h-px flex-1 bg-border" />
     </div>
-  );
-}
-
-function PropSelect({
-  id,
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Select
-        value={value}
-        onValueChange={(v) => {
-          if (v) onChange(v);
-        }}
-      >
-        <SelectTrigger id={id} className="w-full capitalize">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent align="start" alignItemWithTrigger={false}>
-          <SelectGroup>
-            {options.map((o) => (
-              <SelectItem key={o} value={o} className="capitalize">
-                {o}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-    </Field>
   );
 }
 

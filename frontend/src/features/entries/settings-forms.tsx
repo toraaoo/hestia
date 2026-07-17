@@ -1,26 +1,16 @@
 import { ArrowsClockwiseIcon, TrashIcon } from '@phosphor-icons/react';
-import { useForm } from '@tanstack/react-form';
+import { revalidateLogic } from '@tanstack/react-form';
 
 import { Button } from '@/components/ui/button';
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldSeparator,
-} from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
+import { FieldGroup, FieldSeparator } from '@/components/ui/field';
 import type { Instance, Server } from '@/features/entries/mock';
-import { memGb } from '@/lib/format';
+import {
+  instanceSettingsDefaults,
+  instanceSettingsSchema,
+  serverSettingsDefaults,
+  serverSettingsSchema,
+} from '@/features/entries/schema';
+import { useAppForm } from '@/hooks/form';
 
 const MC_VERSIONS = ['1.21.4', '1.21.1', '1.20.1', '1.19.2'];
 const LOADERS = ['vanilla', 'fabric'];
@@ -52,14 +42,10 @@ function DangerZone({
 }
 
 export function InstanceSettingsForm({ inst }: { inst: Instance }) {
-  const form = useForm({
-    defaultValues: {
-      name: inst.name,
-      version: inst.game_version,
-      loader: inst.flavor,
-      memory: memGb(inst.memory),
-      jvmArgs: '',
-    },
+  const form = useAppForm({
+    defaultValues: instanceSettingsDefaults(inst),
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: instanceSettingsSchema() },
     onSubmit: async () => {},
   });
 
@@ -72,112 +58,57 @@ export function InstanceSettingsForm({ inst }: { inst: Instance }) {
       }}
     >
       <FieldGroup>
-        <form.Field name="name">
-          {(field) => (
-            <Field>
-              <FieldLabel htmlFor={field.name}>Instance name</FieldLabel>
-              <Input
-                id={field.name}
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-            </Field>
-          )}
-        </form.Field>
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Instance name" />}
+        </form.AppField>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <form.Field name="version">
+          <form.AppField name="version">
             {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>Minecraft version</FieldLabel>
-                <Select
-                  value={field.state.value}
-                  onValueChange={(v) => {
-                    if (v) field.handleChange(v);
-                  }}
-                >
-                  <SelectTrigger id={field.name} className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {MC_VERSIONS.map((v) => (
-                        <SelectItem key={v} value={v}>
-                          {v}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
+              <field.SelectField
+                label="Minecraft version"
+                options={MC_VERSIONS.map((v) => ({ value: v, label: v }))}
+                triggerClassName="w-full"
+              />
             )}
-          </form.Field>
-
-          <form.Field name="loader">
+          </form.AppField>
+          <form.AppField name="loader">
             {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>Mod loader</FieldLabel>
-                <Select
-                  value={field.state.value}
-                  onValueChange={(v) => {
-                    if (v) field.handleChange(v);
-                  }}
-                >
-                  <SelectTrigger id={field.name} className="w-full capitalize">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {LOADERS.map((l) => (
-                        <SelectItem key={l} value={l} className="capitalize">
-                          {l}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
+              <field.SelectField
+                label="Mod loader"
+                options={LOADERS.map((l) => ({
+                  value: l,
+                  label: l,
+                  className: 'capitalize',
+                }))}
+                triggerClassName="w-full capitalize"
+              />
             )}
-          </form.Field>
+          </form.AppField>
         </div>
 
-        <form.Field name="memory">
+        <form.AppField name="memory">
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor={field.name}>
-                Allocated memory — {field.state.value} GB
-              </FieldLabel>
-              <Slider
-                id={field.name}
-                className="max-w-md"
-                min={2}
-                max={32}
-                step={1}
-                value={field.state.value}
-                onValueChange={(v) =>
-                  field.handleChange(Array.isArray(v) ? v[0] : v)
-                }
-              />
-            </Field>
+            <field.SliderField
+              label="Allocated memory"
+              formatValue={(v) => `${v} GB`}
+              sliderClassName="max-w-md"
+              min={2}
+              max={32}
+              step={1}
+            />
           )}
-        </form.Field>
+        </form.AppField>
 
-        <form.Field name="jvmArgs">
+        <form.AppField name="jvmArgs">
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor={field.name}>Java arguments</FieldLabel>
-              <Input
-                id={field.name}
-                className="font-mono"
-                placeholder="-XX:+UseG1GC"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-            </Field>
+            <field.TextField
+              label="Java arguments"
+              placeholder="-XX:+UseG1GC"
+              inputClassName="font-mono"
+            />
           )}
-        </form.Field>
+        </form.AppField>
 
         <DangerZone removeLabel="Remove instance" />
       </FieldGroup>
@@ -186,14 +117,10 @@ export function InstanceSettingsForm({ inst }: { inst: Instance }) {
 }
 
 export function ServerSettingsForm({ server }: { server: Server }) {
-  const form = useForm({
-    defaultValues: {
-      name: server.name,
-      memory: memGb(server.memory),
-      jvmArgs: '',
-      backupInterval: server.backup_interval,
-      backupRetention: server.backup_retention,
-    },
+  const form = useAppForm({
+    defaultValues: serverSettingsDefaults(server),
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: serverSettingsSchema() },
     onSubmit: async () => {},
   });
 
@@ -206,103 +133,56 @@ export function ServerSettingsForm({ server }: { server: Server }) {
       }}
     >
       <FieldGroup>
-        <form.Field name="name">
-          {(field) => (
-            <Field>
-              <FieldLabel htmlFor={field.name}>Server name</FieldLabel>
-              <Input
-                id={field.name}
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-            </Field>
-          )}
-        </form.Field>
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Server name" />}
+        </form.AppField>
 
-        <form.Field name="memory">
+        <form.AppField name="memory">
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor={field.name}>
-                Allocated memory — {field.state.value} GB
-              </FieldLabel>
-              <Slider
-                id={field.name}
-                className="max-w-md"
-                min={2}
-                max={32}
-                step={1}
-                value={field.state.value}
-                onValueChange={(v) =>
-                  field.handleChange(Array.isArray(v) ? v[0] : v)
-                }
-              />
-            </Field>
+            <field.SliderField
+              label="Allocated memory"
+              formatValue={(v) => `${v} GB`}
+              sliderClassName="max-w-md"
+              min={2}
+              max={32}
+              step={1}
+            />
           )}
-        </form.Field>
+        </form.AppField>
 
-        <form.Field name="jvmArgs">
+        <form.AppField name="jvmArgs">
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor={field.name}>Java arguments</FieldLabel>
-              <Input
-                id={field.name}
-                className="font-mono"
-                placeholder="-XX:+UseG1GC"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-            </Field>
+            <field.TextField
+              label="Java arguments"
+              placeholder="-XX:+UseG1GC"
+              inputClassName="font-mono"
+            />
           )}
-        </form.Field>
+        </form.AppField>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <form.Field name="backupInterval">
+          <form.AppField name="backupInterval">
             {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>Backup schedule</FieldLabel>
-                <Select
-                  value={field.state.value || 'off'}
-                  onValueChange={(v) => {
-                    if (v) field.handleChange(v === 'off' ? '' : v);
-                  }}
-                >
-                  <SelectTrigger id={field.name} className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {INTERVALS.map((iv) => (
-                        <SelectItem key={iv || 'off'} value={iv || 'off'}>
-                          {iv ? `Every ${iv}` : 'Off'}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
+              <field.SelectField
+                label="Backup schedule"
+                options={INTERVALS.map((iv) => ({
+                  value: iv || 'off',
+                  label: iv ? `Every ${iv}` : 'Off',
+                }))}
+                triggerClassName="w-full"
+              />
             )}
-          </form.Field>
+          </form.AppField>
 
-          <form.Field name="backupRetention">
+          <form.AppField name="backupRetention">
             {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>Keep backups</FieldLabel>
-                <Input
-                  id={field.name}
-                  type="number"
-                  min={1}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) =>
-                    field.handleChange(Number(e.target.value) || 1)
-                  }
-                />
-                <FieldDescription>Newest scheduled archives.</FieldDescription>
-              </Field>
+              <field.NumberField
+                label="Keep backups"
+                min={1}
+                description="Newest scheduled archives."
+              />
             )}
-          </form.Field>
+          </form.AppField>
         </div>
 
         <DangerZone removeLabel="Remove server" />

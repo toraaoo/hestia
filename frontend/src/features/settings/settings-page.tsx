@@ -1,43 +1,27 @@
 import { BroomIcon, CoffeeIcon, TrashIcon } from '@phosphor-icons/react';
-import { useForm } from '@tanstack/react-form';
+import { revalidateLogic } from '@tanstack/react-form';
 
 import { Page } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
   FieldLegend,
   FieldSet,
 } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
 import { StatusDot } from '@/components/ui/status-dot';
 import { javaReleases, javaRuntimes } from '@/features/settings/mock';
+import { settingsDefaults, settingsSchema } from '@/features/settings/schema';
+import { useAppForm } from '@/hooks/form';
 import { daemon } from '@/lib/mock';
 
 export function SettingsPage() {
-  const form = useForm({
-    defaultValues: {
-      theme: 'dark',
-      dataDir: '~/.hestia',
-      startAtLogin: true,
-      keepOpen: true,
-      memory: 6,
-      jvmArgs: '-XX:+UseG1GC -XX:+ParallelRefProcEnabled',
-      shared: 'options.txt, config/',
-    },
+  const form = useAppForm({
+    defaultValues: settingsDefaults,
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: settingsSchema },
     onSubmit: async () => {},
   });
 
@@ -54,122 +38,67 @@ export function SettingsPage() {
           <FieldSet>
             <FieldLegend>General</FieldLegend>
             <FieldGroup>
-              <form.Field name="theme">
+              <form.AppField name="theme">
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor={field.name}>Theme</FieldLabel>
-                    <Select
-                      value={field.state.value}
-                      onValueChange={(v) => {
-                        if (v) field.handleChange(v);
-                      }}
-                    >
-                      <SelectTrigger id={field.name} className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="dark">Dark</SelectItem>
-                          <SelectItem value="system">System</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Field>
+                  <field.SelectField
+                    label="Theme"
+                    options={[
+                      { value: 'dark', label: 'Dark' },
+                      { value: 'system', label: 'System' },
+                    ]}
+                    triggerClassName="w-full"
+                  />
                 )}
-              </form.Field>
+              </form.AppField>
 
-              <form.Field name="dataDir">
+              <form.AppField name="dataDir">
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor={field.name}>Data directory</FieldLabel>
-                    <Input
-                      id={field.name}
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                    <FieldDescription>
-                      Where instances and servers live.
-                    </FieldDescription>
-                  </Field>
+                  <field.TextField
+                    label="Data directory"
+                    description="Where instances and servers live."
+                  />
                 )}
-              </form.Field>
+              </form.AppField>
 
-              <form.Field name="startAtLogin">
+              <form.AppField name="startAtLogin">
                 {(field) => (
-                  <Field orientation="horizontal">
-                    <Checkbox
-                      id={field.name}
-                      checked={field.state.value}
-                      onCheckedChange={(c) => field.handleChange(c === true)}
-                    />
-                    <FieldLabel htmlFor={field.name} className="font-normal">
-                      Start Hestia at login
-                    </FieldLabel>
-                  </Field>
+                  <field.CheckboxField label="Start Hestia at login" />
                 )}
-              </form.Field>
+              </form.AppField>
 
-              <form.Field name="keepOpen">
+              <form.AppField name="keepOpen">
                 {(field) => (
-                  <Field orientation="horizontal">
-                    <Checkbox
-                      id={field.name}
-                      checked={field.state.value}
-                      onCheckedChange={(c) => field.handleChange(c === true)}
-                    />
-                    <FieldLabel htmlFor={field.name} className="font-normal">
-                      Keep the launcher open while a game runs
-                    </FieldLabel>
-                  </Field>
+                  <field.CheckboxField label="Keep the launcher open while a game runs" />
                 )}
-              </form.Field>
+              </form.AppField>
             </FieldGroup>
           </FieldSet>
 
           <FieldSet>
             <FieldLegend>Java & performance</FieldLegend>
             <FieldGroup>
-              <form.Field name="memory">
+              <form.AppField name="memory">
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor={field.name}>
-                      Default allocated memory — {field.state.value} GB
-                    </FieldLabel>
-                    <Slider
-                      id={field.name}
-                      className="max-w-md"
-                      min={2}
-                      max={32}
-                      step={1}
-                      value={field.state.value}
-                      onValueChange={(v) =>
-                        field.handleChange(Array.isArray(v) ? v[0] : v)
-                      }
-                    />
-                    <FieldDescription>
-                      Instances and servers can override this individually.
-                    </FieldDescription>
-                  </Field>
+                  <field.SliderField
+                    label="Default allocated memory"
+                    formatValue={(v) => `${v} GB`}
+                    sliderClassName="max-w-md"
+                    min={2}
+                    max={32}
+                    step={1}
+                    description="Instances and servers can override this individually."
+                  />
                 )}
-              </form.Field>
+              </form.AppField>
 
-              <form.Field name="jvmArgs">
+              <form.AppField name="jvmArgs">
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor={field.name}>
-                      Default JVM arguments
-                    </FieldLabel>
-                    <Input
-                      id={field.name}
-                      className="font-mono"
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                  </Field>
+                  <field.TextField
+                    label="Default JVM arguments"
+                    inputClassName="font-mono"
+                  />
                 )}
-              </form.Field>
+              </form.AppField>
 
               <Field>
                 <FieldLabel>Installed runtimes</FieldLabel>
@@ -237,22 +166,14 @@ export function SettingsPage() {
                 </Button>
               </Field>
 
-              <form.Field name="shared">
+              <form.AppField name="shared">
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor={field.name}>Shared config</FieldLabel>
-                    <Input
-                      id={field.name}
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                    <FieldDescription>
-                      Files synced across entries.
-                    </FieldDescription>
-                  </Field>
+                  <field.TextField
+                    label="Shared config"
+                    description="Files synced across entries."
+                  />
                 )}
-              </form.Field>
+              </form.AppField>
 
               <Field orientation="horizontal">
                 <FieldLabel className="flex-1 gap-2 font-normal">
