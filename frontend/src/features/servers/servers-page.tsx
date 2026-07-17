@@ -1,4 +1,5 @@
 import { PlusIcon } from '@phosphor-icons/react';
+import { useState } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
@@ -12,6 +13,7 @@ import {
   type View,
   ViewToggle,
 } from '@/features/entries/collection';
+import { CreateEntryModal } from '@/features/entries/create-modal';
 
 export function ServersPage({
   view,
@@ -26,6 +28,7 @@ export function ServersPage({
 }) {
   const { query } = useSearch();
   const cards = filterCards(serverCards, query, flavor);
+  const [creating, setCreating] = useState(false);
 
   return (
     <Page
@@ -46,7 +49,11 @@ export function ServersPage({
             ]}
           />
           <ViewToggle view={view} onView={onViewChange} />
-          <Button size="sm" data-icon="inline-start">
+          <Button
+            size="sm"
+            data-icon="inline-start"
+            onClick={() => setCreating(true)}
+          >
             <PlusIcon weight="bold" />
             New server
           </Button>
@@ -57,6 +64,11 @@ export function ServersPage({
         cards={cards}
         view={view}
         empty="No servers match your search."
+      />
+      <CreateEntryModal
+        kind="server"
+        open={creating}
+        onOpenChange={setCreating}
       />
     </Page>
   );

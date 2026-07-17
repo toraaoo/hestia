@@ -1,4 +1,5 @@
 import { PlusIcon } from '@phosphor-icons/react';
+import { useState } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
@@ -12,6 +13,7 @@ import {
   type View,
   ViewToggle,
 } from '@/features/entries/collection';
+import { CreateEntryModal } from '@/features/entries/create-modal';
 
 export function InstancesPage({
   view,
@@ -26,6 +28,7 @@ export function InstancesPage({
 }) {
   const { query } = useSearch();
   const cards = filterCards(instanceCards, query, flavor);
+  const [creating, setCreating] = useState(false);
 
   return (
     <Page
@@ -46,7 +49,11 @@ export function InstancesPage({
             ]}
           />
           <ViewToggle view={view} onView={onViewChange} />
-          <Button size="sm" data-icon="inline-start">
+          <Button
+            size="sm"
+            data-icon="inline-start"
+            onClick={() => setCreating(true)}
+          >
             <PlusIcon weight="bold" />
             New instance
           </Button>
@@ -57,6 +64,11 @@ export function InstancesPage({
         cards={cards}
         view={view}
         empty="No instances match your search."
+      />
+      <CreateEntryModal
+        kind="instance"
+        open={creating}
+        onOpenChange={setCreating}
       />
     </Page>
   );
