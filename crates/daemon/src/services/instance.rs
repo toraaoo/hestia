@@ -5,9 +5,11 @@
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList, InstanceConfigListResult,
     InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch,
-    InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLogs, InstanceRemove,
-    InstanceRename, InstanceResolve, InstanceStop, InstanceUpdate, InstanceUpdateResult,
-    InstanceVersions, InstanceWorlds, InstanceWorldsResult,
+    InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLogs, InstanceProfileCreate,
+    InstanceProfileEdit, InstanceProfileList, InstanceProfileListResult, InstanceProfileRemove,
+    InstanceProfileRename, InstanceProfileUse, InstanceRemove, InstanceRename, InstanceResolve,
+    InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds,
+    InstanceWorldsResult,
 };
 use proto::minecraft::{ConfigEntry, FlavorsResult, VersionsResult};
 use proto::process::ProcessLogsResult;
@@ -158,16 +160,38 @@ pub(super) fn register(on: &mut Channels<'_>) {
         let record = find_instance(&ctx, &p.instance)?;
         // Concurrent sessions are opt-in: by default a running instance is
         // refused, and `new_session` unlocks a second (or third) launch.
-        if !p.new_session && ctx.runtime.instance_running(&record.id) {
+        let running = ctx.runtime.instance_running(&record.id);
+        if !p.new_session && running {
             return Err(ServiceError::bad_request(format!(
                 "instance '{}' is already running; pass --new-session to run another",
                 record.name
             )));
         }
+        // A concurrent session runs against the mirror the live sessions use
+        // (the reconcile is skipped), so a profile override that differs from
+        // the active one cannot be honoured.
+        if running && !p.profile.is_empty() {
+            let (active, _) = ctx
+                .runtime
+                .engine()
+                .instance_profiles(&record.id)
+                .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            let requested = if p.profile == "none" { "" } else { &p.profile };
+            if !requested.eq_ignore_ascii_case(&active) {
+                return Err(ServiceError::bad_request(format!(
+                    "instance '{}' is running{}; stop it before switching profiles",
+                    record.name,
+                    match active.is_empty() {
+                        true => " with no profile".to_string(),
+                        false => format!(" under profile '{active}'"),
+                    }
+                )));
+            }
+        }
         match ctx
             .runtime
             .instance_launches()
-            .start(record.id, p.account, p.id)
+            .start(record.id, p.account, p.profile, !running, p.id)
         {
             Some(id) => Ok(InstanceLaunchResult { id }),
             None => Err(ServiceError::bad_request(
@@ -261,5 +285,68 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .map(|(key, value)| ConfigEntry { key, value })
             .collect();
         Ok(InstanceConfigListResult { entries })
+    });
+
+    // Profile CRUD is metadata-safe while the instance runs (a change applies
+    // at the next launch); only seeding reads the pool, so only create guards
+    // against an in-flight content job.
+    on.handle::<InstanceProfileList, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        let (active, profiles) = ctx
+            .runtime
+            .engine()
+            .instance_profiles(&record.id)
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(InstanceProfileListResult { active, profiles })
+    });
+
+    on.handle::<InstanceProfileCreate, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        if p.seed_from_pool {
+            ensure_no_content(&ctx, &instance_process_id(&record.id), &record.name)?;
+        }
+        let profile = ctx
+            .runtime
+            .engine()
+            .create_instance_profile(&record.id, &p.name, p.seed_from_pool)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+        tracing::info!(instance = %record.id, profile = %profile.name, "profile created");
+        Ok(profile)
+    });
+
+    on.handle::<InstanceProfileRemove, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        ctx.runtime
+            .engine()
+            .remove_instance_profile(&record.id, &p.name)
+            .map_err(|e| ServiceError::not_found(format!("{e:#}")))?;
+        tracing::info!(instance = %record.id, profile = %p.name, "profile removed");
+        Ok(Empty {})
+    });
+
+    on.handle::<InstanceProfileRename, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        ctx.runtime
+            .engine()
+            .rename_instance_profile(&record.id, &p.name, &p.new_name)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))
+    });
+
+    on.handle::<InstanceProfileUse, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        ctx.runtime
+            .engine()
+            .use_instance_profile(&record.id, &p.name)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+        tracing::info!(instance = %record.id, profile = %p.name, "active profile changed");
+        Ok(Empty {})
+    });
+
+    on.handle::<InstanceProfileEdit, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        ctx.runtime
+            .engine()
+            .edit_instance_profile(&record.id, &p.name, &p.add, &p.remove)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))
     });
 }

@@ -35,8 +35,17 @@ impl InstanceLaunchManager {
 
     /// Prepare and spawn a fresh session of an instance off-thread. Instances may
     /// run several sessions at once, so this always launches — it does not refuse
-    /// a running instance. Returns the launch job id.
-    pub fn start(&self, instance_id: String, account: String, id: String) -> Option<String> {
+    /// a running instance. `profile` overrides the active content profile for
+    /// this launch; `reconcile` off skips the sync/mirror pass (sessions are
+    /// already running, so the mirror is in use). Returns the launch job id.
+    pub fn start(
+        &self,
+        instance_id: String,
+        account: String,
+        profile: String,
+        reconcile: bool,
+        id: String,
+    ) -> Option<String> {
         let id = job_id(id, "instance-launch");
         let (session_id, seq) = self.reserve_session(&instance_id);
 
@@ -64,6 +73,8 @@ impl InstanceLaunchManager {
                 &session_id,
                 seq,
                 &account,
+                &profile,
+                reconcile,
                 on_progress.as_ref(),
             )
             .await;
@@ -116,6 +127,7 @@ impl InstanceLaunchManager {
 
 /// Materialise the instance, then hand the plan to the supervisor under the
 /// session's own id and per-session log file.
+#[allow(clippy::too_many_arguments)]
 async fn launch(
     engine: &Engine,
     processes: &ProcessSupervisor,
@@ -123,10 +135,12 @@ async fn launch(
     session_id: &str,
     seq: u32,
     account: &str,
+    profile: &str,
+    reconcile: bool,
     on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
 ) -> Result<(String, u32), String> {
     let (_record, plan, log_file) = engine
-        .prepare_instance(instance_id, account, seq, on_progress)
+        .prepare_instance(instance_id, account, seq, profile, reconcile, on_progress)
         .await
         .map_err(|e| format!("{e:#}"))?;
 

@@ -11,9 +11,12 @@ use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo,
     InstanceLaunch, InstanceLaunchParams, InstanceList, InstanceLogs, InstanceLogsParams,
-    InstanceRef, InstanceRemove, InstanceRename, InstanceRenameParams, InstanceResolve,
-    InstanceStop, InstanceStopParams, InstanceUpdate, InstanceUpdateParams, InstanceVersions,
-    InstanceWorlds,
+    InstanceProfileCreate, InstanceProfileCreateParams, InstanceProfileEdit,
+    InstanceProfileEditParams, InstanceProfileList, InstanceProfileRef, InstanceProfileRemove,
+    InstanceProfileRename, InstanceProfileRenameParams, InstanceProfileUse, InstanceRef,
+    InstanceRemove, InstanceRename, InstanceRenameParams, InstanceResolve, InstanceStop,
+    InstanceStopParams, InstanceUpdate, InstanceUpdateParams, InstanceVersions, InstanceWorlds,
+    Profile,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams,
@@ -205,12 +208,15 @@ impl Instance<'_> {
 
     /// Launch an instance, blocking until the game process has spawned (or the
     /// preparation failed) and forwarding each progress event to `on_progress`.
-    /// Returns the supervised process id and pid.
+    /// `profile` overrides the active content profile for this launch (empty
+    /// keeps it; `none` launches with no profile). Returns the supervised
+    /// process id and pid.
     pub async fn launch(
         &self,
         instance: &str,
         account: &str,
         new_session: bool,
+        profile: &str,
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
     ) -> Result<(String, u32), IpcError> {
         let id = job_id("instance-launch");
@@ -220,6 +226,7 @@ impl Instance<'_> {
             account: account.to_string(),
             id: id.clone(),
             new_session,
+            profile: profile.to_string(),
         };
         let payload = self
             .session
@@ -265,6 +272,78 @@ impl Instance<'_> {
                 .map(|_| ())
         })
         .await
+    }
+
+    /// The instance's active profile name (empty = none) and every profile.
+    pub async fn profiles(&self, instance: &str) -> Result<(String, Vec<Profile>), IpcError> {
+        let result = self
+            .session
+            .call::<InstanceProfileList>(&instance_ref(instance))
+            .await?;
+        Ok((result.active, result.profiles))
+    }
+
+    /// Create a profile — seeded from the pool by default, or empty.
+    pub async fn create_profile(
+        &self,
+        instance: &str,
+        name: &str,
+        seed_from_pool: bool,
+    ) -> Result<Profile, IpcError> {
+        let params = InstanceProfileCreateParams {
+            instance: instance.to_string(),
+            name: name.to_string(),
+            seed_from_pool,
+        };
+        self.session.call::<InstanceProfileCreate>(&params).await
+    }
+
+    /// Removing the active profile clears the active selection.
+    pub async fn remove_profile(&self, instance: &str, name: &str) -> Result<(), IpcError> {
+        self.session
+            .call::<InstanceProfileRemove>(&profile_ref(instance, name))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn rename_profile(
+        &self,
+        instance: &str,
+        name: &str,
+        new_name: &str,
+    ) -> Result<Profile, IpcError> {
+        let params = InstanceProfileRenameParams {
+            instance: instance.to_string(),
+            name: name.to_string(),
+            new_name: new_name.to_string(),
+        };
+        self.session.call::<InstanceProfileRename>(&params).await
+    }
+
+    /// Set the active profile (empty clears it); applied at the next launch.
+    pub async fn use_profile(&self, instance: &str, name: &str) -> Result<(), IpcError> {
+        self.session
+            .call::<InstanceProfileUse>(&profile_ref(instance, name))
+            .await?;
+        Ok(())
+    }
+
+    /// Add/remove members by pool reference (project id, slug, filename, or
+    /// title).
+    pub async fn edit_profile(
+        &self,
+        instance: &str,
+        name: &str,
+        add: Vec<String>,
+        remove: Vec<String>,
+    ) -> Result<Profile, IpcError> {
+        let params = InstanceProfileEditParams {
+            instance: instance.to_string(),
+            name: name.to_string(),
+            add,
+            remove,
+        };
+        self.session.call::<InstanceProfileEdit>(&params).await
     }
 
     pub async fn content_list(
@@ -330,5 +409,12 @@ impl Instance<'_> {
 fn instance_ref(instance: &str) -> InstanceRef {
     InstanceRef {
         instance: instance.to_string(),
+    }
+}
+
+fn profile_ref(instance: &str, name: &str) -> InstanceProfileRef {
+    InstanceProfileRef {
+        instance: instance.to_string(),
+        name: name.to_string(),
     }
 }

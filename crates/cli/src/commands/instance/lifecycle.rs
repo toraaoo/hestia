@@ -27,7 +27,9 @@ pub async fn launch(
     let progress = reporter.clone();
     let result = client
         .instance()
-        .launch(reference, account, new_session, move |p| progress.update(p))
+        .launch(reference, account, new_session, "", move |p| {
+            progress.update(p)
+        })
         .await;
     reporter.finish();
     let (process_id, pid) = result?;
