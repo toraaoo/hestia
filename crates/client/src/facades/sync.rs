@@ -20,4 +20,32 @@ impl Sync<'_> {
         let params = proto::sync::SyncSetParams { targets };
         self.session.call::<proto::sync::SyncSet>(&params).await
     }
+
+    /// Every instance's per-folder-target link state.
+    pub async fn status(&self) -> Result<Vec<proto::sync::InstanceSyncStatus>, IpcError> {
+        Ok(self
+            .session
+            .call::<proto::sync::SyncStatus>(&proto::Empty {})
+            .await?
+            .instances)
+    }
+
+    /// Adopt a stopped instance's folder contents into the shared store
+    /// (every folder target when `targets` is empty). Returns the targets
+    /// linked after the call.
+    pub async fn adopt(
+        &self,
+        instance: &str,
+        targets: Vec<String>,
+    ) -> Result<Vec<String>, IpcError> {
+        let params = proto::sync::SyncAdoptParams {
+            instance: instance.to_string(),
+            targets,
+        };
+        Ok(self
+            .session
+            .call::<proto::sync::SyncAdopt>(&params)
+            .await?
+            .adopted)
+    }
 }

@@ -1,11 +1,16 @@
-//! Shared settings/configs: the set of game-relative files/folders propagated
-//! across instances. Apply runs inside the instance launch flow; these channels
-//! only read and edit the target set.
+//! Shared settings/configs: the set of game-relative files (copied) and
+//! folders (linked) propagated across instances. Apply runs inside the
+//! instance launch flow; these channels read and edit the target set, report
+//! each instance's per-target link state, and run the adopt migration.
 
-use proto::sync::{SyncConfig, SyncGet, SyncSet, SyncSetParams};
+use proto::sync::{
+    SyncAdopt, SyncAdoptResult, SyncConfig, SyncGet, SyncSet, SyncSetParams, SyncStatus,
+    SyncStatusResult,
+};
 use proto::Empty;
 
-use crate::runtime::{Channels, ServiceError};
+use super::guards::{ensure_no_content, find_instance};
+use crate::runtime::{instance_process_id, Channels, ServiceError};
 
 fn config(sync: &engine::Sync) -> SyncConfig {
     SyncConfig {
@@ -30,5 +35,33 @@ pub(super) fn register(on: &mut Channels<'_>) {
             "sync targets updated"
         );
         Ok(config(sync))
+    });
+
+    on.handle::<SyncStatus, _, _>(|_: Empty, ctx| async move {
+        Ok(SyncStatusResult {
+            instances: ctx.runtime.engine().sync_status(),
+        })
+    });
+
+    on.handle::<SyncAdopt, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        if ctx.runtime.instance_running(&record.id) {
+            return Err(ServiceError::bad_request(format!(
+                "instance '{}' is running; stop it first",
+                record.name
+            )));
+        }
+        ensure_no_content(&ctx, &instance_process_id(&record.id), &record.name)?;
+        let adopted = ctx
+            .runtime
+            .engine()
+            .adopt_instance_sync(&record.id, &p.targets)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+        tracing::info!(
+            instance = %record.id,
+            targets = adopted.len(),
+            "sync folders adopted into the shared store"
+        );
+        Ok(SyncAdoptResult { adopted })
     });
 }

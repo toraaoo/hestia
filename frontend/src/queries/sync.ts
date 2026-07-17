@@ -1,4 +1,7 @@
-/** `sync.*` — the shared settings/config target set (instance-only). */
+/**
+ * `sync.*` — the shared settings/config target set (instance-only): files
+ * copied, folders linked into the shared store.
+ */
 import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
 import type { SyncConfig, SyncTargets } from '../api';
 import * as api from '../api/sync';
@@ -11,6 +14,12 @@ export const syncQueries = {
       queryKey: keys.sync.config(),
       queryFn: () => api.get(),
     }),
+  /** Every instance's per-folder-target link state. */
+  status: () =>
+    queryOptions({
+      queryKey: keys.sync.status(),
+      queryFn: () => api.status(),
+    }),
 };
 
 export const syncMutations = {
@@ -21,12 +30,27 @@ export const syncMutations = {
       mutationFn: (targets) => api.set(targets),
       invalidates: () => [keys.sync.all],
     }),
+  /** Adopt a stopped instance's folders into the store; empty = all. */
+  adopt: (id: string) =>
+    mutation<string[], string[] | undefined>({
+      mutationKey: [...keys.instances.detail(id), 'sync', 'adopt'],
+      mutationFn: (targets) => api.adopt(id, targets),
+      invalidates: () => [keys.sync.all, keys.instances.detail(id)],
+    }),
 };
 
 export function useSyncConfig() {
   return useQuery(syncQueries.config());
 }
 
+export function useSyncStatus() {
+  return useQuery(syncQueries.status());
+}
+
 export function useSetSyncTargets() {
   return useMutation(syncMutations.set());
+}
+
+export function useAdoptInstanceSync(id: string) {
+  return useMutation(syncMutations.adopt(id));
 }

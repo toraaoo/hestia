@@ -168,9 +168,24 @@ enum InstanceAction {
         /// The new display name
         new_name: String,
     },
+    /// Link the instance's shared folders (see `hestia sync status`)
+    Sync {
+        #[command(subcommand)]
+        cmd: SyncAction,
+    },
     /// Delete the instance (its saves and all)
     #[command(visible_alias = "rm")]
     Remove,
+}
+
+#[derive(Subcommand)]
+pub enum SyncAction {
+    /// Move existing folder contents into the shared store and link them
+    /// (all-or-nothing per folder; a name already in the store refuses it)
+    Adopt {
+        /// Folder targets to adopt (e.g. `saves`); default all of them
+        targets: Vec<String>,
+    },
 }
 
 pub async fn run(cmd: InstanceCmd) -> Result<()> {
@@ -281,8 +296,24 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             downgrade,
         } => update::run(client, name, version, loader, downgrade).await,
         InstanceAction::Rename { new_name } => lifecycle::rename(client, &name, &new_name).await,
+        InstanceAction::Sync {
+            cmd: SyncAction::Adopt { targets },
+        } => adopt(client, &name, targets).await,
         InstanceAction::Remove => lifecycle::remove(client, &name).await,
     }
+}
+
+async fn adopt(client: &Client, name: &str, targets: Vec<String>) -> Result<()> {
+    let info = entry::pick_instance(client.instance().list().await?, Some(name.to_string()))?;
+    let adopted = client.sync().adopt(&info.id, targets).await?;
+    if adopted.is_empty() {
+        return crate::ui::show(crate::ui::View::note("no folder targets to adopt"));
+    }
+    crate::ui::show(crate::ui::View::line(format!(
+        "'{}' now shares {} through the store",
+        info.name,
+        adopted.join(", ")
+    )))
 }
 
 async fn versions(client: &Client, flavor: Option<String>, all: bool) -> Result<()> {

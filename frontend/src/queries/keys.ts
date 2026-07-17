@@ -110,5 +110,6 @@ export const keys = {
   sync: {
     all: ['sync'] as const,
     config: () => [...keys.sync.all, 'config'] as const,
+    status: () => [...keys.sync.all, 'status'] as const,
   },
 };
