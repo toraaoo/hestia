@@ -346,6 +346,32 @@ impl Instance<'_> {
         self.session.call::<InstanceProfileEdit>(&params).await
     }
 
+    /// Apply a global profile into the instance's pool — a content job:
+    /// references not already present install at their newest compatible
+    /// version, tagged with the profile; incompatible ones come back as
+    /// failures. Applying never removes de-listed content.
+    pub async fn apply_profile(
+        &self,
+        instance: &str,
+        profile: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>), IpcError> {
+        let id = job_id("profile-apply");
+        let params = proto::profile::InstanceProfileApplyParams {
+            instance: instance.to_string(),
+            profile: profile.to_string(),
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_content_job(session, &id, on_progress, move || async move {
+            session
+                .call::<proto::profile::InstanceProfileApply>(&params)
+                .await
+                .map(|_| ())
+        })
+        .await
+    }
+
     pub async fn content_list(
         &self,
         instance: &str,
