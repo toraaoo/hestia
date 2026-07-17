@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -26,9 +25,10 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { javaReleases, javaRuntimes } from '@/features/settings/mock';
 import { settingsDefaults, settingsSchema } from '@/features/settings/schema';
 import { useAppForm } from '@/hooks/form';
+import { type Locale, useLocale } from '@/hooks/locale';
 import { daemon } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
-import { getLocale, locales, setLocale } from '@/paraglide/runtime.js';
+import { locales } from '@/paraglide/runtime.js';
 
 /** Endonyms — a language always names itself, whatever locale is active. */
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -37,16 +37,14 @@ const LANGUAGE_NAMES: Record<string, string> = {
 };
 
 function LanguageField() {
-  const current = getLocale();
+  const { locale, changeLocale } = useLocale();
   return (
     <Field>
       <FieldLabel htmlFor="language">{m['settings.language']()}</FieldLabel>
       <Select
-        value={current}
+        value={locale}
         onValueChange={(value) => {
-          if (value && value !== current) {
-            setLocale(value as (typeof locales)[number]);
-          }
+          if (value) changeLocale(value as Locale);
         }}
       >
         <SelectTrigger id="language" className="w-full">
@@ -56,15 +54,14 @@ function LanguageField() {
         </SelectTrigger>
         <SelectContent align="start" alignItemWithTrigger={false}>
           <SelectGroup>
-            {locales.map((locale) => (
-              <SelectItem key={locale} value={locale}>
-                {LANGUAGE_NAMES[locale] ?? locale}
+            {locales.map((l) => (
+              <SelectItem key={l} value={l}>
+                {LANGUAGE_NAMES[l] ?? l}
               </SelectItem>
             ))}
           </SelectGroup>
         </SelectContent>
       </Select>
-      <FieldDescription>{m['settings.language_hint']()}</FieldDescription>
     </Field>
   );
 }
@@ -75,7 +72,7 @@ export function SettingsPage() {
   const form = useAppForm({
     defaultValues: settingsDefaults,
     validationLogic: revalidateLogic(),
-    validators: { onDynamic: settingsSchema },
+    validators: { onDynamic: settingsSchema() },
     onSubmit: async () => {},
   });
 

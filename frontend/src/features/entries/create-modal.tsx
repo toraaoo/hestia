@@ -224,7 +224,7 @@ export function CreateEntryModal({
         ) : step === 'flavor' ? (
           <form.FormGroup
             name="flavor"
-            validators={{ onDynamic: flavorStepSchema }}
+            validators={{ onDynamic: flavorStepSchema() }}
             onGroupSubmit={() => setStep('version')}
           >
             {(group) => (
@@ -253,7 +253,7 @@ export function CreateEntryModal({
         ) : step === 'version' ? (
           <form.FormGroup
             name="version"
-            validators={{ onDynamic: versionStepSchema }}
+            validators={{ onDynamic: versionStepSchema() }}
             onGroupSubmit={() => setStep('details')}
           >
             {(group) => (

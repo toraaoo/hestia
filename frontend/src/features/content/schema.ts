@@ -22,9 +22,11 @@ export function pickStepSchema(mode: Mode) {
       });
 }
 
-export const worldsStepSchema = z.object({
-  worlds: z.array(z.string()).min(1, m['error.pick_world']()),
-});
+export function worldsStepSchema() {
+  return z.object({
+    worlds: z.array(z.string()).min(1, m['error.pick_world']()),
+  });
+}
 
 export const reviewStepSchema = z.object({
   versionId: z.string(),

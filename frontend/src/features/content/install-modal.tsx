@@ -420,7 +420,7 @@ function WizardBody({
       ) : stepId === 'worlds' ? (
         <form.FormGroup
           name="worlds"
-          validators={{ onDynamic: worldsStepSchema }}
+          validators={{ onDynamic: worldsStepSchema() }}
           onGroupSubmit={next}
         >
           {(group: { handleSubmit: () => void }) => (

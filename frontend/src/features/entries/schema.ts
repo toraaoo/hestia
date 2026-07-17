@@ -11,14 +11,18 @@ type Kind = 'server' | 'instance';
  * current step; the whole-form `onDynamic` composes them for the final submit.
  */
 
-export const flavorStepSchema = z.object({
-  flavor: z.string().min(1, m['error.pick_flavor']()),
-});
+export function flavorStepSchema() {
+  return z.object({
+    flavor: z.string().min(1, m['error.pick_flavor']()),
+  });
+}
 
-export const versionStepSchema = z.object({
-  version: z.string().min(1, m['error.choose_version']()),
-  loaderVersion: z.string(),
-});
+export function versionStepSchema() {
+  return z.object({
+    version: z.string().min(1, m['error.choose_version']()),
+    loaderVersion: z.string(),
+  });
+}
 
 export function detailsStepSchema(kind: Kind) {
   return z.object({
@@ -46,8 +50,8 @@ export function detailsStepSchema(kind: Kind) {
 
 export function createWizardSchema(kind: Kind) {
   return z.object({
-    flavor: flavorStepSchema,
-    version: versionStepSchema,
+    flavor: flavorStepSchema(),
+    version: versionStepSchema(),
     details: detailsStepSchema(kind),
   });
 }

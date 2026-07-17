@@ -83,10 +83,11 @@ function useLiveResources(
   return series;
 }
 
-const chartConfig = {
-  cpu: { label: m['label.cpu'](), color: 'var(--color-ember)' },
-  mem: { label: m['label.memory'](), color: 'var(--chart-2)' },
-} satisfies ChartConfig;
+const chartConfig = () =>
+  ({
+    cpu: { label: m['label.cpu'](), color: 'var(--color-ember)' },
+    mem: { label: m['label.memory'](), color: 'var(--chart-2)' },
+  }) satisfies ChartConfig;
 
 function Sparkline({
   data,
@@ -100,7 +101,10 @@ function Sparkline({
   max: number;
 }) {
   return (
-    <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
+    <ChartContainer
+      config={chartConfig()}
+      className="aspect-auto h-full w-full"
+    >
       <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
         <defs>
           <linearGradient id={`fill-${dataKey}`} x1="0" y1="0" x2="0" y2="1">

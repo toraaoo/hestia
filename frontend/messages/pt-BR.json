@@ -321,7 +321,6 @@
     "subtitle": "Launcher, runtimes e daemon",
     "general": "Geral",
     "language": "Idioma",
-    "language_hint": "Aplica imediatamente — o aplicativo recarrega.",
     "theme": "Tema",
     "theme_dark": "Escuro",
     "theme_system": "Sistema",
