@@ -38,8 +38,11 @@ it's just as comfortable from a terminal as from a window.
 > world, which the world backup already covers). An instance's installed pool
 > can be sliced into **content profiles** — named selections (mods,
 > resourcepacks, shaders) enforced by the launch-time mirror reconcile; no
-> profile active mirrors everything, and a per-launch override picks another
-> (a daemon/desktop surface, no CLI verbs). Vanilla and Fabric are the
+> profile active mirrors everything, and a per-launch override picks another.
+> **Global profiles** are data-home-level project reference lists applied
+> into an instance in one shot — each reference resolved against that
+> instance's version/loader and installed as ordinary origin-tagged content
+> (both a daemon/desktop surface, no CLI verbs). Vanilla and Fabric are the
 > shipped flavors, Modrinth the shipped content source. A **system tray**
 > accompanies every serving daemon — status, start/restart, a start-at-login
 > toggle, quit. The **desktop shell** talks to the daemon through a generic

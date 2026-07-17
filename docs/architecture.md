@@ -466,6 +466,26 @@ The subsystems behind the aggregate:
 > name is reserved: `launch { profile: "none" }` overrides an active profile
 > with "no profile" for one launch. Servers have no profiles.
 
+> **A global profile stores project references, never jars.** A data-home-level
+> profile (`profiles/<name>.json`, a bare array of `{source, project_id, slug}`
+> — the disk is the registry, the name is the slugged filename) is a reusable
+> "starter pack" of content: jars are version- and loader-specific, so each
+> `instance.profile.apply` resolves every reference against the *target*
+> instance's game version and loader through the ordinary add-content path
+> (`pick_version`, dependencies included). Applied content becomes an ordinary
+> pool item with an `origin` tag (`profile:<name>`), so all downstream
+> machinery — the mirror, backup heal, untracked detection, update — works on
+> it unchanged (an update preserves the tag; a user re-install clears it, taking
+> ownership). Apply is **one-shot and additive**: a reference already in the
+> pool is skipped (the local copy wins), one with no compatible version is a
+> per-item failure the batch continues past, and de-listed references are never
+> removed (the launch-time reconcile stays a per-instance-profile concern —
+> `content list` shows the origin instead). Removing a profile-tagged item
+> locally is refused naming the profile — it would silently reappear at the
+> next apply; the reference leaves the global profile instead. The apply runs
+> as a `ContentManager` job under the instance's in-flight key, publishing the
+> `content.*` topics.
+
 > **Skins follow Modrinth's shape, minus its couplings — and skip the CLI.**
 > Skin management (`skin.*`/`cape.*`) is a desktop-only surface: picking a skin
 > is visual, so the CLI deliberately grows no command for it. The design mirrors
@@ -748,7 +768,10 @@ supervises launched processes, and manages autostart. The only crate that links
   `server.content.add|list|remove|update` and its `instance.content.*`
   counterpart (add/update are jobs over a `ContentManager`, publishing the
   `content.*` topics; list/remove are plain request/response; all refuse a
-  running or busy entry).
+  running or busy entry). Plus `profile.list|create|remove|edit` — the global
+  content-profile reference lists (edit resolves adds through the content
+  registry) — and `instance.profile.apply`, a `ContentManager` job installing
+  a global profile's references into a stopped, non-busy instance.
 - **`autostart.rs`** — registers/removes the daemon as a login-time service per
   platform, driven by the `config` service when the reserved `autostart` key is
   set (`is_enabled()` / `set()`).
