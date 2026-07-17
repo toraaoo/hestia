@@ -119,8 +119,8 @@ impl Engine {
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
         let entry_dir = self.instances.instance_dir(&record.id);
-        let selection = if reconcile {
-            profiles::selection(&entry_dir, profile)?
+        let launch_profile = if reconcile {
+            profiles::resolve(&entry_dir, profile)?
         } else {
             None
         };
@@ -167,7 +167,15 @@ impl Engine {
         std::fs::create_dir_all(&game_dir)
             .with_context(|| format!("cannot create {}", game_dir.display()))?;
         if reconcile {
-            self.sync.apply(&game_dir)?;
+            // A captured profile scopes the settings-class sync targets to its
+            // own store; an uncaptured one inherits the global store.
+            let store = launch_profile
+                .as_ref()
+                .filter(|p| p.captured)
+                .map(|p| profiles::store_dir(&entry_dir, &p.name));
+            self.sync.apply(&game_dir, store.as_deref())?;
+            let selection: Option<std::collections::HashSet<String>> =
+                launch_profile.map(|p| p.members.into_iter().collect());
             install::sync(&entry_dir, &game_dir, selection.as_ref())?;
         }
         let natives_dir = meta.join("natives").join(&record.profile.game_version);

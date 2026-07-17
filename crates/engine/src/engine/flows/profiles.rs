@@ -110,6 +110,49 @@ impl Engine {
         profiles::edit(&dir, name, &adds, &removes)
     }
 
+    /// Capture the profile's own settings store, seeded from the global
+    /// `shared/` store as it currently stands. Launches under the profile
+    /// then sync settings against it; divergence after capture is by design.
+    pub fn capture_instance_profile(&self, reference: &str, name: &str) -> Result<Profile> {
+        let (dir, profile) = self.find_profile(reference, name)?;
+        if profile.captured {
+            bail!("profile '{}' is already captured", profile.name);
+        }
+        self.sync()
+            .capture(&profiles::store_dir(&dir, &profile.name))?;
+        tracing::info!(instance = %reference, profile = %profile.name, "profile settings captured");
+        Ok(Profile {
+            captured: true,
+            ..profile
+        })
+    }
+
+    /// Delete the profile's captured store; it inherits the global store again
+    /// from the next launch (the stale link relinks itself).
+    pub fn release_instance_profile(&self, reference: &str, name: &str) -> Result<Profile> {
+        let (dir, profile) = self.find_profile(reference, name)?;
+        if !profile.captured {
+            bail!("profile '{}' has no captured settings", profile.name);
+        }
+        self.sync()
+            .release(&profiles::store_dir(&dir, &profile.name))?;
+        tracing::info!(instance = %reference, profile = %profile.name, "profile settings released");
+        Ok(Profile {
+            captured: false,
+            ..profile
+        })
+    }
+
+    fn find_profile(&self, reference: &str, name: &str) -> Result<(PathBuf, Profile)> {
+        let dir = self.profile_dir(reference)?;
+        let (_, profiles) = profiles::list(&dir);
+        let profile = profiles
+            .into_iter()
+            .find(|p| p.name.eq_ignore_ascii_case(name))
+            .with_context(|| format!("no profile named '{name}'"))?;
+        Ok((dir, profile))
+    }
+
     fn profile_dir(&self, reference: &str) -> Result<PathBuf> {
         let record = self
             .instances()

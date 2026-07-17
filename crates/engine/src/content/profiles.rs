@@ -4,10 +4,10 @@
 //! reconcile decides which managed files are mirrored into `data/`. An absent
 //! or empty file is valid and means "no profiles, mirror everything".
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::path::Path;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use proto::content::ContentKind;
 use proto::instance::Profile;
 use serde::{Deserialize, Serialize};
@@ -47,10 +47,17 @@ fn save_stored(entry_dir: &Path, stored: &Stored) -> Result<()> {
     registry::write_record(entry_dir, FILE, stored)
 }
 
-fn profile(name: &str, members: &Members) -> Profile {
+/// A profile's captured settings store (`<instance>/profiles/<name>/`). Its
+/// existence *is* the captured flag — the disk is the registry.
+pub(crate) fn store_dir(entry_dir: &Path, name: &str) -> std::path::PathBuf {
+    entry_dir.join("profiles").join(name)
+}
+
+fn profile(entry_dir: &Path, name: &str, members: &Members) -> Profile {
     Profile {
         name: name.to_string(),
         members: members.members.clone(),
+        captured: store_dir(entry_dir, name).is_dir(),
     }
 }
 
@@ -60,7 +67,7 @@ pub(crate) fn list(entry_dir: &Path) -> (String, Vec<Profile>) {
     let profiles = stored
         .profiles
         .iter()
-        .map(|(name, members)| profile(name, members))
+        .map(|(name, members)| profile(entry_dir, name, members))
         .collect();
     (stored.active, profiles)
 }
@@ -91,7 +98,7 @@ pub(crate) fn create(entry_dir: &Path, name: &str, members: Vec<String>) -> Resu
         bail!("a profile named '{name}' already exists");
     }
     let entry = Members { members };
-    let created = profile(name, &entry);
+    let created = profile(entry_dir, name, &entry);
     stored.profiles.insert(name.to_string(), entry);
     save_stored(entry_dir, &stored)?;
     Ok(created)
@@ -107,6 +114,11 @@ pub(crate) fn remove(entry_dir: &Path, name: &str) -> Result<()> {
     stored.profiles.remove(&key);
     if stored.active == key {
         stored.active = String::new();
+    }
+    let store = store_dir(entry_dir, &key);
+    if store.is_dir() {
+        std::fs::remove_dir_all(&store)
+            .with_context(|| format!("cannot remove {}", store.display()))?;
     }
     save_stored(entry_dir, &stored)
 }
@@ -124,7 +136,12 @@ pub(crate) fn rename(entry_dir: &Path, name: &str, new_name: &str) -> Result<Pro
         }
     }
     let members = stored.profiles.remove(&key).expect("found above");
-    let renamed = profile(new_name, &members);
+    let old_store = store_dir(entry_dir, &key);
+    if old_store.is_dir() {
+        std::fs::rename(&old_store, store_dir(entry_dir, new_name))
+            .with_context(|| format!("cannot move {}", old_store.display()))?;
+    }
+    let renamed = profile(entry_dir, new_name, &members);
     stored.profiles.insert(new_name.to_string(), members);
     if stored.active == key {
         stored.active = new_name.to_string();
@@ -169,15 +186,15 @@ pub(crate) fn edit(
     members
         .members
         .retain(|filename| !remove.contains(filename));
-    let edited = profile(&key, members);
+    let edited = profile(entry_dir, &key, members);
     save_stored(entry_dir, &stored)?;
     Ok(edited)
 }
 
-/// The member set a launch reconciles against: `requested` is the launch
-/// override (`none` = no profile, empty = the active profile, else a profile
-/// name that must exist). `None` means "no profile — mirror everything".
-pub(crate) fn selection(entry_dir: &Path, requested: &str) -> Result<Option<HashSet<String>>> {
+/// The profile a launch runs under: `requested` is the launch override
+/// (`none` = no profile, empty = the active profile, else a profile name that
+/// must exist). `None` means "no profile — mirror everything, global store".
+pub(crate) fn resolve(entry_dir: &Path, requested: &str) -> Result<Option<Profile>> {
     let stored = load_stored(entry_dir);
     let name = match requested {
         RESERVED => return Ok(None),
@@ -185,10 +202,19 @@ pub(crate) fn selection(entry_dir: &Path, requested: &str) -> Result<Option<Hash
         "" => stored.active.clone(),
         other => other.to_string(),
     };
-    let Some((_, members)) = find(&stored, &name) else {
+    let Some((key, members)) = find(&stored, &name) else {
         bail!("no profile named '{name}'");
     };
-    Ok(Some(members.members.iter().cloned().collect()))
+    Ok(Some(profile(entry_dir, key, members)))
+}
+
+/// The member set a launch reconciles against (see [`resolve`]).
+#[cfg(test)]
+pub(crate) fn selection(
+    entry_dir: &Path,
+    requested: &str,
+) -> Result<Option<std::collections::HashSet<String>>> {
+    Ok(resolve(entry_dir, requested)?.map(|p| p.members.into_iter().collect()))
 }
 
 /// Drop filenames that left the pool from every profile (content removal).

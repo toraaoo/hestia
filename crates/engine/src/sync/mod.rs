@@ -44,6 +44,12 @@ const RESERVED_ROOTS: &[&str] = &["mods", "resourcepacks", "shaderpacks", "backu
 /// instances through the shared store (mirrors Pandora's `options.txt` handling).
 const LOCAL_OPTION_KEYS: &[&str] = &["resourcePacks", "incompatibleResourcePacks"];
 
+/// The settings-class targets a captured profile scopes to its own store.
+/// Worlds and screenshots stay on the global store: capture exists to fork
+/// *settings*, not game data.
+const CAPTURE_FILES: &[&str] = &[OPTIONS_TXT];
+const CAPTURE_FOLDERS: &[&str] = &["config"];
+
 pub struct Sync {
     dir: Mutex<PathBuf>,
 }
@@ -94,36 +100,87 @@ impl Sync {
         Ok(targets)
     }
 
-    /// Reconcile an instance's `data/` with the shared store: copy-reconcile
-    /// the file targets newest-wins, then ensure each folder target is a link
-    /// into the store (the apply pass). Best-effort per target: a single
-    /// failing target is logged and skipped rather than failing the launch.
-    pub fn apply(&self, data_dir: &Path) -> Result<()> {
+    /// Reconcile an instance's `data/` with the store: copy-reconcile the file
+    /// targets newest-wins, then ensure each folder target is a link into the
+    /// store (the apply pass). With a `profile_store` (a captured profile's
+    /// launch), the settings-class targets reconcile/link against it instead
+    /// of the global store — worlds and screenshots stay global. Best-effort
+    /// per target: a single failing target is logged and skipped rather than
+    /// failing the launch.
+    pub fn apply(&self, data_dir: &Path, profile_store: Option<&Path>) -> Result<()> {
         let targets = self.targets();
         let shared = self.dir();
         fs::create_dir_all(&shared).ok();
 
-        for rel in &targets.files {
-            let Some(rel) = safe_rel(rel) else { continue };
+        for raw in &targets.files {
+            let Some(rel) = safe_rel(raw) else { continue };
+            let store = scope_root(&shared, profile_store, raw, CAPTURE_FILES);
             let result = if rel.as_os_str() == OPTIONS_TXT {
-                merge_options(&shared.join(&rel), &data_dir.join(&rel))
+                merge_options(&store.join(&rel), &data_dir.join(&rel))
             } else {
-                sync_newer(&shared.join(&rel), &data_dir.join(&rel))
+                sync_newer(&store.join(&rel), &data_dir.join(&rel))
             };
             if let Err(e) = result {
                 tracing::warn!(target = %rel.display(), error = %e, "config sync skipped a file");
             }
         }
 
-        for rel in &targets.folders {
-            let Some(rel) = safe_rel(rel) else { continue };
-            if let Err(e) = ensure_link(&shared.join(&rel), &data_dir.join(&rel), &rel) {
+        for raw in &targets.folders {
+            let Some(rel) = safe_rel(raw) else { continue };
+            let store = scope_root(&shared, profile_store, raw, CAPTURE_FOLDERS);
+            if let Err(e) = ensure_link(&store.join(&rel), &data_dir.join(&rel), &rel) {
                 tracing::warn!(
                     target = %rel.display(),
                     error = format!("{e:#}"),
                     "cannot link a sync folder"
                 );
             }
+        }
+        Ok(())
+    }
+
+    /// Seed a profile's captured store from the global one: the settings-class
+    /// file and folder targets are copied as they currently stand. From then on
+    /// launches under the profile reconcile against the captured store, and
+    /// divergence is by design.
+    pub fn capture(&self, profile_store: &Path) -> Result<()> {
+        let targets = self.targets();
+        let shared = self.dir();
+        fs::create_dir_all(profile_store)
+            .with_context(|| format!("cannot create {}", profile_store.display()))?;
+        for raw in &targets.files {
+            let Some(rel) = safe_rel(raw) else { continue };
+            if !CAPTURE_FILES.contains(&raw.as_str()) {
+                continue;
+            }
+            let source = shared.join(&rel);
+            if source.is_file() {
+                copy_file(&source, &profile_store.join(&rel))?;
+            }
+        }
+        for raw in &targets.folders {
+            let Some(rel) = safe_rel(raw) else { continue };
+            if !CAPTURE_FOLDERS.contains(&raw.as_str()) {
+                continue;
+            }
+            let source = shared.join(&rel);
+            let dest = profile_store.join(&rel);
+            if source.is_dir() && link::read_target(&source).is_none() {
+                copy_tree(&source, &dest)?;
+            } else {
+                fs::create_dir_all(&dest)
+                    .with_context(|| format!("cannot create {}", dest.display()))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Delete a profile's captured store; the profile inherits the global
+    /// store again (the stale link in `data/` is relinked at the next apply).
+    pub fn release(&self, profile_store: &Path) -> Result<()> {
+        if profile_store.symlink_metadata().is_ok() {
+            fs::remove_dir_all(profile_store)
+                .with_context(|| format!("cannot remove {}", profile_store.display()))?;
         }
         Ok(())
     }
@@ -342,11 +399,34 @@ fn link_state(store: &Path, at: &Path, rel: &Path) -> LinkState {
     }
 }
 
-/// Whether a link target points into *a* hestia shared store (this data home's
-/// or a stale one after a data-home move): `…/shared/<rel>`. Only such links
-/// are ever touched; a user's own unrelated symlink is left alone.
+/// The store root a target reconciles against: the profile's captured store
+/// for settings-class targets when one is in scope, the global store otherwise.
+fn scope_root(shared: &Path, profile_store: Option<&Path>, raw: &str, scoped: &[&str]) -> PathBuf {
+    match profile_store {
+        Some(store) if scoped.contains(&raw) => store.to_path_buf(),
+        _ => shared.to_path_buf(),
+    }
+}
+
+/// Whether a link target points into *a* hestia store (this data home's, a
+/// stale one after a data-home move, or a profile's captured store):
+/// `…/shared/<rel>` or `…/profiles/<name>/<rel>`. Only such links are ever
+/// touched; a user's own unrelated symlink is left alone.
 fn is_store_target(target: &Path, rel: &Path) -> bool {
-    target.ends_with(Path::new("shared").join(rel))
+    if target.ends_with(Path::new("shared").join(rel)) {
+        return true;
+    }
+    if !target.ends_with(rel) {
+        return false;
+    }
+    let mut above = target;
+    for _ in 0..rel.components().count() {
+        match above.parent() {
+            Some(parent) => above = parent,
+            None => return false,
+        }
+    }
+    above.parent().and_then(|p| p.file_name()) == Some(std::ffi::OsStr::new("profiles"))
 }
 
 /// Reject an absolute path, a `..` escape, an empty path, or one rooted at a
@@ -525,7 +605,7 @@ mod tests {
         fs::create_dir_all(&shared).unwrap();
         fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
 
-        Sync::new(shared).apply(&data).unwrap();
+        Sync::new(shared).apply(&data, None).unwrap();
 
         let seeded = fs::read_to_string(data.join("options.txt")).unwrap();
         assert!(seeded.contains("guiScale:3"));
@@ -544,7 +624,7 @@ mod tests {
         )
         .unwrap();
 
-        Sync::new(shared.clone()).apply(&data).unwrap();
+        Sync::new(shared.clone()).apply(&data, None).unwrap();
 
         let stored = fs::read_to_string(shared.join("options.txt")).unwrap();
         assert!(stored.contains("guiScale:2"));
@@ -565,7 +645,7 @@ mod tests {
         let data = base.join("data");
         fs::create_dir_all(data.join("config")).unwrap();
 
-        Sync::new(shared.clone()).apply(&data).unwrap();
+        Sync::new(shared.clone()).apply(&data, None).unwrap();
 
         assert!(link::is_linked_to(
             &shared.join("saves"),
@@ -580,7 +660,7 @@ mod tests {
         fs::create_dir_all(data.join("saves").join("world")).unwrap();
         let data2 = base.join("data2");
         fs::create_dir_all(&data2).unwrap();
-        Sync::new(shared.clone()).apply(&data2).unwrap();
+        Sync::new(shared.clone()).apply(&data2, None).unwrap();
         assert!(data2.join("saves").join("world").is_dir());
         fs::remove_dir_all(&base).ok();
     }
@@ -594,7 +674,7 @@ mod tests {
         fs::write(data.join("saves").join("old-world").join("level.dat"), "x").unwrap();
 
         let sync = Sync::new(shared.clone());
-        sync.apply(&data).unwrap();
+        sync.apply(&data, None).unwrap();
 
         assert!(link::read_target(&data.join("saves")).is_none());
         assert!(data
@@ -618,7 +698,7 @@ mod tests {
         link::link_dir(&old_shared.join("saves"), &data.join("saves")).unwrap();
 
         let shared = base.join("new-home").join("shared");
-        Sync::new(shared.clone()).apply(&data).unwrap();
+        Sync::new(shared.clone()).apply(&data, None).unwrap();
 
         assert!(link::is_linked_to(
             &shared.join("saves"),
@@ -637,7 +717,7 @@ mod tests {
         fs::create_dir_all(&data).unwrap();
         link::link_dir(&elsewhere, &data.join("saves")).unwrap();
 
-        Sync::new(shared.clone()).apply(&data).unwrap();
+        Sync::new(shared.clone()).apply(&data, None).unwrap();
 
         assert_eq!(link::read_target(&data.join("saves")), Some(elsewhere));
         fs::remove_dir_all(&base).ok();
@@ -701,6 +781,74 @@ mod tests {
             fs::read_to_string(shared.join("saves").join("world").join("level.dat")).unwrap(),
             "store"
         );
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn capture_seeds_the_profile_store_from_the_global_one() {
+        let base = temp_dir("capture");
+        let shared = base.join("shared");
+        fs::create_dir_all(shared.join("config")).unwrap();
+        fs::write(shared.join("config").join("mod.toml"), "x=1").unwrap();
+        fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
+
+        let store = base.join("instance").join("profiles").join("showcase");
+        Sync::new(shared.clone()).capture(&store).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(store.join("config").join("mod.toml")).unwrap(),
+            "x=1"
+        );
+        assert!(store.join("options.txt").is_file());
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn apply_scopes_settings_targets_to_the_profile_store() {
+        let base = temp_dir("scoped");
+        let shared = base.join("shared");
+        fs::create_dir_all(&shared).unwrap();
+        let store = base.join("instance").join("profiles").join("showcase");
+        let data = base.join("data");
+        fs::create_dir_all(&data).unwrap();
+
+        let sync = Sync::new(shared.clone());
+        sync.capture(&store).unwrap();
+        sync.apply(&data, Some(&store)).unwrap();
+
+        // config links into the captured store; saves stays on the global one.
+        assert!(link::is_linked_to(
+            &store.join("config"),
+            &data.join("config")
+        ));
+        assert!(link::is_linked_to(
+            &shared.join("saves"),
+            &data.join("saves")
+        ));
+
+        // An in-game settings change lands in the captured store, not the
+        // global one (the link writes through).
+        fs::write(data.join("config").join("mod.toml"), "render=far").unwrap();
+        assert!(store.join("config").join("mod.toml").is_file());
+        assert!(!shared.join("config").join("mod.toml").exists());
+
+        // options.txt reconciles against the captured store.
+        fs::write(data.join("options.txt"), "guiScale:2\n").unwrap();
+        sync.apply(&data, Some(&store)).unwrap();
+        assert!(fs::read_to_string(store.join("options.txt"))
+            .unwrap()
+            .contains("guiScale:2"));
+        assert!(!shared.join("options.txt").exists());
+
+        // Release, and the next un-profiled apply relinks the global store —
+        // the stale captured-store link counts as a hestia store target.
+        sync.release(&store).unwrap();
+        assert!(!store.exists());
+        sync.apply(&data, None).unwrap();
+        assert!(link::is_linked_to(
+            &shared.join("config"),
+            &data.join("config")
+        ));
         fs::remove_dir_all(&base).ok();
     }
 }
