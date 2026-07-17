@@ -256,6 +256,10 @@ impl Contract for InstanceConfigList {
 pub struct Profile {
     pub name: String,
     pub members: Vec<String>,
+    /// Whether the profile owns a captured settings store: launches under it
+    /// sync settings against `<instance>/profiles/<name>/` instead of the
+    /// global `shared/` store. Uncaptured profiles inherit the global store.
+    pub captured: bool,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -324,6 +328,25 @@ impl Contract for InstanceProfileRename {
 pub struct InstanceProfileUse;
 impl Contract for InstanceProfileUse {
     const CHANNEL: &'static str = "instance.profile.use";
+    type Params = InstanceProfileRef;
+    type Result = Empty;
+}
+
+/// Capture the profile's own settings store, snapshotted from the global
+/// `shared/` store; from then on launches under the profile sync against it.
+/// Divergence after capture is by design.
+pub struct InstanceProfileCapture;
+impl Contract for InstanceProfileCapture {
+    const CHANNEL: &'static str = "instance.profile.capture";
+    type Params = InstanceProfileRef;
+    type Result = Empty;
+}
+
+/// Delete the profile's captured store; the profile inherits the global
+/// `shared/` store again from the next launch.
+pub struct InstanceProfileRelease;
+impl Contract for InstanceProfileRelease {
+    const CHANNEL: &'static str = "instance.profile.release";
     type Params = InstanceProfileRef;
     type Result = Empty;
 }

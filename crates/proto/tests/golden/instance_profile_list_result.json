@@ -3,11 +3,13 @@
   "profiles": [
     {
       "name": "performance",
-      "members": ["sodium-fabric.jar", "lithium-fabric.jar"]
+      "members": ["sodium-fabric.jar", "lithium-fabric.jar"],
+      "captured": false
     },
     {
       "name": "showcase",
-      "members": []
+      "members": [],
+      "captured": true
     }
   ]
 }
