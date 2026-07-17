@@ -1,4 +1,5 @@
 import { DotsThreeIcon, TrashIcon } from '@phosphor-icons/react';
+import { Link } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
 
 import { Empty } from '@/components/empty';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { KindChips } from '@/features/content/kind-chips';
 import { kindInfo } from '@/features/content/kinds';
+import { getProject } from '@/features/content/mock';
 import type { Backup, InstalledContent } from '@/features/entries/mock';
 import { agoLabel, bytes } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
@@ -103,12 +105,16 @@ export function ContentList({
     <div className="divide-y divide-border border border-border">
       {items.map((c) => {
         const Icon = contentIcon(c.kind);
-        return (
-          <div key={c.id} className="flex items-center gap-3 px-3 py-2.5">
+        // A local-file import has no project page to open.
+        const linked = c.source !== 'file' && getProject(c.id) !== undefined;
+        const body = (
+          <>
             <Icon className="size-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="truncate text-sm">{c.name}</span>
+                <span className="truncate text-sm group-hover/item:underline group-hover/item:underline-offset-2">
+                  {c.name}
+                </span>
                 {!c.enabled && (
                   <Badge variant="outline" className="shrink-0">
                     {m['content.disabled']()}
@@ -129,6 +135,23 @@ export function ContentList({
                 {contentKindLabel[c.kind]()} · {c.source} · {c.version}
               </div>
             </div>
+          </>
+        );
+        return (
+          <div key={c.id} className="flex items-center gap-3 px-3 py-2.5">
+            {linked ? (
+              <Link
+                to="/browse/$kind/$id"
+                params={{ kind: kindInfo[c.kind].slug, id: c.id }}
+                className="group/item flex min-w-0 flex-1 items-center gap-3 outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {body}
+              </Link>
+            ) : (
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                {body}
+              </div>
+            )}
             <ConfirmDialog
               trigger={
                 <Button
