@@ -1,9 +1,17 @@
 import { PlusIcon } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
+import { useState } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
+import { entryIcon } from '@/components/icons';
 import { Page, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   EntryCollection,
   FilterMenu,
@@ -15,6 +23,10 @@ import {
   type View,
   ViewToggle,
 } from '@/features/entries/collection';
+import { CreateEntryModal } from '@/features/entries/create-modal';
+
+const InstanceIcon = entryIcon('instance');
+const ServerIcon = entryIcon('server');
 
 export function LibraryPage({
   view,
@@ -36,6 +48,13 @@ export function LibraryPage({
   const srv = filterCards(serverCards, query, serverFlavor);
   const inst = filterCards(instanceCards, query, instanceFlavor);
 
+  const [newKind, setNewKind] = useState<'server' | 'instance'>('instance');
+  const [creating, setCreating] = useState(false);
+  const openNew = (kind: 'server' | 'instance') => {
+    setNewKind(kind);
+    setCreating(true);
+  };
+
   return (
     <Page
       title="Library"
@@ -45,10 +64,26 @@ export function LibraryPage({
       actions={
         <>
           <ViewToggle view={view} onView={onViewChange} />
-          <Button size="sm" data-icon="inline-start">
-            <PlusIcon weight="bold" />
-            New
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button size="sm" data-icon="inline-start">
+                  <PlusIcon weight="bold" />
+                  New
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={() => openNew('instance')}>
+                <InstanceIcon />
+                New instance
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openNew('server')}>
+                <ServerIcon />
+                New server
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </>
       }
     >
@@ -115,6 +150,12 @@ export function LibraryPage({
           />
         </Section>
       </div>
+
+      <CreateEntryModal
+        kind={newKind}
+        open={creating}
+        onOpenChange={setCreating}
+      />
     </Page>
   );
 }
