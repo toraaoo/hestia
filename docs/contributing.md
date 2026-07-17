@@ -281,9 +281,9 @@ offer an argument as the fallback), and `ui::human_bytes` for sizes.
 
 Once a domain grows past a handful of verbs, make it a directory: `mod.rs` keeps
 the `Subcommand` enum and the dispatch, and each verb group gets its own file —
-as `commands/server/` and `commands/instance/` do (`create`, `update`, `backup`,
-`config`, `lifecycle`, plus an `entry` module for the select/render helpers they
-share).
+as `commands/server/` (`create`, `update`, `backup`, `config`, `lifecycle`,
+`console`) and `commands/instance/` do, each over an `entry` module for the
+select/render helpers they share.
 
 **2. Wire it in** `crates/cli/src/main.rs`:
 

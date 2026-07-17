@@ -25,7 +25,11 @@ it's just as comfortable from a terminal as from a window.
 > of the game data (a running server keeps running — world saving pauses
 > around the archive), plus scheduled backups with retention pruning.
 > Instances have none — import/export is the intended replacement and is
-> still to come. **Content** —
+> still to come. Instance settings and worlds are **shared** across
+> instances (`sync`): `options.txt` and `servers.dat` copied and merged,
+> `saves`/`config`/`screenshots` linked into one store (symlinks; junctions
+> on Windows), with `sync status` link states and a per-instance `sync
+> adopt` migration for pre-existing folders. **Content** —
 > mods, resourcepacks, shaders, datapacks — is discovered on Modrinth (search,
 > browse, resolve versions) and installed into a server (mods, datapacks) or
 > instance (mods/resourcepacks/shaders/datapacks) from a project, a Modrinth

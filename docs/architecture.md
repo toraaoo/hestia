@@ -301,14 +301,18 @@ The subsystems behind the aggregate:
   `sync` pass re-mirrors any missing managed file at every start/launch (below).
   Installing a modpack's files and `overrides/` is the remaining materialize
   step.
-- **`sync`** (`Sync`) — shared settings/configs: a small set of game-relative
-  files/folders (`options.txt` key-merged, `servers.dat`, `config/`) propagated
-  across instances through a persistent `<data_home>/shared/` store (one flat
-  store, one `targets.json`). Copy-based, not symlinked: each instance keeps
-  its own copy under `data/`, and `apply` reconciles it with the store
-  newest-wins at every launch (hooked into `prepare_instance`, before the
-  content re-mirror). Sync is **instance-only**: servers are deliberately
-  decoupled from it. The managed content dirs and `saves/` are rejected as
+- **`sync`** (`Sync`) — shared settings/configs propagated across instances
+  through a persistent `<data_home>/shared/` store (one flat store, one
+  `targets.json`). Two target classes: **files are copied** (`options.txt`
+  key-merged, `servers.dat` newest-wins) and **folders are linked**
+  (`saves`, `config`, `screenshots` — a symlink on POSIX, a junction on
+  Windows, via `sync/link.rs`), so folder content is stored once and shared
+  live. `apply` runs at every launch (hooked into `prepare_instance`,
+  before the content re-mirror): it reconciles the file targets and links
+  each folder target under the empty-or-linked guard; `status` reports each
+  instance's per-target link state and `adopt` migrates existing folder
+  contents into the store. Sync is **instance-only**: servers are
+  deliberately decoupled from it. The managed content dirs are rejected as
   targets at the edge — see the decision note below.
 - **`servers`** / **`instances`** (`Servers`, `Instances`) — the persistent
   stores, one directory per entry beside a JSON record (`servers/<id>/server.json`
@@ -433,6 +437,12 @@ The subsystems behind the aggregate:
 > The client-side support flag is waived for datapacks: they run on a world's
 > server side, including a client's integrated server, so a source marking a
 > datapack client-unsupported must not block installing it on an instance.
+> With `saves/` linked (linked sync), an instance's datapack lives in the
+> *shared* world every instance opens — the pack itself is visible
+> everywhere, while its `content.json` provenance stays in the installing
+> instance, so other instances list it as untracked world data. Known
+> behavior, not a bug: the world carries its own datapacks, and exactly one
+> instance manages each.
 
 > **Skins follow Modrinth's shape, minus its couplings — and skip the CLI.**
 > Skin management (`skin.*`/`cape.*`) is a desktop-only surface: picking a skin
@@ -463,27 +473,41 @@ The subsystems behind the aggregate:
 > what is actually in use. The layout change is not migrated: pre-`data/`
 > entries must be recreated (or their game files moved into `data/` by hand).
 
-> **Shared settings/configs are copied, not symlinked.** Pandora shares files
-> across instances by symlinking whole folders (`saves`, `config`, …) into one
-> live directory. That model fights three things Hestia already decided: servers
-> run concurrently (two live processes on one symlinked `config/`/world corrupt
-> each other), the content system already owns `resourcepacks/`/`shaderpacks/`
-> (a symlink there would leak one entry's content to all), and backups archive
-> `data/` (a symlinked `saves` would be archived-through or clobbered on
-> restore). So `sync` is **copy-based**: each entry keeps its own physical copy
-> under `data/`, reconciled newest-wins with a persistent `shared/` store at
-> every start/launch. Nothing is live-shared, so concurrent writers are safe and
-> backups stay intact; the cost is that propagation is at-launch, not instant —
-> which settings don't need. Scope is settings/config only: the managed content
-> dirs and `saves/` are rejected as targets (the content system shares content;
-> worlds belong to backups). Pack selection (`options.txt`'s `resourcePacks`)
-> stays entry-local — merged like Pandora's, but never pushed to the store.
-> Sync is **instance-only, like Pandora (client-only)**: it is a client-side
-> quality-of-life feature, and servers are decoupled from it entirely. A
-> server's shareable state is its own `server.config.*` keys and
-> `server.properties` — per-server infrastructure, never a cross-entry store
-> (concurrent live servers must not share writable config). The store is one
-> flat `<data_home>/shared/` with one `targets.json`.
+> **Sync links folders and copies files — Pandora's split, adopted.** Sync
+> was originally all-copy ("copied, not symlinked"): each instance kept its
+> own physical copy of every target, reconciled newest-wins at launch. That
+> call was revisited for one reason — worlds. Copying `saves/` across
+> instances would duplicate gigabytes per instance and still leave each copy
+> divergent; linking stores a world **once** and shares it instantly. So
+> folder targets (`saves`, `config`, `screenshots`) are now **links** into
+> the flat `shared/` store (a symlink on POSIX, a junction on Windows —
+> junctions need no privileges), while file targets (`options.txt`
+> key-merged, `servers.dat`) keep the copy-reconcile: file symlinks need
+> elevation or developer mode on Windows, and merge semantics need a real
+> copy anyway. The original decision's three objections each found a
+> narrower home instead of blocking linking wholesale: concurrent live
+> servers → servers are decoupled from sync entirely (a server's shareable
+> state is its own `server.config.*` and `server.properties`, never a
+> cross-entry store); content ownership → the managed content dirs are still
+> rejected as targets (per-instance selection is impossible over a shared
+> dir); backups archiving through links → instance backups no longer exist.
+> The safety story is Pandora's **empty-or-linked guard**: a folder becomes
+> a link only when missing, empty, or already linked into a hestia store —
+> a non-empty real directory is never merged or overwritten, only surfaced
+> as `cannot_link` until an explicit `sync adopt` moves its entries into
+> the store (all-or-nothing per target, refused on any name collision).
+> Only links pointing into a hestia store (`…/shared/<target>`) are ever
+> touched, so a user's own symlinks survive; a stale store link after a
+> data-home move is relinked at the next launch. Pack selection
+> (`options.txt`'s `resourcePacks`) stays entry-local — merged like
+> Pandora's, but never pushed to the store. **Accepted risks, documented
+> not guarded:** two instances (or sessions) opening one shared world are
+> arbitrated only by Minecraft's own `session.lock`, and instances of
+> different versions/loaders writing one world can corrupt it — plus, until
+> import/export lands, instance data (the shared worlds store included) has
+> no backup story at all. Any code that walks or deletes an instance's
+> `data/` must treat a link as a boundary, never a directory to descend
+> into — `remove_dir_all`'s link-preserving behavior is pinned by a test.
 
 > **The id is a stable, slug-tagged token; rename is a metadata write.** The
 > `id` is the directory name (`servers/<id>/`), the supervisor's process key
@@ -682,11 +706,12 @@ supervises launched processes, and manages autostart. The only crate that links
   refuses a running instance unless `new_session` is set, then each launch is
   a new session; `stop` fans out to every session or a named one; `logs`
   targets the newest running or a named session — all thin over the
-  supervisor), `instance.backup.create|list|restore|remove` (create and
-  restore require the instance stopped), and `instance.config.get|set|list`
-  (`memory`/`jvm-args` only). Plus `sync.get|set` — the instance-only
-  shared-config target set (`set` validates each path: relative, no `..`
-  escape, not a launcher-managed dir). Plus
+  supervisor), and `instance.config.get|set|list` (`memory`/`jvm-args`
+  only). Plus `sync.get|set|status` and
+  `instance.sync.adopt` — the instance-only shared-config target set (`set`
+  validates each path: relative, no `..` escape, not a launcher-managed
+  dir; `status` reports each instance's folder link states; `adopt` moves a
+  stopped instance's existing folder contents into the shared store). Plus
   `content.sources|search|project|versions|modpack.resolve` — thin over the
   engine's content registry (an empty `source` selects the default; search,
   project, and versions are plain request/response, and `modpack.resolve`
@@ -788,8 +813,9 @@ the cross-entry shortcuts `start`/`stop`/`restart`/`logs`, `cache`, `config`,
 `sync`, `daemon` — each a module under `commands/` exposing a `Subcommand` enum and a
 `run()`. A domain with many verbs is a directory whose `mod.rs` holds only that
 grammar and dispatch, with one file per verb group: `server/` and `instance/`
-split into `create`, `update`, `backup`, `config`, `lifecycle` (plus the
-server's `console`) over a shared `entry` module, and `content/` splits along
+split into their verb groups (`create`, `update`, `config`, `lifecycle`,
+plus the server's `backup` and `console`) over a shared `entry` module, and
+`content/` splits along
 its own seam — `browse` (search a source) versus `manage` (install into an
 entry). Global flags (`--verbose`/`--quiet`/`--home`) sit on the root; `--home`
 is exported as `$HESTIA_HOME` and only takes effect when this invocation
@@ -995,9 +1021,10 @@ a console over rcon — one-shot `command`, followed logs, interactive
 `attach`); instance management (create a
 record, launch materialises client/libraries/assets and spawns the game as the
 signed-in account, and can run several concurrent sessions each with its own
-Log4j2-routed log); shared settings/configs across instances
-(copy-based `sync`, instance-only: `options.txt` merged, `config/` and others
-reconciled newest-wins with a `shared/` store at each launch); in-place version
+Log4j2-routed log); shared settings/configs across instances (instance-only
+`sync`: `options.txt`/`servers.dat` copied and merged, `saves`/`config`/
+`screenshots` linked into the `shared/` store — with `sync status` link
+states and per-instance `sync adopt` migration); in-place version
 updates for both (downgrades gated
 behind an explicit confirmation, the existing data backed up automatically
 first); backups for both (on-demand archive/restore with live progress — a
@@ -1049,8 +1076,8 @@ launching the desktop app.
   persistence) and `auth_oracle` (the account sign-in state machine); launch-plan
   assembly (classpath, placeholder substitution, the per-session log-config
   injection) is unit-tested in `minecraft/launch.rs`, the Log4Shell-safe
-  session config in `minecraft/log4j.rs`, the copy-based config reconciliation
-  and `options.txt` merge in `sync.rs`, the Modrinth mapping and `.mrpack`/URL
+  session config in `minecraft/log4j.rs`, the config reconciliation, folder
+  linking/adopt, and `options.txt` merge in `sync/`, the Modrinth mapping and `.mrpack`/URL
   parsing in `content/modrinth.rs`, and content version-pick / reference-matching
   in `content/install.rs`.
 - `crates/daemon/tests/e2e.rs` — a client-to-daemon round trip over a real

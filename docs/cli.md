@@ -226,6 +226,11 @@ hestia instance modded datapack remove terralith --world Alpha   # only that wor
 hestia instance modded datapack update [item]      # updates it in each world
 ```
 
+Worlds are shared across instances (linked `saves/` — see below), so a
+datapack installed into a world is active for every instance that opens that
+world. Only the installing instance tracks it; the others list it as
+untracked world data.
+
 ## Shortcuts
 
 One verb resolves a name across servers and instances, so you need not recall
@@ -272,31 +277,53 @@ hestia cache clear               # evict everything
 
 ## Shared settings/configs
 
-Settings and configs are shared across your instances automatically. Each
-instance keeps its **own copy** under `data/`; at every launch Hestia
-reconciles it with a shared store, newest edit wins (nothing is live-shared,
-so it is safe with concurrent processes). It works out of the box — no setup.
+Settings, configs — and worlds — are shared across your instances
+automatically. **File** targets (`options.txt`, key-merged with pack
+selection kept per-instance; `servers.dat`) are copied: each instance keeps
+its own copy, reconciled newest-wins at every launch. **Folder** targets
+(`saves`, `config`, `screenshots`) are **linked** into the shared store (a
+symlink on Linux/macOS, a junction on Windows): every instance opens the
+same physical folders, so a world exists once and appears everywhere
+instantly. It works out of the box — no setup.
+
+A folder is only linked when it is missing, empty, or already linked — an
+existing non-empty folder (a pre-linking instance's `saves/`, say) is never
+touched. `sync status` shows it as *cannot link*; move its contents into the
+store with `adopt`:
+
+```bash
+hestia sync status               # store path, targets, per-instance link state
+
+hestia instance modded sync adopt        # move existing folders into the store
+hestia instance modded sync adopt saves  # …or just one target
+```
+
+Adopt is all-or-nothing per folder: a name that already exists in the store
+(two instances with a world called `New World`) refuses that folder and
+lists the collisions — rename one, then retry. Nothing is ever merged or
+overwritten.
 
 Sync is **instance-only**: a server's configuration is per-server
 infrastructure, managed through `server <name> config …` and
-`server.properties`, and is never shared. Defaults: instances share
-`options.txt` (key-merged; pack selection stays per-instance), `servers.dat`,
-and `config/`.
+`server.properties`, and is never shared.
 
 ```bash
-hestia sync status               # the store path + the current targets
-
-hestia sync add screenshots --folder   # also share client screenshots
+hestia sync add screenshots --folder   # share a folder (linked)
+hestia sync add optionsof.txt          # share a file (copied)
 hestia sync remove servers.dat         # keep each instance's list local
-hestia sync remove <path>              # stop sharing a target
 ```
 
-Paths are **game-relative** (relative to `data/`). `add` shares a file;
-`--folder` shares a whole directory (every file under it, synced per file).
-`..` escapes and the launcher-managed directories (`mods`, `resourcepacks`,
-`shaderpacks`, `saves`, `backups`) are rejected — the content system already
-shares content, and worlds belong to backups. Propagation is at launch, not
-instant.
+Paths are **game-relative** (relative to `data/`). `..` escapes and the
+launcher-managed content directories (`mods`, `resourcepacks`, `shaderpacks`)
+are rejected — the content system already shares content. `saves` can only be
+shared as a folder (linked), never copied.
+
+Two things to know about shared worlds: opening the same world from two
+instances at once is only guarded by Minecraft's own `session.lock`, and
+instances on different versions or loaders writing one world can corrupt it.
+And until instance import/export lands, instance data — the shared worlds
+store included — has **no backup story**; keep your own copies of worlds you
+care about.
 
 ## Configuration
 
