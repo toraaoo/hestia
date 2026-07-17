@@ -60,7 +60,9 @@ export function SettingsPage() {
                     <FieldLabel htmlFor={field.name}>Theme</FieldLabel>
                     <Select
                       value={field.state.value}
-                      onValueChange={(v) => field.handleChange(v)}
+                      onValueChange={(v) => {
+                        if (v) field.handleChange(v);
+                      }}
                     >
                       <SelectTrigger id={field.name} className="w-full">
                         <SelectValue />

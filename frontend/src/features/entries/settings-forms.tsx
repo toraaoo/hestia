@@ -93,7 +93,9 @@ export function InstanceSettingsForm({ inst }: { inst: Instance }) {
                 <FieldLabel htmlFor={field.name}>Minecraft version</FieldLabel>
                 <Select
                   value={field.state.value}
-                  onValueChange={(v) => field.handleChange(v)}
+                  onValueChange={(v) => {
+                    if (v) field.handleChange(v);
+                  }}
                 >
                   <SelectTrigger id={field.name} className="w-full">
                     <SelectValue />
@@ -118,7 +120,9 @@ export function InstanceSettingsForm({ inst }: { inst: Instance }) {
                 <FieldLabel htmlFor={field.name}>Mod loader</FieldLabel>
                 <Select
                   value={field.state.value}
-                  onValueChange={(v) => field.handleChange(v)}
+                  onValueChange={(v) => {
+                    if (v) field.handleChange(v);
+                  }}
                 >
                   <SelectTrigger id={field.name} className="w-full capitalize">
                     <SelectValue />
@@ -260,9 +264,9 @@ export function ServerSettingsForm({ server }: { server: Server }) {
                 <FieldLabel htmlFor={field.name}>Backup schedule</FieldLabel>
                 <Select
                   value={field.state.value || 'off'}
-                  onValueChange={(v) =>
-                    field.handleChange(v === 'off' ? '' : v)
-                  }
+                  onValueChange={(v) => {
+                    if (v) field.handleChange(v === 'off' ? '' : v);
+                  }}
                 >
                   <SelectTrigger id={field.name} className="w-full">
                     <SelectValue />
