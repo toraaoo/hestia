@@ -122,3 +122,80 @@ export const contentProjects: ContentProject[] = [
 
 export const getProject = (id: string) =>
   contentProjects.find((p) => p.id === id);
+
+/** A downloadable version of a project, from `content.versions`. */
+export interface ContentVersion {
+  id: string;
+  version_number: string;
+  channel: 'release' | 'beta' | 'alpha';
+  game_versions: string[];
+  loaders: string[];
+  published_unix: number;
+  downloads: number;
+  filename: string;
+}
+
+/** Game versions a project's builds target, newest first. */
+const VERSION_GAMES = ['1.21.4', '1.21.3', '1.21.1', '1.21', '1.20.6'];
+
+/** The loaders a kind's files declare — mods pin a loader, the rest don't. */
+function kindLoaders(kind: ContentKind): string[] {
+  switch (kind) {
+    case 'mod':
+    case 'modpack':
+      return ['fabric'];
+    case 'datapack':
+      return ['datapack'];
+    case 'resourcepack':
+      return ['minecraft'];
+    case 'shader':
+      return ['iris', 'optifine'];
+  }
+}
+
+/**
+ * A deterministic version list for a project, newest first — the stand-in for
+ * `content.versions`. The three builds descend in version and reach back one
+ * more game version each, so older builds cover a wider compatibility range.
+ */
+export function projectVersions(project: ContentProject): ContentVersion[] {
+  const loaders = kindLoaders(project.kind);
+  return [0, 1, 2].map((seq) => ({
+    id: `${project.id}-v${seq}`,
+    version_number: `1.${5 - seq}.${(project.id.length + seq) % 9}`,
+    channel: seq === 2 ? 'beta' : 'release',
+    game_versions: VERSION_GAMES.slice(0, 3 + seq),
+    loaders,
+    published_unix: project.updated_unix - seq * 18 * DAY,
+    downloads: Math.round(project.downloads / (seq + 3)),
+    filename: `${project.id}-1.${5 - seq}.${(project.id.length + seq) % 9}.jar`,
+  }));
+}
+
+/** Required-dependency edges — one project pulls another in on install. */
+const REQUIRES: Record<string, string[]> = {
+  create: ['fabric-api'],
+  lithium: ['fabric-api'],
+  iris: ['sodium'],
+  'voice-chat': ['fabric-api'],
+};
+
+/**
+ * Resolves a project's required dependencies breadth-first, mirroring the
+ * daemon's install-time resolve: transitive, de-duplicated, and never
+ * including the project itself.
+ */
+export function resolveDependencies(projectId: string): ContentProject[] {
+  const seen = new Set<string>([projectId]);
+  const out: ContentProject[] = [];
+  const queue = [...(REQUIRES[projectId] ?? [])];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const dep = getProject(id);
+    if (dep) out.push(dep);
+    queue.push(...(REQUIRES[id] ?? []));
+  }
+  return out;
+}

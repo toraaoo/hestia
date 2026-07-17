@@ -8,6 +8,8 @@ import {
   UploadSimpleIcon,
 } from '@phosphor-icons/react';
 
+import { useState } from 'react';
+
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { entryIcon } from '@/components/icons';
@@ -16,6 +18,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  ContentInstallModal,
+  instanceTarget,
+} from '@/features/content/install-modal';
 import {
   BackupList,
   ContentSection,
@@ -66,6 +72,7 @@ export function InstanceDetailPage({
   onContentKindChange: (kind?: ContentKind) => void;
 }) {
   const inst = getInstance(id);
+  const [addingContent, setAddingContent] = useState(false);
 
   if (!inst) {
     return (
@@ -213,7 +220,12 @@ export function InstanceDetailPage({
             kind={contentKind}
             onKindChange={onContentKindChange}
             action={
-              <Button size="sm" variant="outline" data-icon="inline-start">
+              <Button
+                size="sm"
+                variant="outline"
+                data-icon="inline-start"
+                onClick={() => setAddingContent(true)}
+              >
                 <PlusIcon weight="bold" />
                 Add content
               </Button>
@@ -262,6 +274,12 @@ export function InstanceDetailPage({
           <InstanceSettingsForm inst={inst} />
         </TabsContent>
       </Tabs>
+
+      <ContentInstallModal
+        entry={instanceTarget(inst)}
+        open={addingContent}
+        onOpenChange={setAddingContent}
+      />
     </div>
   );
 }

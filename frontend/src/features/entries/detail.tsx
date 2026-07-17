@@ -6,7 +6,7 @@ import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { kindInfo } from '@/features/browse/kinds';
+import { kindInfo } from '@/features/content/kinds';
 import type { Backup, InstalledContent } from '@/features/entries/mock';
 import { agoLabel, bytes } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';

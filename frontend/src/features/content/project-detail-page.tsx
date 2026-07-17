@@ -1,4 +1,5 @@
 import { DownloadSimpleIcon, HeartIcon, PlusIcon } from '@phosphor-icons/react';
+import { useState } from 'react';
 
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
@@ -7,16 +8,11 @@ import { Stat } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { kindInfo } from '@/features/browse/kinds';
-import { getProject } from '@/features/browse/mock';
+import { ContentInstallModal } from '@/features/content/install-modal';
+import { kindInfo } from '@/features/content/kinds';
+import { getProject, projectVersions } from '@/features/content/mock';
 import { agoLabel, compact } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
-
-const versions = [
-  { id: 'v1', name: '0.6.13', game: '1.21.4', loader: 'fabric', when: 5 },
-  { id: 'v2', name: '0.6.12', game: '1.21.3', loader: 'fabric', when: 26 },
-  { id: 'v3', name: '0.6.9', game: '1.21.1', loader: 'fabric', when: 58 },
-];
 
 export type ProjectTab = 'description' | 'versions';
 
@@ -32,6 +28,8 @@ export function ProjectDetailPage({
   onTabChange: (tab: ProjectTab) => void;
 }) {
   const project = getProject(id);
+  const [installVersion, setInstallVersion] = useState<string | null>(null);
+  const [installOpen, setInstallOpen] = useState(false);
 
   if (!project || project.kind !== kind) {
     return (
@@ -42,6 +40,11 @@ export function ProjectDetailPage({
   }
 
   const parent = kindInfo[kind];
+  const versions = projectVersions(project);
+  const openInstall = (versionId?: string) => {
+    setInstallVersion(versionId ?? null);
+    setInstallOpen(true);
+  };
 
   return (
     <div className="flex min-h-full flex-col">
@@ -63,6 +66,7 @@ export function ProjectDetailPage({
           <Button
             data-icon="inline-start"
             className="bg-ember text-ember-foreground hover:bg-ember/90"
+            onClick={() => openInstall()}
           >
             <PlusIcon weight="bold" />
             Install
@@ -120,13 +124,28 @@ export function ProjectDetailPage({
             {versions.map((v) => (
               <div key={v.id} className="flex items-center gap-3 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm">{v.name}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{v.version_number}</span>
+                    {v.channel !== 'release' && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] capitalize"
+                      >
+                        {v.channel}
+                      </Badge>
+                    )}
+                  </div>
                   <div className="font-mono text-[11px] text-muted-foreground">
-                    {v.loader} · {v.game} ·{' '}
-                    {agoLabel(Math.floor(Date.now() / 1000 - v.when * 86_400))}
+                    {v.loaders.join(', ')} · {v.game_versions.join(', ')} ·{' '}
+                    {agoLabel(v.published_unix)}
                   </div>
                 </div>
-                <Button variant="outline" size="sm" data-icon="inline-start">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-icon="inline-start"
+                  onClick={() => openInstall(v.id)}
+                >
                   <PlusIcon weight="bold" />
                   Install
                 </Button>
@@ -135,6 +154,13 @@ export function ProjectDetailPage({
           </div>
         </TabsContent>
       </Tabs>
+
+      <ContentInstallModal
+        project={project}
+        versionId={installVersion ?? undefined}
+        open={installOpen}
+        onOpenChange={setInstallOpen}
+      />
     </div>
   );
 }

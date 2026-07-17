@@ -4,6 +4,7 @@ import {
   PlusIcon,
   PowerIcon,
 } from '@phosphor-icons/react';
+import { useState } from 'react';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { entryIcon } from '@/components/icons';
@@ -13,6 +14,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  ContentInstallModal,
+  serverTarget,
+} from '@/features/content/install-modal';
 import {
   BackupList,
   ContentSection,
@@ -57,6 +62,7 @@ export function ServerDetailPage({
   onContentKindChange: (kind?: ContentKind) => void;
 }) {
   const server = getServer(id);
+  const [addingContent, setAddingContent] = useState(false);
 
   if (!server) {
     return (
@@ -205,7 +211,12 @@ export function ServerDetailPage({
             kind={contentKind}
             onKindChange={onContentKindChange}
             action={
-              <Button size="sm" variant="outline" data-icon="inline-start">
+              <Button
+                size="sm"
+                variant="outline"
+                data-icon="inline-start"
+                onClick={() => setAddingContent(true)}
+              >
                 <PlusIcon weight="bold" />
                 Add content
               </Button>
@@ -232,6 +243,12 @@ export function ServerDetailPage({
           <ServerSettingsForm server={server} />
         </TabsContent>
       </Tabs>
+
+      <ContentInstallModal
+        entry={serverTarget(server)}
+        open={addingContent}
+        onOpenChange={setAddingContent}
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { BrowsePage } from '@/features/browse/browse-page';
-import { kindBySlug } from '@/features/browse/kinds';
+import { BrowsePage } from '@/features/content/browse-page';
+import { kindBySlug } from '@/features/content/kinds';
 
 export const Route = createFileRoute('/_app/browse/$kind/')({
   beforeLoad: ({ params }) => {

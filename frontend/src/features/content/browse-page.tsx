@@ -3,9 +3,9 @@ import { Link } from '@tanstack/react-router';
 import { useSearch } from '@/components/app-shell/search-context';
 import { chipClass } from '@/components/chip';
 import { Page } from '@/components/page';
-import { ContentCard } from '@/features/browse/content-card';
-import { contentKinds, kindInfo } from '@/features/browse/kinds';
-import { contentProjects } from '@/features/browse/mock';
+import { ContentCard } from '@/features/content/content-card';
+import { contentKinds, kindInfo } from '@/features/content/kinds';
+import { contentProjects } from '@/features/content/mock';
 import type { ContentKind } from '@/lib/mock';
 
 export function BrowsePage({ kind }: { kind?: ContentKind }) {
