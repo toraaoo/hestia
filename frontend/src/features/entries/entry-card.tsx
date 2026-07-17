@@ -5,6 +5,7 @@ import { entryIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusDot } from '@/components/ui/status-dot';
 import { cn } from '@/lib/utils';
 
@@ -59,15 +60,30 @@ function ActionButton({
 }) {
   if (entry.running) {
     return (
-      <Button
-        variant="outline"
-        size={size}
-        data-icon="inline-start"
-        onClick={(e) => e.preventDefault()}
-      >
-        <PowerIcon weight="bold" />
-        Stop
-      </Button>
+      <ConfirmDialog
+        trigger={
+          <Button
+            variant="outline"
+            size={size}
+            data-icon="inline-start"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <PowerIcon weight="bold" />
+            Stop
+          </Button>
+        }
+        title={`Stop ${entry.name}?`}
+        description={
+          entry.kind === 'server'
+            ? 'The server shuts down and any connected players are disconnected.'
+            : 'The running game session is closed. Unsaved progress may be lost.'
+        }
+        confirmLabel="Stop"
+        onConfirm={() => {}}
+      />
     );
   }
   return (

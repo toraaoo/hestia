@@ -1,9 +1,11 @@
 import { BroomIcon, CoffeeIcon, TrashIcon } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
+import { useState } from 'react';
 
 import { Page } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Field,
   FieldGroup,
@@ -18,6 +20,8 @@ import { useAppForm } from '@/hooks/form';
 import { daemon } from '@/lib/mock';
 
 export function SettingsPage() {
+  const [runtimes, setRuntimes] = useState(javaRuntimes);
+
   const form = useAppForm({
     defaultValues: settingsDefaults,
     validationLogic: revalidateLogic(),
@@ -103,7 +107,7 @@ export function SettingsPage() {
               <Field>
                 <FieldLabel>Installed runtimes</FieldLabel>
                 <div className="divide-y divide-border border border-border">
-                  {javaRuntimes.map((rt) => (
+                  {runtimes.map((rt) => (
                     <div
                       key={`${rt.vendor}-${rt.major}`}
                       className="flex items-center gap-3 px-3 py-2"
@@ -118,14 +122,35 @@ export function SettingsPage() {
                         </div>
                       </div>
                       {rt.in_use && <Badge variant="secondary">In use</Badge>}
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Uninstall runtime"
-                        disabled={rt.in_use}
-                      >
-                        <TrashIcon className="size-4" />
-                      </Button>
+                      <ConfirmDialog
+                        trigger={
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="Uninstall runtime"
+                            disabled={rt.in_use}
+                          >
+                            <TrashIcon className="size-4" />
+                          </Button>
+                        }
+                        title="Uninstall runtime?"
+                        description={
+                          <>
+                            <span className="font-medium text-foreground">
+                              {rt.vendor} {rt.major}
+                            </span>{' '}
+                            will be removed. Entries that need it reinstall it
+                            on the next start.
+                          </>
+                        }
+                        destructive
+                        confirmLabel="Uninstall"
+                        onConfirm={() =>
+                          setRuntimes((rts) =>
+                            rts.filter((r) => r.major !== rt.major),
+                          )
+                        }
+                      />
                     </div>
                   ))}
                 </div>
@@ -160,10 +185,22 @@ export function SettingsPage() {
                     1.8 GB
                   </span>
                 </FieldLabel>
-                <Button variant="outline" size="sm" data-icon="inline-start">
-                  <BroomIcon />
-                  Clear cache
-                </Button>
+                <ConfirmDialog
+                  trigger={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-icon="inline-start"
+                    >
+                      <BroomIcon />
+                      Clear cache
+                    </Button>
+                  }
+                  title="Clear download cache?"
+                  description="Frees the cached downloads. Files are re-fetched from the network the next time they're needed."
+                  confirmLabel="Clear cache"
+                  onConfirm={() => {}}
+                />
               </Field>
 
               <form.AppField name="shared">
@@ -183,9 +220,17 @@ export function SettingsPage() {
                     v{daemon.version} · up {daemon.uptime}
                   </span>
                 </FieldLabel>
-                <Button variant="outline" size="sm">
-                  Restart daemon
-                </Button>
+                <ConfirmDialog
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      Restart daemon
+                    </Button>
+                  }
+                  title="Restart the daemon?"
+                  description="The launcher briefly disconnects while it restarts. Running servers and instances keep running."
+                  confirmLabel="Restart"
+                  onConfirm={() => {}}
+                />
               </Field>
             </FieldGroup>
           </FieldSet>

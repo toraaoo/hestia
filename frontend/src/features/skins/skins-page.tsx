@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 
 import { Page, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { SkinDraft } from '@/features/skins/edit-skin-modal';
 import { EditSkinModal } from '@/features/skins/edit-skin-modal';
 import type { Skin } from '@/features/skins/mock';
@@ -23,6 +24,7 @@ export function SkinsPage() {
     skin: Skin | null;
     texture?: string;
   } | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<Skin | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const library = [...custom, ...defaultSkins];
@@ -118,7 +120,7 @@ export function SkinsPage() {
                     onSelect={() => setSelectedId(skin.id)}
                     onEquip={() => equip(skin.id)}
                     onEdit={() => setModal({ skin })}
-                    onRemove={() => removeSkin(skin.id)}
+                    onRemove={() => setPendingRemove(skin)}
                   />
                 ))}
               </SkinGrid>
@@ -150,6 +152,28 @@ export function SkinsPage() {
         skin={modal?.skin ?? null}
         initialTexture={modal?.texture}
         onSave={saveDraft}
+      />
+
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        onOpenChange={(open) => !open && setPendingRemove(null)}
+        title="Delete skin?"
+        description={
+          pendingRemove && (
+            <>
+              <span className="font-medium text-foreground">
+                {pendingRemove.name}
+              </span>{' '}
+              is removed from your saved skins.
+            </>
+          )
+        }
+        destructive
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (pendingRemove) removeSkin(pendingRemove.id);
+          setPendingRemove(null);
+        }}
       />
     </Page>
   );

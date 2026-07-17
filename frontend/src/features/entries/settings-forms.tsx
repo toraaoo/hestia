@@ -2,6 +2,7 @@ import { ArrowsClockwiseIcon, TrashIcon } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { FieldGroup, FieldSeparator } from '@/components/ui/field';
 import type { Instance, Server } from '@/features/entries/mock';
 import {
@@ -17,10 +18,12 @@ const LOADERS = ['vanilla', 'fabric'];
 const INTERVALS = ['', '6h', '12h', '1d'];
 
 function DangerZone({
-  removeLabel,
+  noun,
+  name,
   children,
 }: {
-  removeLabel: string;
+  noun: 'server' | 'instance';
+  name: string;
   children?: React.ReactNode;
 }) {
   return (
@@ -32,10 +35,25 @@ function DangerZone({
           Change version
         </Button>
         {children}
-        <Button variant="destructive" size="sm" data-icon="inline-start">
-          <TrashIcon />
-          {removeLabel}
-        </Button>
+        <ConfirmDialog
+          trigger={
+            <Button variant="destructive" size="sm" data-icon="inline-start">
+              <TrashIcon />
+              Remove {noun}
+            </Button>
+          }
+          title={`Remove ${noun}?`}
+          description={
+            <>
+              <span className="font-medium text-foreground">{name}</span> and
+              all its data — worlds, backups, and installed content — are
+              permanently deleted. This cannot be undone.
+            </>
+          }
+          destructive
+          confirmLabel={`Remove ${noun}`}
+          onConfirm={() => {}}
+        />
       </div>
     </>
   );
@@ -110,7 +128,7 @@ export function InstanceSettingsForm({ inst }: { inst: Instance }) {
           )}
         </form.AppField>
 
-        <DangerZone removeLabel="Remove instance" />
+        <DangerZone noun="instance" name={inst.name} />
       </FieldGroup>
     </form>
   );
@@ -185,7 +203,7 @@ export function ServerSettingsForm({ server }: { server: Server }) {
           </form.AppField>
         </div>
 
-        <DangerZone removeLabel="Remove server" />
+        <DangerZone noun="server" name={server.name} />
       </FieldGroup>
     </form>
   );

@@ -1,11 +1,12 @@
 import { DotsThreeIcon, TrashIcon } from '@phosphor-icons/react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { chipClass } from '@/components/chip';
 import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { kindInfo } from '@/features/content/kinds';
 import type { Backup, InstalledContent } from '@/features/entries/mock';
 import { agoLabel, bytes } from '@/lib/format';
@@ -59,8 +60,12 @@ export function ContentSection({
   onKindChange: (kind?: ContentKind) => void;
   action?: ReactNode;
 }) {
-  const filtered = kind ? items.filter((c) => c.kind === kind) : items;
-  const count = (k: ContentKind) => items.filter((c) => c.kind === k).length;
+  const [list, setList] = useState(items);
+  const remove = (item: InstalledContent) =>
+    setList((l) => l.filter((c) => c.id !== item.id));
+
+  const filtered = kind ? list.filter((c) => c.kind === kind) : list;
+  const count = (k: ContentKind) => list.filter((c) => c.kind === k).length;
 
   return (
     <>
@@ -90,13 +95,19 @@ export function ContentSection({
       {filtered.length === 0 && kind ? (
         <Empty>No {kindInfo[kind].label.toLowerCase()} installed.</Empty>
       ) : (
-        <ContentList items={filtered} />
+        <ContentList items={filtered} onRemove={remove} />
       )}
     </>
   );
 }
 
-export function ContentList({ items }: { items: InstalledContent[] }) {
+export function ContentList({
+  items,
+  onRemove,
+}: {
+  items: InstalledContent[];
+  onRemove?: (item: InstalledContent) => void;
+}) {
   if (items.length === 0) {
     return <Empty>No content installed yet. Add some from Browse.</Empty>;
   }
@@ -125,9 +136,24 @@ export function ContentList({ items }: { items: InstalledContent[] }) {
                 {contentKindLabel[c.kind]} · {c.source} · {c.version}
               </div>
             </div>
-            <Button variant="ghost" size="icon-sm" aria-label="Remove">
-              <TrashIcon className="size-4" />
-            </Button>
+            <ConfirmDialog
+              trigger={
+                <Button variant="ghost" size="icon-sm" aria-label="Remove">
+                  <TrashIcon className="size-4" />
+                </Button>
+              }
+              title="Remove content?"
+              description={
+                <>
+                  <span className="font-medium text-foreground">{c.name}</span>{' '}
+                  will be removed. Its files are deleted; the change applies at
+                  the next start.
+                </>
+              }
+              destructive
+              confirmLabel="Remove"
+              onConfirm={() => onRemove?.(c)}
+            />
             <Button variant="ghost" size="icon-sm" aria-label="More">
               <DotsThreeIcon weight="bold" className="size-4" />
             </Button>
@@ -139,12 +165,14 @@ export function ContentList({ items }: { items: InstalledContent[] }) {
 }
 
 export function BackupList({ backups }: { backups: Backup[] }) {
-  if (backups.length === 0) {
+  const [list, setList] = useState(backups);
+
+  if (list.length === 0) {
     return <Empty>No backups yet. Create one to archive this world.</Empty>;
   }
   return (
     <div className="divide-y divide-border border border-border">
-      {backups.map((b) => (
+      {list.map((b) => (
         <div key={b.id} className="flex items-center gap-3 px-3 py-2.5">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -157,12 +185,45 @@ export function BackupList({ backups }: { backups: Backup[] }) {
               {bytes(b.size_bytes)}
             </div>
           </div>
-          <Button variant="outline" size="sm">
-            Restore
-          </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Delete backup">
-            <TrashIcon className="size-4" />
-          </Button>
+          <ConfirmDialog
+            trigger={
+              <Button variant="outline" size="sm">
+                Restore
+              </Button>
+            }
+            title="Restore backup?"
+            description={
+              <>
+                This overwrites the current game data with the archive from{' '}
+                <span className="font-medium text-foreground">
+                  {agoLabel(b.created_unix)}
+                </span>
+                . The current data is backed up first.
+              </>
+            }
+            confirmLabel="Restore"
+            onConfirm={() => {}}
+          />
+          <ConfirmDialog
+            trigger={
+              <Button variant="ghost" size="icon-sm" aria-label="Delete backup">
+                <TrashIcon className="size-4" />
+              </Button>
+            }
+            title="Delete backup?"
+            description={
+              <>
+                The archive from{' '}
+                <span className="font-medium text-foreground">
+                  {agoLabel(b.created_unix)}
+                </span>{' '}
+                will be permanently deleted.
+              </>
+            }
+            destructive
+            confirmLabel="Delete"
+            onConfirm={() => setList((l) => l.filter((x) => x.id !== b.id))}
+          />
         </div>
       ))}
     </div>

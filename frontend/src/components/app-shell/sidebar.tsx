@@ -11,7 +11,9 @@ import {
   TShirtIcon,
 } from '@phosphor-icons/react';
 import { Link, useLocation } from '@tanstack/react-router';
+import { useState } from 'react';
 
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -180,51 +182,64 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 
 function AccountMenu() {
   const others = accounts.filter((a) => !a.active);
+  const [signingOut, setSigningOut] = useState(false);
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <button
-            type="button"
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset aria-expanded:bg-muted"
-          >
-            <span className="grid size-7 shrink-0 place-items-center bg-muted text-[11px] font-semibold text-muted-foreground ring-1 ring-border">
-              {account.name.slice(0, 2).toUpperCase()}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm">{account.name}</span>
-              <span className="block truncate text-[11px] text-muted-foreground">
-                Microsoft account
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <button
+              type="button"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset aria-expanded:bg-muted"
+            >
+              <span className="grid size-7 shrink-0 place-items-center bg-muted text-[11px] font-semibold text-muted-foreground ring-1 ring-border">
+                {account.name.slice(0, 2).toUpperCase()}
               </span>
-            </span>
-            <CaretUpDownIcon className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-        }
-      />
-      <DropdownMenuContent side="top" align="start" className="w-48">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Signed in as {account.name}</DropdownMenuLabel>
-          {others.map((a) => (
-            <DropdownMenuItem key={a.uuid}>
-              <span className="grid size-5 shrink-0 place-items-center bg-muted text-[9px] font-semibold text-muted-foreground ring-1 ring-border">
-                {a.name.slice(0, 2).toUpperCase()}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm">{account.name}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  Microsoft account
+                </span>
               </span>
-              Switch to {a.name}
+              <CaretUpDownIcon className="size-4 shrink-0 text-muted-foreground" />
+            </button>
+          }
+        />
+        <DropdownMenuContent side="top" align="start" className="w-48">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Signed in as {account.name}</DropdownMenuLabel>
+            {others.map((a) => (
+              <DropdownMenuItem key={a.uuid}>
+                <span className="grid size-5 shrink-0 place-items-center bg-muted text-[9px] font-semibold text-muted-foreground ring-1 ring-border">
+                  {a.name.slice(0, 2).toUpperCase()}
+                </span>
+                Switch to {a.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem>
+              <PlusIcon />
+              Add account
             </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <PlusIcon />
-            Add account
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <SignOutIcon />
-            Sign out
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+            <DropdownMenuItem onClick={() => setSigningOut(true)}>
+              <SignOutIcon />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <ConfirmDialog
+        open={signingOut}
+        onOpenChange={setSigningOut}
+        title={`Sign out ${account.name}?`}
+        description="You'll need to sign in with Microsoft again to launch as this account."
+        destructive
+        confirmLabel="Sign out"
+        onConfirm={() => setSigningOut(false)}
+      />
+    </>
   );
 }

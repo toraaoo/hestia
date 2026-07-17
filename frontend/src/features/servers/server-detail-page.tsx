@@ -11,6 +11,7 @@ import { entryIcon } from '@/components/icons';
 import { Stat, TabCount } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -106,10 +107,18 @@ export function ServerDetailPage({
               <FolderOpenIcon className="size-4" />
             </Button>
             {server.running ? (
-              <Button variant="outline" data-icon="inline-start">
-                <PowerIcon weight="bold" />
-                Stop
-              </Button>
+              <ConfirmDialog
+                trigger={
+                  <Button variant="outline" data-icon="inline-start">
+                    <PowerIcon weight="bold" />
+                    Stop
+                  </Button>
+                }
+                title={`Stop ${server.name}?`}
+                description="The server shuts down and any connected players are disconnected."
+                confirmLabel="Stop"
+                onConfirm={() => {}}
+              />
             ) : (
               <Button
                 disabled={!server.ready}
