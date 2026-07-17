@@ -179,6 +179,20 @@ export const instanceMutations = {
           api.profiles.edit(id, name, add, remove),
         invalidates: () => [keys.instances.profiles(id)],
       }),
+    /** Capture the profile's settings store; the instance must be stopped. */
+    capture: (id: string) =>
+      mutation<void, string>({
+        mutationKey: [...keys.instances.profiles(id), 'capture'],
+        mutationFn: (name) => api.profiles.capture(id, name),
+        invalidates: () => [keys.instances.profiles(id)],
+      }),
+    /** Release the captured store; the instance must be stopped. */
+    release: (id: string) =>
+      mutation<void, string>({
+        mutationKey: [...keys.instances.profiles(id), 'release'],
+        mutationFn: (name) => api.profiles.release(id, name),
+        invalidates: () => [keys.instances.profiles(id)],
+      }),
     /**
      * Apply a global profile into the pool — a content job; installs are
      * tagged with the profile and never removed by a later apply.
@@ -360,6 +374,16 @@ export function useUseInstanceProfile(id: string) {
 
 export function useEditInstanceProfile(id: string) {
   return useMutation(instanceMutations.profiles.edit(id));
+}
+
+/** Capture the profile's settings store; the instance must be stopped. */
+export function useCaptureInstanceProfile(id: string) {
+  return useMutation(instanceMutations.profiles.capture(id));
+}
+
+/** Release the captured store; the instance must be stopped. */
+export function useReleaseInstanceProfile(id: string) {
+  return useMutation(instanceMutations.profiles.release(id));
 }
 
 /** Apply a global profile into the instance's pool (a content job). */

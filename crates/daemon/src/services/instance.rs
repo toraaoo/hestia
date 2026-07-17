@@ -5,17 +5,17 @@
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList, InstanceConfigListResult,
     InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch,
-    InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLogs, InstanceProfileCreate,
-    InstanceProfileEdit, InstanceProfileList, InstanceProfileListResult, InstanceProfileRemove,
-    InstanceProfileRename, InstanceProfileUse, InstanceRemove, InstanceRename, InstanceResolve,
-    InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds,
-    InstanceWorldsResult,
+    InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLogs, InstanceProfileCapture,
+    InstanceProfileCreate, InstanceProfileEdit, InstanceProfileList, InstanceProfileListResult,
+    InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename, InstanceProfileUse,
+    InstanceRemove, InstanceRename, InstanceResolve, InstanceStop, InstanceUpdate,
+    InstanceUpdateResult, InstanceVersions, InstanceWorlds, InstanceWorldsResult,
 };
 use proto::minecraft::{ConfigEntry, FlavorsResult, VersionsResult};
 use proto::process::ProcessLogsResult;
 use proto::Empty;
 
-use super::guards::{ensure_no_content, find_instance};
+use super::guards::{ensure_no_content, ensure_stopped, find_instance};
 use crate::runtime::{instance_process_id, Channels, ServiceError};
 
 pub(super) fn register(on: &mut Channels<'_>) {
@@ -348,5 +348,40 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .edit_instance_profile(&record.id, &p.name, &p.add, &p.remove)
             .map_err(|e| ServiceError::bad_request(format!("{e:#}")))
+    });
+
+    // Capture/release move real settings trees (and a released store may be
+    // what a live session's `config` link writes through), so both require a
+    // stopped instance — unlike the metadata-only CRUD above.
+    on.handle::<InstanceProfileCapture, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        ensure_stopped(
+            &ctx,
+            &instance_process_id(&record.id),
+            "instance",
+            &record.name,
+        )?;
+        ctx.runtime
+            .engine()
+            .capture_instance_profile(&record.id, &p.name)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+        tracing::info!(instance = %record.id, profile = %p.name, "profile settings captured");
+        Ok(Empty {})
+    });
+
+    on.handle::<InstanceProfileRelease, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        ensure_stopped(
+            &ctx,
+            &instance_process_id(&record.id),
+            "instance",
+            &record.name,
+        )?;
+        ctx.runtime
+            .engine()
+            .release_instance_profile(&record.id, &p.name)
+            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+        tracing::info!(instance = %record.id, profile = %p.name, "profile settings released");
+        Ok(Empty {})
     });
 }

@@ -63,6 +63,11 @@ export interface InstanceLaunchDone {
 export interface ContentProfile {
   name: string;
   members: string[];
+  /**
+   * Whether the profile owns a captured settings store: launches under it
+   * sync settings against the profile's own store instead of the global one.
+   */
+  captured: boolean;
 }
 
 export interface InstanceProfiles {

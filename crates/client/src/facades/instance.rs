@@ -11,12 +11,12 @@ use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo,
     InstanceLaunch, InstanceLaunchParams, InstanceList, InstanceLogs, InstanceLogsParams,
-    InstanceProfileCreate, InstanceProfileCreateParams, InstanceProfileEdit,
-    InstanceProfileEditParams, InstanceProfileList, InstanceProfileRef, InstanceProfileRemove,
-    InstanceProfileRename, InstanceProfileRenameParams, InstanceProfileUse, InstanceRef,
-    InstanceRemove, InstanceRename, InstanceRenameParams, InstanceResolve, InstanceStop,
-    InstanceStopParams, InstanceUpdate, InstanceUpdateParams, InstanceVersions, InstanceWorlds,
-    Profile,
+    InstanceProfileCapture, InstanceProfileCreate, InstanceProfileCreateParams,
+    InstanceProfileEdit, InstanceProfileEditParams, InstanceProfileList, InstanceProfileRef,
+    InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename,
+    InstanceProfileRenameParams, InstanceProfileUse, InstanceRef, InstanceRemove, InstanceRename,
+    InstanceRenameParams, InstanceResolve, InstanceStop, InstanceStopParams, InstanceUpdate,
+    InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams,
@@ -344,6 +344,25 @@ impl Instance<'_> {
             remove,
         };
         self.session.call::<InstanceProfileEdit>(&params).await
+    }
+
+    /// Capture the profile's own settings store (snapshotted from the global
+    /// one); launches under it then sync settings against the captured store.
+    /// The instance must be stopped.
+    pub async fn capture_profile(&self, instance: &str, name: &str) -> Result<(), IpcError> {
+        self.session
+            .call::<InstanceProfileCapture>(&profile_ref(instance, name))
+            .await?;
+        Ok(())
+    }
+
+    /// Delete the profile's captured store; it inherits the global store
+    /// again. The instance must be stopped.
+    pub async fn release_profile(&self, instance: &str, name: &str) -> Result<(), IpcError> {
+        self.session
+            .call::<InstanceProfileRelease>(&profile_ref(instance, name))
+            .await?;
+        Ok(())
     }
 
     /// Apply a global profile into the instance's pool — a content job:

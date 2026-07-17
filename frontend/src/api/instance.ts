@@ -215,6 +215,23 @@ export const profiles = {
   },
 
   /**
+   * Capture the profile's own settings store (snapshotted from the global
+   * one); launches under it then sync settings against the captured store.
+   * The instance must be stopped.
+   */
+  async capture(instance: string, name: string): Promise<void> {
+    await call('instance.profile.capture', { instance, name });
+  },
+
+  /**
+   * Delete the profile's captured store; it inherits the global store again.
+   * The instance must be stopped.
+   */
+  async release(instance: string, name: string): Promise<void> {
+    await call('instance.profile.release', { instance, name });
+  },
+
+  /**
    * Apply a **global** profile into the instance's pool — a content job:
    * references not already present install at their newest compatible
    * version, tagged `profile:<name>`; incompatible ones come back as
