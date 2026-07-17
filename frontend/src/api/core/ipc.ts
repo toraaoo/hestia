@@ -64,6 +64,23 @@ export async function call<T>(
   }
 }
 
+/**
+ * Invoke a bespoke shell command (not the generic `ipc_call` bridge). Reserved
+ * for the few flows the frontend cannot drive over the socket alone — sign-in,
+ * which opens a native webview and reads its redirect. Rejections share
+ * `ipc_call`'s `{ code, message }` shape.
+ */
+export async function invokeCommand<T>(
+  command: string,
+  args: Record<string, unknown> = {},
+): Promise<T> {
+  try {
+    return await invoke<T>(command, args);
+  } catch (raw) {
+    throw toHestiaError(raw);
+  }
+}
+
 /** Like `call`, but a `not_found` answer becomes `null` instead of throwing. */
 export async function tryCall<T>(
   channel: string,

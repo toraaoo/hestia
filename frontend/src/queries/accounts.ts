@@ -19,6 +19,16 @@ export const accountQueries = {
 };
 
 export const accountMutations = {
+  /**
+   * The desktop sign-in: one shell command drives the whole sisu flow behind a
+   * native Microsoft window. Resolves to the new account, or `null` on cancel.
+   */
+  loginSisu: () =>
+    mutation<Account | null, void>({
+      mutationKey: [...keys.accounts.all, 'login', 'sisu'],
+      mutationFn: () => api.loginSisu(),
+      invalidates: () => [keys.accounts.all],
+    }),
   beginLogin: () =>
     mutation<LoginBegin, LoginMethod>({
       mutationKey: [...keys.accounts.all, 'login', 'begin'],
@@ -47,6 +57,10 @@ export const accountMutations = {
 
 export function useAccounts() {
   return useQuery(accountQueries.list());
+}
+
+export function useLoginSisu() {
+  return useMutation(accountMutations.loginSisu());
 }
 
 export function useBeginLogin() {

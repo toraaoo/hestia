@@ -6,13 +6,24 @@
  * `user_code`/`verification_uri` instead — `completeLogin` then polls until
  * the user approves, hence the long timeout on both variants.
  */
-import { call } from './core/ipc';
+import { call, invokeCommand } from './core/ipc';
 import type {
   Account,
   AccountList,
   LoginBegin,
   LoginMethod,
 } from './types/accounts';
+
+/**
+ * Sign in a Microsoft account over the sisu flow. The shell command opens the
+ * Microsoft sign-in page in a native webview, catches the OAuth redirect, and
+ * drives `account.login.begin` → `account.login.complete` around it — reading
+ * the cross-origin redirect URL is only possible shell-side. Resolves to the
+ * stored account, or `null` when the user closes the window before finishing.
+ */
+export function loginSisu(): Promise<Account | null> {
+  return invokeCommand<Account | null>('account_login_sisu');
+}
 
 export function beginLogin(method: LoginMethod = 'sisu'): Promise<LoginBegin> {
   return call('account.login.begin', { method }, { timeoutMs: 60_000 });

@@ -1,3 +1,4 @@
+mod auth;
 mod bridge;
 
 use bridge::Bridge;
@@ -11,7 +12,10 @@ pub fn run() {
             bridge::watch(app.handle().clone());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![bridge::ipc_call])
+        .invoke_handler(tauri::generate_handler![
+            bridge::ipc_call,
+            auth::account_login_sisu
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

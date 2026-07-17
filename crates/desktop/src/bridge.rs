@@ -53,6 +53,16 @@ pub struct CallError {
     message: String,
 }
 
+impl CallError {
+    /// A shell-side failure with no daemon error code of its own.
+    pub(crate) fn other(message: impl Into<String>) -> Self {
+        CallError {
+            code: "error".into(),
+            message: message.into(),
+        }
+    }
+}
+
 impl From<IpcError> for CallError {
     fn from(error: IpcError) -> Self {
         let code = match &error {
@@ -127,7 +137,7 @@ pub fn watch(app: AppHandle) {
     });
 }
 
-async fn acquire(app: &AppHandle, bridge: &Bridge) -> Result<Arc<Client>, CallError> {
+pub(crate) async fn acquire(app: &AppHandle, bridge: &Bridge) -> Result<Arc<Client>, CallError> {
     let mut guard = bridge.client.lock().await;
     if let Some(client) = guard.as_ref() {
         if !client.session().is_closed() {
