@@ -320,6 +320,8 @@
   "settings": {
     "subtitle": "Launcher, runtimes and daemon",
     "general": "General",
+    "language": "Language",
+    "language_hint": "Applies immediately — the app reloads.",
     "theme": "Theme",
     "theme_dark": "Dark",
     "theme_system": "System",

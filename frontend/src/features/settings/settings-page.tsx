@@ -8,17 +8,66 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Field,
+  FieldDescription,
   FieldGroup,
   FieldLabel,
   FieldLegend,
   FieldSet,
 } from '@/components/ui/field';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { StatusDot } from '@/components/ui/status-dot';
 import { javaReleases, javaRuntimes } from '@/features/settings/mock';
 import { settingsDefaults, settingsSchema } from '@/features/settings/schema';
 import { useAppForm } from '@/hooks/form';
 import { daemon } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
+import { getLocale, locales, setLocale } from '@/paraglide/runtime.js';
+
+/** Endonyms — a language always names itself, whatever locale is active. */
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  'pt-BR': 'Português (Brasil)',
+};
+
+function LanguageField() {
+  const current = getLocale();
+  return (
+    <Field>
+      <FieldLabel htmlFor="language">{m['settings.language']()}</FieldLabel>
+      <Select
+        value={current}
+        onValueChange={(value) => {
+          if (value && value !== current) {
+            setLocale(value as (typeof locales)[number]);
+          }
+        }}
+      >
+        <SelectTrigger id="language" className="w-full">
+          <SelectValue>
+            {(value: string) => LANGUAGE_NAMES[value] ?? value}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent align="start" alignItemWithTrigger={false}>
+          <SelectGroup>
+            {locales.map((locale) => (
+              <SelectItem key={locale} value={locale}>
+                {LANGUAGE_NAMES[locale] ?? locale}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <FieldDescription>{m['settings.language_hint']()}</FieldDescription>
+    </Field>
+  );
+}
 
 export function SettingsPage() {
   const [runtimes, setRuntimes] = useState(javaRuntimes);
@@ -43,6 +92,8 @@ export function SettingsPage() {
           <FieldSet>
             <FieldLegend>{m['settings.general']()}</FieldLegend>
             <FieldGroup>
+              <LanguageField />
+
               <form.AppField name="theme">
                 {(field) => (
                   <field.SelectField
