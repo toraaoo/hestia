@@ -40,6 +40,7 @@ import {
 } from '@/features/entries/schema';
 import { useAppForm } from '@/hooks/form';
 import { cn } from '@/lib/utils';
+import { m } from '@/paraglide/messages.js';
 
 type Kind = 'server' | 'instance';
 type Step = 'flavor' | 'version' | 'details';
@@ -47,28 +48,44 @@ type Step = 'flavor' | 'version' | 'details';
 const STEPS: Step[] = ['flavor', 'version', 'details'];
 
 /** A curated slice of `server.properties` surfaced in the wizard. */
-const GAMEMODES = ['survival', 'creative', 'adventure', 'spectator'];
-const DIFFICULTIES = ['peaceful', 'easy', 'normal', 'hard'];
+const GAMEMODES: Array<{ value: string; label: () => string }> = [
+  { value: 'survival', label: m['gamemode.survival'] },
+  { value: 'creative', label: m['gamemode.creative'] },
+  { value: 'adventure', label: m['gamemode.adventure'] },
+  { value: 'spectator', label: m['gamemode.spectator'] },
+];
+const DIFFICULTIES: Array<{ value: string; label: () => string }> = [
+  { value: 'peaceful', label: m['difficulty.peaceful'] },
+  { value: 'easy', label: m['difficulty.easy'] },
+  { value: 'normal', label: m['difficulty.normal'] },
+  { value: 'hard', label: m['difficulty.hard'] },
+];
 
-const capitalized = (options: string[]) =>
-  options.map((o) => ({ value: o, label: o, className: 'capitalize' }));
+const options = (items: Array<{ value: string; label: () => string }>) =>
+  items.map((o) => ({ value: o.value, label: o.label() }));
 
 /** The create flow the daemon runs, faked as timed phases for the wizard. */
-const PHASES: Record<Kind, string[]> = {
+const PHASES: Record<Kind, Array<() => string>> = {
   server: [
-    'Resolving profile',
-    'Installing Java runtime',
-    'Downloading server',
-    'Generating properties',
-    'Ready',
+    m['phase.resolving_profile'],
+    m['phase.installing_java'],
+    m['phase.downloading_server'],
+    m['phase.generating_properties'],
+    m['phase.ready'],
   ],
-  instance: ['Creating record', 'Ready'],
+  instance: [m['phase.creating_record'], m['phase.ready']],
 };
 
-const STEP_HINTS: Record<Step, (noun: string) => string> = {
-  flavor: (noun) => `Pick the distribution your ${noun} runs.`,
-  version: () => 'Choose the Minecraft version.',
-  details: (noun) => `Name your ${noun} and set its resources.`,
+const STEP_HINTS: Record<Step, (kind: Kind) => string> = {
+  flavor: (kind) =>
+    kind === 'server'
+      ? m['wizard.hint_flavor_server']()
+      : m['wizard.hint_flavor_instance'](),
+  version: () => m['wizard.hint_version'](),
+  details: (kind) =>
+    kind === 'server'
+      ? m['wizard.hint_details_server']()
+      : m['wizard.hint_details_instance'](),
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -106,7 +123,7 @@ export function CreateEntryModal({
       setCreating(true);
       const phases = PHASES[kind];
       for (let i = 0; i < phases.length; i++) {
-        setPhase(phases[i]);
+        setPhase(phases[i]());
         setProgress(Math.round(((i + 1) / phases.length) * 100));
         await sleep(650);
       }
@@ -127,7 +144,6 @@ export function CreateEntryModal({
   }, [open, form]);
 
   const Icon = entryIcon(kind);
-  const noun = kind === 'server' ? 'server' : 'instance';
   const stepIndex = STEPS.indexOf(step);
 
   const nav = (
@@ -139,7 +155,7 @@ export function CreateEntryModal({
           variant="outline"
           onClick={() => onOpenChange(false)}
         >
-          Cancel
+          {m['action.cancel']()}
         </Button>
       ) : (
         <Button
@@ -149,7 +165,7 @@ export function CreateEntryModal({
           data-icon="inline-start"
         >
           <CaretLeftIcon />
-          Back
+          {m['action.back']()}
         </Button>
       )}
       {step === 'details' ? (
@@ -157,7 +173,9 @@ export function CreateEntryModal({
           type="submit"
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
-          Create {noun}
+          {kind === 'server'
+            ? m['wizard.create_server']()
+            : m['wizard.create_instance']()}
         </Button>
       ) : (
         <Button
@@ -165,7 +183,7 @@ export function CreateEntryModal({
           data-icon="inline-end"
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
-          Next
+          {m['action.next']()}
           <CaretRightIcon />
         </Button>
       )}
@@ -183,10 +201,14 @@ export function CreateEntryModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Icon className="size-4.5 text-muted-foreground" />
-            New {noun}
+            {kind === 'server' ? m['servers.new']() : m['instances.new']()}
           </DialogTitle>
           <DialogDescription>
-            {creating ? `Provisioning your ${noun}…` : STEP_HINTS[step](noun)}
+            {creating
+              ? kind === 'server'
+                ? m['wizard.provisioning_server']()
+                : m['wizard.provisioning_instance']()
+              : STEP_HINTS[step](kind)}
           </DialogDescription>
         </DialogHeader>
 
@@ -214,7 +236,7 @@ export function CreateEntryModal({
                         <FlavorOption
                           key={f.id}
                           name={f.name}
-                          summary={f.summary}
+                          summary={f.summary()}
                           selected={field.state.value === f.id}
                           onSelect={() => {
                             field.handleChange(f.id);
@@ -250,7 +272,7 @@ export function CreateEntryModal({
                           <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
                           <Input
                             className="pl-8"
-                            placeholder="Filter versions"
+                            placeholder={m['wizard.filter_versions']()}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                           />
@@ -261,7 +283,7 @@ export function CreateEntryModal({
                             {(field) => (
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-muted-foreground">
-                                  Loader
+                                  {m['label.loader']()}
                                 </span>
                                 <field.SelectField
                                   options={loaderVersions.map((l) => ({
@@ -285,7 +307,7 @@ export function CreateEntryModal({
                                 setShowSnapshots(c === true)
                               }
                             />
-                            Show snapshots
+                            {m['wizard.show_snapshots']()}
                           </label>
                         )}
 
@@ -299,7 +321,7 @@ export function CreateEntryModal({
                                 <div className="max-h-52 divide-y divide-border overflow-y-auto border border-border">
                                   {list.length === 0 ? (
                                     <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                                      No versions match.
+                                      {m['wizard.no_versions_match']()}
                                     </p>
                                   ) : (
                                     list.map((v) => (
@@ -355,9 +377,9 @@ export function CreateEntryModal({
                       <form.AppField name="details.name">
                         {(field) => (
                           <field.TextField
-                            label="Name"
+                            label={m['label.name']()}
                             placeholder={`${flavor}-${version}`}
-                            description="Leave blank to use the flavor and version."
+                            description={m['wizard.name_hint']()}
                           />
                         )}
                       </form.AppField>
@@ -367,8 +389,8 @@ export function CreateEntryModal({
                   <form.AppField name="details.memory">
                     {(field) => (
                       <field.SliderField
-                        label="Memory"
-                        formatValue={(v) => `${v} GB`}
+                        label={m['label.memory']()}
+                        formatValue={(v) => m['wizard.gb']({ value: v })}
                         min={2}
                         max={32}
                         step={1}
@@ -378,11 +400,13 @@ export function CreateEntryModal({
 
                   {kind === 'server' && (
                     <>
-                      <SectionHeader>Server properties</SectionHeader>
+                      <SectionHeader>
+                        {m['wizard.server_properties']()}
+                      </SectionHeader>
 
                       <form.AppField name="details.motd">
                         {(field) => (
-                          <field.TextField label="Message of the day" />
+                          <field.TextField label={m['wizard.motd']()} />
                         )}
                       </form.AppField>
 
@@ -390,18 +414,18 @@ export function CreateEntryModal({
                         <form.AppField name="details.gamemode">
                           {(field) => (
                             <field.SelectField
-                              label="Gamemode"
-                              options={capitalized(GAMEMODES)}
-                              triggerClassName="w-full capitalize"
+                              label={m['wizard.gamemode']()}
+                              options={options(GAMEMODES)}
+                              triggerClassName="w-full"
                             />
                           )}
                         </form.AppField>
                         <form.AppField name="details.difficulty">
                           {(field) => (
                             <field.SelectField
-                              label="Difficulty"
-                              options={capitalized(DIFFICULTIES)}
-                              triggerClassName="w-full capitalize"
+                              label={m['wizard.difficulty']()}
+                              options={options(DIFFICULTIES)}
+                              triggerClassName="w-full"
                             />
                           )}
                         </form.AppField>
@@ -411,7 +435,7 @@ export function CreateEntryModal({
                         <form.AppField name="details.maxPlayers">
                           {(field) => (
                             <field.TextField
-                              label="Max players"
+                              label={m['wizard.max_players']()}
                               type="number"
                             />
                           )}
@@ -419,10 +443,10 @@ export function CreateEntryModal({
                         <form.AppField name="details.port">
                           {(field) => (
                             <field.TextField
-                              label="Port"
+                              label={m['wizard.port']()}
                               type="number"
-                              placeholder="auto"
-                              description="Blank picks the lowest free."
+                              placeholder={m['wizard.port_auto']()}
+                              description={m['wizard.port_hint']()}
                             />
                           )}
                         </form.AppField>
@@ -433,7 +457,7 @@ export function CreateEntryModal({
                           {(field) => (
                             <PropToggle
                               id="prop-pvp"
-                              label="PVP"
+                              label={m['wizard.pvp']()}
                               checked={field.state.value}
                               onChange={field.handleChange}
                             />
@@ -443,7 +467,7 @@ export function CreateEntryModal({
                           {(field) => (
                             <PropToggle
                               id="prop-online"
-                              label="Online mode"
+                              label={m['wizard.online_mode']()}
                               checked={field.state.value}
                               onChange={field.handleChange}
                             />
@@ -470,16 +494,16 @@ export function CreateEntryModal({
                                   }
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                  I accept the{' '}
+                                  {m['wizard.eula_before']()}{' '}
                                   <a
                                     href="https://aka.ms/MinecraftEULA"
                                     target="_blank"
                                     rel="noreferrer"
                                     className="text-foreground underline underline-offset-2"
                                   >
-                                    Minecraft EULA
+                                    {m['wizard.eula_link']()}
                                   </a>
-                                  . A server won't start until you do.
+                                  {m['wizard.eula_after']()}
                                 </span>
                               </label>
                               {invalid && (
@@ -633,7 +657,7 @@ function VersionRow({
       <span className="flex-1 font-mono text-xs">{version.id}</span>
       {version.kind === 'snapshot' && (
         <Badge variant="outline" className="text-[10px]">
-          snapshot
+          {m['wizard.snapshot']()}
         </Badge>
       )}
     </button>

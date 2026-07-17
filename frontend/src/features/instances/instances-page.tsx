@@ -14,6 +14,7 @@ import {
   ViewToggle,
 } from '@/features/entries/collection';
 import { CreateEntryModal } from '@/features/entries/create-modal';
+import { m } from '@/paraglide/messages.js';
 
 export function InstancesPage({
   view,
@@ -32,16 +33,16 @@ export function InstancesPage({
 
   return (
     <Page
-      title="Instances"
-      subtitle="Worlds you play"
+      title={m['nav.instances']()}
+      subtitle={m['instances.subtitle']()}
       search
-      searchPlaceholder="Search instances"
+      searchPlaceholder={m['search.instances']()}
       actions={
         <>
           <FilterMenu
             groups={[
               {
-                label: 'Flavor',
+                label: m['label.flavor'](),
                 flavors: instanceFlavors,
                 value: flavor,
                 onChange: onFlavorChange,
@@ -55,7 +56,7 @@ export function InstancesPage({
             onClick={() => setCreating(true)}
           >
             <PlusIcon weight="bold" />
-            New instance
+            {m['instances.new']()}
           </Button>
         </>
       }
@@ -63,7 +64,7 @@ export function InstancesPage({
       <EntryCollection
         cards={cards}
         view={view}
-        empty="No instances match your search."
+        empty={m['instances.none_match']()}
       />
       <CreateEntryModal
         kind="instance"

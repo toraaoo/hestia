@@ -30,6 +30,7 @@ import { ResourceCards } from '@/features/entries/resource-panel';
 import { ServerSettingsForm } from '@/features/entries/settings-forms';
 import { agoLabel } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
+import { m } from '@/paraglide/messages.js';
 
 const consoleLines = [
   '[12:04:21] [Server thread/INFO]: Starting minecraft server version 1.21.4',
@@ -68,22 +69,22 @@ export function ServerDetailPage({
   if (!server) {
     return (
       <div className="p-6">
-        <Empty>That server no longer exists.</Empty>
+        <Empty>{m['servers.missing']()}</Empty>
       </div>
     );
   }
 
   const statusTone = !server.ready ? 'warn' : server.running ? 'on' : 'off';
   const statusLabel = !server.ready
-    ? 'Preparing'
+    ? m['status.preparing']()
     : server.running
-      ? 'Online'
-      : 'Stopped';
+      ? m['status.online']()
+      : m['status.stopped']();
 
   return (
     <div className="flex min-h-full flex-col">
       <DetailHero
-        parentLabel="Servers"
+        parentLabel={m['nav.servers']()}
         parentTo="/servers"
         icon={entryIcon('server')}
         name={server.name}
@@ -103,7 +104,11 @@ export function ServerDetailPage({
         }
         actions={
           <>
-            <Button variant="outline" size="icon" aria-label="Open folder">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label={m['detail.open_folder']()}
+            >
               <FolderOpenIcon className="size-4" />
             </Button>
             {server.running ? (
@@ -111,12 +116,12 @@ export function ServerDetailPage({
                 trigger={
                   <Button variant="outline" data-icon="inline-start">
                     <PowerIcon weight="bold" />
-                    Stop
+                    {m['action.stop']()}
                   </Button>
                 }
-                title={`Stop ${server.name}?`}
-                description="The server shuts down and any connected players are disconnected."
-                confirmLabel="Stop"
+                title={m['entry.stop_title']({ name: server.name })}
+                description={m['entry.stop_server_description']()}
+                confirmLabel={m['action.stop']()}
                 onConfirm={() => {}}
               />
             ) : (
@@ -126,7 +131,7 @@ export function ServerDetailPage({
                 className="bg-ember text-ember-foreground hover:bg-ember/90"
               >
                 <PlayIcon weight="fill" />
-                Start
+                {m['action.start']()}
               </Button>
             )}
           </>
@@ -139,17 +144,17 @@ export function ServerDetailPage({
         className="min-h-0 flex-1 gap-0 p-0"
       >
         <TabsList variant="line" className="h-auto gap-6 px-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="console">Console</TabsTrigger>
+          <TabsTrigger value="overview">{m['tab.overview']()}</TabsTrigger>
+          <TabsTrigger value="console">{m['tab.console']()}</TabsTrigger>
           <TabsTrigger value="content">
-            Content
+            {m['tab.content']()}
             <TabCount n={server.content.length} />
           </TabsTrigger>
           <TabsTrigger value="backups">
-            Backups
+            {m['tab.backups']()}
             <TabCount n={server.backups.length} />
           </TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="settings">{m['tab.settings']()}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col p-5">
@@ -161,32 +166,44 @@ export function ServerDetailPage({
               <div className="grid grid-cols-3 gap-3">
                 <StatCard
                   value={`${server.players}/${server.max_players}`}
-                  label="Players"
+                  label={m['label.players']()}
                 />
-                <StatCard value={server.memory} label="Memory" />
-                <StatCard value={server.content.length} label="Content" />
+                <StatCard value={server.memory} label={m['label.memory']()} />
+                <StatCard
+                  value={server.content.length}
+                  label={m['label.content']()}
+                />
               </div>
               <ResourceCards id={server.id} />
             </div>
 
             <div className="space-y-4">
-              <SideCard title="Details">
+              <SideCard title={m['label.details']()}>
                 <div className="divide-y divide-border">
                   <Stat
-                    label="Address"
+                    label={m['label.address']()}
                     value={`localhost:${server.port ?? '—'}`}
                   />
-                  <Stat label="Loader" value={server.flavor} />
-                  <Stat label="Version" value={server.game_version} />
-                  <Stat label="Java" value={server.java_major} />
-                  <Stat label="Created" value={agoLabel(server.created_unix)} />
+                  <Stat label={m['label.loader']()} value={server.flavor} />
+                  <Stat
+                    label={m['label.version']()}
+                    value={server.game_version}
+                  />
+                  <Stat label={m['label.java']()} value={server.java_major} />
+                  <Stat
+                    label={m['label.created']()}
+                    value={agoLabel(server.created_unix)}
+                  />
                 </div>
               </SideCard>
-              <SideCard title="Backups">
+              <SideCard title={m['tab.backups']()}>
                 <p className="text-xs text-muted-foreground">
                   {server.backup_interval
-                    ? `Every ${server.backup_interval}, keeping ${server.backup_retention}.`
-                    : 'Scheduled backups are off.'}
+                    ? m['backup.schedule_summary']({
+                        interval: server.backup_interval,
+                        retention: server.backup_retention,
+                      })
+                    : m['backup.off']()}
                 </p>
               </SideCard>
             </div>
@@ -203,13 +220,13 @@ export function ServerDetailPage({
               </div>
               <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
                 <Input
-                  placeholder="Enter a server command, e.g. say hello"
+                  placeholder={m['detail.console_placeholder']()}
                   className="font-mono"
                 />
               </form>
             </div>
           ) : (
-            <Empty>Start the server to open its console.</Empty>
+            <Empty>{m['detail.console_empty']()}</Empty>
           )}
         </TabsContent>
 
@@ -227,7 +244,7 @@ export function ServerDetailPage({
                 onClick={() => setAddingContent(true)}
               >
                 <PlusIcon weight="bold" />
-                Add content
+                {m['content.add']()}
               </Button>
             }
           />
@@ -237,12 +254,15 @@ export function ServerDetailPage({
           <div className="mb-5 flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
               {server.backup_interval
-                ? `Scheduled every ${server.backup_interval}, keeping ${server.backup_retention}`
-                : 'Scheduled backups off'}
+                ? m['backup.schedule_status']({
+                    interval: server.backup_interval,
+                    retention: server.backup_retention,
+                  })
+                : m['backup.off_short']()}
             </span>
             <Button size="sm" variant="outline" data-icon="inline-start">
               <PlusIcon weight="bold" />
-              Create backup
+              {m['backup.create']()}
             </Button>
           </div>
           <BackupList backups={server.backups} />

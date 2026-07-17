@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { StatusDot } from '@/components/ui/status-dot';
 import { featured, instances, pinnedInstances } from '@/features/entries/mock';
+import { m } from '@/paraglide/messages.js';
 
 /**
  * The always-present quick-play strip along the bottom of the library. The
@@ -43,7 +44,7 @@ export function PlayBar() {
               </span>
               <span className="min-w-0 flex-1 leading-tight">
                 <span className="block text-[11px] tracking-wide text-muted-foreground uppercase">
-                  Quick play
+                  {m['playbar.quick_play']()}
                 </span>
                 <span className="block truncate text-base font-medium">
                   {sel.name}
@@ -55,7 +56,7 @@ export function PlayBar() {
         />
         <DropdownMenuContent side="top" align="start" className="w-56">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Pinned</DropdownMenuLabel>
+            <DropdownMenuLabel>{m['label.pinned']()}</DropdownMenuLabel>
             {pinnedInstances.map((i) => (
               <InstanceItem
                 key={i.id}
@@ -66,7 +67,9 @@ export function PlayBar() {
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuLabel>All instances</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              {m['playbar.all_instances']()}
+            </DropdownMenuLabel>
             {others.map((i) => (
               <InstanceItem
                 key={i.id}
@@ -93,14 +96,14 @@ export function PlayBar() {
         nativeButton={false}
         render={<Link to="/instances/$id" params={{ id: sel.id }} />}
       >
-        Manage
+        {m['action.manage']()}
       </Button>
       <Button
         data-icon="inline-start"
         className="bg-ember text-ember-foreground hover:bg-ember/90"
       >
         <PlayIcon weight="fill" />
-        {sel.sessions > 0 ? 'Resume' : 'Play'}
+        {sel.sessions > 0 ? m['action.resume']() : m['action.play']()}
       </Button>
     </div>
   );

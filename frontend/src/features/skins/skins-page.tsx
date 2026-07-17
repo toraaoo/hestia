@@ -15,6 +15,7 @@ import {
 import { PreviewPanel } from '@/features/skins/preview-panel';
 import { SkinCard, SkinGrid } from '@/features/skins/skin-card';
 import { readTextureFile } from '@/features/skins/texture';
+import { m } from '@/paraglide/messages.js';
 
 export function SkinsPage() {
   const [custom, setCustom] = useState<Skin[]>(customSkins);
@@ -69,8 +70,8 @@ export function SkinsPage() {
 
   return (
     <Page
-      title="Skins"
-      subtitle="Your Minecraft character"
+      title={m['nav.skins']()}
+      subtitle={m['skins.subtitle']()}
       actions={
         <>
           <input
@@ -90,7 +91,7 @@ export function SkinsPage() {
             onClick={() => fileRef.current?.click()}
           >
             <PlusIcon weight="bold" />
-            Add skin
+            {m['skins.add']()}
           </Button>
         </>
       }
@@ -103,11 +104,10 @@ export function SkinsPage() {
         />
 
         <div className="min-w-0 flex-1 space-y-8">
-          <Section title="Your skins" count={custom.length}>
+          <Section title={m['skins.your_skins']()} count={custom.length}>
             {custom.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No saved skins yet — add one from a PNG texture, or start from a
-                default skin.
+                {m['skins.none_yet']()}
               </p>
             ) : (
               <SkinGrid>
@@ -127,7 +127,10 @@ export function SkinsPage() {
             )}
           </Section>
 
-          <Section title="Default skins" count={defaultSkins.length}>
+          <Section
+            title={m['skins.default_skins']()}
+            count={defaultSkins.length}
+          >
             <SkinGrid>
               {defaultSkins.map((skin) => (
                 <SkinCard
@@ -157,19 +160,13 @@ export function SkinsPage() {
       <ConfirmDialog
         open={pendingRemove !== null}
         onOpenChange={(open) => !open && setPendingRemove(null)}
-        title="Delete skin?"
+        title={m['skins.delete_title']()}
         description={
-          pendingRemove && (
-            <>
-              <span className="font-medium text-foreground">
-                {pendingRemove.name}
-              </span>{' '}
-              is removed from your saved skins.
-            </>
-          )
+          pendingRemove &&
+          m['skins.delete_description']({ name: pendingRemove.name })
         }
         destructive
-        confirmLabel="Delete"
+        confirmLabel={m['action.delete']()}
         onConfirm={() => {
           if (pendingRemove) removeSkin(pendingRemove.id);
           setPendingRemove(null);

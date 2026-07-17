@@ -17,6 +17,7 @@ import { capes, getCape } from '@/features/skins/mock';
 import { CapeFront, SkinModel } from '@/features/skins/skin-render';
 import { readTextureFile } from '@/features/skins/texture';
 import { cn } from '@/lib/utils';
+import { m } from '@/paraglide/messages.js';
 
 export interface SkinDraft {
   name: string;
@@ -71,11 +72,13 @@ export function EditSkinModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{adding ? 'Add skin' : 'Edit skin'}</DialogTitle>
+          <DialogTitle>
+            {adding ? m['skins.add']() : m['skins.edit']()}
+          </DialogTitle>
           <DialogDescription>
             {adding
-              ? 'Name the skin, pick its arm style and cape.'
-              : 'Changes apply the next time you equip this skin.'}
+              ? m['skins.add_description']()
+              : m['skins.edit_description']()}
           </DialogDescription>
         </DialogHeader>
 
@@ -100,24 +103,24 @@ export function EditSkinModal({
               />
             ) : (
               <span className="px-4 text-center text-xs text-muted-foreground">
-                Upload a texture to preview it
+                {m['skins.upload_hint']()}
               </span>
             )}
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col gap-4">
             <Field>
-              <FieldLabel htmlFor="skin-name">Name</FieldLabel>
+              <FieldLabel htmlFor="skin-name">{m['label.name']()}</FieldLabel>
               <Input
                 id="skin-name"
                 value={name}
-                placeholder="My skin"
+                placeholder={m['skins.name_placeholder']()}
                 onChange={(e) => setName(e.target.value)}
               />
             </Field>
 
             <Field>
-              <FieldLabel>Texture</FieldLabel>
+              <FieldLabel>{m['skins.texture']()}</FieldLabel>
               <input
                 ref={fileRef}
                 type="file"
@@ -137,12 +140,14 @@ export function EditSkinModal({
                 onClick={() => fileRef.current?.click()}
               >
                 <UploadSimpleIcon />
-                {texture ? 'Replace texture' : 'Upload texture'}
+                {texture
+                  ? m['skins.replace_texture']()
+                  : m['skins.upload_texture']()}
               </Button>
             </Field>
 
             <Field>
-              <FieldLabel>Arm style</FieldLabel>
+              <FieldLabel>{m['skins.arm_style']()}</FieldLabel>
               <ToggleGroup
                 variant="outline"
                 size="sm"
@@ -152,16 +157,20 @@ export function EditSkinModal({
                   if (next) setVariant(next as SkinVariant);
                 }}
               >
-                <ToggleGroupItem value="classic">Wide</ToggleGroupItem>
-                <ToggleGroupItem value="slim">Slim</ToggleGroupItem>
+                <ToggleGroupItem value="classic">
+                  {m['skins.wide']()}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="slim">
+                  {m['skins.slim']()}
+                </ToggleGroupItem>
               </ToggleGroup>
             </Field>
 
             <Field>
-              <FieldLabel>Cape</FieldLabel>
+              <FieldLabel>{m['skins.cape']()}</FieldLabel>
               <div className="grid grid-cols-4 gap-1.5">
                 <CapeOption
-                  label="None"
+                  label={m['label.none']()}
                   selected={capeId === undefined}
                   onSelect={() => setCapeId(undefined)}
                 >
@@ -184,7 +193,7 @@ export function EditSkinModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {m['action.cancel']()}
           </Button>
           <Button
             disabled={!canSave}
@@ -194,7 +203,7 @@ export function EditSkinModal({
               onOpenChange(false);
             }}
           >
-            {adding ? 'Add skin' : 'Save skin'}
+            {adding ? m['skins.add']() : m['skins.save']()}
           </Button>
         </DialogFooter>
       </DialogContent>

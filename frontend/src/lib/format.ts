@@ -1,15 +1,17 @@
 /** Display-only formatting helpers for the launcher UI. */
 
+import { m } from '@/paraglide/messages.js';
+
 export function agoLabel(unix: number): string {
   const secs = Math.max(0, Date.now() / 1000 - unix);
   const mins = Math.round(secs / 60);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return m['ago.just_now']();
+  if (mins < 60) return m['ago.minutes']({ count: mins });
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return m['ago.hours']({ count: hours });
   const days = Math.round(hours / 24);
-  if (days === 1) return 'yesterday';
-  return `${days} days ago`;
+  if (days === 1) return m['ago.yesterday']();
+  return m['ago.days']({ count: days });
 }
 
 export function bytes(n: number): string {

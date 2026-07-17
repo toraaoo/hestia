@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { m } from '@/paraglide/messages.js';
+
 type Mode = 'browse' | 'entry';
 
 /**
@@ -11,17 +13,17 @@ type Mode = 'browse' | 'entry';
 export function pickStepSchema(mode: Mode) {
   return mode === 'browse'
     ? z.object({
-        targetId: z.string().min(1, 'Choose where to install this.'),
+        targetId: z.string().min(1, m['error.choose_target']()),
         projectId: z.string(),
       })
     : z.object({
-        projectId: z.string().min(1, 'Choose content to install.'),
+        projectId: z.string().min(1, m['error.choose_content']()),
         targetId: z.string(),
       });
 }
 
 export const worldsStepSchema = z.object({
-  worlds: z.array(z.string()).min(1, 'Pick at least one world.'),
+  worlds: z.array(z.string()).min(1, m['error.pick_world']()),
 });
 
 export const reviewStepSchema = z.object({

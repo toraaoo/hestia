@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react';
 
 import type { ContentKind } from '@/lib/mock';
+import { m } from '@/paraglide/messages.js';
 
 /** Icon for a library entry kind — instances vs hosted servers. */
 export function entryIcon(kind: 'instance' | 'server'): Icon {
@@ -32,10 +33,10 @@ export function contentIcon(kind: ContentKind): Icon {
   }
 }
 
-export const contentKindLabel: Record<ContentKind, string> = {
-  mod: 'Mod',
-  resourcepack: 'Resource pack',
-  shader: 'Shader',
-  datapack: 'Datapack',
-  modpack: 'Modpack',
+export const contentKindLabel: Record<ContentKind, () => string> = {
+  mod: m['kind.mod'],
+  resourcepack: m['kind.resourcepack'],
+  shader: m['kind.shader'],
+  datapack: m['kind.datapack'],
+  modpack: m['kind.modpack'],
 };

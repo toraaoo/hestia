@@ -11,6 +11,7 @@ import { kindInfo } from '@/features/content/kinds';
 import type { Backup, InstalledContent } from '@/features/entries/mock';
 import { agoLabel, bytes } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
+import { m } from '@/paraglide/messages.js';
 
 /** A big number + label tile for an overview row. */
 export function StatCard({
@@ -75,7 +76,7 @@ export function ContentSection({
           className={chipClass(!kind)}
           onClick={() => onKindChange(undefined)}
         >
-          All
+          {m['label.all']()}
         </button>
         {kinds.map((k) => (
           <button
@@ -84,7 +85,7 @@ export function ContentSection({
             className={chipClass(kind === k)}
             onClick={() => onKindChange(k)}
           >
-            {kindInfo[k].label}
+            {kindInfo[k].label()}
             <span className="ml-1.5 font-mono text-[10px] opacity-60">
               {count(k)}
             </span>
@@ -93,7 +94,11 @@ export function ContentSection({
         {action && <div className="ml-auto">{action}</div>}
       </div>
       {filtered.length === 0 && kind ? (
-        <Empty>No {kindInfo[kind].label.toLowerCase()} installed.</Empty>
+        <Empty>
+          {m['content.none_of_kind']({
+            kind: kindInfo[kind].label().toLowerCase(),
+          })}
+        </Empty>
       ) : (
         <ContentList items={filtered} onRemove={remove} />
       )}
@@ -109,7 +114,7 @@ export function ContentList({
   onRemove?: (item: InstalledContent) => void;
 }) {
   if (items.length === 0) {
-    return <Empty>No content installed yet. Add some from Browse.</Empty>;
+    return <Empty>{m['content.none_installed']()}</Empty>;
   }
   return (
     <div className="divide-y divide-border border border-border">
@@ -123,38 +128,40 @@ export function ContentList({
                 <span className="truncate text-sm">{c.name}</span>
                 {!c.enabled && (
                   <Badge variant="outline" className="shrink-0">
-                    Disabled
+                    {m['content.disabled']()}
                   </Badge>
                 )}
                 {c.updatable && (
                   <Badge className="shrink-0 bg-ember text-ember-foreground">
-                    Update
+                    {m['content.update']()}
                   </Badge>
                 )}
               </div>
               <div className="truncate font-mono text-[11px] text-muted-foreground">
-                {contentKindLabel[c.kind]} · {c.source} · {c.version}
+                {contentKindLabel[c.kind]()} · {c.source} · {c.version}
               </div>
             </div>
             <ConfirmDialog
               trigger={
-                <Button variant="ghost" size="icon-sm" aria-label="Remove">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={m['action.remove']()}
+                >
                   <TrashIcon className="size-4" />
                 </Button>
               }
-              title="Remove content?"
-              description={
-                <>
-                  <span className="font-medium text-foreground">{c.name}</span>{' '}
-                  will be removed. Its files are deleted; the change applies at
-                  the next start.
-                </>
-              }
+              title={m['content.remove_title']()}
+              description={m['content.remove_description']({ name: c.name })}
               destructive
-              confirmLabel="Remove"
+              confirmLabel={m['action.remove']()}
               onConfirm={() => onRemove?.(c)}
             />
-            <Button variant="ghost" size="icon-sm" aria-label="More">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={m['action.more']()}
+            >
               <DotsThreeIcon weight="bold" className="size-4" />
             </Button>
           </div>
@@ -164,11 +171,22 @@ export function ContentList({
   );
 }
 
+function backupKindLabel(kind: Backup['kind']): string {
+  switch (kind) {
+    case 'manual':
+      return m['backup.kind_manual']();
+    case 'scheduled':
+      return m['backup.kind_scheduled']();
+    case 'update':
+      return m['backup.kind_update']();
+  }
+}
+
 export function BackupList({ backups }: { backups: Backup[] }) {
   const [list, setList] = useState(backups);
 
   if (list.length === 0) {
-    return <Empty>No backups yet. Create one to archive this world.</Empty>;
+    return <Empty>{m['backup.none']()}</Empty>;
   }
   return (
     <div className="divide-y divide-border border border-border">
@@ -178,7 +196,7 @@ export function BackupList({ backups }: { backups: Backup[] }) {
             <div className="flex items-center gap-2">
               <span className="text-sm">{agoLabel(b.created_unix)}</span>
               <Badge variant="secondary" className="shrink-0 capitalize">
-                {b.kind}
+                {backupKindLabel(b.kind)}
               </Badge>
             </div>
             <div className="font-mono text-[11px] text-muted-foreground">
@@ -188,40 +206,32 @@ export function BackupList({ backups }: { backups: Backup[] }) {
           <ConfirmDialog
             trigger={
               <Button variant="outline" size="sm">
-                Restore
+                {m['action.restore']()}
               </Button>
             }
-            title="Restore backup?"
-            description={
-              <>
-                This overwrites the current game data with the archive from{' '}
-                <span className="font-medium text-foreground">
-                  {agoLabel(b.created_unix)}
-                </span>
-                . The current data is backed up first.
-              </>
-            }
-            confirmLabel="Restore"
+            title={m['backup.restore_title']()}
+            description={m['backup.restore_description']({
+              when: agoLabel(b.created_unix),
+            })}
+            confirmLabel={m['action.restore']()}
             onConfirm={() => {}}
           />
           <ConfirmDialog
             trigger={
-              <Button variant="ghost" size="icon-sm" aria-label="Delete backup">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={m['backup.delete_aria']()}
+              >
                 <TrashIcon className="size-4" />
               </Button>
             }
-            title="Delete backup?"
-            description={
-              <>
-                The archive from{' '}
-                <span className="font-medium text-foreground">
-                  {agoLabel(b.created_unix)}
-                </span>{' '}
-                will be permanently deleted.
-              </>
-            }
+            title={m['backup.delete_title']()}
+            description={m['backup.delete_description']({
+              when: agoLabel(b.created_unix),
+            })}
             destructive
-            confirmLabel="Delete"
+            confirmLabel={m['action.delete']()}
             onConfirm={() => setList((l) => l.filter((x) => x.id !== b.id))}
           />
         </div>

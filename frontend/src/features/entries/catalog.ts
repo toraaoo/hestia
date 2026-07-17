@@ -4,10 +4,12 @@
  * backend — the wizards mirror the real create flow over this stand-in.
  */
 
+import { m } from '@/paraglide/messages.js';
+
 export interface CatalogFlavor {
   id: string;
   name: string;
-  summary: string;
+  summary: () => string;
 }
 
 export type VersionKind = 'release' | 'snapshot';
@@ -18,12 +20,8 @@ export interface CatalogVersion {
 }
 
 export const flavors: CatalogFlavor[] = [
-  { id: 'vanilla', name: 'Vanilla', summary: "Mojang's game, unmodified." },
-  {
-    id: 'fabric',
-    name: 'Fabric',
-    summary: 'Lightweight loader for mods, resource packs and datapacks.',
-  },
+  { id: 'vanilla', name: 'Vanilla', summary: m['flavor.vanilla_summary'] },
+  { id: 'fabric', name: 'Fabric', summary: m['flavor.fabric_summary'] },
 ];
 
 /** Newest first, the way a provider's catalogue reports them. */

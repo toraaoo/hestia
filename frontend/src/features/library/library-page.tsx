@@ -24,6 +24,7 @@ import {
   ViewToggle,
 } from '@/features/entries/collection';
 import { CreateEntryModal } from '@/features/entries/create-modal';
+import { m } from '@/paraglide/messages.js';
 
 const InstanceIcon = entryIcon('instance');
 const ServerIcon = entryIcon('server');
@@ -57,10 +58,10 @@ export function LibraryPage({
 
   return (
     <Page
-      title="Library"
-      subtitle="Instances you play and servers you host"
+      title={m['nav.library']()}
+      subtitle={m['library.subtitle']()}
       search
-      searchPlaceholder="Search library"
+      searchPlaceholder={m['search.library']()}
       actions={
         <>
           <ViewToggle view={view} onView={onViewChange} />
@@ -69,18 +70,18 @@ export function LibraryPage({
               render={
                 <Button size="sm" data-icon="inline-start">
                   <PlusIcon weight="bold" />
-                  New
+                  {m['library.new']()}
                 </Button>
               }
             />
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem onClick={() => openNew('instance')}>
                 <InstanceIcon />
-                New instance
+                {m['instances.new']()}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => openNew('server')}>
                 <ServerIcon />
-                New server
+                {m['servers.new']()}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -89,14 +90,14 @@ export function LibraryPage({
     >
       <div className="flex flex-col gap-6">
         <Section
-          title="Your servers"
+          title={m['library.your_servers']()}
           count={srv.length}
           action={
             <div className="flex items-center gap-3">
               <FilterMenu
                 groups={[
                   {
-                    label: 'Flavor',
+                    label: m['label.flavor'](),
                     flavors: serverFlavors,
                     value: serverFlavor,
                     onChange: onServerFlavorChange,
@@ -107,7 +108,7 @@ export function LibraryPage({
                 to="/servers"
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                Manage all
+                {m['library.manage_all']()}
               </Link>
             </div>
           }
@@ -115,19 +116,19 @@ export function LibraryPage({
           <EntryCollection
             cards={srv}
             view={view}
-            empty="No servers match your search."
+            empty={m['servers.none_match']()}
           />
         </Section>
 
         <Section
-          title="Instances"
+          title={m['nav.instances']()}
           count={inst.length}
           action={
             <div className="flex items-center gap-3">
               <FilterMenu
                 groups={[
                   {
-                    label: 'Flavor',
+                    label: m['label.flavor'](),
                     flavors: instanceFlavors,
                     value: instanceFlavor,
                     onChange: onInstanceFlavorChange,
@@ -138,7 +139,7 @@ export function LibraryPage({
                 to="/instances"
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                Manage all
+                {m['library.manage_all']()}
               </Link>
             </div>
           }
@@ -146,7 +147,7 @@ export function LibraryPage({
           <EntryCollection
             cards={inst}
             view={view}
-            empty="No instances match your search."
+            empty={m['instances.none_match']()}
           />
         </Section>
       </div>

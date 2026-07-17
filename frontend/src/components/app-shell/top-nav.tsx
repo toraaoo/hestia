@@ -4,6 +4,7 @@ import { useCanGoBack, useRouter } from '@tanstack/react-router';
 import { Logo } from '@/components/app-shell/logo';
 import { WindowControls } from '@/components/app-shell/window-controls';
 import { cn } from '@/lib/utils';
+import { m } from '@/paraglide/messages.js';
 
 /**
  * The window's single top bar: brand, browser-style history nav, and the
@@ -24,13 +25,16 @@ export function TopNav() {
         <span className="mr-1 text-sm font-semibold">Hestia</span>
         <div className="mx-1 h-4 w-px bg-border" />
         <HistoryButton
-          label="Back"
+          label={m['nav.back']()}
           disabled={!canGoBack}
           onClick={() => router.history.back()}
         >
           <CaretLeftIcon weight="bold" className="size-4" />
         </HistoryButton>
-        <HistoryButton label="Forward" onClick={() => router.history.forward()}>
+        <HistoryButton
+          label={m['nav.forward']()}
+          onClick={() => router.history.forward()}
+        >
           <CaretRightIcon weight="bold" className="size-4" />
         </HistoryButton>
       </div>

@@ -10,6 +10,7 @@ import { ContentInstallModal } from '@/features/content/install-modal';
 import { kindInfo } from '@/features/content/kinds';
 import type { ContentProject } from '@/features/content/mock';
 import { compact } from '@/lib/format';
+import { m } from '@/paraglide/messages.js';
 
 export function ContentCard({ project }: { project: ContentProject }) {
   const Icon = contentIcon(project.kind);
@@ -34,10 +35,10 @@ export function ContentCard({ project }: { project: ContentProject }) {
                   {project.title}
                 </span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">
-                  by {project.author}
+                  {m['browse.by_author']({ name: project.author })}
                 </span>
                 <Badge variant="secondary" className="ml-auto shrink-0">
-                  {contentKindLabel[project.kind]}
+                  {contentKindLabel[project.kind]()}
                 </Badge>
               </div>
 
@@ -68,7 +69,7 @@ export function ContentCard({ project }: { project: ContentProject }) {
                   }}
                 >
                   <PlusIcon weight="bold" />
-                  Install
+                  {m['action.install']()}
                 </Button>
               </div>
             </div>

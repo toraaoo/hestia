@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
 import { Input } from '@/components/ui/input';
+import { m } from '@/paraglide/messages.js';
 
 /**
  * A full-bleed page: header with title/actions over a scrolling body. Every
@@ -13,7 +14,7 @@ export function Page({
   title,
   subtitle,
   search,
-  searchPlaceholder = 'Search',
+  searchPlaceholder,
   actions,
   children,
 }: {
@@ -36,7 +37,11 @@ export function Page({
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {search && <PageSearch placeholder={searchPlaceholder} />}
+          {search && (
+            <PageSearch
+              placeholder={searchPlaceholder ?? m['search.placeholder']()}
+            />
+          )}
           {actions}
         </div>
       </div>

@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusDot } from '@/components/ui/status-dot';
 import { cn } from '@/lib/utils';
+import { m } from '@/paraglide/messages.js';
 
 export interface EntryCardData {
   id: string;
@@ -22,11 +23,13 @@ export interface EntryCardData {
 }
 
 function statusOf(entry: EntryCardData) {
-  if (!entry.ready) return { tone: 'warn' as const, label: 'Preparing' };
+  if (!entry.ready)
+    return { tone: 'warn' as const, label: m['status.preparing']() };
   if (entry.running)
     return {
       tone: 'on' as const,
-      label: entry.kind === 'server' ? 'Online' : 'Running',
+      label:
+        entry.kind === 'server' ? m['status.online']() : m['status.running'](),
     };
   return null;
 }
@@ -72,16 +75,16 @@ function ActionButton({
             }}
           >
             <PowerIcon weight="bold" />
-            Stop
+            {m['action.stop']()}
           </Button>
         }
-        title={`Stop ${entry.name}?`}
+        title={m['entry.stop_title']({ name: entry.name })}
         description={
           entry.kind === 'server'
-            ? 'The server shuts down and any connected players are disconnected.'
-            : 'The running game session is closed. Unsaved progress may be lost.'
+            ? m['entry.stop_server_description']()
+            : m['entry.stop_instance_description']()
         }
-        confirmLabel="Stop"
+        confirmLabel={m['action.stop']()}
         onConfirm={() => {}}
       />
     );
@@ -95,7 +98,7 @@ function ActionButton({
       className="bg-ember text-ember-foreground hover:bg-ember/90"
     >
       <PlayIcon weight="fill" />
-      {entry.kind === 'server' ? 'Start' : 'Play'}
+      {entry.kind === 'server' ? m['action.start']() : m['action.play']()}
     </Button>
   );
 }

@@ -60,6 +60,7 @@ import { useAppForm } from '@/hooks/form';
 import { agoLabel } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
 import { cn } from '@/lib/utils';
+import { m } from '@/paraglide/messages.js';
 
 /** An entry the content can be installed into, drawn from both stores. */
 export interface Target {
@@ -119,6 +120,9 @@ function projectsFor(target: Target): ContentProject[] {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const entryTypeLabel = (type: Target['type']): string =>
+  type === 'server' ? m['entry.type_server']() : m['entry.type_instance']();
+
 /**
  * The content install wizard, mirroring the daemon's `content.add`. Built on
  * TanStack Form's multi-step wizard pattern — one `useAppForm` holds the
@@ -164,18 +168,18 @@ export function ContentInstallModal({
       if (!proj) return;
       const files = [proj, ...resolveDependencies(proj.id)];
       setInstalling(true);
-      setPhase('Resolving dependencies');
+      setPhase(m['phase.resolving_dependencies']());
       setProgress(4);
       await sleep(600);
       for (let i = 0; i < files.length; i++) {
-        setPhase(`Downloading ${files[i].title}`);
+        setPhase(m['phase.downloading']({ name: files[i].title }));
         setProgress(Math.round(((i + 1) / (files.length + 1)) * 90) + 4);
         await sleep(650);
       }
-      setPhase('Mirroring into data/');
+      setPhase(m['phase.mirroring']());
       setProgress(97);
       await sleep(500);
-      setPhase('Ready');
+      setPhase(m['phase.ready']());
       setProgress(100);
       await sleep(400);
       onOpenChange(false);
@@ -198,8 +202,8 @@ export function ContentInstallModal({
       : entryIcon(entry?.type ?? 'instance');
   const title =
     mode === 'browse'
-      ? `Install ${project?.title}`
-      : `Add content to ${entry?.name}`;
+      ? m['content.install_title']({ name: project?.title ?? '' })
+      : m['content.add_to_title']({ name: entry?.name ?? '' });
 
   return (
     <Dialog
@@ -302,21 +306,21 @@ function WizardBody({
   const next = () => setStepIndex(Math.min(steps.length - 1, index + 1));
 
   const hint = installing
-    ? 'Installing…'
+    ? m['content.installing']()
     : stepId === 'target'
-      ? 'Choose where this content is installed.'
+      ? m['content.hint_target']()
       : stepId === 'content'
-        ? 'Choose the content to install.'
+        ? m['content.hint_content']()
         : stepId === 'worlds'
-          ? 'Choose the worlds to add this datapack to.'
-          : 'Review and install.';
+          ? m['content.hint_worlds']()
+          : m['content.hint_review']();
 
   const nav = (
     <DialogFooter className="items-center">
       <StepDots steps={steps} active={index} className="mr-auto" />
       {index === 0 ? (
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {m['action.cancel']()}
         </Button>
       ) : (
         <Button
@@ -326,7 +330,7 @@ function WizardBody({
           data-icon="inline-start"
         >
           <CaretLeftIcon />
-          Back
+          {m['action.back']()}
         </Button>
       )}
       {stepId === 'review' ? (
@@ -334,7 +338,7 @@ function WizardBody({
           type="submit"
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
-          Install
+          {m['action.install']()}
         </Button>
       ) : (
         <Button
@@ -342,7 +346,7 @@ function WizardBody({
           data-icon="inline-end"
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
-          Next
+          {m['action.next']()}
           <CaretRightIcon />
         </Button>
       )}
@@ -444,7 +448,7 @@ function WizardBody({
                         ))
                       ) : (
                         <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-                          This instance has no worlds yet.
+                          {m['content.no_worlds_in_instance']()}
                         </p>
                       )}
                       {errors && <FieldError errors={errors} />}
@@ -614,20 +618,20 @@ function TargetStep({
       <FilterBar
         search={search}
         onSearch={setSearch}
-        placeholder="Search servers and instances"
+        placeholder={m['search.targets']()}
         chips={[
           {
-            label: 'All',
+            label: m['label.all'](),
             active: type === 'all',
             onClick: () => setType('all'),
           },
           {
-            label: 'Servers',
+            label: m['nav.servers'](),
             active: type === 'server',
             onClick: () => setType('server'),
           },
           {
-            label: 'Instances',
+            label: m['nav.instances'](),
             active: type === 'instance',
             onClick: () => setType('instance'),
           },
@@ -635,12 +639,13 @@ function TargetStep({
       />
       {targets.length === 0 ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-          No server or instance can take a{' '}
-          {contentKindLabel[kind].toLowerCase()}.
+          {m['content.no_target_for_kind']({
+            kind: contentKindLabel[kind]().toLowerCase(),
+          })}
         </p>
       ) : shown.length === 0 ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-          Nothing matches your search.
+          {m['browse.nothing_matches']()}
         </p>
       ) : (
         <div className="grid gap-2">
@@ -649,8 +654,8 @@ function TargetStep({
               key={t.id}
               icon={entryIcon(t.type)}
               title={t.name}
-              subtitle={`${t.type} · ${t.flavor} · ${t.game_version}`}
-              badge={t.running ? 'Stop to install' : undefined}
+              subtitle={`${entryTypeLabel(t.type)} · ${t.flavor} · ${t.game_version}`}
+              badge={t.running ? m['content.stop_to_install']() : undefined}
               disabled={t.running}
               selected={selectedId === t.id}
               onSelect={() => onSelect(t)}
@@ -697,15 +702,15 @@ function ContentStep({
       <FilterBar
         search={search}
         onSearch={setSearch}
-        placeholder="Search Modrinth"
+        placeholder={m['search.modrinth']()}
         chips={[
           {
-            label: 'All',
+            label: m['label.all'](),
             active: kind === 'all',
             onClick: () => setKind('all'),
           },
           ...kinds.map((k) => ({
-            label: kindInfo[k].label,
+            label: kindInfo[k].label(),
             active: kind === k,
             onClick: () => setKind(k),
           })),
@@ -713,7 +718,7 @@ function ContentStep({
       />
       {shown.length === 0 ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-          Nothing matches your search.
+          {m['browse.nothing_matches']()}
         </p>
       ) : (
         <div className="grid gap-2">
@@ -722,7 +727,7 @@ function ContentStep({
               key={p.id}
               icon={contentIcon(p.kind)}
               title={p.title}
-              subtitle={`${contentKindLabel[p.kind]} · by ${p.author}`}
+              subtitle={`${contentKindLabel[p.kind]()} · ${m['browse.by_author']({ name: p.author })}`}
               selected={selectedId === p.id}
               onSelect={() => onSelect(p)}
             />
@@ -837,26 +842,32 @@ function ReviewStep({
   return (
     <div className="flex flex-col gap-4 p-1">
       <div className="divide-y divide-border border border-border">
-        <ReviewRow label="Content" value={project.title} />
-        <ReviewRow label="Target" value={target?.name ?? '—'} />
+        <ReviewRow label={m['label.content']()} value={project.title} />
+        <ReviewRow label={m['label.target']()} value={target?.name ?? '—'} />
         {reviewWorlds && (
           <form.Subscribe
             selector={(s: WizardValues) => s.values.worlds.worlds}
           >
             {(worlds: string[]) => (
               <ReviewRow
-                label="Worlds"
-                value={worlds.length ? worlds.join(', ') : 'none selected'}
+                label={m['label.worlds']()}
+                value={
+                  worlds.length
+                    ? worlds.join(', ')
+                    : m['content.none_selected']()
+                }
               />
             )}
           </form.Subscribe>
         )}
         <div className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
-          <span className="text-xs text-muted-foreground">Version</span>
+          <span className="text-xs text-muted-foreground">
+            {m['label.version']()}
+          </span>
           <div className="flex items-center gap-2">
             {!explicit && (
               <Badge variant="secondary" className="shrink-0">
-                latest
+                {m['label.latest']()}
               </Badge>
             )}
             <VersionCombobox
@@ -871,7 +882,7 @@ function ReviewStep({
       {deps.length > 0 && (
         <div>
           <p className="mb-2 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-            Dependencies ({deps.length})
+            {m['content.dependencies']({ count: deps.length })}
           </p>
           <div className="divide-y divide-border border border-border">
             {deps.map((d) => {
@@ -883,7 +894,9 @@ function ReviewStep({
                 >
                   <Icon className="size-4 shrink-0 text-muted-foreground" />
                   <span className="flex-1 truncate">{d.title}</span>
-                  <span className="text-muted-foreground">required</span>
+                  <span className="text-muted-foreground">
+                    {m['label.required']()}
+                  </span>
                 </div>
               );
             })}
@@ -923,9 +936,12 @@ function VersionCombobox({
         itemToStringLabel={(v: ContentVersion) => v.version_number}
         itemToStringValue={(v: ContentVersion) => v.version_number}
       >
-        <ComboboxInput placeholder="Select version" className="w-48" />
+        <ComboboxInput
+          placeholder={m['content.select_version']()}
+          className="w-48"
+        />
         <ComboboxContent>
-          <ComboboxEmpty>No versions.</ComboboxEmpty>
+          <ComboboxEmpty>{m['content.no_versions']()}</ComboboxEmpty>
           <ComboboxList>
             {(v: ContentVersion) => (
               <ComboboxItem key={v.id} value={v}>
@@ -934,7 +950,7 @@ function VersionCombobox({
                     {v.version_number}
                     {v.id === latestId && (
                       <Badge variant="secondary" className="text-[10px]">
-                        latest
+                        {m['label.latest']()}
                       </Badge>
                     )}
                     {v.channel !== 'release' && (

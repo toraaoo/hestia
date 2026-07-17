@@ -13,6 +13,7 @@ import { kindInfo } from '@/features/content/kinds';
 import { getProject, projectVersions } from '@/features/content/mock';
 import { agoLabel, compact } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
+import { m } from '@/paraglide/messages.js';
 
 export type ProjectTab = 'description' | 'versions';
 
@@ -34,7 +35,7 @@ export function ProjectDetailPage({
   if (!project || project.kind !== kind) {
     return (
       <div className="p-6">
-        <Empty>That project could not be found.</Empty>
+        <Empty>{m['browse.project_missing']()}</Empty>
       </div>
     );
   }
@@ -49,16 +50,18 @@ export function ProjectDetailPage({
   return (
     <div className="flex min-h-full flex-col">
       <DetailHero
-        parentLabel={parent.label}
+        parentLabel={parent.label()}
         parentTo="/browse/$kind"
         parentParams={{ kind: parent.slug }}
         icon={contentIcon(project.kind)}
         name={project.title}
         badges={
           <>
-            <Badge variant="secondary">{contentKindLabel[project.kind]}</Badge>
+            <Badge variant="secondary">
+              {contentKindLabel[project.kind]()}
+            </Badge>
             <span className="text-xs text-muted-foreground">
-              by {project.author}
+              {m['browse.by_author']({ name: project.author })}
             </span>
           </>
         }
@@ -69,7 +72,7 @@ export function ProjectDetailPage({
             onClick={() => openInstall()}
           >
             <PlusIcon weight="bold" />
-            Install
+            {m['action.install']()}
           </Button>
         }
       />
@@ -80,8 +83,10 @@ export function ProjectDetailPage({
         className="gap-0 p-0"
       >
         <TabsList variant="line" className="h-auto gap-6 px-5">
-          <TabsTrigger value="description">Description</TabsTrigger>
-          <TabsTrigger value="versions">Versions</TabsTrigger>
+          <TabsTrigger value="description">
+            {m['tab.description']()}
+          </TabsTrigger>
+          <TabsTrigger value="versions">{m['tab.versions']()}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="description" className="p-5">
@@ -94,18 +99,21 @@ export function ProjectDetailPage({
               <div className="divide-y divide-border border border-border p-3">
                 <div className="flex items-center gap-2 pb-2 text-xs text-muted-foreground">
                   <DownloadSimpleIcon className="size-4" />
-                  {compact(project.downloads)} downloads
+                  {m['browse.downloads']({ count: compact(project.downloads) })}
                 </div>
                 <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
                   <HeartIcon className="size-4" />
-                  {compact(project.follows)} followers
+                  {m['browse.followers']({ count: compact(project.follows) })}
                 </div>
-                <Stat label="Updated" value={agoLabel(project.updated_unix)} />
+                <Stat
+                  label={m['label.updated']()}
+                  value={agoLabel(project.updated_unix)}
+                />
               </div>
 
               <div>
                 <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  Categories
+                  {m['label.categories']()}
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
                   {project.categories.map((c) => (
@@ -147,7 +155,7 @@ export function ProjectDetailPage({
                   onClick={() => openInstall(v.id)}
                 >
                   <PlusIcon weight="bold" />
-                  Install
+                  {m['action.install']()}
                 </Button>
               </div>
             ))}

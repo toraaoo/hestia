@@ -25,6 +25,7 @@ import {
 import { instances, servers } from '@/features/entries/mock';
 import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { m } from '@/paraglide/messages.js';
 
 export type View = 'grid' | 'list';
 
@@ -37,8 +38,8 @@ export const instanceCards: EntryCardData[] = instances.map((i) => ({
   running: i.running,
   ready: true,
   subtitle: i.running
-    ? `${i.sessions} running`
-    : `Last played ${agoLabel(i.last_played_unix)}`,
+    ? m['entry.sessions_running']({ count: i.sessions })
+    : m['entry.last_played_ago']({ when: agoLabel(i.last_played_unix) }),
 }));
 
 export const serverCards: EntryCardData[] = servers.map((s) => ({
@@ -50,8 +51,12 @@ export const serverCards: EntryCardData[] = servers.map((s) => ({
   running: s.running,
   ready: s.ready,
   subtitle: !s.ready
-    ? 'Preparing…'
-    : `:${s.port ?? '—'} · ${s.running ? `${s.players} online` : 'Stopped'}`,
+    ? m['status.preparing_ellipsis']()
+    : `:${s.port ?? '—'} · ${
+        s.running
+          ? m['entry.players_online']({ count: s.players })
+          : m['status.stopped']()
+      }`,
 }));
 
 export const instanceFlavors = [...new Set(instanceCards.map((c) => c.flavor))];
@@ -91,7 +96,7 @@ export function FilterMenu({ groups }: { groups: FlavorGroup[] }) {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Filter by flavor"
+            aria-label={m['collection.filter_by_flavor']()}
             className={cn(filtered ? 'text-ember' : 'text-muted-foreground')}
           >
             <FunnelSimpleIcon weight={filtered ? 'bold' : 'regular'} />
@@ -108,7 +113,9 @@ export function FilterMenu({ groups }: { groups: FlavorGroup[] }) {
                 value={group.value}
                 onValueChange={(value) => group.onChange(String(value))}
               >
-                <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="all">
+                  {m['label.all']()}
+                </DropdownMenuRadioItem>
                 {group.flavors.map((f) => (
                   <DropdownMenuRadioItem
                     key={f}
@@ -137,12 +144,16 @@ export function ViewToggle({
 }) {
   const next: View = view === 'grid' ? 'list' : 'grid';
   const Icon = next === 'list' ? RowsIcon : SquaresFourIcon;
+  const label =
+    next === 'list'
+      ? m['collection.switch_to_list']()
+      : m['collection.switch_to_grid']();
   return (
     <Button
       variant="ghost"
       size="icon"
-      aria-label={`Switch to ${next} view`}
-      title={`Switch to ${next} view`}
+      aria-label={label}
+      title={label}
       onClick={() => onView(next)}
       className="text-muted-foreground"
     >

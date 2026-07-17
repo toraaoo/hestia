@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Instance, Server } from '@/features/entries/mock';
 import { memGb } from '@/lib/format';
+import { m } from '@/paraglide/messages.js';
 
 type Kind = 'server' | 'instance';
 
@@ -11,11 +12,11 @@ type Kind = 'server' | 'instance';
  */
 
 export const flavorStepSchema = z.object({
-  flavor: z.string().min(1, 'Pick a flavor to continue.'),
+  flavor: z.string().min(1, m['error.pick_flavor']()),
 });
 
 export const versionStepSchema = z.object({
-  version: z.string().min(1, 'Choose a version to continue.'),
+  version: z.string().min(1, m['error.choose_version']()),
   loaderVersion: z.string(),
 });
 
@@ -28,17 +29,17 @@ export function detailsStepSchema(kind: Kind) {
     difficulty: z.string(),
     maxPlayers: z
       .string()
-      .regex(/^\d+$/, 'Enter a whole number.')
-      .refine((v) => Number(v) >= 1, 'At least one player.'),
+      .regex(/^\d+$/, m['error.whole_number']())
+      .refine((v) => Number(v) >= 1, m['error.min_players']()),
     port: z
       .string()
-      .regex(/^\d*$/, 'Port must be a number.')
-      .refine((v) => v === '' || Number(v) <= 65535, 'Port is out of range.'),
+      .regex(/^\d*$/, m['error.port_number']())
+      .refine((v) => v === '' || Number(v) <= 65535, m['error.port_range']()),
     pvp: z.boolean(),
     onlineMode: z.boolean(),
     eula:
       kind === 'server'
-        ? z.literal(true, { error: 'Accept the EULA to create a server.' })
+        ? z.literal(true, { error: m['error.eula']() })
         : z.boolean(),
   });
 }
@@ -76,7 +77,7 @@ export const jvmArgsField = z.string();
 
 export function instanceSettingsSchema() {
   return z.object({
-    name: z.string().min(1, 'A name is required.'),
+    name: z.string().min(1, m['error.name_required']()),
     version: z.string().min(1),
     loader: z.string().min(1),
     memory: z.number().min(2).max(32),
@@ -96,14 +97,14 @@ export function instanceSettingsDefaults(inst: Instance) {
 
 export function serverSettingsSchema() {
   return z.object({
-    name: z.string().min(1, 'A name is required.'),
+    name: z.string().min(1, m['error.name_required']()),
     memory: z.number().min(2).max(32),
     jvmArgs: jvmArgsField,
     backupInterval: z.string(),
     backupRetention: z
       .number()
-      .int('Whole number of backups.')
-      .min(1, 'Keep at least one.'),
+      .int(m['error.backup_whole']())
+      .min(1, m['error.backup_min']()),
   });
 }
 

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
+import { m } from '@/paraglide/messages.js';
+
 /** Zod schema + defaults for the launcher settings form. */
 export const settingsSchema = z.object({
   theme: z.string(),
-  dataDir: z.string().min(1, 'A data directory is required.'),
+  dataDir: z.string().min(1, m['error.data_dir_required']()),
   startAtLogin: z.boolean(),
   keepOpen: z.boolean(),
   memory: z.number().min(2).max(32),

@@ -34,6 +34,7 @@ import { ResourceCards } from '@/features/entries/resource-panel';
 import { InstanceSettingsForm } from '@/features/entries/settings-forms';
 import { agoLabel } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
+import { m } from '@/paraglide/messages.js';
 
 const logLines = [
   '[12:31:08] [main/INFO]: Setting user: toraaoo',
@@ -78,7 +79,7 @@ export function InstanceDetailPage({
   if (!inst) {
     return (
       <div className="p-6">
-        <Empty>That instance no longer exists.</Empty>
+        <Empty>{m['instances.missing']()}</Empty>
       </div>
     );
   }
@@ -86,7 +87,7 @@ export function InstanceDetailPage({
   return (
     <div className="flex min-h-full flex-col">
       <DetailHero
-        parentLabel="Library"
+        parentLabel={m['nav.library']()}
         parentTo="/instances"
         icon={entryIcon('instance')}
         name={inst.name}
@@ -101,14 +102,18 @@ export function InstanceDetailPage({
             {inst.running && (
               <Badge variant="secondary" className="gap-1.5">
                 <StatusDot tone="on" />
-                {inst.sessions} running
+                {m['entry.sessions_running']({ count: inst.sessions })}
               </Badge>
             )}
           </>
         }
         actions={
           <>
-            <Button variant="outline" size="icon" aria-label="Open folder">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label={m['detail.open_folder']()}
+            >
               <FolderOpenIcon className="size-4" />
             </Button>
             {inst.running ? (
@@ -116,16 +121,18 @@ export function InstanceDetailPage({
                 trigger={
                   <Button variant="outline" data-icon="inline-start">
                     <PowerIcon weight="bold" />
-                    Stop
+                    {m['action.stop']()}
                   </Button>
                 }
-                title={`Stop ${inst.name}?`}
+                title={m['entry.stop_title']({ name: inst.name })}
                 description={
                   inst.sessions > 1
-                    ? `All ${inst.sessions} running sessions are closed. Unsaved progress may be lost.`
-                    : 'The running game session is closed. Unsaved progress may be lost.'
+                    ? m['entry.stop_sessions_description']({
+                        count: inst.sessions,
+                      })
+                    : m['entry.stop_instance_description']()
                 }
-                confirmLabel="Stop"
+                confirmLabel={m['action.stop']()}
                 onConfirm={() => {}}
               />
             ) : (
@@ -134,7 +141,7 @@ export function InstanceDetailPage({
                 className="bg-ember text-ember-foreground hover:bg-ember/90"
               >
                 <PlayIcon weight="fill" />
-                Play
+                {m['action.play']()}
               </Button>
             )}
           </>
@@ -147,51 +154,64 @@ export function InstanceDetailPage({
         className="min-h-0 flex-1 gap-0 p-0"
       >
         <TabsList variant="line" className="h-auto gap-6 px-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="overview">{m['tab.overview']()}</TabsTrigger>
           <TabsTrigger value="content">
-            Content
+            {m['tab.content']()}
             <TabCount n={inst.content.length} />
           </TabsTrigger>
           <TabsTrigger value="worlds">
-            Worlds
+            {m['tab.worlds']()}
             <TabCount n={inst.worlds.length} />
           </TabsTrigger>
           <TabsTrigger value="backups">
-            Backups
+            {m['tab.backups']()}
             <TabCount n={inst.backups.length} />
           </TabsTrigger>
-          <TabsTrigger value="logs">Logs</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="logs">{m['tab.logs']()}</TabsTrigger>
+          <TabsTrigger value="settings">{m['tab.settings']()}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col p-5">
           <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_260px]">
             <div className="flex flex-col gap-5">
               <p className="max-w-2xl text-sm leading-relaxed text-foreground/90">
-                A {inst.flavor} {inst.game_version} instance with{' '}
-                {inst.content.length} mods across {inst.worlds.length} worlds.
+                {m['entry.overview_summary']({
+                  flavor: inst.flavor,
+                  version: inst.game_version,
+                  mods: inst.content.length,
+                  worlds: inst.worlds.length,
+                })}
               </p>
               <div className="grid grid-cols-3 gap-3">
-                <StatCard value={inst.content.length} label="Content" />
-                <StatCard value={inst.worlds.length} label="Worlds" />
-                <StatCard value={inst.memory} label="Memory" />
+                <StatCard
+                  value={inst.content.length}
+                  label={m['label.content']()}
+                />
+                <StatCard
+                  value={inst.worlds.length}
+                  label={m['label.worlds']()}
+                />
+                <StatCard value={inst.memory} label={m['label.memory']()} />
               </div>
               <ResourceCards id={inst.id} />
             </div>
 
             <div className="space-y-4">
-              <SideCard title="Details">
+              <SideCard title={m['label.details']()}>
                 <div className="divide-y divide-border">
-                  <Stat label="Loader" value={inst.flavor} />
-                  <Stat label="Version" value={inst.game_version} />
-                  <Stat label="Java" value={inst.java_major} />
+                  <Stat label={m['label.loader']()} value={inst.flavor} />
                   <Stat
-                    label="Last played"
+                    label={m['label.version']()}
+                    value={inst.game_version}
+                  />
+                  <Stat label={m['label.java']()} value={inst.java_major} />
+                  <Stat
+                    label={m['label.last_played']()}
                     value={agoLabel(inst.last_played_unix)}
                   />
                 </div>
               </SideCard>
-              <SideCard title="Quick actions">
+              <SideCard title={m['detail.quick_actions']()}>
                 <div className="flex flex-col gap-1">
                   <Button
                     variant="ghost"
@@ -200,7 +220,7 @@ export function InstanceDetailPage({
                     data-icon="inline-start"
                   >
                     <FolderOpenIcon />
-                    Open folder
+                    {m['detail.open_folder']()}
                   </Button>
                   <Button
                     variant="ghost"
@@ -209,7 +229,7 @@ export function InstanceDetailPage({
                     data-icon="inline-start"
                   >
                     <CopyIcon />
-                    Duplicate
+                    {m['detail.duplicate']()}
                   </Button>
                   <Button
                     variant="ghost"
@@ -218,7 +238,7 @@ export function InstanceDetailPage({
                     data-icon="inline-start"
                   >
                     <UploadSimpleIcon />
-                    Export
+                    {m['detail.export']()}
                   </Button>
                 </div>
               </SideCard>
@@ -240,7 +260,7 @@ export function InstanceDetailPage({
                 onClick={() => setAddingContent(true)}
               >
                 <PlusIcon weight="bold" />
-                Add content
+                {m['content.add']()}
               </Button>
             }
           />
@@ -248,7 +268,7 @@ export function InstanceDetailPage({
 
         <TabsContent value="worlds" className="p-5">
           {inst.worlds.length === 0 ? (
-            <Empty>No saved worlds yet.</Empty>
+            <Empty>{m['detail.no_worlds']()}</Empty>
           ) : (
             <div className="divide-y divide-border border border-border">
               {inst.worlds.map((w) => (
@@ -265,7 +285,7 @@ export function InstanceDetailPage({
           <div className="mb-5 flex justify-end">
             <Button size="sm" variant="outline" data-icon="inline-start">
               <PlusIcon weight="bold" />
-              Create backup
+              {m['backup.create']()}
             </Button>
           </div>
           <BackupList backups={inst.backups} />
@@ -279,7 +299,7 @@ export function InstanceDetailPage({
               ))}
             </div>
           ) : (
-            <Empty>Launch this instance to stream its log here.</Empty>
+            <Empty>{m['detail.logs_empty']()}</Empty>
           )}
         </TabsContent>
 

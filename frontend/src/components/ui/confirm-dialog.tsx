@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { m } from '@/paraglide/messages.js';
 
 /**
  * A confirmation dialog for destructive or otherwise irreversible actions.
@@ -28,8 +29,8 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   destructive = false,
   onConfirm,
 }: {
@@ -54,13 +55,15 @@ export function ConfirmDialog({
           )}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel size="sm">{cancelLabel}</AlertDialogCancel>
+          <AlertDialogCancel size="sm">
+            {cancelLabel ?? m['action.cancel']()}
+          </AlertDialogCancel>
           <AlertDialogAction
             size="sm"
             variant={destructive ? 'destructive' : 'default'}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmLabel ?? m['action.confirm']()}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

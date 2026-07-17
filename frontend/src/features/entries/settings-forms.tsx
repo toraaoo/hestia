@@ -12,6 +12,7 @@ import {
   serverSettingsSchema,
 } from '@/features/entries/schema';
 import { useAppForm } from '@/hooks/form';
+import { m } from '@/paraglide/messages.js';
 
 const MC_VERSIONS = ['1.21.4', '1.21.1', '1.20.1', '1.19.2'];
 const LOADERS = ['vanilla', 'fabric'];
@@ -26,32 +27,34 @@ function DangerZone({
   name: string;
   children?: React.ReactNode;
 }) {
+  const removeLabel =
+    noun === 'server'
+      ? m['entry_settings.remove_server']()
+      : m['entry_settings.remove_instance']();
   return (
     <>
       <FieldSeparator />
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" data-icon="inline-start">
           <ArrowsClockwiseIcon />
-          Change version
+          {m['entry_settings.change_version']()}
         </Button>
         {children}
         <ConfirmDialog
           trigger={
             <Button variant="destructive" size="sm" data-icon="inline-start">
               <TrashIcon />
-              Remove {noun}
+              {removeLabel}
             </Button>
           }
-          title={`Remove ${noun}?`}
-          description={
-            <>
-              <span className="font-medium text-foreground">{name}</span> and
-              all its data — worlds, backups, and installed content — are
-              permanently deleted. This cannot be undone.
-            </>
+          title={
+            noun === 'server'
+              ? m['entry_settings.remove_server_title']()
+              : m['entry_settings.remove_instance_title']()
           }
+          description={m['entry_settings.remove_description']({ name })}
           destructive
-          confirmLabel={`Remove ${noun}`}
+          confirmLabel={removeLabel}
           onConfirm={() => {}}
         />
       </div>
@@ -77,14 +80,16 @@ export function InstanceSettingsForm({ inst }: { inst: Instance }) {
     >
       <FieldGroup>
         <form.AppField name="name">
-          {(field) => <field.TextField label="Instance name" />}
+          {(field) => (
+            <field.TextField label={m['entry_settings.instance_name']()} />
+          )}
         </form.AppField>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <form.AppField name="version">
             {(field) => (
               <field.SelectField
-                label="Minecraft version"
+                label={m['entry_settings.minecraft_version']()}
                 options={MC_VERSIONS.map((v) => ({ value: v, label: v }))}
                 triggerClassName="w-full"
               />
@@ -93,7 +98,7 @@ export function InstanceSettingsForm({ inst }: { inst: Instance }) {
           <form.AppField name="loader">
             {(field) => (
               <field.SelectField
-                label="Mod loader"
+                label={m['entry_settings.mod_loader']()}
                 options={LOADERS.map((l) => ({
                   value: l,
                   label: l,
@@ -108,8 +113,8 @@ export function InstanceSettingsForm({ inst }: { inst: Instance }) {
         <form.AppField name="memory">
           {(field) => (
             <field.SliderField
-              label="Allocated memory"
-              formatValue={(v) => `${v} GB`}
+              label={m['entry_settings.allocated_memory']()}
+              formatValue={(v) => m['wizard.gb']({ value: v })}
               sliderClassName="max-w-md"
               min={2}
               max={32}
@@ -121,7 +126,7 @@ export function InstanceSettingsForm({ inst }: { inst: Instance }) {
         <form.AppField name="jvmArgs">
           {(field) => (
             <field.TextField
-              label="Java arguments"
+              label={m['entry_settings.java_arguments']()}
               placeholder="-XX:+UseG1GC"
               inputClassName="font-mono"
             />
@@ -152,14 +157,16 @@ export function ServerSettingsForm({ server }: { server: Server }) {
     >
       <FieldGroup>
         <form.AppField name="name">
-          {(field) => <field.TextField label="Server name" />}
+          {(field) => (
+            <field.TextField label={m['entry_settings.server_name']()} />
+          )}
         </form.AppField>
 
         <form.AppField name="memory">
           {(field) => (
             <field.SliderField
-              label="Allocated memory"
-              formatValue={(v) => `${v} GB`}
+              label={m['entry_settings.allocated_memory']()}
+              formatValue={(v) => m['wizard.gb']({ value: v })}
               sliderClassName="max-w-md"
               min={2}
               max={32}
@@ -171,7 +178,7 @@ export function ServerSettingsForm({ server }: { server: Server }) {
         <form.AppField name="jvmArgs">
           {(field) => (
             <field.TextField
-              label="Java arguments"
+              label={m['entry_settings.java_arguments']()}
               placeholder="-XX:+UseG1GC"
               inputClassName="font-mono"
             />
@@ -182,10 +189,12 @@ export function ServerSettingsForm({ server }: { server: Server }) {
           <form.AppField name="backupInterval">
             {(field) => (
               <field.SelectField
-                label="Backup schedule"
+                label={m['entry_settings.backup_schedule']()}
                 options={INTERVALS.map((iv) => ({
                   value: iv || 'off',
-                  label: iv ? `Every ${iv}` : 'Off',
+                  label: iv
+                    ? m['entry_settings.every_interval']({ interval: iv })
+                    : m['label.off'](),
                 }))}
                 triggerClassName="w-full"
               />
@@ -195,9 +204,9 @@ export function ServerSettingsForm({ server }: { server: Server }) {
           <form.AppField name="backupRetention">
             {(field) => (
               <field.NumberField
-                label="Keep backups"
+                label={m['entry_settings.keep_backups']()}
                 min={1}
-                description="Newest scheduled archives."
+                description={m['entry_settings.keep_backups_hint']()}
               />
             )}
           </form.AppField>

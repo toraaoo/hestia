@@ -7,6 +7,7 @@ import { ContentCard } from '@/features/content/content-card';
 import { contentKinds, kindInfo } from '@/features/content/kinds';
 import { contentProjects } from '@/features/content/mock';
 import type { ContentKind } from '@/lib/mock';
+import { m } from '@/paraglide/messages.js';
 
 export function BrowsePage({ kind }: { kind?: ContentKind }) {
   const { query } = useSearch();
@@ -25,14 +26,14 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
 
   return (
     <Page
-      title="Browse content"
-      subtitle="Discover mods, packs and shaders on Modrinth"
+      title={m['nav.browse']()}
+      subtitle={m['browse.subtitle']()}
       search
-      searchPlaceholder="Search Modrinth"
+      searchPlaceholder={m['search.modrinth']()}
     >
       <div className="mb-5 flex flex-wrap gap-1.5">
         <Link to="/browse" className={chipClass(!kind)}>
-          All
+          {m['label.all']()}
         </Link>
         {contentKinds.map((k) => (
           <Link
@@ -41,14 +42,14 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
             params={{ kind: kindInfo[k].slug }}
             className={chipClass(kind === k)}
           >
-            {kindInfo[k].label}
+            {kindInfo[k].label()}
           </Link>
         ))}
       </div>
 
       {results.length === 0 ? (
         <p className="border border-dashed border-border px-4 py-10 text-center text-xs text-muted-foreground">
-          Nothing matches your search.
+          {m['browse.nothing_matches']()}
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">

@@ -14,6 +14,7 @@ import {
   ViewToggle,
 } from '@/features/entries/collection';
 import { CreateEntryModal } from '@/features/entries/create-modal';
+import { m } from '@/paraglide/messages.js';
 
 export function ServersPage({
   view,
@@ -32,16 +33,16 @@ export function ServersPage({
 
   return (
     <Page
-      title="Servers"
-      subtitle="Worlds you host"
+      title={m['nav.servers']()}
+      subtitle={m['servers.subtitle']()}
       search
-      searchPlaceholder="Search servers"
+      searchPlaceholder={m['search.servers']()}
       actions={
         <>
           <FilterMenu
             groups={[
               {
-                label: 'Flavor',
+                label: m['label.flavor'](),
                 flavors: serverFlavors,
                 value: flavor,
                 onChange: onFlavorChange,
@@ -55,7 +56,7 @@ export function ServersPage({
             onClick={() => setCreating(true)}
           >
             <PlusIcon weight="bold" />
-            New server
+            {m['servers.new']()}
           </Button>
         </>
       }
@@ -63,7 +64,7 @@ export function ServersPage({
       <EntryCollection
         cards={cards}
         view={view}
-        empty="No servers match your search."
+        empty={m['servers.none_match']()}
       />
       <CreateEntryModal
         kind="server"

@@ -27,38 +27,39 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { pinnedInstances } from '@/features/entries/mock';
 import { account, accounts } from '@/lib/mock';
 import { cn } from '@/lib/utils';
+import { m } from '@/paraglide/messages.js';
 
 interface NavItem {
   to: string;
-  label: string;
+  label: () => string;
   icon: Icon;
   /** Path prefixes that also light this item (detail routes, etc.). */
   match: string[];
 }
 
 const nav: NavItem[] = [
-  { to: '/', label: 'Library', icon: PackageIcon, match: ['/'] },
+  { to: '/', label: m['nav.library'], icon: PackageIcon, match: ['/'] },
   {
     to: '/browse',
-    label: 'Browse content',
+    label: m['nav.browse'],
     icon: StorefrontIcon,
     match: ['/browse'],
   },
   {
     to: '/instances',
-    label: 'Instances',
+    label: m['nav.instances'],
     icon: CubeIcon,
     match: ['/instances'],
   },
   {
     to: '/servers',
-    label: 'Servers',
+    label: m['nav.servers'],
     icon: HardDrivesIcon,
     match: ['/servers'],
   },
   {
     to: '/skins',
-    label: 'Skins',
+    label: m['nav.skins'],
     icon: TShirtIcon,
     match: ['/skins'],
   },
@@ -92,7 +93,7 @@ export function Sidebar() {
         <NavLink
           item={{
             to: '/settings',
-            label: 'Settings',
+            label: m['nav.settings'],
             icon: GearSixIcon,
             match: ['/settings'],
           }}
@@ -110,11 +111,11 @@ function PinnedSection({ pathname }: { pathname: string }) {
     <div className="border-t border-border p-2">
       <div className="flex items-center justify-between px-3 pt-1 pb-1.5">
         <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-          Pinned
+          {m['label.pinned']()}
         </span>
         <button
           type="button"
-          aria-label="New instance"
+          aria-label={m['instances.new']()}
           className="text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
         >
           <PlusIcon className="size-3.5" />
@@ -175,7 +176,7 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
         )}
       />
       <Icon weight={active ? 'fill' : 'regular'} className="size-4.5" />
-      {label}
+      {label()}
     </Link>
   );
 }
@@ -198,7 +199,7 @@ function AccountMenu() {
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm">{account.name}</span>
                 <span className="block truncate text-[11px] text-muted-foreground">
-                  Microsoft account
+                  {m['account.microsoft']()}
                 </span>
               </span>
               <CaretUpDownIcon className="size-4 shrink-0 text-muted-foreground" />
@@ -207,13 +208,15 @@ function AccountMenu() {
         />
         <DropdownMenuContent side="top" align="start" className="w-48">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Signed in as {account.name}</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              {m['account.signed_in_as']({ name: account.name })}
+            </DropdownMenuLabel>
             {others.map((a) => (
               <DropdownMenuItem key={a.uuid}>
                 <span className="grid size-5 shrink-0 place-items-center bg-muted text-[9px] font-semibold text-muted-foreground ring-1 ring-border">
                   {a.name.slice(0, 2).toUpperCase()}
                 </span>
-                Switch to {a.name}
+                {m['account.switch_to']({ name: a.name })}
               </DropdownMenuItem>
             ))}
           </DropdownMenuGroup>
@@ -221,11 +224,11 @@ function AccountMenu() {
           <DropdownMenuGroup>
             <DropdownMenuItem>
               <PlusIcon />
-              Add account
+              {m['account.add']()}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setSigningOut(true)}>
               <SignOutIcon />
-              Sign out
+              {m['account.sign_out']()}
             </DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>
@@ -234,10 +237,10 @@ function AccountMenu() {
       <ConfirmDialog
         open={signingOut}
         onOpenChange={setSigningOut}
-        title={`Sign out ${account.name}?`}
-        description="You'll need to sign in with Microsoft again to launch as this account."
+        title={m['account.sign_out_title']({ name: account.name })}
+        description={m['account.sign_out_description']()}
         destructive
-        confirmLabel="Sign out"
+        confirmLabel={m['account.sign_out']()}
         onConfirm={() => setSigningOut(false)}
       />
     </>

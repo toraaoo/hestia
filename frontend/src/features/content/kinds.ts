@@ -1,4 +1,5 @@
 import type { ContentKind } from '@/lib/mock';
+import { m } from '@/paraglide/messages.js';
 
 export type KindSlug =
   | 'mods'
@@ -7,14 +8,16 @@ export type KindSlug =
   | 'shaders'
   | 'datapacks';
 
-export const kindInfo: Record<ContentKind, { slug: KindSlug; label: string }> =
-  {
-    mod: { slug: 'mods', label: 'Mods' },
-    modpack: { slug: 'modpacks', label: 'Modpacks' },
-    resourcepack: { slug: 'resourcepacks', label: 'Resource packs' },
-    shader: { slug: 'shaders', label: 'Shaders' },
-    datapack: { slug: 'datapacks', label: 'Datapacks' },
-  };
+export const kindInfo: Record<
+  ContentKind,
+  { slug: KindSlug; label: () => string }
+> = {
+  mod: { slug: 'mods', label: m['kind.mods'] },
+  modpack: { slug: 'modpacks', label: m['kind.modpacks'] },
+  resourcepack: { slug: 'resourcepacks', label: m['kind.resourcepacks'] },
+  shader: { slug: 'shaders', label: m['kind.shaders'] },
+  datapack: { slug: 'datapacks', label: m['kind.datapacks'] },
+};
 
 export const contentKinds = Object.keys(kindInfo) as ContentKind[];
 

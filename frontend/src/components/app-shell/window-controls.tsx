@@ -9,6 +9,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useState } from 'react';
 
 import { cn } from '@/lib/utils';
+import { m } from '@/paraglide/messages.js';
 
 /**
  * Custom min/maximize/close for the frameless window (`decorations: false`).
@@ -48,11 +49,11 @@ export function WindowControls() {
 
   return (
     <div className="flex h-full">
-      <ControlButton label="Minimize" onClick={minimize}>
+      <ControlButton label={m['window.minimize']()} onClick={minimize}>
         <MinusIcon weight="bold" className="size-3.5" />
       </ControlButton>
       <ControlButton
-        label={maximized ? 'Restore' : 'Maximize'}
+        label={maximized ? m['window.restore']() : m['window.maximize']()}
         onClick={toggleMaximize}
       >
         {maximized ? (
@@ -61,7 +62,7 @@ export function WindowControls() {
           <CornersOutIcon weight="bold" className="size-3.5" />
         )}
       </ControlButton>
-      <ControlButton label="Close" onClick={close} danger>
+      <ControlButton label={m['window.close']()} onClick={close} danger>
         <XIcon weight="bold" className="size-3.5" />
       </ControlButton>
     </div>

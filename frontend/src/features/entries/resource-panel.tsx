@@ -13,6 +13,7 @@ import { type ChartConfig, ChartContainer } from '@/components/ui/chart';
 import { StatusDot } from '@/components/ui/status-dot';
 import { getEntryResources } from '@/features/entries/mock';
 import { bytes, memGb } from '@/lib/format';
+import { m } from '@/paraglide/messages.js';
 
 /** Rolling window length and refresh cadence of the simulated feed. */
 const SAMPLES = 40;
@@ -83,8 +84,8 @@ function useLiveResources(
 }
 
 const chartConfig = {
-  cpu: { label: 'CPU', color: 'var(--color-ember)' },
-  mem: { label: 'Memory', color: 'var(--chart-2)' },
+  cpu: { label: m['label.cpu'](), color: 'var(--color-ember)' },
+  mem: { label: m['label.memory'](), color: 'var(--chart-2)' },
 } satisfies ChartConfig;
 
 function Sparkline({
@@ -148,9 +149,19 @@ function MetricCard({
 
 /** A believable, deterministic split of an entry's on-disk footprint. */
 const diskParts = [
-  { label: 'Worlds', frac: 0.55, color: 'var(--color-ember)' },
-  { label: 'Content', frac: 0.3, color: 'var(--chart-2)' },
-  { label: 'Other', frac: 0.15, color: 'var(--chart-4)' },
+  {
+    id: 'worlds',
+    label: m['label.worlds'],
+    frac: 0.55,
+    color: 'var(--color-ember)',
+  },
+  {
+    id: 'content',
+    label: m['label.content'],
+    frac: 0.3,
+    color: 'var(--chart-2)',
+  },
+  { id: 'other', label: m['label.other'], frac: 0.15, color: 'var(--chart-4)' },
 ];
 
 /**
@@ -162,23 +173,23 @@ function DiskStrip({ diskBytes }: { diskBytes: number }) {
     <div className="flex flex-col gap-2 bg-card px-4 py-3 ring-1 ring-foreground/10">
       <div className="flex items-baseline justify-between text-xs">
         <span className="tracking-wide text-muted-foreground uppercase">
-          Disk
+          {m['label.disk']()}
         </span>
         <span className="tabular-nums">{bytes(diskBytes)}</span>
       </div>
       <div className="flex h-1.5 w-full overflow-hidden">
         {diskParts.map((p) => (
           <div
-            key={p.label}
+            key={p.id}
             style={{ width: `${p.frac * 100}%`, background: p.color }}
           />
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-muted-foreground">
         {diskParts.map((p) => (
-          <span key={p.label} className="flex items-center gap-1.5">
+          <span key={p.id} className="flex items-center gap-1.5">
             <span className="size-2" style={{ background: p.color }} />
-            {p.label}
+            {p.label()}
             <span className="tabular-nums text-foreground">
               {bytes(diskBytes * p.frac)}
             </span>
@@ -212,17 +223,17 @@ export function ResourceCards({ id }: { id: string }) {
     <div className="flex flex-1 flex-col gap-3">
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          System resources
+          {m['resources.system']()}
         </span>
         <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <StatusDot tone={running ? 'on' : 'off'} />
-          {running ? 'Live' : 'Idle'}
+          {running ? m['status.live']() : m['status.idle']()}
         </span>
       </div>
 
       <div className="grid flex-1 gap-3 sm:grid-cols-2">
         <MetricCard
-          label="CPU"
+          label={m['label.cpu']()}
           value={running ? `${Math.round(now.cpu)}%` : '—'}
         >
           <Sparkline
@@ -234,7 +245,7 @@ export function ResourceCards({ id }: { id: string }) {
         </MetricCard>
 
         <MetricCard
-          label="Memory"
+          label={m['label.memory']()}
           value={
             running ? (
               <>

@@ -18,6 +18,7 @@ import { javaReleases, javaRuntimes } from '@/features/settings/mock';
 import { settingsDefaults, settingsSchema } from '@/features/settings/schema';
 import { useAppForm } from '@/hooks/form';
 import { daemon } from '@/lib/mock';
+import { m } from '@/paraglide/messages.js';
 
 export function SettingsPage() {
   const [runtimes, setRuntimes] = useState(javaRuntimes);
@@ -30,7 +31,7 @@ export function SettingsPage() {
   });
 
   return (
-    <Page title="Settings" subtitle="Launcher, runtimes and daemon">
+    <Page title={m['nav.settings']()} subtitle={m['settings.subtitle']()}>
       <form
         className="max-w-2xl"
         onSubmit={(e) => {
@@ -40,15 +41,15 @@ export function SettingsPage() {
       >
         <FieldGroup>
           <FieldSet>
-            <FieldLegend>General</FieldLegend>
+            <FieldLegend>{m['settings.general']()}</FieldLegend>
             <FieldGroup>
               <form.AppField name="theme">
                 {(field) => (
                   <field.SelectField
-                    label="Theme"
+                    label={m['settings.theme']()}
                     options={[
-                      { value: 'dark', label: 'Dark' },
-                      { value: 'system', label: 'System' },
+                      { value: 'dark', label: m['settings.theme_dark']() },
+                      { value: 'system', label: m['settings.theme_system']() },
                     ]}
                     triggerClassName="w-full"
                   />
@@ -58,39 +59,39 @@ export function SettingsPage() {
               <form.AppField name="dataDir">
                 {(field) => (
                   <field.TextField
-                    label="Data directory"
-                    description="Where instances and servers live."
+                    label={m['settings.data_dir']()}
+                    description={m['settings.data_dir_hint']()}
                   />
                 )}
               </form.AppField>
 
               <form.AppField name="startAtLogin">
                 {(field) => (
-                  <field.CheckboxField label="Start Hestia at login" />
+                  <field.CheckboxField label={m['settings.start_at_login']()} />
                 )}
               </form.AppField>
 
               <form.AppField name="keepOpen">
                 {(field) => (
-                  <field.CheckboxField label="Keep the launcher open while a game runs" />
+                  <field.CheckboxField label={m['settings.keep_open']()} />
                 )}
               </form.AppField>
             </FieldGroup>
           </FieldSet>
 
           <FieldSet>
-            <FieldLegend>Java & performance</FieldLegend>
+            <FieldLegend>{m['settings.java_performance']()}</FieldLegend>
             <FieldGroup>
               <form.AppField name="memory">
                 {(field) => (
                   <field.SliderField
-                    label="Default allocated memory"
-                    formatValue={(v) => `${v} GB`}
+                    label={m['settings.default_memory']()}
+                    formatValue={(v) => m['wizard.gb']({ value: v })}
                     sliderClassName="max-w-md"
                     min={2}
                     max={32}
                     step={1}
-                    description="Instances and servers can override this individually."
+                    description={m['settings.default_memory_hint']()}
                   />
                 )}
               </form.AppField>
@@ -98,14 +99,14 @@ export function SettingsPage() {
               <form.AppField name="jvmArgs">
                 {(field) => (
                   <field.TextField
-                    label="Default JVM arguments"
+                    label={m['settings.default_jvm_args']()}
                     inputClassName="font-mono"
                   />
                 )}
               </form.AppField>
 
               <Field>
-                <FieldLabel>Installed runtimes</FieldLabel>
+                <FieldLabel>{m['settings.installed_runtimes']()}</FieldLabel>
                 <div className="divide-y divide-border border border-border">
                   {runtimes.map((rt) => (
                     <div
@@ -121,30 +122,28 @@ export function SettingsPage() {
                           {rt.version}
                         </div>
                       </div>
-                      {rt.in_use && <Badge variant="secondary">In use</Badge>}
+                      {rt.in_use && (
+                        <Badge variant="secondary">
+                          {m['settings.in_use']()}
+                        </Badge>
+                      )}
                       <ConfirmDialog
                         trigger={
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            aria-label="Uninstall runtime"
+                            aria-label={m['settings.uninstall_runtime']()}
                             disabled={rt.in_use}
                           >
                             <TrashIcon className="size-4" />
                           </Button>
                         }
-                        title="Uninstall runtime?"
-                        description={
-                          <>
-                            <span className="font-medium text-foreground">
-                              {rt.vendor} {rt.major}
-                            </span>{' '}
-                            will be removed. Entries that need it reinstall it
-                            on the next start.
-                          </>
-                        }
+                        title={m['settings.uninstall_runtime_title']()}
+                        description={m[
+                          'settings.uninstall_runtime_description'
+                        ]({ name: `${rt.vendor} ${rt.major}` })}
                         destructive
-                        confirmLabel="Uninstall"
+                        confirmLabel={m['action.uninstall']()}
                         onConfirm={() =>
                           setRuntimes((rts) =>
                             rts.filter((r) => r.major !== rt.major),
@@ -156,7 +155,7 @@ export function SettingsPage() {
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <span className="mr-1 text-xs text-muted-foreground">
-                    Install:
+                    {m['settings.install_prompt']()}
                   </span>
                   {javaReleases.map((r) => (
                     <Button
@@ -176,11 +175,11 @@ export function SettingsPage() {
           </FieldSet>
 
           <FieldSet>
-            <FieldLegend>Storage & daemon</FieldLegend>
+            <FieldLegend>{m['settings.storage_daemon']()}</FieldLegend>
             <FieldGroup>
               <Field orientation="horizontal">
                 <FieldLabel className="flex-1">
-                  Download cache
+                  {m['settings.download_cache']()}
                   <span className="font-mono text-muted-foreground">
                     1.8 GB
                   </span>
@@ -193,12 +192,12 @@ export function SettingsPage() {
                       data-icon="inline-start"
                     >
                       <BroomIcon />
-                      Clear cache
+                      {m['settings.clear_cache']()}
                     </Button>
                   }
-                  title="Clear download cache?"
-                  description="Frees the cached downloads. Files are re-fetched from the network the next time they're needed."
-                  confirmLabel="Clear cache"
+                  title={m['settings.clear_cache_title']()}
+                  description={m['settings.clear_cache_description']()}
+                  confirmLabel={m['settings.clear_cache']()}
                   onConfirm={() => {}}
                 />
               </Field>
@@ -206,8 +205,8 @@ export function SettingsPage() {
               <form.AppField name="shared">
                 {(field) => (
                   <field.TextField
-                    label="Shared config"
-                    description="Files synced across entries."
+                    label={m['settings.shared_config']()}
+                    description={m['settings.shared_config_hint']()}
                   />
                 )}
               </form.AppField>
@@ -215,20 +214,25 @@ export function SettingsPage() {
               <Field orientation="horizontal">
                 <FieldLabel className="flex-1 gap-2 font-normal">
                   <StatusDot tone={daemon.connected ? 'on' : 'off'} />
-                  Daemon {daemon.connected ? 'connected' : 'offline'}
+                  {daemon.connected
+                    ? m['daemon.connected_label']()
+                    : m['daemon.offline_label']()}
                   <span className="font-mono text-muted-foreground">
-                    v{daemon.version} · up {daemon.uptime}
+                    {m['daemon.version_uptime']({
+                      version: daemon.version,
+                      uptime: daemon.uptime,
+                    })}
                   </span>
                 </FieldLabel>
                 <ConfirmDialog
                   trigger={
                     <Button variant="outline" size="sm">
-                      Restart daemon
+                      {m['daemon.restart']()}
                     </Button>
                   }
-                  title="Restart the daemon?"
-                  description="The launcher briefly disconnects while it restarts. Running servers and instances keep running."
-                  confirmLabel="Restart"
+                  title={m['daemon.restart_title']()}
+                  description={m['daemon.restart_description']()}
+                  confirmLabel={m['action.restart']()}
                   onConfirm={() => {}}
                 />
               </Field>

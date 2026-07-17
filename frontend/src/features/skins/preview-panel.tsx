@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import type { Skin } from '@/features/skins/mock';
 import { getCape } from '@/features/skins/mock';
 import { SkinModel } from '@/features/skins/skin-render';
+import { m } from '@/paraglide/messages.js';
 
 /** The sticky left panel: animated model plus the preview → apply flow. */
 export function PreviewPanel({
@@ -26,7 +27,7 @@ export function PreviewPanel({
             variant="secondary"
             className="absolute top-2 left-2 z-10 bg-background/80 backdrop-blur-sm"
           >
-            Previewing
+            {m['skins.previewing']()}
           </Badge>
         )}
         <SkinModel
@@ -42,9 +43,11 @@ export function PreviewPanel({
         <div className="truncate text-sm font-medium">{skin.name}</div>
         <div className="mt-1.5 flex items-center gap-1.5">
           <Badge variant="secondary">
-            {skin.variant === 'slim' ? 'Slim' : 'Wide'}
+            {skin.variant === 'slim' ? m['skins.slim']() : m['skins.wide']()}
           </Badge>
-          <Badge variant="outline">{cape ? cape.name : 'No cape'}</Badge>
+          <Badge variant="outline">
+            {cape ? cape.name : m['skins.no_cape']()}
+          </Badge>
         </div>
 
         <div className="mt-3 flex gap-1.5">
@@ -56,11 +59,11 @@ export function PreviewPanel({
               onClick={onApply}
             >
               <CheckIcon weight="bold" />
-              Apply
+              {m['action.apply']()}
             </Button>
           ) : (
             <p className="text-xs text-muted-foreground">
-              This skin is equipped on your account.
+              {m['skins.equipped_hint']()}
             </p>
           )}
         </div>
