@@ -220,7 +220,8 @@
   "ready": "Pronto",
   "resolving_dependencies": "Resolvendo dependências",
   "downloading": "Baixando {name}",
-  "mirroring": "Espelhando em data/"
+  "mirroring": "Espelhando em data/",
+  "importing": "Importando {name}…"
  },
  "error": {
   "pick_flavor": "Escolha uma distribuição para continuar.",
@@ -284,7 +285,10 @@
   "change_version": "Trocar versão…",
   "change_version_title": "Trocar versão — {name}",
   "change_version_description": "Escolha qualquer versão publicada; a troca é aplicada no próximo início.",
-  "current_version": "atual"
+  "current_version": "atual",
+  "import_file": "Importar um arquivo local",
+  "import_file_hint": "Instala como está — sem atualizações nem resolução de dependências.",
+  "local_file": "arquivo local"
  },
  "backup": {
   "create": "Criar backup",

@@ -220,7 +220,8 @@
   "ready": "Ready",
   "resolving_dependencies": "Resolving dependencies",
   "downloading": "Downloading {name}",
-  "mirroring": "Mirroring into data/"
+  "mirroring": "Mirroring into data/",
+  "importing": "Importing {name}…"
  },
  "error": {
   "pick_flavor": "Pick a flavor to continue.",
@@ -284,7 +285,10 @@
   "change_version": "Change version…",
   "change_version_title": "Change version — {name}",
   "change_version_description": "Pick any published version; the swap applies at the next launch.",
-  "current_version": "current"
+  "current_version": "current",
+  "import_file": "Import a local file",
+  "import_file_hint": "Installs as-is — no updates or dependency resolution.",
+  "local_file": "local file"
  },
  "backup": {
   "create": "Create backup",

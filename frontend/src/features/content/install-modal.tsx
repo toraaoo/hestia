@@ -3,6 +3,7 @@ import {
   CaretRightIcon,
   CheckIcon,
   MagnifyingGlassIcon,
+  UploadSimpleIcon,
 } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -138,6 +139,17 @@ function projectsFor(target: Target): ContentProject[] {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * A local-file pick travels through the form's `pick.projectId` slot as a
+ * `file:<name>` marker — the daemon's `ContentAddItem` likewise takes exactly
+ * one of a project or a path.
+ */
+const FILE_MARKER = 'file:';
+const pickedFileName = (projectId: string): string | null =>
+  projectId.startsWith(FILE_MARKER)
+    ? projectId.slice(FILE_MARKER.length)
+    : null;
+
 const entryTypeLabel = (type: Target['type']): string =>
   type === 'server'
     ? m['entry.type_server']()
@@ -186,6 +198,23 @@ export function ContentInstallModal({
     validationLogic: revalidateLogic(),
     validators: { onDynamic: installWizardSchema(mode) },
     onSubmit: async ({ value }) => {
+      // A local file installs as-is: no resolution, no dependencies.
+      const fileName = pickedFileName(value.pick.projectId);
+      if (fileName) {
+        setInstalling(true);
+        setPhase(m['phase.importing']({ name: fileName }));
+        setProgress(30);
+        await sleep(700);
+        setPhase(m['phase.mirroring']());
+        setProgress(85);
+        await sleep(500);
+        setPhase(m['phase.ready']());
+        setProgress(100);
+        await sleep(400);
+        onOpenChange(false);
+        setInstalling(false);
+        return;
+      }
       const proj = contentProjects.find((p) => p.id === value.pick.projectId);
       if (!proj) return;
       const files = [proj, ...resolveDependencies(proj.id)];
@@ -243,6 +272,7 @@ export function ContentInstallModal({
           {([projectId, targetId]) => {
             const proj =
               contentProjects.find((p) => p.id === projectId) ?? null;
+            const fileName = pickedFileName(projectId);
             const target = allTargets().find((t) => t.id === targetId) ?? null;
             const needsWorlds =
               proj?.kind === 'datapack' && target?.type === 'instance';
@@ -257,6 +287,7 @@ export function ContentInstallModal({
                 pickStep={pickStep}
                 steps={steps}
                 proj={proj}
+                fileName={fileName}
                 target={target}
                 needsWorlds={needsWorlds}
                 Icon={Icon}
@@ -286,6 +317,7 @@ function WizardBody({
   pickStep,
   steps,
   proj,
+  fileName,
   target,
   needsWorlds,
   Icon,
@@ -303,6 +335,7 @@ function WizardBody({
   pickStep: string;
   steps: string[];
   proj: ContentProject | null;
+  fileName: string | null;
   target: Target | null;
   needsWorlds: boolean;
   Icon: typeof CheckIcon;
@@ -489,9 +522,18 @@ function WizardBody({
                         search={pickSearch}
                         kind={pickFilter as 'all' | ContentKind}
                         selectedId={field.state.value}
+                        fileName={fileName}
+                        // A global profile stores project references, never
+                        // files, so it takes no local import.
+                        allowFile={target.type !== 'profile'}
                         errors={fieldErrors(field)}
                         onSelect={(p) => {
                           field.handleChange(p.id);
+                          form.setFieldValue('review.versionId', '');
+                          form.setFieldValue('worlds.worlds', []);
+                        }}
+                        onPickFile={(name) => {
+                          field.handleChange(`${FILE_MARKER}${name}`);
                           form.setFieldValue('review.versionId', '');
                           form.setFieldValue('worlds.worlds', []);
                         }}
@@ -579,6 +621,10 @@ function WizardBody({
                     );
                   }}
                 </form.AppField>
+              </StepForm>
+            ) : fileName ? (
+              <StepForm onSubmit={group.handleSubmit} footer={nav}>
+                <FileReview name={fileName} target={target} />
               </StepForm>
             ) : (
               <div className="min-h-[18rem]" />
@@ -747,16 +793,23 @@ function ContentStep({
   search,
   kind,
   selectedId,
+  fileName,
+  allowFile,
   errors,
   onSelect,
+  onPickFile,
 }: {
   projects: ContentProject[];
   search: string;
   kind: 'all' | ContentKind;
   selectedId: string;
+  fileName: string | null;
+  allowFile: boolean;
   errors?: Array<{ message?: string }>;
   onSelect: (project: ContentProject) => void;
+  onPickFile: (name: string) => void;
 }) {
+  const fileRef = useRef<HTMLInputElement>(null);
   const q = search.trim().toLowerCase();
   const shown = projects.filter((p) => {
     if (kind !== 'all' && p.kind !== kind) return false;
@@ -769,6 +822,42 @@ function ContentStep({
 
   return (
     <div>
+      {allowFile && (
+        <>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".jar,.zip,.mrpack"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onPickFile(file.name);
+              e.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            aria-pressed={fileName !== null}
+            onClick={() => fileRef.current?.click()}
+            className={cn(
+              'mb-2 flex w-full items-center gap-3 border border-dashed p-3 text-left outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
+              fileName
+                ? 'border-ember bg-muted'
+                : 'border-border hover:bg-muted/60',
+            )}
+          >
+            <UploadSimpleIcon className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm">
+                {fileName ?? m['content.import_file']()}
+              </span>
+              <span className="block truncate text-[11px] text-muted-foreground">
+                {m['content.import_file_hint']()}
+              </span>
+            </span>
+          </button>
+        </>
+      )}
       {shown.length === 0 ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
           {m['browse.nothing_matches']()}
@@ -956,6 +1045,25 @@ function ReviewStep({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** The review body for a local-file import: no versions, no dependencies. */
+function FileReview({ name, target }: { name: string; target: Target | null }) {
+  return (
+    <div className="flex flex-col gap-4 p-1">
+      <div className="divide-y divide-border border border-border">
+        <ReviewRow label={m['label.content']()} value={name} />
+        <ReviewRow label={m['label.target']()} value={target?.name ?? '—'} />
+        <ReviewRow
+          label={m['label.version']()}
+          value={m['content.local_file']()}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {m['content.import_file_hint']()}
+      </p>
     </div>
   );
 }
