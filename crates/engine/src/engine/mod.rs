@@ -20,6 +20,7 @@ use crate::content::Content;
 use crate::instances::Instances;
 use crate::java::Java;
 use crate::minecraft::Minecraft;
+use crate::profiles::Profiles;
 use crate::servers::Servers;
 use crate::skins::Skins;
 use crate::sync::Sync;
@@ -58,6 +59,7 @@ pub struct Engine {
     instances: Instances,
     skins: Skins,
     sync: Sync,
+    profiles: Profiles,
     // One backup or restore per entry at a time: two archives of the same
     // data would interleave the rcon save-off/save-on dance.
     backups_active: Mutex<HashSet<String>>,
@@ -75,6 +77,7 @@ impl Engine {
         let instances = Instances::new(data_home.join("instances"));
         let skins = Skins::new(data_home.join("skins"));
         let sync = Sync::new(data_home.join("shared"));
+        let profiles = Profiles::new(data_home.join("profiles"));
         Engine {
             data_home: Mutex::new(data_home),
             config,
@@ -87,6 +90,7 @@ impl Engine {
             instances,
             skins,
             sync,
+            profiles,
             backups_active: Mutex::new(HashSet::new()),
         }
     }
@@ -109,6 +113,7 @@ impl Engine {
         self.instances.reload(resolved.join("instances"));
         self.skins.reload(resolved.join("skins"));
         self.sync.reload(resolved.join("shared"));
+        self.profiles.reload(resolved.join("profiles"));
         *self.data_home.lock().unwrap() = resolved.clone();
         tracing::info!(home = %resolved.display(), "engine data home changed");
         Ok(resolved)
@@ -152,5 +157,9 @@ impl Engine {
 
     pub fn sync(&self) -> &Sync {
         &self.sync
+    }
+
+    pub fn profiles(&self) -> &Profiles {
+        &self.profiles
     }
 }

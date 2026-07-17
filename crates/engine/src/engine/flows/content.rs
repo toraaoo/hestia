@@ -93,6 +93,19 @@ impl Engine {
         worlds: &[String],
     ) -> Result<bool> {
         let (_, ctx) = self.instance_content_ctx(reference)?;
+        // A global-profile install is owned by its profile: removing it locally
+        // would silently reappear on the next apply, so the removal is refused
+        // until the reference leaves the profile (no local-exclusion mechanism).
+        let tagged = install::load(&ctx.entry_dir).into_iter().find(|i| {
+            i.kind == kind && install::matches(i, item) && i.origin.starts_with("profile:")
+        });
+        if let Some(tagged) = tagged {
+            bail!(
+                "'{}' was installed by global profile '{}'; remove it from that profile instead",
+                tagged.title,
+                tagged.origin.trim_start_matches("profile:")
+            );
+        }
         let removed = remove_content(&ctx, kind, item, worlds)?;
         let gone: Vec<String> = removed
             .iter()
@@ -500,6 +513,7 @@ impl Engine {
                 url: file.artifact.url.clone(),
                 installed_unix: registry::now_unix(),
                 world: world.to_string(),
+                origin: String::new(),
             });
         }
         Ok(installed)
@@ -595,7 +609,13 @@ impl Engine {
                         && i.project_id == new_item.project_id
                         && (i.kind != ContentKind::DataPack || i.world == new_item.world)
                 }) {
-                    Some(entry) => *entry = new_item.clone(),
+                    Some(entry) => {
+                        // An update moves the version, not the ownership: a
+                        // profile-tagged item keeps its origin.
+                        let origin = std::mem::take(&mut entry.origin);
+                        *entry = new_item.clone();
+                        entry.origin = origin;
+                    }
                     None => index.push(new_item.clone()),
                 }
             }
