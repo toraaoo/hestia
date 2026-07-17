@@ -14,7 +14,7 @@ const CLIENT_ID: &str = "00000000402b5328";
 const REPLY_URL: &str = "https://login.live.com/oauth20_desktop.srf";
 const SCOPE: &str = "service::user.auth.xboxlive.com::MBI_SSL";
 const TITLE_ID: &str = "1794566092";
-const USER_AGENT: &str = "Hestia/1.0 (+https://github.com/toraaoo/hestia)";
+pub(crate) const USER_AGENT: &str = "Hestia/1.0 (+https://github.com/toraaoo/hestia)";
 
 const DEVICE_AUTH_URL: &str = "https://device.auth.xboxlive.com/device/authenticate";
 const SISU_AUTHENTICATE_URL: &str = "https://sisu.xboxlive.com/authenticate";

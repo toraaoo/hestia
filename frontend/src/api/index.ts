@@ -36,6 +36,7 @@ export * as instance from './instance';
 export * as java from './java';
 export * as process from './process';
 export * as server from './server';
+export * as skins from './skins';
 export * as sync from './sync';
 export type * from './types';
 export { downgradeBetween } from './types/minecraft';

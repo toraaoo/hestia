@@ -45,4 +45,5 @@ export { keys } from './keys';
 export { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
 export * from './process';
 export * from './server';
+export * from './skins';
 export * from './sync';

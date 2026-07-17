@@ -23,6 +23,7 @@ use proto::java::{JavaInstallProgress, JavaRuntime};
 use proto::minecraft::ProvisionProgress;
 use proto::process::{ProcessExitEvent, ProcessInfo, ProcessOutputEvent, ProcessSpec};
 use proto::server::ServerInfo;
+use proto::skins::{Cape, Skin};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
@@ -130,3 +131,5 @@ golden!(
 );
 golden!(search_query, SearchQuery, "search_query.json");
 golden!(content_version, ContentVersion, "content_version.json");
+golden!(skin, Skin, "skin.json");
+golden!(cape, Cape, "cape.json");

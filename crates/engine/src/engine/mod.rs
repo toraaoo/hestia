@@ -21,6 +21,7 @@ use crate::instances::Instances;
 use crate::java::Java;
 use crate::minecraft::Minecraft;
 use crate::servers::Servers;
+use crate::skins::Skins;
 use crate::sync::Sync;
 
 /// Everything a server create needs from the caller — the engine-side input to
@@ -55,6 +56,7 @@ pub struct Engine {
     content: Content,
     servers: Servers,
     instances: Instances,
+    skins: Skins,
     sync: Sync,
     // One backup or restore per entry at a time: two archives of the same
     // data would interleave the rcon save-off/save-on dance.
@@ -71,6 +73,7 @@ impl Engine {
         let accounts = Accounts::new(data_home.join("accounts.json"));
         let servers = Servers::new(data_home.join("servers"));
         let instances = Instances::new(data_home.join("instances"));
+        let skins = Skins::new(data_home.join("skins"));
         let sync = Sync::new(data_home.join("shared"));
         Engine {
             data_home: Mutex::new(data_home),
@@ -82,6 +85,7 @@ impl Engine {
             content: Content::new(),
             servers,
             instances,
+            skins,
             sync,
             backups_active: Mutex::new(HashSet::new()),
         }
@@ -103,6 +107,7 @@ impl Engine {
         self.accounts.reload(resolved.join("accounts.json"));
         self.servers.reload(resolved.join("servers"));
         self.instances.reload(resolved.join("instances"));
+        self.skins.reload(resolved.join("skins"));
         self.sync.reload(resolved.join("shared"));
         *self.data_home.lock().unwrap() = resolved.clone();
         tracing::info!(home = %resolved.display(), "engine data home changed");
@@ -139,6 +144,10 @@ impl Engine {
 
     pub fn instances(&self) -> &Instances {
         &self.instances
+    }
+
+    pub fn skins(&self) -> &Skins {
+        &self.skins
     }
 
     pub fn sync(&self) -> &Sync {

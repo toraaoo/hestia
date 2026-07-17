@@ -29,7 +29,7 @@ tracing-appender = "0.2.5"
 clap = { version = "4.6.1", features = ["derive"] }
 ratatui = { version = "0.30.2", features = ["unstable-rendered-line-info"] }
 tui-markdown = { version = "0.3.8", default-features = false }
-reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "json", "stream", "form", "query"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "json", "stream", "form", "query", "multipart"] }
 tray-icon = { version = "0.24.1", default-features = false, features = ["gtk"] }
 tao = "0.35.3"
 glib = "0.18.5"

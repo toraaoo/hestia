@@ -38,7 +38,7 @@ proto   → wire contracts + domain types (serde)                    leaf
 ipc     → transport (unix socket / named pipe) + JSON envelope      leaf   → (tokio, libc)
 common  → logging (tracing) + app identity + path resolution        leaf
 client  → typed client SDK (Session + one facade per domain)       → proto, ipc, common
-engine  → config·cache·download·java·accounts·minecraft·content    → proto, common          (daemon-only)
+engine  → config·cache·download·java·accounts·skins·minecraft·content → proto, common       (daemon-only)
 cli     → bin hestia          (clap + ratatui presentation)        → client, common, proto
 daemon  → bin hestiad         (router, services, supervisor)       → engine, proto, ipc, common, client
 desktop → bin hestia-desktop  (Tauri v2 shell)                     → (tauri)                 (+ frontend/)
@@ -100,7 +100,8 @@ pub trait Contract {
 An unsolicited daemon→client push is a **`Topic`** (the implementing type is its
 own payload). `Empty` is the `{}` payload for channels that take or return
 nothing. One module per domain: `app`, `health`, `daemon`, `config`, `cache`,
-`download`, `java`, `accounts`, `process`, `server`, `instance`, `events` —
+`download`, `java`, `accounts`, `skins`, `process`, `server`, `instance`,
+`events` —
 plus `minecraft`, the provider vocabulary (`Flavor`, `GameVersion`, `Artifact`,
 the profiles, `ProvisionProgress`) the `server` and `instance` domains share,
 and `content`, the normalized third-party content vocabulary (`ContentProject`
@@ -165,7 +166,7 @@ connection (auto-spawning `hestiad` if it is not running and `auto_spawn` is set
   through a `Client` accessor (`client.java().install(21, …)`), mirroring the
   engine's domain modules on the other side of the socket. Facade methods are
   one-liners over `Session`: `App`, `Daemon`, `Config`, `Cache`, `Java`,
-  `Accounts`, `Process`, `Server`, `Instance`, `Content`. `facades/jobs.rs` holds
+  `Accounts`, `Skins`, `Process`, `Server`, `Instance`, `Content`. `facades/jobs.rs` holds
   the drivers the server and instance facades share — the backup and content jobs
   publish the same topics, disambiguated by job id.
 - **spawn** (`spawn.rs`) — locates and launches the `hestiad` binary, then retries
@@ -221,6 +222,19 @@ The subsystems behind the aggregate:
       The HTTP steps are the private `accounts/microsoft.rs`; Xbox request signing (the
       proof key and the FILETIME-stamped `Signature` header) is `accounts/signing.rs` —
       one cross-platform `p256` implementation.
+- **`skins`** (`Skins`) — the skin library: PNG textures the user saved, kept
+  under `<data_home>/skins/` as `<key>.png` blobs beside a `library.json` index
+  (the disk is the registry, as with `java`). A row is keyed by Mojang's texture
+  hash — an upload response reports the minted key and the row follows it — so
+  matching the account's equipped skin at list time is a key comparison.
+  `skins/mojang.rs` holds the profile-customization HTTP calls (profile fetch,
+  multipart skin upload, by-URL skin change, reset, cape set/clear) against
+  `api.minecraftservices.com`, bearer-authed with the accounts subsystem's
+  rotated token; `skins/defaults.rs` is the table of the eighteen vanilla
+  default skins (nine characters × two model variants) — nothing bundled, since
+  Mojang serves every texture publicly by its hash. The flows composing
+  accounts + library (`engine/flows/skins.rs`) build the merged picker list and
+  run the changes — see the decision note below.
 - **`java`** (`Java`, `JavaProvider`) — installs and tracks Java runtimes under
   `<data_home>/java/<vendor>-<major>/` beside a `runtime.json` record; listing
   scans the directory, so the disk is the registry. `JavaProvider` is the abstract
@@ -421,6 +435,23 @@ The subsystems behind the aggregate:
 > server side, including a client's integrated server, so a source marking a
 > datapack client-unsupported must not block installing it on an instance.
 
+> **Skins follow Modrinth's shape, minus its couplings — and skip the CLI.**
+> Skin management (`skin.*`/`cape.*`) is a desktop-only surface: picking a skin
+> is visual, so the CLI deliberately grows no command for it. The design mirrors
+> Modrinth's launcher where its rules earn their keep: a local library preserves
+> textures (before any change, the currently equipped skin is saved into the
+> library if neither it nor a default already records it — switching away from
+> an externally-set skin must never lose it), library rows are keyed by Mojang's
+> texture hash (an upload response reports the minted key and the row follows
+> it), and the vanilla defaults are listed by their public texture URLs rather
+> than bundled PNGs (equipping one is a by-URL skin change). It deliberately
+> drops two Modrinth couplings: the library is **global**, not per-account
+> (a texture is not an entitlement; the equipped state is per-account already),
+> and a cape is **not** bound to a skin — Mojang's own API models them as
+> independent (`skins/active` vs `capes/active`), and binding them is what
+> forces Modrinth's save-row reconciliation dance. Changes apply immediately
+> (no debounce): the daemon is resident, so there is no app-close edge to flush.
+
 > **The entry root is hestia's; `data/` is the game's.** A server or instance
 > directory used to *be* the game's working directory, which left hestia
 > nowhere to put its own artifacts without mixing them into files the game
@@ -606,7 +637,7 @@ supervises launched processes, and manages autostart. The only crate that links
     - **`event_hub.rs`** — `EventHub` fans daemon events out to subscribed
       connections, filtered by job id, and unsubscribes them on disconnect.
 - **`services/`** — the single wire-in point, one registrar per domain
-  (`lifecycle`, `config`, `cache`, `java`, `download`, `accounts`, `process`,
+  (`lifecycle`, `config`, `cache`, `java`, `download`, `accounts`, `skins`, `process`,
   `server`, `instance`, `backup`, `content`), each registering its channels with
   one `on.handle::<C>(…)` apiece; `services/mod.rs`'s `make_router()` is the list
   of `register()` calls, and `services/guards.rs` holds the preconditions the
@@ -618,6 +649,9 @@ supervises launched processes, and manages autostart. The only crate that links
   `java.releases|list|install|uninstall`, `download.start`,
   `account.login.begin|login.complete`, `account.list|switch|remove` (`switch`
   picks the default account launches use; `list` reports it),
+  `skin.list|add|equip|reset|remove` and `cape.equip|clear` (the desktop skin
+  picker: one `skin.list` answers the merged library/defaults/external skins
+  plus the owned capes; changes relay to Mojang with the account's token),
   `process.start|stop|list|status|logs`, `events.subscribe`,
   `server.flavors|versions|resolve`,
   `server.create|update|rename|list|status|remove|start|stop|logs|command`
@@ -946,6 +980,9 @@ the app has a UI to show.
 identity, path resolution; the wire protocol and typed client SDK; the config
 store; the download cache; Java runtime management (install/list/uninstall via
 Adoptium); Microsoft account sign-in (device-code and sisu) with token rotation;
+skin and cape management for signed-in accounts (a preserved local skin
+library, the vanilla defaults, upload/equip/reset and cape selection over the
+Mojang profile API — daemon and desktop layers only, no CLI);
 the daemon's process supervisor; the Minecraft provider layer (flavors, versions,
 and profile resolution for vanilla and fabric, servers and instances); server
 management (create = fully provisioned: profile + java + jar + EULA, each

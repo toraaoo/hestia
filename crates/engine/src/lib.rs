@@ -16,6 +16,7 @@ mod java;
 mod minecraft;
 mod registry;
 mod servers;
+mod skins;
 mod sync;
 
 pub use accounts::{Accounts, LoginChallenge};
@@ -30,4 +31,5 @@ pub use java::{Java, JavaInstallOutcome};
 pub use minecraft::launch::{JavaSettings, LaunchPlan};
 pub use minecraft::Minecraft;
 pub use servers::{RconConfig, ServerRecord, Servers};
+pub use skins::Skins;
 pub use sync::Sync;

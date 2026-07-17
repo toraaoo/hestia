@@ -18,6 +18,7 @@ pub mod minecraft;
 pub mod naming;
 pub mod process;
 pub mod server;
+pub mod skins;
 pub mod sync;
 
 pub use contract::{Contract, Empty, Topic};

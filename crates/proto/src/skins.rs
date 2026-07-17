@@ -1,0 +1,175 @@
+//! The skins domain: profile skins and capes for a signed-in Minecraft account,
+//! plus the daemon's local skin library. Desktop-facing — deliberately no CLI
+//! surface. Textures cross the wire as URLs (Mojang-hosted) or data URLs
+//! (library blobs); uploads carry the PNG as base64.
+
+use serde::{Deserialize, Serialize};
+
+use crate::contract::{Contract, Empty};
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SkinVariant {
+    #[default]
+    Classic,
+    Slim,
+}
+
+/// How the daemon knows about a skin: a vanilla default, a library entry, or
+/// the account's currently equipped texture that neither covers.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SkinSource {
+    #[default]
+    Default,
+    Library,
+    External,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct Skin {
+    /// The texture hash — the stable identity a library row and an equip name.
+    pub key: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    pub variant: SkinVariant,
+    /// An https texture URL, or a data URL for a library blob.
+    pub texture: String,
+    pub source: SkinSource,
+    pub equipped: bool,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct Cape {
+    pub id: String,
+    pub name: String,
+    /// The Mojang-hosted texture URL.
+    pub texture: String,
+    pub equipped: bool,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct SkinListParams {
+    /// Name or uuid; empty uses the default account.
+    pub account: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct SkinListResult {
+    /// Library entries, then the vanilla defaults, then — only when neither
+    /// covers it — the account's equipped external skin. At most one entry is
+    /// `equipped`.
+    pub skins: Vec<Skin>,
+    /// The capes the account owns; at most one is `equipped`.
+    pub capes: Vec<Cape>,
+}
+
+pub struct SkinList;
+impl Contract for SkinList {
+    const CHANNEL: &'static str = "skin.list";
+    type Params = SkinListParams;
+    type Result = SkinListResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct SkinAddParams {
+    /// Name or uuid; empty uses the default account.
+    pub account: String,
+    /// An optional label for the library entry.
+    pub name: String,
+    pub variant: SkinVariant,
+    /// The skin PNG (64×64, or the legacy 64×32), base64-encoded.
+    pub data: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct SkinAddResult {
+    pub skin: Skin,
+}
+
+pub struct SkinAdd;
+impl Contract for SkinAdd {
+    const CHANNEL: &'static str = "skin.add";
+    type Params = SkinAddParams;
+    type Result = SkinAddResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct SkinEquipParams {
+    /// Name or uuid; empty uses the default account.
+    pub account: String,
+    /// A library or default skin key from `skin.list`.
+    pub key: String,
+}
+
+pub struct SkinEquip;
+impl Contract for SkinEquip {
+    const CHANNEL: &'static str = "skin.equip";
+    type Params = SkinEquipParams;
+    type Result = Empty;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct SkinResetParams {
+    /// Name or uuid; empty uses the default account.
+    pub account: String,
+}
+
+pub struct SkinReset;
+impl Contract for SkinReset {
+    const CHANNEL: &'static str = "skin.reset";
+    type Params = SkinResetParams;
+    type Result = Empty;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct SkinRemoveParams {
+    /// The library entry to remove. The equipped Mojang skin is untouched.
+    pub key: String,
+}
+
+pub struct SkinRemove;
+impl Contract for SkinRemove {
+    const CHANNEL: &'static str = "skin.remove";
+    type Params = SkinRemoveParams;
+    type Result = Empty;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct CapeEquipParams {
+    /// Name or uuid; empty uses the default account.
+    pub account: String,
+    /// A cape id from `skin.list`.
+    pub cape: String,
+}
+
+pub struct CapeEquip;
+impl Contract for CapeEquip {
+    const CHANNEL: &'static str = "cape.equip";
+    type Params = CapeEquipParams;
+    type Result = Empty;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct CapeClearParams {
+    /// Name or uuid; empty uses the default account.
+    pub account: String,
+}
+
+pub struct CapeClear;
+impl Contract for CapeClear {
+    const CHANNEL: &'static str = "cape.clear";
+    type Params = CapeClearParams;
+    type Result = Empty;
+}

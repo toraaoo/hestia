@@ -104,6 +104,10 @@ export const keys = {
     modpack: (source: string, versionId: string) =>
       [...keys.content.all, 'modpack', source, versionId] as const,
   },
+  skins: {
+    all: ['skins'] as const,
+    list: (account: string) => [...keys.skins.all, 'list', account] as const,
+  },
   sync: {
     all: ['sync'] as const,
     config: () => [...keys.sync.all, 'config'] as const,

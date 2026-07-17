@@ -15,6 +15,7 @@ mod java;
 mod lifecycle;
 mod process;
 mod server;
+mod skins;
 mod sync;
 
 use crate::runtime::{Channels, Router};
@@ -29,6 +30,7 @@ pub fn make_router() -> Router {
     java::register(&mut on);
     download::register(&mut on);
     accounts::register(&mut on);
+    skins::register(&mut on);
     process::register(&mut on);
     server::register(&mut on);
     instance::register(&mut on);

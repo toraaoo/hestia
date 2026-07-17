@@ -1,0 +1,56 @@
+/**
+ * The `skin.*` / `cape.*` channels: the account's Mojang skin picture (saved
+ * library + vanilla defaults + owned capes) and the operations over it.
+ * `account` is a name or uuid everywhere; empty uses the default account.
+ * Every Mojang-touching call carries a generous timeout — a stale account
+ * token is rotated through Microsoft inline, which multiplies the round trips.
+ */
+import { call } from './core/ipc';
+import type { Skin, SkinList, SkinVariant } from './types/skins';
+
+const MOJANG_TIMEOUT = { timeoutMs: 30_000 };
+
+export function list(account = ''): Promise<SkinList> {
+  return call('skin.list', { account }, MOJANG_TIMEOUT);
+}
+
+/**
+ * Upload a skin PNG, equip it, and save it to the library. `data` is the PNG
+ * base64-encoded (64×64, or the legacy 64×32).
+ */
+export async function add(params: {
+  account?: string;
+  name?: string;
+  variant: SkinVariant;
+  data: string;
+}): Promise<Skin> {
+  const result = await call<{ skin: Skin }>(
+    'skin.add',
+    { account: '', name: '', ...params },
+    MOJANG_TIMEOUT,
+  );
+  return result.skin;
+}
+
+/** Equip a library or default skin by its key from `list`. */
+export async function equip(key: string, account = ''): Promise<void> {
+  await call('skin.equip', { account, key }, MOJANG_TIMEOUT);
+}
+
+/** Reset the account to its uuid-derived default skin. */
+export async function reset(account = ''): Promise<void> {
+  await call('skin.reset', { account }, MOJANG_TIMEOUT);
+}
+
+/** Remove a library entry; the equipped Mojang skin is untouched. */
+export async function remove(key: string): Promise<void> {
+  await call('skin.remove', { key });
+}
+
+export async function equipCape(cape: string, account = ''): Promise<void> {
+  await call('cape.equip', { account, cape }, MOJANG_TIMEOUT);
+}
+
+export async function clearCape(account = ''): Promise<void> {
+  await call('cape.clear', { account }, MOJANG_TIMEOUT);
+}

@@ -5,6 +5,8 @@
 mod microsoft;
 mod signing;
 
+pub(crate) use microsoft::USER_AGENT;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;

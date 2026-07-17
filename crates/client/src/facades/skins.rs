@@ -1,0 +1,107 @@
+use std::time::Duration;
+
+use ipc::errors::IpcError;
+use proto::skins::{
+    Cape, CapeClear, CapeClearParams, CapeEquip, CapeEquipParams, Skin, SkinAdd, SkinAddParams,
+    SkinEquip, SkinEquipParams, SkinList, SkinListParams, SkinRemove, SkinRemoveParams, SkinReset,
+    SkinResetParams, SkinVariant,
+};
+
+use crate::session::Session;
+
+/// Every call that touches Mojang carries a generous timeout: a stale account
+/// token is rotated through Microsoft inline, which multiplies the round trips.
+const MOJANG_TIMEOUT: Duration = Duration::from_secs(30);
+
+pub struct Skins<'a> {
+    pub(crate) session: &'a Session,
+}
+
+impl Skins<'_> {
+    /// The account's skins (library + defaults + the equipped external one)
+    /// and owned capes. `account` is a name or uuid; empty uses the default.
+    pub async fn list(&self, account: &str) -> Result<(Vec<Skin>, Vec<Cape>), IpcError> {
+        let params = SkinListParams {
+            account: account.to_string(),
+        };
+        let result = self
+            .session
+            .call_with_timeout::<SkinList>(&params, MOJANG_TIMEOUT)
+            .await?;
+        Ok((result.skins, result.capes))
+    }
+
+    /// Upload a skin PNG (base64), equip it, and save it to the library.
+    pub async fn add(
+        &self,
+        account: &str,
+        name: &str,
+        variant: SkinVariant,
+        data: &str,
+    ) -> Result<Skin, IpcError> {
+        let params = SkinAddParams {
+            account: account.to_string(),
+            name: name.to_string(),
+            variant,
+            data: data.to_string(),
+        };
+        Ok(self
+            .session
+            .call_with_timeout::<SkinAdd>(&params, MOJANG_TIMEOUT)
+            .await?
+            .skin)
+    }
+
+    /// Equip a library or default skin by its key from `list`.
+    pub async fn equip(&self, account: &str, key: &str) -> Result<(), IpcError> {
+        let params = SkinEquipParams {
+            account: account.to_string(),
+            key: key.to_string(),
+        };
+        self.session
+            .call_with_timeout::<SkinEquip>(&params, MOJANG_TIMEOUT)
+            .await?;
+        Ok(())
+    }
+
+    /// Reset the account to its uuid-derived default skin.
+    pub async fn reset(&self, account: &str) -> Result<(), IpcError> {
+        let params = SkinResetParams {
+            account: account.to_string(),
+        };
+        self.session
+            .call_with_timeout::<SkinReset>(&params, MOJANG_TIMEOUT)
+            .await?;
+        Ok(())
+    }
+
+    /// Remove a library entry; the equipped Mojang skin is untouched.
+    pub async fn remove(&self, key: &str) -> Result<(), IpcError> {
+        let params = SkinRemoveParams {
+            key: key.to_string(),
+        };
+        self.session.call::<SkinRemove>(&params).await?;
+        Ok(())
+    }
+
+    pub async fn equip_cape(&self, account: &str, cape: &str) -> Result<(), IpcError> {
+        let params = CapeEquipParams {
+            account: account.to_string(),
+            cape: cape.to_string(),
+        };
+        self.session
+            .call_with_timeout::<CapeEquip>(&params, MOJANG_TIMEOUT)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn clear_cape(&self, account: &str) -> Result<(), IpcError> {
+        let params = CapeClearParams {
+            account: account.to_string(),
+        };
+        self.session
+            .call_with_timeout::<CapeClear>(&params, MOJANG_TIMEOUT)
+            .await?;
+        Ok(())
+    }
+}

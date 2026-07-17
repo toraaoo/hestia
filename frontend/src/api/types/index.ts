@@ -10,4 +10,5 @@ export type * from './java';
 export type * from './minecraft';
 export type * from './process';
 export type * from './server';
+export type * from './skins';
 export type * from './sync';

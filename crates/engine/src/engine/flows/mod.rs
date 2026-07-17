@@ -6,6 +6,7 @@ mod backup;
 mod content;
 mod instance;
 mod server;
+mod skins;
 
 use std::path::PathBuf;
 

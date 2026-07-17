@@ -14,6 +14,7 @@ mod java;
 mod jobs;
 mod process;
 mod server;
+mod skins;
 mod sync;
 
 pub use accounts::Accounts;
@@ -26,4 +27,5 @@ pub use instance::Instance;
 pub use java::Java;
 pub use process::{Process, ProcessEvent};
 pub use server::Server;
+pub use skins::Skins;
 pub use sync::Sync;

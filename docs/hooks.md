@@ -334,6 +334,12 @@ marks a job mutation — pair with `useJobMutation` semantics above.
 | `useProcesses()` / `useProcess(id)` | `process.list\|status` | — |
 | `useProcessLogs(id, { tail, follow, limit })` | `process.logs` + `process.output` | — |
 | `useStartProcess()` / `useStopProcess()` | `process.start\|stop` | `ProcessSpec` / `id: string` |
+| `useSkins(account?)` | `skin.list` | — |
+| `useAddSkin()` | `skin.add` | `{ account?, name?, variant, data }` |
+| `useEquipSkin()` | `skin.equip` | `{ key, account? }` |
+| `useResetSkin()` | `skin.reset` | `{ account? }?` |
+| `useRemoveSkin()` | `skin.remove` | `key: string` |
+| `useEquipCape()` / `useClearCape()` | `cape.equip\|clear` | `{ cape, account? }` / `{ account? }?` |
 | `useSyncConfig()` | `sync.get` | — |
 | `useSetSyncTargets()` | `sync.set` | `{ kind, targets }` |
 | `useStartDownload()` *(job)* | `download.start` | `Omit<DownloadSpec, 'id'>` |

@@ -1,0 +1,254 @@
+//! The skin library: PNG textures the user saved, kept under
+//! `<data_home>/skins/` as `<key>.png` blobs beside a `library.json` index —
+//! the disk is the registry, as with `java`. A row's key is Mojang's texture
+//! hash once Mojang has seen the texture (an upload response reports it, and
+//! the row is re-keyed to match), so equipped-detection at list time is a key
+//! comparison. The Mojang profile operations live in `mojang`, the vanilla
+//! default-skin table in `defaults`.
+
+pub(crate) mod defaults;
+pub(crate) mod mojang;
+
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+use anyhow::{bail, Context, Result};
+use proto::skins::SkinVariant;
+use serde::{Deserialize, Serialize};
+
+const INDEX_FILE: &str = "library.json";
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LibraryEntry {
+    pub key: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub variant: SkinVariant,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct LibraryFile {
+    #[serde(default)]
+    skins: Vec<LibraryEntry>,
+}
+
+pub struct Skins {
+    dir: Mutex<PathBuf>,
+}
+
+impl Skins {
+    pub fn new(dir: PathBuf) -> Self {
+        Skins {
+            dir: Mutex::new(dir),
+        }
+    }
+
+    pub fn reload(&self, dir: PathBuf) {
+        *self.dir.lock().unwrap() = dir;
+    }
+
+    fn dir(&self) -> PathBuf {
+        self.dir.lock().unwrap().clone()
+    }
+
+    fn blob_path(&self, key: &str) -> PathBuf {
+        self.dir().join(format!("{key}.png"))
+    }
+
+    pub fn list(&self) -> Vec<LibraryEntry> {
+        load(&self.dir()).skins
+    }
+
+    pub fn entry(&self, key: &str) -> Option<LibraryEntry> {
+        self.list().into_iter().find(|e| e.key == key)
+    }
+
+    pub fn texture(&self, key: &str) -> Result<Vec<u8>> {
+        let path = self.blob_path(key);
+        fs::read(&path).with_context(|| format!("cannot read skin texture {}", path.display()))
+    }
+
+    /// Save `png` under a known texture key (Mojang's hash), validating the
+    /// dimensions. An existing row with the same key is updated in place;
+    /// otherwise the entry is inserted newest-first.
+    pub fn add_keyed(
+        &self,
+        key: &str,
+        png: &[u8],
+        variant: SkinVariant,
+        name: &str,
+    ) -> Result<LibraryEntry> {
+        validate_skin_png(png)?;
+        let dir = self.dir();
+        fs::create_dir_all(&dir).with_context(|| format!("cannot create {}", dir.display()))?;
+        fs::write(self.blob_path(key), png)?;
+
+        let mut file = load(&dir);
+        let entry = LibraryEntry {
+            key: key.to_string(),
+            name: name.trim().to_string(),
+            variant,
+        };
+        match file.skins.iter_mut().find(|e| e.key == key) {
+            Some(existing) => {
+                if !entry.name.is_empty() {
+                    existing.name = entry.name.clone();
+                }
+                existing.variant = variant;
+            }
+            None => file.skins.insert(0, entry.clone()),
+        }
+        save(&dir, &file)?;
+        tracing::info!(key, "skin saved to the library");
+        Ok(entry)
+    }
+
+    /// Re-key a row (and its blob) to the texture hash Mojang reported for the
+    /// same PNG. A no-op when the keys already agree.
+    pub fn rekey(&self, from: &str, to: &str) -> Result<()> {
+        if from == to {
+            return Ok(());
+        }
+        let dir = self.dir();
+        let mut file = load(&dir);
+        let Some(entry) = file.skins.iter_mut().find(|e| e.key == from) else {
+            return Ok(());
+        };
+        entry.key = to.to_string();
+        // The target may already exist (the same texture added twice); the
+        // rename overwrite plus a duplicate sweep collapses them into one row.
+        fs::rename(self.blob_path(from), self.blob_path(to))?;
+        let mut seen = false;
+        file.skins.retain(|e| {
+            let duplicate = e.key == to && std::mem::replace(&mut seen, true);
+            !duplicate
+        });
+        save(&dir, &file)?;
+        tracing::debug!(from, to, "skin re-keyed to Mojang's texture hash");
+        Ok(())
+    }
+
+    /// Record the model variant Mojang reports for a saved texture.
+    pub fn sync_variant(&self, key: &str, variant: SkinVariant) -> Result<()> {
+        let dir = self.dir();
+        let mut file = load(&dir);
+        let Some(entry) = file.skins.iter_mut().find(|e| e.key == key) else {
+            return Ok(());
+        };
+        if entry.variant == variant {
+            return Ok(());
+        }
+        entry.variant = variant;
+        save(&dir, &file)
+    }
+
+    pub fn remove(&self, key: &str) -> Result<bool> {
+        let dir = self.dir();
+        let mut file = load(&dir);
+        let before = file.skins.len();
+        file.skins.retain(|e| e.key != key);
+        if file.skins.len() == before {
+            return Ok(false);
+        }
+        save(&dir, &file)?;
+        let _ = fs::remove_file(self.blob_path(key));
+        tracing::info!(key, "skin removed from the library");
+        Ok(true)
+    }
+}
+
+/// Reject anything that is not a skin-shaped PNG: 64×64, or the legacy 64×32.
+pub(crate) fn validate_skin_png(png: &[u8]) -> Result<()> {
+    let Some((width, height)) = png_dimensions(png) else {
+        bail!("the skin texture is not a PNG file");
+    };
+    if width != 64 || !(height == 64 || height == 32) {
+        bail!("a skin texture must be 64×64 (or the legacy 64×32), got {width}×{height}");
+    }
+    Ok(())
+}
+
+/// Width/height from the PNG signature + IHDR header; `None` when the bytes
+/// are not a PNG. Full decoding is Mojang's job — only the shape is checked.
+fn png_dimensions(data: &[u8]) -> Option<(u32, u32)> {
+    const SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    if data.len() < 24 || data[..8] != SIGNATURE || &data[12..16] != b"IHDR" {
+        return None;
+    }
+    let width = u32::from_be_bytes(data[16..20].try_into().ok()?);
+    let height = u32::from_be_bytes(data[20..24].try_into().ok()?);
+    Some((width, height))
+}
+
+fn load(dir: &std::path::Path) -> LibraryFile {
+    let Ok(text) = fs::read_to_string(dir.join(INDEX_FILE)) else {
+        return LibraryFile::default();
+    };
+    serde_json::from_str(&text).unwrap_or_default()
+}
+
+fn save(dir: &std::path::Path, file: &LibraryFile) -> Result<()> {
+    fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
+    let text = serde_json::to_string_pretty(file).expect("skin library serializes");
+    fs::write(dir.join(INDEX_FILE), format!("{text}\n"))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn png(width: u32, height: u32) -> Vec<u8> {
+        let mut data = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+        data.extend_from_slice(&13u32.to_be_bytes());
+        data.extend_from_slice(b"IHDR");
+        data.extend_from_slice(&width.to_be_bytes());
+        data.extend_from_slice(&height.to_be_bytes());
+        data.extend_from_slice(&[8, 6, 0, 0, 0]);
+        data
+    }
+
+    #[test]
+    fn accepts_modern_and_legacy_skin_dimensions() {
+        assert!(validate_skin_png(&png(64, 64)).is_ok());
+        assert!(validate_skin_png(&png(64, 32)).is_ok());
+        assert!(validate_skin_png(&png(64, 48)).is_err());
+        assert!(validate_skin_png(&png(128, 64)).is_err());
+        assert!(validate_skin_png(b"not a png").is_err());
+    }
+
+    #[test]
+    fn library_round_trip_and_rekey() {
+        let dir = std::env::temp_dir().join(format!("hestia-skins-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let skins = Skins::new(dir.clone());
+
+        let entry = skins
+            .add_keyed("local-key", &png(64, 64), SkinVariant::Slim, "My Skin")
+            .unwrap();
+        assert_eq!(skins.list().len(), 1);
+        assert_eq!(skins.texture(&entry.key).unwrap(), png(64, 64));
+
+        skins.rekey(&entry.key, "mojang-key").unwrap();
+        assert!(skins.entry(&entry.key).is_none());
+        let rekeyed = skins.entry("mojang-key").unwrap();
+        assert_eq!(rekeyed.name, "My Skin");
+        assert_eq!(rekeyed.variant, SkinVariant::Slim);
+        assert_eq!(skins.texture("mojang-key").unwrap(), png(64, 64));
+
+        skins
+            .sync_variant("mojang-key", SkinVariant::Classic)
+            .unwrap();
+        assert_eq!(
+            skins.entry("mojang-key").unwrap().variant,
+            SkinVariant::Classic
+        );
+
+        assert!(skins.remove("mojang-key").unwrap());
+        assert!(!skins.remove("mojang-key").unwrap());
+        assert!(skins.list().is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+}

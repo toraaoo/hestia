@@ -9,7 +9,9 @@ it's just as comfortable from a terminal as from a window.
 > C++ tree is gone. Hestia runs as a daemon (`hestiad`) with thin clients over a
 > local socket. In place today: the build/workspace, logging, a config store, the
 > CLI, Java runtime management (install/list/uninstall via the Adoptium API),
-> Microsoft account sign-in, a process supervisor whose workloads survive
+> Microsoft account sign-in — with skin and cape management over the Mojang
+> profile API (a preserving local skin library plus the vanilla defaults;
+> desktop-only, no CLI surface) — a process supervisor whose workloads survive
 > daemon restarts (on-disk records + re-adoption), and full
 > Minecraft **server** and **instance** management — a server is fully
 > provisioned at create (jar + java runtime + EULA), runs on its own claimed
@@ -63,7 +65,7 @@ hestia/
 │   ├── ipc/                   transport (unix socket / named pipe) + envelope (tokio)
 │   ├── common/                logging (tracing) + app identity + paths
 │   ├── client/                typed client SDK (facades over a Session)
-│   ├── engine/                config·cache·download·java·accounts   (daemon-only)
+│   ├── engine/                config·cache·download·java·accounts·skins  (daemon-only)
 │   ├── cli/                   bin: hestia   (clap)
 │   ├── daemon/                bin: hestiad  (router, services, supervisor)
 │   ├── tray/                  bin: tray     (tray-icon + tao)
