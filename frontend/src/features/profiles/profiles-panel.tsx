@@ -1,7 +1,6 @@
 import {
   CameraIcon,
   CameraSlashIcon,
-  CheckCircleIcon,
   DotsThreeIcon,
   DownloadSimpleIcon,
   PencilSimpleIcon,
@@ -13,7 +12,7 @@ import {
 import { useState } from 'react';
 
 import { Empty } from '@/components/empty';
-import { contentIcon } from '@/components/icons';
+import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -35,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { PickRow } from '@/features/content/pick-row';
 import type { ContentProfile, Instance } from '@/features/entries/mock';
 import { globalProfiles } from '@/features/profiles/mock';
 import { m } from '@/paraglide/messages.js';
@@ -427,35 +427,24 @@ function MembersDialog({
         {pool.length === 0 ? (
           <Empty>{m['profiles.members_empty']()}</Empty>
         ) : (
-          <div className="max-h-72 divide-y divide-border overflow-y-auto border border-border">
+          <div className="grid max-h-72 gap-2 overflow-y-auto p-1">
             {pool.map((c) => {
-              const Icon = contentIcon(c.kind);
               const checked = members.includes(c.id);
               return (
-                <label
+                <PickRow
                   key={c.id}
-                  htmlFor={`member-${c.id}`}
-                  className="flex cursor-pointer items-center gap-3 px-3 py-2"
-                >
-                  <Checkbox
-                    id={`member-${c.id}`}
-                    checked={checked}
-                    onCheckedChange={(next) =>
-                      setSelected(
-                        next === true
-                          ? [...members, c.id]
-                          : members.filter((id) => id !== c.id),
-                      )
-                    }
-                  />
-                  <Icon className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {c.name}
-                  </span>
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    {c.version}
-                  </span>
-                </label>
+                  icon={contentIcon(c.kind)}
+                  title={c.name}
+                  subtitle={`${contentKindLabel[c.kind]()} · ${c.version}`}
+                  selected={checked}
+                  onSelect={() =>
+                    setSelected(
+                      checked
+                        ? members.filter((id) => id !== c.id)
+                        : [...members, c.id],
+                    )
+                  }
+                />
               );
             })}
           </div>
@@ -567,35 +556,19 @@ function ApplyGlobalDialog({
         {globalProfiles.length === 0 ? (
           <Empty>{m['profiles.global_empty']()}</Empty>
         ) : (
-          <div className="divide-y divide-border border border-border">
-            {globalProfiles.map((profile) => {
-              const active = picked === profile.name;
-              return (
-                <button
-                  key={profile.name}
-                  type="button"
-                  onClick={() => setPicked(profile.name)}
-                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors outline-none hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
-                >
-                  <CheckCircleIcon
-                    weight={active ? 'fill' : 'regular'}
-                    className={
-                      active
-                        ? 'size-4 shrink-0 text-ember'
-                        : 'size-4 shrink-0 text-muted-foreground'
-                    }
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {profile.name}
-                  </span>
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    {m['profiles.entries_count']({
-                      count: profile.entries.length,
-                    })}
-                  </span>
-                </button>
-              );
-            })}
+          <div className="grid gap-2 p-1">
+            {globalProfiles.map((profile) => (
+              <PickRow
+                key={profile.name}
+                icon={StackIcon}
+                title={profile.name}
+                subtitle={m['profiles.entries_count']({
+                  count: profile.entries.length,
+                })}
+                selected={picked === profile.name}
+                onSelect={() => setPicked(profile.name)}
+              />
+            ))}
           </div>
         )}
         <DialogFooter>

@@ -1,7 +1,7 @@
 import {
   CaretLeftIcon,
   CaretRightIcon,
-  CheckIcon,
+  type CheckIcon,
   MagnifyingGlassIcon,
   UploadSimpleIcon,
 } from '@phosphor-icons/react';
@@ -44,6 +44,7 @@ import {
   projectVersions,
   resolveDependencies,
 } from '@/features/content/mock';
+import { PickRow } from '@/features/content/pick-row';
 import {
   installWizardDefaults,
   installWizardSchema,
@@ -878,56 +879,6 @@ function ContentStep({
       )}
       {errors && <FieldError className="mt-2" errors={errors} />}
     </div>
-  );
-}
-
-/** A selectable row shared by the target and content pick lists. */
-function PickRow({
-  icon: Icon,
-  title,
-  subtitle,
-  badge,
-  disabled,
-  selected,
-  onSelect,
-}: {
-  icon: typeof CheckIcon;
-  title: string;
-  subtitle: string;
-  badge?: string;
-  disabled?: boolean;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      disabled={disabled}
-      onClick={onSelect}
-      className={cn(
-        'flex items-center gap-3 p-3 text-left ring-1 transition-colors outline-none focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55',
-        selected
-          ? 'bg-muted ring-ember'
-          : 'ring-border hover:bg-muted/60 hover:ring-foreground/20',
-      )}
-    >
-      <Icon className="size-4.5 shrink-0 text-muted-foreground" />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">{title}</span>
-          {badge && (
-            <Badge variant="outline" className="shrink-0">
-              {badge}
-            </Badge>
-          )}
-        </div>
-        <div className="truncate font-mono text-[11px] text-muted-foreground">
-          {subtitle}
-        </div>
-      </div>
-      {selected && <CheckIcon weight="bold" className="size-4 text-ember" />}
-    </button>
   );
 }
 
