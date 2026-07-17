@@ -1,4 +1,4 @@
-//! Entry backups: gzipped tar archives of a server/instance `data/` directory
+//! Server backups: gzipped tar archives of a server's `data/` directory
 //! under the entry root's `backups/` (appearing on demand, like the other
 //! managed content directories). An archive is named
 //! `<utc-stamp>-<kind>.tar.gz` — the disk is the registry, as with the entry

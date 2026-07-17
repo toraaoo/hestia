@@ -4,7 +4,6 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use proto::backup::BackupKind;
 use proto::minecraft::{ConfigEntry, ProvisionPhase};
 
 use super::{effective_name, guard_downgrade};
@@ -37,7 +36,9 @@ impl Engine {
 
     /// Move an instance to another version of its flavor. A downgrade must be
     /// allowed explicitly — Minecraft cannot load saves written by a newer
-    /// version. Only the record changes; files materialise at the next launch.
+    /// version, and **nothing is backed up first** (instances have no backup
+    /// story until import/export lands). Only the record changes; files
+    /// materialise at the next launch.
     pub async fn update_instance(
         &self,
         reference: &str,
@@ -65,11 +66,6 @@ impl Engine {
             .minecraft
             .resolve_instance(&record.profile.flavor, version, loader_version)
             .await?;
-        if self.instances.data_dir(&record.id).is_dir() {
-            self.backup_instance(&record.id, BackupKind::Update, &|_| {})
-                .await
-                .context("pre-update backup failed")?;
-        }
         self.instances.update(&record.id, profile)
     }
 

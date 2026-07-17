@@ -47,7 +47,6 @@ export interface Instance {
   disk_bytes: number;
   content: InstalledContent[];
   worlds: string[];
-  backups: Backup[];
 }
 
 export const instances: Instance[] = [
@@ -114,20 +113,6 @@ export const instances: Instance[] = [
       },
     ],
     worlds: ['New World', 'Skyblock Run', 'Creative Flats'],
-    backups: [
-      {
-        id: 'b1',
-        created_unix: hoursAgo(6),
-        kind: 'manual',
-        size_bytes: 184_320_000,
-      },
-      {
-        id: 'b2',
-        created_unix: daysAgo(3),
-        kind: 'update',
-        size_bytes: 172_800_000,
-      },
-    ],
   },
   {
     id: 'vanilla-1214-a1b2c3d4',
@@ -145,7 +130,6 @@ export const instances: Instance[] = [
     disk_bytes: 640_000_000,
     content: [],
     worlds: ['Survival'],
-    backups: [],
   },
   {
     id: 'create-above-77ffee11',
@@ -183,14 +167,6 @@ export const instances: Instance[] = [
       },
     ],
     worlds: ['Factory'],
-    backups: [
-      {
-        id: 'b3',
-        created_unix: daysAgo(20),
-        kind: 'manual',
-        size_bytes: 512_000_000,
-      },
-    ],
   },
   {
     id: 'snapshot-lab-9090abab',
@@ -208,7 +184,6 @@ export const instances: Instance[] = [
     disk_bytes: 120_000_000,
     content: [],
     worlds: [],
-    backups: [],
   },
 ];
 

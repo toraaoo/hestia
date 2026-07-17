@@ -1,5 +1,7 @@
-//! Entry backups: the archive/restore passes, the per-entry claim that admits
-//! one at a time, and the RCON save-off/save-on dance around a live server.
+//! Server backups: the archive/restore passes, the per-server claim that
+//! admits one at a time, and the RCON save-off/save-on dance around a live
+//! server. Backups are a server feature — instances have none (import/export
+//! is the intended replacement, not yet built).
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -125,68 +127,6 @@ impl Engine {
         )
     }
 
-    /// Archive a stopped instance's `data/` into its `backups/`.
-    pub async fn backup_instance(
-        &self,
-        reference: &str,
-        kind: BackupKind,
-        on_progress: OnProgress<'_>,
-    ) -> Result<BackupInfo> {
-        let record = self
-            .instances
-            .get(reference)
-            .with_context(|| format!("unknown instance: {reference}"))?;
-        let _claim = self.claim_backup(format!("instance-{}", record.id))?;
-        run_backup(
-            self.instances.instance_dir(&record.id),
-            self.instances.data_dir(&record.id),
-            kind,
-            instance_backup_excludes(),
-            on_progress,
-        )
-        .await
-    }
-
-    /// Replace a stopped instance's `data/` with a backup's content.
-    pub async fn restore_instance_backup(
-        &self,
-        reference: &str,
-        backup: &str,
-        on_progress: OnProgress<'_>,
-    ) -> Result<BackupInfo> {
-        let record = self
-            .instances
-            .get(reference)
-            .with_context(|| format!("unknown instance: {reference}"))?;
-        let _claim = self.claim_backup(format!("instance-{}", record.id))?;
-        run_restore(
-            self.instances.instance_dir(&record.id),
-            self.instances.data_dir(&record.id),
-            backup.to_string(),
-            instance_backup_excludes(),
-            on_progress,
-        )
-        .await
-    }
-
-    /// An instance's stored backups, newest first.
-    pub fn instance_backups(&self, reference: &str) -> Result<Vec<BackupInfo>> {
-        let record = self
-            .instances
-            .get(reference)
-            .with_context(|| format!("unknown instance: {reference}"))?;
-        Ok(backup::list(&self.instances.instance_dir(&record.id)))
-    }
-
-    /// Delete one instance backup. Returns false when no backup matches.
-    pub fn remove_instance_backup(&self, reference: &str, backup: &str) -> Result<bool> {
-        let record = self
-            .instances
-            .get(reference)
-            .with_context(|| format!("unknown instance: {reference}"))?;
-        backup::remove(&self.instances.instance_dir(&record.id), backup)
-    }
-
     fn claim_backup(&self, key: String) -> Result<BackupClaim<'_>> {
         let mut active = self.backups_active.lock().unwrap();
         if !active.insert(key.clone()) {
@@ -236,15 +176,6 @@ fn server_backup_excludes(record: &ServerRecord) -> Vec<String> {
         "logs".into(),
         "cache".into(),
         "mods".into(),
-    ]
-}
-
-fn instance_backup_excludes() -> Vec<String> {
-    vec![
-        "logs".into(),
-        "mods".into(),
-        "resourcepacks".into(),
-        "shaderpacks".into(),
     ]
 }
 

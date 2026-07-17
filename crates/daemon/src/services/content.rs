@@ -165,7 +165,6 @@ fn register_instance(on: &mut Channels<'_>) {
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::InstanceAdd {
                 instance_id: record.id,
@@ -202,7 +201,6 @@ fn register_instance(on: &mut Channels<'_>) {
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
         ensure_no_content(&ctx, &process_id, &record.name)?;
         match ctx
             .runtime
@@ -222,7 +220,6 @@ fn register_instance(on: &mut Channels<'_>) {
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::InstanceUpdate {
                 instance_id: record.id,

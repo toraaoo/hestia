@@ -7,7 +7,6 @@
  */
 import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
 import type {
-  BackupInfo,
   ConfigEntry,
   ContentAddSpec,
   ContentDone,
@@ -72,11 +71,6 @@ export const instanceQueries = {
       queryKey: keys.instances.configValue(id, key),
       queryFn: () => api.config.get(id, key),
     }),
-  backups: (id: string) =>
-    queryOptions({
-      queryKey: keys.instances.backups(id),
-      queryFn: () => api.backup.list(id),
-    }),
   content: (id: string, kind: ContentKind) =>
     queryOptions({
       queryKey: keys.instances.contentList(id, kind),
@@ -137,38 +131,6 @@ export const instanceMutations = {
       mutationFn: ({ key, value }) => api.config.set(id, key, value),
       invalidates: () => [keys.instances.config(id)],
     }),
-  backup: {
-    /** Create and restore require the instance stopped. */
-    create: (id: string) =>
-      jobMutation<BackupInfo>({
-        mutationKey: [...keys.instances.backups(id), 'create'],
-        meta: () => ({
-          kind: 'backup.create',
-          label: 'back up',
-          entry: { kind: 'instance', id },
-        }),
-        run: (_variables, onProgress) => api.backup.create(id, onProgress),
-        invalidates: () => [keys.instances.backups(id)],
-      }),
-    restore: (id: string) =>
-      jobMutation<BackupInfo, string>({
-        mutationKey: [...keys.instances.backups(id), 'restore'],
-        meta: () => ({
-          kind: 'backup.restore',
-          label: 'restore backup',
-          entry: { kind: 'instance', id },
-        }),
-        run: (backupId, onProgress) =>
-          api.backup.restore(id, backupId, onProgress),
-        invalidates: () => [keys.instances.detail(id)],
-      }),
-    remove: (id: string) =>
-      mutation<void, string>({
-        mutationKey: [...keys.instances.backups(id), 'remove'],
-        mutationFn: (backupId) => api.backup.remove(id, backupId),
-        invalidates: () => [keys.instances.backups(id)],
-      }),
-  },
   content: {
     /** Instances take mods, resourcepacks, shaders, and datapacks. */
     add: (id: string) =>
@@ -267,10 +229,6 @@ export function useInstanceConfigValue(id: string, key: string) {
   return useQuery(instanceQueries.configValue(id, key));
 }
 
-export function useInstanceBackups(id: string) {
-  return useQuery(instanceQueries.backups(id));
-}
-
 export function useInstanceContent(id: string, kind: ContentKind) {
   return useQuery(instanceQueries.content(id, kind));
 }
@@ -301,18 +259,6 @@ export function useStopInstance(id: string) {
 
 export function useSetInstanceConfig(id: string) {
   return useMutation(instanceMutations.setConfig(id));
-}
-
-export function useCreateInstanceBackup(id: string) {
-  return useJobMutation(instanceMutations.backup.create(id));
-}
-
-export function useRestoreInstanceBackup(id: string) {
-  return useJobMutation(instanceMutations.backup.restore(id));
-}
-
-export function useRemoveInstanceBackup(id: string) {
-  return useMutation(instanceMutations.backup.remove(id));
 }
 
 export function useAddInstanceContent(id: string) {

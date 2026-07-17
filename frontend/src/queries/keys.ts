@@ -87,7 +87,6 @@ export const keys = {
     config: (id: string) => [...keys.instances.detail(id), 'config'] as const,
     configValue: (id: string, key: string) =>
       [...keys.instances.config(id), key] as const,
-    backups: (id: string) => [...keys.instances.detail(id), 'backups'] as const,
     content: (id: string) => [...keys.instances.detail(id), 'content'] as const,
     contentList: (id: string, kind: ContentKind) =>
       [...keys.instances.content(id), kind] as const,

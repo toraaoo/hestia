@@ -33,7 +33,13 @@ pub(super) async fn run(
         client::proto::minecraft::downgrade_between(&versions, &info.game_version, &version)
             == Some(true);
     if is_downgrade && !downgrade {
-        mc::confirm_downgrade(&info.name, "a world", &info.game_version, &version)?;
+        mc::confirm_downgrade(
+            &info.name,
+            "a world",
+            "the current data is backed up automatically first",
+            &info.game_version,
+            &version,
+        )?;
     }
 
     if was_running {

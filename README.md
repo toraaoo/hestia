@@ -20,10 +20,12 @@ it's just as comfortable from a terminal as from a window.
 > files (client jar, libraries,
 > assets) at launch and runs as the signed-in account. Both move between game
 > versions in place (`server|instance update`; downgrades warn — worlds and
-> saves do not downgrade, and both are backed up automatically first). Both
-> also have **backups**: on-demand archive/restore of the entry's game data
-> (a running server keeps running — world saving pauses around the archive),
-> plus per-server scheduled backups with retention pruning. **Content** —
+> saves do not downgrade; a server's data is backed up automatically first,
+> an instance's is not). Servers have **backups**: on-demand archive/restore
+> of the game data (a running server keeps running — world saving pauses
+> around the archive), plus scheduled backups with retention pruning.
+> Instances have none — import/export is the intended replacement and is
+> still to come. **Content** —
 > mods, resourcepacks, shaders, datapacks — is discovered on Modrinth (search,
 > browse, resolve versions) and installed into a server (mods, datapacks) or
 > instance (mods/resourcepacks/shaders/datapacks) from a project, a Modrinth

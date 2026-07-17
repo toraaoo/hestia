@@ -23,12 +23,7 @@ import {
   ContentInstallModal,
   instanceTarget,
 } from '@/features/content/install-modal';
-import {
-  BackupList,
-  ContentSection,
-  SideCard,
-  StatCard,
-} from '@/features/entries/detail';
+import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
 import { getInstance } from '@/features/entries/mock';
 import { ResourceCards } from '@/features/entries/resource-panel';
 import { InstanceSettingsForm } from '@/features/entries/settings-forms';
@@ -48,7 +43,6 @@ export type InstanceTab =
   | 'overview'
   | 'content'
   | 'worlds'
-  | 'backups'
   | 'logs'
   | 'settings';
 
@@ -163,10 +157,6 @@ export function InstanceDetailPage({
             {m['tab.worlds']()}
             <TabCount n={inst.worlds.length} />
           </TabsTrigger>
-          <TabsTrigger value="backups">
-            {m['tab.backups']()}
-            <TabCount n={inst.backups.length} />
-          </TabsTrigger>
           <TabsTrigger value="logs">{m['tab.logs']()}</TabsTrigger>
           <TabsTrigger value="settings">{m['tab.settings']()}</TabsTrigger>
         </TabsList>
@@ -279,16 +269,6 @@ export function InstanceDetailPage({
               ))}
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="backups" className="p-5">
-          <div className="mb-5 flex justify-end">
-            <Button size="sm" variant="outline" data-icon="inline-start">
-              <PlusIcon weight="bold" />
-              {m['backup.create']()}
-            </Button>
-          </div>
-          <BackupList backups={inst.backups} />
         </TabsContent>
 
         <TabsContent value="logs" className="flex min-h-0 flex-col p-5">

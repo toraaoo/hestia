@@ -7,7 +7,6 @@
 //! as `instance <name> <action>`. This module is the grammar and the dispatch;
 //! each verb group lives beside it.
 
-mod backup;
 mod config;
 mod create;
 mod entry;
@@ -23,7 +22,6 @@ use crate::commands::content::{self, ContentCmd, EntryKind};
 use crate::commands::mc;
 use crate::ui::Spinner;
 
-pub use backup::BackupCmd;
 pub use lifecycle::launch;
 
 #[derive(Subcommand)]
@@ -128,11 +126,6 @@ enum InstanceAction {
     Config {
         #[command(subcommand)]
         cmd: mc::ConfigCmd,
-    },
-    /// Archive, restore, or manage the instance's backups
-    Backup {
-        #[command(subcommand)]
-        cmd: BackupCmd,
     },
     /// Install, list, remove, or update the instance's mods
     Mod {
@@ -256,7 +249,6 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             session,
         } => lifecycle::logs(client, &name, session, tail, follow).await,
         InstanceAction::Config { cmd } => config::run(client, &name, cmd).await,
-        InstanceAction::Backup { cmd } => backup::run(client, &name, cmd).await,
         InstanceAction::Mod { cmd } => {
             content::run_entry(client, EntryKind::Instance, ContentKind::Mod, &name, cmd).await
         }

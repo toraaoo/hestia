@@ -25,7 +25,13 @@ pub(super) async fn run(
         client::proto::minecraft::downgrade_between(&versions, &info.game_version, &version)
             == Some(true);
     if is_downgrade && !downgrade {
-        mc::confirm_downgrade(&info.name, "saves", &info.game_version, &version)?;
+        mc::confirm_downgrade(
+            &info.name,
+            "saves",
+            "nothing is backed up first (instances have no backups)",
+            &info.game_version,
+            &version,
+        )?;
     }
 
     let updated = {

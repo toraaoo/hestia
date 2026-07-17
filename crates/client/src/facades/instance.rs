@@ -1,10 +1,6 @@
 use std::time::Duration;
 
 use ipc::errors::IpcError;
-use proto::backup::{
-    BackupInfo, InstanceBackupCreate, InstanceBackupCreateParams, InstanceBackupList,
-    InstanceBackupRef, InstanceBackupRemove, InstanceBackupRestore, InstanceBackupRestoreParams,
-};
 use proto::content::{
     ContentAddSpec, ContentFailure, ContentKind, InstalledContent, InstanceContentAdd,
     InstanceContentAddParams, InstanceContentList, InstanceContentListParams,
@@ -26,7 +22,7 @@ use proto::minecraft::{
 use proto::process::ProcessLogLine;
 use serde_json::Value;
 
-use crate::facades::jobs::{forward, run_backup_job, run_content_job};
+use crate::facades::jobs::{forward, run_content_job};
 use crate::session::{job_id, Session};
 
 pub struct Instance<'a> {
@@ -92,9 +88,9 @@ impl Instance<'_> {
     }
 
     /// Move a stopped instance to another version (the profile is resolved
-    /// upstream and the game directory is backed up first, so this can take a
-    /// while; the new files materialise at the next launch). `allow_downgrade`
-    /// asserts the user confirmed a downgrade.
+    /// upstream; the new files materialise at the next launch). Nothing is
+    /// backed up first — instances have no backups. `allow_downgrade` asserts
+    /// the user confirmed a downgrade.
     pub async fn update(
         &self,
         instance: &str,
@@ -173,71 +169,6 @@ impl Instance<'_> {
             tail,
         };
         Ok(self.session.call::<InstanceLogs>(&params).await?.lines)
-    }
-
-    /// Archive a stopped instance's data directory, blocking until the daemon
-    /// reports done or error and forwarding each progress event to
-    /// `on_progress`.
-    pub async fn backup_create(
-        &self,
-        instance: &str,
-        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
-    ) -> Result<BackupInfo, IpcError> {
-        let id = job_id("instance-backup");
-        let params = InstanceBackupCreateParams {
-            instance: instance.to_string(),
-            id: id.clone(),
-        };
-        let session = self.session;
-        run_backup_job(session, &id, on_progress, move || async move {
-            session
-                .call::<InstanceBackupCreate>(&params)
-                .await
-                .map(|_| ())
-        })
-        .await
-    }
-
-    pub async fn backup_list(&self, instance: &str) -> Result<Vec<BackupInfo>, IpcError> {
-        Ok(self
-            .session
-            .call::<InstanceBackupList>(&instance_ref(instance))
-            .await?
-            .backups)
-    }
-
-    /// Replace a stopped instance's data directory with a backup's content,
-    /// blocking until the daemon reports done or error and forwarding each
-    /// progress event to `on_progress`.
-    pub async fn backup_restore(
-        &self,
-        instance: &str,
-        backup: &str,
-        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
-    ) -> Result<BackupInfo, IpcError> {
-        let id = job_id("instance-restore");
-        let params = InstanceBackupRestoreParams {
-            instance: instance.to_string(),
-            backup: backup.to_string(),
-            id: id.clone(),
-        };
-        let session = self.session;
-        run_backup_job(session, &id, on_progress, move || async move {
-            session
-                .call::<InstanceBackupRestore>(&params)
-                .await
-                .map(|_| ())
-        })
-        .await
-    }
-
-    pub async fn backup_remove(&self, instance: &str, backup: &str) -> Result<(), IpcError> {
-        let params = InstanceBackupRef {
-            instance: instance.to_string(),
-            backup: backup.to_string(),
-        };
-        self.session.call::<InstanceBackupRemove>(&params).await?;
-        Ok(())
     }
 
     /// Read one JVM setting; `None` when it is not set (a `not_found` from the

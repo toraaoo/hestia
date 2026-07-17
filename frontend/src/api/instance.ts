@@ -7,7 +7,6 @@
 
 import { call, tryCall } from './core/ipc';
 import { jobId, runJob } from './core/jobs';
-import type { BackupInfo } from './types/backup';
 import type {
   ContentAddSpec,
   ContentDone,
@@ -152,48 +151,6 @@ export const config = {
       { instance },
     );
     return result.entries;
-  },
-};
-
-/** Create and restore require the instance stopped (no RCON to quiesce). */
-export const backup = {
-  async create(instance: string, onProgress?: OnProgress): Promise<BackupInfo> {
-    const id = jobId('instance-backup');
-    const done = await runJob<{ id: string; backup: BackupInfo }>({
-      id,
-      topics: { done: 'backup.done', error: 'backup.error' },
-      onProgress,
-      start: () => call('instance.backup.create', { instance, id }),
-    });
-    return done.backup;
-  },
-
-  async list(instance: string): Promise<BackupInfo[]> {
-    const result = await call<{ backups: BackupInfo[] }>(
-      'instance.backup.list',
-      { instance },
-    );
-    return result.backups;
-  },
-
-  async restore(
-    instance: string,
-    backupId: string,
-    onProgress?: OnProgress,
-  ): Promise<BackupInfo> {
-    const id = jobId('instance-restore');
-    const done = await runJob<{ id: string; backup: BackupInfo }>({
-      id,
-      topics: { done: 'backup.done', error: 'backup.error' },
-      onProgress,
-      start: () =>
-        call('instance.backup.restore', { instance, backup: backupId, id }),
-    });
-    return done.backup;
-  },
-
-  async remove(instance: string, backupId: string): Promise<void> {
-    await call('instance.backup.remove', { instance, backup: backupId });
   },
 };
 

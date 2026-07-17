@@ -28,9 +28,10 @@ const TOPICS: Record<string, (payload: Record<string, unknown>) => QueryKey[]> =
     'server.update.done': () => [keys.servers.all],
     'instance.launch.done': () => [keys.instances.all],
     'java.install.done': () => [keys.java.all],
-    // Backup and content jobs carry only a job id, which another client's
-    // jobs mint themselves — the entry is unknowable, so sweep both kinds.
-    'backup.done': () => [keys.servers.all, keys.instances.all],
+    // Backup jobs are server-only; content jobs carry only a job id, which
+    // another client's jobs mint themselves — the entry is unknowable, so
+    // sweep both kinds.
+    'backup.done': () => [keys.servers.all],
     'content.done': () => [keys.servers.all, keys.instances.all],
   };
 

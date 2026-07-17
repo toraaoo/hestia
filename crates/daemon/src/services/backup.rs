@@ -1,15 +1,15 @@
-//! Entry backups. The server and instance channels are symmetrical: create and
-//! restore are jobs over the `BackupManager`, list and remove answer inline.
+//! Server backups: create and restore are jobs over the `BackupManager`, list
+//! and remove answer inline. Backups are a server feature — instances have
+//! none (import/export is the intended replacement, not yet built).
 
 use proto::backup::{
-    BackupJobResult, BackupListResult, InstanceBackupCreate, InstanceBackupList,
-    InstanceBackupRemove, InstanceBackupRestore, ServerBackupCreate, ServerBackupList,
-    ServerBackupRemove, ServerBackupRestore,
+    BackupJobResult, BackupListResult, ServerBackupCreate, ServerBackupList, ServerBackupRemove,
+    ServerBackupRestore,
 };
 use proto::Empty;
 
-use super::guards::{ensure_no_content, find_instance, find_server, is_running, require_backup};
-use crate::runtime::{instance_process_id, server_process_id, BackupJob, Channels, ServiceError};
+use super::guards::{ensure_no_content, find_server, is_running, require_backup};
+use crate::runtime::{server_process_id, BackupJob, Channels, ServiceError};
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<ServerBackupCreate, _, _>(|p, ctx| async move {
@@ -90,80 +90,6 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .remove_server_backup(&record.id, &p.backup)
-        {
-            Ok(true) => Ok(Empty {}),
-            Ok(false) => Err(ServiceError::not_found(format!(
-                "no backup matches '{}'",
-                p.backup
-            ))),
-            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
-        }
-    });
-
-    on.handle::<InstanceBackupCreate, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        if ctx.runtime.instance_running(&record.id) {
-            return Err(ServiceError::bad_request(format!(
-                "instance '{}' is running; stop it first",
-                record.name
-            )));
-        }
-        match ctx.runtime.backups().start(
-            BackupJob::InstanceBackup {
-                instance_id: record.id,
-            },
-            p.id,
-        ) {
-            Some(id) => Ok(BackupJobResult { id }),
-            None => Err(ServiceError::bad_request(
-                "a backup or restore is already running for that instance",
-            )),
-        }
-    });
-
-    on.handle::<InstanceBackupList, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        let backups = ctx
-            .runtime
-            .engine()
-            .instance_backups(&record.id)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
-        Ok(BackupListResult { backups })
-    });
-
-    on.handle::<InstanceBackupRestore, _, _>(|p, ctx| async move {
-        if p.backup.is_empty() {
-            return Err(ServiceError::bad_request("backup is required"));
-        }
-        let record = find_instance(&ctx, &p.instance)?;
-        if ctx.runtime.instance_running(&record.id) {
-            return Err(ServiceError::bad_request(format!(
-                "instance '{}' is running; stop it first",
-                record.name
-            )));
-        }
-        ensure_no_content(&ctx, &instance_process_id(&record.id), &record.name)?;
-        require_backup(ctx.runtime.engine().instance_backups(&record.id), &p.backup)?;
-        match ctx.runtime.backups().start(
-            BackupJob::InstanceRestore {
-                instance_id: record.id,
-                backup: p.backup,
-            },
-            p.id,
-        ) {
-            Some(id) => Ok(BackupJobResult { id }),
-            None => Err(ServiceError::bad_request(
-                "a backup or restore is already running for that instance",
-            )),
-        }
-    });
-
-    on.handle::<InstanceBackupRemove, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        match ctx
-            .runtime
-            .engine()
-            .remove_instance_backup(&record.id, &p.backup)
         {
             Ok(true) => Ok(Empty {}),
             Ok(false) => Err(ServiceError::not_found(format!(

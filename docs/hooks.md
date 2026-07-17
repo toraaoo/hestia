@@ -287,7 +287,6 @@ marks a job mutation — pair with `useJobMutation` semantics above.
 | `useInstanceWorlds(id)` | `instance.worlds` | — |
 | `useInstanceLogs(id, { session, tail, follow, limit })` | `instance.logs` + `process.output` | — |
 | `useInstanceConfig(id)` / `useInstanceConfigValue(id, key)` | `instance.config.list\|get` | — |
-| `useInstanceBackups(id)` | `instance.backup.list` | — |
 | `useInstanceContent(id, kind)` | `instance.content.list` | — |
 | `useCreateInstance()` | `instance.create` | `InstanceCreateParams` |
 | `useUpdateInstance(id)` | `instance.update` | `{ version, loader_version?, allow_downgrade? }` |
@@ -296,9 +295,6 @@ marks a job mutation — pair with `useJobMutation` semantics above.
 | `useLaunchInstance(id)` *(job)* | `instance.launch` | `{ account?, new_session? }` |
 | `useStopInstance(id)` | `instance.stop` | `{ session? }` |
 | `useSetInstanceConfig(id)` | `instance.config.set` | `{ key, value }` |
-| `useCreateInstanceBackup(id)` *(job)* | `instance.backup.create` | — |
-| `useRestoreInstanceBackup(id)` *(job)* | `instance.backup.restore` | `backupId: string` |
-| `useRemoveInstanceBackup(id)` | `instance.backup.remove` | `backupId: string` |
 | `useAddInstanceContent(id)` *(job)* | `instance.content.add` | `ContentAddSpec` |
 | `useRemoveInstanceContent(id)` | `instance.content.remove` | `{ kind, item, worlds? }` |
 | `useUpdateInstanceContent(id)` *(job)* | `instance.content.update` | `{ kind, item? }` |

@@ -1,8 +1,8 @@
 //! Persistent Minecraft instance (client) store: each instance lives at
 //! `<dir>/<id>/` — the `instance.json` record beside `data/`, the game
 //! directory the client writes into (saves, options). The root is reserved
-//! for managed content directories (`mods/`, `resourcepacks/`, `configs/`,
-//! `backups/`); every directory appears on demand. Files shared across
+//! for managed content directories (`mods/`, `resourcepacks/`, `configs/`);
+//! every directory appears on demand. Files shared across
 //! instances (client jars, libraries, assets) live in the engine-wide stores
 //! and are materialised at launch.
 

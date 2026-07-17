@@ -167,8 +167,8 @@ connection (auto-spawning `hestiad` if it is not running and `auto_spawn` is set
   engine's domain modules on the other side of the socket. Facade methods are
   one-liners over `Session`: `App`, `Daemon`, `Config`, `Cache`, `Java`,
   `Accounts`, `Skins`, `Process`, `Server`, `Instance`, `Content`. `facades/jobs.rs` holds
-  the drivers the server and instance facades share — the backup and content jobs
-  publish the same topics, disambiguated by job id.
+  the drivers the server and instance facades share — the backup (server-only)
+  and content jobs publish the same topics, disambiguated by job id.
 - **spawn** (`spawn.rs`) — locates and launches the `hestiad` binary, then retries
   the connection until it is listening.
 
@@ -324,16 +324,16 @@ The subsystems behind the aggregate:
   file; the hestia-managed ports/rcon keys are rejected — see the decision
   note below). An entry directory holds the record beside `data/`, the game's
   own working directory; the root is reserved for the managed content
-  directories (`mods/` for servers / `mods/`, `resourcepacks/`, `shaderpacks/`
-  for instances, `backups/`) and the `content.json` install index, each created on
-  demand — see the decision note below:
+  directories (`mods/` and `backups/` for servers; `mods/`, `resourcepacks/`,
+  `shaderpacks/` for instances) and the `content.json` install index, each
+  created on demand — see the decision note below:
 
   ```
   servers/<id>/               instances/<id>/
   ├── server.json             ├── instance.json
   ├── content.json            ├── content.json
   ├── mods/ backups/          ├── mods/ resourcepacks/
-  │                           │   shaderpacks/ backups/
+  │                           │   shaderpacks/
   └── data/                   └── data/
       jar, libraries/,            saves, options, logs,
       eula.txt,                   mods/ (mirror) —
@@ -341,18 +341,19 @@ The subsystems behind the aggregate:
       world, logs, mods/          writes into
   ```
 
-- **`backup`** — entry backups: gzipped tar archives of an entry's `data/`
+- **`backup`** — server backups: gzipped tar archives of a server's `data/`
   under its `backups/`, named `<utc-stamp>-<kind>.tar.gz` (kind = `manual` /
   `scheduled` / `update`) — the disk is the registry, here too. Creation
   skips what the launcher re-materialises (the server jar, `libraries/`,
   `logs/`, `cache/` — docker-mc-backup's default exclude set — plus the managed
-  content mirror `mods/`; instances skip `logs/` and the mirrors `mods/`,
-  `resourcepacks/`, `shaderpacks/`) and writes through a `.part` temp file; restore
+  content mirror `mods/`) and writes through a `.part` temp file; restore
   extracts into a
   staging directory, carries the skipped names over from the current tree
   (they belong to the record's *current* version), and swaps — a failure
   leaves the current data untouched. `prune` keeps the newest N of one kind.
-  Every pass reports per-file progress.
+  Every pass reports per-file progress. Backups are a **server** feature:
+  instances have none — import/export is the intended replacement and is not
+  built yet, so instance data currently has no backup story at all.
 
   A server's record also claims its **ports**: the game port at create (lowest
   free from 25565, or pinned via the create params) and its rcon console
@@ -370,19 +371,19 @@ The subsystems behind the aggregate:
   `prepare_instance` (materialise java/client/libraries/assets, then assemble
   the plan for the signed-in account's rotated token), and the version moves
   `update_server` / `update_instance` (re-resolve the same flavor at another
-  version, take an automatic `update`-kind backup of the existing data, and
-  swap the record's profile — a server also re-materialises its files under
-  the `ready` gate and regenerates its properties schema; an instance pays at
-  the next launch). Both directions work; a downgrade must be allowed
-  explicitly, and the direction is judged by position in the flavor's own
-  newest-first catalogue, not by parsing version strings. The aggregate also
-  composes the backup flows over the `backup` module: `backup_server` (a live
-  server's world saving pauses over RCON around the archive — `save-off`,
+  version and swap the record's profile — a server takes an automatic
+  `update`-kind backup of its existing data first and re-materialises its
+  files under the `ready` gate, regenerating its properties schema; an
+  instance pays at the next launch, and **nothing of it is backed up** —
+  its downgrade warning says so). Both directions work; a downgrade must be
+  allowed explicitly, and the direction is judged by position in the flavor's
+  own newest-first catalogue, not by parsing version strings. The aggregate
+  also composes the backup flows over the `backup` module: `backup_server` (a
+  live server's world saving pauses over RCON around the archive — `save-off`,
   `save-all flush`, tar, `save-on`, with `save-on` retried even when
   archiving fails, exactly docker-mc-backup's sequence),
-  `restore_server_backup`, their instance counterparts (instances archive
-  only while stopped — no RCON to quiesce a client), and
-  `prune_server_backups`; one backup *or* restore runs per entry at a time.
+  `restore_server_backup`, and `prune_server_backups`; one backup *or*
+  restore runs per server at a time.
   Servers are fully provisioned at create so `start` is an immediate spawn;
   instances are records at create and pay at launch.
 
@@ -529,10 +530,13 @@ The subsystems behind the aggregate:
 > (`backup-interval`/`backup-retention` config keys) rather than a sidecar's
 > environment. Version updates always back up first — an update is the one
 > moment data provably changes shape, and the confirmation gate (downgrade
-> warnings) already marks it as risky. Instances get on-demand backups only:
-> a Minecraft client has no RCON channel to quiesce it, so it must be stopped
-> to archive, and an interactive client session has no analogue of a
-> long-running server's unattended schedule.
+> warnings) already marks it as risky. Backups are **server-only**: an
+> instance is an interactive client session with no RCON channel to quiesce
+> it and no analogue of a long-running server's unattended schedule, and
+> archive/restore proved the wrong tool for it — instance **import/export is
+> the intended replacement and is deferred**, so until it lands instance data
+> has no backup story at all (the instance `update` downgrade warning states
+> that nothing is backed up).
 
 > **The properties schema is generated, not maintained.** `config set`
 > validates a `server.properties` key against the server's own file, written
@@ -593,10 +597,11 @@ supervises launched processes, and manages autostart. The only crate that links
       `JavaInstallManager`, `ServerCreateManager`, `ServerUpdateManager`,
       `InstanceLaunchManager`, `BackupManager`, and `ContentManager`. The
       worker-thread pattern that lets `download.start` / `java.install` /
-      `server.create` / `instance.launch` / `*.backup.create|restore` answer
-      immediately while the blocking engine work runs off-thread, publishing
-      progress/done/error events through the hub (the four backup job types
-      share the `backup.progress|done|error` topics, disambiguated by job id).
+      `server.create` / `instance.launch` / `server.backup.create|restore`
+      answer immediately while the blocking engine work runs off-thread,
+      publishing progress/done/error events through the hub (the two backup
+      job types share the `backup.progress|done|error` topics, disambiguated
+      by job id).
       `managers/job.rs` is the plumbing they share: `topic_event`, the job-id
       generator, and `InFlight<K>` — the "one job per key" set whose `claim()`
       returns a guard that releases on drop, so a panicking job cannot wedge

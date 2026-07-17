@@ -136,15 +136,11 @@ hestia instance modded launch    # ensures java/client/libraries/assets, runs,
 hestia instance modded launch --new-session   # launch another session while one
                                  #   is already running (default refuses — see
                                  #   "Multiple sessions" below)
-hestia instance modded update 1.21.4  # move to another version (saves stay
-                                 #   and are backed up automatically first;
-                                 #   files download at the next launch; a
-                                 #   downgrade asks for a confirm)
-hestia instance modded backup create  # archive saves + options (instance
-                                 #   stopped; on demand only — no schedule)
-hestia instance modded backup list    # stored backups, newest first
-hestia instance modded backup restore # replace saves with a backup's content
-hestia instance modded backup remove <backup>
+hestia instance modded update 1.21.4  # move to another version (saves stay,
+                                 #   but nothing is backed up — instances
+                                 #   have no backups; files download at the
+                                 #   next launch; a downgrade asks for a
+                                 #   confirm)
 hestia instance modded config set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
 hestia instance modded logs -n 50 # captured output — the newest running session
                                  #   (-f opens the fullscreen log session; piped

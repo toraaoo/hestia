@@ -13,7 +13,7 @@ use proto::minecraft::{ConfigEntry, FlavorsResult, VersionsResult};
 use proto::process::ProcessLogsResult;
 use proto::Empty;
 
-use super::guards::{ensure_no_backup, ensure_no_content, find_instance};
+use super::guards::{ensure_no_content, find_instance};
 use crate::runtime::{instance_process_id, Channels, ServiceError};
 
 pub(super) fn register(on: &mut Channels<'_>) {
@@ -76,7 +76,6 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 record.name
             )));
         }
-        ensure_no_backup(&ctx, &instance_process_id(&record.id), &record.name)?;
         let record = ctx
             .runtime
             .engine()
@@ -122,7 +121,6 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 record.name
             )));
         }
-        ensure_no_backup(&ctx, &instance_process_id(&record.id), &record.name)?;
         ctx.runtime
             .engine()
             .instances()
@@ -145,7 +143,6 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 record.name
             )));
         }
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
         ensure_no_content(&ctx, &process_id, &record.name)?;
         let renamed = ctx
             .runtime
@@ -167,7 +164,6 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 record.name
             )));
         }
-        ensure_no_backup(&ctx, &instance_process_id(&record.id), &record.name)?;
         match ctx
             .runtime
             .instance_launches()
