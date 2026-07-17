@@ -7,6 +7,7 @@ import { Empty } from '@/components/empty';
 import { Page } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -115,49 +116,50 @@ function entrySummary(profile: GlobalProfile): string {
   );
 }
 
+/** Grid tile mirroring `EntryCard`: art banner + name + chip + footer. */
 function ProfileCard({ profile }: { profile: GlobalProfile }) {
   return (
     <Link
       to="/profiles/$name"
       params={{ name: profile.name }}
-      className="group flex flex-col gap-3 border border-border bg-card p-4 transition-colors outline-none hover:border-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-ring"
+      className="group block outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
-      <div className="flex items-start justify-between gap-2">
-        <span className="grid size-10 shrink-0 place-items-center bg-muted ring-1 ring-border">
-          <StackIcon className="size-5 text-muted-foreground" />
-        </span>
-        <Badge variant="outline" className="font-mono">
-          {m['profiles.entries_count']({ count: profile.entries.length })}
-        </Badge>
-      </div>
-      <div className="min-w-0">
-        <div className="truncate text-sm font-medium">{profile.name}</div>
-        <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
-          {entrySummary(profile)}
+      <Card className="gap-0 overflow-hidden py-0 transition-colors group-hover:border-ember/40">
+        <div className="relative flex h-24 items-center justify-center border-b border-border bg-muted/40">
+          <StackIcon className="size-9 text-muted-foreground/40" />
+          <span className="absolute top-2 left-2 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground backdrop-blur-sm">
+            {m['profiles.entries_count']({ count: profile.entries.length })}
+          </span>
         </div>
-      </div>
+
+        <div className="space-y-2 p-3">
+          <div className="truncate text-sm font-medium">{profile.name}</div>
+          <div className="truncate font-mono text-[11px] text-muted-foreground">
+            {entrySummary(profile)}
+          </div>
+        </div>
+      </Card>
     </Link>
   );
 }
 
+/** List row mirroring `EntryRow`: icon tile + name + summary + count. */
 function ProfileRow({ profile }: { profile: GlobalProfile }) {
   return (
     <Link
       to="/profiles/$name"
       params={{ name: profile.name }}
-      className="flex items-center gap-3 px-3 py-2.5 transition-colors outline-none hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
+      className="flex items-center gap-3 px-3 py-2.5 transition-colors outline-none hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
     >
-      <span className="grid size-9 shrink-0 place-items-center bg-muted ring-1 ring-border">
-        <StackIcon className="size-4.5 text-muted-foreground" />
+      <span className="grid size-9 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
+        <StackIcon className="size-4.5" />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">
-          {profile.name}
-        </span>
-        <span className="block truncate font-mono text-[11px] text-muted-foreground">
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{profile.name}</div>
+        <div className="truncate font-mono text-[11px] text-muted-foreground">
           {entrySummary(profile)}
-        </span>
-      </span>
+        </div>
+      </div>
       <Badge variant="outline" className="shrink-0 font-mono">
         {m['profiles.entries_count']({ count: profile.entries.length })}
       </Badge>
