@@ -253,6 +253,9 @@ pub struct InstalledContent {
     /// the file lives in — datapacks load from inside a world, not a flat dir.
     /// Empty for every other kind.
     pub world: String,
+    /// Who put the item in the pool: empty = user-installed; a global profile
+    /// apply tags its installs `profile:<name>`.
+    pub origin: String,
 }
 
 /// The installed items of one kind, plus filenames found in the entry's game

@@ -13,7 +13,8 @@
       "sha1": "0123456789abcdef0123456789abcdef01234567",
       "url": "https://cdn.modrinth.com/data/AANobbMI/versions/abcd1234/sodium-0.6.0.jar",
       "installed_unix": 1783783800,
-      "world": ""
+      "world": "",
+      "origin": ""
     }
   ],
   "failures": [

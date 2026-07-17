@@ -1,0 +1,15 @@
+{
+  "name": "performance",
+  "entries": [
+    {
+      "source": "modrinth",
+      "project_id": "AANobbMI",
+      "slug": "sodium"
+    },
+    {
+      "source": "modrinth",
+      "project_id": "gvQqBUqZ",
+      "slug": "lithium"
+    }
+  ]
+}

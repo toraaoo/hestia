@@ -22,6 +22,7 @@ use proto::instance::{InstanceInfo, InstanceLaunchParams, InstanceProfileListRes
 use proto::java::{JavaInstallProgress, JavaRuntime};
 use proto::minecraft::ProvisionProgress;
 use proto::process::{ProcessExitEvent, ProcessInfo, ProcessOutputEvent, ProcessSpec};
+use proto::profile::GlobalProfile;
 use proto::server::ServerInfo;
 use proto::skins::{Cape, Skin};
 use serde::de::DeserializeOwned;
@@ -140,6 +141,7 @@ golden!(
     "content_error_event.json"
 );
 golden!(search_query, SearchQuery, "search_query.json");
+golden!(global_profile, GlobalProfile, "global_profile.json");
 golden!(content_version, ContentVersion, "content_version.json");
 golden!(skin, Skin, "skin.json");
 golden!(cape, Cape, "cape.json");
