@@ -39,10 +39,12 @@ it's just as comfortable from a terminal as from a window.
 > can be sliced into **content profiles** — named selections (mods,
 > resourcepacks, shaders) enforced by the launch-time mirror reconcile; no
 > profile active mirrors everything, and a per-launch override picks another.
+> A profile can also **capture** its own settings scope (`options.txt`,
+> `config/`) snapshotted from the shared store — worlds stay shared.
 > **Global profiles** are data-home-level project reference lists applied
 > into an instance in one shot — each reference resolved against that
 > instance's version/loader and installed as ordinary origin-tagged content
-> (both a daemon/desktop surface, no CLI verbs). Vanilla and Fabric are the
+> (all a daemon/desktop surface, no CLI verbs). Vanilla and Fabric are the
 > shipped flavors, Modrinth the shipped content source. A **system tray**
 > accompanies every serving daemon — status, start/restart, a start-at-login
 > toggle, quit. The **desktop shell** talks to the daemon through a generic

@@ -304,6 +304,8 @@ marks a job mutation — pair with `useJobMutation` semantics above.
 | `useRenameInstanceProfile(id)` | `instance.profile.rename` | `{ name, newName }` |
 | `useUseInstanceProfile(id)` | `instance.profile.use` | `name: string` (empty clears) |
 | `useEditInstanceProfile(id)` | `instance.profile.edit` | `{ name, add?, remove? }` |
+| `useCaptureInstanceProfile(id)` | `instance.profile.capture` | `name: string` |
+| `useReleaseInstanceProfile(id)` | `instance.profile.release` | `name: string` |
 | `useApplyInstanceProfile(id)` *(job)* | `instance.profile.apply` | `profile: string` |
 
 ### Global profiles
