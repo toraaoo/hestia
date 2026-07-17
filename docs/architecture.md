@@ -444,6 +444,28 @@ The subsystems behind the aggregate:
 > behavior, not a bug: the world carries its own datapacks, and exactly one
 > instance manages each.
 
+> **A content profile is a selection, not a copy.** An instance's profiles
+> (`profiles.json` beside `content.json`; absent = no profiles) are named
+> subsets of the managed pool, keyed by **filename** — the one index field
+> always present and unique (`project_id` is empty for local imports). The
+> managed dirs stay the single source of truth: activating a profile changes
+> only what the launch-time reconcile mirrors into `data/` — members are
+> mirrored, tracked non-members have their `data/` copy removed (the managed
+> copy stays), and untracked files are never touched, consistent with the
+> untracked-not-adopted rule. No profile active = mirror everything — exactly
+> the pre-profile behavior, so existing instances need no migration. Selectable
+> kinds are mods, resourcepacks, and shaders only: a datapack *is* world data,
+> outside the pool. Worlds, `servers.dat`, and all other game data are shared
+> across profiles *by construction* — every profile runs against the same
+> single `data/` (per-profile game dirs and symlinked game dirs were rejected).
+> The pool keeps profiles honest at its edges: removing content prunes the
+> filename from every profile, and a content update remaps a member to the new
+> version's filename. When sessions are already running, a launch skips the
+> reconcile entirely (the mirror is in use; jars are locked on Windows) and a
+> profile override that differs from the active one is refused. The `none`
+> name is reserved: `launch { profile: "none" }` overrides an active profile
+> with "no profile" for one launch. Servers have no profiles.
+
 > **Skins follow Modrinth's shape, minus its couplings — and skip the CLI.**
 > Skin management (`skin.*`/`cape.*`) is a desktop-only surface: picking a skin
 > is visual, so the CLI deliberately grows no command for it. The design mirrors
@@ -707,7 +729,13 @@ supervises launched processes, and manages autostart. The only crate that links
   a new session; `stop` fans out to every session or a named one; `logs`
   targets the newest running or a named session — all thin over the
   supervisor), and `instance.config.get|set|list` (`memory`/`jvm-args`
-  only). Plus `sync.get|set|status` and
+  only), and `instance.profile.list|create|remove|rename|use|edit` — the
+  per-instance content profiles (CRUD is metadata-safe while running and
+  applies at the next launch; `create` guards the pool read behind the
+  content in-flight key when seeding; `launch` takes a per-launch `profile`
+  override, refused on a running instance when it differs from the active
+  one — a desktop/daemon surface with no CLI verbs, like skins).
+  Plus `sync.get|set|status` and
   `instance.sync.adopt` — the instance-only shared-config target set (`set`
   validates each path: relative, no `..` escape, not a launcher-managed
   dir; `status` reports each instance's folder link states; `adopt` moves a
@@ -1021,7 +1049,9 @@ a console over rcon — one-shot `command`, followed logs, interactive
 `attach`); instance management (create a
 record, launch materialises client/libraries/assets and spawns the game as the
 signed-in account, and can run several concurrent sessions each with its own
-Log4j2-routed log); shared settings/configs across instances (instance-only
+Log4j2-routed log); per-instance content profiles (named selections over the
+installed pool, enforced by the launch-time mirror reconcile — daemon and
+desktop layers only, no CLI); shared settings/configs across instances (instance-only
 `sync`: `options.txt`/`servers.dat` copied and merged, `saves`/`config`/
 `screenshots` linked into the `shared/` store — with `sync status` link
 states and per-instance `sync adopt` migration); in-place version

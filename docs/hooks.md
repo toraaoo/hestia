@@ -288,16 +288,22 @@ marks a job mutation — pair with `useJobMutation` semantics above.
 | `useInstanceLogs(id, { session, tail, follow, limit })` | `instance.logs` + `process.output` | — |
 | `useInstanceConfig(id)` / `useInstanceConfigValue(id, key)` | `instance.config.list\|get` | — |
 | `useInstanceContent(id, kind)` | `instance.content.list` | — |
+| `useInstanceProfiles(id)` | `instance.profile.list` | — |
 | `useCreateInstance()` | `instance.create` | `InstanceCreateParams` |
 | `useUpdateInstance(id)` | `instance.update` | `{ version, loader_version?, allow_downgrade? }` |
 | `useRenameInstance(id)` | `instance.rename` | `name: string` |
 | `useRemoveInstance(id)` | `instance.remove` | — |
-| `useLaunchInstance(id)` *(job)* | `instance.launch` | `{ account?, new_session? }` |
+| `useLaunchInstance(id)` *(job)* | `instance.launch` | `{ account?, new_session?, profile? }` |
 | `useStopInstance(id)` | `instance.stop` | `{ session? }` |
 | `useSetInstanceConfig(id)` | `instance.config.set` | `{ key, value }` |
 | `useAddInstanceContent(id)` *(job)* | `instance.content.add` | `ContentAddSpec` |
 | `useRemoveInstanceContent(id)` | `instance.content.remove` | `{ kind, item, worlds? }` |
 | `useUpdateInstanceContent(id)` *(job)* | `instance.content.update` | `{ kind, item? }` |
+| `useCreateInstanceProfile(id)` | `instance.profile.create` | `{ name, seedFromPool? }` |
+| `useRemoveInstanceProfile(id)` | `instance.profile.remove` | `name: string` |
+| `useRenameInstanceProfile(id)` | `instance.profile.rename` | `{ name, newName }` |
+| `useUseInstanceProfile(id)` | `instance.profile.use` | `name: string` (empty clears) |
+| `useEditInstanceProfile(id)` | `instance.profile.edit` | `{ name, add?, remove? }` |
 
 ### Content browse
 
