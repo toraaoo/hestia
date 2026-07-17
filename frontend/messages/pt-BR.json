@@ -279,7 +279,12 @@
   "disabled": "Desativado",
   "update": "Atualizar",
   "remove_title": "Remover conteúdo?",
-  "remove_description": "{name} será removido. Seus arquivos serão excluídos; a mudança se aplica na próxima inicialização."
+  "remove_description": "{name} será removido. Seus arquivos serão excluídos; a mudança se aplica na próxima inicialização.",
+  "update_to_latest": "Atualizar para a mais recente",
+  "change_version": "Trocar versão…",
+  "change_version_title": "Trocar versão — {name}",
+  "change_version_description": "Escolha qualquer versão publicada; a troca é aplicada no próximo início.",
+  "current_version": "atual"
  },
  "backup": {
   "create": "Criar backup",

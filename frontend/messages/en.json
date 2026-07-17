@@ -279,7 +279,12 @@
   "disabled": "Disabled",
   "update": "Update",
   "remove_title": "Remove content?",
-  "remove_description": "{name} will be removed. Its files are deleted; the change applies at the next start."
+  "remove_description": "{name} will be removed. Its files are deleted; the change applies at the next start.",
+  "update_to_latest": "Update to latest",
+  "change_version": "Change version…",
+  "change_version_title": "Change version — {name}",
+  "change_version_description": "Pick any published version; the swap applies at the next launch.",
+  "current_version": "current"
  },
  "backup": {
   "create": "Create backup",
