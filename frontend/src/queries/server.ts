@@ -35,10 +35,15 @@ export const serverQueries = {
       queryKey: keys.servers.list(),
       queryFn: () => api.list(),
     }),
-  detail: (id: string) =>
+  detail: (id: string, withUsage = false) =>
     queryOptions({
       queryKey: keys.servers.detail(id),
-      queryFn: () => api.status(id),
+      queryFn: () => api.status(id, withUsage),
+    }),
+  ping: (id: string) =>
+    queryOptions({
+      queryKey: keys.servers.ping(id),
+      queryFn: () => api.ping(id),
     }),
   flavors: () =>
     queryOptions({
@@ -50,6 +55,12 @@ export const serverQueries = {
     queryOptions({
       queryKey: keys.servers.versions(flavor),
       queryFn: () => api.versions(flavor),
+      staleTime: CATALOG_STALE_MS,
+    }),
+  loaders: (flavor: string, version: string) =>
+    queryOptions({
+      queryKey: keys.servers.loaders(flavor, version),
+      queryFn: () => api.loaders(flavor, version),
       staleTime: CATALOG_STALE_MS,
     }),
   profile: (params: ResolveParams) =>
@@ -130,6 +141,19 @@ export const serverMutations = {
     mutation({
       mutationKey: [...keys.servers.detail(id), 'stop'],
       mutationFn: () => api.stop(id),
+      invalidates: () => [keys.servers.all, keys.processes.all],
+    }),
+  /** Id-by-variable variants for list rows, which can't call a per-id hook. */
+  startAny: () =>
+    mutation<{ process_id: string; pid: number }, string>({
+      mutationKey: [...keys.servers.all, 'start'],
+      mutationFn: (id) => api.start(id),
+      invalidates: () => [keys.servers.all, keys.processes.all],
+    }),
+  stopAny: () =>
+    mutation<void, string>({
+      mutationKey: [...keys.servers.all, 'stop'],
+      mutationFn: (id) => api.stop(id),
       invalidates: () => [keys.servers.all, keys.processes.all],
     }),
   /** One console command over RCON; touches no cached state. */
@@ -217,11 +241,14 @@ export function useServers() {
   return useQuery(serverQueries.list());
 }
 
-/** One server's status, seeded from the list cache so a row costs no call. */
-export function useServer(id: string) {
+/**
+ * One server's status, seeded from the list cache so a row costs no call.
+ * `withUsage` also fetches the entry's on-disk footprint (a directory walk).
+ */
+export function useServer(id: string, withUsage = false) {
   const queryClient = useQueryClient();
   return useQuery({
-    ...serverQueries.detail(id),
+    ...serverQueries.detail(id, withUsage),
     initialData: () =>
       queryClient
         .getQueryData<ServerInfo[]>(keys.servers.list())
@@ -231,12 +258,29 @@ export function useServer(id: string) {
   });
 }
 
+/** A running server's live ping (players/MOTD); polls while `enabled`. */
+export function useServerPing(id: string, enabled: boolean) {
+  return useQuery({
+    ...serverQueries.ping(id),
+    enabled,
+    refetchInterval: enabled ? 5000 : false,
+    retry: false,
+  });
+}
+
 export function useServerFlavors() {
   return useQuery(serverQueries.flavors());
 }
 
 export function useServerVersions(flavor: string) {
   return useQuery(serverQueries.versions(flavor));
+}
+
+export function useServerLoaders(flavor: string, version: string) {
+  return useQuery({
+    ...serverQueries.loaders(flavor, version),
+    enabled: flavor !== '' && version !== '',
+  });
 }
 
 export function useServerProfile(params: ResolveParams) {
@@ -296,6 +340,14 @@ export function useStartServer(id: string) {
 
 export function useStopServer(id: string) {
   return useMutation(serverMutations.stop(id));
+}
+
+export function useStartServerAny() {
+  return useMutation(serverMutations.startAny());
+}
+
+export function useStopServerAny() {
+  return useMutation(serverMutations.stopAny());
 }
 
 export function useServerCommand(id: string) {

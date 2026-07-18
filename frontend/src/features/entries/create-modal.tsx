@@ -4,8 +4,16 @@ import {
   MagnifyingGlassIcon,
 } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
+import type {
+  ConfigEntry,
+  Flavor,
+  GameVersion,
+  ProvisionPhase,
+  ProvisionProgress,
+} from '@/api';
 import { entryIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,12 +34,6 @@ import {
   ProgressValue,
 } from '@/components/ui/progress';
 import {
-  type CatalogVersion,
-  flavors,
-  loaderVersions,
-  versionsFor,
-} from '@/features/entries/catalog';
-import {
   createWizardDefaults,
   createWizardSchema,
   detailsStepSchema,
@@ -41,13 +43,16 @@ import {
 import { useAppForm } from '@/hooks/form';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+import * as instanceQueries from '@/queries/instance';
+import { useCreateInstance } from '@/queries/instance';
+import * as serverQueries from '@/queries/server';
+import { useCreateServer } from '@/queries/server';
 
 type Kind = 'server' | 'instance';
 type Step = 'flavor' | 'version' | 'details';
 
 const STEPS: Step[] = ['flavor', 'version', 'details'];
 
-/** A curated slice of `server.properties` surfaced in the wizard. */
 const GAMEMODES: Array<{ value: string; label: () => string }> = [
   { value: 'survival', label: m['gamemode.survival'] },
   { value: 'creative', label: m['gamemode.creative'] },
@@ -64,18 +69,6 @@ const DIFFICULTIES: Array<{ value: string; label: () => string }> = [
 const options = (items: Array<{ value: string; label: () => string }>) =>
   items.map((o) => ({ value: o.value, label: o.label() }));
 
-/** The create flow the daemon runs, faked as timed phases for the wizard. */
-const PHASES: Record<Kind, Array<() => string>> = {
-  server: [
-    m['phase.resolving_profile'],
-    m['phase.installing_java'],
-    m['phase.downloading_server'],
-    m['phase.generating_properties'],
-    m['phase.ready'],
-  ],
-  instance: [m['phase.creating_record'], m['phase.ready']],
-};
-
 const STEP_HINTS: Record<Step, (kind: Kind) => string> = {
   flavor: (kind) =>
     kind === 'server'
@@ -88,16 +81,36 @@ const STEP_HINTS: Record<Step, (kind: Kind) => string> = {
       : m['wizard.hint_details_instance'](),
 };
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Map a live provisioning phase to a human label; falls back to the raw id. */
+function phaseLabel(phase: ProvisionPhase): string {
+  switch (phase) {
+    case 'resolving':
+      return m['phase.resolving_profile']();
+    case 'java':
+      return m['phase.installing_java']();
+    case 'server':
+      return m['phase.downloading_server']();
+    case 'client':
+    case 'libraries':
+    case 'assets':
+      return m['phase.downloading']({ name: phase });
+    case 'content':
+      return m['phase.mirroring']();
+    default:
+      return phase;
+  }
+}
+
+function percentOf(progress: ProvisionProgress | null): number {
+  if (!progress || progress.total <= 0) return 0;
+  return Math.round((progress.current / progress.total) * 100);
+}
 
 /**
- * The New server / New instance wizard: flavor → version → details, mirroring
- * the CLI's interactive `create`. Built on TanStack Form's multi-step wizard
- * pattern — one `useAppForm` holds the whole value nested per step, each step
- * is a `FormGroup` that validates only its own zod schema on "Next", and the
- * final submit validates the composed schema. A server also gates on the EULA.
- * Submitting plays the daemon's provisioning phases as a progress bar — nothing
- * is persisted, the library is static mock data.
+ * The New server / New instance wizard: flavor → version → details, wired to
+ * the daemon's provider catalogue and the real create job. A server create
+ * streams provisioning phases as a progress bar; an instance create is a quick
+ * record write. On success the dialog closes and the list invalidates.
  */
 export function CreateEntryModal({
   kind,
@@ -111,25 +124,39 @@ export function CreateEntryModal({
   const [step, setStep] = useState<Step>('flavor');
   const [search, setSearch] = useState('');
   const [showSnapshots, setShowSnapshots] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [phase, setPhase] = useState('');
-  const [progress, setProgress] = useState(0);
+
+  const serverFlavors = serverQueries.useServerFlavors();
+  const instanceFlavors = instanceQueries.useInstanceFlavors();
+  const flavorsQuery = kind === 'server' ? serverFlavors : instanceFlavors;
+  const flavors: Flavor[] = useMemo(
+    () => flavorsQuery.data ?? [],
+    [flavorsQuery.data],
+  );
+
+  const createServer = useCreateServer();
+  const createInstance = useCreateInstance();
+  const creating = createServer.isPending || createInstance.isPending;
+  const progress = createServer.progress;
 
   const form = useAppForm({
-    defaultValues: createWizardDefaults(loaderVersions[0]),
+    defaultValues: createWizardDefaults(''),
     validationLogic: revalidateLogic(),
     validators: { onDynamic: createWizardSchema(kind) },
-    onSubmit: async () => {
-      setCreating(true);
-      const phases = PHASES[kind];
-      for (let i = 0; i < phases.length; i++) {
-        setPhase(phases[i]());
-        setProgress(Math.round(((i + 1) / phases.length) * 100));
-        await sleep(650);
+    onSubmit: async ({ value }) => {
+      try {
+        if (kind === 'server') {
+          const server = await createServer.mutateAsync(serverParams(value));
+          toast.success(m['toast.created']({ name: server.name }));
+        } else {
+          const instance = await createInstance.mutateAsync(
+            instanceParams(value),
+          );
+          toast.success(m['toast.created']({ name: instance.name }));
+        }
+        onOpenChange(false);
+      } catch (error) {
+        toast.error(errorMessage(error));
       }
-      await sleep(300);
-      onOpenChange(false);
-      setCreating(false);
     },
   });
 
@@ -138,8 +165,6 @@ export function CreateEntryModal({
     setStep('flavor');
     setSearch('');
     setShowSnapshots(false);
-    setCreating(false);
-    setProgress(0);
     form.reset();
   }, [open, form]);
 
@@ -215,8 +240,12 @@ export function CreateEntryModal({
         {creating ? (
           <div className="min-h-[18rem] p-1">
             <div className="flex min-h-[18rem] flex-col justify-center px-1">
-              <Progress value={progress}>
-                <ProgressLabel>{phase}</ProgressLabel>
+              <Progress value={percentOf(progress)}>
+                <ProgressLabel>
+                  {progress
+                    ? phaseLabel(progress.phase)
+                    : m['phase.resolving_profile']()}
+                </ProgressLabel>
                 <ProgressValue />
               </Progress>
             </div>
@@ -236,14 +265,22 @@ export function CreateEntryModal({
                         <FlavorOption
                           key={f.id}
                           name={f.name}
-                          summary={f.summary()}
+                          summary={flavorSummary(f.id)}
                           selected={field.state.value === f.id}
                           onSelect={() => {
                             field.handleChange(f.id);
                             form.setFieldValue('version.version', '');
+                            form.setFieldValue('version.loaderVersion', '');
                           }}
                         />
                       ))}
+                      {flavors.length === 0 && (
+                        <p className="px-1 py-6 text-center text-xs text-muted-foreground">
+                          {flavorsQuery.isPending
+                            ? m['common.loading']()
+                            : m['wizard.no_versions_match']()}
+                        </p>
+                      )}
                     </div>
                   )}
                 </form.AppField>
@@ -259,99 +296,17 @@ export function CreateEntryModal({
             {(group) => (
               <StepForm onSubmit={group.handleSubmit} footer={nav}>
                 <form.Subscribe selector={(s) => s.values.flavor.flavor}>
-                  {(flavor) => {
-                    const q = search.trim().toLowerCase();
-                    const list = versionsFor(flavor).filter((v) => {
-                      if (!showSnapshots && v.kind === 'snapshot') return false;
-                      if (q && !v.id.toLowerCase().includes(q)) return false;
-                      return true;
-                    });
-                    return (
-                      <div className="flex flex-col gap-3">
-                        <div className="relative">
-                          <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
-                          <Input
-                            className="pl-8"
-                            placeholder={m['wizard.filter_versions']()}
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                          />
-                        </div>
-
-                        {flavor === 'fabric' ? (
-                          <form.AppField name="version.loaderVersion">
-                            {(field) => (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">
-                                  {m['label.loader']()}
-                                </span>
-                                <field.SelectField
-                                  options={loaderVersions.map((l) => ({
-                                    value: l,
-                                    label: l,
-                                  }))}
-                                  triggerClassName="w-32"
-                                />
-                              </div>
-                            )}
-                          </form.AppField>
-                        ) : (
-                          <label
-                            htmlFor="wizard-snapshots"
-                            className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground"
-                          >
-                            <Checkbox
-                              id="wizard-snapshots"
-                              checked={showSnapshots}
-                              onCheckedChange={(c) =>
-                                setShowSnapshots(c === true)
-                              }
-                            />
-                            {m['wizard.show_snapshots']()}
-                          </label>
-                        )}
-
-                        <form.AppField name="version.version">
-                          {(field) => {
-                            const invalid =
-                              field.state.meta.isTouched &&
-                              field.state.meta.errors.length > 0;
-                            return (
-                              <div className="flex flex-col gap-1.5">
-                                <div className="max-h-52 divide-y divide-border overflow-y-auto border border-border">
-                                  {list.length === 0 ? (
-                                    <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                                      {m['wizard.no_versions_match']()}
-                                    </p>
-                                  ) : (
-                                    list.map((v) => (
-                                      <VersionRow
-                                        key={v.id}
-                                        version={v}
-                                        selected={field.state.value === v.id}
-                                        onSelect={() =>
-                                          field.handleChange(v.id)
-                                        }
-                                      />
-                                    ))
-                                  )}
-                                </div>
-                                {invalid && (
-                                  <FieldError
-                                    errors={
-                                      field.state.meta.errors as Array<{
-                                        message?: string;
-                                      }>
-                                    }
-                                  />
-                                )}
-                              </div>
-                            );
-                          }}
-                        </form.AppField>
-                      </div>
-                    );
-                  }}
+                  {(flavor) => (
+                    <VersionStep
+                      form={form}
+                      kind={kind}
+                      flavor={flavor}
+                      search={search}
+                      onSearch={setSearch}
+                      showSnapshots={showSnapshots}
+                      onShowSnapshots={setShowSnapshots}
+                    />
+                  )}
                 </form.Subscribe>
               </StepForm>
             )}
@@ -364,164 +319,7 @@ export function CreateEntryModal({
           >
             {(group) => (
               <StepForm onSubmit={group.handleSubmit} footer={nav}>
-                <div className="flex flex-col gap-4">
-                  <form.Subscribe
-                    selector={(s) =>
-                      [
-                        s.values.flavor.flavor,
-                        s.values.version.version,
-                      ] as const
-                    }
-                  >
-                    {([flavor, version]) => (
-                      <form.AppField name="details.name">
-                        {(field) => (
-                          <field.TextField
-                            label={m['label.name']()}
-                            placeholder={`${flavor}-${version}`}
-                            description={m['wizard.name_hint']()}
-                          />
-                        )}
-                      </form.AppField>
-                    )}
-                  </form.Subscribe>
-
-                  <form.AppField name="details.memory">
-                    {(field) => (
-                      <field.SliderField
-                        label={m['label.memory']()}
-                        formatValue={(v) => m['wizard.gb']({ value: v })}
-                        min={2}
-                        max={32}
-                        step={1}
-                      />
-                    )}
-                  </form.AppField>
-
-                  {kind === 'server' && (
-                    <>
-                      <SectionHeader>
-                        {m['wizard.server_properties']()}
-                      </SectionHeader>
-
-                      <form.AppField name="details.motd">
-                        {(field) => (
-                          <field.TextField label={m['wizard.motd']()} />
-                        )}
-                      </form.AppField>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <form.AppField name="details.gamemode">
-                          {(field) => (
-                            <field.SelectField
-                              label={m['wizard.gamemode']()}
-                              options={options(GAMEMODES)}
-                              triggerClassName="w-full"
-                            />
-                          )}
-                        </form.AppField>
-                        <form.AppField name="details.difficulty">
-                          {(field) => (
-                            <field.SelectField
-                              label={m['wizard.difficulty']()}
-                              options={options(DIFFICULTIES)}
-                              triggerClassName="w-full"
-                            />
-                          )}
-                        </form.AppField>
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <form.AppField name="details.maxPlayers">
-                          {(field) => (
-                            <field.TextField
-                              label={m['wizard.max_players']()}
-                              type="number"
-                            />
-                          )}
-                        </form.AppField>
-                        <form.AppField name="details.port">
-                          {(field) => (
-                            <field.TextField
-                              label={m['wizard.port']()}
-                              type="number"
-                              placeholder={m['wizard.port_auto']()}
-                              description={m['wizard.port_hint']()}
-                            />
-                          )}
-                        </form.AppField>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 pt-1">
-                        <form.AppField name="details.pvp">
-                          {(field) => (
-                            <PropToggle
-                              id="prop-pvp"
-                              label={m['wizard.pvp']()}
-                              checked={field.state.value}
-                              onChange={field.handleChange}
-                            />
-                          )}
-                        </form.AppField>
-                        <form.AppField name="details.onlineMode">
-                          {(field) => (
-                            <PropToggle
-                              id="prop-online"
-                              label={m['wizard.online_mode']()}
-                              checked={field.state.value}
-                              onChange={field.handleChange}
-                            />
-                          )}
-                        </form.AppField>
-                      </div>
-
-                      <form.AppField name="details.eula">
-                        {(field) => {
-                          const invalid =
-                            field.state.meta.isTouched &&
-                            field.state.meta.errors.length > 0;
-                          return (
-                            <div className="flex flex-col gap-1.5">
-                              <label
-                                htmlFor={field.name}
-                                className="flex cursor-pointer items-center gap-2.5 border border-border px-3 py-2.5"
-                              >
-                                <Checkbox
-                                  id={field.name}
-                                  checked={field.state.value}
-                                  onCheckedChange={(c) =>
-                                    field.handleChange(c === true)
-                                  }
-                                />
-                                <span className="text-xs text-muted-foreground">
-                                  {m['wizard.eula_before']()}{' '}
-                                  <a
-                                    href="https://aka.ms/MinecraftEULA"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-foreground underline underline-offset-2"
-                                  >
-                                    {m['wizard.eula_link']()}
-                                  </a>
-                                  {m['wizard.eula_after']()}
-                                </span>
-                              </label>
-                              {invalid && (
-                                <FieldError
-                                  errors={
-                                    field.state.meta.errors as Array<{
-                                      message?: string;
-                                    }>
-                                  }
-                                />
-                              )}
-                            </div>
-                          );
-                        }}
-                      </form.AppField>
-                    </>
-                  )}
-                </div>
+                <DetailsStep form={form} kind={kind} />
               </StepForm>
             )}
           </form.FormGroup>
@@ -531,12 +329,339 @@ export function CreateEntryModal({
   );
 }
 
-/**
- * A step's scrolling body wrapped in a `<form>` whose submit runs the group.
- * The `footer` sits below the scroll area but inside the form, so the step
- * nav stays pinned while only the fields scroll — and its submit button still
- * drives the group.
- */
+/** The static per-flavor blurb, by id; empty for an unknown flavor. */
+function flavorSummary(id: string): string {
+  if (id === 'vanilla') return m['flavor.vanilla_summary']();
+  if (id === 'fabric') return m['flavor.fabric_summary']();
+  return '';
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: the wizard form's generic type is internal to TanStack Form.
+type WizardForm = any;
+
+/** The version list, snapshot toggle, and loader-build picker for a flavor. */
+function VersionStep({
+  form,
+  kind,
+  flavor,
+  search,
+  onSearch,
+  showSnapshots,
+  onShowSnapshots,
+}: {
+  form: WizardForm;
+  kind: Kind;
+  flavor: string;
+  search: string;
+  onSearch: (value: string) => void;
+  showSnapshots: boolean;
+  onShowSnapshots: (value: boolean) => void;
+}) {
+  const serverVersions = serverQueries.useServerVersions(flavor);
+  const instanceVersions = instanceQueries.useInstanceVersions(flavor);
+  const versionsQuery = kind === 'server' ? serverVersions : instanceVersions;
+  const versions: GameVersion[] = versionsQuery.data ?? [];
+
+  const q = search.trim().toLowerCase();
+  const list = versions.filter((v) => {
+    const isRelease = v.kind === 'release';
+    if (!showSnapshots && !isRelease) return false;
+    if (q && !v.id.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const selected = form.state.values.version.version as string;
+  const serverLoaders = serverQueries.useServerLoaders(flavor, selected);
+  const instanceLoaders = instanceQueries.useInstanceLoaders(flavor, selected);
+  const loadersQuery = kind === 'server' ? serverLoaders : instanceLoaders;
+  const loaders = loadersQuery.data ?? [];
+
+  useEffect(() => {
+    if (loaders.length > 0) {
+      const current = form.state.values.version.loaderVersion as string;
+      if (!current || !loaders.includes(current)) {
+        form.setFieldValue('version.loaderVersion', loaders[0]);
+      }
+    } else {
+      form.setFieldValue('version.loaderVersion', '');
+    }
+  }, [loaders, form]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="relative">
+        <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
+        <Input
+          className="pl-8"
+          placeholder={m['wizard.filter_versions']()}
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+        />
+      </div>
+
+      <label
+        htmlFor="wizard-snapshots"
+        className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground"
+      >
+        <Checkbox
+          id="wizard-snapshots"
+          checked={showSnapshots}
+          onCheckedChange={(c) => onShowSnapshots(c === true)}
+        />
+        {m['wizard.show_snapshots']()}
+      </label>
+
+      <form.AppField name="version.version">
+        {(field: WizardForm) => {
+          const invalid =
+            field.state.meta.isTouched && field.state.meta.errors.length > 0;
+          return (
+            <div className="flex flex-col gap-1.5">
+              <div className="max-h-52 divide-y divide-border overflow-y-auto border border-border">
+                {list.length === 0 ? (
+                  <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                    {versionsQuery.isPending
+                      ? m['common.loading']()
+                      : m['wizard.no_versions_match']()}
+                  </p>
+                ) : (
+                  list.map((v) => (
+                    <VersionRow
+                      key={v.id}
+                      id={v.id}
+                      snapshot={v.kind !== 'release'}
+                      selected={field.state.value === v.id}
+                      onSelect={() => field.handleChange(v.id)}
+                    />
+                  ))
+                )}
+              </div>
+              {invalid && (
+                <FieldError
+                  errors={
+                    field.state.meta.errors as Array<{ message?: string }>
+                  }
+                />
+              )}
+            </div>
+          );
+        }}
+      </form.AppField>
+
+      {loaders.length > 0 && (
+        <form.AppField name="version.loaderVersion">
+          {(field: WizardForm) => (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {m['label.loader']()}
+              </span>
+              <field.SelectField
+                options={loaders.map((l: string) => ({ value: l, label: l }))}
+                triggerClassName="w-40"
+              />
+            </div>
+          )}
+        </form.AppField>
+      )}
+    </div>
+  );
+}
+
+/** The details step: name + memory, plus the server.properties block. */
+function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <form.Subscribe
+        selector={(s: WizardForm) =>
+          [s.values.flavor.flavor, s.values.version.version] as const
+        }
+      >
+        {([flavor, version]: [string, string]) => (
+          <form.AppField name="details.name">
+            {(field: WizardForm) => (
+              <field.TextField
+                label={m['label.name']()}
+                placeholder={`${flavor}-${version}`}
+                description={m['wizard.name_hint']()}
+              />
+            )}
+          </form.AppField>
+        )}
+      </form.Subscribe>
+
+      <form.AppField name="details.memory">
+        {(field: WizardForm) => (
+          <field.SliderField
+            label={m['label.memory']()}
+            formatValue={(v: number) => m['wizard.gb']({ value: v })}
+            min={2}
+            max={32}
+            step={1}
+          />
+        )}
+      </form.AppField>
+
+      {kind === 'server' && (
+        <>
+          <SectionHeader>{m['wizard.server_properties']()}</SectionHeader>
+
+          <form.AppField name="details.motd">
+            {(field: WizardForm) => (
+              <field.TextField label={m['wizard.motd']()} />
+            )}
+          </form.AppField>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <form.AppField name="details.gamemode">
+              {(field: WizardForm) => (
+                <field.SelectField
+                  label={m['wizard.gamemode']()}
+                  options={options(GAMEMODES)}
+                  triggerClassName="w-full"
+                />
+              )}
+            </form.AppField>
+            <form.AppField name="details.difficulty">
+              {(field: WizardForm) => (
+                <field.SelectField
+                  label={m['wizard.difficulty']()}
+                  options={options(DIFFICULTIES)}
+                  triggerClassName="w-full"
+                />
+              )}
+            </form.AppField>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <form.AppField name="details.maxPlayers">
+              {(field: WizardForm) => (
+                <field.TextField
+                  label={m['wizard.max_players']()}
+                  type="number"
+                />
+              )}
+            </form.AppField>
+            <form.AppField name="details.port">
+              {(field: WizardForm) => (
+                <field.TextField
+                  label={m['wizard.port']()}
+                  type="number"
+                  placeholder={m['wizard.port_auto']()}
+                  description={m['wizard.port_hint']()}
+                />
+              )}
+            </form.AppField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-1">
+            <form.AppField name="details.pvp">
+              {(field: WizardForm) => (
+                <PropToggle
+                  id="prop-pvp"
+                  label={m['wizard.pvp']()}
+                  checked={field.state.value}
+                  onChange={field.handleChange}
+                />
+              )}
+            </form.AppField>
+            <form.AppField name="details.onlineMode">
+              {(field: WizardForm) => (
+                <PropToggle
+                  id="prop-online"
+                  label={m['wizard.online_mode']()}
+                  checked={field.state.value}
+                  onChange={field.handleChange}
+                />
+              )}
+            </form.AppField>
+          </div>
+
+          <form.AppField name="details.eula">
+            {(field: WizardForm) => {
+              const invalid =
+                field.state.meta.isTouched &&
+                field.state.meta.errors.length > 0;
+              return (
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor={field.name}
+                    className="flex cursor-pointer items-center gap-2.5 border border-border px-3 py-2.5"
+                  >
+                    <Checkbox
+                      id={field.name}
+                      checked={field.state.value}
+                      onCheckedChange={(c) => field.handleChange(c === true)}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {m['wizard.eula_before']()}{' '}
+                      <a
+                        href="https://aka.ms/MinecraftEULA"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-foreground underline underline-offset-2"
+                      >
+                        {m['wizard.eula_link']()}
+                      </a>
+                      {m['wizard.eula_after']()}
+                    </span>
+                  </label>
+                  {invalid && (
+                    <FieldError
+                      errors={
+                        field.state.meta.errors as Array<{ message?: string }>
+                      }
+                    />
+                  )}
+                </div>
+              );
+            }}
+          </form.AppField>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Build the server create params from the wizard's collected values. */
+// biome-ignore lint/suspicious/noExplicitAny: the wizard value is the form's internal shape.
+function serverParams(value: any) {
+  const d = value.details;
+  const config: ConfigEntry[] = [
+    { key: 'memory', value: `${d.memory}G` },
+    { key: 'motd', value: d.motd },
+    { key: 'gamemode', value: d.gamemode },
+    { key: 'difficulty', value: d.difficulty },
+    { key: 'max-players', value: d.maxPlayers },
+    { key: 'pvp', value: String(d.pvp) },
+    { key: 'online-mode', value: String(d.onlineMode) },
+  ];
+  return {
+    name: d.name || undefined,
+    flavor: value.flavor.flavor,
+    version: value.version.version,
+    loader_version: value.version.loaderVersion || undefined,
+    eula: true,
+    port: d.port ? Number(d.port) : undefined,
+    config,
+  };
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: the wizard value is the form's internal shape.
+function instanceParams(value: any) {
+  const d = value.details;
+  return {
+    name: d.name || undefined,
+    flavor: value.flavor.flavor,
+    version: value.version.version,
+    loader_version: value.version.loaderVersion || undefined,
+    config: [{ key: 'memory', value: `${d.memory}G` }],
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function StepForm({
   onSubmit,
   footer,
@@ -624,17 +749,21 @@ function FlavorOption({
       )}
     >
       <span className="text-sm font-medium">{name}</span>
-      <span className="text-xs text-muted-foreground">{summary}</span>
+      {summary && (
+        <span className="text-xs text-muted-foreground">{summary}</span>
+      )}
     </button>
   );
 }
 
 function VersionRow({
-  version,
+  id,
+  snapshot,
   selected,
   onSelect,
 }: {
-  version: CatalogVersion;
+  id: string;
+  snapshot: boolean;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -654,8 +783,8 @@ function VersionRow({
           selected ? 'bg-ember' : 'bg-transparent',
         )}
       />
-      <span className="flex-1 font-mono text-xs">{version.id}</span>
-      {version.kind === 'snapshot' && (
+      <span className="flex-1 font-mono text-xs">{id}</span>
+      {snapshot && (
         <Badge variant="outline" className="text-[10px]">
           {m['wizard.snapshot']()}
         </Badge>

@@ -4,41 +4,43 @@ import {
   PlusIcon,
   PowerIcon,
 } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+
+import type { ServerInfo } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { entryIcon } from '@/components/icons';
 import { Stat, TabCount } from '@/components/page';
+import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Input } from '@/components/ui/input';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ContentInstallModal,
   serverTarget,
 } from '@/features/content/install-modal';
+import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
+import { servers as mockServers } from '@/features/entries/mock';
 import {
-  BackupList,
-  ContentSection,
-  SideCard,
-  StatCard,
-} from '@/features/entries/detail';
-import { getServer } from '@/features/entries/mock';
-import { ResourceCards } from '@/features/entries/resource-panel';
-import { ServerSettingsForm } from '@/features/entries/settings-forms';
-import { agoLabel } from '@/lib/format';
+  type LiveResources,
+  ResourceCards,
+} from '@/features/entries/resource-panel';
+import { ServerBackupsTab } from '@/features/servers/backups-tab';
+import { ServerConsoleTab } from '@/features/servers/console-tab';
+import { ServerSettingsTab } from '@/features/servers/settings-tab';
+import { agoLabel, bytes, memGb } from '@/lib/format';
 import type { ContentKind } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
-
-const consoleLines = [
-  '[12:04:21] [Server thread/INFO]: Starting minecraft server version 1.21.4',
-  '[12:04:23] [Server thread/INFO]: Preparing level "world"',
-  '[12:04:25] [Server thread/INFO]: Done (3.812s)! For help, type "help"',
-  '[12:07:02] [Server thread/INFO]: toraaoo joined the game',
-  '[12:19:44] [Server thread/INFO]: <toraaoo> anyone near spawn?',
-];
+import { useProcessMetrics } from '@/queries/metrics';
+import {
+  useServer,
+  useServerConfig,
+  useServerPing,
+  useStartServer,
+  useStopServer,
+} from '@/queries/server';
 
 export type ServerTab =
   | 'overview'
@@ -49,6 +51,10 @@ export type ServerTab =
 
 /** The content kinds a server takes (see `server.content.add`). */
 export const serverContentKinds: ContentKind[] = ['mod', 'datapack'];
+
+function isRunning(server: ServerInfo): boolean {
+  return server.process?.state === 'running';
+}
 
 export function ServerDetailPage({
   id,
@@ -63,8 +69,30 @@ export function ServerDetailPage({
   contentKind?: ContentKind;
   onContentKindChange: (kind?: ContentKind) => void;
 }) {
-  const server = getServer(id);
+  const query = useServer(id, true);
+  const config = useServerConfig(id);
   const [addingContent, setAddingContent] = useState(false);
+  const start = useStartServer(id);
+  const stop = useStopServer(id);
+
+  const server = query.data;
+  const running = server ? isRunning(server) : false;
+  const ping = useServerPing(id, running);
+  const metrics = useProcessMetrics(server?.process?.id ?? null);
+
+  const memoryLimitGb = useMemo(() => {
+    const value = config.data?.find((e) => e.key === 'memory')?.value;
+    return value ? memGb(value) : 4;
+  }, [config.data]);
+
+  if (query.isPending) {
+    return (
+      <div className="space-y-4 p-6">
+        <Bone className="h-8 w-64" />
+        <Bone className="h-40" />
+      </div>
+    );
+  }
 
   if (!server) {
     return (
@@ -74,12 +102,24 @@ export function ServerDetailPage({
     );
   }
 
-  const statusTone = !server.ready ? 'warn' : server.running ? 'on' : 'off';
+  const statusTone = !server.ready ? 'warn' : running ? 'on' : 'off';
   const statusLabel = !server.ready
     ? m['status.preparing']()
-    : server.running
+    : running
       ? m['status.online']()
       : m['status.stopped']();
+
+  const live: LiveResources = {
+    running,
+    memoryLimitGb,
+    diskBytes: server.disk_bytes ?? 0,
+    series: metrics.series.map((s) => ({
+      cpu: s.cpu_pct,
+      mem: s.mem_bytes / (1024 * 1024),
+    })),
+  };
+
+  const contentItems = mockServers[0].content;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -111,10 +151,14 @@ export function ServerDetailPage({
             >
               <FolderOpenIcon className="size-4" />
             </Button>
-            {server.running ? (
+            {running ? (
               <ConfirmDialog
                 trigger={
-                  <Button variant="outline" data-icon="inline-start">
+                  <Button
+                    variant="outline"
+                    data-icon="inline-start"
+                    disabled={stop.isPending}
+                  >
                     <PowerIcon weight="bold" />
                     {m['action.stop']()}
                   </Button>
@@ -122,13 +166,14 @@ export function ServerDetailPage({
                 title={m['entry.stop_title']({ name: server.name })}
                 description={m['entry.stop_server_description']()}
                 confirmLabel={m['action.stop']()}
-                onConfirm={() => {}}
+                onConfirm={() => stop.mutate()}
               />
             ) : (
               <Button
-                disabled={!server.ready}
+                disabled={!server.ready || start.isPending}
                 data-icon="inline-start"
                 className="bg-ember text-ember-foreground hover:bg-ember/90"
+                onClick={() => start.mutate()}
               >
                 <PlayIcon weight="fill" />
                 {m['action.start']()}
@@ -148,33 +193,41 @@ export function ServerDetailPage({
           <TabsTrigger value="console">{m['tab.console']()}</TabsTrigger>
           <TabsTrigger value="content">
             {m['tab.content']()}
-            <TabCount n={server.content.length} />
+            <TabCount n={contentItems.length} />
           </TabsTrigger>
-          <TabsTrigger value="backups">
-            {m['tab.backups']()}
-            <TabCount n={server.backups.length} />
-          </TabsTrigger>
+          <TabsTrigger value="backups">{m['tab.backups']()}</TabsTrigger>
           <TabsTrigger value="settings">{m['tab.settings']()}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col p-5">
           <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_260px]">
             <div className="flex flex-col gap-5">
-              <p className="max-w-2xl text-sm leading-relaxed text-foreground/90">
-                {server.motd}
-              </p>
+              {ping.data?.motd && (
+                <p className="max-w-2xl text-sm leading-relaxed text-foreground/90">
+                  {ping.data.motd}
+                </p>
+              )}
               <div className="grid grid-cols-3 gap-3">
                 <StatCard
-                  value={`${server.players}/${server.max_players}`}
+                  value={
+                    ping.data
+                      ? `${ping.data.players_online}/${ping.data.players_max}`
+                      : '—'
+                  }
                   label={m['label.players']()}
                 />
-                <StatCard value={server.memory} label={m['label.memory']()} />
                 <StatCard
-                  value={server.content.length}
-                  label={m['label.content']()}
+                  value={memoryLimitGb ? `${memoryLimitGb}G` : '—'}
+                  label={m['label.memory']()}
+                />
+                <StatCard
+                  value={
+                    server.disk_bytes != null ? bytes(server.disk_bytes) : '—'
+                  }
+                  label={m['label.disk']()}
                 />
               </div>
-              <ResourceCards id={server.id} />
+              <ResourceCards id={server.id} live={live} />
             </div>
 
             <div className="space-y-4">
@@ -182,7 +235,7 @@ export function ServerDetailPage({
                 <div className="divide-y divide-border">
                   <Stat
                     label={m['label.address']()}
-                    value={`localhost:${server.port ?? '—'}`}
+                    value={`localhost:${server.game_port ?? '—'}`}
                   />
                   <Stat label={m['label.loader']()} value={server.flavor} />
                   <Stat
@@ -196,43 +249,17 @@ export function ServerDetailPage({
                   />
                 </div>
               </SideCard>
-              <SideCard title={m['tab.backups']()}>
-                <p className="text-xs text-muted-foreground">
-                  {server.backup_interval
-                    ? m['backup.schedule_summary']({
-                        interval: server.backup_interval,
-                        retention: server.backup_retention,
-                      })
-                    : m['backup.off']()}
-                </p>
-              </SideCard>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="console" className="flex min-h-0 flex-col p-5">
-          {server.running ? (
-            <div className="flex min-h-0 flex-1 flex-col gap-2">
-              <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto border border-border bg-card p-3 font-mono text-[11px] text-muted-foreground">
-                {consoleLines.map((line) => (
-                  <div key={line}>{line}</div>
-                ))}
-              </div>
-              <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
-                <Input
-                  placeholder={m['detail.console_placeholder']()}
-                  className="font-mono"
-                />
-              </form>
-            </div>
-          ) : (
-            <Empty>{m['detail.console_empty']()}</Empty>
-          )}
+          <ServerConsoleTab id={id} running={running} name={server.name} />
         </TabsContent>
 
         <TabsContent value="content" className="p-5">
           <ContentSection
-            items={server.content}
+            items={contentItems}
             kinds={serverContentKinds}
             kind={contentKind}
             onKindChange={onContentKindChange}
@@ -251,30 +278,20 @@ export function ServerDetailPage({
         </TabsContent>
 
         <TabsContent value="backups" className="p-5">
-          <div className="mb-5 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
-              {server.backup_interval
-                ? m['backup.schedule_status']({
-                    interval: server.backup_interval,
-                    retention: server.backup_retention,
-                  })
-                : m['backup.off_short']()}
-            </span>
-            <Button size="sm" variant="outline" data-icon="inline-start">
-              <PlusIcon weight="bold" />
-              {m['backup.create']()}
-            </Button>
-          </div>
-          <BackupList backups={server.backups} />
+          <ServerBackupsTab id={id} running={running} config={config.data} />
         </TabsContent>
 
         <TabsContent value="settings" className="p-5">
-          <ServerSettingsForm server={server} />
+          <ServerSettingsTab
+            server={server}
+            config={config.data}
+            running={running}
+          />
         </TabsContent>
       </Tabs>
 
       <ContentInstallModal
-        entry={serverTarget(server)}
+        entry={serverTarget(mockServers[0])}
         open={addingContent}
         onOpenChange={setAddingContent}
       />

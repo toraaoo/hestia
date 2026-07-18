@@ -45,6 +45,12 @@ export const instanceQueries = {
       queryFn: () => api.versions(flavor),
       staleTime: CATALOG_STALE_MS,
     }),
+  loaders: (flavor: string, version: string) =>
+    queryOptions({
+      queryKey: keys.instances.loaders(flavor, version),
+      queryFn: () => api.loaders(flavor, version),
+      staleTime: CATALOG_STALE_MS,
+    }),
   profile: (params: ResolveParams) =>
     queryOptions({
       queryKey: keys.instances.profile(params),
@@ -276,6 +282,13 @@ export function useInstanceFlavors() {
 
 export function useInstanceVersions(flavor: string) {
   return useQuery(instanceQueries.versions(flavor));
+}
+
+export function useInstanceLoaders(flavor: string, version: string) {
+  return useQuery({
+    ...instanceQueries.loaders(flavor, version),
+    enabled: flavor !== '' && version !== '',
+  });
 }
 
 export function useInstanceProfile(params: ResolveParams) {

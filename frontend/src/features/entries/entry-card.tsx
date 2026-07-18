@@ -20,6 +20,10 @@ export interface EntryCardData {
   ready: boolean;
   /** One-line footer: "Last played 2h ago" / ":25565 · 3 online". */
   subtitle: string;
+  /** Wired quick actions; absent leaves the button inert (mock surfaces). */
+  onStart?: () => void;
+  onStop?: () => void;
+  busy?: boolean;
 }
 
 function statusOf(entry: EntryCardData) {
@@ -69,6 +73,7 @@ function ActionButton({
             variant="outline"
             size={size}
             data-icon="inline-start"
+            disabled={entry.busy}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -85,16 +90,20 @@ function ActionButton({
             : m['entry.stop_instance_description']()
         }
         confirmLabel={m['action.stop']()}
-        onConfirm={() => {}}
+        onConfirm={() => entry.onStop?.()}
       />
     );
   }
   return (
     <Button
       size={size}
-      disabled={!entry.ready}
+      disabled={!entry.ready || entry.busy}
       data-icon="inline-start"
-      onClick={(e) => e.preventDefault()}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        entry.onStart?.();
+      }}
       className="bg-ember text-ember-foreground hover:bg-ember/90"
     >
       <PlayIcon weight="fill" />

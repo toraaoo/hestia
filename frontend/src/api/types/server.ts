@@ -20,7 +20,17 @@ export interface ServerInfo {
   game_port?: number;
   /** True once RCON is configured. */
   console: boolean;
+  /** Present only when the status call set `with_usage`. */
+  disk_bytes?: number;
   process?: ProcessInfo;
+}
+
+/** Server List Ping snapshot; only a running server answers. */
+export interface ServerPingResult {
+  players_online: number;
+  players_max: number;
+  motd: string;
+  version: string;
 }
 
 export interface ServerCreateParams {

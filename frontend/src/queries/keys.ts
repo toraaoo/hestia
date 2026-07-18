@@ -58,9 +58,12 @@ export const keys = {
     flavors: () => [...keys.servers.all, 'flavors'] as const,
     versions: (flavor: string) =>
       [...keys.servers.all, 'versions', flavor] as const,
+    loaders: (flavor: string, version: string) =>
+      [...keys.servers.all, 'loaders', flavor, version] as const,
     profile: (params: ResolveParams) =>
       [...keys.servers.all, 'profile', params] as const,
     detail: (id: string) => [...keys.servers.all, 'detail', id] as const,
+    ping: (id: string) => [...keys.servers.detail(id), 'ping'] as const,
     logs: (id: string, tail?: number) =>
       [...keys.servers.detail(id), 'logs', tail ?? null] as const,
     config: (id: string) => [...keys.servers.detail(id), 'config'] as const,
@@ -77,6 +80,8 @@ export const keys = {
     flavors: () => [...keys.instances.all, 'flavors'] as const,
     versions: (flavor: string) =>
       [...keys.instances.all, 'versions', flavor] as const,
+    loaders: (flavor: string, version: string) =>
+      [...keys.instances.all, 'loaders', flavor, version] as const,
     profile: (params: ResolveParams) =>
       [...keys.instances.all, 'profile', params] as const,
     detail: (id: string) => [...keys.instances.all, 'detail', id] as const,

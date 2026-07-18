@@ -1,6 +1,7 @@
 import { BroomIcon, CoffeeIcon, TrashIcon } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { Page } from '@/components/page';
 import { Bone } from '@/components/skeleton';
@@ -27,8 +28,10 @@ import { javaReleases, javaRuntimes } from '@/features/settings/mock';
 import { settingsDefaults, settingsSchema } from '@/features/settings/schema';
 import { useAppForm } from '@/hooks/form';
 import { type Locale, useLocale } from '@/hooks/locale';
+import { bytes } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { locales } from '@/paraglide/runtime.js';
+import { useCacheInfo, useClearCache } from '@/queries/cache';
 import { useDaemon } from '@/queries/daemon';
 
 /** Endonyms — a language always names itself, whatever locale is active. */
@@ -70,6 +73,8 @@ function LanguageField() {
 export function SettingsPage() {
   const [runtimes, setRuntimes] = useState(javaRuntimes);
   const daemon = useDaemon();
+  const cache = useCacheInfo();
+  const clearCache = useClearCache();
 
   const form = useAppForm({
     defaultValues: settingsDefaults,
@@ -249,7 +254,7 @@ export function SettingsPage() {
                 <FieldLabel className="flex-1">
                   {m['settings.download_cache']()}
                   <span className="font-mono text-muted-foreground">
-                    1.8 GB
+                    {cache.data ? bytes(cache.data.bytes) : '—'}
                   </span>
                 </FieldLabel>
                 <ConfirmDialog
@@ -258,6 +263,7 @@ export function SettingsPage() {
                       variant="outline"
                       size="sm"
                       data-icon="inline-start"
+                      disabled={clearCache.isPending || !cache.data?.entries}
                     >
                       <BroomIcon />
                       {m['settings.clear_cache']()}
@@ -266,7 +272,16 @@ export function SettingsPage() {
                   title={m['settings.clear_cache_title']()}
                   description={m['settings.clear_cache_description']()}
                   confirmLabel={m['settings.clear_cache']()}
-                  onConfirm={() => {}}
+                  onConfirm={() =>
+                    clearCache.mutate(undefined, {
+                      onSuccess: (usage) =>
+                        toast.success(
+                          m['toast.cache_cleared']({
+                            size: bytes(usage.bytes),
+                          }),
+                        ),
+                    })
+                  }
                 />
               </Field>
 

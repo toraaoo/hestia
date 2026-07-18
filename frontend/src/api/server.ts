@@ -27,6 +27,7 @@ import type { ProcessLogLine } from './types/process';
 import type {
   ServerCreateParams,
   ServerInfo,
+  ServerPingResult,
   ServerUpdateParams,
 } from './types/server';
 
@@ -48,13 +49,31 @@ export function resolve(params: ResolveParams): Promise<ServerProfile> {
   return call('server.resolve', params);
 }
 
+/** Loader builds for a flavor/version, newest first; empty for vanilla. */
+export async function loaders(
+  flavor: string,
+  version: string,
+): Promise<string[]> {
+  const result = await call<{ loaders: string[] }>('server.loaders', {
+    flavor,
+    version,
+  });
+  return result.loaders;
+}
+
 export async function list(): Promise<ServerInfo[]> {
   const result = await call<{ servers: ServerInfo[] }>('server.list');
   return result.servers;
 }
 
-export function status(server: string): Promise<ServerInfo> {
-  return call('server.status', { server });
+/** `withUsage` also walks the entry directory and fills `disk_bytes`. */
+export function status(server: string, withUsage = false): Promise<ServerInfo> {
+  return call('server.status', { server, with_usage: withUsage });
+}
+
+/** A Server List Ping snapshot; only a running server answers. */
+export function ping(server: string): Promise<ServerPingResult> {
+  return call('server.ping', { server });
 }
 
 export async function create(

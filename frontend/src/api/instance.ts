@@ -50,6 +50,18 @@ export function resolve(params: ResolveParams): Promise<InstanceProfile> {
   return call('instance.resolve', params);
 }
 
+/** Loader builds for a flavor/version, newest first; empty for vanilla. */
+export async function loaders(
+  flavor: string,
+  version: string,
+): Promise<string[]> {
+  const result = await call<{ loaders: string[] }>('instance.loaders', {
+    flavor,
+    version,
+  });
+  return result.loaders;
+}
+
 export async function list(): Promise<InstanceInfo[]> {
   const result = await call<{ instances: InstanceInfo[] }>('instance.list');
   return result.instances;

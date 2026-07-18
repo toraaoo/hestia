@@ -19,7 +19,7 @@ import { m } from '@/paraglide/messages.js';
 const SAMPLES = 40;
 const TICK_MS = 1500;
 
-interface Sample {
+export interface Sample {
   cpu: number;
   mem: number;
 }
@@ -205,23 +205,43 @@ function DiskStrip({ diskBytes }: { diskBytes: number }) {
 }
 
 /**
- * The overview's system-resources area: separate live CPU/memory charts and a
- * disk breakdown, laid out to fill the remaining page height. Resolves its own
- * metrics from the entry id so callers never drill the values.
+ * Real metrics for the charts, fed by the daemon's `process.metrics` stream.
+ * When provided, the simulated feed is bypassed. `series` mem is in MB.
  */
-export function ResourceCards({ id }: { id: string }) {
+export interface LiveResources {
+  running: boolean;
+  memoryLimitGb: number;
+  diskBytes: number;
+  series: Sample[];
+}
+
+/**
+ * The overview's system-resources area: separate live CPU/memory charts and a
+ * disk breakdown. Uses `live` (real daemon metrics) when given, otherwise
+ * resolves a simulated feed from the entry id (the mock instance surfaces).
+ */
+export function ResourceCards({
+  id,
+  live,
+}: {
+  id: string;
+  live?: LiveResources;
+}) {
   const res = getEntryResources(id);
-  const limitGb = memGb(res?.memory ?? '');
-  const series = useLiveResources(
-    res?.running ?? false,
+  const mockLimit = memGb(res?.memory ?? '');
+  const mockSeries = useLiveResources(
+    live ? false : (res?.running ?? false),
     res?.cpu_pct ?? 0,
     res?.mem_used_mb ?? 0,
-    limitGb * 1024,
+    mockLimit * 1024,
   );
-  const now = series[series.length - 1];
 
-  if (!res) return null;
-  const { running, disk_bytes: diskBytes } = res;
+  if (!live && !res) return null;
+  const running = live ? live.running : (res?.running ?? false);
+  const limitGb = live ? live.memoryLimitGb : mockLimit;
+  const diskBytes = live ? live.diskBytes : (res?.disk_bytes ?? 0);
+  const series = live ? live.series : mockSeries;
+  const now = series[series.length - 1] ?? { cpu: 0, mem: 0 };
 
   return (
     <div className="flex flex-1 flex-col gap-3">

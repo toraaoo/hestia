@@ -41,3 +41,14 @@ export interface ProcessExit {
   exit_code?: number;
   success: boolean;
 }
+
+/** One running process's resource sample; `cpu_pct` is 100 per full core. */
+export interface ProcessMetrics {
+  id: string;
+  cpu_pct: number;
+  mem_bytes: number;
+}
+
+export interface ProcessMetricsEvent {
+  samples: ProcessMetrics[];
+}

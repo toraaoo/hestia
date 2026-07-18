@@ -43,6 +43,11 @@ export {
 } from './jobs';
 export { keys } from './keys';
 export { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
+export {
+  type MetricSample,
+  type ProcessMetricsResult,
+  useProcessMetrics,
+} from './metrics';
 export * from './prefs';
 export * from './process';
 export * from './profile';

@@ -74,6 +74,19 @@
     "live": "Ao vivo",
     "idle": "Ocioso"
   },
+  "common": {
+    "loading": "Carregando…"
+  },
+  "toast": {
+    "created": "{name} criado",
+    "started": "{name} iniciado",
+    "stopped": "{name} parado",
+    "removed": "{name} removido",
+    "renamed": "Renomeado para {name}",
+    "updated": "{name} atualizado",
+    "saved": "Salvo",
+    "cache_cleared": "Cache limpo ({size} recuperado)"
+  },
   "search": {
     "placeholder": "Pesquisar",
     "library": "Pesquisar na biblioteca",
@@ -336,6 +349,7 @@
     "keep_backups": "Manter backups",
     "keep_backups_hint": "Arquivos agendados mais recentes.",
     "change_version": "Mudar versão",
+    "allow_downgrade": "Permitir downgrade (mundos não voltam de versão)",
     "remove_server": "Remover servidor",
     "remove_instance": "Remover instância",
     "remove_server_title": "Remover servidor?",

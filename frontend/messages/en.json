@@ -74,6 +74,19 @@
     "live": "Live",
     "idle": "Idle"
   },
+  "common": {
+    "loading": "Loading…"
+  },
+  "toast": {
+    "created": "{name} created",
+    "started": "{name} started",
+    "stopped": "{name} stopped",
+    "removed": "{name} removed",
+    "renamed": "Renamed to {name}",
+    "updated": "{name} updated",
+    "saved": "Saved",
+    "cache_cleared": "Cache cleared ({size} reclaimed)"
+  },
   "search": {
     "placeholder": "Search",
     "library": "Search library",
@@ -336,6 +349,7 @@
     "keep_backups": "Keep backups",
     "keep_backups_hint": "Newest scheduled archives.",
     "change_version": "Change version",
+    "allow_downgrade": "Allow downgrade (worlds do not downgrade)",
     "remove_server": "Remove server",
     "remove_instance": "Remove instance",
     "remove_server_title": "Remove server?",
