@@ -401,6 +401,7 @@
     "actions": "Ações da skin",
     "unnamed": "Skin sem nome",
     "saving": "Salvando…",
+    "locked_title": "Entre para gerenciar skins",
     "sign_in_hint": "Entre com uma conta Microsoft para gerenciar suas skins e capas.",
     "load_failed": "Não foi possível carregar suas skins."
   },

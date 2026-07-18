@@ -8,7 +8,7 @@ export function SignInGate({ title, hint }: { title: string; hint: string }) {
   const { login } = useAccounts();
 
   return (
-    <div className="grid min-h-[60vh] place-items-center px-4">
+    <div className="grid h-full min-h-full place-items-center px-4">
       <div className="flex max-w-sm flex-col items-center gap-5 text-center">
         <span className="grid size-14 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
           <SignInIcon className="size-7" />

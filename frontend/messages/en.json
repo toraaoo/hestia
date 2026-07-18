@@ -401,6 +401,7 @@
     "actions": "Skin actions",
     "unnamed": "Unnamed skin",
     "saving": "Saving…",
+    "locked_title": "Sign in to manage skins",
     "sign_in_hint": "Sign in with a Microsoft account to manage your skins and capes.",
     "load_failed": "Couldn't load your skins."
   },

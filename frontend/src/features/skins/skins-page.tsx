@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import type { Skin } from '@/api';
 import { Empty } from '@/components/empty';
 import { Page, Section } from '@/components/page';
+import { SignInGate } from '@/components/sign-in-gate';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CapeCard, CapeGrid } from '@/features/skins/cape-card';
@@ -131,7 +132,10 @@ export function SkinsPage() {
   };
 
   const body = !signedIn ? (
-    <Empty>{m['skins.sign_in_hint']()}</Empty>
+    <SignInGate
+      title={m['skins.locked_title']()}
+      hint={m['skins.sign_in_hint']()}
+    />
   ) : list.isError && !list.data ? (
     <Empty>{m['skins.load_failed']()}</Empty>
   ) : (
