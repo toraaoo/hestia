@@ -16,6 +16,7 @@ import type {
 import type {
   ContentProfile,
   InstanceCreateParams,
+  InstanceDetails,
   InstanceInfo,
   InstanceLaunchDone,
   InstanceLaunchParams,
@@ -65,6 +66,11 @@ export async function loaders(
 export async function list(): Promise<InstanceInfo[]> {
   const result = await call<{ instances: InstanceInfo[] }>('instance.list');
   return result.instances;
+}
+
+/** The instance's static, informational view (locations + disk footprint). */
+export function info(instance: string): Promise<InstanceDetails> {
+  return call('instance.info', { instance });
 }
 
 export async function create(

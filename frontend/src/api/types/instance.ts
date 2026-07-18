@@ -17,6 +17,27 @@ export interface InstanceInfo {
   sessions?: ProcessInfo[];
 }
 
+/**
+ * An instance's static, informational view: descriptor, on-disk locations, and
+ * footprint — everything independent of the live sessions. Fetched on demand
+ * (the disk figure is a directory walk).
+ */
+export interface InstanceDetails {
+  id: string;
+  name: string;
+  flavor: string;
+  gameVersion: string;
+  loaderVersion?: string;
+  javaMajor: number;
+  createdUnix: number;
+  /** The entry root (`instances/<id>/`) — hestia's namespace. */
+  entryDir: string;
+  /** The game's working directory (`instances/<id>/data/`). */
+  dataDir: string;
+  /** The entry's total on-disk footprint, in bytes. */
+  diskBytes: number;
+}
+
 export interface InstanceCreateParams {
   /** Display name; defaults to `<flavor>-<version>` when empty. */
   name?: string;

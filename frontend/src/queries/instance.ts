@@ -33,6 +33,14 @@ export const instanceQueries = {
       queryKey: keys.instances.list(),
       queryFn: () => api.list(),
     }),
+  // The informational view (locations + footprint) is a directory walk, so it
+  // rides its own key — fetched fresh (never seeded from the diskless list).
+  info: (id: string) =>
+    queryOptions({
+      queryKey: keys.instances.info(id),
+      queryFn: () => api.info(id),
+      staleTime: 60_000,
+    }),
   flavors: () =>
     queryOptions({
       queryKey: keys.instances.flavors(),
@@ -135,6 +143,22 @@ export const instanceMutations = {
     mutation<void, { session?: string }>({
       mutationKey: [...keys.instances.detail(id), 'stop'],
       mutationFn: ({ session }) => api.stop(id, session),
+      invalidates: () => [keys.instances.all, keys.processes.all],
+    }),
+  /**
+   * Id-by-variable variants for list rows, which can't call a per-id hook. A
+   * launch materialises files, so a row awaits it without progress tracking.
+   */
+  launchAny: () =>
+    mutation<InstanceLaunchDone, string>({
+      mutationKey: [...keys.instances.all, 'launch'],
+      mutationFn: (id) => api.launch({ instance: id }),
+      invalidates: () => [keys.instances.all, keys.processes.all],
+    }),
+  stopAny: () =>
+    mutation<void, string>({
+      mutationKey: [...keys.instances.all, 'stop'],
+      mutationFn: (id) => api.stop(id),
       invalidates: () => [keys.instances.all, keys.processes.all],
     }),
   /** `memory` and `jvm-args` only. */
@@ -265,6 +289,19 @@ export const instanceMutations = {
 
 export function useInstances() {
   return useQuery(instanceQueries.list());
+}
+
+/** The instance's static, informational view (locations + disk footprint). */
+export function useInstanceInfo(id: string) {
+  return useQuery(instanceQueries.info(id));
+}
+
+export function useLaunchInstanceAny() {
+  return useMutation(instanceMutations.launchAny());
+}
+
+export function useStopInstanceAny() {
+  return useMutation(instanceMutations.stopAny());
 }
 
 /** One instance, selected out of the list query (there is no status channel). */

@@ -86,6 +86,7 @@ export const keys = {
     profile: (params: ResolveParams) =>
       [...keys.instances.all, 'profile', params] as const,
     detail: (id: string) => [...keys.instances.all, 'detail', id] as const,
+    info: (id: string) => [...keys.instances.detail(id), 'info'] as const,
     worlds: (id: string) => [...keys.instances.detail(id), 'worlds'] as const,
     logs: (id: string, session?: string, tail?: number) =>
       [
