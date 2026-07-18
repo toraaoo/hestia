@@ -66,7 +66,7 @@ export function useAccounts() {
 
   const accounts = query.data?.accounts ?? [];
   const active =
-    accounts.find((a) => a.uuid === query.data?.default_uuid) ?? accounts[0];
+    accounts.find((a) => a.uuid === query.data?.defaultUuid) ?? accounts[0];
 
   return {
     accounts,

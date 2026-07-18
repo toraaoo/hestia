@@ -45,7 +45,7 @@ export function resolveModpack(
 ): Promise<ResolvedModpack> {
   return call(
     'content.modpack.resolve',
-    { source, version_id: versionId },
+    { source, versionId },
     { timeoutMs: 120_000 },
   );
 }

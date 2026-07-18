@@ -114,10 +114,10 @@ export function ServerDetailPage({
   const live: LiveResources = {
     running,
     memoryLimitGb,
-    diskBytes: info.data?.disk_bytes ?? 0,
+    diskBytes: info.data?.diskBytes ?? 0,
     series: metrics.series.map((s) => ({
-      cpu: s.cpu_pct,
-      mem: s.mem_bytes / (1024 * 1024),
+      cpu: s.cpuPct,
+      mem: s.memBytes / (1024 * 1024),
     })),
   };
 
@@ -136,7 +136,7 @@ export function ServerDetailPage({
               {server.flavor}
             </Badge>
             <Badge variant="outline" className="font-mono">
-              {server.game_version}
+              {server.gameVersion}
             </Badge>
             <Badge variant="secondary" className="gap-1.5">
               <StatusDot tone={statusTone} />
@@ -152,7 +152,7 @@ export function ServerDetailPage({
               aria-label={m['detail.open_folder']()}
               disabled={!info.data}
               onClick={() => {
-                if (info.data) void system.openPath(info.data.entry_dir);
+                if (info.data) void system.openPath(info.data.entryDir);
               }}
             >
               <FolderOpenIcon className="size-4" />
@@ -217,7 +217,7 @@ export function ServerDetailPage({
                 <StatCard
                   value={
                     ping.data
-                      ? `${ping.data.players_online}/${ping.data.players_max}`
+                      ? `${ping.data.playersOnline}/${ping.data.playersMax}`
                       : '—'
                   }
                   label={m['label.players']()}
@@ -228,8 +228,8 @@ export function ServerDetailPage({
                 />
                 <StatCard
                   value={
-                    info.data?.disk_bytes != null
-                      ? bytes(info.data.disk_bytes)
+                    info.data?.diskBytes != null
+                      ? bytes(info.data.diskBytes)
                       : '—'
                   }
                   label={m['label.disk']()}
@@ -243,17 +243,17 @@ export function ServerDetailPage({
                 <div className="divide-y divide-border">
                   <Stat
                     label={m['label.address']()}
-                    value={`localhost:${server.game_port ?? '—'}`}
+                    value={`localhost:${server.gamePort ?? '—'}`}
                   />
                   <Stat label={m['label.loader']()} value={server.flavor} />
                   <Stat
                     label={m['label.version']()}
-                    value={server.game_version}
+                    value={server.gameVersion}
                   />
-                  <Stat label={m['label.java']()} value={server.java_major} />
+                  <Stat label={m['label.java']()} value={server.javaMajor} />
                   <Stat
                     label={m['label.created']()}
-                    value={agoLabel(server.created_unix)}
+                    value={agoLabel(server.createdUnix)}
                   />
                 </div>
               </SideCard>

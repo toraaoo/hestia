@@ -657,7 +657,7 @@ function serverParams(value: any) {
     name: d.name || undefined,
     flavor: value.flavor.flavor,
     version: value.version.version,
-    loader_version: value.version.loaderVersion || undefined,
+    loaderVersion: value.version.loaderVersion || undefined,
     eula: true,
     port: d.port ? Number(d.port) : undefined,
     config,
@@ -671,7 +671,7 @@ function instanceParams(value: any) {
     name: d.name || undefined,
     flavor: value.flavor.flavor,
     version: value.version.version,
-    loader_version: value.version.loaderVersion || undefined,
+    loaderVersion: value.version.loaderVersion || undefined,
     config: [{ key: 'memory', value: `${d.memory}G` }],
   };
 }

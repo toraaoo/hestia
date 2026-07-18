@@ -43,8 +43,8 @@ export function ChangeVersionModal({
   const shown = versions.filter(
     (v) =>
       !q ||
-      v.version_number.toLowerCase().includes(q) ||
-      v.game_versions.some((g) => g.toLowerCase().includes(q)),
+      v.versionNumber.toLowerCase().includes(q) ||
+      v.gameVersions.some((g) => g.toLowerCase().includes(q)),
   );
   const picked = versions.find((v) => v.id === pickedId) ?? null;
 
@@ -86,7 +86,7 @@ export function ChangeVersionModal({
               </p>
             ) : (
               shown.map((v) => {
-                const current = v.version_number === item?.version;
+                const current = v.versionNumber === item?.version;
                 const selected = pickedId === v.id;
                 return (
                   <button
@@ -109,11 +109,11 @@ export function ChangeVersionModal({
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-mono text-xs">
-                        {v.version_number}
+                        {v.versionNumber}
                       </span>
                       <span className="block truncate text-[11px] text-muted-foreground">
-                        {v.game_versions.join(', ')} ·{' '}
-                        {agoLabel(v.published_unix)}
+                        {v.gameVersions.join(', ')} ·{' '}
+                        {agoLabel(v.publishedUnix)}
                       </span>
                     </span>
                     {v.channel !== 'release' && (
@@ -141,7 +141,7 @@ export function ChangeVersionModal({
             {m['action.cancel']()}
           </Button>
           <Button
-            disabled={!picked || picked.version_number === item?.version}
+            disabled={!picked || picked.versionNumber === item?.version}
             onClick={() => {
               if (item && picked) onPick(item, picked);
               close(false);

@@ -10,10 +10,10 @@ export interface InstanceInfo {
   id: string;
   name: string;
   flavor: string;
-  game_version: string;
-  loader_version?: string;
-  java_major: number;
-  created_unix: number;
+  gameVersion: string;
+  loaderVersion?: string;
+  javaMajor: number;
+  createdUnix: number;
   sessions?: ProcessInfo[];
 }
 
@@ -22,7 +22,7 @@ export interface InstanceCreateParams {
   name?: string;
   flavor: string;
   version: string;
-  loader_version?: string;
+  loaderVersion?: string;
   /** Create-time settings (memory, jvm-args). */
   config?: ConfigEntry[];
 }
@@ -31,9 +31,9 @@ export interface InstanceUpdateParams {
   /** Instance name or id. */
   instance: string;
   version: string;
-  loader_version?: string;
+  loaderVersion?: string;
   /** The caller confirms the risk of moving to an older version. */
-  allow_downgrade?: boolean;
+  allowDowngrade?: boolean;
 }
 
 export interface InstanceLaunchParams {
@@ -41,7 +41,7 @@ export interface InstanceLaunchParams {
   /** Account name or uuid; empty picks the sole signed-in account. */
   account?: string;
   /** Launch another session even when one is already running. */
-  new_session?: boolean;
+  newSession?: boolean;
   /**
    * A profile override for this launch only: empty uses the active profile,
    * the literal `none` launches with no profile.
@@ -51,7 +51,7 @@ export interface InstanceLaunchParams {
 
 export interface InstanceLaunchDone {
   id: string;
-  process_id: string;
+  processId: string;
   pid: number;
 }
 

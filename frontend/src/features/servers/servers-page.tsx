@@ -27,7 +27,7 @@ function isRunning(server: ServerInfo): boolean {
 
 function subtitle(server: ServerInfo): string {
   if (!server.ready) return m['status.preparing_ellipsis']();
-  const address = server.game_port ? `:${server.game_port}` : '';
+  const address = server.gamePort ? `:${server.gamePort}` : '';
   const state = isRunning(server)
     ? m['status.online']()
     : m['status.stopped']();
@@ -63,7 +63,7 @@ export function ServersPage({
         name: server.name,
         kind: 'server' as const,
         flavor: server.flavor,
-        version: server.game_version,
+        version: server.gameVersion,
         running: isRunning(server),
         ready: server.ready,
         subtitle: subtitle(server),

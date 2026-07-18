@@ -273,8 +273,8 @@ export function ResourceCards({
   const mockLimit = memGb(res?.memory ?? '');
   const mockSeries = useLiveResources(
     live ? false : (res?.running ?? false),
-    res?.cpu_pct ?? 0,
-    res?.mem_used_mb ?? 0,
+    res?.cpuPct ?? 0,
+    res?.memUsedMb ?? 0,
     mockLimit * 1024,
   );
   const running = live ? live.running : (res?.running ?? false);
@@ -282,7 +282,7 @@ export function ResourceCards({
 
   if (!live && !res) return null;
   const limitGb = live ? live.memoryLimitGb : mockLimit;
-  const diskBytes = live ? live.diskBytes : (res?.disk_bytes ?? 0);
+  const diskBytes = live ? live.diskBytes : (res?.diskBytes ?? 0);
   const now = series[series.length - 1] ?? { cpu: 0, mem: 0 };
 
   return (

@@ -187,7 +187,7 @@ export const profiles = {
     return call('instance.profile.create', {
       instance,
       name,
-      seed_from_pool: seedFromPool,
+      seedFromPool,
     });
   },
 
@@ -204,7 +204,7 @@ export const profiles = {
     return call('instance.profile.rename', {
       instance,
       name,
-      new_name: newName,
+      newName,
     });
   },
 

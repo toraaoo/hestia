@@ -93,7 +93,7 @@ export function InstanceDetailPage({
               {inst.flavor}
             </Badge>
             <Badge variant="outline" className="font-mono">
-              {inst.game_version}
+              {inst.gameVersion}
             </Badge>
             {inst.running && (
               <Badge variant="secondary" className="gap-1.5">
@@ -173,7 +173,7 @@ export function InstanceDetailPage({
               <p className="max-w-2xl text-sm leading-relaxed text-foreground/90">
                 {m['entry.overview_summary']({
                   flavor: inst.flavor,
-                  version: inst.game_version,
+                  version: inst.gameVersion,
                   mods: inst.content.length,
                   worlds: inst.worlds.length,
                 })}
@@ -196,14 +196,11 @@ export function InstanceDetailPage({
               <SideCard title={m['label.details']()}>
                 <div className="divide-y divide-border">
                   <Stat label={m['label.loader']()} value={inst.flavor} />
-                  <Stat
-                    label={m['label.version']()}
-                    value={inst.game_version}
-                  />
-                  <Stat label={m['label.java']()} value={inst.java_major} />
+                  <Stat label={m['label.version']()} value={inst.gameVersion} />
+                  <Stat label={m['label.java']()} value={inst.javaMajor} />
                   <Stat
                     label={m['label.last_played']()}
-                    value={agoLabel(inst.last_played_unix)}
+                    value={agoLabel(inst.lastPlayedUnix)}
                   />
                 </div>
               </SideCard>

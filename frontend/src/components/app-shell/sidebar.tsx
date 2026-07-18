@@ -152,7 +152,7 @@ function PinnedSection({ pathname }: { pathname: string }) {
                   {i.name}
                 </span>
                 <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                  {i.flavor} · {i.game_version}
+                  {i.flavor} · {i.gameVersion}
                 </span>
               </span>
               {i.running && <StatusDot tone="on" />}

@@ -40,10 +40,10 @@ export interface ContentProject {
   categories: string[];
   downloads: number;
   follows: number;
-  icon_url: string;
+  iconUrl: string;
   gallery: GalleryImage[];
-  client_side: SideSupport;
-  server_side: SideSupport;
+  clientSide: SideSupport;
+  serverSide: SideSupport;
 }
 
 export interface ContentFile {
@@ -58,22 +58,22 @@ export type DependencyKind =
   | 'embedded';
 
 export interface ContentDependency {
-  project_id: string;
-  version_id: string;
+  projectId: string;
+  versionId: string;
   kind: DependencyKind;
 }
 
 export interface ContentVersion {
   source: string;
   id: string;
-  project_id: string;
+  projectId: string;
   name: string;
-  version_number: string;
+  versionNumber: string;
   channel: ReleaseChannel;
-  game_versions: string[];
+  gameVersions: string[];
   loaders: string[];
   featured: boolean;
-  date_published: string;
+  datePublished: string;
   downloads: number;
   files: ContentFile[];
   dependencies: ContentDependency[];
@@ -92,7 +92,7 @@ export interface SearchQuery {
   kind?: ContentKind;
   query?: string;
   loader?: string;
-  game_version?: string;
+  gameVersion?: string;
   categories?: string[];
   sort?: SearchSort;
   limit?: number;
@@ -110,7 +110,7 @@ export interface VersionQuery {
   source?: string;
   project: string;
   loader?: string;
-  game_version?: string;
+  gameVersion?: string;
 }
 
 export interface ModpackFile {
@@ -122,12 +122,12 @@ export interface ModpackFile {
 
 export interface ResolvedModpack {
   source: string;
-  project_id: string;
-  version_id: string;
+  projectId: string;
+  versionId: string;
   name: string;
-  game_version: string;
+  gameVersion: string;
   loader?: string;
-  loader_version?: string;
+  loaderVersion?: string;
   files: ModpackFile[];
 }
 
@@ -138,15 +138,15 @@ export interface ResolvedModpack {
 export interface InstalledContent {
   kind: ContentKind;
   source: string;
-  project_id: string;
+  projectId: string;
   slug: string;
   title: string;
-  version_id: string;
-  version_number: string;
+  versionId: string;
+  versionNumber: string;
   filename: string;
   sha1: string;
   url: string;
-  installed_unix: number;
+  installedUnix: number;
   /** For datapacks: the world the file lives in; empty for other kinds. */
   world: string;
   /**

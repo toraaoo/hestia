@@ -3,7 +3,7 @@
 /** One project reference of a global profile. */
 export interface ProfileEntry {
   source: string;
-  project_id: string;
+  projectId: string;
   slug: string;
 }
 

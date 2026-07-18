@@ -195,7 +195,7 @@ export function SettingsPage() {
                           {rt.version}
                         </div>
                       </div>
-                      {rt.in_use && (
+                      {rt.inUse && (
                         <Badge variant="secondary">
                           {m['settings.in_use']()}
                         </Badge>
@@ -206,7 +206,7 @@ export function SettingsPage() {
                             variant="ghost"
                             size="icon-sm"
                             aria-label={m['settings.uninstall_runtime']()}
-                            disabled={rt.in_use}
+                            disabled={rt.inUse}
                           >
                             <TrashIcon className="size-4" />
                           </Button>

@@ -36,36 +36,36 @@ export interface Library {
 export interface AssetIndex {
   id: string;
   artifact: Artifact;
-  total_size: number;
+  totalSize: number;
 }
 
 export interface ServerProfile {
   flavor: string;
-  game_version: string;
-  loader_version?: string;
+  gameVersion: string;
+  loaderVersion?: string;
   primary: Artifact;
   libraries: Library[];
-  java_major: number;
-  main_class: string;
+  javaMajor: number;
+  mainClass: string;
 }
 
 export interface InstanceProfile {
   flavor: string;
-  game_version: string;
-  loader_version?: string;
+  gameVersion: string;
+  loaderVersion?: string;
   client: Artifact;
   libraries: Library[];
-  asset_index: AssetIndex;
-  java_major: number;
-  main_class: string;
-  jvm_args: string[];
-  game_args: string[];
+  assetIndex: AssetIndex;
+  javaMajor: number;
+  mainClass: string;
+  jvmArgs: string[];
+  gameArgs: string[];
 }
 
 export interface ResolveParams {
   flavor: string;
   version: string;
-  loader_version?: string;
+  loaderVersion?: string;
 }
 
 export type ProvisionPhase =

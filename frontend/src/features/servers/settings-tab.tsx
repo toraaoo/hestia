@@ -271,8 +271,8 @@ function ChangeVersionDialog({
   const [downgrade, setDowngrade] = useState(false);
 
   const options = useMemo(
-    () => (versions.data ?? []).filter((v) => v.id !== server.game_version),
-    [versions.data, server.game_version],
+    () => (versions.data ?? []).filter((v) => v.id !== server.gameVersion),
+    [versions.data, server.gameVersion],
   );
 
   const apply = async () => {
@@ -280,7 +280,7 @@ function ChangeVersionDialog({
     try {
       await update.mutateAsync({
         version,
-        allow_downgrade: downgrade,
+        allowDowngrade: downgrade,
       });
       toast.success(m['toast.updated']({ name: server.name }));
       onOpenChange(false);

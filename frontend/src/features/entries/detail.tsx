@@ -86,7 +86,7 @@ export function ContentSection({
         c.id === item.id
           ? {
               ...c,
-              version: version.version_number,
+              version: version.versionNumber,
               updatable: newestVersion(c)?.id !== version.id,
             }
           : c,
@@ -313,13 +313,13 @@ export function BackupList({ backups }: { backups: Backup[] }) {
         <div key={b.id} className="flex items-center gap-3 px-3 py-2.5">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm">{agoLabel(b.created_unix)}</span>
+              <span className="text-sm">{agoLabel(b.createdUnix)}</span>
               <Badge variant="secondary" className="shrink-0 capitalize">
                 {backupKindLabel(b.kind)}
               </Badge>
             </div>
             <div className="font-mono text-[11px] text-muted-foreground">
-              {bytes(b.size_bytes)}
+              {bytes(b.sizeBytes)}
             </div>
           </div>
           <ConfirmDialog
@@ -330,7 +330,7 @@ export function BackupList({ backups }: { backups: Backup[] }) {
             }
             title={m['backup.restore_title']()}
             description={m['backup.restore_description']({
-              when: agoLabel(b.created_unix),
+              when: agoLabel(b.createdUnix),
             })}
             confirmLabel={m['action.restore']()}
             onConfirm={() => {}}
@@ -347,7 +347,7 @@ export function BackupList({ backups }: { backups: Backup[] }) {
             }
             title={m['backup.delete_title']()}
             description={m['backup.delete_description']({
-              when: agoLabel(b.created_unix),
+              when: agoLabel(b.createdUnix),
             })}
             destructive
             confirmLabel={m['action.delete']()}

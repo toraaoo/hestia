@@ -7,7 +7,7 @@
 /** One project reference of a global profile. */
 export interface GlobalProfileEntry {
   source: string;
-  project_id: string;
+  projectId: string;
   slug: string;
 }
 
@@ -24,16 +24,16 @@ export const globalProfiles: GlobalProfile[] = [
   {
     name: 'performance',
     entries: [
-      { source: 'modrinth', project_id: 'sodium', slug: 'sodium' },
-      { source: 'modrinth', project_id: 'lithium', slug: 'lithium' },
-      { source: 'modrinth', project_id: 'iris', slug: 'iris' },
+      { source: 'modrinth', projectId: 'sodium', slug: 'sodium' },
+      { source: 'modrinth', projectId: 'lithium', slug: 'lithium' },
+      { source: 'modrinth', projectId: 'iris', slug: 'iris' },
     ],
   },
   {
     name: 'qol',
     entries: [
-      { source: 'modrinth', project_id: 'voice-chat', slug: 'voice-chat' },
-      { source: 'modrinth', project_id: 'faithful', slug: 'faithful' },
+      { source: 'modrinth', projectId: 'voice-chat', slug: 'voice-chat' },
+      { source: 'modrinth', projectId: 'faithful', slug: 'faithful' },
     ],
   },
 ];

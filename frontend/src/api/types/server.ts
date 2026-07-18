@@ -10,14 +10,14 @@ export interface ServerInfo {
   id: string;
   name: string;
   flavor: string;
-  game_version: string;
-  loader_version?: string;
-  java_major: number;
-  created_unix: number;
+  gameVersion: string;
+  loaderVersion?: string;
+  javaMajor: number;
+  createdUnix: number;
   /** False while the create job is still provisioning files. */
   ready: boolean;
   /** Allocated at create and stable thereafter — players connect to it. */
-  game_port?: number;
+  gamePort?: number;
   /** True once RCON is configured. */
   console: boolean;
   process?: ProcessInfo;
@@ -32,23 +32,23 @@ export interface ServerDetails {
   id: string;
   name: string;
   flavor: string;
-  game_version: string;
-  loader_version?: string;
-  java_major: number;
-  created_unix: number;
-  game_port?: number;
+  gameVersion: string;
+  loaderVersion?: string;
+  javaMajor: number;
+  createdUnix: number;
+  gamePort?: number;
   /** The entry root (`servers/<id>/`) — hestia's namespace. */
-  entry_dir: string;
+  entryDir: string;
   /** The game's working directory (`servers/<id>/data/`). */
-  data_dir: string;
+  dataDir: string;
   /** The entry's total on-disk footprint, in bytes. */
-  disk_bytes: number;
+  diskBytes: number;
 }
 
 /** Server List Ping snapshot; only a running server answers. */
 export interface ServerPingResult {
-  players_online: number;
-  players_max: number;
+  playersOnline: number;
+  playersMax: number;
   motd: string;
   version: string;
 }
@@ -58,7 +58,7 @@ export interface ServerCreateParams {
   name?: string;
   flavor: string;
   version: string;
-  loader_version?: string;
+  loaderVersion?: string;
   /** The caller confirms the user accepted the Minecraft EULA. */
   eula: boolean;
   /** Pin the game port; omitted picks the lowest free one. */
@@ -71,7 +71,7 @@ export interface ServerUpdateParams {
   /** Server name or id. */
   server: string;
   version: string;
-  loader_version?: string;
+  loaderVersion?: string;
   /** The caller confirms the risk of moving to an older version. */
-  allow_downgrade?: boolean;
+  allowDowngrade?: boolean;
 }

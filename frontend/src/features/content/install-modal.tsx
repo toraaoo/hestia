@@ -71,7 +71,7 @@ export interface Target {
   name: string;
   type: 'server' | 'instance' | 'profile';
   flavor: string;
-  game_version: string;
+  gameVersion: string;
   running: boolean;
   worlds: string[];
 }
@@ -81,7 +81,7 @@ export const serverTarget = (s: Server): Target => ({
   name: s.name,
   type: 'server',
   flavor: s.flavor,
-  game_version: s.game_version,
+  gameVersion: s.gameVersion,
   running: s.running,
   worlds: [],
 });
@@ -91,7 +91,7 @@ export const instanceTarget = (i: Instance): Target => ({
   name: i.name,
   type: 'instance',
   flavor: i.flavor,
-  game_version: i.game_version,
+  gameVersion: i.gameVersion,
   running: i.running,
   worlds: i.worlds,
 });
@@ -105,7 +105,7 @@ export const profileTarget = (p: GlobalProfile): Target => ({
   name: p.name,
   type: 'profile',
   flavor: '',
-  game_version: '',
+  gameVersion: '',
   running: false,
   worlds: [],
 });
@@ -775,7 +775,7 @@ function TargetStep({
               key={t.id}
               icon={entryIcon(t.type)}
               title={t.name}
-              subtitle={`${entryTypeLabel(t.type)} · ${t.flavor} · ${t.game_version}`}
+              subtitle={`${entryTypeLabel(t.type)} · ${t.flavor} · ${t.gameVersion}`}
               badge={t.running ? m['content.stop_to_install']() : undefined}
               disabled={t.running}
               selected={selectedId === t.id}
@@ -1045,8 +1045,8 @@ function VersionCombobox({
             rootRef.current?.querySelector('input')?.blur(),
           );
         }}
-        itemToStringLabel={(v: ContentVersion) => v.version_number}
-        itemToStringValue={(v: ContentVersion) => v.version_number}
+        itemToStringLabel={(v: ContentVersion) => v.versionNumber}
+        itemToStringValue={(v: ContentVersion) => v.versionNumber}
       >
         <ComboboxInput
           placeholder={m['content.select_version']()}
@@ -1059,7 +1059,7 @@ function VersionCombobox({
               <ComboboxItem key={v.id} value={v}>
                 <div className="flex min-w-0 flex-col">
                   <span className="flex items-center gap-1.5">
-                    {v.version_number}
+                    {v.versionNumber}
                     {v.id === latestId && (
                       <Badge variant="secondary" className="text-[10px]">
                         {m['label.latest']()}
@@ -1075,7 +1075,7 @@ function VersionCombobox({
                     )}
                   </span>
                   <span className="truncate font-mono text-[11px] text-muted-foreground">
-                    {v.game_versions.join(', ')} · {agoLabel(v.published_unix)}
+                    {v.gameVersions.join(', ')} · {agoLabel(v.publishedUnix)}
                   </span>
                 </div>
               </ComboboxItem>

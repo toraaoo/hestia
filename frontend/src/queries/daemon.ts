@@ -41,7 +41,7 @@ export const daemonMutations = {
         const key = keys.daemon.status();
         const previous = queryClient.getQueryData<DaemonStatus>(key);
         if (previous) {
-          queryClient.setQueryData(key, { ...previous, uptime_seconds: 0 });
+          queryClient.setQueryData(key, { ...previous, uptimeSeconds: 0 });
         }
         return () => {
           if (previous) queryClient.setQueryData(key, previous);
@@ -69,7 +69,7 @@ export function useRestartDaemon() {
 
 /**
  * The uptime as a live, optimistic label: it ticks up every second from the
- * fetched `uptime_seconds` anchored to when that read resolved, so it counts
+ * fetched `uptimeSeconds` anchored to when that read resolved, so it counts
  * on its own without refetching and resets the moment a restart writes a fresh
  * status into the cache.
  */
@@ -83,7 +83,7 @@ function useLiveUptime(
     return () => clearInterval(id);
   }, []);
   if (!status) return null;
-  const anchorMs = updatedAt - status.uptime_seconds * 1000;
+  const anchorMs = updatedAt - status.uptimeSeconds * 1000;
   const seconds = Math.max(0, (Date.now() - anchorMs) / 1000);
   return formatUptime(seconds);
 }

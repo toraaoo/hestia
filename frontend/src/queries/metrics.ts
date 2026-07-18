@@ -9,8 +9,8 @@ import type { ProcessMetrics, ProcessMetricsEvent } from '../api';
 import { useDaemonEvent } from './events';
 
 export interface MetricSample {
-  cpu_pct: number;
-  mem_bytes: number;
+  cpuPct: number;
+  memBytes: number;
 }
 
 export interface ProcessMetricsResult {
@@ -37,8 +37,8 @@ export function useProcessMetrics(
     );
     if (!sample) return;
     const next: MetricSample = {
-      cpu_pct: sample.cpu_pct,
-      mem_bytes: sample.mem_bytes,
+      cpuPct: sample.cpuPct,
+      memBytes: sample.memBytes,
     };
     setSeries((prev) =>
       prev.length >= window ? [...prev.slice(1), next] : [...prev, next],

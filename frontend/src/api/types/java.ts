@@ -8,7 +8,7 @@ export interface JavaRelease {
 export interface JavaRuntime {
   vendor: string;
   major: number;
-  release_name: string;
+  releaseName: string;
   home: string;
   executable: string;
 }
@@ -24,5 +24,5 @@ export interface JavaInstallProgress {
 export interface JavaInstallDone {
   id: string;
   runtime: JavaRuntime;
-  already_installed: boolean;
+  alreadyInstalled: boolean;
 }

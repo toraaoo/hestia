@@ -128,7 +128,7 @@ export async function remove(server: string): Promise<void> {
 
 export function start(
   server: string,
-): Promise<{ process_id: string; pid: number }> {
+): Promise<{ processId: string; pid: number }> {
   return call('server.start', { server });
 }
 

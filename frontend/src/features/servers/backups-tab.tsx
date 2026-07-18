@@ -85,7 +85,7 @@ export function ServerBackupsTab({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm">
-                    {agoLabel(backup.created_unix)}
+                    {agoLabel(backup.createdUnix)}
                   </span>
                   <Badge variant="secondary" className="shrink-0 capitalize">
                     {kindLabel(backup.kind)}
@@ -107,7 +107,7 @@ export function ServerBackupsTab({
                 }
                 title={m['backup.restore_title']()}
                 description={m['backup.restore_description']({
-                  when: agoLabel(backup.created_unix),
+                  when: agoLabel(backup.createdUnix),
                 })}
                 confirmLabel={m['action.restore']()}
                 onConfirm={() =>
@@ -129,7 +129,7 @@ export function ServerBackupsTab({
                 }
                 title={m['backup.delete_title']()}
                 description={m['backup.delete_description']({
-                  when: agoLabel(backup.created_unix),
+                  when: agoLabel(backup.createdUnix),
                 })}
                 destructive
                 confirmLabel={m['action.delete']()}

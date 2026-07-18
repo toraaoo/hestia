@@ -5,6 +5,6 @@ export type BackupKind = 'manual' | 'scheduled' | 'update';
 export interface BackupInfo {
   id: string;
   kind: BackupKind;
-  created_unix: number;
+  createdUnix: number;
   size: number;
 }

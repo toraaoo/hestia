@@ -7,7 +7,7 @@ export interface SyncTargets {
 }
 
 export interface SyncConfig {
-  shared_dir: string;
+  sharedDir: string;
   targets: SyncTargets;
 }
 

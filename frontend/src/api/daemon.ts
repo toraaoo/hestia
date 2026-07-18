@@ -12,7 +12,7 @@ export function status(): Promise<DaemonStatus> {
 /** Without `stopProcesses`, supervised workloads keep running. */
 export async function stop(stopProcesses = false): Promise<boolean> {
   const result = await call<{ stopping: boolean }>('daemon.stop', {
-    stop_processes: stopProcesses,
+    stopProcesses,
   });
   return result.stopping;
 }

@@ -24,8 +24,8 @@ export interface ProcessInfo {
   program: string;
   args: string[];
   state: ProcessState;
-  exit_code?: number;
-  started_unix: number;
+  exitCode?: number;
+  startedUnix: number;
 }
 
 export type LogStream = 'stdout' | 'stderr';
@@ -38,15 +38,15 @@ export interface ProcessLogLine {
 export interface ProcessExit {
   id: string;
   state: ProcessState;
-  exit_code?: number;
+  exitCode?: number;
   success: boolean;
 }
 
-/** One running process's resource sample; `cpu_pct` is 100 per full core. */
+/** One running process's resource sample; `cpuPct` is 100 per full core. */
 export interface ProcessMetrics {
   id: string;
-  cpu_pct: number;
-  mem_bytes: number;
+  cpuPct: number;
+  memBytes: number;
 }
 
 export interface ProcessMetricsEvent {

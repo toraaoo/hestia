@@ -3,7 +3,7 @@
 export interface DaemonStatus {
   pid: number;
   version: string;
-  uptime_seconds: number;
+  uptimeSeconds: number;
   home: string;
   log: string;
 }

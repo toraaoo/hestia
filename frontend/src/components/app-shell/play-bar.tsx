@@ -88,7 +88,7 @@ export function PlayBar() {
           {sel.flavor}
         </Badge>
         <Badge variant="outline" className="font-mono">
-          {sel.game_version}
+          {sel.gameVersion}
         </Badge>
       </div>
 
@@ -127,7 +127,7 @@ function InstanceItem({
         <StatusDot tone="on" />
       ) : (
         <span className="font-mono text-[10px] text-muted-foreground">
-          {instance.game_version}
+          {instance.gameVersion}
         </span>
       )}
     </DropdownMenuItem>

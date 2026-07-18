@@ -19,7 +19,7 @@ export interface ContentProject {
   downloads: number;
   follows: number;
   categories: string[];
-  updated_unix: number;
+  updatedUnix: number;
 }
 
 export const contentProjects: ContentProject[] = [
@@ -33,7 +33,7 @@ export const contentProjects: ContentProject[] = [
     downloads: 42_100_000,
     follows: 78_400,
     categories: ['Optimization'],
-    updated_unix: daysAgo(5),
+    updatedUnix: daysAgo(5),
   },
   {
     id: 'iris',
@@ -45,7 +45,7 @@ export const contentProjects: ContentProject[] = [
     downloads: 28_600_000,
     follows: 61_200,
     categories: ['Optimization'],
-    updated_unix: daysAgo(9),
+    updatedUnix: daysAgo(9),
   },
   {
     id: 'fabric-api',
@@ -57,7 +57,7 @@ export const contentProjects: ContentProject[] = [
     downloads: 98_300_000,
     follows: 40_900,
     categories: ['Library'],
-    updated_unix: daysAgo(2),
+    updatedUnix: daysAgo(2),
   },
   {
     id: 'complementary',
@@ -69,7 +69,7 @@ export const contentProjects: ContentProject[] = [
     downloads: 12_800_000,
     follows: 33_500,
     categories: ['Fantasy', 'Vanilla-like'],
-    updated_unix: daysAgo(15),
+    updatedUnix: daysAgo(15),
   },
   {
     id: 'lithium',
@@ -81,7 +81,7 @@ export const contentProjects: ContentProject[] = [
     downloads: 31_500_000,
     follows: 44_100,
     categories: ['Optimization'],
-    updated_unix: daysAgo(7),
+    updatedUnix: daysAgo(7),
   },
   {
     id: 'create',
@@ -92,7 +92,7 @@ export const contentProjects: ContentProject[] = [
     downloads: 21_200_000,
     follows: 52_300,
     categories: ['Technology'],
-    updated_unix: daysAgo(30),
+    updatedUnix: daysAgo(30),
   },
   {
     id: 'faithful',
@@ -104,7 +104,7 @@ export const contentProjects: ContentProject[] = [
     downloads: 9_400_000,
     follows: 18_700,
     categories: ['Vanilla-like'],
-    updated_unix: daysAgo(22),
+    updatedUnix: daysAgo(22),
   },
   {
     id: 'voice-chat',
@@ -116,7 +116,7 @@ export const contentProjects: ContentProject[] = [
     downloads: 17_900_000,
     follows: 29_800,
     categories: ['Social'],
-    updated_unix: daysAgo(12),
+    updatedUnix: daysAgo(12),
   },
 ];
 
@@ -126,11 +126,11 @@ export const getProject = (id: string) =>
 /** A downloadable version of a project, from `content.versions`. */
 export interface ContentVersion {
   id: string;
-  version_number: string;
+  versionNumber: string;
   channel: 'release' | 'beta' | 'alpha';
-  game_versions: string[];
+  gameVersions: string[];
   loaders: string[];
-  published_unix: number;
+  publishedUnix: number;
   downloads: number;
   filename: string;
 }
@@ -162,11 +162,11 @@ export function projectVersions(project: ContentProject): ContentVersion[] {
   const loaders = kindLoaders(project.kind);
   return [0, 1, 2].map((seq) => ({
     id: `${project.id}-v${seq}`,
-    version_number: `1.${5 - seq}.${(project.id.length + seq) % 9}`,
+    versionNumber: `1.${5 - seq}.${(project.id.length + seq) % 9}`,
     channel: seq === 2 ? 'beta' : 'release',
-    game_versions: VERSION_GAMES.slice(0, 3 + seq),
+    gameVersions: VERSION_GAMES.slice(0, 3 + seq),
     loaders,
-    published_unix: project.updated_unix - seq * 18 * DAY,
+    publishedUnix: project.updatedUnix - seq * 18 * DAY,
     downloads: Math.round(project.downloads / (seq + 3)),
     filename: `${project.id}-1.${5 - seq}.${(project.id.length + seq) % 9}.jar`,
   }));

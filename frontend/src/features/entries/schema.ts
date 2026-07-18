@@ -92,7 +92,7 @@ export function instanceSettingsSchema() {
 export function instanceSettingsDefaults(inst: Instance) {
   return {
     name: inst.name,
-    version: inst.game_version,
+    version: inst.gameVersion,
     loader: inst.flavor,
     memory: memGb(inst.memory),
     jvmArgs: '',
@@ -118,7 +118,7 @@ export function serverSettingsDefaults(server: Server) {
     memory: memGb(server.memory),
     jvmArgs: '',
     // The Select can't carry an empty value; 'off' is the sentinel for disabled.
-    backupInterval: server.backup_interval || 'off',
-    backupRetention: server.backup_retention,
+    backupInterval: server.backupInterval || 'off',
+    backupRetention: server.backupRetention,
   };
 }

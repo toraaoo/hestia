@@ -49,7 +49,7 @@ const selectableKinds = ['mod', 'resourcepack', 'shader'] as const;
  */
 export function ProfilesPanel({ inst }: { inst: Instance }) {
   const [profiles, setProfiles] = useState<ContentProfile[]>(inst.profiles);
-  const [active, setActive] = useState(inst.active_profile);
+  const [active, setActive] = useState(inst.activeProfile);
   const [creating, setCreating] = useState(false);
   const [applying, setApplying] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -149,7 +149,7 @@ export function ProfilesPanel({ inst }: { inst: Instance }) {
       <ApplyGlobalDialog
         open={applying}
         onOpenChange={setApplying}
-        version={inst.game_version}
+        version={inst.gameVersion}
       />
 
       <MembersDialog

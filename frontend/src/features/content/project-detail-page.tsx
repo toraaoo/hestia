@@ -107,7 +107,7 @@ export function ProjectDetailPage({
                 </div>
                 <Stat
                   label={m['label.updated']()}
-                  value={agoLabel(project.updated_unix)}
+                  value={agoLabel(project.updatedUnix)}
                 />
               </div>
 
@@ -133,7 +133,7 @@ export function ProjectDetailPage({
               <div key={v.id} className="flex items-center gap-3 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">{v.version_number}</span>
+                    <span className="text-sm">{v.versionNumber}</span>
                     {v.channel !== 'release' && (
                       <Badge
                         variant="outline"
@@ -144,8 +144,8 @@ export function ProjectDetailPage({
                     )}
                   </div>
                   <div className="font-mono text-[11px] text-muted-foreground">
-                    {v.loaders.join(', ')} · {v.game_versions.join(', ')} ·{' '}
-                    {agoLabel(v.published_unix)}
+                    {v.loaders.join(', ')} · {v.gameVersions.join(', ')} ·{' '}
+                    {agoLabel(v.publishedUnix)}
                   </div>
                 </div>
                 <Button

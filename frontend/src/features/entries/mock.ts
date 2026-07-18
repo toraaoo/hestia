@@ -34,9 +34,9 @@ export interface ContentProfile {
 /** A backup archive, from `backup.list`. */
 export interface Backup {
   id: string;
-  created_unix: number;
+  createdUnix: number;
   kind: 'manual' | 'scheduled' | 'update';
-  size_bytes: number;
+  sizeBytes: number;
 }
 
 const DAY = 86_400;
@@ -48,21 +48,21 @@ export interface Instance {
   id: string;
   name: string;
   flavor: string;
-  game_version: string;
-  loader_version?: string;
-  java_major: number;
+  gameVersion: string;
+  loaderVersion?: string;
+  javaMajor: number;
   memory: string;
-  created_unix: number;
-  last_played_unix: number;
+  createdUnix: number;
+  lastPlayedUnix: number;
   running: boolean;
   sessions: number;
-  cpu_pct: number;
-  mem_used_mb: number;
-  disk_bytes: number;
+  cpuPct: number;
+  memUsedMb: number;
+  diskBytes: number;
   content: InstalledContent[];
   worlds: string[];
   /** The active content profile's name; empty when none is active. */
-  active_profile: string;
+  activeProfile: string;
   profiles: ContentProfile[];
 }
 
@@ -71,17 +71,17 @@ export const instances: Instance[] = [
     id: 'aether-skies-3f9a2c7d',
     name: 'Aether Skies',
     flavor: 'fabric',
-    game_version: '1.21.4',
-    loader_version: '0.16.9',
-    java_major: 21,
+    gameVersion: '1.21.4',
+    loaderVersion: '0.16.9',
+    javaMajor: 21,
     memory: '6G',
-    created_unix: daysAgo(96),
-    last_played_unix: hoursAgo(2),
+    createdUnix: daysAgo(96),
+    lastPlayedUnix: hoursAgo(2),
     running: true,
     sessions: 1,
-    cpu_pct: 47,
-    mem_used_mb: 4280,
-    disk_bytes: 3_200_000_000,
+    cpuPct: 47,
+    memUsedMb: 4280,
+    diskBytes: 3_200_000_000,
     content: [
       {
         id: 'sodium',
@@ -130,7 +130,7 @@ export const instances: Instance[] = [
       },
     ],
     worlds: ['New World', 'Skyblock Run', 'Creative Flats'],
-    active_profile: 'performance',
+    activeProfile: 'performance',
     profiles: [
       {
         name: 'performance',
@@ -148,36 +148,36 @@ export const instances: Instance[] = [
     id: 'vanilla-1214-a1b2c3d4',
     name: 'Vanilla 1.21',
     flavor: 'vanilla',
-    game_version: '1.21.4',
-    java_major: 21,
+    gameVersion: '1.21.4',
+    javaMajor: 21,
     memory: '4G',
-    created_unix: daysAgo(120),
-    last_played_unix: daysAgo(4),
+    createdUnix: daysAgo(120),
+    lastPlayedUnix: daysAgo(4),
     running: false,
     sessions: 0,
-    cpu_pct: 0,
-    mem_used_mb: 0,
-    disk_bytes: 640_000_000,
+    cpuPct: 0,
+    memUsedMb: 0,
+    diskBytes: 640_000_000,
     content: [],
     worlds: ['Survival'],
-    active_profile: '',
+    activeProfile: '',
     profiles: [],
   },
   {
     id: 'create-above-77ffee11',
     name: 'Create: Above & Beyond',
     flavor: 'fabric',
-    game_version: '1.20.1',
-    loader_version: '0.15.11',
-    java_major: 17,
+    gameVersion: '1.20.1',
+    loaderVersion: '0.15.11',
+    javaMajor: 17,
     memory: '8G',
-    created_unix: daysAgo(210),
-    last_played_unix: daysAgo(23),
+    createdUnix: daysAgo(210),
+    lastPlayedUnix: daysAgo(23),
     running: false,
     sessions: 0,
-    cpu_pct: 0,
-    mem_used_mb: 0,
-    disk_bytes: 2_800_000_000,
+    cpuPct: 0,
+    memUsedMb: 0,
+    diskBytes: 2_800_000_000,
     content: [
       {
         id: 'create',
@@ -200,26 +200,26 @@ export const instances: Instance[] = [
       },
     ],
     worlds: ['Factory'],
-    active_profile: '',
+    activeProfile: '',
     profiles: [{ name: 'lightweight', members: ['create'], captured: false }],
   },
   {
     id: 'snapshot-lab-9090abab',
     name: 'Snapshot Lab',
     flavor: 'vanilla',
-    game_version: '25w03a',
-    java_major: 21,
+    gameVersion: '25w03a',
+    javaMajor: 21,
     memory: '4G',
-    created_unix: daysAgo(150),
-    last_played_unix: daysAgo(58),
+    createdUnix: daysAgo(150),
+    lastPlayedUnix: daysAgo(58),
     running: false,
     sessions: 0,
-    cpu_pct: 0,
-    mem_used_mb: 0,
-    disk_bytes: 120_000_000,
+    cpuPct: 0,
+    memUsedMb: 0,
+    diskBytes: 120_000_000,
     content: [],
     worlds: [],
-    active_profile: '',
+    activeProfile: '',
     profiles: [],
   },
 ];
@@ -237,23 +237,23 @@ export interface Server {
   id: string;
   name: string;
   flavor: string;
-  game_version: string;
-  loader_version?: string;
-  java_major: number;
+  gameVersion: string;
+  loaderVersion?: string;
+  javaMajor: number;
   memory: string;
-  created_unix: number;
+  createdUnix: number;
   ready: boolean;
   running: boolean;
-  cpu_pct: number;
-  mem_used_mb: number;
-  disk_bytes: number;
+  cpuPct: number;
+  memUsedMb: number;
+  diskBytes: number;
   port?: number;
-  rcon_port?: number;
+  rconPort?: number;
   players: number;
-  max_players: number;
+  maxPlayers: number;
   motd: string;
-  backup_interval: string;
-  backup_retention: number;
+  backupInterval: string;
+  backupRetention: number;
   content: InstalledContent[];
   backups: Backup[];
 }
@@ -263,22 +263,22 @@ export const servers: Server[] = [
     id: 'smp-cottage-3f9a2c7d',
     name: 'Cottage SMP',
     flavor: 'vanilla',
-    game_version: '1.21.4',
-    java_major: 21,
+    gameVersion: '1.21.4',
+    javaMajor: 21,
     memory: '4G',
-    created_unix: daysAgo(88),
+    createdUnix: daysAgo(88),
     ready: true,
     running: true,
-    cpu_pct: 34,
-    mem_used_mb: 2610,
-    disk_bytes: 890_000_000,
+    cpuPct: 34,
+    memUsedMb: 2610,
+    diskBytes: 890_000_000,
     port: 25565,
-    rcon_port: 25575,
+    rconPort: 25575,
     players: 3,
-    max_players: 20,
+    maxPlayers: 20,
     motd: 'A cozy survival server',
-    backup_interval: '6h',
-    backup_retention: 10,
+    backupInterval: '6h',
+    backupRetention: 10,
     content: [
       {
         id: 'vanilla-tweaks',
@@ -293,21 +293,21 @@ export const servers: Server[] = [
     backups: [
       {
         id: 's1',
-        created_unix: hoursAgo(1),
+        createdUnix: hoursAgo(1),
         kind: 'scheduled',
-        size_bytes: 96_000_000,
+        sizeBytes: 96_000_000,
       },
       {
         id: 's2',
-        created_unix: hoursAgo(7),
+        createdUnix: hoursAgo(7),
         kind: 'scheduled',
-        size_bytes: 95_200_000,
+        sizeBytes: 95_200_000,
       },
       {
         id: 's3',
-        created_unix: daysAgo(1),
+        createdUnix: daysAgo(1),
         kind: 'manual',
-        size_bytes: 94_800_000,
+        sizeBytes: 94_800_000,
       },
     ],
   },
@@ -315,22 +315,22 @@ export const servers: Server[] = [
     id: 'modded-hub-1122ccdd',
     name: 'Modded Hub',
     flavor: 'fabric',
-    game_version: '1.20.1',
-    loader_version: '0.15.11',
-    java_major: 17,
+    gameVersion: '1.20.1',
+    loaderVersion: '0.15.11',
+    javaMajor: 17,
     memory: '6G',
-    created_unix: daysAgo(60),
+    createdUnix: daysAgo(60),
     ready: true,
     running: false,
-    cpu_pct: 0,
-    mem_used_mb: 0,
-    disk_bytes: 1_400_000_000,
+    cpuPct: 0,
+    memUsedMb: 0,
+    diskBytes: 1_400_000_000,
     port: 25566,
     players: 0,
-    max_players: 40,
+    maxPlayers: 40,
     motd: 'Modded chaos',
-    backup_interval: '',
-    backup_retention: 5,
+    backupInterval: '',
+    backupRetention: 5,
     content: [
       {
         id: 'lithium',
@@ -357,20 +357,20 @@ export const servers: Server[] = [
     id: 'hardcore-9f9f9f9f',
     name: 'Hardcore Trials',
     flavor: 'vanilla',
-    game_version: '1.21.1',
-    java_major: 21,
+    gameVersion: '1.21.1',
+    javaMajor: 21,
     memory: '4G',
-    created_unix: daysAgo(14),
+    createdUnix: daysAgo(14),
     ready: false,
     running: false,
-    cpu_pct: 0,
-    mem_used_mb: 0,
-    disk_bytes: 210_000_000,
+    cpuPct: 0,
+    memUsedMb: 0,
+    diskBytes: 210_000_000,
     players: 0,
-    max_players: 10,
+    maxPlayers: 10,
     motd: 'One life.',
-    backup_interval: '12h',
-    backup_retention: 3,
+    backupInterval: '12h',
+    backupRetention: 3,
     content: [],
     backups: [],
   },
@@ -382,10 +382,10 @@ export const getServer = (id: string) => servers.find((s) => s.id === id);
 /** The live-metric slice of an entry, keyed by id across both stores. */
 export interface EntryResources {
   running: boolean;
-  cpu_pct: number;
-  mem_used_mb: number;
+  cpuPct: number;
+  memUsedMb: number;
   memory: string;
-  disk_bytes: number;
+  diskBytes: number;
 }
 
 /**
@@ -395,8 +395,8 @@ export interface EntryResources {
 export function getEntryResources(id: string): EntryResources | undefined {
   const entry = getServer(id) ?? getInstance(id);
   if (!entry) return undefined;
-  const { running, cpu_pct, mem_used_mb, memory, disk_bytes } = entry;
-  return { running, cpu_pct, mem_used_mb, memory, disk_bytes };
+  const { running, cpuPct, memUsedMb, memory, diskBytes } = entry;
+  return { running, cpuPct, memUsedMb, memory, diskBytes };
 }
 
 /** The world resumed by the library's "continue playing". */

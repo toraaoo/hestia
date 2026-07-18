@@ -34,12 +34,12 @@ export const instanceCards: EntryCardData[] = instances.map((i) => ({
   name: i.name,
   kind: 'instance',
   flavor: i.flavor,
-  version: i.game_version,
+  version: i.gameVersion,
   running: i.running,
   ready: true,
   subtitle: i.running
     ? m['entry.sessions_running']({ count: i.sessions })
-    : m['entry.last_played_ago']({ when: agoLabel(i.last_played_unix) }),
+    : m['entry.last_played_ago']({ when: agoLabel(i.lastPlayedUnix) }),
 }));
 
 export const serverCards: EntryCardData[] = servers.map((s) => ({
@@ -47,7 +47,7 @@ export const serverCards: EntryCardData[] = servers.map((s) => ({
   name: s.name,
   kind: 'server',
   flavor: s.flavor,
-  version: s.game_version,
+  version: s.gameVersion,
   running: s.running,
   ready: s.ready,
   subtitle: !s.ready
