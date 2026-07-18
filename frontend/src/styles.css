@@ -185,4 +185,20 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Indeterminate progress: a segment sweeps the track when the total work is
+   * unknown — an instance create is a record write, with no byte stream to
+   * gauge (files materialise at launch). */
+  @keyframes progress-sweep {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(500%);
+    }
+  }
+  .progress-sweep {
+    width: 20%;
+    animation: progress-sweep 1.15s ease-in-out infinite;
+  }
 }

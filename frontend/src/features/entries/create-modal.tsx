@@ -8,13 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import type {
-  ConfigEntry,
-  Flavor,
-  GameVersion,
-  ProvisionPhase,
-  ProvisionProgress,
-} from '@/api';
+import type { ConfigEntry, Flavor, GameVersion } from '@/api';
 import { entryIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,11 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { FieldError } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Progress,
-  ProgressLabel,
-  ProgressValue,
-} from '@/components/ui/progress';
+import { ProvisionProgressView } from '@/features/entries/provision-progress';
 import {
   createWizardDefaults,
   createWizardSchema,
@@ -79,31 +69,6 @@ const STEP_HINTS: Record<Step, (kind: Kind) => string> = {
       ? m['wizard.hint_details_server']()
       : m['wizard.hint_details_instance'](),
 };
-
-/** Map a live provisioning phase to a human label; falls back to the raw id. */
-function phaseLabel(phase: ProvisionPhase): string {
-  switch (phase) {
-    case 'resolving':
-      return m['phase.resolving_profile']();
-    case 'java':
-      return m['phase.installing_java']();
-    case 'server':
-      return m['phase.downloading_server']();
-    case 'client':
-    case 'libraries':
-    case 'assets':
-      return m['phase.downloading']({ name: phase });
-    case 'content':
-      return m['phase.mirroring']();
-    default:
-      return phase;
-  }
-}
-
-function percentOf(progress: ProvisionProgress | null): number {
-  if (!progress || progress.total <= 0) return 0;
-  return Math.round((progress.current / progress.total) * 100);
-}
 
 /**
  * The New server / New instance wizard: flavor → version → details, wired to
@@ -243,18 +208,11 @@ export function CreateEntryModal({
         </DialogHeader>
 
         {creating ? (
-          <div className="min-h-[18rem] p-1">
-            <div className="flex min-h-[18rem] flex-col justify-center px-1">
-              <Progress value={percentOf(progress)}>
-                <ProgressLabel>
-                  {progress
-                    ? phaseLabel(progress.phase)
-                    : m['phase.resolving_profile']()}
-                </ProgressLabel>
-                <ProgressValue />
-              </Progress>
-            </div>
-          </div>
+          <ProvisionProgressView
+            progress={progress}
+            indeterminate={kind === 'instance'}
+            className="min-h-[18rem] justify-center px-1"
+          />
         ) : step === 'flavor' ? (
           <form.FormGroup
             name="flavor"

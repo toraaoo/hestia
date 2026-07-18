@@ -147,12 +147,18 @@ export const instanceMutations = {
     }),
   /**
    * Id-by-variable variants for list rows, which can't call a per-id hook. A
-   * launch materialises files, so a row awaits it without progress tracking.
+   * launch materialises files, so it streams provisioning progress through the
+   * job store like the per-id `launch` above.
    */
   launchAny: () =>
-    mutation<InstanceLaunchDone, string>({
+    jobMutation<InstanceLaunchDone, string>({
       mutationKey: [...keys.instances.all, 'launch'],
-      mutationFn: (id) => api.launch({ instance: id }),
+      meta: (id) => ({
+        kind: 'instance.launch',
+        label: 'launch',
+        entry: { kind: 'instance', id },
+      }),
+      run: (id, onProgress) => api.launch({ instance: id }, onProgress),
       invalidates: () => [keys.instances.all, keys.processes.all],
     }),
   stopAny: () =>
@@ -297,7 +303,7 @@ export function useInstanceInfo(id: string) {
 }
 
 export function useLaunchInstanceAny() {
-  return useMutation(instanceMutations.launchAny());
+  return useJobMutation(instanceMutations.launchAny());
 }
 
 export function useStopInstanceAny() {

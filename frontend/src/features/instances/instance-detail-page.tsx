@@ -26,6 +26,7 @@ import {
 } from '@/features/content/install-modal';
 import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
 import { instances as mockInstances } from '@/features/entries/mock';
+import { LaunchProgressDialog } from '@/features/entries/provision-progress';
 import {
   type LiveResources,
   ResourceCards,
@@ -380,6 +381,12 @@ export function InstanceDetailPage({
         entry={instanceTarget(mock)}
         open={addingContent}
         onOpenChange={setAddingContent}
+      />
+
+      <LaunchProgressDialog
+        open={launch.isPending}
+        name={instance.name}
+        progress={launch.progress}
       />
     </div>
   );

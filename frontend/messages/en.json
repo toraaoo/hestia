@@ -246,7 +246,12 @@
     "resolving_dependencies": "Resolving dependencies",
     "downloading": "Downloading {name}",
     "mirroring": "Mirroring into data/",
-    "importing": "Importing {name}…"
+    "importing": "Importing {name}…",
+    "backing_up": "Backing up"
+  },
+  "launch": {
+    "title": "Launching {name}",
+    "hint": "Materialising files and starting the game…"
   },
   "error": {
     "pick_flavor": "Pick a flavor to continue.",
