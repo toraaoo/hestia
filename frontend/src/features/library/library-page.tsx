@@ -165,37 +165,6 @@ export function LibraryPage({
     >
       <div className="flex flex-col gap-6">
         <Section
-          title={m['library.your_servers']()}
-          count={srv.length}
-          action={
-            <div className="flex items-center gap-3">
-              <FilterMenu
-                groups={[
-                  {
-                    label: m['label.flavor'](),
-                    flavors: serverFlavors,
-                    value: serverFlavor,
-                    onChange: onServerFlavorChange,
-                  },
-                ]}
-              />
-              <Link
-                to="/servers"
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                {m['library.manage_all']()}
-              </Link>
-            </div>
-          }
-        >
-          <EntryCollection
-            cards={srv}
-            view={view}
-            empty={m['servers.none_match']()}
-          />
-        </Section>
-
-        <Section
           title={m['nav.instances']()}
           count={signedIn ? inst.length : undefined}
           action={
@@ -230,6 +199,37 @@ export function LibraryPage({
           ) : (
             <InstancesSignInPrompt />
           )}
+        </Section>
+
+        <Section
+          title={m['library.your_servers']()}
+          count={srv.length}
+          action={
+            <div className="flex items-center gap-3">
+              <FilterMenu
+                groups={[
+                  {
+                    label: m['label.flavor'](),
+                    flavors: serverFlavors,
+                    value: serverFlavor,
+                    onChange: onServerFlavorChange,
+                  },
+                ]}
+              />
+              <Link
+                to="/servers"
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                {m['library.manage_all']()}
+              </Link>
+            </div>
+          }
+        >
+          <EntryCollection
+            cards={srv}
+            view={view}
+            empty={m['servers.none_match']()}
+          />
         </Section>
       </div>
 
