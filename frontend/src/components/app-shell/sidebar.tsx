@@ -12,12 +12,13 @@ import {
   TShirtIcon,
 } from '@phosphor-icons/react';
 import { Link, useLocation } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccountAvatar } from '@/components/app-shell/account-avatar';
 import { Bone } from '@/components/skeleton';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -26,10 +27,52 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StatusDot } from '@/components/ui/status-dot';
-import { pinnedInstances } from '@/features/entries/mock';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries/accounts';
+import { useInstances } from '@/queries/instance';
+import { usePrefs } from '@/queries/prefs';
+import { useServers } from '@/queries/server';
+
+const PINNED_ENTRIES_KEY = 'sidebar.pinned-entries';
+
+/** Stable empty fallback so the parse memo doesn't churn when nothing is pinned. */
+const NO_PINS: unknown[] = [];
+
+type PinnedKind = 'instance' | 'server';
+type PinnedEntry = { kind: PinnedKind; id: string };
+type ResolvedPin = PinnedEntry & {
+  name: string;
+  flavor: string;
+  version: string;
+  running: boolean;
+};
+
+/** Validate the persisted blob, dropping malformed and duplicate entries. */
+function parsePinnedEntries(value: unknown): PinnedEntry[] {
+  if (!Array.isArray(value)) return [];
+
+  const entries: PinnedEntry[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) continue;
+    const { kind, id } = item as Record<string, unknown>;
+    if ((kind !== 'instance' && kind !== 'server') || typeof id !== 'string') {
+      continue;
+    }
+    if (id === '') continue;
+
+    const key = `${kind}:${id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push({ kind, id });
+  }
+  return entries;
+}
+
+function pinKey(pin: PinnedEntry): string {
+  return `${pin.kind}:${pin.id}`;
+}
 
 interface NavItem {
   to: string;
@@ -115,52 +158,212 @@ export function Sidebar() {
 }
 
 function PinnedSection({ pathname }: { pathname: string }) {
+  const instances = useInstances();
+  const servers = useServers();
+  const { get, set, ready } = usePrefs();
+
+  const instanceList = instances.data ?? [];
+  const serverList = servers.data ?? [];
+
+  const raw = get<unknown>(PINNED_ENTRIES_KEY, NO_PINS);
+  const pinnedEntries = useMemo(() => parsePinnedEntries(raw), [raw]);
+
+  const pinned = useMemo<ResolvedPin[]>(
+    () =>
+      pinnedEntries.flatMap((pin) => {
+        if (pin.kind === 'instance') {
+          const entry = instanceList.find((i) => i.id === pin.id);
+          if (!entry) return [];
+          return [
+            {
+              ...pin,
+              name: entry.name,
+              flavor: entry.flavor,
+              version: entry.gameVersion,
+              running: (entry.sessions ?? []).some(
+                (session) => session.state === 'running',
+              ),
+            },
+          ];
+        }
+        const entry = serverList.find((s) => s.id === pin.id);
+        if (!entry) return [];
+        return [
+          {
+            ...pin,
+            name: entry.name,
+            flavor: entry.flavor,
+            version: entry.gameVersion,
+            running: entry.process?.state === 'running',
+          },
+        ];
+      }),
+    [pinnedEntries, instanceList, serverList],
+  );
+
+  // Persist the pruned list when a pinned entry is deleted elsewhere. Both
+  // lists must be loaded first, or a still-fetching query reads as empty and
+  // would wrongly drop live pins. The ref keeps the effect off `set`'s churn.
+  const setRef = useRef(set);
+  setRef.current = set;
+  useEffect(() => {
+    if (!ready || !instances.data || !servers.data) return;
+    if (pinned.length === pinnedEntries.length) return;
+    setRef.current(
+      PINNED_ENTRIES_KEY,
+      pinned.map(({ kind, id }) => ({ kind, id })),
+    );
+  }, [ready, instances.data, servers.data, pinned, pinnedEntries]);
+
+  const isPinned = (pin: PinnedEntry) =>
+    pinnedEntries.some((entry) => pinKey(entry) === pinKey(pin));
+
+  const togglePin = (pin: PinnedEntry) => {
+    set(
+      PINNED_ENTRIES_KEY,
+      isPinned(pin)
+        ? pinnedEntries.filter((entry) => pinKey(entry) !== pinKey(pin))
+        : [...pinnedEntries, pin],
+    );
+  };
+
+  const nothingToPin = instanceList.length === 0 && serverList.length === 0;
+
   return (
     <div className="border-t border-border p-2">
       <div className="flex items-center justify-between px-3 pt-1 pb-1.5">
         <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
           {m['label.pinned']()}
         </span>
-        <button
-          type="button"
-          aria-label={m['instances.new']()}
-          className="text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <PlusIcon className="size-3.5" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                aria-label={m['label.pin_entries']()}
+                title={m['label.pin_entries']()}
+                disabled={
+                  !ready ||
+                  instances.isPending ||
+                  servers.isPending ||
+                  nothingToPin
+                }
+                className="text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+              >
+                <PlusIcon className="size-3.5" />
+              </button>
+            }
+          />
+          <DropdownMenuContent align="end" className="w-52">
+            {instanceList.length > 0 && (
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>{m['nav.instances']()}</DropdownMenuLabel>
+                {instanceList.map((instance) => (
+                  <DropdownMenuCheckboxItem
+                    key={instance.id}
+                    checked={isPinned({ kind: 'instance', id: instance.id })}
+                    onCheckedChange={() =>
+                      togglePin({ kind: 'instance', id: instance.id })
+                    }
+                  >
+                    {instance.name}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuGroup>
+            )}
+            {serverList.length > 0 && (
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>{m['nav.servers']()}</DropdownMenuLabel>
+                {serverList.map((server) => (
+                  <DropdownMenuCheckboxItem
+                    key={server.id}
+                    checked={isPinned({ kind: 'server', id: server.id })}
+                    onCheckedChange={() =>
+                      togglePin({ kind: 'server', id: server.id })
+                    }
+                  >
+                    {server.name}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuGroup>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      <div className="space-y-0.5">
-        {pinnedInstances.map((i) => {
-          const active = pathname === `/instances/${i.id}`;
-          return (
-            <Link
-              key={i.id}
-              to="/instances/$id"
-              params={{ id: i.id }}
-              className={cn(
-                'flex items-center gap-2.5 px-3 py-1.5 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset',
-                active
-                  ? 'bg-muted text-foreground'
-                  : 'text-muted-foreground hover:bg-muted/60',
-              )}
-            >
-              <span className="grid size-6 shrink-0 place-items-center bg-muted ring-1 ring-border">
-                <CubeIcon className="size-3.5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs text-foreground">
-                  {i.name}
-                </span>
-                <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                  {i.flavor} · {i.gameVersion}
-                </span>
-              </span>
-              {i.running && <StatusDot tone="on" />}
-            </Link>
-          );
-        })}
-      </div>
+      {pinned.length === 0 ? (
+        <p className="px-3 py-1.5 text-[11px] text-muted-foreground/70">
+          {m['label.nothing_pinned']()}
+        </p>
+      ) : (
+        <div className="space-y-0.5">
+          {pinned.map((entry) => (
+            <PinnedLink key={pinKey(entry)} entry={entry} pathname={pathname} />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function PinnedLink({
+  entry,
+  pathname,
+}: {
+  entry: ResolvedPin;
+  pathname: string;
+}) {
+  const active = pathname === `/${entry.kind}s/${entry.id}`;
+  const content = <PinnedLinkContent entry={entry} />;
+
+  if (entry.kind === 'server') {
+    return (
+      <Link
+        to="/servers/$id"
+        params={{ id: entry.id }}
+        className={pinnedLinkClass(active)}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      to="/instances/$id"
+      params={{ id: entry.id }}
+      className={pinnedLinkClass(active)}
+    >
+      {content}
+    </Link>
+  );
+}
+
+function pinnedLinkClass(active: boolean) {
+  return cn(
+    'flex items-center gap-2.5 px-3 py-1.5 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset',
+    active
+      ? 'bg-muted text-foreground'
+      : 'text-muted-foreground hover:bg-muted/60',
+  );
+}
+
+function PinnedLinkContent({ entry }: { entry: ResolvedPin }) {
+  const Icon = entry.kind === 'server' ? HardDrivesIcon : CubeIcon;
+  return (
+    <>
+      <span className="grid size-6 shrink-0 place-items-center bg-muted ring-1 ring-border">
+        <Icon className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs text-foreground">
+          {entry.name}
+        </span>
+        <span className="block truncate font-mono text-[10px] text-muted-foreground">
+          {entry.flavor} · {entry.version}
+        </span>
+      </span>
+      {entry.running && <StatusDot tone="on" />}
+    </>
   );
 }
 

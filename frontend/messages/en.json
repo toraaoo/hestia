@@ -63,7 +63,9 @@
     "none": "None",
     "required": "required",
     "latest": "latest",
-    "pinned": "Pinned"
+    "pinned": "Pinned",
+    "nothing_pinned": "Nothing pinned yet",
+    "pin_entries": "Pin an instance or server"
   },
   "status": {
     "preparing": "Preparing",

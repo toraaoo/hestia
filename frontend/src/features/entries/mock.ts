@@ -224,15 +224,6 @@ export const instances: Instance[] = [
   },
 ];
 
-/** Instances the user pinned for quick access (the play-bar picker). */
-export const pinnedInstanceIds = [
-  'aether-skies-3f9a2c7d',
-  'create-above-77ffee11',
-];
-export const pinnedInstances = instances.filter((i) =>
-  pinnedInstanceIds.includes(i.id),
-);
-
 export interface Server {
   id: string;
   name: string;

@@ -63,7 +63,9 @@
     "none": "Nenhuma",
     "required": "obrigatório",
     "latest": "mais recente",
-    "pinned": "Fixados"
+    "pinned": "Fixados",
+    "nothing_pinned": "Nada fixado ainda",
+    "pin_entries": "Fixar uma instância ou servidor"
   },
   "status": {
     "preparing": "Preparando",
