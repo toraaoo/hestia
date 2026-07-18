@@ -9,15 +9,21 @@
 pub(crate) mod defaults;
 pub(crate) mod mojang;
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 use proto::skins::SkinVariant;
 use serde::{Deserialize, Serialize};
 
+use self::mojang::Profile;
+
 const INDEX_FILE: &str = "library.json";
+// Absorbs bursts of skin.list reads; Mojang's profile API rate-limits hard.
+const PROFILE_TTL: Duration = Duration::from_secs(30);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LibraryEntry {
@@ -36,13 +42,32 @@ struct LibraryFile {
 
 pub struct Skins {
     dir: Mutex<PathBuf>,
+    profiles: Mutex<HashMap<String, (Instant, Profile)>>,
 }
 
 impl Skins {
     pub fn new(dir: PathBuf) -> Self {
         Skins {
             dir: Mutex::new(dir),
+            profiles: Mutex::new(HashMap::new()),
         }
+    }
+
+    pub(crate) fn cached_profile(&self, account: &str) -> Option<Profile> {
+        let profiles = self.profiles.lock().unwrap();
+        let (stored, profile) = profiles.get(account)?;
+        (stored.elapsed() < PROFILE_TTL).then(|| profile.clone())
+    }
+
+    pub(crate) fn store_profile(&self, account: &str, profile: Profile) {
+        self.profiles
+            .lock()
+            .unwrap()
+            .insert(account.to_string(), (Instant::now(), profile));
+    }
+
+    pub(crate) fn invalidate_profile(&self, account: &str) {
+        self.profiles.lock().unwrap().remove(account);
     }
 
     pub fn reload(&self, dir: PathBuf) {
@@ -237,6 +262,17 @@ mod tests {
         assert!(validate_skin_png(&png(64, 48)).is_err());
         assert!(validate_skin_png(&png(128, 64)).is_err());
         assert!(validate_skin_png(b"not a png").is_err());
+    }
+
+    #[test]
+    fn profile_cache_stores_and_invalidates() {
+        let skins = Skins::new(std::env::temp_dir());
+        assert!(skins.cached_profile("u1").is_none());
+        skins.store_profile("u1", Profile::default());
+        assert!(skins.cached_profile("u1").is_some());
+        assert!(skins.cached_profile("u2").is_none());
+        skins.invalidate_profile("u1");
+        assert!(skins.cached_profile("u1").is_none());
     }
 
     #[test]

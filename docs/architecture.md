@@ -230,7 +230,9 @@ The subsystems behind the aggregate:
   `skins/mojang.rs` holds the profile-customization HTTP calls (profile fetch,
   multipart skin upload, by-URL skin change, reset, cape set/clear) against
   `api.minecraftservices.com`, bearer-authed with the accounts subsystem's
-  rotated token; `skins/defaults.rs` is the table of the eighteen vanilla
+  rotated token; a 30 s per-account profile cache absorbs bursts of
+  `skin.list` reads (Mojang rate-limits hard) — a change stores the profile
+  its response carries, or drops the entry so the next read refetches; `skins/defaults.rs` is the table of the eighteen vanilla
   default skins (nine characters × two model variants) — nothing bundled, since
   Mojang serves every texture publicly by its hash. The flows composing
   accounts + library (`engine/flows/skins.rs`) build the merged picker list and

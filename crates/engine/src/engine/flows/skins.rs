@@ -13,8 +13,9 @@ use super::Engine;
 use crate::skins::{defaults, mojang, validate_skin_png};
 
 impl Engine {
-    /// A live token for `account` (name or uuid; empty = the default account).
-    async fn skin_token(&self, account: &str) -> Result<String> {
+    /// The resolved account reference and a live token for it (name or uuid;
+    /// empty = the default account). The reference keys the profile cache.
+    async fn skin_session(&self, account: &str) -> Result<(String, String)> {
         let reference = if account.trim().is_empty() {
             self.accounts()
                 .default_account()
@@ -23,15 +24,23 @@ impl Engine {
         } else {
             account.trim().to_string()
         };
-        self.accounts().access_token(&reference).await
+        let token = self.accounts().access_token(&reference).await?;
+        Ok((reference, token))
     }
 
     /// The account's skin picture: library entries, the vanilla defaults, and —
     /// when neither covers it — the equipped external skin; plus the owned
     /// capes. At most one skin and one cape are marked equipped.
     pub async fn list_skins(&self, account: &str) -> Result<(Vec<Skin>, Vec<Cape>)> {
-        let token = self.skin_token(account).await?;
-        let profile = mojang::fetch_profile(&token).await?;
+        let (reference, token) = self.skin_session(account).await?;
+        let profile = match self.skins().cached_profile(&reference) {
+            Some(profile) => profile,
+            None => {
+                let profile = mojang::fetch_profile(&token).await?;
+                self.skins().store_profile(&reference, profile.clone());
+                profile
+            }
+        };
         let active = profile.active_skin();
 
         let mut skins = Vec::new();
@@ -122,7 +131,7 @@ impl Engine {
             .context("the skin data is not valid base64")?;
         validate_skin_png(&png)?;
 
-        let token = self.skin_token(account).await?;
+        let (reference, token) = self.skin_session(account).await?;
         let before = mojang::fetch_profile(&token).await?;
         self.preserve_current_skin(&before).await;
 
@@ -130,6 +139,7 @@ impl Engine {
             Some(profile) => profile,
             None => mojang::fetch_profile(&token).await?,
         };
+        self.skins().store_profile(&reference, after.clone());
         let key = after
             .active_skin()
             .map(|s| s.key.clone())
@@ -168,12 +178,15 @@ impl Engine {
 
         let mut equipped = false;
         if previous.variant != variant {
-            let token = self.skin_token(account).await?;
+            let (reference, token) = self.skin_session(account).await?;
             let profile = mojang::fetch_profile(&token).await?;
             if profile.active_skin().is_some_and(|a| a.key == key) {
                 equipped = true;
                 let png = self.skins().texture(key)?;
-                mojang::upload_skin(&token, png, variant).await?;
+                match mojang::upload_skin(&token, png, variant).await? {
+                    Some(profile) => self.skins().store_profile(&reference, profile),
+                    None => self.skins().invalidate_profile(&reference),
+                }
                 tracing::info!(
                     key,
                     ?variant,
@@ -195,7 +208,7 @@ impl Engine {
 
     /// Equip a library or default skin by its key from `skin.list`.
     pub async fn equip_skin(&self, account: &str, key: &str) -> Result<()> {
-        let token = self.skin_token(account).await?;
+        let (reference, token) = self.skin_session(account).await?;
         let before = mojang::fetch_profile(&token).await?;
         self.preserve_current_skin(&before).await;
 
@@ -205,11 +218,16 @@ impl Engine {
                 Some(profile) => profile,
                 None => mojang::fetch_profile(&token).await?,
             };
+            self.skins().store_profile(&reference, after.clone());
             if let Some(active) = after.active_skin() {
                 self.skins().rekey(key, &active.key)?;
             }
         } else if let Some(default) = defaults::find(key) {
-            mojang::set_skin_url(&token, &defaults::texture_url(key), default.variant).await?;
+            match mojang::set_skin_url(&token, &defaults::texture_url(key), default.variant).await?
+            {
+                Some(profile) => self.skins().store_profile(&reference, profile),
+                None => self.skins().invalidate_profile(&reference),
+            }
         } else {
             bail!("no skin matches '{key}'");
         }
@@ -219,24 +237,27 @@ impl Engine {
 
     /// Reset the account to its uuid-derived default skin.
     pub async fn reset_skin(&self, account: &str) -> Result<()> {
-        let token = self.skin_token(account).await?;
+        let (reference, token) = self.skin_session(account).await?;
         let before = mojang::fetch_profile(&token).await?;
         self.preserve_current_skin(&before).await;
         mojang::reset_skin(&token).await?;
+        self.skins().invalidate_profile(&reference);
         tracing::info!("skin reset to the default");
         Ok(())
     }
 
     pub async fn equip_cape(&self, account: &str, cape_id: &str) -> Result<()> {
-        let token = self.skin_token(account).await?;
+        let (reference, token) = self.skin_session(account).await?;
         mojang::set_cape(&token, cape_id).await?;
+        self.skins().invalidate_profile(&reference);
         tracing::info!(cape = %cape_id, "cape equipped");
         Ok(())
     }
 
     pub async fn clear_cape(&self, account: &str) -> Result<()> {
-        let token = self.skin_token(account).await?;
+        let (reference, token) = self.skin_session(account).await?;
         mojang::clear_cape(&token).await?;
+        self.skins().invalidate_profile(&reference);
         tracing::info!("cape cleared");
         Ok(())
     }
