@@ -554,11 +554,11 @@ function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
           </div>
 
           <div className="grid grid-cols-2 gap-4 pt-1">
-            <form.AppField name="details.pvp">
+            <form.AppField name="details.hardcore">
               {(field: WizardForm) => (
                 <PropToggle
-                  id="prop-pvp"
-                  label={m['wizard.pvp']()}
+                  id="prop-hardcore"
+                  label={m['wizard.hardcore']()}
                   checked={field.state.value}
                   onChange={field.handleChange}
                 />
@@ -632,7 +632,7 @@ function serverParams(value: any) {
     { key: 'gamemode', value: d.gamemode },
     { key: 'difficulty', value: d.difficulty },
     { key: 'max-players', value: d.maxPlayers },
-    { key: 'pvp', value: String(d.pvp) },
+    { key: 'hardcore', value: String(d.hardcore) },
     { key: 'online-mode', value: String(d.onlineMode) },
   ];
   return {

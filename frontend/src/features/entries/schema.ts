@@ -39,7 +39,7 @@ export function detailsStepSchema(kind: Kind) {
       .string()
       .regex(/^\d*$/, m['error.port_number']())
       .refine((v) => v === '' || Number(v) <= 65535, m['error.port_range']()),
-    pvp: z.boolean(),
+    hardcore: z.boolean(),
     onlineMode: z.boolean(),
     eula:
       kind === 'server'
@@ -68,7 +68,7 @@ export function createWizardDefaults(loaderVersion: string) {
       difficulty: 'normal',
       maxPlayers: '20',
       port: '',
-      pvp: true,
+      hardcore: false,
       onlineMode: true,
       eula: false,
     },
