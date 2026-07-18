@@ -24,6 +24,7 @@ import {
   ViewToggle,
 } from '@/features/entries/collection';
 import { CreateEntryModal } from '@/features/entries/create-modal';
+import { EntryGridSkeleton } from '@/features/entries/skeleton';
 import { m } from '@/paraglide/messages.js';
 
 const InstanceIcon = entryIcon('instance');
@@ -60,6 +61,12 @@ export function LibraryPage({
     <Page
       title={m['nav.library']()}
       subtitle={m['library.subtitle']()}
+      skeleton={
+        <div className="flex flex-col gap-6">
+          <EntryGridSkeleton header count={4} />
+          <EntryGridSkeleton header count={4} />
+        </div>
+      }
       search
       searchPlaceholder={m['search.library']()}
       actions={

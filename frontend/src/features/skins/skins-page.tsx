@@ -13,6 +13,7 @@ import {
   equippedSkinId,
 } from '@/features/skins/mock';
 import { PreviewPanel } from '@/features/skins/preview-panel';
+import { SkinsPageSkeleton } from '@/features/skins/skeleton';
 import { SkinCard, SkinGrid } from '@/features/skins/skin-card';
 import { readTextureFile } from '@/features/skins/texture';
 import { m } from '@/paraglide/messages.js';
@@ -72,6 +73,7 @@ export function SkinsPage() {
     <Page
       title={m['nav.skins']()}
       subtitle={m['skins.subtitle']()}
+      skeleton={<SkinsPageSkeleton />}
       actions={
         <>
           <input

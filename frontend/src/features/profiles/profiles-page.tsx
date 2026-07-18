@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Empty } from '@/components/empty';
 import { Page } from '@/components/page';
+import { CardGridSkeleton } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -56,6 +57,13 @@ export function ProfilesPage({
     <Page
       title={m['profiles.page_title']()}
       subtitle={m['profiles.page_description']()}
+      skeleton={
+        <CardGridSkeleton
+          grid="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3"
+          count={6}
+          card="h-24"
+        />
+      }
       search
       searchPlaceholder={m['profiles.search_placeholder']()}
       actions={

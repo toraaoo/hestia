@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { useSearch } from '@/components/app-shell/search-context';
 import { chipClass } from '@/components/chip';
 import { Page } from '@/components/page';
+import { Bone, CardGridSkeleton } from '@/components/skeleton';
 import { ContentCard } from '@/features/content/content-card';
 import { contentKinds, kindInfo } from '@/features/content/kinds';
 import { contentProjects } from '@/features/content/mock';
@@ -30,6 +31,20 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
       subtitle={m['browse.subtitle']()}
       search
       searchPlaceholder={m['search.modrinth']()}
+      skeleton={
+        <div>
+          <div className="mb-5 flex flex-wrap gap-1.5">
+            {contentKinds.map((k) => (
+              <Bone key={k} className="h-6 w-20" />
+            ))}
+          </div>
+          <CardGridSkeleton
+            grid="grid grid-cols-1 gap-3 xl:grid-cols-2"
+            count={8}
+            card="h-28"
+          />
+        </div>
+      }
     >
       <div className="mb-5 flex flex-wrap gap-1.5">
         <Link to="/browse" className={chipClass(!kind)}>

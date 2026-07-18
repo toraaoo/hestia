@@ -14,6 +14,7 @@ import {
 import { Link, useLocation } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AccountAvatar } from '@/components/app-shell/account-avatar';
+import { Bone } from '@/components/skeleton';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   DropdownMenu,
@@ -194,7 +195,7 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 }
 
 function AccountMenu() {
-  const { data } = useAccounts();
+  const { data, isPending } = useAccounts();
   const login = useLoginSisu();
   const switchAccount = useSwitchAccount();
   const removeAccount = useRemoveAccount();
@@ -206,6 +207,18 @@ function AccountMenu() {
   const others = active
     ? accounts.filter((a) => a.uuid !== active.uuid)
     : accounts;
+
+  if (isPending) {
+    return (
+      <div className="flex w-full items-center gap-2.5 px-3 py-2">
+        <Bone className="size-7 shrink-0" />
+        <span className="min-w-0 flex-1 space-y-1.5">
+          <Bone className="h-3.5 w-24" />
+          <Bone className="h-2.5 w-16" />
+        </span>
+      </div>
+    );
+  }
 
   if (!active) {
     return (

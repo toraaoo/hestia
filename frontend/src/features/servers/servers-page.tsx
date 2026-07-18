@@ -14,6 +14,7 @@ import {
   ViewToggle,
 } from '@/features/entries/collection';
 import { CreateEntryModal } from '@/features/entries/create-modal';
+import { EntryGridSkeleton } from '@/features/entries/skeleton';
 import { m } from '@/paraglide/messages.js';
 
 export function ServersPage({
@@ -35,6 +36,7 @@ export function ServersPage({
     <Page
       title={m['nav.servers']()}
       subtitle={m['servers.subtitle']()}
+      skeleton={<EntryGridSkeleton />}
       search
       searchPlaceholder={m['search.servers']()}
       actions={

@@ -83,6 +83,22 @@ Catalogue reads (`useServerFlavors`, `useServerVersions(flavor)`,
 `useJavaReleases`, content browse) carry a longer `staleTime` — upstream
 catalogues don't change mid-session.
 
+## Loading skeletons
+
+Pending reads render hand-drawn, theme-matched skeletons — ordinary
+components over the same tokens (`bg-muted`, the app's square corners), no
+capture step and no dependency. `Bone` (`components/skeleton.tsx`) is the
+pulsing primitive; `CardGridSkeleton` mirrors a page's real grid classes so
+bones land where cards will; a page-shaped composition lives beside any page
+that needs more (`features/skins/skeleton.tsx`, the entry grid shared by
+servers/instances/library in `features/entries/skeleton.tsx`). Two seams:
+
+- A routed page passes `skeleton={<… />}` with its pending flag to `Page` —
+  `<Page skeleton={<EntryGridSkeleton />} loading={isPending} …>` — and the
+  body swaps for the skeleton while the header stays live.
+- A surface outside `Page` (the sidebar account row) renders its bones
+  inline while its query is pending.
+
 ## Writes
 
 Every mutation hook returns a standard TanStack mutation: `mutate` /

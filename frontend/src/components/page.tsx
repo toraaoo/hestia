@@ -8,7 +8,9 @@ import { m } from '@/paraglide/messages.js';
 /**
  * A full-bleed page: header with title/actions over a scrolling body. Every
  * routed page uses this so the chrome stays consistent app-wide. Pass
- * `search` to surface the shared search box on the header's right.
+ * `search` to surface the shared search box on the header's right. Pass
+ * `skeleton` (a hand-drawn stand-in of the loaded body) with `loading` and
+ * the body swaps for it while data loads — the header stays live.
  */
 export function Page({
   title,
@@ -16,6 +18,8 @@ export function Page({
   search,
   searchPlaceholder,
   actions,
+  skeleton,
+  loading = false,
   children,
 }: {
   title: ReactNode;
@@ -23,6 +27,8 @@ export function Page({
   search?: boolean;
   searchPlaceholder?: string;
   actions?: ReactNode;
+  skeleton?: ReactNode;
+  loading?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -45,7 +51,9 @@ export function Page({
           {actions}
         </div>
       </div>
-      <div className="flex-1 p-5">{children}</div>
+      <div className="flex-1 p-5">
+        {loading && skeleton ? skeleton : children}
+      </div>
     </div>
   );
 }

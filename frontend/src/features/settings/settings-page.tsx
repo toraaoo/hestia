@@ -3,6 +3,7 @@ import { revalidateLogic } from '@tanstack/react-form';
 import { useState } from 'react';
 
 import { Page } from '@/components/page';
+import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -77,7 +78,25 @@ export function SettingsPage() {
   });
 
   return (
-    <Page title={m['nav.settings']()} subtitle={m['settings.subtitle']()}>
+    <Page
+      title={m['nav.settings']()}
+      subtitle={m['settings.subtitle']()}
+      skeleton={
+        <div className="max-w-2xl space-y-8">
+          {[0, 1, 2].map((group) => (
+            <div key={group} className="space-y-5">
+              <Bone className="h-4 w-32" />
+              {[0, 1].map((field) => (
+                <div key={field} className="space-y-2">
+                  <Bone className="h-3 w-24" />
+                  <Bone className="h-9 max-w-md" />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      }
+    >
       <form
         className="max-w-2xl"
         onSubmit={(e) => {
