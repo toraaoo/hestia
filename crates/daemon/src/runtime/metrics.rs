@@ -13,16 +13,22 @@ const TICK: Duration = Duration::from_secs(2);
 pub fn spawn_metrics_sampler(runtime: Arc<Runtime>) {
     tokio::spawn(async move {
         let mut system = System::new();
+        // `cpu_usage()` sums across cores, so a multi-threaded JVM reports well
+        // over 100%; normalize by the logical core count to a 0-100% share of
+        // total machine capacity.
+        let cores = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1) as f32;
         let mut tick = tokio::time::interval(TICK);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             tick.tick().await;
-            sample(&runtime, &mut system);
+            sample(&runtime, &mut system, cores);
         }
     });
 }
 
-fn sample(runtime: &Runtime, system: &mut System) {
+fn sample(runtime: &Runtime, system: &mut System, cores: f32) {
     if !runtime.hub().has_broadcast_subscriber() {
         return;
     }
@@ -50,7 +56,7 @@ fn sample(runtime: &Runtime, system: &mut System) {
             let process = system.process(pid)?;
             Some(ProcessMetrics {
                 id,
-                cpu_pct: process.cpu_usage(),
+                cpu_pct: process.cpu_usage() / cores,
                 mem_bytes: process.memory(),
             })
         })

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Area, AreaChart, YAxis } from 'recharts';
 
 import {
@@ -18,6 +18,10 @@ import { m } from '@/paraglide/messages.js';
 /** Rolling window length and refresh cadence of the simulated feed. */
 const SAMPLES = 40;
 const TICK_MS = 1500;
+
+/** Ease factor and cadence of the fade-to-zero after an entry stops. */
+const DECAY = 0.6;
+const DECAY_MS = 450;
 
 export interface Sample {
   cpu: number;
@@ -81,6 +85,44 @@ function useLiveResources(
   }, [running, baseCpu, baseMem, memLimitMb]);
 
   return series;
+}
+
+/**
+ * The series the charts render: the live feed while running, then a brief
+ * ease-to-zero after a stop so the graph glides down rather than snapping flat.
+ * The fade seeds from the last non-empty running window — the metrics feed
+ * clears the instant the process exits, so the live prop is already empty by
+ * the time `running` flips.
+ */
+function useResourceSeries(running: boolean, live: Sample[]): Sample[] {
+  const [decay, setDecay] = useState<Sample[]>([]);
+  const lastLive = useRef<Sample[]>(live);
+  if (running && live.length > 0) lastLive.current = live;
+
+  useEffect(() => {
+    if (running) {
+      setDecay([]);
+      return;
+    }
+    if (lastLive.current.length === 0) return;
+    setDecay(lastLive.current);
+    const id = setInterval(() => {
+      setDecay((prev) => {
+        let anyNonZero = false;
+        const next = prev.map((s) => {
+          const cpu = s.cpu * DECAY < 0.3 ? 0 : s.cpu * DECAY;
+          const mem = s.mem * DECAY < 0.5 ? 0 : s.mem * DECAY;
+          if (cpu > 0 || mem > 0) anyNonZero = true;
+          return { cpu, mem };
+        });
+        if (!anyNonZero) clearInterval(id);
+        return next;
+      });
+    }, DECAY_MS);
+    return () => clearInterval(id);
+  }, [running]);
+
+  return running ? live : decay;
 }
 
 const chartConfig = () =>
@@ -235,12 +277,12 @@ export function ResourceCards({
     res?.mem_used_mb ?? 0,
     mockLimit * 1024,
   );
+  const running = live ? live.running : (res?.running ?? false);
+  const series = useResourceSeries(running, live ? live.series : mockSeries);
 
   if (!live && !res) return null;
-  const running = live ? live.running : (res?.running ?? false);
   const limitGb = live ? live.memoryLimitGb : mockLimit;
   const diskBytes = live ? live.diskBytes : (res?.disk_bytes ?? 0);
-  const series = live ? live.series : mockSeries;
   const now = series[series.length - 1] ?? { cpu: 0, mem: 0 };
 
   return (
