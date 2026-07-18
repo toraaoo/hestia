@@ -142,7 +142,7 @@ export function ServerSettingsTab({
             min={2}
             max={32}
             step={1}
-            onValueChange={(v) => setMemory((v as number[])[0])}
+            onValueChange={(v) => setMemory(Array.isArray(v) ? v[0] : v)}
             className="max-w-md"
           />
         </Field>
