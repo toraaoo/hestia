@@ -56,7 +56,7 @@ export function ServerConsoleTab({
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 space-y-0.5 overflow-y-auto border border-border bg-card p-3 font-mono text-[11px] break-words whitespace-pre-wrap text-muted-foreground"
+        className="min-h-0 flex-1 space-y-0.5 overflow-y-auto border border-border bg-card p-3 font-mono text-[11px] wrap-break-word whitespace-pre-wrap text-muted-foreground"
       >
         {logs.lines.length === 0 && entries.length === 0 ? (
           <span className="text-muted-foreground/60">
