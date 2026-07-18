@@ -5,13 +5,14 @@
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList, InstanceConfigListResult,
     InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch,
-    InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLogs, InstanceProfileCapture,
-    InstanceProfileCreate, InstanceProfileEdit, InstanceProfileList, InstanceProfileListResult,
-    InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename, InstanceProfileUse,
-    InstanceRemove, InstanceRename, InstanceResolve, InstanceStop, InstanceUpdate,
-    InstanceUpdateResult, InstanceVersions, InstanceWorlds, InstanceWorldsResult,
+    InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLoaders, InstanceLogs,
+    InstanceProfileCapture, InstanceProfileCreate, InstanceProfileEdit, InstanceProfileList,
+    InstanceProfileListResult, InstanceProfileRelease, InstanceProfileRemove,
+    InstanceProfileRename, InstanceProfileUse, InstanceRemove, InstanceRename, InstanceResolve,
+    InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds,
+    InstanceWorldsResult,
 };
-use proto::minecraft::{ConfigEntry, FlavorsResult, VersionsResult};
+use proto::minecraft::{ConfigEntry, FlavorsResult, LoadersResult, VersionsResult};
 use proto::process::ProcessLogsResult;
 use proto::Empty;
 
@@ -43,6 +44,17 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .resolve_instance(&p.flavor, &p.version, p.loader_version)
             .await
             .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+    });
+
+    on.handle::<InstanceLoaders, _, _>(|p, ctx| async move {
+        let loaders = ctx
+            .runtime
+            .engine()
+            .minecraft()
+            .instance_loader_versions(&p.flavor, &p.version)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(LoadersResult { loaders })
     });
 
     on.handle::<InstanceCreate, _, _>(|p, ctx| async move {

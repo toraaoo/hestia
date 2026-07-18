@@ -5,13 +5,16 @@ use anyhow::{Context, Result};
 use proto::backup::BackupKind;
 use proto::minecraft::ProvisionPhase;
 
+use proto::server::ServerPingResult;
+
 use super::{effective_name, guard_downgrade, phase_progress};
 use crate::content::install;
 use crate::engine::{Engine, ServerCreateSpec, ServerUpdateSpec};
 use crate::minecraft::launch::LaunchPlan;
 use crate::minecraft::materialize::OnProgress;
-use crate::minecraft::rcon;
+use crate::minecraft::{ping, rcon};
 use crate::servers::ServerRecord;
+use crate::usage;
 
 impl Engine {
     /// Create a fully provisioned server: resolve the profile, register the
@@ -128,5 +131,24 @@ impl Engine {
             .context("this server has no console yet (restart it to enable one)")?;
         let mut conn = rcon::Rcon::connect(rcon.port, &rcon.password).await?;
         conn.command(command).await
+    }
+
+    pub async fn server_ping(&self, reference: &str) -> Result<ServerPingResult> {
+        let record = self
+            .servers
+            .get(reference)
+            .with_context(|| format!("unknown server: {reference}"))?;
+        let port = record
+            .game_port
+            .context("this server has no game port allocated")?;
+        ping::ping(port).await
+    }
+
+    pub fn server_disk_usage(&self, reference: &str) -> Result<u64> {
+        let record = self
+            .servers
+            .get(reference)
+            .with_context(|| format!("unknown server: {reference}"))?;
+        Ok(usage::dir_size(&self.servers.server_dir(&record.id)))
     }
 }

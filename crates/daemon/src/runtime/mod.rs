@@ -3,6 +3,7 @@
 
 mod event_hub;
 mod managers;
+mod metrics;
 mod process;
 pub mod router;
 mod scheduler;
@@ -24,6 +25,7 @@ pub use managers::{
     BackupJob, BackupManager, ContentJob, ContentManager, DownloadManager, InstanceLaunchManager,
     JavaInstallManager, ServerCreateManager, ServerUpdateManager,
 };
+pub use metrics::spawn_metrics_sampler;
 pub use process::{ProcessSupervisor, StartError};
 pub use router::{Channels, Router, ServiceError};
 pub use scheduler::spawn_backup_scheduler;
@@ -68,6 +70,7 @@ pub fn server_info(
         ready: record.ready,
         game_port: record.game_port,
         console: record.rcon.is_some(),
+        disk_bytes: None,
         process,
     }
 }

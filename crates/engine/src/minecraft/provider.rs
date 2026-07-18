@@ -20,6 +20,11 @@ pub trait ServerProvider: Send + Sync {
     fn name(&self) -> &'static str;
     async fn versions(&self) -> Result<Vec<GameVersion>>;
     async fn resolve(&self, request: &ResolveRequest) -> Result<ServerProfile>;
+    /// The loader builds available for a game version, newest first. A flavor
+    /// with no loader concept (vanilla) reports none — the default.
+    async fn loader_versions(&self, _game: &str) -> Result<Vec<String>> {
+        Ok(Vec::new())
+    }
 }
 
 #[async_trait]
@@ -28,4 +33,9 @@ pub trait InstanceProvider: Send + Sync {
     fn name(&self) -> &'static str;
     async fn versions(&self) -> Result<Vec<GameVersion>>;
     async fn resolve(&self, request: &ResolveRequest) -> Result<InstanceProfile>;
+    /// The loader builds available for a game version, newest first. A flavor
+    /// with no loader concept (vanilla) reports none — the default.
+    async fn loader_versions(&self, _game: &str) -> Result<Vec<String>> {
+        Ok(Vec::new())
+    }
 }

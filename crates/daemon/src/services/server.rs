@@ -2,14 +2,14 @@
 //! the rcon console, and the per-server settings. Backups live in `backup`,
 //! content installs in `content`.
 
-use proto::minecraft::{ConfigEntry, FlavorsResult, VersionsResult};
+use proto::minecraft::{ConfigEntry, FlavorsResult, LoadersResult, VersionsResult};
 use proto::process::{LogSource, ProcessLogsResult, ProcessSpec, RestartPolicy};
 use proto::server::{
     ServerCommand, ServerCommandResult, ServerConfigGet, ServerConfigGetResult, ServerConfigList,
     ServerConfigListResult, ServerConfigSet, ServerCreate, ServerCreateResult, ServerFlavors,
-    ServerList, ServerListResult, ServerLogs, ServerRemove, ServerRename, ServerResolve,
-    ServerStart, ServerStartResult, ServerStatus, ServerStop, ServerUpdate, ServerUpdateResult,
-    ServerVersions,
+    ServerList, ServerListResult, ServerLoaders, ServerLogs, ServerPing, ServerRemove,
+    ServerRename, ServerResolve, ServerStart, ServerStartResult, ServerStatus, ServerStop,
+    ServerUpdate, ServerUpdateResult, ServerVersions,
 };
 use proto::Empty;
 
@@ -43,6 +43,17 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .resolve_server(&p.flavor, &p.version, p.loader_version)
             .await
             .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+    });
+
+    on.handle::<ServerLoaders, _, _>(|p, ctx| async move {
+        let loaders = ctx
+            .runtime
+            .engine()
+            .minecraft()
+            .server_loader_versions(&p.flavor, &p.version)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(LoadersResult { loaders })
     });
 
     on.handle::<ServerCreate, _, _>(|p, ctx| async move {
@@ -102,7 +113,20 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<ServerStatus, _, _>(|p, ctx| async move {
         let record = find_server(&ctx, &p.server)?;
-        Ok(ctx.runtime.server_view(record))
+        let mut view = ctx.runtime.server_view(record);
+        if p.with_usage {
+            view.disk_bytes = ctx.runtime.engine().server_disk_usage(&view.id).ok();
+        }
+        Ok(view)
+    });
+
+    on.handle::<ServerPing, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        ctx.runtime
+            .engine()
+            .server_ping(&record.id)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
     });
 
     on.handle::<ServerRemove, _, _>(|p, ctx| async move {

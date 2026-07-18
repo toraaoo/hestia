@@ -73,7 +73,7 @@ pub(super) async fn run(
         "server '{}' updated to {}",
         server.name, server.game_version
     )))?;
-    entry::show_status(&server)?;
+    entry::show_status(&server, None)?;
     if was_running {
         lifecycle::start(client, &server.id).await?;
     }

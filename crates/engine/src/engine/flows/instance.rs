@@ -34,6 +34,16 @@ impl Engine {
         Ok(worlds)
     }
 
+    pub fn instance_disk_usage(&self, reference: &str) -> Result<u64> {
+        let record = self
+            .instances
+            .get(reference)
+            .with_context(|| format!("unknown instance: {reference}"))?;
+        Ok(crate::usage::dir_size(
+            &self.instances.instance_dir(&record.id),
+        ))
+    }
+
     /// Move an instance to another version of its flavor. A downgrade must be
     /// allowed explicitly — Minecraft cannot load saves written by a newer
     /// version, and **nothing is backed up first** (instances have no backup

@@ -9,16 +9,17 @@ use proto::content::{
     ServerContentRemoveParams, ServerContentUpdate, ServerContentUpdateParams,
 };
 use proto::minecraft::{
-    ConfigEntry, Flavor, GameVersion, ProvisionProgress, ResolveParams, ServerProfile,
-    VersionsParams,
+    ConfigEntry, Flavor, GameVersion, LoadersParams, ProvisionProgress, ResolveParams,
+    ServerProfile, VersionsParams,
 };
 use proto::process::ProcessLogLine;
 use proto::server::{
     ServerCommand, ServerCommandParams, ServerConfigGet, ServerConfigGetParams, ServerConfigList,
     ServerConfigSet, ServerConfigSetParams, ServerCreate, ServerCreateParams, ServerFlavors,
-    ServerInfo, ServerList, ServerLogs, ServerLogsParams, ServerRef, ServerRemove, ServerRename,
-    ServerRenameParams, ServerResolve, ServerStart, ServerStartResult, ServerStatus, ServerStop,
-    ServerUpdate, ServerUpdateParams, ServerVersions,
+    ServerInfo, ServerList, ServerLoaders, ServerLogs, ServerLogsParams, ServerPing,
+    ServerPingResult, ServerRef, ServerRemove, ServerRename, ServerRenameParams, ServerResolve,
+    ServerStart, ServerStartResult, ServerStatus, ServerStatusParams, ServerStop, ServerUpdate,
+    ServerUpdateParams, ServerVersions,
 };
 use serde_json::Value;
 
@@ -57,6 +58,14 @@ impl Server<'_> {
             loader_version,
         };
         self.session.call::<ServerResolve>(&params).await
+    }
+
+    pub async fn loaders(&self, flavor: &str, version: &str) -> Result<Vec<String>, IpcError> {
+        let params = LoadersParams {
+            flavor: flavor.to_string(),
+            version: version.to_string(),
+        };
+        Ok(self.session.call::<ServerLoaders>(&params).await?.loaders)
     }
 
     /// Create a fully provisioned server, blocking until the daemon reports
@@ -123,8 +132,17 @@ impl Server<'_> {
             .servers)
     }
 
-    pub async fn status(&self, server: &str) -> Result<ServerInfo, IpcError> {
-        self.session.call::<ServerStatus>(&server_ref(server)).await
+    pub async fn status(&self, server: &str, with_usage: bool) -> Result<ServerInfo, IpcError> {
+        let params = ServerStatusParams {
+            server: server.to_string(),
+            with_usage,
+        };
+        self.session.call::<ServerStatus>(&params).await
+    }
+
+    /// A Server List Ping status snapshot; only a running server answers.
+    pub async fn ping(&self, server: &str) -> Result<ServerPingResult, IpcError> {
+        self.session.call::<ServerPing>(&server_ref(server)).await
     }
 
     pub async fn remove(&self, server: &str) -> Result<(), IpcError> {

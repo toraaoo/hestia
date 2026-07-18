@@ -41,6 +41,7 @@ flate2 = "1.1.9"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 uuid = { version = "1.23.4", features = ["v7"] }
 junction = "1.2.0"
+sysinfo = { version = "0.37.2", default-features = false, features = ["system"] }
 
 [profile.release]
 lto = "thin"

@@ -2,7 +2,8 @@ use ipc::errors::IpcError;
 use ipc::protocol::Event;
 use proto::process::{
     ProcessExitEvent, ProcessInfo, ProcessList, ProcessLogLine, ProcessLogs, ProcessLogsParams,
-    ProcessRef, ProcessSpec, ProcessStart, ProcessStartResult, ProcessStatus, ProcessStop,
+    ProcessMetrics, ProcessRef, ProcessSpec, ProcessStart, ProcessStartResult, ProcessStatus,
+    ProcessStop,
 };
 
 use crate::session::{job_id, Session};
@@ -85,6 +86,33 @@ impl Process<'_> {
                     _ => return,
                 };
                 let _ = sent;
+            })));
+        Ok(rx)
+    }
+
+    /// Stream the daemon's periodic resource samples for every running process.
+    /// Claims the session's event callback like [`subscribe`], so it does not
+    /// compose with another subscription on the same client.
+    pub async fn subscribe_metrics(
+        &self,
+    ) -> Result<tokio::sync::mpsc::UnboundedReceiver<Vec<ProcessMetrics>>, IpcError> {
+        use proto::events::{EventsSubscribe, EventsSubscribeParams};
+        use proto::process::ProcessMetricsEvent;
+        use proto::Topic;
+
+        self.session
+            .call::<EventsSubscribe>(&EventsSubscribeParams { id: String::new() })
+            .await?;
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        self.session
+            .set_event_callback(Some(std::sync::Arc::new(move |event: &Event| {
+                if event.topic == ProcessMetricsEvent::TOPIC {
+                    if let Ok(e) =
+                        serde_json::from_value::<ProcessMetricsEvent>(event.payload.clone())
+                    {
+                        let _ = tx.send(e.samples);
+                    }
+                }
             })));
         Ok(rx)
     }

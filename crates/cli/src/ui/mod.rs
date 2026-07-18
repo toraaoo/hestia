@@ -24,6 +24,7 @@ use anyhow::{anyhow, bail, Result};
 pub use components::PickerItem;
 pub use progress::{InstallReporter, ProvisionReporter, Spinner};
 pub use session::console::ConsoleEvent;
+pub use session::monitor::MonitorSample;
 pub use view::View;
 
 /// Whether this invocation can run widgets: stdin (keys) and stderr (drawing)
@@ -191,6 +192,19 @@ pub fn log_session(
         bail!("no interactive terminal");
     }
     session::run(session::logs::LogScreen::new(title, backfill), Some(events))
+}
+
+/// Run the fullscreen resource monitor, fed by `samples` (one per daemon tick,
+/// `None` when the process reported nothing). Blocking until Esc/q/Ctrl-C.
+/// Requires an interactive terminal.
+pub fn monitor(
+    title: &str,
+    samples: tokio::sync::mpsc::UnboundedReceiver<Option<MonitorSample>>,
+) -> Result<()> {
+    if !is_interactive() {
+        bail!("no interactive terminal");
+    }
+    session::run(session::monitor::MonitorScreen::new(title), Some(samples))
 }
 
 /// Render a byte count in human units (KB, MB, …).

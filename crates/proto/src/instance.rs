@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty, Topic};
 use crate::minecraft::{
-    ConfigEntry, FlavorsResult, InstanceProfile, ProvisionProgress, ResolveParams, VersionsParams,
-    VersionsResult,
+    ConfigEntry, FlavorsResult, InstanceProfile, LoadersParams, LoadersResult, ProvisionProgress,
+    ResolveParams, VersionsParams, VersionsResult,
 };
 use crate::process::{ProcessInfo, ProcessLogsResult};
 
@@ -31,6 +31,13 @@ impl Contract for InstanceResolve {
     const CHANNEL: &'static str = "instance.resolve";
     type Params = ResolveParams;
     type Result = InstanceProfile;
+}
+
+pub struct InstanceLoaders;
+impl Contract for InstanceLoaders {
+    const CHANNEL: &'static str = "instance.loaders";
+    type Params = LoadersParams;
+    type Result = LoadersResult;
 }
 
 /// A managed instance: the stored record plus, when launched, its live sessions.

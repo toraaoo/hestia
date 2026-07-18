@@ -110,6 +110,14 @@ enum InstanceAction {
     },
     /// The instance's record and running sessions
     Info,
+    /// Watch a running session's CPU and memory on a fullscreen graph
+    Monitor {
+        #[arg(
+            long,
+            help = "Target one session by its handle (see `info`); default newest"
+        )]
+        session: Option<String>,
+    },
     /// Captured instance output
     Logs {
         #[arg(short = 'n', long = "tail", help = "Only the last N lines")]
@@ -258,6 +266,7 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             };
             entry::show_info(info)
         }
+        InstanceAction::Monitor { session } => lifecycle::monitor(client, &name, session).await,
         InstanceAction::Logs {
             tail,
             follow,

@@ -35,6 +35,14 @@ impl EventHub {
         });
     }
 
+    /// Whether any live subscriber takes every event (unfiltered) — only these
+    /// receive an idless broadcast like `process.metrics`.
+    pub fn has_broadcast_subscriber(&self) -> bool {
+        let mut subs = self.subs.lock().unwrap();
+        subs.retain(|s| !s.out.is_closed());
+        subs.iter().any(|s| s.filter.is_none())
+    }
+
     pub fn unsubscribe(&self, conn_id: u64) {
         let mut subs = self.subs.lock().unwrap();
         let before = subs.len();

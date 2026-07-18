@@ -7,6 +7,7 @@
 
 pub mod console;
 pub mod logs;
+pub mod monitor;
 pub mod pager;
 pub mod prompt;
 mod terminal;

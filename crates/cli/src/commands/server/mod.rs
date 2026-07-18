@@ -55,6 +55,13 @@ pub enum ServerCmd {
     },
     /// The available flavors
     Flavors,
+    /// Loader builds a flavor offers for a version (modloaders only)
+    Loaders {
+        /// Flavor id (e.g. fabric); prompts when omitted
+        flavor: Option<String>,
+        /// Game version the loaders must support; prompts when omitted
+        version: Option<String>,
+    },
     /// Act on one server: `hestia server <name> <start|stop|config|backup|…>`
     #[command(external_subcommand)]
     Entry(Vec<String>),
@@ -86,7 +93,12 @@ enum ServerAction {
         detach: bool,
     },
     /// The server's record merged with its live process state
-    Status,
+    Status {
+        #[arg(long, help = "Include disk usage and a live server ping")]
+        usage: bool,
+    },
+    /// Watch live CPU and memory usage on a fullscreen graph
+    Monitor,
     /// Captured server output
     Logs {
         #[arg(short = 'n', long = "tail", help = "Only the last N lines")]
@@ -173,6 +185,7 @@ pub async fn run(cmd: ServerCmd) -> Result<()> {
                 ServerCmd::List => entry::list(&client).await,
                 ServerCmd::Versions { flavor, all } => versions(&client, flavor, all).await,
                 ServerCmd::Flavors => flavors(&client).await,
+                ServerCmd::Loaders { flavor, version } => loaders(&client, flavor, version).await,
                 ServerCmd::Entry(_) => unreachable!("handled above"),
             }
         }
@@ -184,10 +197,16 @@ async fn run_action(client: Client, name: String, action: ServerAction) -> Resul
         ServerAction::Start { detach } => console::start_attached(client, &name, detach).await,
         ServerAction::Stop => lifecycle::stop(&client, &name).await,
         ServerAction::Restart { detach } => console::restart_attached(client, &name, detach).await,
-        ServerAction::Status => {
-            let info = client.server().status(&name).await?;
-            entry::show_status(&info)
+        ServerAction::Status { usage } => {
+            let info = client.server().status(&name, usage).await?;
+            let ping = if usage && entry::running_process(&info).is_some() {
+                client.server().ping(&name).await.ok()
+            } else {
+                None
+            };
+            entry::show_status(&info, ping.as_ref())
         }
+        ServerAction::Monitor => lifecycle::monitor(&client, &name).await,
         ServerAction::Logs { tail, follow } => lifecycle::logs(&client, &name, tail, follow).await,
         ServerAction::Attach => console::attach(client, &name).await,
         ServerAction::Command { command } => {
@@ -239,4 +258,31 @@ async fn flavors(client: &Client) -> Result<()> {
         client.server().flavors().await?
     };
     mc::show_flavors(&flavors)
+}
+
+async fn loaders(client: &Client, flavor: Option<String>, version: Option<String>) -> Result<()> {
+    let flavors = {
+        let _spinner = Spinner::start("fetching flavors");
+        client.server().flavors().await?
+    };
+    let flavor = mc::pick_flavor(flavors, flavor)?;
+    let versions = {
+        let _spinner = Spinner::start("fetching versions");
+        client.server().versions(&flavor).await?
+    };
+    let version = mc::pick_version(versions, version)?;
+    let loaders = {
+        let _spinner = Spinner::start("fetching loaders");
+        client.server().loaders(&flavor, &version).await?
+    };
+    if loaders.is_empty() {
+        return crate::ui::show(crate::ui::View::note(format!(
+            "{flavor} has no pickable loader version for {version} (the latest is used)"
+        )));
+    }
+    crate::ui::show(crate::ui::View::table(
+        format!("{flavor} loaders for {version}"),
+        ["LOADER"],
+        loaders.into_iter().map(|l| vec![l]).collect(),
+    ))
 }

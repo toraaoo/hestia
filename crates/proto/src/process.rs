@@ -173,6 +173,23 @@ impl Topic for ProcessOutputEvent {
     const TOPIC: &'static str = "process.output";
 }
 
+/// One running process's resource sample; `cpu_pct` is 100 per full core.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ProcessMetrics {
+    pub id: String,
+    pub cpu_pct: f32,
+    pub mem_bytes: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ProcessMetricsEvent {
+    pub samples: Vec<ProcessMetrics>,
+}
+impl Topic for ProcessMetricsEvent {
+    const TOPIC: &'static str = "process.metrics";
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ProcessExitEvent {
     pub id: String,

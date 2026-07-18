@@ -54,6 +54,10 @@ impl ServerProvider for FabricServer {
         game_versions().await
     }
 
+    async fn loader_versions(&self, game: &str) -> Result<Vec<String>> {
+        fabric::loader_versions(game).await
+    }
+
     async fn resolve(&self, request: &ResolveRequest) -> Result<ServerProfile> {
         let loader = resolve_loader(request).await?;
         let installer = fabric::latest_installer().await?;
@@ -130,6 +134,10 @@ impl InstanceProvider for FabricInstance {
 
     async fn versions(&self) -> Result<Vec<GameVersion>> {
         game_versions().await
+    }
+
+    async fn loader_versions(&self, game: &str) -> Result<Vec<String>> {
+        fabric::loader_versions(game).await
     }
 
     async fn resolve(&self, request: &ResolveRequest) -> Result<InstanceProfile> {

@@ -9,7 +9,7 @@ use client::proto::process::ProcessState;
 use client::{Client, ProcessEvent};
 
 use super::entry;
-use crate::ui::{self, ProvisionReporter, Spinner, View};
+use crate::ui::{self, MonitorSample, ProvisionReporter, Spinner, View};
 
 /// Launch `reference`, rendering preparation progress, then attach a
 /// read-only log session (unless detached or piped); shared with
@@ -161,6 +161,40 @@ pub(crate) async fn logs(
         follow_logs(client, &info, &target).await?;
     }
     Ok(())
+}
+
+/// Run the fullscreen resource monitor over one running session (named, else
+/// the newest), filtering the daemon's metrics stream to it.
+pub(crate) async fn monitor(
+    client: &Client,
+    instance: &str,
+    session: Option<String>,
+) -> Result<()> {
+    let target = resolve_session(client, instance, &session).await?;
+    let info = entry::fetch(client, instance).await?;
+    let process_id = follow_target(&info, &target)?;
+
+    let mut samples = client.process().subscribe_metrics().await?;
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let forward = tokio::spawn(async move {
+        while let Some(batch) = samples.recv().await {
+            let sample = batch
+                .into_iter()
+                .find(|m| m.id == process_id)
+                .map(|m| MonitorSample {
+                    cpu_pct: m.cpu_pct,
+                    mem_bytes: m.mem_bytes,
+                });
+            if tx.send(sample).is_err() {
+                break;
+            }
+        }
+    });
+
+    let title = format!("{} — resources", info.name);
+    let result = tokio::task::spawn_blocking(move || ui::monitor(&title, rx)).await?;
+    forward.abort();
+    result
 }
 
 /// The process id to follow: the named session, else the newest running one.

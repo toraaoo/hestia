@@ -130,7 +130,7 @@ pub(super) async fn run(client: &Client, args: CreateArgs) -> Result<()> {
     reporter.finish();
     let server = result?;
     ui::show(View::line(format!("server '{}' created", server.name)))?;
-    entry::show_status(&server)
+    entry::show_status(&server, None)
 }
 
 /// The interactive path: the fullscreen step wizard, prefilled from whatever
@@ -192,7 +192,7 @@ async fn run_wizard(client: &Client, args: CreateArgs) -> Result<()> {
         None => ui::show(View::note("cancelled")),
         Some(WizardOutcome::Server(server)) => {
             ui::show(View::line(format!("server '{}' created", server.name)))?;
-            entry::show_status(&server)
+            entry::show_status(&server, None)
         }
         Some(WizardOutcome::Instance(_)) => unreachable!("server wizard created an instance"),
     }

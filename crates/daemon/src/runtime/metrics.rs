@@ -1,0 +1,65 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use ipc::protocol::Event;
+use proto::process::{ProcessMetrics, ProcessMetricsEvent, ProcessState};
+use proto::Topic;
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+
+use super::Runtime;
+
+const TICK: Duration = Duration::from_secs(2);
+
+pub fn spawn_metrics_sampler(runtime: Arc<Runtime>) {
+    tokio::spawn(async move {
+        let mut system = System::new();
+        let mut tick = tokio::time::interval(TICK);
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            tick.tick().await;
+            sample(&runtime, &mut system);
+        }
+    });
+}
+
+fn sample(runtime: &Runtime, system: &mut System) {
+    if !runtime.hub().has_broadcast_subscriber() {
+        return;
+    }
+    let running: Vec<(String, Pid)> = runtime
+        .processes()
+        .list()
+        .into_iter()
+        .filter(|p| p.state == ProcessState::Running)
+        .map(|p| (p.id, Pid::from_u32(p.pid)))
+        .collect();
+    if running.is_empty() {
+        return;
+    }
+
+    let pids: Vec<Pid> = running.iter().map(|(_, pid)| *pid).collect();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&pids),
+        true,
+        ProcessRefreshKind::nothing().with_cpu().with_memory(),
+    );
+
+    let samples: Vec<ProcessMetrics> = running
+        .into_iter()
+        .filter_map(|(id, pid)| {
+            let process = system.process(pid)?;
+            Some(ProcessMetrics {
+                id,
+                cpu_pct: process.cpu_usage(),
+                mem_bytes: process.memory(),
+            })
+        })
+        .collect();
+    if samples.is_empty() {
+        return;
+    }
+    runtime.hub().publish(&Event {
+        topic: ProcessMetricsEvent::TOPIC.to_string(),
+        payload: serde_json::to_value(ProcessMetricsEvent { samples }).unwrap_or_default(),
+    });
+}

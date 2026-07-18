@@ -136,6 +136,21 @@ pub struct VersionsResult {
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
+pub struct LoadersParams {
+    pub flavor: String,
+    pub version: String,
+}
+
+/// Loader builds newest-first; empty for a flavor with no pickable loader
+/// version (vanilla, and loaders that pin one build per game version).
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct LoadersResult {
+    pub loaders: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
 pub struct ResolveParams {
     pub flavor: String,
     pub version: String,

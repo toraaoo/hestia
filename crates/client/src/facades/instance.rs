@@ -10,8 +10,8 @@ use proto::content::{
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo,
-    InstanceLaunch, InstanceLaunchParams, InstanceList, InstanceLogs, InstanceLogsParams,
-    InstanceProfileCapture, InstanceProfileCreate, InstanceProfileCreateParams,
+    InstanceLaunch, InstanceLaunchParams, InstanceList, InstanceLoaders, InstanceLogs,
+    InstanceLogsParams, InstanceProfileCapture, InstanceProfileCreate, InstanceProfileCreateParams,
     InstanceProfileEdit, InstanceProfileEditParams, InstanceProfileList, InstanceProfileRef,
     InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename,
     InstanceProfileRenameParams, InstanceProfileUse, InstanceRef, InstanceRemove, InstanceRename,
@@ -19,8 +19,8 @@ use proto::instance::{
     InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile,
 };
 use proto::minecraft::{
-    ConfigEntry, Flavor, GameVersion, InstanceProfile, ProvisionProgress, ResolveParams,
-    VersionsParams,
+    ConfigEntry, Flavor, GameVersion, InstanceProfile, LoadersParams, ProvisionProgress,
+    ResolveParams, VersionsParams,
 };
 use proto::process::ProcessLogLine;
 use serde_json::Value;
@@ -64,6 +64,14 @@ impl Instance<'_> {
             loader_version,
         };
         self.session.call::<InstanceResolve>(&params).await
+    }
+
+    pub async fn loaders(&self, flavor: &str, version: &str) -> Result<Vec<String>, IpcError> {
+        let params = LoadersParams {
+            flavor: flavor.to_string(),
+            version: version.to_string(),
+        };
+        Ok(self.session.call::<InstanceLoaders>(&params).await?.loaders)
     }
 
     /// Create an instance record (the profile is resolved upstream, so this can

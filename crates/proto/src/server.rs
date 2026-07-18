@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty, Topic};
 use crate::minecraft::{
-    ConfigEntry, FlavorsResult, ProvisionProgress, ResolveParams, ServerProfile, VersionsParams,
-    VersionsResult,
+    ConfigEntry, FlavorsResult, LoadersParams, LoadersResult, ProvisionProgress, ResolveParams,
+    ServerProfile, VersionsParams, VersionsResult,
 };
 use crate::process::{ProcessInfo, ProcessLogsResult};
 
@@ -34,6 +34,13 @@ impl Contract for ServerResolve {
     type Result = ServerProfile;
 }
 
+pub struct ServerLoaders;
+impl Contract for ServerLoaders {
+    const CHANNEL: &'static str = "server.loaders";
+    type Params = LoadersParams;
+    type Result = LoadersResult;
+}
+
 /// A managed server: the stored record plus, when it has been started, the
 /// supervised process snapshot.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -55,6 +62,9 @@ pub struct ServerInfo {
     /// True once RCON is configured (a server started before the console
     /// existed gains one on its next start).
     pub console: bool,
+    /// Present only when the status call set `with_usage` (the walk is not free).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disk_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub process: Option<ProcessInfo>,
 }
@@ -188,11 +198,36 @@ impl Contract for ServerStop {
     type Result = Empty;
 }
 
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerStatusParams {
+    pub server: String,
+    /// Also walk the entry directory and report `disk_bytes`.
+    pub with_usage: bool,
+}
+
 pub struct ServerStatus;
 impl Contract for ServerStatus {
     const CHANNEL: &'static str = "server.status";
-    type Params = ServerRef;
+    type Params = ServerStatusParams;
     type Result = ServerInfo;
+}
+
+/// Server List Ping snapshot over the game port; only a running server answers.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerPingResult {
+    pub players_online: u32,
+    pub players_max: u32,
+    pub motd: String,
+    pub version: String,
+}
+
+pub struct ServerPing;
+impl Contract for ServerPing {
+    const CHANNEL: &'static str = "server.ping";
+    type Params = ServerRef;
+    type Result = ServerPingResult;
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]

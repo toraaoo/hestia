@@ -21,9 +21,11 @@ use proto::download::DownloadSpec;
 use proto::instance::{InstanceInfo, InstanceLaunchParams, InstanceProfileListResult};
 use proto::java::{JavaInstallProgress, JavaRuntime};
 use proto::minecraft::ProvisionProgress;
-use proto::process::{ProcessExitEvent, ProcessInfo, ProcessOutputEvent, ProcessSpec};
+use proto::process::{
+    ProcessExitEvent, ProcessInfo, ProcessMetricsEvent, ProcessOutputEvent, ProcessSpec,
+};
 use proto::profile::GlobalProfile;
-use proto::server::ServerInfo;
+use proto::server::{ServerInfo, ServerPingResult};
 use proto::skins::{Cape, Skin};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -145,3 +147,13 @@ golden!(global_profile, GlobalProfile, "global_profile.json");
 golden!(content_version, ContentVersion, "content_version.json");
 golden!(skin, Skin, "skin.json");
 golden!(cape, Cape, "cape.json");
+golden!(
+    server_ping_result,
+    ServerPingResult,
+    "server_ping_result.json"
+);
+golden!(
+    process_metrics_event,
+    ProcessMetricsEvent,
+    "process_metrics_event.json"
+);

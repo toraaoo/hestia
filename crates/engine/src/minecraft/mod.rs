@@ -7,6 +7,7 @@ pub(crate) mod launch;
 pub(crate) mod log4j;
 pub(crate) mod materialize;
 mod meta;
+pub(crate) mod ping;
 mod provider;
 pub(crate) mod rcon;
 mod vanilla;
@@ -57,6 +58,14 @@ impl Minecraft {
 
     pub async fn server_versions(&self, flavor: &str) -> Result<Vec<GameVersion>> {
         self.server(flavor)?.versions().await
+    }
+
+    pub async fn server_loader_versions(&self, flavor: &str, game: &str) -> Result<Vec<String>> {
+        self.server(flavor)?.loader_versions(game).await
+    }
+
+    pub async fn instance_loader_versions(&self, flavor: &str, game: &str) -> Result<Vec<String>> {
+        self.instance(flavor)?.loader_versions(game).await
     }
 
     pub async fn resolve_server(

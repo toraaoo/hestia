@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use client::proto::process::{ProcessInfo, ProcessState};
-use client::proto::server::ServerInfo;
+use client::proto::server::{ServerInfo, ServerPingResult};
 use client::Client;
 
 use crate::commands::mc;
@@ -60,8 +60,8 @@ pub(super) async fn list(client: &Client) -> Result<()> {
     ))
 }
 
-pub(super) fn show_status(info: &ServerInfo) -> Result<()> {
-    ui::show(View::detail([
+pub(super) fn show_status(info: &ServerInfo, ping: Option<&ServerPingResult>) -> Result<()> {
+    let mut rows = vec![
         ("name", info.name.clone()),
         ("id", info.id.clone()),
         ("flavor", info.flavor.clone()),
@@ -77,7 +77,20 @@ pub(super) fn show_status(info: &ServerInfo) -> Result<()> {
             if info.console { "yes" } else { "on next start" }.into(),
         ),
         ("state", state_label(info)),
-    ]))
+    ];
+    if let Some(bytes) = info.disk_bytes {
+        rows.push(("disk", ui::human_bytes(bytes)));
+    }
+    if let Some(ping) = ping {
+        rows.push((
+            "players",
+            format!("{}/{}", ping.players_online, ping.players_max),
+        ));
+        if !ping.motd.is_empty() {
+            rows.push(("motd", ping.motd.clone()));
+        }
+    }
+    ui::show(View::detail(rows))
 }
 
 fn address_label(info: &ServerInfo) -> String {

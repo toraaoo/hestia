@@ -28,6 +28,18 @@ pub async fn game_versions() -> Result<Vec<(String, bool)>> {
         .collect())
 }
 
+/// Every loader build published for a game version, newest first.
+pub async fn loader_versions(game: &str) -> Result<Vec<String>> {
+    let j = fetch_json(&format!("{META}/versions/loader/{game}")).await?;
+    let arr = j
+        .as_array()
+        .context("fabric loader response is not an array")?;
+    Ok(arr
+        .iter()
+        .filter_map(|e| e.get("loader")?.get("version")?.as_str().map(String::from))
+        .collect())
+}
+
 /// The newest loader for a game version: the first stable build, else the newest.
 pub async fn latest_loader(game: &str) -> Result<String> {
     let j = fetch_json(&format!("{META}/versions/loader/{game}")).await?;

@@ -19,6 +19,7 @@ mod registry;
 mod servers;
 mod skins;
 mod sync;
+mod usage;
 
 pub use accounts::{Accounts, LoginChallenge};
 pub use backup::BackupSettings;
