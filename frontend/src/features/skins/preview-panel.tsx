@@ -28,7 +28,7 @@ export function PreviewPanel({
         {previewing && (
           <Badge
             variant="secondary"
-            className="absolute top-2 left-2 z-10 bg-background/80 backdrop-blur-sm"
+            className="absolute top-2 left-2 z-10 bg-background/80 backdrop-blur-xs"
           >
             {m['skins.previewing']()}
           </Badge>

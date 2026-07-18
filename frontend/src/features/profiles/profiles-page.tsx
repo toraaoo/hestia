@@ -135,7 +135,7 @@ function ProfileCard({ profile }: { profile: GlobalProfile }) {
       <Card className="gap-0 overflow-hidden py-0 transition-colors group-hover:border-ember/40">
         <div className="relative flex h-24 items-center justify-center border-b border-border bg-muted/40">
           <StackIcon className="size-9 text-muted-foreground/40" />
-          <span className="absolute top-2 left-2 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground backdrop-blur-sm">
+          <span className="absolute top-2 left-2 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground backdrop-blur-xs">
             {m['profiles.entries_count']({ count: profile.entries.length })}
           </span>
         </div>

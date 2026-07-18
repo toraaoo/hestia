@@ -93,7 +93,7 @@ export function SkinCard({
               variant="secondary"
               size="icon-sm"
               aria-label={m['skins.actions']()}
-              className="absolute top-1.5 right-1.5 bg-background/80 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
+              className="absolute top-1.5 right-1.5 bg-background/80 opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
             >
               <DotsThreeIcon weight="bold" className="size-3.5" />
             </Button>

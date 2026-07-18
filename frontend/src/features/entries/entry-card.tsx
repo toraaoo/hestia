@@ -46,7 +46,7 @@ function StatusBadge({
   return (
     <Badge
       variant="secondary"
-      className="gap-1.5 bg-background/80 backdrop-blur-sm"
+      className="gap-1.5 bg-background/80 backdrop-blur-xs"
     >
       <StatusDot tone={status.tone} />
       {status.label}

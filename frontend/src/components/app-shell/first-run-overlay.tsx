@@ -14,7 +14,7 @@ export function FirstRunOverlay() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-xs">
       <div className="flex w-full max-w-md flex-col items-center gap-6 border border-border bg-card px-8 py-10 text-center shadow-lg">
         <Logo className="size-12" />
         <div className="space-y-2">
