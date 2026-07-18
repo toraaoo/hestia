@@ -131,9 +131,6 @@
     "body": "Sign in with a Microsoft account to create and play instances. You can browse servers and settings without one.",
     "dismiss": "Maybe later"
   },
-  "job": {
-    "installing": "Installing {name}"
-  },
   "library": {
     "subtitle": "Instances you play and servers you host",
     "your_servers": "Your servers",

@@ -131,9 +131,6 @@
     "body": "Entre com uma conta Microsoft para criar e jogar instâncias. Você pode navegar por servidores e configurações sem uma.",
     "dismiss": "Talvez depois"
   },
-  "job": {
-    "installing": "Instalando {name}"
-  },
   "library": {
     "subtitle": "Instâncias que você joga e servidores que você hospeda",
     "your_servers": "Seus servidores",
