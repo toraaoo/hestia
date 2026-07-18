@@ -1,7 +1,6 @@
 import { PlusIcon } from '@phosphor-icons/react';
 import { useMemo, useState } from 'react';
 
-import type { InstanceInfo } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
 import { SignInGate } from '@/components/sign-in-gate';
@@ -10,6 +9,8 @@ import {
   EntryCollection,
   FilterMenu,
   filterCards,
+  flavorsOf,
+  instanceToCard,
   type View,
   ViewToggle,
 } from '@/features/entries/collection';
@@ -24,17 +25,6 @@ import {
   useLaunchInstanceAny,
   useStopInstanceAny,
 } from '@/queries/instance';
-
-function runningSessions(instance: InstanceInfo): number {
-  return (instance.sessions ?? []).filter((s) => s.state === 'running').length;
-}
-
-function subtitle(instance: InstanceInfo): string {
-  const running = runningSessions(instance);
-  return running > 0
-    ? m['entry.sessions_running']({ count: running })
-    : m['status.stopped']();
-}
 
 export function InstancesPage({
   view,
@@ -61,26 +51,17 @@ export function InstancesPage({
 
   const cards: EntryCardData[] = useMemo(
     () =>
-      (instances.data ?? []).map((instance) => ({
-        id: instance.id,
-        name: instance.name,
-        kind: 'instance' as const,
-        flavor: instance.flavor,
-        version: instance.gameVersion,
-        running: runningSessions(instance) > 0,
-        ready: true,
-        subtitle: subtitle(instance),
-        busy: busyId === instance.id,
-        onStart: () => launch.mutate(instance.id),
-        onStop: () => stop.mutate(instance.id),
-      })),
+      (instances.data ?? []).map((instance) =>
+        instanceToCard(instance, {
+          busy: busyId === instance.id,
+          onStart: () => launch.mutate(instance.id),
+          onStop: () => stop.mutate(instance.id),
+        }),
+      ),
     [instances.data, busyId, launch, stop],
   );
 
-  const flavors = useMemo(
-    () => [...new Set(cards.map((c) => c.flavor))],
-    [cards],
-  );
+  const flavors = useMemo(() => flavorsOf(cards), [cards]);
   const filtered = filterCards(cards, query, flavor);
 
   return (

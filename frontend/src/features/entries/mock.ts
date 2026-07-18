@@ -375,6 +375,3 @@ export const servers: Server[] = [
     backups: [],
   },
 ];
-
-/** The world resumed by the library's "continue playing". */
-export const featured = instances[0];

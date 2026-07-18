@@ -1,6 +1,6 @@
-import { PlusIcon } from '@phosphor-icons/react';
+import { PlusIcon, SignInIcon } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
 import { entryIcon } from '@/components/icons';
@@ -16,16 +16,28 @@ import {
   EntryCollection,
   FilterMenu,
   filterCards,
-  instanceCards,
-  instanceFlavors,
-  serverCards,
-  serverFlavors,
+  flavorsOf,
+  instanceToCard,
+  serverToCard,
   type View,
   ViewToggle,
 } from '@/features/entries/collection';
 import { CreateEntryModal } from '@/features/entries/create-modal';
+import type { EntryCardData } from '@/features/entries/entry-card';
+import { LaunchProgressDialog } from '@/features/entries/provision-progress';
 import { EntryGridSkeleton } from '@/features/entries/skeleton';
 import { m } from '@/paraglide/messages.js';
+import { useAccounts } from '@/queries';
+import {
+  useInstances,
+  useLaunchInstanceAny,
+  useStopInstanceAny,
+} from '@/queries/instance';
+import {
+  useServers,
+  useStartServerAny,
+  useStopServerAny,
+} from '@/queries/server';
 
 const InstanceIcon = entryIcon('instance');
 const ServerIcon = entryIcon('server');
@@ -46,9 +58,15 @@ export function LibraryPage({
   onInstanceFlavorChange: (flavor: string) => void;
 }) {
   const { query } = useSearch();
+  const { signedIn, ready } = useAccounts();
 
-  const srv = filterCards(serverCards, query, serverFlavor);
-  const inst = filterCards(instanceCards, query, instanceFlavor);
+  const servers = useServers();
+  const startServer = useStartServerAny();
+  const stopServer = useStopServerAny();
+
+  const instances = useInstances();
+  const launchInstance = useLaunchInstanceAny();
+  const stopInstance = useStopInstanceAny();
 
   const [newKind, setNewKind] = useState<'server' | 'instance'>('instance');
   const [creating, setCreating] = useState(false);
@@ -57,10 +75,57 @@ export function LibraryPage({
     setCreating(true);
   };
 
+  const serverBusy =
+    startServer.isPending || stopServer.isPending
+      ? ((startServer.variables ?? stopServer.variables) as string | undefined)
+      : undefined;
+  const serverCards: EntryCardData[] = useMemo(
+    () =>
+      (servers.data ?? []).map((server) =>
+        serverToCard(server, {
+          busy: serverBusy === server.id,
+          onStart: () => startServer.mutate(server.id),
+          onStop: () => stopServer.mutate(server.id),
+        }),
+      ),
+    [servers.data, serverBusy, startServer, stopServer],
+  );
+
+  const instanceBusy =
+    launchInstance.isPending || stopInstance.isPending
+      ? ((launchInstance.variables ?? stopInstance.variables) as
+          | string
+          | undefined)
+      : undefined;
+  const instanceCards: EntryCardData[] = useMemo(
+    () =>
+      (instances.data ?? []).map((instance) =>
+        instanceToCard(instance, {
+          busy: instanceBusy === instance.id,
+          onStart: () => launchInstance.mutate(instance.id),
+          onStop: () => stopInstance.mutate(instance.id),
+        }),
+      ),
+    [instances.data, instanceBusy, launchInstance, stopInstance],
+  );
+
+  const serverFlavors = useMemo(() => flavorsOf(serverCards), [serverCards]);
+  const instanceFlavors = useMemo(
+    () => flavorsOf(instanceCards),
+    [instanceCards],
+  );
+
+  const srv = filterCards(serverCards, query, serverFlavor);
+  const inst = filterCards(instanceCards, query, instanceFlavor);
+
+  const loading =
+    !ready || servers.isPending || (signedIn && instances.isPending);
+
   return (
     <Page
       title={m['nav.library']()}
       subtitle={m['library.subtitle']()}
+      loading={loading}
       skeleton={
         <div className="flex flex-col gap-6">
           <EntryGridSkeleton header count={4} />
@@ -82,7 +147,10 @@ export function LibraryPage({
               }
             />
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onClick={() => openNew('instance')}>
+              <DropdownMenuItem
+                disabled={!signedIn}
+                onClick={() => openNew('instance')}
+              >
                 <InstanceIcon />
                 {m['instances.new']()}
               </DropdownMenuItem>
@@ -129,33 +197,39 @@ export function LibraryPage({
 
         <Section
           title={m['nav.instances']()}
-          count={inst.length}
+          count={signedIn ? inst.length : undefined}
           action={
-            <div className="flex items-center gap-3">
-              <FilterMenu
-                groups={[
-                  {
-                    label: m['label.flavor'](),
-                    flavors: instanceFlavors,
-                    value: instanceFlavor,
-                    onChange: onInstanceFlavorChange,
-                  },
-                ]}
-              />
-              <Link
-                to="/instances"
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                {m['library.manage_all']()}
-              </Link>
-            </div>
+            signedIn ? (
+              <div className="flex items-center gap-3">
+                <FilterMenu
+                  groups={[
+                    {
+                      label: m['label.flavor'](),
+                      flavors: instanceFlavors,
+                      value: instanceFlavor,
+                      onChange: onInstanceFlavorChange,
+                    },
+                  ]}
+                />
+                <Link
+                  to="/instances"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {m['library.manage_all']()}
+                </Link>
+              </div>
+            ) : undefined
           }
         >
-          <EntryCollection
-            cards={inst}
-            view={view}
-            empty={m['instances.none_match']()}
-          />
+          {signedIn ? (
+            <EntryCollection
+              cards={inst}
+              view={view}
+              empty={m['instances.none_match']()}
+            />
+          ) : (
+            <InstancesSignInPrompt />
+          )}
         </Section>
       </div>
 
@@ -164,6 +238,38 @@ export function LibraryPage({
         open={creating}
         onOpenChange={setCreating}
       />
+      <LaunchProgressDialog
+        open={launchInstance.isPending}
+        name={
+          (instances.data ?? []).find((i) => i.id === launchInstance.variables)
+            ?.name ?? ''
+        }
+        progress={launchInstance.progress}
+      />
     </Page>
+  );
+}
+
+/** Instances need a signed-in account, so their section blocks until sign-in. */
+function InstancesSignInPrompt() {
+  const { login } = useAccounts();
+  return (
+    <div className="flex flex-col items-center gap-4 border border-dashed border-border px-4 py-10 text-center">
+      <div className="space-y-1">
+        <p className="text-sm font-medium">{m['instances.locked_title']()}</p>
+        <p className="text-xs text-muted-foreground">
+          {m['instances.sign_in_hint']()}
+        </p>
+      </div>
+      <Button
+        size="sm"
+        data-icon="inline-start"
+        disabled={login.isPending}
+        onClick={() => login.mutate()}
+      >
+        <SignInIcon weight="bold" />
+        {login.isPending ? m['account.signing_in']() : m['account.sign_in']()}
+      </Button>
+    </div>
   );
 }

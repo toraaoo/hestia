@@ -1,11 +1,11 @@
 import {
   FunnelSimpleIcon,
-  PlusIcon,
   RowsIcon,
   SquaresFourIcon,
 } from '@phosphor-icons/react';
 import { Fragment } from 'react';
 
+import type { InstanceInfo, ServerInfo } from '@/api';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -22,45 +22,76 @@ import {
   type EntryCardData,
   EntryRow,
 } from '@/features/entries/entry-card';
-import { instances, servers } from '@/features/entries/mock';
-import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
 export type View = 'grid' | 'list';
 
-export const instanceCards: EntryCardData[] = instances.map((i) => ({
-  id: i.id,
-  name: i.name,
-  kind: 'instance',
-  flavor: i.flavor,
-  version: i.gameVersion,
-  running: i.running,
-  ready: true,
-  subtitle: i.running
-    ? m['entry.sessions_running']({ count: i.sessions })
-    : m['entry.last_played_ago']({ when: agoLabel(i.lastPlayedUnix) }),
-}));
+/** Quick-action wiring shared by every card builder. */
+export type CardActions = {
+  busy: boolean;
+  onStart: () => void;
+  onStop: () => void;
+};
 
-export const serverCards: EntryCardData[] = servers.map((s) => ({
-  id: s.id,
-  name: s.name,
-  kind: 'server',
-  flavor: s.flavor,
-  version: s.gameVersion,
-  running: s.running,
-  ready: s.ready,
-  subtitle: !s.ready
-    ? m['status.preparing_ellipsis']()
-    : `:${s.port ?? '—'} · ${
-        s.running
-          ? m['entry.players_online']({ count: s.players })
-          : m['status.stopped']()
-      }`,
-}));
+function runningSessions(instance: InstanceInfo): number {
+  return (instance.sessions ?? []).filter((s) => s.state === 'running').length;
+}
 
-export const instanceFlavors = [...new Set(instanceCards.map((c) => c.flavor))];
-export const serverFlavors = [...new Set(serverCards.map((c) => c.flavor))];
+/** Map a live server record to the card shape, with its quick actions wired. */
+export function serverToCard(
+  server: ServerInfo,
+  actions: CardActions,
+): EntryCardData {
+  const running = server.process?.state === 'running';
+  const address = server.gamePort ? `:${server.gamePort}` : '';
+  const state = running ? m['status.online']() : m['status.stopped']();
+  return {
+    id: server.id,
+    name: server.name,
+    kind: 'server',
+    flavor: server.flavor,
+    version: server.gameVersion,
+    running,
+    ready: server.ready,
+    subtitle: !server.ready
+      ? m['status.preparing_ellipsis']()
+      : address
+        ? `${address} · ${state}`
+        : state,
+    busy: actions.busy,
+    onStart: actions.onStart,
+    onStop: actions.onStop,
+  };
+}
+
+/** Map a live instance record to the card shape, with its quick actions wired. */
+export function instanceToCard(
+  instance: InstanceInfo,
+  actions: CardActions,
+): EntryCardData {
+  const running = runningSessions(instance);
+  return {
+    id: instance.id,
+    name: instance.name,
+    kind: 'instance',
+    flavor: instance.flavor,
+    version: instance.gameVersion,
+    running: running > 0,
+    ready: true,
+    subtitle:
+      running > 0
+        ? m['entry.sessions_running']({ count: running })
+        : m['status.stopped'](),
+    busy: actions.busy,
+    onStart: actions.onStart,
+    onStop: actions.onStop,
+  };
+}
+
+export function flavorsOf(cards: EntryCardData[]): string[] {
+  return [...new Set(cards.map((c) => c.flavor))];
+}
 
 export function filterCards(
   cards: EntryCardData[],
@@ -193,18 +224,5 @@ export function EntryCollection({
         <EntryCard key={entry.id} entry={entry} />
       ))}
     </div>
-  );
-}
-
-/** The dashed "new entry" tile shown at the end of a grid. */
-export function NewTile({ label }: { label: string }) {
-  return (
-    <button
-      type="button"
-      className="flex min-h-[11.5rem] flex-col items-center justify-center gap-2 border border-dashed border-border text-xs text-muted-foreground transition-colors outline-none hover:border-ember/40 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-    >
-      <PlusIcon className="size-6" />
-      {label}
-    </button>
   );
 }

@@ -160,8 +160,6 @@
     "type_server": "servidor",
     "type_instance": "instância",
     "sessions_running": "{count} em execução",
-    "players_online": "{count} online",
-    "last_played_ago": "Jogado pela última vez {when}",
     "stop_title": "Parar {name}?",
     "stop_server_description": "O servidor será desligado e os jogadores conectados serão desconectados.",
     "stop_instance_description": "A sessão de jogo em execução será fechada. Progresso não salvo pode ser perdido.",

@@ -1,6 +1,5 @@
 import { PlusIcon } from '@phosphor-icons/react';
 import { useMemo, useState } from 'react';
-import type { ServerInfo } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,8 @@ import {
   EntryCollection,
   FilterMenu,
   filterCards,
+  flavorsOf,
+  serverToCard,
   type View,
   ViewToggle,
 } from '@/features/entries/collection';
@@ -20,19 +21,6 @@ import {
   useStartServerAny,
   useStopServerAny,
 } from '@/queries/server';
-
-function isRunning(server: ServerInfo): boolean {
-  return server.process?.state === 'running';
-}
-
-function subtitle(server: ServerInfo): string {
-  if (!server.ready) return m['status.preparing_ellipsis']();
-  const address = server.gamePort ? `:${server.gamePort}` : '';
-  const state = isRunning(server)
-    ? m['status.online']()
-    : m['status.stopped']();
-  return address ? `${address} · ${state}` : state;
-}
 
 export function ServersPage({
   view,
@@ -58,26 +46,17 @@ export function ServersPage({
 
   const cards: EntryCardData[] = useMemo(
     () =>
-      (servers.data ?? []).map((server) => ({
-        id: server.id,
-        name: server.name,
-        kind: 'server' as const,
-        flavor: server.flavor,
-        version: server.gameVersion,
-        running: isRunning(server),
-        ready: server.ready,
-        subtitle: subtitle(server),
-        busy: busyId === server.id,
-        onStart: () => start.mutate(server.id),
-        onStop: () => stop.mutate(server.id),
-      })),
+      (servers.data ?? []).map((server) =>
+        serverToCard(server, {
+          busy: busyId === server.id,
+          onStart: () => start.mutate(server.id),
+          onStop: () => stop.mutate(server.id),
+        }),
+      ),
     [servers.data, busyId, start, stop],
   );
 
-  const flavors = useMemo(
-    () => [...new Set(cards.map((c) => c.flavor))],
-    [cards],
-  );
+  const flavors = useMemo(() => flavorsOf(cards), [cards]);
   const filtered = filterCards(cards, query, flavor);
 
   return (

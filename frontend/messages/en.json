@@ -160,8 +160,6 @@
     "type_server": "server",
     "type_instance": "instance",
     "sessions_running": "{count} running",
-    "players_online": "{count} online",
-    "last_played_ago": "Last played {when}",
     "stop_title": "Stop {name}?",
     "stop_server_description": "The server shuts down and any connected players are disconnected.",
     "stop_instance_description": "The running game session is closed. Unsaved progress may be lost.",
