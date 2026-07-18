@@ -9,14 +9,15 @@ use proto::content::{
 };
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
-    InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceFlavors, InstanceInfo,
-    InstanceLaunch, InstanceLaunchParams, InstanceList, InstanceLoaders, InstanceLogs,
-    InstanceLogsParams, InstanceProfileCapture, InstanceProfileCreate, InstanceProfileCreateParams,
-    InstanceProfileEdit, InstanceProfileEditParams, InstanceProfileList, InstanceProfileRef,
-    InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename,
-    InstanceProfileRenameParams, InstanceProfileUse, InstanceRef, InstanceRemove, InstanceRename,
-    InstanceRenameParams, InstanceResolve, InstanceStop, InstanceStopParams, InstanceUpdate,
-    InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile,
+    InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceDetails,
+    InstanceFlavors, InstanceInfo, InstanceInfoQuery, InstanceLaunch, InstanceLaunchParams,
+    InstanceList, InstanceLoaders, InstanceLogs, InstanceLogsParams, InstanceProfileCapture,
+    InstanceProfileCreate, InstanceProfileCreateParams, InstanceProfileEdit,
+    InstanceProfileEditParams, InstanceProfileList, InstanceProfileRef, InstanceProfileRelease,
+    InstanceProfileRemove, InstanceProfileRename, InstanceProfileRenameParams, InstanceProfileUse,
+    InstanceRef, InstanceRemove, InstanceRename, InstanceRenameParams, InstanceResolve,
+    InstanceStop, InstanceStopParams, InstanceUpdate, InstanceUpdateParams, InstanceVersions,
+    InstanceWorlds, Profile,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, LoadersParams, ProvisionProgress,
@@ -128,6 +129,13 @@ impl Instance<'_> {
             .call::<InstanceList>(&proto::Empty {})
             .await?
             .instances)
+    }
+
+    /// The instance's static, informational view (locations + disk footprint).
+    pub async fn info(&self, instance: &str) -> Result<InstanceDetails, IpcError> {
+        self.session
+            .call::<InstanceInfoQuery>(&instance_ref(instance))
+            .await
     }
 
     /// The instance's save-world folder names — the worlds a datapack can

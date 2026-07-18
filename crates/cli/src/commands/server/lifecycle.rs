@@ -71,7 +71,7 @@ pub(crate) async fn logs(
 ) -> Result<()> {
     let lines = client.server().logs(server, tail).await?;
     if follow && ui::interactive_output() {
-        let info = client.server().status(server, false).await?;
+        let info = client.server().status(server).await?;
         let process = entry::running_process(&info)
             .with_context(|| format!("server '{}' is not running", info.name))?;
         let backfill = lines.into_iter().map(|l| l.line).collect();
@@ -99,7 +99,7 @@ pub(crate) async fn logs(
 /// Run the fullscreen resource monitor over the running server's process,
 /// filtering the daemon's metrics stream to it and feeding the graph.
 pub(crate) async fn monitor(client: &Client, server: &str) -> Result<()> {
-    let info = client.server().status(server, false).await?;
+    let info = client.server().status(server).await?;
     let process = entry::running_process(&info)
         .with_context(|| format!("server '{}' is not running", info.name))?;
     let target = process.id;
@@ -128,7 +128,7 @@ pub(crate) async fn monitor(client: &Client, server: &str) -> Result<()> {
 }
 
 async fn follow_logs(client: &Client, server: &str) -> Result<()> {
-    let info = client.server().status(server, false).await?;
+    let info = client.server().status(server).await?;
     let process = entry::running_process(&info)
         .with_context(|| format!("server '{}' is not running", info.name))?;
     let mut events = client.process().subscribe(&process.id).await?;
@@ -147,7 +147,7 @@ async fn follow_logs(client: &Client, server: &str) -> Result<()> {
 /// `start` does not race the spawn.
 pub(crate) async fn wait_until_running(client: &Client, server: &str) -> Result<()> {
     for _ in 0..20 {
-        let info = client.server().status(server, false).await?;
+        let info = client.server().status(server).await?;
         let running = info
             .process
             .is_some_and(|p| p.state == ProcessState::Running);
@@ -163,7 +163,7 @@ pub(crate) async fn wait_until_running(client: &Client, server: &str) -> Result<
 /// race the old child.
 pub(super) async fn wait_until_stopped(client: &Client, server: &str) -> Result<()> {
     for _ in 0..30 {
-        let info = client.server().status(server, false).await?;
+        let info = client.server().status(server).await?;
         let running = info
             .process
             .is_some_and(|p| p.state == ProcessState::Running);

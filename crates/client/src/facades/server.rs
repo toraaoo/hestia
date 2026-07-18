@@ -15,11 +15,11 @@ use proto::minecraft::{
 use proto::process::ProcessLogLine;
 use proto::server::{
     ServerCommand, ServerCommandParams, ServerConfigGet, ServerConfigGetParams, ServerConfigList,
-    ServerConfigSet, ServerConfigSetParams, ServerCreate, ServerCreateParams, ServerFlavors,
-    ServerInfo, ServerList, ServerLoaders, ServerLogs, ServerLogsParams, ServerPing,
-    ServerPingResult, ServerRef, ServerRemove, ServerRename, ServerRenameParams, ServerResolve,
-    ServerStart, ServerStartResult, ServerStatus, ServerStatusParams, ServerStop, ServerUpdate,
-    ServerUpdateParams, ServerVersions,
+    ServerConfigSet, ServerConfigSetParams, ServerCreate, ServerCreateParams, ServerDetail,
+    ServerDetails, ServerFlavors, ServerInfo, ServerList, ServerLoaders, ServerLogs,
+    ServerLogsParams, ServerPing, ServerPingResult, ServerRef, ServerRemove, ServerRename,
+    ServerRenameParams, ServerResolve, ServerStart, ServerStartResult, ServerStatus, ServerStop,
+    ServerUpdate, ServerUpdateParams, ServerVersions,
 };
 use serde_json::Value;
 
@@ -132,12 +132,13 @@ impl Server<'_> {
             .servers)
     }
 
-    pub async fn status(&self, server: &str, with_usage: bool) -> Result<ServerInfo, IpcError> {
-        let params = ServerStatusParams {
-            server: server.to_string(),
-            with_usage,
-        };
-        self.session.call::<ServerStatus>(&params).await
+    pub async fn status(&self, server: &str) -> Result<ServerInfo, IpcError> {
+        self.session.call::<ServerStatus>(&server_ref(server)).await
+    }
+
+    /// The server's static, informational view (locations + disk footprint).
+    pub async fn info(&self, server: &str) -> Result<ServerDetails, IpcError> {
+        self.session.call::<ServerDetail>(&server_ref(server)).await
     }
 
     /// A Server List Ping status snapshot; only a running server answers.

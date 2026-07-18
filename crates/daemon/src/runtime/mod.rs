@@ -70,7 +70,6 @@ pub fn server_info(
         ready: record.ready,
         game_port: record.game_port,
         console: record.rcon.is_some(),
-        disk_bytes: None,
         process,
     }
 }

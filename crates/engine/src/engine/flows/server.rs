@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use proto::backup::BackupKind;
 use proto::minecraft::ProvisionPhase;
 
-use proto::server::ServerPingResult;
+use proto::server::{ServerDetails, ServerPingResult};
 
 use super::{effective_name, guard_downgrade, phase_progress};
 use crate::content::install;
@@ -150,5 +150,29 @@ impl Engine {
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
         Ok(usage::dir_size(&self.servers.server_dir(&record.id)))
+    }
+
+    /// The server's static, informational view: descriptor, locations, and the
+    /// on-disk footprint (a directory walk).
+    pub fn server_detail(&self, reference: &str) -> Result<ServerDetails> {
+        let record = self
+            .servers
+            .get(reference)
+            .with_context(|| format!("unknown server: {reference}"))?;
+        let entry_dir = self.servers.server_dir(&record.id);
+        let data_dir = self.servers.data_dir(&record.id);
+        Ok(ServerDetails {
+            id: record.id,
+            name: record.name,
+            flavor: record.profile.flavor,
+            game_version: record.profile.game_version,
+            loader_version: record.profile.loader_version,
+            java_major: record.profile.java_major,
+            created_unix: record.created_unix,
+            game_port: record.game_port,
+            disk_bytes: usage::dir_size(&entry_dir),
+            entry_dir: entry_dir.to_string_lossy().into_owned(),
+            data_dir: data_dir.to_string_lossy().into_owned(),
+        })
     }
 }

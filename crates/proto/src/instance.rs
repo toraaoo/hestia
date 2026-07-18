@@ -134,6 +134,35 @@ pub struct InstanceRef {
     pub instance: String,
 }
 
+/// An instance's static, informational view: its descriptor, on-disk
+/// locations, and footprint — everything independent of the live sessions.
+/// The disk figure is a directory walk, so this is fetched on demand.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceDetails {
+    pub id: String,
+    pub name: String,
+    pub flavor: String,
+    pub game_version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loader_version: Option<String>,
+    pub java_major: i32,
+    pub created_unix: i64,
+    /// The entry root (`instances/<id>/`) — hestia's namespace.
+    pub entry_dir: String,
+    /// The game's working directory (`instances/<id>/data/`).
+    pub data_dir: String,
+    /// The entry's total on-disk footprint, in bytes.
+    pub disk_bytes: u64,
+}
+
+pub struct InstanceInfoQuery;
+impl Contract for InstanceInfoQuery {
+    const CHANNEL: &'static str = "instance.info";
+    type Params = InstanceRef;
+    type Result = InstanceDetails;
+}
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
 pub struct InstanceWorldsResult {

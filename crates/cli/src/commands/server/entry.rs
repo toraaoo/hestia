@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use client::proto::process::{ProcessInfo, ProcessState};
-use client::proto::server::{ServerInfo, ServerPingResult};
+use client::proto::server::{ServerDetails, ServerInfo, ServerPingResult};
 use client::Client;
 
 use crate::commands::mc;
@@ -78,9 +78,6 @@ pub(super) fn show_status(info: &ServerInfo, ping: Option<&ServerPingResult>) ->
         ),
         ("state", state_label(info)),
     ];
-    if let Some(bytes) = info.disk_bytes {
-        rows.push(("disk", ui::human_bytes(bytes)));
-    }
     if let Some(ping) = ping {
         rows.push((
             "players",
@@ -91,6 +88,30 @@ pub(super) fn show_status(info: &ServerInfo, ping: Option<&ServerPingResult>) ->
         }
     }
     ui::show(View::detail(rows))
+}
+
+pub(super) fn show_info(info: &ServerDetails) -> Result<()> {
+    ui::show(View::detail([
+        ("name", info.name.clone()),
+        ("id", info.id.clone()),
+        ("flavor", info.flavor.clone()),
+        ("version", info.game_version.clone()),
+        (
+            "loader",
+            info.loader_version.clone().unwrap_or_else(|| "-".into()),
+        ),
+        ("java", info.java_major.to_string()),
+        (
+            "address",
+            match info.game_port {
+                Some(port) => format!("localhost:{port}"),
+                None => "-".into(),
+            },
+        ),
+        ("disk", ui::human_bytes(info.disk_bytes)),
+        ("folder", info.entry_dir.clone()),
+        ("data", info.data_dir.clone()),
+    ]))
 }
 
 fn address_label(info: &ServerInfo) -> String {

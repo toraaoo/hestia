@@ -92,11 +92,11 @@ enum ServerAction {
         #[arg(short, long, help = "Return immediately instead of attaching")]
         detach: bool,
     },
-    /// The server's record merged with its live process state
-    Status {
-        #[arg(long, help = "Include disk usage and a live server ping")]
-        usage: bool,
-    },
+    /// The server's record merged with its live process state (and, when
+    /// running, a live server ping)
+    Status,
+    /// The server's descriptor, on-disk location, and footprint
+    Info,
     /// Watch live CPU and memory usage on a fullscreen graph
     Monitor,
     /// Captured server output
@@ -197,14 +197,18 @@ async fn run_action(client: Client, name: String, action: ServerAction) -> Resul
         ServerAction::Start { detach } => console::start_attached(client, &name, detach).await,
         ServerAction::Stop => lifecycle::stop(&client, &name).await,
         ServerAction::Restart { detach } => console::restart_attached(client, &name, detach).await,
-        ServerAction::Status { usage } => {
-            let info = client.server().status(&name, usage).await?;
-            let ping = if usage && entry::running_process(&info).is_some() {
+        ServerAction::Status => {
+            let info = client.server().status(&name).await?;
+            let ping = if entry::running_process(&info).is_some() {
                 client.server().ping(&name).await.ok()
             } else {
                 None
             };
             entry::show_status(&info, ping.as_ref())
+        }
+        ServerAction::Info => {
+            let info = client.server().info(&name).await?;
+            entry::show_info(&info)
         }
         ServerAction::Monitor => lifecycle::monitor(&client, &name).await,
         ServerAction::Logs { tail, follow } => lifecycle::logs(&client, &name, tail, follow).await,

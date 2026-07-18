@@ -40,7 +40,7 @@ pub(crate) async fn attach(client: Client, server: &str) -> Result<()> {
     if !ui::is_interactive() {
         bail!("attach needs an interactive terminal (use `server logs -f` and `server command`)");
     }
-    let info = client.server().status(server, false).await?;
+    let info = client.server().status(server).await?;
     let process = entry::running_process(&info)
         .with_context(|| format!("server '{}' is not running", info.name))?;
     let backfill = client

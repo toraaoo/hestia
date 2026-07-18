@@ -13,7 +13,7 @@ mod entry;
 pub(crate) mod lifecycle;
 mod update;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use client::proto::content::ContentKind;
 use client::Client;
@@ -257,14 +257,9 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             .await
         }
         InstanceAction::Info => {
-            let instances = client.instance().list().await?;
-            let Some(info) = instances
-                .iter()
-                .find(|i| client::proto::naming::reference_matches(&name, &i.id, &i.name))
-            else {
-                bail!("no instance matches '{name}'");
-            };
-            entry::show_info(info)
+            let info = client.instance().info(&name).await?;
+            let sessions = entry::fetch(client, &name).await?.sessions;
+            entry::show_detail(&info, &sessions)
         }
         InstanceAction::Monitor { session } => lifecycle::monitor(client, &name, session).await,
         InstanceAction::Logs {

@@ -106,7 +106,8 @@ hestia server smp attach         # interactive console: live logs, type to send
 hestia server smp command say hi # one-shot console command (alias: cmd)
 hestia server smp logs -n 50     # captured output (-f opens the fullscreen
                                  #   log session; piped it streams plainly)
-hestia server smp status         # the record merged with live process state
+hestia server smp status         # live process state + a running server's ping
+hestia server smp info           # descriptor, on-disk folder, and disk footprint
 hestia server smp stop           # stop the running server
 hestia server smp restart        # stop, then start again
 hestia server smp rename cozy    # rename (stopped): rewrites the display name;
@@ -145,7 +146,8 @@ hestia instance modded config set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
 hestia instance modded logs -n 50 # captured output — the newest running session
                                  #   (-f opens the fullscreen log session; piped
                                  #   it streams plainly)
-hestia instance modded info      # the record and each running session (handles)
+hestia instance modded info      # descriptor, folder, disk footprint, and each
+                                 #   running session (handles)
 hestia instance modded stop      # kill every session (--session <h> targets one)
 hestia instance modded restart   # stop, then launch again (--session <h> for one)
 hestia instance modded rename mp # rename (stopped): rewrites the display name;

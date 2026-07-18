@@ -6,10 +6,10 @@ use proto::minecraft::{ConfigEntry, FlavorsResult, LoadersResult, VersionsResult
 use proto::process::{LogSource, ProcessLogsResult, ProcessSpec, RestartPolicy};
 use proto::server::{
     ServerCommand, ServerCommandResult, ServerConfigGet, ServerConfigGetResult, ServerConfigList,
-    ServerConfigListResult, ServerConfigSet, ServerCreate, ServerCreateResult, ServerFlavors,
-    ServerList, ServerListResult, ServerLoaders, ServerLogs, ServerPing, ServerRemove,
-    ServerRename, ServerResolve, ServerStart, ServerStartResult, ServerStatus, ServerStop,
-    ServerUpdate, ServerUpdateResult, ServerVersions,
+    ServerConfigListResult, ServerConfigSet, ServerCreate, ServerCreateResult, ServerDetail,
+    ServerFlavors, ServerList, ServerListResult, ServerLoaders, ServerLogs, ServerPing,
+    ServerRemove, ServerRename, ServerResolve, ServerStart, ServerStartResult, ServerStatus,
+    ServerStop, ServerUpdate, ServerUpdateResult, ServerVersions,
 };
 use proto::Empty;
 
@@ -113,11 +113,15 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<ServerStatus, _, _>(|p, ctx| async move {
         let record = find_server(&ctx, &p.server)?;
-        let mut view = ctx.runtime.server_view(record);
-        if p.with_usage {
-            view.disk_bytes = ctx.runtime.engine().server_disk_usage(&view.id).ok();
-        }
-        Ok(view)
+        Ok(ctx.runtime.server_view(record))
+    });
+
+    on.handle::<ServerDetail, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        ctx.runtime
+            .engine()
+            .server_detail(&record.id)
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
     });
 
     on.handle::<ServerPing, _, _>(|p, ctx| async move {

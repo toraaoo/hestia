@@ -2,7 +2,7 @@
 //! share.
 
 use anyhow::{bail, Context, Result};
-use client::proto::instance::InstanceInfo;
+use client::proto::instance::{InstanceDetails, InstanceInfo};
 use client::proto::process::{ProcessInfo, ProcessState};
 use client::Client;
 
@@ -117,9 +117,33 @@ pub(super) fn show_info(info: &InstanceInfo) -> Result<()> {
         ("java", info.java_major.to_string()),
         ("state", mc::sessions_label(&info.sessions)),
     ]))?;
-    if !info.sessions.is_empty() {
-        let rows = info
-            .sessions
+    show_sessions(&info.sessions)
+}
+
+/// The `info` command's richer view: the static detail (locations, footprint)
+/// alongside the live sessions.
+pub(super) fn show_detail(info: &InstanceDetails, sessions: &[ProcessInfo]) -> Result<()> {
+    ui::show(View::detail([
+        ("name", info.name.clone()),
+        ("id", info.id.clone()),
+        ("flavor", info.flavor.clone()),
+        ("version", info.game_version.clone()),
+        (
+            "loader",
+            info.loader_version.clone().unwrap_or_else(|| "-".into()),
+        ),
+        ("java", info.java_major.to_string()),
+        ("state", mc::sessions_label(sessions)),
+        ("disk", ui::human_bytes(info.disk_bytes)),
+        ("folder", info.entry_dir.clone()),
+        ("data", info.data_dir.clone()),
+    ]))?;
+    show_sessions(sessions)
+}
+
+fn show_sessions(sessions: &[ProcessInfo]) -> Result<()> {
+    if !sessions.is_empty() {
+        let rows = sessions
             .iter()
             .map(|s| {
                 vec![

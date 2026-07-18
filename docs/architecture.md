@@ -748,7 +748,7 @@ supervises launched processes, and manages autostart. The only crate that links
   account's token),
   `process.start|stop|list|status|logs`, `events.subscribe`,
   `server.flavors|versions|resolve`,
-  `server.create|update|rename|list|status|remove|start|stop|logs|command`
+  `server.create|update|rename|list|status|info|remove|start|stop|logs|command`
   (create
   requires the caller to assert EULA acceptance; update refuses a running or
   still-creating server and, without `allow_downgrade`, a downgrade — a
@@ -757,7 +757,10 @@ supervises launched processes, and manages autostart. The only crate that links
   and moves the directory, refused while running or busy — see the decision
   note below;
   start/stop/status/logs are thin over
-  the supervisor, merging the stored record with live process state; command
+  the supervisor, merging the stored record with live process state; `info` is
+  the static, informational view — descriptor, on-disk locations, and the disk
+  footprint (a directory walk), deliberately kept off the live `status` call;
+  command
   relays one console command over the running server's rcon channel),
   `server.config.get|set|list` (the reserved `memory`/`jvm-args`/
   `backup-interval`/`backup-retention` keys on the record plus any
@@ -766,8 +769,10 @@ supervises launched processes, and manages autostart. The only crate that links
   server live; restore refuses a running or busy server and verifies the
   backup exists before answering with the job id), and the `instance.*`
   counterparts:
-  `flavors|versions|resolve|create|update|rename|list|remove|worlds`
-  (`worlds` lists a client's save worlds for the datapack picker), plus
+  `flavors|versions|resolve|create|update|rename|list|info|remove|worlds`
+  (`worlds` lists a client's save worlds for the datapack picker; `info` is the
+  static, informational view — descriptor, on-disk locations, and disk footprint
+  — the instance twin of `server.info`), plus
   `instance.launch|stop|logs` (concurrent sessions are opt-in — `launch`
   refuses a running instance unless `new_session` is set, then each launch is
   a new session; `stop` fans out to every session or a named one; `logs`

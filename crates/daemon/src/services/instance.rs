@@ -4,10 +4,10 @@
 
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList, InstanceConfigListResult,
-    InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceLaunch,
-    InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLoaders, InstanceLogs,
-    InstanceProfileCapture, InstanceProfileCreate, InstanceProfileEdit, InstanceProfileList,
-    InstanceProfileListResult, InstanceProfileRelease, InstanceProfileRemove,
+    InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceInfoQuery,
+    InstanceLaunch, InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLoaders,
+    InstanceLogs, InstanceProfileCapture, InstanceProfileCreate, InstanceProfileEdit,
+    InstanceProfileList, InstanceProfileListResult, InstanceProfileRelease, InstanceProfileRemove,
     InstanceProfileRename, InstanceProfileUse, InstanceRemove, InstanceRename, InstanceResolve,
     InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds,
     InstanceWorldsResult,
@@ -116,6 +116,14 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .map(|r| ctx.runtime.instance_view(r))
             .collect();
         Ok(InstanceListResult { instances })
+    });
+
+    on.handle::<InstanceInfoQuery, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        ctx.runtime
+            .engine()
+            .instance_detail(&record.id)
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
     });
 
     on.handle::<InstanceWorlds, _, _>(|p, ctx| async move {

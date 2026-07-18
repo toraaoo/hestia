@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use proto::instance::InstanceDetails;
 use proto::minecraft::{ConfigEntry, ProvisionPhase};
 
 use super::{effective_name, guard_downgrade};
@@ -42,6 +43,29 @@ impl Engine {
         Ok(crate::usage::dir_size(
             &self.instances.instance_dir(&record.id),
         ))
+    }
+
+    /// The instance's static, informational view: descriptor, locations, and
+    /// the on-disk footprint (a directory walk).
+    pub fn instance_detail(&self, reference: &str) -> Result<InstanceDetails> {
+        let record = self
+            .instances
+            .get(reference)
+            .with_context(|| format!("unknown instance: {reference}"))?;
+        let entry_dir = self.instances.instance_dir(&record.id);
+        let data_dir = self.instances.data_dir(&record.id);
+        Ok(InstanceDetails {
+            id: record.id,
+            name: record.name,
+            flavor: record.profile.flavor,
+            game_version: record.profile.game_version,
+            loader_version: record.profile.loader_version,
+            java_major: record.profile.java_major,
+            created_unix: record.created_unix,
+            disk_bytes: crate::usage::dir_size(&entry_dir),
+            entry_dir: entry_dir.to_string_lossy().into_owned(),
+            data_dir: data_dir.to_string_lossy().into_owned(),
+        })
     }
 
     /// Move an instance to another version of its flavor. A downgrade must be

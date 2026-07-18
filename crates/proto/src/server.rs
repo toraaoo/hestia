@@ -62,11 +62,40 @@ pub struct ServerInfo {
     /// True once RCON is configured (a server started before the console
     /// existed gains one on its next start).
     pub console: bool,
-    /// Present only when the status call set `with_usage` (the walk is not free).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub disk_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub process: Option<ProcessInfo>,
+}
+
+/// A server's static, informational view: its descriptor, on-disk locations,
+/// and footprint — everything that does not depend on the live process. The
+/// disk figure is a directory walk, so this is fetched on demand, never in a
+/// list.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerDetails {
+    pub id: String,
+    pub name: String,
+    pub flavor: String,
+    pub game_version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loader_version: Option<String>,
+    pub java_major: i32,
+    pub created_unix: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub game_port: Option<u16>,
+    /// The entry root (`servers/<id>/`) — hestia's namespace.
+    pub entry_dir: String,
+    /// The game's working directory (`servers/<id>/data/`).
+    pub data_dir: String,
+    /// The entry's total on-disk footprint, in bytes.
+    pub disk_bytes: u64,
+}
+
+pub struct ServerDetail;
+impl Contract for ServerDetail {
+    const CHANNEL: &'static str = "server.info";
+    type Params = ServerRef;
+    type Result = ServerDetails;
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -198,18 +227,10 @@ impl Contract for ServerStop {
     type Result = Empty;
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
-pub struct ServerStatusParams {
-    pub server: String,
-    /// Also walk the entry directory and report `disk_bytes`.
-    pub with_usage: bool,
-}
-
 pub struct ServerStatus;
 impl Contract for ServerStatus {
     const CHANNEL: &'static str = "server.status";
-    type Params = ServerStatusParams;
+    type Params = ServerRef;
     type Result = ServerInfo;
 }
 
