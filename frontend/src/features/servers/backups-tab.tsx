@@ -60,7 +60,7 @@ export function ServerBackupsTab({
           size="sm"
           variant="outline"
           data-icon="inline-start"
-          disabled={!running || create.isPending}
+          disabled={create.isPending}
           onClick={() =>
             create.mutate(undefined, {
               onSuccess: () => toast.success(m['toast.saved']()),
