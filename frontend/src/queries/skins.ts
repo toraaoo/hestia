@@ -20,6 +20,8 @@ export const skinQueries = {
     }),
 };
 
+// Exact transforms skip the settle refetch (a Mojang round trip); equip keeps
+// it, since the daemon may mint a preserved library row.
 function optimisticList(
   update: (list: SkinList) => SkinList,
 ): (() => void) | undefined {
@@ -65,7 +67,6 @@ export const skinMutations = {
             s.key === key ? { ...s, name, variant } : s,
           ),
         })),
-      invalidates: () => [keys.skins.all],
     }),
   equip: () =>
     mutation<void, { key: string; account?: string }>({
@@ -90,7 +91,6 @@ export const skinMutations = {
           ...list,
           skins: list.skins.filter((s) => s.key !== key),
         })),
-      invalidates: () => [keys.skins.all],
     }),
   equipCape: () =>
     mutation<void, { cape: string; account?: string }>({
@@ -101,7 +101,6 @@ export const skinMutations = {
           ...list,
           capes: list.capes.map((c) => ({ ...c, equipped: c.id === cape })),
         })),
-      invalidates: () => [keys.skins.all],
     }),
   clearCape: () =>
     mutation<void, { account?: string } | undefined>({
@@ -112,7 +111,6 @@ export const skinMutations = {
           ...list,
           capes: list.capes.map((c) => ({ ...c, equipped: false })),
         })),
-      invalidates: () => [keys.skins.all],
     }),
 };
 

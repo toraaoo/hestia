@@ -12,6 +12,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme="dark"
       className="toaster group"
+      position="top-right"
+      offset={{ top: 56, right: 16 }}
       icons={{
         success: <CheckCircleIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
@@ -23,14 +25,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
         {
           '--normal-bg': 'var(--popover)',
           '--normal-text': 'var(--popover-foreground)',
-          '--normal-border': 'var(--border)',
-          '--border-radius': 'var(--radius)',
+          '--normal-border':
+            'color-mix(in oklab, var(--foreground) 10%, transparent)',
+          '--border-radius': '0px',
         } as React.CSSProperties
       }
       toastOptions={{
-        classNames: {
-          toast: 'cn-toast',
-        },
+        style: { fontSize: 'var(--text-xs)' },
       }}
       {...props}
     />
