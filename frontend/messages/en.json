@@ -101,6 +101,9 @@
     "connected_label": "Daemon connected",
     "offline_label": "Daemon offline",
     "version_uptime": "v{version} · up {uptime}",
+    "start": "Start daemon",
+    "starting": "Starting…",
+    "restarting": "Restarting…",
     "restart": "Restart daemon",
     "restart_title": "Restart the daemon?",
     "restart_description": "The launcher briefly disconnects while it restarts. Running servers and instances keep running."

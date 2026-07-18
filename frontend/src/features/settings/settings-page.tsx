@@ -27,9 +27,9 @@ import { javaReleases, javaRuntimes } from '@/features/settings/mock';
 import { settingsDefaults, settingsSchema } from '@/features/settings/schema';
 import { useAppForm } from '@/hooks/form';
 import { type Locale, useLocale } from '@/hooks/locale';
-import { daemon } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
 import { locales } from '@/paraglide/runtime.js';
+import { useDaemon } from '@/queries/daemon';
 
 /** Endonyms — a language always names itself, whatever locale is active. */
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -69,6 +69,7 @@ function LanguageField() {
 
 export function SettingsPage() {
   const [runtimes, setRuntimes] = useState(javaRuntimes);
+  const daemon = useDaemon();
 
   const form = useAppForm({
     defaultValues: settingsDefaults,
@@ -284,24 +285,42 @@ export function SettingsPage() {
                   {daemon.connected
                     ? m['daemon.connected_label']()
                     : m['daemon.offline_label']()}
-                  <span className="font-mono text-muted-foreground">
-                    {m['daemon.version_uptime']({
-                      version: daemon.version,
-                      uptime: daemon.uptime,
-                    })}
-                  </span>
+                  {daemon.status && (
+                    <span className="font-mono text-muted-foreground">
+                      {m['daemon.version_uptime']({
+                        version: daemon.status.version,
+                        uptime: daemon.uptime ?? '0s',
+                      })}
+                    </span>
+                  )}
                 </FieldLabel>
-                <ConfirmDialog
-                  trigger={
-                    <Button variant="outline" size="sm">
-                      {m['daemon.restart']()}
-                    </Button>
-                  }
-                  title={m['daemon.restart_title']()}
-                  description={m['daemon.restart_description']()}
-                  confirmLabel={m['action.restart']()}
-                  onConfirm={() => {}}
-                />
+                {daemon.busy ? (
+                  <Button variant="outline" size="sm" disabled>
+                    {daemon.restart.isPending
+                      ? m['daemon.restarting']()
+                      : m['daemon.starting']()}
+                  </Button>
+                ) : daemon.connected ? (
+                  <ConfirmDialog
+                    trigger={
+                      <Button variant="outline" size="sm">
+                        {m['daemon.restart']()}
+                      </Button>
+                    }
+                    title={m['daemon.restart_title']()}
+                    description={m['daemon.restart_description']()}
+                    confirmLabel={m['action.restart']()}
+                    onConfirm={() => daemon.restart.mutate()}
+                  />
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => daemon.start.mutate()}
+                  >
+                    {m['daemon.start']()}
+                  </Button>
+                )}
               </Field>
             </FieldGroup>
           </FieldSet>

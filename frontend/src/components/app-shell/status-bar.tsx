@@ -2,10 +2,11 @@ import { DownloadSimpleIcon } from '@phosphor-icons/react';
 
 import { Progress } from '@/components/ui/progress';
 import { StatusDot } from '@/components/ui/status-dot';
-import { daemon } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
+import { useDaemon } from '@/queries/daemon';
 
 export function StatusBar() {
+  const daemon = useDaemon();
   const jobProgress = 64;
 
   return (
@@ -14,7 +15,9 @@ export function StatusBar() {
         <StatusDot tone={daemon.connected ? 'on' : 'off'} />
         {daemon.connected ? m['daemon.connected']() : m['daemon.offline']()}
       </span>
-      <span className="font-mono">v{daemon.version}</span>
+      {daemon.status && (
+        <span className="font-mono">v{daemon.status.version}</span>
+      )}
 
       <div className="ml-auto flex items-center gap-2">
         <DownloadSimpleIcon className="size-3.5" />

@@ -30,6 +30,19 @@ export function memGb(memory: string): number {
   return Number.parseInt(memory, 10) || 4;
 }
 
+/** A running duration in seconds as a compact `1d 3h` / `12m 5s` label. */
+export function uptime(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
 export function compact(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
