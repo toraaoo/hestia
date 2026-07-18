@@ -35,15 +35,26 @@ export const serverQueries = {
       queryKey: keys.servers.list(),
       queryFn: () => api.list(),
     }),
-  detail: (id: string, withUsage = false) =>
+  detail: (id: string) =>
     queryOptions({
       queryKey: keys.servers.detail(id),
-      queryFn: () => api.status(id, withUsage),
+      queryFn: () => api.status(id),
+    }),
+  // The on-disk footprint is a directory walk, so it rides its own key —
+  // fetched fresh (never seeded from the diskless list) and off the
+  // frequently-invalidated detail query.
+  usage: (id: string) =>
+    queryOptions({
+      queryKey: keys.servers.usage(id),
+      queryFn: () => api.status(id, true),
+      select: (server) => server.disk_bytes ?? null,
+      staleTime: 60_000,
     }),
   ping: (id: string) =>
     queryOptions({
       queryKey: keys.servers.ping(id),
       queryFn: () => api.ping(id),
+      meta: { silent: true },
     }),
   flavors: () =>
     queryOptions({
@@ -241,14 +252,11 @@ export function useServers() {
   return useQuery(serverQueries.list());
 }
 
-/**
- * One server's status, seeded from the list cache so a row costs no call.
- * `withUsage` also fetches the entry's on-disk footprint (a directory walk).
- */
-export function useServer(id: string, withUsage = false) {
+/** One server's status, seeded from the list cache so a row costs no call. */
+export function useServer(id: string) {
   const queryClient = useQueryClient();
   return useQuery({
-    ...serverQueries.detail(id, withUsage),
+    ...serverQueries.detail(id),
     initialData: () =>
       queryClient
         .getQueryData<ServerInfo[]>(keys.servers.list())
@@ -256,6 +264,11 @@ export function useServer(id: string, withUsage = false) {
     initialDataUpdatedAt: () =>
       queryClient.getQueryState(keys.servers.list())?.dataUpdatedAt,
   });
+}
+
+/** The server's on-disk footprint (a directory walk), on its own cadence. */
+export function useServerDisk(id: string) {
+  return useQuery(serverQueries.usage(id));
 }
 
 /** A running server's live ping (players/MOTD); polls while `enabled`. */

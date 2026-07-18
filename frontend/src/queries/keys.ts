@@ -63,6 +63,7 @@ export const keys = {
     profile: (params: ResolveParams) =>
       [...keys.servers.all, 'profile', params] as const,
     detail: (id: string) => [...keys.servers.all, 'detail', id] as const,
+    usage: (id: string) => [...keys.servers.detail(id), 'usage'] as const,
     ping: (id: string) => [...keys.servers.detail(id), 'ping'] as const,
     logs: (id: string, tail?: number) =>
       [...keys.servers.detail(id), 'logs', tail ?? null] as const,

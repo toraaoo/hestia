@@ -37,6 +37,7 @@ import { useProcessMetrics } from '@/queries/metrics';
 import {
   useServer,
   useServerConfig,
+  useServerDisk,
   useServerPing,
   useStartServer,
   useStopServer,
@@ -69,7 +70,8 @@ export function ServerDetailPage({
   contentKind?: ContentKind;
   onContentKindChange: (kind?: ContentKind) => void;
 }) {
-  const query = useServer(id, true);
+  const query = useServer(id);
+  const disk = useServerDisk(id);
   const config = useServerConfig(id);
   const [addingContent, setAddingContent] = useState(false);
   const start = useStartServer(id);
@@ -112,7 +114,7 @@ export function ServerDetailPage({
   const live: LiveResources = {
     running,
     memoryLimitGb,
-    diskBytes: server.disk_bytes ?? 0,
+    diskBytes: disk.data ?? 0,
     series: metrics.series.map((s) => ({
       cpu: s.cpu_pct,
       mem: s.mem_bytes / (1024 * 1024),
@@ -122,7 +124,7 @@ export function ServerDetailPage({
   const contentItems = mockServers[0].content;
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full flex-col">
       <DetailHero
         parentLabel={m['nav.servers']()}
         parentTo="/servers"
@@ -221,9 +223,7 @@ export function ServerDetailPage({
                   label={m['label.memory']()}
                 />
                 <StatCard
-                  value={
-                    server.disk_bytes != null ? bytes(server.disk_bytes) : '—'
-                  }
+                  value={disk.data != null ? bytes(disk.data) : '—'}
                   label={m['label.disk']()}
                 />
               </div>

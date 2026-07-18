@@ -23,6 +23,9 @@ export const queryClient = new QueryClient({
   // a retriggering refetch replacing its own toast rather than stacking.
   queryCache: new QueryCache({
     onError: (error, query) => {
+      // A query may opt out of the toast (e.g. a ping a stopped server can't
+      // answer) via meta.silent.
+      if (query.meta?.silent) return;
       toast.error(error.message, { id: query.queryHash });
     },
   }),
