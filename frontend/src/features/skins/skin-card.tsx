@@ -5,6 +5,7 @@ import {
   TrashIcon,
 } from '@phosphor-icons/react';
 
+import type { Skin } from '@/api';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,11 +14,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { Skin } from '@/features/skins/mock';
-import { getCape } from '@/features/skins/mock';
 import { SkinBody } from '@/features/skins/skin-render';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+
+/** An external (Mojang-set, never saved) skin arrives unnamed. */
+export function skinDisplayName(skin: Skin): string {
+  return skin.name || m['skins.unnamed']();
+}
+
+export function skinVariantLabel(skin: Skin): string {
+  return skin.variant === 'slim' ? m['skins.slim']() : m['skins.wide']();
+}
 
 export function SkinGrid({ children }: { children: React.ReactNode }) {
   return (
@@ -69,10 +77,11 @@ export function SkinCard({
           />
         </div>
         <div className="border-t border-border p-2 text-left">
-          <div className="truncate text-xs font-medium">{skin.name}</div>
+          <div className="truncate text-xs font-medium">
+            {skinDisplayName(skin)}
+          </div>
           <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-            {skin.variant === 'slim' ? m['skins.slim']() : m['skins.wide']()}
-            {skin.cape_id ? ` · ${getCape(skin.cape_id)?.name}` : ''}
+            {skinVariantLabel(skin)}
           </div>
         </div>
       </button>

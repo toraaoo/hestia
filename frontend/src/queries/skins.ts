@@ -29,6 +29,15 @@ export const skinMutations = {
       mutationFn: (params) => api.add(params),
       invalidates: () => [keys.skins.all],
     }),
+  update: () =>
+    mutation<
+      Skin,
+      { account?: string; key: string; name: string; variant: SkinVariant }
+    >({
+      mutationKey: [...keys.skins.all, 'update'],
+      mutationFn: (params) => api.update(params),
+      invalidates: () => [keys.skins.all],
+    }),
   equip: () =>
     mutation<void, { key: string; account?: string }>({
       mutationKey: [...keys.skins.all, 'equip'],
@@ -67,6 +76,10 @@ export function useSkins(account = '') {
 
 export function useAddSkin() {
   return useMutation(skinMutations.add());
+}
+
+export function useUpdateSkin() {
+  return useMutation(skinMutations.update());
 }
 
 export function useEquipSkin() {

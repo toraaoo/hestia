@@ -1,24 +1,31 @@
 import { CheckIcon } from '@phosphor-icons/react';
 
+import type { Cape, Skin } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { Skin } from '@/features/skins/mock';
-import { getCape } from '@/features/skins/mock';
+import { skinDisplayName, skinVariantLabel } from '@/features/skins/skin-card';
 import { SkinModel } from '@/features/skins/skin-render';
 import { m } from '@/paraglide/messages.js';
 
-/** The sticky left panel: animated model plus the preview → apply flow. */
+/**
+ * The sticky left panel: animated model plus the preview → apply flow. The
+ * cape is the account's equipped one — account-level, worn with every skin.
+ */
 export function PreviewPanel({
   skin,
+  cape,
   previewing,
+  applying,
+  error,
   onApply,
 }: {
   skin: Skin;
+  cape?: Cape;
   previewing: boolean;
+  applying: boolean;
+  error?: string;
   onApply: () => void;
 }) {
-  const cape = getCape(skin.cape_id);
-
   return (
     <div className="sticky top-5 w-64 shrink-0">
       <div className="relative border border-border bg-muted/40">
@@ -40,11 +47,11 @@ export function PreviewPanel({
       </div>
 
       <div className="border border-t-0 border-border p-3">
-        <div className="truncate text-sm font-medium">{skin.name}</div>
+        <div className="truncate text-sm font-medium">
+          {skinDisplayName(skin)}
+        </div>
         <div className="mt-1.5 flex items-center gap-1.5">
-          <Badge variant="secondary">
-            {skin.variant === 'slim' ? m['skins.slim']() : m['skins.wide']()}
-          </Badge>
+          <Badge variant="secondary">{skinVariantLabel(skin)}</Badge>
           <Badge variant="outline">
             {cape ? cape.name : m['skins.no_cape']()}
           </Badge>
@@ -55,11 +62,12 @@ export function PreviewPanel({
             <Button
               size="sm"
               data-icon="inline-start"
+              disabled={applying}
               className="flex-1 bg-ember text-ember-foreground hover:bg-ember/90"
               onClick={onApply}
             >
               <CheckIcon weight="bold" />
-              {m['action.apply']()}
+              {applying ? m['skins.applying']() : m['action.apply']()}
             </Button>
           ) : (
             <p className="text-xs text-muted-foreground">
@@ -67,6 +75,9 @@ export function PreviewPanel({
             </p>
           )}
         </div>
+        {error && (
+          <p className="mt-2 text-xs break-words text-destructive">{error}</p>
+        )}
       </div>
     </div>
   );

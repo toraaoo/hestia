@@ -32,6 +32,25 @@ export async function add(params: {
   return result.skin;
 }
 
+/**
+ * Rewrite a library entry's label and variant. A variant change on the
+ * equipped skin is re-pushed to Mojang; `list` stays the authority on which
+ * skin is equipped.
+ */
+export async function update(params: {
+  account?: string;
+  key: string;
+  name: string;
+  variant: SkinVariant;
+}): Promise<Skin> {
+  const result = await call<{ skin: Skin }>(
+    'skin.update',
+    { account: '', ...params },
+    MOJANG_TIMEOUT,
+  );
+  return result.skin;
+}
+
 /** Equip a library or default skin by its key from `list`. */
 export async function equip(key: string, account = ''): Promise<void> {
   await call('skin.equip', { account, key }, MOJANG_TIMEOUT);

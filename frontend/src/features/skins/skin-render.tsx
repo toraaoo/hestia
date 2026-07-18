@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { SkinViewer, WalkingAnimation } from 'skinview3d';
 
-import type { SkinVariant } from '@/features/skins/mock';
+import type { SkinVariant } from '@/api';
 import {
   BODY_H,
   BODY_W,

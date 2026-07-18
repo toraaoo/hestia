@@ -22,6 +22,12 @@ export function SkinsPageSkeleton() {
       <div className="min-w-0 flex-1 space-y-8">
         <CardGridSkeleton header grid={SKIN_GRID} count={2} card="h-40" />
         <CardGridSkeleton header grid={SKIN_GRID} count={9} card="h-40" />
+        <CardGridSkeleton
+          header
+          grid="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5"
+          count={10}
+          card="h-20"
+        />
       </div>
     </div>
   );

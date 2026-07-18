@@ -1,5 +1,6 @@
-import { UploadSimpleIcon, XIcon } from '@phosphor-icons/react';
+import { UploadSimpleIcon } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
+import type { Skin, SkinVariant } from '@/api';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,30 +13,31 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import type { Cape, Skin, SkinVariant } from '@/features/skins/mock';
-import { capes, getCape } from '@/features/skins/mock';
-import { CapeFront, SkinModel } from '@/features/skins/skin-render';
+import { SkinModel } from '@/features/skins/skin-render';
 import { readTextureFile } from '@/features/skins/texture';
-import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
 export interface SkinDraft {
   name: string;
   variant: SkinVariant;
+  /** Add mode only: the texture data URL to upload. */
   texture: string;
-  cape_id?: string;
 }
 
 /**
- * Add/edit a skin: texture upload, arm style, cape and name over a live
- * model preview. Add mode arrives with the picked file's texture already
- * loaded; edit mode starts from the existing skin.
+ * Add/edit a skin over a live model preview. Add mode arrives with the picked
+ * file's texture already loaded and uploads it; edit mode renames a saved
+ * entry and picks its arm style — the texture is the entry's identity, so
+ * replacing it means adding a new skin. Capes are equipped on the account,
+ * not stored per skin, so no cape choice lives here.
  */
 export function EditSkinModal({
   open,
   onOpenChange,
   skin,
   initialTexture,
+  saving,
+  error,
   onSave,
 }: {
   open: boolean;
@@ -44,12 +46,13 @@ export function EditSkinModal({
   skin: Skin | null;
   /** Add mode: the texture data URL read from the picked file. */
   initialTexture?: string;
+  saving: boolean;
+  error?: string;
   onSave: (draft: SkinDraft) => void;
 }) {
   const [name, setName] = useState('');
   const [variant, setVariant] = useState<SkinVariant>('classic');
   const [texture, setTexture] = useState('');
-  const [capeId, setCapeId] = useState<string | undefined>(undefined);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -57,11 +60,10 @@ export function EditSkinModal({
     setName(skin?.name ?? '');
     setVariant(skin?.variant ?? 'classic');
     setTexture(skin?.texture ?? initialTexture ?? '');
-    setCapeId(skin?.cape_id);
   }, [open, skin, initialTexture]);
 
   const adding = skin === null;
-  const canSave = texture !== '' && name.trim() !== '';
+  const canSave = texture !== '' && name.trim() !== '' && !saving;
 
   const pickTexture = async (file: File | undefined) => {
     if (!file?.type.includes('png')) return;
@@ -90,13 +92,12 @@ export function EditSkinModal({
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
-              pickTexture(e.dataTransfer.files[0]);
+              if (adding) pickTexture(e.dataTransfer.files[0]);
             }}
           >
             {texture ? (
               <SkinModel
                 texture={texture}
-                capeTexture={getCape(capeId)?.texture}
                 variant={variant}
                 width={192}
                 height={288}
@@ -119,32 +120,34 @@ export function EditSkinModal({
               />
             </Field>
 
-            <Field>
-              <FieldLabel>{m['skins.texture']()}</FieldLabel>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/png"
-                className="hidden"
-                onChange={(e) => {
-                  pickTexture(e.target.files?.[0]);
-                  e.target.value = '';
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-fit"
-                data-icon="inline-start"
-                onClick={() => fileRef.current?.click()}
-              >
-                <UploadSimpleIcon />
-                {texture
-                  ? m['skins.replace_texture']()
-                  : m['skins.upload_texture']()}
-              </Button>
-            </Field>
+            {adding && (
+              <Field>
+                <FieldLabel>{m['skins.texture']()}</FieldLabel>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/png"
+                  className="hidden"
+                  onChange={(e) => {
+                    pickTexture(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-fit"
+                  data-icon="inline-start"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <UploadSimpleIcon />
+                  {texture
+                    ? m['skins.replace_texture']()
+                    : m['skins.upload_texture']()}
+                </Button>
+              </Field>
+            )}
 
             <Field>
               <FieldLabel>{m['skins.arm_style']()}</FieldLabel>
@@ -166,78 +169,33 @@ export function EditSkinModal({
               </ToggleGroup>
             </Field>
 
-            <Field>
-              <FieldLabel>{m['skins.cape']()}</FieldLabel>
-              <div className="grid grid-cols-4 gap-1.5">
-                <CapeOption
-                  label={m['label.none']()}
-                  selected={capeId === undefined}
-                  onSelect={() => setCapeId(undefined)}
-                >
-                  <XIcon className="size-5 text-muted-foreground" />
-                </CapeOption>
-                {capes.map((cape: Cape) => (
-                  <CapeOption
-                    key={cape.id}
-                    label={cape.name}
-                    selected={capeId === cape.id}
-                    onSelect={() => setCapeId(cape.id)}
-                  >
-                    <CapeFront texture={cape.texture} className="h-12" />
-                  </CapeOption>
-                ))}
-              </div>
-            </Field>
+            {error && (
+              <p className="text-xs break-words text-destructive">{error}</p>
+            )}
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            disabled={saving}
+            onClick={() => onOpenChange(false)}
+          >
             {m['action.cancel']()}
           </Button>
           <Button
             disabled={!canSave}
             className="bg-ember text-ember-foreground hover:bg-ember/90"
-            onClick={() => {
-              onSave({ name: name.trim(), variant, texture, cape_id: capeId });
-              onOpenChange(false);
-            }}
+            onClick={() => onSave({ name: name.trim(), variant, texture })}
           >
-            {adding ? m['skins.add']() : m['skins.save']()}
+            {saving
+              ? m['skins.saving']()
+              : adding
+                ? m['skins.add']()
+                : m['skins.save']()}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function CapeOption({
-  label,
-  selected,
-  onSelect,
-  children,
-}: {
-  label: string;
-  selected: boolean;
-  onSelect: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={cn(
-        'flex flex-col items-center gap-1.5 px-1 pt-2.5 pb-1.5 ring-1 transition-colors outline-none focus-visible:ring-ring',
-        selected
-          ? 'bg-muted ring-ember'
-          : 'ring-border hover:bg-muted/60 hover:ring-foreground/20',
-      )}
-    >
-      <span className="grid h-12 place-items-center">{children}</span>
-      <span className="w-full truncate text-center text-[10px] text-muted-foreground">
-        {label}
-      </span>
-    </button>
   );
 }
