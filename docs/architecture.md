@@ -1063,7 +1063,7 @@ flow: `account.login.begin` returns the Microsoft URL for the shell to open,
 > event bus, where many subscribers are natural.
 
 > **Sign-in is the one bespoke shell command — it must be.** Microsoft sign-in
-> over the sisu flow (`bridge.rs`'s sibling `auth.rs`, one
+> over the sisu flow (`bridge.rs`'s sibling `commands/auth.rs`, one
 > `account_login_sisu` command) is the deliberate exception to the generic-pipe
 > rule above, for the same reason Modrinth's launcher makes it one: the flow
 > opens Microsoft's sign-in page in a **native webview window** and completes
@@ -1086,6 +1086,20 @@ flow: `account.login.begin` returns the Microsoft URL for the shell to open,
 > service (helm overlay included, initials fallback), the same source Modrinth
 > uses — the account list carries only `{uuid, name}`, so the head is derived
 > from the uuid rather than round-tripped.
+
+> **Front-end preferences are desktop-local, in the data home — not the
+> daemon.** UI state (a dismissed first-run overlay, remembered view) is the
+> front-end's concern, not the launcher's, so it never crosses the socket: the
+> `prefs_list|set|remove` commands (`commands/prefs.rs`) read and write
+> `<data_home>/prefs.json` directly, resolving the same data home the engine
+> uses (`common::paths`, so `--home`/`$HESTIA_HOME`/the persisted pointer are
+> honoured). This keeps UI state out of the engine's typed `config` store (which
+> the CLI and every front-end would then see) and out of the webview's
+> `localStorage` (wiped with the webview cache, and not a real file). A Tauri
+> store plugin was rejected for keeping its own file in the app dir — an extra
+> indirection when a direct write to the data home is simpler. The store is
+> schema-less: the front-end owns its own keys, consumed through the frontend's
+> `usePrefs` hook.
 
 ### Tray (`tray`)
 

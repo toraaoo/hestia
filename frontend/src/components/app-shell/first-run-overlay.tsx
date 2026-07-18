@@ -1,24 +1,17 @@
-import { useState } from 'react';
-
 import { Logo } from '@/components/app-shell/logo';
 import { Button } from '@/components/ui/button';
 import { m } from '@/paraglide/messages.js';
-import { useAccounts } from '@/queries';
+import { useAccounts, usePrefs } from '@/queries';
 
-const DISMISS_KEY = 'hestia.welcome-dismissed';
+const DISMISS_KEY = 'welcome-dismissed';
 
 export function FirstRunOverlay() {
-  const { signedIn, ready, login } = useAccounts();
-  const [dismissed, setDismissed] = useState(
-    () => localStorage.getItem(DISMISS_KEY) === '1',
-  );
+  const { signedIn, ready: accountsReady, login } = useAccounts();
+  const { get, set, ready: prefsReady } = usePrefs();
 
-  if (!ready || signedIn || dismissed) return null;
-
-  const dismiss = () => {
-    localStorage.setItem(DISMISS_KEY, '1');
-    setDismissed(true);
-  };
+  if (!accountsReady || !prefsReady || signedIn || get(DISMISS_KEY, false)) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm">
@@ -34,7 +27,7 @@ export function FirstRunOverlay() {
               ? m['account.signing_in']()
               : m['account.sign_in']()}
           </Button>
-          <Button variant="ghost" onClick={dismiss}>
+          <Button variant="ghost" onClick={() => set(DISMISS_KEY, true)}>
             {m['welcome.dismiss']()}
           </Button>
         </div>

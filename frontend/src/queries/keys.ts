@@ -27,6 +27,10 @@ export const keys = {
     list: () => [...keys.config.all, 'list'] as const,
     value: (key: string) => [...keys.config.all, 'value', key] as const,
   },
+  prefs: {
+    all: ['prefs'] as const,
+    list: () => [...keys.prefs.all, 'list'] as const,
+  },
   cache: {
     all: ['cache'] as const,
     info: () => [...keys.cache.all, 'info'] as const,

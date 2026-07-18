@@ -34,6 +34,7 @@ export * as daemon from './daemon';
 export * as download from './download';
 export * as instance from './instance';
 export * as java from './java';
+export * as prefs from './prefs';
 export * as process from './process';
 export * as profile from './profile';
 export * as server from './server';

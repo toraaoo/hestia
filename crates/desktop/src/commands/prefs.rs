@@ -1,0 +1,63 @@
+//! Desktop-local preferences, written straight into the hestia data home.
+//!
+//! Front-end UI state (a dismissed first-run overlay, remembered view) is not
+//! the daemon's concern, so it never crosses the socket: these commands resolve
+//! the same data home the engine uses (`common::paths`, honouring `--home` /
+//! `$HESTIA_HOME` / the persisted pointer) and read/write `prefs.json` there
+//! directly. Schema-less — the front-end owns its own keys.
+
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+
+use serde_json::Value;
+
+use crate::bridge::CallError;
+
+type Map = BTreeMap<String, Value>;
+
+// Serialize the read-modify-write so two concurrent commands can't lose an edit.
+static LOCK: Mutex<()> = Mutex::new(());
+
+fn path() -> PathBuf {
+    common::paths::data_home(None).join("prefs.json")
+}
+
+fn load(path: &Path) -> Map {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+fn save(path: &Path, values: &Map) -> Result<(), CallError> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| CallError::other(e.to_string()))?;
+    }
+    let text = serde_json::to_string_pretty(values).map_err(|e| CallError::other(e.to_string()))?;
+    std::fs::write(path, format!("{text}\n")).map_err(|e| CallError::other(e.to_string()))
+}
+
+#[tauri::command]
+pub fn prefs_list() -> Result<Value, CallError> {
+    let _guard = LOCK.lock().unwrap();
+    Ok(serde_json::to_value(load(&path())).unwrap_or_else(|_| Value::Object(Default::default())))
+}
+
+#[tauri::command]
+pub fn prefs_set(key: String, value: Value) -> Result<(), CallError> {
+    let _guard = LOCK.lock().unwrap();
+    let path = path();
+    let mut values = load(&path);
+    values.insert(key, value);
+    save(&path, &values)
+}
+
+#[tauri::command]
+pub fn prefs_remove(key: String) -> Result<(), CallError> {
+    let _guard = LOCK.lock().unwrap();
+    let path = path();
+    let mut values = load(&path);
+    values.remove(&key);
+    save(&path, &values)
+}
