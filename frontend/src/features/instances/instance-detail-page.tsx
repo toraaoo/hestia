@@ -229,7 +229,7 @@ export function InstanceDetailPage({
           <TabsTrigger value="settings">{m['tab.settings']()}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="flex flex-col p-5">
+        <TabsContent value="overview" keepMounted className="flex flex-col p-5">
           <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_260px]">
             <div className="flex flex-col gap-5">
               <p className="max-w-2xl text-sm leading-relaxed text-foreground/90">
