@@ -11,13 +11,8 @@ import {
 } from '@/components/ui/card';
 import { type ChartConfig, ChartContainer } from '@/components/ui/chart';
 import { StatusDot } from '@/components/ui/status-dot';
-import { getEntryResources } from '@/features/entries/mock';
-import { bytes, memGb } from '@/lib/format';
+import { bytes } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
-
-/** Rolling window length and refresh cadence of the simulated feed. */
-const SAMPLES = 40;
-const TICK_MS = 1500;
 
 /** Ease factor and cadence of the fade-to-zero after an entry stops. */
 const DECAY = 0.6;
@@ -26,65 +21,6 @@ const DECAY_MS = 450;
 export interface Sample {
   cpu: number;
   mem: number;
-}
-
-/** A bounded random walk that mimics a live metric drifting toward a baseline. */
-function step(
-  prev: number,
-  target: number,
-  jitter: number,
-  max: number,
-): number {
-  const drift = (target - prev) * 0.12;
-  const noise = (Math.random() - 0.5) * jitter;
-  return Math.max(0, Math.min(max, prev + drift + noise));
-}
-
-function seed(running: boolean, cpu: number, mem: number): Sample[] {
-  return Array.from({ length: SAMPLES }, () =>
-    running
-      ? {
-          cpu: step(cpu, cpu, 12, 100),
-          mem: step(mem, mem, mem * 0.06, mem * 2),
-        }
-      : { cpu: 0, mem: 0 },
-  );
-}
-
-/**
- * Keeps a rolling series of CPU/memory samples that ticks on an interval,
- * standing in for a real daemon metrics stream — a running entry drifts around
- * its baseline, a stopped one flatlines.
- */
-function useLiveResources(
-  running: boolean,
-  baseCpu: number,
-  baseMem: number,
-  memLimitMb: number,
-): Sample[] {
-  const [series, setSeries] = useState<Sample[]>(() =>
-    seed(running, baseCpu, baseMem),
-  );
-
-  useEffect(() => {
-    setSeries(seed(running, baseCpu, baseMem));
-    if (!running) return;
-    const id = setInterval(() => {
-      setSeries((prev) => {
-        const last = prev[prev.length - 1];
-        return [
-          ...prev.slice(1),
-          {
-            cpu: step(last.cpu, baseCpu, 14, 100),
-            mem: step(last.mem, baseMem, memLimitMb * 0.05, memLimitMb),
-          },
-        ];
-      });
-    }, TICK_MS);
-    return () => clearInterval(id);
-  }, [running, baseCpu, baseMem, memLimitMb]);
-
-  return series;
 }
 
 /**
@@ -259,30 +195,14 @@ export interface LiveResources {
 
 /**
  * The overview's system-resources area: separate live CPU/memory charts and a
- * disk breakdown. Uses `live` (real daemon metrics) when given, otherwise
- * resolves a simulated feed from the entry id (the mock instance surfaces).
+ * disk breakdown, fed by the daemon's `process.metrics` stream.
  */
-export function ResourceCards({
-  id,
-  live,
-}: {
-  id: string;
-  live?: LiveResources;
-}) {
-  const res = getEntryResources(id);
-  const mockLimit = memGb(res?.memory ?? '');
-  const mockSeries = useLiveResources(
-    live ? false : (res?.running ?? false),
-    res?.cpuPct ?? 0,
-    res?.memUsedMb ?? 0,
-    mockLimit * 1024,
-  );
-  const running = live ? live.running : (res?.running ?? false);
-  const series = useResourceSeries(running, live ? live.series : mockSeries);
+export function ResourceCards({ live }: { live: LiveResources }) {
+  const running = live.running;
+  const series = useResourceSeries(running, live.series);
 
-  if (!live && !res) return null;
-  const limitGb = live ? live.memoryLimitGb : mockLimit;
-  const diskBytes = live ? live.diskBytes : (res?.diskBytes ?? 0);
+  const limitGb = live.memoryLimitGb;
+  const diskBytes = live.diskBytes;
   const now = series[series.length - 1] ?? { cpu: 0, mem: 0 };
 
   return (

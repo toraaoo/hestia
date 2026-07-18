@@ -235,7 +235,7 @@ export function ServerDetailPage({
                   label={m['label.disk']()}
                 />
               </div>
-              <ResourceCards id={server.id} live={live} />
+              <ResourceCards live={live} />
             </div>
 
             <div className="space-y-4">

@@ -376,28 +376,5 @@ export const servers: Server[] = [
   },
 ];
 
-export const getInstance = (id: string) => instances.find((i) => i.id === id);
-export const getServer = (id: string) => servers.find((s) => s.id === id);
-
-/** The live-metric slice of an entry, keyed by id across both stores. */
-export interface EntryResources {
-  running: boolean;
-  cpuPct: number;
-  memUsedMb: number;
-  memory: string;
-  diskBytes: number;
-}
-
-/**
- * Resolves an entry's resource usage by id — the mock stand-in for the daemon's
- * per-process metrics, which a server and an instance expose the same way.
- */
-export function getEntryResources(id: string): EntryResources | undefined {
-  const entry = getServer(id) ?? getInstance(id);
-  if (!entry) return undefined;
-  const { running, cpuPct, memUsedMb, memory, diskBytes } = entry;
-  return { running, cpuPct, memUsedMb, memory, diskBytes };
-}
-
 /** The world resumed by the library's "continue playing". */
 export const featured = instances[0];

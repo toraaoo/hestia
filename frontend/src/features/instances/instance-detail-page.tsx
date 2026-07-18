@@ -254,7 +254,7 @@ export function InstanceDetailPage({
                   label={m['label.memory']()}
                 />
               </div>
-              <ResourceCards id={instance.id} live={live} />
+              <ResourceCards live={live} />
             </div>
 
             <div className="space-y-4">
