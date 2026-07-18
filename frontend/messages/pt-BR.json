@@ -110,7 +110,13 @@
   },
   "playbar": {
     "quick_play": "Jogo rápido",
-    "all_instances": "Todas as instâncias"
+    "all_instances": "Todas as instâncias",
+    "sign_in_required": "Entre para jogar"
+  },
+  "welcome": {
+    "title": "Bem-vindo ao Hestia",
+    "body": "Entre com uma conta Microsoft para criar e jogar instâncias. Você pode navegar por servidores e configurações sem uma.",
+    "dismiss": "Talvez depois"
   },
   "job": {
     "installing": "Instalando {name}"
@@ -131,7 +137,9 @@
     "subtitle": "Mundos que você joga",
     "new": "Nova instância",
     "none_match": "Nenhuma instância corresponde à sua pesquisa.",
-    "missing": "Essa instância não existe mais."
+    "missing": "Essa instância não existe mais.",
+    "locked_title": "Entre para jogar",
+    "sign_in_hint": "Entre com uma conta Microsoft para criar e jogar instâncias."
   },
   "collection": {
     "filter_by_flavor": "Filtrar por distribuição",

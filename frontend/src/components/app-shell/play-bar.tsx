@@ -17,12 +17,14 @@ import {
 import { StatusDot } from '@/components/ui/status-dot';
 import { featured, instances, pinnedInstances } from '@/features/entries/mock';
 import { m } from '@/paraglide/messages.js';
+import { useAccounts } from '@/queries';
 
 /**
  * The always-present quick-play strip along the bottom of the library. The
  * instance is chosen from a dropdown (pinned first); the button launches it.
  */
 export function PlayBar() {
+  const { signedIn } = useAccounts();
   const [selId, setSelId] = useState(featured.id);
   const sel = instances.find((i) => i.id === selId) ?? featured;
   const Icon = entryIcon('instance');
@@ -100,6 +102,8 @@ export function PlayBar() {
       </Button>
       <Button
         data-icon="inline-start"
+        disabled={!signedIn}
+        title={signedIn ? undefined : m['playbar.sign_in_required']()}
         className="bg-ember text-ember-foreground hover:bg-ember/90"
       >
         <PlayIcon weight="fill" />

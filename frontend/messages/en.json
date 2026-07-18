@@ -110,7 +110,13 @@
   },
   "playbar": {
     "quick_play": "Quick play",
-    "all_instances": "All instances"
+    "all_instances": "All instances",
+    "sign_in_required": "Sign in to play"
+  },
+  "welcome": {
+    "title": "Welcome to Hestia",
+    "body": "Sign in with a Microsoft account to create and play instances. You can browse servers and settings without one.",
+    "dismiss": "Maybe later"
   },
   "job": {
     "installing": "Installing {name}"
@@ -131,7 +137,9 @@
     "subtitle": "Worlds you play",
     "new": "New instance",
     "none_match": "No instances match your search.",
-    "missing": "That instance no longer exists."
+    "missing": "That instance no longer exists.",
+    "locked_title": "Sign in to play",
+    "sign_in_hint": "Sign in with a Microsoft account to create and play instances."
   },
   "collection": {
     "filter_by_flavor": "Filter by flavor",

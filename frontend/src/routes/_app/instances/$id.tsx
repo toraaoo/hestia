@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
 import {
   InstanceDetailPage,
@@ -6,6 +6,7 @@ import {
   instanceContentKinds,
 } from '@/features/instances/instance-detail-page';
 import type { ContentKind } from '@/lib/mock';
+import { ensureSignedIn } from '@/queries';
 
 const tabs: InstanceTab[] = [
   'content',
@@ -16,6 +17,11 @@ const tabs: InstanceTab[] = [
 ];
 
 export const Route = createFileRoute('/_app/instances/$id')({
+  beforeLoad: async ({ context }) => {
+    if (!(await ensureSignedIn(context.queryClient))) {
+      throw redirect({ to: '/instances' });
+    }
+  },
   validateSearch: (
     search: Record<string, unknown>,
   ): { tab?: InstanceTab; kind?: ContentKind } => {

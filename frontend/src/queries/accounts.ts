@@ -4,6 +4,7 @@
  * URL, or a device code), `useCompleteLogin` blocks until the account is
  * stored — hence its long-lived pending state.
  */
+import type { QueryClient } from '@tanstack/react-query';
 import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
 import type { Account, LoginBegin, LoginMethod } from '../api';
 import * as api from '../api/accounts';
@@ -56,25 +57,34 @@ export const accountMutations = {
 };
 
 export function useAccounts() {
-  return useQuery(accountQueries.list());
+  const query = useQuery(accountQueries.list());
+  const login = useMutation(accountMutations.loginSisu());
+  const beginLogin = useMutation(accountMutations.beginLogin());
+  const completeLogin = useMutation(accountMutations.completeLogin());
+  const switchAccount = useMutation(accountMutations.switch());
+  const remove = useMutation(accountMutations.remove());
+
+  const accounts = query.data?.accounts ?? [];
+  const active =
+    accounts.find((a) => a.uuid === query.data?.default_uuid) ?? accounts[0];
+
+  return {
+    accounts,
+    active,
+    signedIn: accounts.length > 0,
+    isPending: query.isPending,
+    ready: !query.isPending,
+    login,
+    beginLogin,
+    completeLogin,
+    switch: switchAccount,
+    remove,
+  };
 }
 
-export function useLoginSisu() {
-  return useMutation(accountMutations.loginSisu());
-}
-
-export function useBeginLogin() {
-  return useMutation(accountMutations.beginLogin());
-}
-
-export function useCompleteLogin() {
-  return useMutation(accountMutations.completeLogin());
-}
-
-export function useSwitchAccount() {
-  return useMutation(accountMutations.switch());
-}
-
-export function useRemoveAccount() {
-  return useMutation(accountMutations.remove());
+export async function ensureSignedIn(
+  queryClient: QueryClient,
+): Promise<boolean> {
+  const list = await queryClient.ensureQueryData(accountQueries.list());
+  return list.accounts.length > 0;
 }

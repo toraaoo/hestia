@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from '@tanstack/react-router';
 
+import { FirstRunOverlay } from '@/components/app-shell/first-run-overlay';
 import { PlayBar } from '@/components/app-shell/play-bar';
 import { SearchProvider } from '@/components/app-shell/search-context';
 import { Sidebar } from '@/components/app-shell/sidebar';
@@ -26,6 +27,7 @@ export function AppLayout() {
           </div>
         </div>
       </div>
+      <FirstRunOverlay />
     </SearchProvider>
   );
 }

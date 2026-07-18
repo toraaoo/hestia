@@ -29,12 +29,7 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { pinnedInstances } from '@/features/entries/mock';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import {
-  useAccounts,
-  useLoginSisu,
-  useRemoveAccount,
-  useSwitchAccount,
-} from '@/queries/accounts';
+import { useAccounts } from '@/queries/accounts';
 
 interface NavItem {
   to: string;
@@ -195,15 +190,16 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 }
 
 function AccountMenu() {
-  const { data, isPending } = useAccounts();
-  const login = useLoginSisu();
-  const switchAccount = useSwitchAccount();
-  const removeAccount = useRemoveAccount();
+  const {
+    accounts,
+    active,
+    isPending,
+    login,
+    switch: switchAccount,
+    remove: removeAccount,
+  } = useAccounts();
   const [signingOut, setSigningOut] = useState(false);
 
-  const accounts = data?.accounts ?? [];
-  const active =
-    accounts.find((a) => a.uuid === data?.default_uuid) ?? accounts[0];
   const others = active
     ? accounts.filter((a) => a.uuid !== active.uuid)
     : accounts;

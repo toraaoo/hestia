@@ -34,8 +34,7 @@ import {
 const BASE64_PREFIX = /^data:image\/png;base64,/;
 
 export function SkinsPage() {
-  const accounts = useAccounts();
-  const signedIn = (accounts.data?.accounts.length ?? 0) > 0;
+  const { signedIn, isPending: accountsPending } = useAccounts();
   const list = useQuery({ ...skinQueries.list(''), enabled: signedIn });
 
   const add = useAddSkin();
@@ -227,7 +226,7 @@ export function SkinsPage() {
       title={m['nav.skins']()}
       subtitle={m['skins.subtitle']()}
       skeleton={<SkinsPageSkeleton />}
-      loading={accounts.isPending || (signedIn && list.isPending)}
+      loading={accountsPending || (signedIn && list.isPending)}
       actions={
         <>
           <input
