@@ -4,7 +4,7 @@ use ipc::errors::IpcError;
 use proto::skins::{
     Cape, CapeClear, CapeClearParams, CapeEquip, CapeEquipParams, Skin, SkinAdd, SkinAddParams,
     SkinEquip, SkinEquipParams, SkinList, SkinListParams, SkinRemove, SkinRemoveParams, SkinReset,
-    SkinResetParams, SkinVariant,
+    SkinResetParams, SkinUpdate, SkinUpdateParams, SkinVariant,
 };
 
 use crate::session::Session;
@@ -73,6 +73,28 @@ impl Skins<'_> {
             .call_with_timeout::<SkinReset>(&params, MOJANG_TIMEOUT)
             .await?;
         Ok(())
+    }
+
+    /// Rewrite a library entry's label and variant. A variant change on the
+    /// equipped skin is re-pushed to Mojang, hence the generous timeout.
+    pub async fn update(
+        &self,
+        account: &str,
+        key: &str,
+        name: &str,
+        variant: SkinVariant,
+    ) -> Result<Skin, IpcError> {
+        let params = SkinUpdateParams {
+            account: account.to_string(),
+            key: key.to_string(),
+            name: name.to_string(),
+            variant,
+        };
+        Ok(self
+            .session
+            .call_with_timeout::<SkinUpdate>(&params, MOJANG_TIMEOUT)
+            .await?
+            .skin)
     }
 
     /// Remove a library entry; the equipped Mojang skin is untouched.

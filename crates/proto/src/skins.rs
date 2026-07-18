@@ -132,6 +132,33 @@ impl Contract for SkinReset {
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
+pub struct SkinUpdateParams {
+    /// Name or uuid; empty uses the default account.
+    pub account: String,
+    /// The library entry to update.
+    pub key: String,
+    /// The new label; empty clears it.
+    pub name: String,
+    pub variant: SkinVariant,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct SkinUpdateResult {
+    /// The updated library entry. A label-only update never touches Mojang,
+    /// so `equipped` here is authoritative only from `skin.list`.
+    pub skin: Skin,
+}
+
+pub struct SkinUpdate;
+impl Contract for SkinUpdate {
+    const CHANNEL: &'static str = "skin.update";
+    type Params = SkinUpdateParams;
+    type Result = SkinUpdateResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
 pub struct SkinRemoveParams {
     /// The library entry to remove. The equipped Mojang skin is untouched.
     pub key: String,

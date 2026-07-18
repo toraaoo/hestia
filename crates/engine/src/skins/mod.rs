@@ -144,6 +144,26 @@ impl Skins {
         save(&dir, &file)
     }
 
+    /// Rewrite a row's label and variant; `None` when no row matches.
+    pub fn update(
+        &self,
+        key: &str,
+        name: &str,
+        variant: SkinVariant,
+    ) -> Result<Option<LibraryEntry>> {
+        let dir = self.dir();
+        let mut file = load(&dir);
+        let Some(entry) = file.skins.iter_mut().find(|e| e.key == key) else {
+            return Ok(None);
+        };
+        entry.name = name.trim().to_string();
+        entry.variant = variant;
+        let updated = entry.clone();
+        save(&dir, &file)?;
+        tracing::info!(key, "skin library entry updated");
+        Ok(Some(updated))
+    }
+
     pub fn remove(&self, key: &str) -> Result<bool> {
         let dir = self.dir();
         let mut file = load(&dir);
@@ -245,6 +265,17 @@ mod tests {
             skins.entry("mojang-key").unwrap().variant,
             SkinVariant::Classic
         );
+
+        let updated = skins
+            .update("mojang-key", "  Renamed  ", SkinVariant::Slim)
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.name, "Renamed");
+        assert_eq!(updated.variant, SkinVariant::Slim);
+        assert!(skins
+            .update("missing-key", "x", SkinVariant::Classic)
+            .unwrap()
+            .is_none());
 
         assert!(skins.remove("mojang-key").unwrap());
         assert!(!skins.remove("mojang-key").unwrap());

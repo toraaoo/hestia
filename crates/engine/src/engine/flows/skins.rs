@@ -146,6 +146,53 @@ impl Engine {
         })
     }
 
+    /// Rewrite a library entry's label and variant. When the edited skin is
+    /// the one equipped and its variant changed, the texture is re-uploaded
+    /// under the new variant — otherwise `list_skins` would sync the local
+    /// variant back from the profile and silently undo the edit.
+    pub async fn update_skin(
+        &self,
+        account: &str,
+        key: &str,
+        name: &str,
+        variant: SkinVariant,
+    ) -> Result<Skin> {
+        let previous = self
+            .skins()
+            .entry(key)
+            .with_context(|| format!("no library skin matches '{key}'"))?;
+        let entry = self
+            .skins()
+            .update(key, name, variant)?
+            .with_context(|| format!("no library skin matches '{key}'"))?;
+
+        let mut equipped = false;
+        if previous.variant != variant {
+            let token = self.skin_token(account).await?;
+            let profile = mojang::fetch_profile(&token).await?;
+            if profile.active_skin().is_some_and(|a| a.key == key) {
+                equipped = true;
+                let png = self.skins().texture(key)?;
+                mojang::upload_skin(&token, png, variant).await?;
+                tracing::info!(
+                    key,
+                    ?variant,
+                    "re-equipped the edited skin under its new variant"
+                );
+            }
+        }
+
+        let texture = data_url(&self.skins().texture(key)?);
+        Ok(Skin {
+            key: entry.key,
+            name: entry.name,
+            variant,
+            texture,
+            source: SkinSource::Library,
+            equipped,
+        })
+    }
+
     /// Equip a library or default skin by its key from `skin.list`.
     pub async fn equip_skin(&self, account: &str, key: &str) -> Result<()> {
         let token = self.skin_token(account).await?;

@@ -4,7 +4,7 @@
 
 use proto::skins::{
     CapeClear, CapeEquip, SkinAdd, SkinAddResult, SkinEquip, SkinList, SkinListResult, SkinRemove,
-    SkinReset,
+    SkinReset, SkinUpdate, SkinUpdateResult,
 };
 use proto::Empty;
 
@@ -48,6 +48,22 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .await
             .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
         Ok(Empty {})
+    });
+
+    on.handle::<SkinUpdate, _, _>(|p, ctx| async move {
+        if ctx.runtime.engine().skins().entry(&p.key).is_none() {
+            return Err(ServiceError::not_found(format!(
+                "no library skin matches '{}'",
+                p.key
+            )));
+        }
+        let skin = ctx
+            .runtime
+            .engine()
+            .update_skin(&p.account, &p.key, &p.name, p.variant)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(SkinUpdateResult { skin })
     });
 
     on.handle::<SkinRemove, _, _>(|p, ctx| async move {

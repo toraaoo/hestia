@@ -739,9 +739,11 @@ supervises launched processes, and manages autostart. The only crate that links
   `java.releases|list|install|uninstall`, `download.start`,
   `account.login.begin|login.complete`, `account.list|switch|remove` (`switch`
   picks the default account launches use; `list` reports it),
-  `skin.list|add|equip|reset|remove` and `cape.equip|clear` (the desktop skin
-  picker: one `skin.list` answers the merged library/defaults/external skins
-  plus the owned capes; changes relay to Mojang with the account's token),
+  `skin.list|add|update|equip|reset|remove` and `cape.equip|clear` (the desktop
+  skin picker: one `skin.list` answers the merged library/defaults/external
+  skins plus the owned capes; `update` edits a library entry's label/arm style,
+  re-pushing an equipped skin's variant; changes relay to Mojang with the
+  account's token),
   `process.start|stop|list|status|logs`, `events.subscribe`,
   `server.flavors|versions|resolve`,
   `server.create|update|rename|list|status|remove|start|stop|logs|command`
