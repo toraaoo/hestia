@@ -168,7 +168,8 @@ impl Drop for BackupClaim<'_> {
 /// launcher re-materialises for the record's *current* version (jar,
 /// libraries) plus logs and cache — the docker-mc-backup default set — and
 /// the managed content mirror (`mods/`), which the sync pass re-creates from
-/// the entry root at the next start.
+/// the entry root at the next start. Transient `session.lock` files are
+/// omitted by the archive walker at every depth.
 fn server_backup_excludes(record: &ServerRecord) -> Vec<String> {
     vec![
         record.profile.primary.filename.clone(),

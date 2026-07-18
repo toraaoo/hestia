@@ -352,9 +352,10 @@ The subsystems behind the aggregate:
   `scheduled` / `update`) — the disk is the registry, here too. Creation
   skips what the launcher re-materialises (the server jar, `libraries/`,
   `logs/`, `cache/` — docker-mc-backup's default exclude set — plus the managed
-  content mirror `mods/`) and writes through a `.part` temp file; restore
+  content mirror `mods/` and transient `session.lock` files) and writes through
+  a `.part` temp file; restore
   extracts into a
-  staging directory, carries the skipped names over from the current tree
+  staging directory, carries the skipped top-level names over from the current tree
   (they belong to the record's *current* version), and swaps — a failure
   leaves the current data untouched. `prune` keeps the newest N of one kind.
   Every pass reports per-file progress. Backups are a **server** feature:

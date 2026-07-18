@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 const BACKUPS: &str = "backups";
 const EXTENSION: &str = ".tar.gz";
+const SESSION_LOCK: &str = "session.lock";
 
 /// Progress for an archive/restore pass: `(files done, files total)`; total
 /// is 0 when unknown (restoring streams the archive once).
@@ -147,8 +148,8 @@ pub fn backups_dir(entry_dir: &Path) -> PathBuf {
 }
 
 /// Archive `data_dir` into a new backup under the entry root, skipping the
-/// top-level `exclude` names. The archive lands whole or not at all (written
-/// through a `.part` temp file).
+/// top-level `exclude` names and Minecraft's transient `session.lock` files.
+/// The archive lands whole or not at all (written through a `.part` temp file).
 pub fn create(
     entry_dir: &Path,
     data_dir: &Path,
@@ -239,6 +240,9 @@ fn included_roots(data_dir: &Path, exclude: &[String]) -> Result<Vec<PathBuf>> {
 
 fn count_files(data_dir: &Path, exclude: &[String]) -> Result<u64> {
     fn walk(path: &Path) -> u64 {
+        if is_session_lock(path) {
+            return 0;
+        }
         if !path.is_dir() || path.is_symlink() {
             return 1;
         }
@@ -263,6 +267,9 @@ fn append_tree(
     on_progress: OnProgress<'_>,
 ) -> Result<()> {
     let path = base.join(rel);
+    if is_session_lock(&path) {
+        return Ok(());
+    }
     if path.is_symlink() || !path.is_dir() {
         builder
             .append_path_with_name(&path, rel)
@@ -291,6 +298,12 @@ fn append_tree(
         )?;
     }
     Ok(())
+}
+
+/// A world lock is transient state, not world data. It must not survive into
+/// an archive, regardless of which world directory contains it.
+fn is_session_lock(path: &Path) -> bool {
+    path.file_name().is_some_and(|name| name == SESSION_LOCK)
 }
 
 /// Every stored backup, newest first.
@@ -556,6 +569,34 @@ mod tests {
 
         assert!(remove(&entry, &backup.id).unwrap());
         assert!(list(&entry).is_empty());
+        std::fs::remove_dir_all(&entry).ok();
+    }
+
+    #[test]
+    fn create_omits_session_locks_at_every_depth() {
+        let entry = temp_entry("session-lock");
+        let data = entry.join("data");
+        write(&data.join("session.lock"), "root lock");
+        write(&data.join("world/session.lock"), "world lock");
+        write(&data.join("world/region/r.0.0.mca"), "world data");
+
+        let backup = create(&entry, &data, BackupKind::Manual, &[], &|_, _| {}).unwrap();
+        let archive = backups_dir(&entry).join(format!("{}{EXTENSION}", backup.id));
+        let file = File::open(archive).unwrap();
+        let decoder = flate2::read::GzDecoder::new(file);
+        let mut tar = tar::Archive::new(decoder);
+        let paths: Vec<PathBuf> = tar
+            .entries()
+            .unwrap()
+            .map(|entry| entry.unwrap().path().unwrap().into_owned())
+            .collect();
+
+        assert!(paths
+            .iter()
+            .any(|path| path == Path::new("world/region/r.0.0.mca")));
+        assert!(!paths
+            .iter()
+            .any(|path| path.file_name().is_some_and(|name| name == SESSION_LOCK)));
         std::fs::remove_dir_all(&entry).ok();
     }
 
