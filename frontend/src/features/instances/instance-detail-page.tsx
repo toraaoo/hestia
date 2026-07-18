@@ -138,7 +138,7 @@ export function InstanceDetailPage({
   const worldNames = worlds.data ?? [];
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full flex-col">
       <DetailHero
         parentLabel={m['nav.library']()}
         parentTo="/instances"
@@ -409,7 +409,7 @@ function InstanceLogsTab({
   }
 
   return (
-    <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto border border-border bg-card p-3 font-mono text-[11px] break-words whitespace-pre-wrap text-muted-foreground">
+    <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto border border-border bg-card p-3 font-mono text-[11px] wrap-break-word whitespace-pre-wrap text-muted-foreground">
       <span className="sr-only">{name}</span>
       {logs.lines.map((entry, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: log lines have no stable id.
