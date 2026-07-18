@@ -1,6 +1,6 @@
 import { UploadSimpleIcon } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
-import type { Skin, SkinVariant } from '@/api';
+import type { Cape, Skin, SkinVariant } from '@/api';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { CapeCard, CapeGrid } from '@/features/skins/cape-card';
 import { SkinModel } from '@/features/skins/skin-render';
 import { readTextureFile } from '@/features/skins/texture';
 import { m } from '@/paraglide/messages.js';
@@ -22,20 +23,24 @@ export interface SkinDraft {
   variant: SkinVariant;
   /** Add mode only: the texture data URL to upload. */
   texture: string;
+  /** The account cape to wear; `undefined` clears it. */
+  capeId?: string;
 }
 
 /**
  * Add/edit a skin over a live model preview. Add mode arrives with the picked
  * file's texture already loaded and uploads it; edit mode renames a saved
  * entry and picks its arm style — the texture is the entry's identity, so
- * replacing it means adding a new skin. Capes are equipped on the account,
- * not stored per skin, so no cape choice lives here.
+ * replacing it means adding a new skin. The cape choice edits the *account's*
+ * equipped cape (capes are never stored per skin), applied on save.
  */
 export function EditSkinModal({
   open,
   onOpenChange,
   skin,
   initialTexture,
+  capes,
+  equippedCapeId,
   saving,
   error,
   onSave,
@@ -46,6 +51,9 @@ export function EditSkinModal({
   skin: Skin | null;
   /** Add mode: the texture data URL read from the picked file. */
   initialTexture?: string;
+  /** The account's owned capes; empty hides the cape choice. */
+  capes: Cape[];
+  equippedCapeId?: string;
   saving: boolean;
   error?: string;
   onSave: (draft: SkinDraft) => void;
@@ -53,6 +61,7 @@ export function EditSkinModal({
   const [name, setName] = useState('');
   const [variant, setVariant] = useState<SkinVariant>('classic');
   const [texture, setTexture] = useState('');
+  const [capeId, setCapeId] = useState<string | undefined>(undefined);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -60,7 +69,8 @@ export function EditSkinModal({
     setName(skin?.name ?? '');
     setVariant(skin?.variant ?? 'classic');
     setTexture(skin?.texture ?? initialTexture ?? '');
-  }, [open, skin, initialTexture]);
+    setCapeId(equippedCapeId);
+  }, [open, skin, initialTexture, equippedCapeId]);
 
   const adding = skin === null;
   const canSave = texture !== '' && name.trim() !== '' && !saving;
@@ -98,6 +108,7 @@ export function EditSkinModal({
             {texture ? (
               <SkinModel
                 texture={texture}
+                capeTexture={capes.find((c) => c.id === capeId)?.texture}
                 variant={variant}
                 width={192}
                 height={288}
@@ -169,6 +180,28 @@ export function EditSkinModal({
               </ToggleGroup>
             </Field>
 
+            {capes.length > 0 && (
+              <Field>
+                <FieldLabel>{m['skins.cape']()}</FieldLabel>
+                <CapeGrid>
+                  <CapeCard
+                    label={m['skins.no_cape']()}
+                    equipped={capeId === undefined}
+                    onEquip={() => setCapeId(undefined)}
+                  />
+                  {capes.map((cape) => (
+                    <CapeCard
+                      key={cape.id}
+                      label={cape.name}
+                      texture={cape.texture}
+                      equipped={capeId === cape.id}
+                      onEquip={() => setCapeId(cape.id)}
+                    />
+                  ))}
+                </CapeGrid>
+              </Field>
+            )}
+
             {error && (
               <p className="text-xs break-words text-destructive">{error}</p>
             )}
@@ -186,7 +219,9 @@ export function EditSkinModal({
           <Button
             disabled={!canSave}
             className="bg-ember text-ember-foreground hover:bg-ember/90"
-            onClick={() => onSave({ name: name.trim(), variant, texture })}
+            onClick={() =>
+              onSave({ name: name.trim(), variant, texture, capeId })
+            }
           >
             {saving
               ? m['skins.saving']()

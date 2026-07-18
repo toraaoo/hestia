@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { SkinBody } from '@/features/skins/skin-render';
+import { SkinPose } from '@/features/skins/skin-render';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
@@ -70,10 +70,10 @@ export function SkinCard({
         className="block w-full outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
       >
         <div className="flex h-28 items-center justify-center bg-muted/40 pt-2">
-          <SkinBody
+          <SkinPose
             texture={skin.texture}
             variant={skin.variant}
-            className="h-24"
+            className="h-24 w-full"
           />
         </div>
         <div className="border-t border-border p-2 text-left">

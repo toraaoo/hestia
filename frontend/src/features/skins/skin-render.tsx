@@ -1,20 +1,70 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SkinViewer, WalkingAnimation } from 'skinview3d';
 
 import type { SkinVariant } from '@/api';
 import {
-  BODY_H,
-  BODY_W,
   CAPE_H,
   CAPE_W,
   drawCapeFront,
-  drawSkinFront,
   loadTexture,
 } from '@/features/skins/texture';
 import { cn } from '@/lib/utils';
 
-/** Flat front view of a full skin — the cheap render for library cards. */
-export function SkinBody({
+const POSE_WIDTH = 160;
+const POSE_HEIGHT = 256;
+
+let poseViewer: SkinViewer | null = null;
+let poseQueue: Promise<unknown> = Promise.resolve();
+const poseSnapshots = new Map<string, Promise<string>>();
+
+function posedViewer(): SkinViewer {
+  if (!poseViewer) {
+    poseViewer = new SkinViewer({
+      canvas: document.createElement('canvas'),
+      width: POSE_WIDTH,
+      height: POSE_HEIGHT,
+      zoom: 0.9,
+      renderPaused: true,
+    });
+    poseViewer.playerObject.rotation.y = Math.PI / 9;
+    const parts = poseViewer.playerObject.skin;
+    parts.rightArm.rotation.x = 0.25;
+    parts.leftArm.rotation.x = -0.25;
+    parts.rightLeg.rotation.x = -0.2;
+    parts.leftLeg.rotation.x = 0.2;
+  }
+  return poseViewer;
+}
+
+/**
+ * Render a texture once through the shared paused viewer and cache the
+ * frame as a data URL — a grid of cards must never hold a WebGL context
+ * apiece. Loads serialize through one queue since the viewer is shared.
+ */
+function poseSnapshot(texture: string, variant: SkinVariant): Promise<string> {
+  const key = `${variant}|${texture}`;
+  let pending = poseSnapshots.get(key);
+  if (!pending) {
+    const run = poseQueue.then(async () => {
+      const viewer = posedViewer();
+      await viewer.loadSkin(texture, {
+        model: variant === 'slim' ? 'slim' : 'default',
+      });
+      viewer.render();
+      // Read back in the same task: the frame is gone once the browser
+      // composites, since the buffer is not preserved.
+      return viewer.canvas.toDataURL();
+    });
+    poseQueue = run.catch(() => undefined);
+    poseSnapshots.set(key, run);
+    run.catch(() => poseSnapshots.delete(key));
+    pending = run;
+  }
+  return pending;
+}
+
+/** A static posed render of a full skin — the card-grid view. */
+export function SkinPose({
   texture,
   variant,
   className,
@@ -23,13 +73,14 @@ export function SkinBody({
   variant: SkinVariant;
   className?: string;
 }) {
-  const ref = useRef<HTMLCanvasElement>(null);
+  const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
-    loadTexture(texture)
-      .then((img) => {
-        if (live && ref.current) drawSkinFront(ref.current, img, variant);
+    setSrc(null);
+    poseSnapshot(texture, variant)
+      .then((url) => {
+        if (live) setSrc(url);
       })
       .catch(() => {});
     return () => {
@@ -37,15 +88,8 @@ export function SkinBody({
     };
   }, [texture, variant]);
 
-  return (
-    <canvas
-      ref={ref}
-      width={BODY_W}
-      height={BODY_H}
-      aria-hidden
-      className={cn('[image-rendering:pixelated]', className)}
-    />
-  );
+  if (!src) return <div aria-hidden className={className} />;
+  return <img src={src} alt="" className={cn('object-contain', className)} />;
 }
 
 /** Flat front face of a cape texture, for the cape picker. */

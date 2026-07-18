@@ -60,12 +60,36 @@ export function SkinsPage() {
   const shown = [...saved, ...defaults];
   const equipped = shown.find((s) => s.equipped);
   const equippedCape = capes.find((c) => c.equipped);
+  // Resolve against the full wire list: the variant toggle can select a
+  // default's sibling entry that the collapsed grid does not show.
   const selected =
-    (selectedKey && shown.find((s) => s.key === selectedKey)) ||
+    (selectedKey && skins.find((s) => s.key === selectedKey)) ||
     equipped ||
     shown[0];
+  const isSelectedCard = (skin: Skin) =>
+    selected != null &&
+    (skin.key === selected.key ||
+      (skin.source === 'default' &&
+        selected.source === 'default' &&
+        skin.name === selected.name));
   const previewing = selected != null && selected.key !== equipped?.key;
   const capeBusy = equipCape.isPending || clearCape.isPending;
+
+  const selectVariant = (variant: Skin['variant']) => {
+    const sibling = skins.find(
+      (s) =>
+        s.source === 'default' &&
+        s.name === selected?.name &&
+        s.variant === variant,
+    );
+    if (sibling) setSelectedKey(sibling.key);
+  };
+
+  const applyCape = (capeId?: string) => {
+    if (capeId === equippedCape?.id) return;
+    if (capeId) equipCape.mutate({ cape: capeId });
+    else clearCape.mutate(undefined);
+  };
 
   const addFromFile = async (file: File | undefined) => {
     if (!file?.type.includes('png')) return;
@@ -83,7 +107,12 @@ export function SkinsPage() {
     if (editing) {
       update.mutate(
         { key: editing.key, name: draft.name, variant: draft.variant },
-        { onSuccess: () => setModal(null) },
+        {
+          onSuccess: () => {
+            setModal(null);
+            applyCape(draft.capeId);
+          },
+        },
       );
     } else {
       add.mutate(
@@ -96,6 +125,7 @@ export function SkinsPage() {
           onSuccess: (skin) => {
             setModal(null);
             setSelectedKey(skin.key);
+            applyCape(draft.capeId);
           },
         },
       );
@@ -121,6 +151,9 @@ export function SkinsPage() {
           applying={equip.isPending}
           error={equip.error?.message}
           onApply={() => equip.mutate({ key: selected.key })}
+          onVariantChange={
+            selected.source === 'default' ? selectVariant : undefined
+          }
         />
       )}
 
@@ -136,7 +169,7 @@ export function SkinsPage() {
                 <SkinCard
                   key={skin.key}
                   skin={skin}
-                  selected={skin.key === selected?.key}
+                  selected={isSelectedCard(skin)}
                   equipped={skin.equipped}
                   onSelect={() => setSelectedKey(skin.key)}
                   onEquip={() => equip.mutate({ key: skin.key })}
@@ -160,7 +193,7 @@ export function SkinsPage() {
               <SkinCard
                 key={skin.key}
                 skin={skin}
-                selected={skin.key === selected?.key}
+                selected={isSelectedCard(skin)}
                 equipped={skin.equipped}
                 onSelect={() => setSelectedKey(skin.key)}
                 onEquip={() => equip.mutate({ key: skin.key })}
@@ -246,6 +279,8 @@ export function SkinsPage() {
         }}
         skin={modal?.skin ?? null}
         initialTexture={modal?.texture}
+        capes={capes}
+        equippedCapeId={equippedCape?.id}
         saving={add.isPending || update.isPending}
         error={(modal?.skin ? update.error : add.error)?.message}
         onSave={saveDraft}

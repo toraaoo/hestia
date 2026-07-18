@@ -1,8 +1,9 @@
 import { CheckIcon } from '@phosphor-icons/react';
 
-import type { Cape, Skin } from '@/api';
+import type { Cape, Skin, SkinVariant } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { skinDisplayName, skinVariantLabel } from '@/features/skins/skin-card';
 import { SkinModel } from '@/features/skins/skin-render';
 import { m } from '@/paraglide/messages.js';
@@ -10,6 +11,9 @@ import { m } from '@/paraglide/messages.js';
 /**
  * The sticky left panel: animated model plus the preview → apply flow. The
  * cape is the account's equipped one — account-level, worn with every skin.
+ * A default skin ships in both models, so `onVariantChange` swaps the
+ * previewed variant (the vanilla launcher's slim/classic choice); saved
+ * skins pin theirs and show a plain badge.
  */
 export function PreviewPanel({
   skin,
@@ -18,6 +22,7 @@ export function PreviewPanel({
   applying,
   error,
   onApply,
+  onVariantChange,
 }: {
   skin: Skin;
   cape?: Cape;
@@ -25,6 +30,7 @@ export function PreviewPanel({
   applying: boolean;
   error?: string;
   onApply: () => void;
+  onVariantChange?: (variant: SkinVariant) => void;
 }) {
   return (
     <div className="sticky top-5 w-64 shrink-0">
@@ -51,7 +57,27 @@ export function PreviewPanel({
           {skinDisplayName(skin)}
         </div>
         <div className="mt-1.5 flex items-center gap-1.5">
-          <Badge variant="secondary">{skinVariantLabel(skin)}</Badge>
+          {onVariantChange ? (
+            <ToggleGroup
+              variant="outline"
+              size="sm"
+              value={[skin.variant]}
+              onValueChange={(vals: string[]) => {
+                const next = vals[vals.length - 1];
+                if (next && next !== skin.variant)
+                  onVariantChange(next as SkinVariant);
+              }}
+            >
+              <ToggleGroupItem value="classic">
+                {m['skins.wide']()}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="slim">
+                {m['skins.slim']()}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          ) : (
+            <Badge variant="secondary">{skinVariantLabel(skin)}</Badge>
+          )}
           <Badge variant="outline">
             {cape ? cape.name : m['skins.no_cape']()}
           </Badge>
