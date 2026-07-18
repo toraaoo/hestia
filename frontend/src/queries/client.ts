@@ -5,6 +5,7 @@
  */
 import {
   MutationCache,
+  QueryCache,
   QueryClient,
   type QueryKey,
 } from '@tanstack/react-query';
@@ -18,9 +19,13 @@ declare module '@tanstack/react-query' {
 }
 
 export const queryClient = new QueryClient({
-  // Every mutation failure surfaces as a toast: optimistic surfaces have
-  // already rolled back by the time this fires, so the toast is the one
-  // signal the user gets that the change did not stick.
+  // Failures toast instead of rendering into pages; the query hash id keeps
+  // a retriggering refetch replacing its own toast rather than stacking.
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      toast.error(error.message, { id: query.queryHash });
+    },
+  }),
   mutationCache: new MutationCache({
     onError: (error) => {
       toast.error(error.message);

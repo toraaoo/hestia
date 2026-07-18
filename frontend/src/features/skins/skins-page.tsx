@@ -133,13 +133,8 @@ export function SkinsPage() {
 
   const body = !signedIn ? (
     <Empty>{m['skins.sign_in_hint']()}</Empty>
-  ) : list.isError ? (
-    <Empty>
-      {m['skins.load_failed']()}
-      <span className="mt-1 block font-mono text-[11px]">
-        {list.error.message}
-      </span>
-    </Empty>
+  ) : list.isError && !list.data ? (
+    <Empty>{m['skins.load_failed']()}</Empty>
   ) : (
     <div className="flex items-start gap-6">
       {selected && (
