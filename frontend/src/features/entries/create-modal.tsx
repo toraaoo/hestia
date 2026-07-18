@@ -4,6 +4,7 @@ import {
   MagnifyingGlassIcon,
 } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -43,10 +44,8 @@ import {
 import { useAppForm } from '@/hooks/form';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import * as instanceQueries from '@/queries/instance';
-import { useCreateInstance } from '@/queries/instance';
-import * as serverQueries from '@/queries/server';
-import { useCreateServer } from '@/queries/server';
+import { instanceQueries, useCreateInstance } from '@/queries/instance';
+import { serverQueries, useCreateServer } from '@/queries/server';
 
 type Kind = 'server' | 'instance';
 type Step = 'flavor' | 'version' | 'details';
@@ -125,8 +124,14 @@ export function CreateEntryModal({
   const [search, setSearch] = useState('');
   const [showSnapshots, setShowSnapshots] = useState(false);
 
-  const serverFlavors = serverQueries.useServerFlavors();
-  const instanceFlavors = instanceQueries.useInstanceFlavors();
+  const serverFlavors = useQuery({
+    ...serverQueries.flavors(),
+    enabled: kind === 'server',
+  });
+  const instanceFlavors = useQuery({
+    ...instanceQueries.flavors(),
+    enabled: kind === 'instance',
+  });
   const flavorsQuery = kind === 'server' ? serverFlavors : instanceFlavors;
   const flavors: Flavor[] = useMemo(
     () => flavorsQuery.data ?? [],
@@ -357,10 +362,29 @@ function VersionStep({
   showSnapshots: boolean;
   onShowSnapshots: (value: boolean) => void;
 }) {
-  const serverVersions = serverQueries.useServerVersions(flavor);
-  const instanceVersions = instanceQueries.useInstanceVersions(flavor);
+  const selected = form.state.values.version.version as string;
+
+  const serverVersions = useQuery({
+    ...serverQueries.versions(flavor),
+    enabled: kind === 'server',
+  });
+  const instanceVersions = useQuery({
+    ...instanceQueries.versions(flavor),
+    enabled: kind === 'instance',
+  });
   const versionsQuery = kind === 'server' ? serverVersions : instanceVersions;
   const versions: GameVersion[] = versionsQuery.data ?? [];
+
+  const serverLoaders = useQuery({
+    ...serverQueries.loaders(flavor, selected),
+    enabled: kind === 'server' && flavor !== '' && selected !== '',
+  });
+  const instanceLoaders = useQuery({
+    ...instanceQueries.loaders(flavor, selected),
+    enabled: kind === 'instance' && flavor !== '' && selected !== '',
+  });
+  const loadersQuery = kind === 'server' ? serverLoaders : instanceLoaders;
+  const loaders = loadersQuery.data;
 
   const q = search.trim().toLowerCase();
   const list = versions.filter((v) => {
@@ -370,19 +394,13 @@ function VersionStep({
     return true;
   });
 
-  const selected = form.state.values.version.version as string;
-  const serverLoaders = serverQueries.useServerLoaders(flavor, selected);
-  const instanceLoaders = instanceQueries.useInstanceLoaders(flavor, selected);
-  const loadersQuery = kind === 'server' ? serverLoaders : instanceLoaders;
-  const loaders = loadersQuery.data ?? [];
-
   useEffect(() => {
-    if (loaders.length > 0) {
-      const current = form.state.values.version.loaderVersion as string;
+    const current = form.state.values.version.loaderVersion as string;
+    if (loaders && loaders.length > 0) {
       if (!current || !loaders.includes(current)) {
         form.setFieldValue('version.loaderVersion', loaders[0]);
       }
-    } else {
+    } else if (current) {
       form.setFieldValue('version.loaderVersion', '');
     }
   }, [loaders, form]);
@@ -448,7 +466,7 @@ function VersionStep({
         }}
       </form.AppField>
 
-      {loaders.length > 0 && (
+      {loaders && loaders.length > 0 && (
         <form.AppField name="version.loaderVersion">
           {(field: WizardForm) => (
             <div className="flex items-center gap-2">
