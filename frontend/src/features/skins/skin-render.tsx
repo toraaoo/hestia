@@ -36,11 +36,7 @@ function posedViewer(): SkinViewer {
   return poseViewer;
 }
 
-/**
- * Render a texture once through the shared paused viewer and cache the
- * frame as a data URL — a grid of cards must never hold a WebGL context
- * apiece. Loads serialize through one queue since the viewer is shared.
- */
+// One shared paused viewer: a card grid must never hold WebGL contexts apiece.
 function poseSnapshot(texture: string, variant: SkinVariant): Promise<string> {
   const key = `${variant}|${texture}`;
   let pending = poseSnapshots.get(key);
@@ -51,8 +47,7 @@ function poseSnapshot(texture: string, variant: SkinVariant): Promise<string> {
         model: variant === 'slim' ? 'slim' : 'default',
       });
       viewer.render();
-      // Read back in the same task: the frame is gone once the browser
-      // composites, since the buffer is not preserved.
+      // Same-task readback: the unpreserved buffer is gone after compositing.
       return viewer.canvas.toDataURL();
     });
     poseQueue = run.catch(() => undefined);

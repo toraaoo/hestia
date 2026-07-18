@@ -20,10 +20,6 @@ export const skinQueries = {
     }),
 };
 
-/**
- * Rewrite the default account's cached list and hand back the undo. Every
- * skin mutation targets the default account, so the one list key covers it.
- */
 function optimisticList(
   update: (list: SkinList) => SkinList,
 ): (() => void) | undefined {
@@ -35,10 +31,7 @@ function optimisticList(
   return () => queryClient.setQueryData(key, previous);
 }
 
-/**
- * An external row exists only while it is the equipped skin — equipping
- * anything else removes it, exactly as the next `skin.list` would.
- */
+// An external row exists only while equipped; equipping another drops it.
 function equipSkinInList(list: SkinList, key: string): SkinList {
   return {
     ...list,

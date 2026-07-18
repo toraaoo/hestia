@@ -8,13 +8,7 @@ import { skinDisplayName, skinVariantLabel } from '@/features/skins/skin-card';
 import { SkinModel } from '@/features/skins/skin-render';
 import { m } from '@/paraglide/messages.js';
 
-/**
- * The sticky left panel: animated model plus the preview → apply flow. The
- * cape is the account's equipped one — account-level, worn with every skin.
- * A default skin ships in both models, so `onVariantChange` swaps the
- * previewed variant (the vanilla launcher's slim/classic choice); saved
- * skins pin theirs and show a plain badge.
- */
+/** The sticky left panel: animated model plus the preview → apply flow. */
 export function PreviewPanel({
   skin,
   cape,

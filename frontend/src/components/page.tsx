@@ -7,10 +7,8 @@ import { m } from '@/paraglide/messages.js';
 
 /**
  * A full-bleed page: header with title/actions over a scrolling body. Every
- * routed page uses this so the chrome stays consistent app-wide. Pass
- * `search` to surface the shared search box on the header's right. Pass
- * `skeleton` (a hand-drawn stand-in of the loaded body) with `loading` and
- * the body swaps for it while data loads — the header stays live.
+ * routed page uses this so the chrome stays consistent app-wide. While
+ * `loading`, the body swaps for `skeleton` and the header stays live.
  */
 export function Page({
   title,

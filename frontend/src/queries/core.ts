@@ -11,11 +11,7 @@ import { invalidate } from './client';
 export interface MutationSpec<TData, TVariables> {
   mutationKey: QueryKey;
   mutationFn: (variables: TVariables) => Promise<TData>;
-  /**
-   * Apply the expected outcome to the cache before the daemon answers; the
-   * returned function undoes it, run on error so the UI reconciles back.
-   * The settle-time invalidation then refetches the daemon's truth either way.
-   */
+  /** Applies the expected outcome to the cache now; the undo runs on error. */
   optimistic?: (variables: TVariables) => (() => void) | undefined;
   /** Key prefixes swept when the mutation settles, success or error. */
   invalidates?: (variables: TVariables) => QueryKey[];

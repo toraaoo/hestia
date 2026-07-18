@@ -1,28 +1,21 @@
 import { cn } from '@/lib/utils';
 
-/**
- * Hand-drawn loading placeholders. `Bone` is the primitive — a pulsing
- * theme-muted block sized by utility classes — and `CardGridSkeleton` covers
- * the card-grid pages by mirroring their real grid classes. Page-shaped
- * compositions live beside the page they stand in for.
- */
+/** The pulsing placeholder primitive; size it with utility classes. */
 export function Bone({ className }: { className?: string }) {
   return (
     <div aria-hidden className={cn('animate-pulse bg-muted', className)} />
   );
 }
 
-/** A section-header line plus a grid of card bones. */
+/** Card bones in `grid` — the page's real grid classes, so bones land where cards will. */
 export function CardGridSkeleton({
   grid,
   count,
   card,
   header = false,
 }: {
-  /** The page's real grid classes, so bones land where cards will. */
   grid: string;
   count: number;
-  /** Sizing classes for one card bone. */
   card: string;
   header?: boolean;
 }) {

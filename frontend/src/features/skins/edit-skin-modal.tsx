@@ -27,13 +27,7 @@ export interface SkinDraft {
   capeId?: string;
 }
 
-/**
- * Add/edit a skin over a live model preview. Add mode arrives with the picked
- * file's texture already loaded and uploads it; edit mode renames a saved
- * entry and picks its arm style — the texture is the entry's identity, so
- * replacing it means adding a new skin. The cape choice edits the *account's*
- * equipped cape (capes are never stored per skin), applied on save.
- */
+// The cape choice edits the account's equipped cape — never stored per skin.
 export function EditSkinModal({
   open,
   onOpenChange,

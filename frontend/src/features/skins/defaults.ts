@@ -1,10 +1,5 @@
-/**
- * The wire lists every default character in both model variants; the picker
- * shows one card per character — Modrinth's `filterDefaultSkins` rule: the
- * canonical model, Steve and Alex first. One divergence: when the account has
- * a character's *other* variant equipped, that entry wins the card, so the
- * equipped highlight never disappears.
- */
+// One card per character (Modrinth's rule): the canonical model, Steve and
+// Alex first, except an equipped non-canonical variant wins its card.
 import type { Skin, SkinVariant } from '@/api';
 
 const CANONICAL_MODEL: Record<string, SkinVariant> = {
