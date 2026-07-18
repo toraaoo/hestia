@@ -19,16 +19,12 @@ export function PreviewPanel({
   skin,
   cape,
   previewing,
-  applying,
-  error,
   onApply,
   onVariantChange,
 }: {
   skin: Skin;
   cape?: Cape;
   previewing: boolean;
-  applying: boolean;
-  error?: string;
   onApply: () => void;
   onVariantChange?: (variant: SkinVariant) => void;
 }) {
@@ -88,12 +84,11 @@ export function PreviewPanel({
             <Button
               size="sm"
               data-icon="inline-start"
-              disabled={applying}
               className="flex-1 bg-ember text-ember-foreground hover:bg-ember/90"
               onClick={onApply}
             >
               <CheckIcon weight="bold" />
-              {applying ? m['skins.applying']() : m['action.apply']()}
+              {m['action.apply']()}
             </Button>
           ) : (
             <p className="text-xs text-muted-foreground">
@@ -101,9 +96,6 @@ export function PreviewPanel({
             </p>
           )}
         </div>
-        {error && (
-          <p className="mt-2 text-xs break-words text-destructive">{error}</p>
-        )}
       </div>
     </div>
   );

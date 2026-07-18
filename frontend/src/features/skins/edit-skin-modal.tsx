@@ -42,7 +42,6 @@ export function EditSkinModal({
   capes,
   equippedCapeId,
   saving,
-  error,
   onSave,
 }: {
   open: boolean;
@@ -55,7 +54,6 @@ export function EditSkinModal({
   capes: Cape[];
   equippedCapeId?: string;
   saving: boolean;
-  error?: string;
   onSave: (draft: SkinDraft) => void;
 }) {
   const [name, setName] = useState('');
@@ -200,10 +198,6 @@ export function EditSkinModal({
                   ))}
                 </CapeGrid>
               </Field>
-            )}
-
-            {error && (
-              <p className="text-xs break-words text-destructive">{error}</p>
             )}
           </div>
         </div>

@@ -3,7 +3,12 @@
  * factories and the event-driven invalidation feed can reach it without a
  * React context.
  */
-import { QueryClient, type QueryKey } from '@tanstack/react-query';
+import {
+  MutationCache,
+  QueryClient,
+  type QueryKey,
+} from '@tanstack/react-query';
+import { toast } from 'sonner';
 import type { HestiaError } from '../api';
 
 declare module '@tanstack/react-query' {
@@ -13,6 +18,14 @@ declare module '@tanstack/react-query' {
 }
 
 export const queryClient = new QueryClient({
+  // Every mutation failure surfaces as a toast: optimistic surfaces have
+  // already rolled back by the time this fires, so the toast is the one
+  // signal the user gets that the change did not stick.
+  mutationCache: new MutationCache({
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  }),
   defaultOptions: {
     queries: {
       // The daemon is a local socket, not HTTP: the webview's online/offline

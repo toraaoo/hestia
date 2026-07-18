@@ -73,7 +73,6 @@ export function SkinsPage() {
         selected.source === 'default' &&
         skin.name === selected.name));
   const previewing = selected != null && selected.key !== equipped?.key;
-  const capeBusy = equipCape.isPending || clearCape.isPending;
 
   const selectVariant = (variant: Skin['variant']) => {
     const sibling = skins.find(
@@ -148,8 +147,6 @@ export function SkinsPage() {
           skin={selected}
           cape={equippedCape}
           previewing={previewing}
-          applying={equip.isPending}
-          error={equip.error?.message}
           onApply={() => equip.mutate({ key: selected.key })}
           onVariantChange={
             selected.source === 'default' ? selectVariant : undefined
@@ -208,31 +205,22 @@ export function SkinsPage() {
               {m['skins.no_capes']()}
             </p>
           ) : (
-            <>
-              <CapeGrid>
+            <CapeGrid>
+              <CapeCard
+                label={m['skins.no_cape']()}
+                equipped={equippedCape == null}
+                onEquip={() => clearCape.mutate(undefined)}
+              />
+              {capes.map((cape) => (
                 <CapeCard
-                  label={m['skins.no_cape']()}
-                  equipped={equippedCape == null}
-                  disabled={capeBusy}
-                  onEquip={() => clearCape.mutate(undefined)}
+                  key={cape.id}
+                  label={cape.name}
+                  texture={cape.texture}
+                  equipped={cape.equipped}
+                  onEquip={() => equipCape.mutate({ cape: cape.id })}
                 />
-                {capes.map((cape) => (
-                  <CapeCard
-                    key={cape.id}
-                    label={cape.name}
-                    texture={cape.texture}
-                    equipped={cape.equipped}
-                    disabled={capeBusy}
-                    onEquip={() => equipCape.mutate({ cape: cape.id })}
-                  />
-                ))}
-              </CapeGrid>
-              {(equipCape.error || clearCape.error) && (
-                <p className="mt-2 text-xs break-words text-destructive">
-                  {(equipCape.error ?? clearCape.error)?.message}
-                </p>
-              )}
-            </>
+              ))}
+            </CapeGrid>
           )}
         </Section>
       </div>
@@ -282,7 +270,6 @@ export function SkinsPage() {
         capes={capes}
         equippedCapeId={equippedCape?.id}
         saving={add.isPending || update.isPending}
-        error={(modal?.skin ? update.error : add.error)?.message}
         onSave={saveDraft}
       />
 
