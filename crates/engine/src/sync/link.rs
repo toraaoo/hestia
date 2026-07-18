@@ -66,17 +66,27 @@ mod platform {
 
 #[cfg(windows)]
 mod platform {
+    use std::os::windows::fs::MetadataExt;
+
     use super::*;
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
 
     pub fn link_dir(store: &Path, at: &Path) -> io::Result<()> {
         junction::create(store, at)
     }
 
     pub fn read_target(at: &Path) -> Option<PathBuf> {
-        if !junction::exists(at).unwrap_or(false) {
+        if junction::exists(at).unwrap_or(false) {
+            return junction::get_target(at).ok();
+        }
+        // `junction`'s exists/get_target follow the reparse point, so a dangling
+        // junction reads as nothing; recognise and read it directly instead.
+        let meta = fs::symlink_metadata(at).ok()?;
+        if meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0 {
             return None;
         }
-        junction::get_target(at).ok()
+        fs::read_link(at).ok()
     }
 
     pub fn unlink_dir(at: &Path) -> io::Result<()> {
