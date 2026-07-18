@@ -26,6 +26,7 @@ import type {
 import type { ProcessLogLine } from './types/process';
 import type {
   ServerCreateParams,
+  ServerDetails,
   ServerInfo,
   ServerPingResult,
   ServerUpdateParams,
@@ -66,9 +67,14 @@ export async function list(): Promise<ServerInfo[]> {
   return result.servers;
 }
 
-/** `withUsage` also walks the entry directory and fills `disk_bytes`. */
-export function status(server: string, withUsage = false): Promise<ServerInfo> {
-  return call('server.status', { server, with_usage: withUsage });
+/** The server's record merged with its live process state. */
+export function status(server: string): Promise<ServerInfo> {
+  return call('server.status', { server });
+}
+
+/** The server's static, informational view (locations + disk footprint). */
+export function info(server: string): Promise<ServerDetails> {
+  return call('server.info', { server });
 }
 
 /** A Server List Ping snapshot; only a running server answers. */

@@ -40,14 +40,13 @@ export const serverQueries = {
       queryKey: keys.servers.detail(id),
       queryFn: () => api.status(id),
     }),
-  // The on-disk footprint is a directory walk, so it rides its own key —
-  // fetched fresh (never seeded from the diskless list) and off the
-  // frequently-invalidated detail query.
-  usage: (id: string) =>
+  // The informational view (locations + footprint) is a directory walk, so it
+  // rides its own key — fetched fresh (never seeded from the diskless list) and
+  // off the frequently-invalidated detail query.
+  info: (id: string) =>
     queryOptions({
-      queryKey: keys.servers.usage(id),
-      queryFn: () => api.status(id, true),
-      select: (server) => server.disk_bytes ?? null,
+      queryKey: keys.servers.info(id),
+      queryFn: () => api.info(id),
       staleTime: 60_000,
     }),
   ping: (id: string) =>
@@ -266,9 +265,12 @@ export function useServer(id: string) {
   });
 }
 
-/** The server's on-disk footprint (a directory walk), on its own cadence. */
-export function useServerDisk(id: string) {
-  return useQuery(serverQueries.usage(id));
+/**
+ * The server's informational view (locations + footprint) — a directory walk,
+ * on its own cadence.
+ */
+export function useServerInfo(id: string) {
+  return useQuery(serverQueries.info(id));
 }
 
 /** A running server's live ping (players/MOTD); polls while `enabled`. */

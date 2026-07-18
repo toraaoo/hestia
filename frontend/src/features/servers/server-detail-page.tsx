@@ -6,7 +6,7 @@ import {
 } from '@phosphor-icons/react';
 import { useMemo, useState } from 'react';
 
-import type { ServerInfo } from '@/api';
+import { type ServerInfo, system } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { entryIcon } from '@/components/icons';
@@ -37,7 +37,7 @@ import { useProcessMetrics } from '@/queries/metrics';
 import {
   useServer,
   useServerConfig,
-  useServerDisk,
+  useServerInfo,
   useServerPing,
   useStartServer,
   useStopServer,
@@ -71,7 +71,7 @@ export function ServerDetailPage({
   onContentKindChange: (kind?: ContentKind) => void;
 }) {
   const query = useServer(id);
-  const disk = useServerDisk(id);
+  const info = useServerInfo(id);
   const config = useServerConfig(id);
   const [addingContent, setAddingContent] = useState(false);
   const start = useStartServer(id);
@@ -114,7 +114,7 @@ export function ServerDetailPage({
   const live: LiveResources = {
     running,
     memoryLimitGb,
-    diskBytes: disk.data ?? 0,
+    diskBytes: info.data?.disk_bytes ?? 0,
     series: metrics.series.map((s) => ({
       cpu: s.cpu_pct,
       mem: s.mem_bytes / (1024 * 1024),
@@ -150,6 +150,10 @@ export function ServerDetailPage({
               variant="outline"
               size="icon"
               aria-label={m['detail.open_folder']()}
+              disabled={!info.data}
+              onClick={() => {
+                if (info.data) void system.openPath(info.data.entry_dir);
+              }}
             >
               <FolderOpenIcon className="size-4" />
             </Button>
@@ -223,7 +227,11 @@ export function ServerDetailPage({
                   label={m['label.memory']()}
                 />
                 <StatCard
-                  value={disk.data != null ? bytes(disk.data) : '—'}
+                  value={
+                    info.data?.disk_bytes != null
+                      ? bytes(info.data.disk_bytes)
+                      : '—'
+                  }
                   label={m['label.disk']()}
                 />
               </div>

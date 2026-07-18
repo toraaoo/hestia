@@ -20,9 +20,29 @@ export interface ServerInfo {
   game_port?: number;
   /** True once RCON is configured. */
   console: boolean;
-  /** Present only when the status call set `with_usage`. */
-  disk_bytes?: number;
   process?: ProcessInfo;
+}
+
+/**
+ * A server's static, informational view: descriptor, on-disk locations, and
+ * footprint — everything independent of the live process. Fetched on demand
+ * (the disk figure is a directory walk).
+ */
+export interface ServerDetails {
+  id: string;
+  name: string;
+  flavor: string;
+  game_version: string;
+  loader_version?: string;
+  java_major: number;
+  created_unix: number;
+  game_port?: number;
+  /** The entry root (`servers/<id>/`) — hestia's namespace. */
+  entry_dir: string;
+  /** The game's working directory (`servers/<id>/data/`). */
+  data_dir: string;
+  /** The entry's total on-disk footprint, in bytes. */
+  disk_bytes: number;
 }
 
 /** Server List Ping snapshot; only a running server answers. */
