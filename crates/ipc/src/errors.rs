@@ -6,6 +6,7 @@ pub const BAD_REQUEST: &str = "bad_request";
 pub const HANDLER_ERROR: &str = "handler_error";
 pub const UNKNOWN_CHANNEL: &str = "unknown_channel";
 pub const VERSION_MISMATCH: &str = "version_mismatch";
+pub const UNAUTHORIZED: &str = "unauthorized";
 
 use thiserror::Error;
 

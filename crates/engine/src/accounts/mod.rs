@@ -107,6 +107,10 @@ impl Accounts {
             .collect()
     }
 
+    pub fn has_account(&self) -> bool {
+        !load(&self.path()).accounts.is_empty()
+    }
+
     /// The account launches use when none is named: the switched-to one, else
     /// the first signed-in one.
     pub fn default_account(&self) -> Option<Account> {

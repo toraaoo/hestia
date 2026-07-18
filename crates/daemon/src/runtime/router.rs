@@ -42,6 +42,12 @@ impl ServiceError {
 
 pub type ServiceResult<T> = Result<T, ServiceError>;
 
+/// Channels locked until a Minecraft account is signed in: you cannot use
+/// Minecraft you don't own.
+fn requires_account(channel: &str) -> bool {
+    channel.starts_with("instance.") || channel.starts_with("sync.")
+}
+
 type BoxFuture = Pin<Box<dyn Future<Output = Response> + Send>>;
 type Handler = Arc<dyn Fn(Request, HandlerContext) -> BoxFuture + Send + Sync>;
 
@@ -64,6 +70,15 @@ impl Router {
         async move {
             match self.handlers.get(&request.channel) {
                 Some(handler) => {
+                    if requires_account(&request.channel)
+                        && !ctx.runtime.engine().accounts().has_account()
+                    {
+                        tracing::warn!("rejected: no signed-in account");
+                        return Response::failure(
+                            errors::UNAUTHORIZED,
+                            "sign in with a Microsoft account to use instances",
+                        );
+                    }
                     tracing::debug!("dispatch");
                     let started = std::time::Instant::now();
                     let response = handler(request, ctx).await;
@@ -133,5 +148,38 @@ impl<'r> Channels<'r> {
                 })
             }),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::requires_account;
+
+    #[test]
+    fn gates_instance_and_sync_channels() {
+        for channel in [
+            "instance.launch",
+            "instance.list",
+            "instance.content.add",
+            "instance.profile.apply",
+            "sync.set",
+            "instance.sync.adopt",
+        ] {
+            assert!(requires_account(channel), "{channel} should be gated");
+        }
+    }
+
+    #[test]
+    fn leaves_other_channels_open() {
+        for channel in [
+            "account.list",
+            "server.start",
+            "server.content.add",
+            "content.search",
+            "profile.list",
+            "java.install",
+        ] {
+            assert!(!requires_account(channel), "{channel} should be open");
+        }
     }
 }
