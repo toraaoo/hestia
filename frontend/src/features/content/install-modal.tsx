@@ -1,7 +1,6 @@
 import {
   CaretLeftIcon,
   CaretRightIcon,
-  MagnifyingGlassIcon,
   UploadSimpleIcon,
 } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
@@ -22,6 +21,8 @@ import {
 } from '@/api';
 import { chipClass } from '@/components/chip';
 import { contentIcon, contentKindLabel, entryIcon } from '@/components/icons';
+import { PickerPanel } from '@/components/picker-panel';
+import { SearchInput } from '@/components/search-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -41,7 +42,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import {
   Progress,
   ProgressLabel,
@@ -188,10 +188,18 @@ export function ContentInstallModal({
   }, [open]);
 
   const target = targets.find((t) => t.id === targetId) ?? entry ?? null;
-  // In entry mode the kind comes from the active filter (which scopes search);
-  // in browse mode it is the project's own kind.
+  // The kinds this target accepts, in the order the chips present them.
+  const acceptedKinds = target
+    ? ACCEPTS[target.type].filter((k) => targetTakesKind(target, k))
+    : [];
+  // In entry mode the kind comes from the active filter (which scopes search),
+  // defaulting to the first accepted kind so it is never null — a null kind
+  // both drops the version loader filter and is rejected by the install; in
+  // browse mode it is the project's own kind.
   const kind: ContentKind | null =
-    mode === 'browse' ? (picked?.kind ?? null) : kindFilter;
+    mode === 'browse'
+      ? (picked?.kind ?? null)
+      : (kindFilter ?? acceptedKinds[0] ?? null);
   const needsWorlds = kind === 'data_pack' && target?.type === 'instance';
   const isProfile = target?.type === 'profile';
 
@@ -260,7 +268,14 @@ export function ContentInstallModal({
           target.type === 'server'
             ? serverApi.content.add
             : instanceApi.content.add;
-        await add(target.id, spec, onProgress);
+        const done = await add(target.id, spec, onProgress);
+        // A batch "succeeds" even when every item failed to resolve/install;
+        // surface those per-item failures instead of closing as if installed.
+        if (done.failures.length > 0) {
+          setError(done.failures.map((f) => f.message).join('; '));
+          setInstalling(false);
+          return;
+        }
       }
       onOpenChange(false);
     } catch (e) {
@@ -296,7 +311,7 @@ export function ContentInstallModal({
           </div>
         ) : (
           <>
-            <div className="max-h-[58vh] min-h-[16rem] overflow-x-hidden overflow-y-auto p-1">
+            <div className="flex max-h-[58vh] min-h-[16rem] flex-col overflow-hidden p-1">
               {stepId === 'target' ? (
                 <TargetStep
                   kind={picked?.kind ?? 'mod'}
@@ -336,28 +351,34 @@ export function ContentInstallModal({
                   />
                 )
               ) : stepId === 'worlds' ? (
-                <WorldsStep
-                  instanceId={target?.id ?? ''}
-                  selected={worlds}
-                  onToggle={(w, on) =>
-                    setWorlds((prev) =>
-                      on ? [...prev, w] : prev.filter((x) => x !== w),
-                    )
-                  }
-                />
+                <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+                  <WorldsStep
+                    instanceId={target?.id ?? ''}
+                    selected={worlds}
+                    onToggle={(w, on) =>
+                      setWorlds((prev) =>
+                        on ? [...prev, w] : prev.filter((x) => x !== w),
+                      )
+                    }
+                  />
+                </div>
               ) : (
-                <ReviewStep
-                  target={target}
-                  project={picked}
-                  file={file}
-                  kind={kind}
-                  versionId={versionId}
-                  onVersion={setVersionId}
-                  worlds={needsWorlds ? worlds : undefined}
-                />
+                <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+                  <ReviewStep
+                    target={target}
+                    project={picked}
+                    file={file}
+                    kind={kind}
+                    versionId={versionId}
+                    onVersion={setVersionId}
+                    worlds={needsWorlds ? worlds : undefined}
+                  />
+                </div>
               )}
               {error && (
-                <p className="mt-3 px-1 text-xs text-destructive">{error}</p>
+                <p className="mt-3 shrink-0 px-1 text-xs text-destructive">
+                  {error}
+                </p>
               )}
             </div>
 
@@ -428,15 +449,11 @@ function FilterBar({
 }) {
   return (
     <div className="mb-3 flex flex-col gap-2.5">
-      <div className="relative">
-        <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
-        <Input
-          className="pl-8"
-          placeholder={placeholder}
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-        />
-      </div>
+      <SearchInput
+        value={search}
+        onChange={onSearch}
+        placeholder={placeholder}
+      />
       {chips && chips.length > 1 && (
         <div className="flex flex-wrap gap-1.5">
           {chips.map((c) => (
@@ -480,12 +497,15 @@ function TargetStep({
     );
   }
   return (
-    <div>
-      <FilterBar
-        search={search}
-        onSearch={setSearch}
-        placeholder={m['search.targets']()}
-      />
+    <PickerPanel
+      header={
+        <FilterBar
+          search={search}
+          onSearch={setSearch}
+          placeholder={m['search.targets']()}
+        />
+      }
+    >
       {shown.length === 0 ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
           {m['browse.nothing_matches']()}
@@ -510,7 +530,7 @@ function TargetStep({
           ))}
         </div>
       )}
-    </div>
+    </PickerPanel>
   );
 }
 
@@ -547,23 +567,27 @@ function ContentStep({
   const hits = results.data?.hits ?? [];
 
   return (
-    <div>
-      <FilterBar
-        search={search}
-        onSearch={setSearch}
-        placeholder={m['search.modrinth']()}
-        chips={kinds.map((k) => ({
-          label: kindInfo[k].label(),
-          active: activeKind === k,
-          onClick: () => onKindChange(k),
-        }))}
-      />
+    <PickerPanel
+      header={
+        <>
+          <FilterBar
+            search={search}
+            onSearch={setSearch}
+            placeholder={m['search.modrinth']()}
+            chips={kinds.map((k) => ({
+              label: kindInfo[k].label(),
+              active: activeKind === k,
+              onClick: () => onKindChange(k),
+            }))}
+          />
 
-      {/* A global profile stores project references, never files. */}
-      {target.type !== 'profile' && (
-        <FileImportButton file={file} onPickFile={onPickFile} />
-      )}
-
+          {/* A global profile stores project references, never files. */}
+          {target.type !== 'profile' && (
+            <FileImportButton file={file} onPickFile={onPickFile} />
+          )}
+        </>
+      }
+    >
       {results.isPending ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
           {m['content.installing']()}
@@ -586,7 +610,7 @@ function ContentStep({
           ))}
         </div>
       )}
-    </div>
+    </PickerPanel>
   );
 }
 

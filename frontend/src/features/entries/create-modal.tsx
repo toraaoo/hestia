@@ -1,8 +1,4 @@
-import {
-  CaretLeftIcon,
-  CaretRightIcon,
-  MagnifyingGlassIcon,
-} from '@phosphor-icons/react';
+import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
@@ -10,6 +6,7 @@ import { toast } from 'sonner';
 
 import type { ConfigEntry, Flavor, GameVersion } from '@/api';
 import { entryIcon } from '@/components/icons';
+import { SearchInput } from '@/components/search-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,7 +19,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { FieldError } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { ProvisionProgressView } from '@/features/entries/provision-progress';
 import {
   createWizardDefaults,
@@ -365,15 +361,11 @@ function VersionStep({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative">
-        <MagnifyingGlassIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
-        <Input
-          className="pl-8"
-          placeholder={m['wizard.filter_versions']()}
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-        />
-      </div>
+      <SearchInput
+        value={search}
+        onChange={onSearch}
+        placeholder={m['wizard.filter_versions']()}
+      />
 
       <label
         htmlFor="wizard-snapshots"

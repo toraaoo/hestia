@@ -1,7 +1,7 @@
-import { MagnifyingGlassIcon } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import type { ContentVersion, InstalledContent } from '@/api';
+import { SearchInput } from '@/components/search-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
@@ -77,15 +76,11 @@ export function ChangeVersionModal({
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
-          <div className="relative">
-            <MagnifyingGlassIcon className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-8"
-              placeholder={m['wizard.filter_versions']()}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={m['wizard.filter_versions']()}
+          />
 
           <div className="max-h-64 divide-y divide-border overflow-y-auto border border-border">
             {versions.isPending ? (
