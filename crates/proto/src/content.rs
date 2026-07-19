@@ -256,6 +256,16 @@ pub struct InstalledContent {
     /// Who put the item in the pool: empty = user-installed; a global profile
     /// apply tags its installs `profile:<name>`.
     pub origin: String,
+    /// Whether the launch-time mirror installs this item into `data/`. A
+    /// disabled item keeps its managed copy and provenance but is not loaded by
+    /// the game (for a datapack, its in-world file is renamed `.disabled`).
+    /// Defaults to `true` so records written before this field decode enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// The installed items of one kind, plus filenames found in the entry's game
@@ -383,6 +393,94 @@ pub struct ContentJobResult {
     pub id: String,
 }
 
+/// Enable or disable one installed item (matched by project id, slug, filename,
+/// or title). Disabling drops it from the game's load dir while keeping the
+/// managed copy and provenance; enabling restores the mirror. `worlds` narrows
+/// a datapack toggle to those save worlds (empty toggles every copy).
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerContentEnableParams {
+    pub server: String,
+    pub kind: ContentKind,
+    pub item: String,
+    pub enabled: bool,
+    pub worlds: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceContentEnableParams {
+    pub instance: String,
+    pub kind: ContentKind,
+    pub item: String,
+    pub enabled: bool,
+    pub worlds: Vec<String>,
+}
+
+/// Ask whether each platform-sourced item of the kind has a newer compatible
+/// version. Resolves upstream, so it is a plain (network-bound) call rather
+/// than an install job.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerContentCheckUpdatesParams {
+    pub server: String,
+    pub kind: ContentKind,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceContentCheckUpdatesParams {
+    pub instance: String,
+    pub kind: ContentKind,
+}
+
+/// One installed item's update status: its current pin against the newest
+/// compatible version resolved upstream.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ContentUpdate {
+    pub filename: String,
+    pub project_id: String,
+    /// For a datapack: the world the copy lives in (disambiguates one project
+    /// installed into several worlds). Empty for the other kinds.
+    pub world: String,
+    pub current_version_id: String,
+    pub current_version_number: String,
+    pub latest_version_id: String,
+    pub latest_version_number: String,
+    /// True when the newest compatible version differs from the current pin.
+    pub updatable: bool,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ContentUpdatesResult {
+    pub updates: Vec<ContentUpdate>,
+}
+
+/// Re-pin one installed item to a specific published `version` (id or number).
+/// The swap re-installs that version like an update, applying at the next
+/// start/launch; runs as a content job.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct ServerContentSetVersionParams {
+    pub server: String,
+    pub kind: ContentKind,
+    pub item: String,
+    pub version: String,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
+pub struct InstanceContentSetVersionParams {
+    pub instance: String,
+    pub kind: ContentKind,
+    pub item: String,
+    pub version: String,
+    pub id: String,
+}
+
 pub struct ServerContentAdd;
 impl Contract for ServerContentAdd {
     const CHANNEL: &'static str = "server.content.add";
@@ -436,6 +534,48 @@ pub struct InstanceContentUpdate;
 impl Contract for InstanceContentUpdate {
     const CHANNEL: &'static str = "instance.content.update";
     type Params = InstanceContentUpdateParams;
+    type Result = ContentJobResult;
+}
+
+pub struct ServerContentEnable;
+impl Contract for ServerContentEnable {
+    const CHANNEL: &'static str = "server.content.enable";
+    type Params = ServerContentEnableParams;
+    type Result = Empty;
+}
+
+pub struct InstanceContentEnable;
+impl Contract for InstanceContentEnable {
+    const CHANNEL: &'static str = "instance.content.enable";
+    type Params = InstanceContentEnableParams;
+    type Result = Empty;
+}
+
+pub struct ServerContentCheckUpdates;
+impl Contract for ServerContentCheckUpdates {
+    const CHANNEL: &'static str = "server.content.check_updates";
+    type Params = ServerContentCheckUpdatesParams;
+    type Result = ContentUpdatesResult;
+}
+
+pub struct InstanceContentCheckUpdates;
+impl Contract for InstanceContentCheckUpdates {
+    const CHANNEL: &'static str = "instance.content.check_updates";
+    type Params = InstanceContentCheckUpdatesParams;
+    type Result = ContentUpdatesResult;
+}
+
+pub struct ServerContentSetVersion;
+impl Contract for ServerContentSetVersion {
+    const CHANNEL: &'static str = "server.content.set_version";
+    type Params = ServerContentSetVersionParams;
+    type Result = ContentJobResult;
+}
+
+pub struct InstanceContentSetVersion;
+impl Contract for InstanceContentSetVersion {
+    const CHANNEL: &'static str = "instance.content.set_version";
+    type Params = InstanceContentSetVersionParams;
     type Result = ContentJobResult;
 }
 

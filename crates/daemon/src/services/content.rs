@@ -3,9 +3,11 @@
 
 use proto::content::{
     ContentJobResult, ContentKind, ContentListResult, ContentProjectGet, ContentSearch,
-    ContentSources, ContentVersions, InstanceContentAdd, InstanceContentList,
-    InstanceContentRemove, InstanceContentUpdate, ModpackResolve, ServerContentAdd,
-    ServerContentList, ServerContentRemove, ServerContentUpdate, SourcesResult,
+    ContentSources, ContentUpdatesResult, ContentVersions, InstanceContentAdd,
+    InstanceContentCheckUpdates, InstanceContentEnable, InstanceContentList, InstanceContentRemove,
+    InstanceContentSetVersion, InstanceContentUpdate, ModpackResolve, ServerContentAdd,
+    ServerContentCheckUpdates, ServerContentEnable, ServerContentList, ServerContentRemove,
+    ServerContentSetVersion, ServerContentUpdate, SourcesResult,
     VersionsResult as ContentVersionsResult,
 };
 use proto::Empty;
@@ -15,6 +17,16 @@ use super::guards::{
     find_server, require_content_items,
 };
 use crate::runtime::{instance_process_id, server_process_id, Channels, ContentJob, ServiceError};
+
+/// A datapack toggle may narrow by world; any other kind rejects `worlds`.
+fn check_worlds(kind: ContentKind, worlds: &[String]) -> Result<(), ServiceError> {
+    if !worlds.is_empty() && kind != ContentKind::DataPack {
+        return Err(ServiceError::bad_request(
+            "only datapacks are installed per world",
+        ));
+    }
+    Ok(())
+}
 
 pub(super) fn register(on: &mut Channels<'_>) {
     register_sources(on);
@@ -157,6 +169,67 @@ fn register_server(on: &mut Channels<'_>) {
             )),
         }
     });
+
+    on.handle::<ServerContentEnable, _, _>(|p, ctx| async move {
+        if p.item.is_empty() {
+            return Err(ServiceError::bad_request("item is required"));
+        }
+        check_worlds(p.kind, &p.worlds)?;
+        let record = find_server(&ctx, &p.server)?;
+        let process_id = server_process_id(&record.id);
+        ensure_stopped(&ctx, &process_id, "server", &record.name)?;
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
+        ensure_no_content(&ctx, &process_id, &record.name)?;
+        ensure_no_update(&ctx, &record.id, &record.name)?;
+        match ctx
+            .runtime
+            .engine()
+            .enable_server_content(&record.id, p.kind, &p.item, p.enabled, &p.worlds)
+        {
+            Ok(0) => Err(ServiceError::not_found(format!(
+                "nothing installed matches '{}'",
+                p.item
+            ))),
+            Ok(_) => Ok(Empty {}),
+            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+        }
+    });
+
+    on.handle::<ServerContentCheckUpdates, _, _>(|p, ctx| async move {
+        let record = find_server(&ctx, &p.server)?;
+        let updates = ctx
+            .runtime
+            .engine()
+            .check_server_updates(&record.id, p.kind)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(ContentUpdatesResult { updates })
+    });
+
+    on.handle::<ServerContentSetVersion, _, _>(|p, ctx| async move {
+        if p.item.is_empty() || p.version.is_empty() {
+            return Err(ServiceError::bad_request("item and version are required"));
+        }
+        let record = find_server(&ctx, &p.server)?;
+        let process_id = server_process_id(&record.id);
+        ensure_stopped(&ctx, &process_id, "server", &record.name)?;
+        ensure_no_backup(&ctx, &process_id, &record.name)?;
+        ensure_no_update(&ctx, &record.id, &record.name)?;
+        match ctx.runtime.content_jobs().start(
+            ContentJob::ServerSetVersion {
+                server_id: record.id,
+                kind: p.kind,
+                item: p.item,
+                version: p.version,
+            },
+            p.id,
+        ) {
+            Some(id) => Ok(ContentJobResult { id }),
+            None => Err(ServiceError::bad_request(
+                "a content change is already running for that server",
+            )),
+        }
+    });
 }
 
 fn register_instance(on: &mut Channels<'_>) {
@@ -225,6 +298,63 @@ fn register_instance(on: &mut Channels<'_>) {
                 instance_id: record.id,
                 kind: p.kind,
                 item: p.item,
+            },
+            p.id,
+        ) {
+            Some(id) => Ok(ContentJobResult { id }),
+            None => Err(ServiceError::bad_request(
+                "a content change is already running for that instance",
+            )),
+        }
+    });
+
+    on.handle::<InstanceContentEnable, _, _>(|p, ctx| async move {
+        if p.item.is_empty() {
+            return Err(ServiceError::bad_request("item is required"));
+        }
+        check_worlds(p.kind, &p.worlds)?;
+        let record = find_instance(&ctx, &p.instance)?;
+        let process_id = instance_process_id(&record.id);
+        ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
+        ensure_no_content(&ctx, &process_id, &record.name)?;
+        match ctx
+            .runtime
+            .engine()
+            .enable_instance_content(&record.id, p.kind, &p.item, p.enabled, &p.worlds)
+        {
+            Ok(0) => Err(ServiceError::not_found(format!(
+                "nothing installed matches '{}'",
+                p.item
+            ))),
+            Ok(_) => Ok(Empty {}),
+            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+        }
+    });
+
+    on.handle::<InstanceContentCheckUpdates, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        let updates = ctx
+            .runtime
+            .engine()
+            .check_instance_updates(&record.id, p.kind)
+            .await
+            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        Ok(ContentUpdatesResult { updates })
+    });
+
+    on.handle::<InstanceContentSetVersion, _, _>(|p, ctx| async move {
+        if p.item.is_empty() || p.version.is_empty() {
+            return Err(ServiceError::bad_request("item and version are required"));
+        }
+        let record = find_instance(&ctx, &p.instance)?;
+        let process_id = instance_process_id(&record.id);
+        ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
+        match ctx.runtime.content_jobs().start(
+            ContentJob::InstanceSetVersion {
+                instance_id: record.id,
+                kind: p.kind,
+                item: p.item,
+                version: p.version,
             },
             p.id,
         ) {

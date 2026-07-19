@@ -2,10 +2,12 @@ use std::time::Duration;
 
 use ipc::errors::IpcError;
 use proto::content::{
-    ContentAddSpec, ContentFailure, ContentKind, InstalledContent, InstanceContentAdd,
-    InstanceContentAddParams, InstanceContentList, InstanceContentListParams,
-    InstanceContentRemove, InstanceContentRemoveParams, InstanceContentUpdate,
-    InstanceContentUpdateParams,
+    ContentAddSpec, ContentFailure, ContentKind, ContentUpdate, InstalledContent,
+    InstanceContentAdd, InstanceContentAddParams, InstanceContentCheckUpdates,
+    InstanceContentCheckUpdatesParams, InstanceContentEnable, InstanceContentEnableParams,
+    InstanceContentList, InstanceContentListParams, InstanceContentRemove,
+    InstanceContentRemoveParams, InstanceContentSetVersion, InstanceContentSetVersionParams,
+    InstanceContentUpdate, InstanceContentUpdateParams,
 };
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
@@ -459,6 +461,72 @@ impl Instance<'_> {
         run_content_job(session, &id, on_progress, move || async move {
             session
                 .call::<InstanceContentUpdate>(&params)
+                .await
+                .map(|_| ())
+        })
+        .await
+        .map(|(items, _)| items)
+    }
+
+    /// Enable or disable one installed item. A non-empty `worlds` narrows a
+    /// datapack toggle to those save worlds.
+    pub async fn content_enable(
+        &self,
+        instance: &str,
+        kind: ContentKind,
+        item: &str,
+        enabled: bool,
+        worlds: &[String],
+    ) -> Result<(), IpcError> {
+        let params = InstanceContentEnableParams {
+            instance: instance.to_string(),
+            kind,
+            item: item.to_string(),
+            enabled,
+            worlds: worlds.to_vec(),
+        };
+        self.session.call::<InstanceContentEnable>(&params).await?;
+        Ok(())
+    }
+
+    /// Which platform-sourced items of the kind have a newer compatible version.
+    pub async fn content_check_updates(
+        &self,
+        instance: &str,
+        kind: ContentKind,
+    ) -> Result<Vec<ContentUpdate>, IpcError> {
+        let params = InstanceContentCheckUpdatesParams {
+            instance: instance.to_string(),
+            kind,
+        };
+        let result = self
+            .session
+            .call_with_timeout::<InstanceContentCheckUpdates>(&params, Duration::from_secs(120))
+            .await?;
+        Ok(result.updates)
+    }
+
+    /// Re-pin one item to a specific published `version` (id or number).
+    pub async fn content_set_version(
+        &self,
+        instance: &str,
+        kind: ContentKind,
+        item: &str,
+        version: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<Vec<InstalledContent>, IpcError> {
+        let id = job_id("instance-content-set-version");
+        let params = InstanceContentSetVersionParams {
+            instance: instance.to_string(),
+            kind,
+            item: item.to_string(),
+            version: version.to_string(),
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_content_job(session, &id, on_progress, move || async move {
+            session
+                .call::<InstanceContentSetVersion>(&params)
                 .await
                 .map(|_| ())
         })

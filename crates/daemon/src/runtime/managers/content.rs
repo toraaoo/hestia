@@ -31,6 +31,19 @@ pub enum ContentJob {
         kind: ContentKind,
         item: String,
     },
+    /// Re-pin one item to a specific published version.
+    ServerSetVersion {
+        server_id: String,
+        kind: ContentKind,
+        item: String,
+        version: String,
+    },
+    InstanceSetVersion {
+        instance_id: String,
+        kind: ContentKind,
+        item: String,
+        version: String,
+    },
     /// Apply a global profile's references into an instance's pool.
     ProfileApply {
         instance_id: String,
@@ -44,9 +57,11 @@ impl ContentJob {
     fn key(&self) -> String {
         match self {
             ContentJob::ServerAdd { server_id, .. }
-            | ContentJob::ServerUpdate { server_id, .. } => server_process_id(server_id),
+            | ContentJob::ServerUpdate { server_id, .. }
+            | ContentJob::ServerSetVersion { server_id, .. } => server_process_id(server_id),
             ContentJob::InstanceAdd { instance_id, .. }
             | ContentJob::InstanceUpdate { instance_id, .. }
+            | ContentJob::InstanceSetVersion { instance_id, .. }
             | ContentJob::ProfileApply { instance_id, .. } => instance_process_id(instance_id),
         }
     }
@@ -57,6 +72,8 @@ impl ContentJob {
             ContentJob::InstanceAdd { .. } => "instance-content-add",
             ContentJob::ServerUpdate { .. } => "server-content-update",
             ContentJob::InstanceUpdate { .. } => "instance-content-update",
+            ContentJob::ServerSetVersion { .. } => "server-content-set-version",
+            ContentJob::InstanceSetVersion { .. } => "instance-content-set-version",
             ContentJob::ProfileApply { .. } => "profile-apply",
         }
     }
@@ -91,6 +108,24 @@ impl ContentJob {
                 item,
             } => engine
                 .update_instance_content(&instance_id, kind, &item, on_progress)
+                .await
+                .map(|items| (items, Vec::new())),
+            ContentJob::ServerSetVersion {
+                server_id,
+                kind,
+                item,
+                version,
+            } => engine
+                .set_server_content_version(&server_id, kind, &item, &version, on_progress)
+                .await
+                .map(|items| (items, Vec::new())),
+            ContentJob::InstanceSetVersion {
+                instance_id,
+                kind,
+                item,
+                version,
+            } => engine
+                .set_instance_content_version(&instance_id, kind, &item, &version, on_progress)
                 .await
                 .map(|items| (items, Vec::new())),
             ContentJob::ProfileApply {

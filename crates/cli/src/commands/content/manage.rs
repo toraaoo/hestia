@@ -61,6 +61,32 @@ pub enum ContentCmd {
     Update {
         /// One installed item, or every one of this kind when omitted
         item: Option<String>,
+        #[arg(
+            long,
+            help = "Only report which items have an update, without applying"
+        )]
+        check: bool,
+    },
+    /// Enable a disabled item (prompts to pick when omitted)
+    Enable {
+        /// Installed item (project id, slug, filename, or title)
+        item: Option<String>,
+        #[arg(long, help = "For a datapack: only in this save world (repeatable)")]
+        world: Vec<String>,
+    },
+    /// Disable an item without uninstalling it (prompts to pick when omitted)
+    Disable {
+        /// Installed item (project id, slug, filename, or title)
+        item: Option<String>,
+        #[arg(long, help = "For a datapack: only in this save world (repeatable)")]
+        world: Vec<String>,
+    },
+    /// Re-pin an item to a specific published version
+    SetVersion {
+        /// Installed item (project id, slug, filename, or title)
+        item: String,
+        /// Version id or version number to pin
+        version: String,
     },
 }
 
@@ -89,7 +115,22 @@ pub async fn run_entry(
         ContentCmd::Remove { item, world } => {
             remove(client, entry, kind, reference, item, world).await
         }
-        ContentCmd::Update { item } => update(client, entry, kind, reference, item).await,
+        ContentCmd::Update { item, check } => {
+            if check {
+                check_updates(client, entry, kind, reference).await
+            } else {
+                update(client, entry, kind, reference, item).await
+            }
+        }
+        ContentCmd::Enable { item, world } => {
+            set_enabled(client, entry, kind, reference, item, world, true).await
+        }
+        ContentCmd::Disable { item, world } => {
+            set_enabled(client, entry, kind, reference, item, world, false).await
+        }
+        ContentCmd::SetVersion { item, version } => {
+            set_version(client, entry, kind, reference, item, version).await
+        }
     }
 }
 
@@ -356,6 +397,94 @@ async fn update(
     for content in &updated {
         ui::show(View::line(format!(
             "updated {} to {}",
+            content.title, content.version_number
+        )))?;
+    }
+    Ok(())
+}
+
+async fn check_updates(
+    client: &Client,
+    entry: EntryKind,
+    kind: ContentKind,
+    reference: &str,
+) -> Result<()> {
+    let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
+    let updates = ContentEntry::new(client, entry, id)
+        .check_updates(kind)
+        .await?;
+    let outdated: Vec<_> = updates.iter().filter(|u| u.updatable).collect();
+    if outdated.is_empty() {
+        return ui::show(View::note(format!("'{name}' is up to date")));
+    }
+    let rows = outdated
+        .iter()
+        .map(|u| {
+            vec![
+                u.filename.clone(),
+                u.current_version_number.clone(),
+                u.latest_version_number.clone(),
+            ]
+        })
+        .collect();
+    ui::show(View::table(
+        format!("{name} {} with updates", kind_plural(kind)),
+        ["FILE", "CURRENT", "LATEST"],
+        rows,
+    ))
+}
+
+async fn set_enabled(
+    client: &Client,
+    entry: EntryKind,
+    kind: ContentKind,
+    reference: &str,
+    item: Option<String>,
+    world: Vec<String>,
+    enabled: bool,
+) -> Result<()> {
+    let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
+    let handle = ContentEntry::new(client, entry, id);
+    let worlds: Vec<String> = world.into_iter().filter(|w| !w.is_empty()).collect();
+    let item = match item {
+        Some(item) => item,
+        None => {
+            let (items, _) = handle.list(kind).await?;
+            pick_installed(items)?
+        }
+    };
+    handle.enable(kind, &item, enabled, &worlds).await?;
+    let verb = if enabled { "enabled" } else { "disabled" };
+    ui::show(View::line(format!("{verb} '{item}' in '{name}'")))
+}
+
+async fn set_version(
+    client: &Client,
+    entry: EntryKind,
+    kind: ContentKind,
+    reference: &str,
+    item: String,
+    version: String,
+) -> Result<()> {
+    let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
+    let handle = ContentEntry::new(client, entry, id);
+
+    let reporter = Arc::new(ProvisionReporter::new());
+    let progress = reporter.clone();
+    let updated = {
+        let result = handle
+            .set_version(kind, &item, &version, move |p| progress.update(p))
+            .await;
+        reporter.finish();
+        result?
+    };
+
+    if updated.is_empty() {
+        return ui::show(View::note(format!("'{item}' is already at that version")));
+    }
+    for content in &updated {
+        ui::show(View::line(format!(
+            "pinned {} to {} in '{name}'",
             content.title, content.version_number
         )))?;
     }

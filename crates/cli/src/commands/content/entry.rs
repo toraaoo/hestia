@@ -3,7 +3,9 @@
 //! kind once and lets callers stop re-matching server-vs-instance at every
 //! call.
 
-use client::proto::content::{ContentAddSpec, ContentFailure, ContentKind, InstalledContent};
+use client::proto::content::{
+    ContentAddSpec, ContentFailure, ContentKind, ContentUpdate, InstalledContent,
+};
 use client::proto::minecraft::ProvisionProgress;
 use client::{Client, IpcError};
 
@@ -94,6 +96,72 @@ impl<'a> ContentEntry<'a> {
                 self.client
                     .instance()
                     .content_update(&self.id, kind, item, on_progress)
+                    .await
+            }
+        }
+    }
+
+    pub(super) async fn enable(
+        &self,
+        kind: ContentKind,
+        item: &str,
+        enabled: bool,
+        worlds: &[String],
+    ) -> Result<(), IpcError> {
+        match self.kind {
+            EntryKind::Server => {
+                self.client
+                    .server()
+                    .content_enable(&self.id, kind, item, enabled, worlds)
+                    .await
+            }
+            EntryKind::Instance => {
+                self.client
+                    .instance()
+                    .content_enable(&self.id, kind, item, enabled, worlds)
+                    .await
+            }
+        }
+    }
+
+    pub(super) async fn check_updates(
+        &self,
+        kind: ContentKind,
+    ) -> Result<Vec<ContentUpdate>, IpcError> {
+        match self.kind {
+            EntryKind::Server => {
+                self.client
+                    .server()
+                    .content_check_updates(&self.id, kind)
+                    .await
+            }
+            EntryKind::Instance => {
+                self.client
+                    .instance()
+                    .content_check_updates(&self.id, kind)
+                    .await
+            }
+        }
+    }
+
+    pub(super) async fn set_version(
+        &self,
+        kind: ContentKind,
+        item: &str,
+        version: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<Vec<InstalledContent>, IpcError> {
+        match self.kind {
+            EntryKind::Server => {
+                self.client
+                    .server()
+                    .content_set_version(&self.id, kind, item, version, on_progress)
+                    .await
+            }
+            EntryKind::Instance => {
+                self.client
+                    .instance()
+                    .content_set_version(&self.id, kind, item, version, on_progress)
                     .await
             }
         }

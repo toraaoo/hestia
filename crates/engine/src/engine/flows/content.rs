@@ -127,7 +127,7 @@ impl Engine {
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
         let (_, ctx) = self.server_content_ctx(reference)?;
-        self.update_content(&ctx, kind, item, on_progress).await
+        self.update_content(&ctx, kind, item, "", on_progress).await
     }
 
     pub async fn update_instance_content(
@@ -137,9 +137,59 @@ impl Engine {
         item: &str,
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
+        self.change_instance_version(reference, kind, item, "", on_progress)
+            .await
+    }
+
+    /// Re-pin one named platform item to a specific published `version` (id or
+    /// number), re-installing that version like an update.
+    pub async fn set_server_content_version(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+        item: &str,
+        version: &str,
+        on_progress: OnProgress<'_>,
+    ) -> Result<Vec<InstalledContent>> {
+        if item.is_empty() || version.is_empty() {
+            bail!("an item and a version are required");
+        }
+        let (_, ctx) = self.server_content_ctx(reference)?;
+        self.update_content(&ctx, kind, item, version, on_progress)
+            .await
+    }
+
+    pub async fn set_instance_content_version(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+        item: &str,
+        version: &str,
+        on_progress: OnProgress<'_>,
+    ) -> Result<Vec<InstalledContent>> {
+        if item.is_empty() || version.is_empty() {
+            bail!("an item and a version are required");
+        }
+        self.change_instance_version(reference, kind, item, version, on_progress)
+            .await
+    }
+
+    /// The instance version-change path shared by update (empty pin) and
+    /// set-version (explicit pin): apply the change, then follow each item's
+    /// filename move in every content profile.
+    async fn change_instance_version(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+        item: &str,
+        pin: &str,
+        on_progress: OnProgress<'_>,
+    ) -> Result<Vec<InstalledContent>> {
         let (_, ctx) = self.instance_content_ctx(reference)?;
         let before = install::load(&ctx.entry_dir);
-        let updated = self.update_content(&ctx, kind, item, on_progress).await?;
+        let updated = self
+            .update_content(&ctx, kind, item, pin, on_progress)
+            .await?;
         for new_item in &updated {
             let old = before.iter().find(|i| {
                 i.kind == new_item.kind
@@ -151,6 +201,101 @@ impl Engine {
             }
         }
         Ok(updated)
+    }
+
+    /// Enable or disable installed items matching `item` (a datapack narrows by
+    /// `worlds`). Returns the number of matched entries — zero means nothing
+    /// matched. The entry must be stopped (enforced at the service boundary).
+    pub fn enable_server_content(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+        item: &str,
+        enabled: bool,
+        worlds: &[String],
+    ) -> Result<usize> {
+        let (_, ctx) = self.server_content_ctx(reference)?;
+        set_enabled(&ctx, kind, item, enabled, worlds)
+    }
+
+    pub fn enable_instance_content(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+        item: &str,
+        enabled: bool,
+        worlds: &[String],
+    ) -> Result<usize> {
+        let (_, ctx) = self.instance_content_ctx(reference)?;
+        set_enabled(&ctx, kind, item, enabled, worlds)
+    }
+
+    /// For each platform-sourced item of the kind, resolve the newest
+    /// compatible version and report whether it differs from the current pin.
+    /// An item whose versions cannot be resolved is skipped, not fatal.
+    pub async fn check_server_updates(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+    ) -> Result<Vec<proto::content::ContentUpdate>> {
+        let (_, ctx) = self.server_content_ctx(reference)?;
+        self.content_updates(&ctx, kind).await
+    }
+
+    pub async fn check_instance_updates(
+        &self,
+        reference: &str,
+        kind: ContentKind,
+    ) -> Result<Vec<proto::content::ContentUpdate>> {
+        let (_, ctx) = self.instance_content_ctx(reference)?;
+        self.content_updates(&ctx, kind).await
+    }
+
+    async fn content_updates(
+        &self,
+        ctx: &EntryContent,
+        kind: ContentKind,
+    ) -> Result<Vec<proto::content::ContentUpdate>> {
+        let items: Vec<InstalledContent> = install::load(&ctx.entry_dir)
+            .into_iter()
+            .filter(|i| i.kind == kind && !i.project_id.is_empty())
+            .collect();
+        let loader = content_loader(kind, &ctx.flavor);
+        let mut out = Vec::new();
+        for item in items {
+            let versions = match self
+                .content
+                .versions(&VersionQuery {
+                    source: item.source.clone(),
+                    project: item.project_id.clone(),
+                    loader: loader.clone(),
+                    game_version: Some(ctx.game_version.clone()),
+                })
+                .await
+            {
+                Ok(versions) => versions,
+                Err(e) => {
+                    tracing::warn!(title = %item.title, error = %format!("{e:#}"), "update check failed");
+                    continue;
+                }
+            };
+            let Ok(latest) =
+                install::pick_version(&versions, &ctx.game_version, loader.as_deref(), "")
+            else {
+                continue;
+            };
+            out.push(proto::content::ContentUpdate {
+                filename: item.filename,
+                project_id: item.project_id,
+                world: item.world,
+                current_version_id: item.version_id.clone(),
+                current_version_number: item.version_number.clone(),
+                latest_version_id: latest.id.clone(),
+                latest_version_number: latest.version_number.clone(),
+                updatable: latest.id != item.version_id,
+            });
+        }
+        Ok(out)
     }
 
     fn server_content_ctx(&self, reference: &str) -> Result<(ServerRecord, EntryContent)> {
@@ -514,16 +659,20 @@ impl Engine {
                 installed_unix: registry::now_unix(),
                 world: world.to_string(),
                 origin: String::new(),
+                enabled: true,
             });
         }
         Ok(installed)
     }
 
+    /// Move matched platform items to a newer version — the newest compatible
+    /// when `pin` is empty, or that exact version (id or number) when pinned.
     async fn update_content(
         &self,
         ctx: &EntryContent,
         kind: ContentKind,
         reference: &str,
+        pin: &str,
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
         let index = install::load(&ctx.entry_dir);
@@ -563,7 +712,7 @@ impl Engine {
                 })
                 .await?;
             let version =
-                install::pick_version(&versions, &ctx.game_version, loader.as_deref(), "")
+                install::pick_version(&versions, &ctx.game_version, loader.as_deref(), pin)
                     .with_context(|| format!("cannot update '{}'", item.title))?
                     .clone();
             if version.id == item.version_id {
@@ -610,11 +759,14 @@ impl Engine {
                         && (i.kind != ContentKind::DataPack || i.world == new_item.world)
                 }) {
                     Some(entry) => {
-                        // An update moves the version, not the ownership: a
-                        // profile-tagged item keeps its origin.
+                        // An update moves the version, not the ownership or the
+                        // enabled state: a profile-tagged, disabled item keeps
+                        // both.
                         let origin = std::mem::take(&mut entry.origin);
+                        let enabled = entry.enabled;
                         *entry = new_item.clone();
                         entry.origin = origin;
+                        entry.enabled = enabled;
                     }
                     None => index.push(new_item.clone()),
                 }
@@ -828,6 +980,7 @@ fn add_file_content(
             filename: filename.clone(),
             installed_unix: registry::now_unix(),
             world: world.to_string(),
+            enabled: true,
             ..InstalledContent::default()
         });
     }
@@ -874,6 +1027,48 @@ fn remove_content(
     }
     install::save(&ctx.entry_dir, kept)?;
     Ok(removed)
+}
+
+/// Flip the enabled flag on every index entry matching `reference` (a datapack
+/// narrows by `worlds`), applying the filesystem side immediately. Returns how
+/// many entries matched (regardless of whether the flag actually moved), so the
+/// caller can distinguish "nothing matched" from "already in that state".
+fn set_enabled(
+    ctx: &EntryContent,
+    kind: ContentKind,
+    reference: &str,
+    enabled: bool,
+    worlds: &[String],
+) -> Result<usize> {
+    if !worlds.is_empty() && kind != ContentKind::DataPack {
+        bail!("only datapacks are installed per world");
+    }
+    let mut index = install::load(&ctx.entry_dir);
+    let mut matched = 0usize;
+    for item in index.iter_mut() {
+        let hit = item.kind == kind
+            && install::matches(item, reference)
+            && (worlds.is_empty() || worlds.iter().any(|w| world_matches(&item.world, w)));
+        if !hit {
+            continue;
+        }
+        matched += 1;
+        if item.enabled != enabled {
+            item.enabled = enabled;
+            install::set_enabled_files(&ctx.entry_dir, &ctx.data_dir, item)?;
+            tracing::info!(
+                entry = %ctx.entry_dir.display(),
+                title = %item.title,
+                filename = %item.filename,
+                enabled,
+                "content enabled state changed"
+            );
+        }
+    }
+    if matched > 0 {
+        install::save(&ctx.entry_dir, index)?;
+    }
+    Ok(matched)
 }
 
 /// Whether an index entry's world path (`saves/<name>`, or a server's level

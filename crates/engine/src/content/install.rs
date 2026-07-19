@@ -52,6 +52,55 @@ pub(crate) fn datapack_path(data_dir: &Path, item: &InstalledContent) -> PathBuf
         .join(&item.filename)
 }
 
+/// The disabled twin of a datapack's in-world path (`<file>.disabled`), which
+/// Minecraft ignores because the suffix makes it neither a `.zip` nor a pack
+/// directory — the standard `.disabled` convention.
+pub(crate) fn datapack_disabled_path(data_dir: &Path, item: &InstalledContent) -> PathBuf {
+    let mut path = datapack_path(data_dir, item);
+    path.set_file_name(format!("{}.disabled", item.filename));
+    path
+}
+
+/// Apply an item's enabled state to the filesystem immediately (the entry is
+/// stopped when this runs). A mirror-managed kind adds or removes its `data/`
+/// copy; a datapack renames its in-world file to/from `.disabled`. The launch
+/// -time [`sync`] re-asserts the same, so this only makes the change visible
+/// before the next start.
+pub(crate) fn set_enabled_files(
+    entry_dir: &Path,
+    data_dir: &Path,
+    item: &InstalledContent,
+) -> Result<()> {
+    if item.kind == ContentKind::DataPack {
+        let (from, to) = if item.enabled {
+            (
+                datapack_disabled_path(data_dir, item),
+                datapack_path(data_dir, item),
+            )
+        } else {
+            (
+                datapack_path(data_dir, item),
+                datapack_disabled_path(data_dir, item),
+            )
+        };
+        if from.is_file() {
+            std::fs::rename(&from, &to)
+                .with_context(|| format!("cannot rename {} to {}", from.display(), to.display()))?;
+        }
+        return Ok(());
+    }
+    let managed = managed_path(entry_dir, item)?;
+    let dest = data_path(data_dir, item)?;
+    if item.enabled {
+        if managed.is_file() && !dest.exists() {
+            mirror(&managed, &dest)?;
+        }
+    } else if dest.is_file() {
+        std::fs::remove_file(&dest).with_context(|| format!("cannot remove {}", dest.display()))?;
+    }
+    Ok(())
+}
+
 pub(crate) fn load(entry_dir: &Path) -> Vec<InstalledContent> {
     registry::read_record::<Index>(entry_dir, INDEX)
         .map(|i| i.items)
@@ -88,12 +137,15 @@ pub(crate) fn mirror(source: &Path, dest: &Path) -> Result<()> {
 }
 
 /// Reconcile the `data/` mirror with the index. With no `selection`, heal only:
-/// re-mirror every indexed file whose `data/` copy is missing. With a selection
-/// (a profile's member filenames), members are mirrored and tracked non-members
-/// have their `data/` copy removed (the managed copy stays) — untracked files
-/// are never touched. Datapacks are skipped either way: they live inside the
-/// world (under `data/`), so a backup restore brings them back with the world —
-/// there is no managed copy to heal from, and profiles never select them.
+/// re-mirror every enabled indexed file whose `data/` copy is missing. With a
+/// selection (a profile's member filenames), members are mirrored and tracked
+/// non-members have their `data/` copy removed (the managed copy stays) —
+/// untracked files are never touched. A disabled item is treated like a
+/// non-member: kept out of `data/` regardless of selection, so this pass is the
+/// single enforcement point for the enabled flag. Datapacks are skipped either
+/// way: they live inside the world (under `data/`), so a backup restore brings
+/// them back with the world — there is no managed copy to heal from, profiles
+/// never select them, and a disabled one is renamed `.disabled` in place.
 pub(crate) fn sync(
     entry_dir: &Path,
     data_dir: &Path,
@@ -107,7 +159,9 @@ pub(crate) fn sync(
         }
         let managed = managed_path(entry_dir, &item)?;
         let dest = data_path(data_dir, &item)?;
-        if selection.is_some_and(|members| !members.contains(&item.filename)) {
+        let excluded =
+            !item.enabled || selection.is_some_and(|members| !members.contains(&item.filename));
+        if excluded {
             if dest.is_file() {
                 std::fs::remove_file(&dest)
                     .with_context(|| format!("cannot remove {}", dest.display()))?;
@@ -356,6 +410,7 @@ mod tests {
         InstalledContent {
             kind,
             filename: filename.to_string(),
+            enabled: true,
             ..InstalledContent::default()
         }
     }
@@ -447,6 +502,51 @@ mod tests {
             in_world.is_file(),
             "datapacks are outside profile selection"
         );
+        std::fs::remove_dir_all(&entry).ok();
+    }
+
+    #[test]
+    fn sync_keeps_disabled_items_out_of_data() {
+        let (entry, data) = temp_entry("disabled");
+        let mut mod_item = tracked(ContentKind::Mod, "sodium.jar");
+        install_tracked(&entry, &data, &mod_item);
+        mod_item.enabled = false;
+        save(&entry, vec![mod_item]).unwrap();
+
+        sync(&entry, &data, None).unwrap();
+
+        assert!(
+            !data.join("mods/sodium.jar").exists(),
+            "disabled item is not mirrored"
+        );
+        assert!(
+            entry.join("mods/sodium.jar").is_file(),
+            "managed copy stays"
+        );
+        std::fs::remove_dir_all(&entry).ok();
+    }
+
+    #[test]
+    fn set_enabled_files_renames_datapack_in_world() {
+        let (entry, data) = temp_entry("dp-disable");
+        let mut pack = tracked(ContentKind::DataPack, "terralith.zip");
+        pack.world = "saves/world".to_string();
+        let live = datapack_path(&data, &pack);
+        std::fs::create_dir_all(live.parent().unwrap()).unwrap();
+        std::fs::write(&live, "pack").unwrap();
+
+        pack.enabled = false;
+        set_enabled_files(&entry, &data, &pack).unwrap();
+        assert!(!live.exists(), "enabled path gone once disabled");
+        assert!(
+            datapack_disabled_path(&data, &pack).is_file(),
+            "renamed to .disabled"
+        );
+
+        pack.enabled = true;
+        set_enabled_files(&entry, &data, &pack).unwrap();
+        assert!(live.is_file(), "restored on enable");
+        assert!(!datapack_disabled_path(&data, &pack).exists());
         std::fs::remove_dir_all(&entry).ok();
     }
 

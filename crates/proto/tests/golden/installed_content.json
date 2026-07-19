@@ -11,5 +11,6 @@
   "url": "https://cdn.modrinth.com/data/AANobbMI/versions/abcd1234/sodium-0.6.0.jar",
   "installed_unix": 1783783800,
   "world": "",
-  "origin": "profile:performance"
+  "origin": "profile:performance",
+  "enabled": true
 }

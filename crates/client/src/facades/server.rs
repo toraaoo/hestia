@@ -1,12 +1,16 @@
+use std::time::Duration;
+
 use ipc::errors::IpcError;
 use proto::backup::{
     BackupInfo, ServerBackupCreate, ServerBackupCreateParams, ServerBackupList, ServerBackupRef,
     ServerBackupRemove, ServerBackupRestore, ServerBackupRestoreParams,
 };
 use proto::content::{
-    ContentAddSpec, ContentFailure, ContentKind, InstalledContent, ServerContentAdd,
-    ServerContentAddParams, ServerContentList, ServerContentListParams, ServerContentRemove,
-    ServerContentRemoveParams, ServerContentUpdate, ServerContentUpdateParams,
+    ContentAddSpec, ContentFailure, ContentKind, ContentUpdate, InstalledContent, ServerContentAdd,
+    ServerContentAddParams, ServerContentCheckUpdates, ServerContentCheckUpdatesParams,
+    ServerContentEnable, ServerContentEnableParams, ServerContentList, ServerContentListParams,
+    ServerContentRemove, ServerContentRemoveParams, ServerContentSetVersion,
+    ServerContentSetVersionParams, ServerContentUpdate, ServerContentUpdateParams,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, LoadersParams, ProvisionProgress, ResolveParams,
@@ -367,6 +371,72 @@ impl Server<'_> {
         run_content_job(session, &id, on_progress, move || async move {
             session
                 .call::<ServerContentUpdate>(&params)
+                .await
+                .map(|_| ())
+        })
+        .await
+        .map(|(items, _)| items)
+    }
+
+    /// Enable or disable one installed item. A non-empty `worlds` narrows a
+    /// datapack toggle to those save worlds.
+    pub async fn content_enable(
+        &self,
+        server: &str,
+        kind: ContentKind,
+        item: &str,
+        enabled: bool,
+        worlds: &[String],
+    ) -> Result<(), IpcError> {
+        let params = ServerContentEnableParams {
+            server: server.to_string(),
+            kind,
+            item: item.to_string(),
+            enabled,
+            worlds: worlds.to_vec(),
+        };
+        self.session.call::<ServerContentEnable>(&params).await?;
+        Ok(())
+    }
+
+    /// Which platform-sourced items of the kind have a newer compatible version.
+    pub async fn content_check_updates(
+        &self,
+        server: &str,
+        kind: ContentKind,
+    ) -> Result<Vec<ContentUpdate>, IpcError> {
+        let params = ServerContentCheckUpdatesParams {
+            server: server.to_string(),
+            kind,
+        };
+        let result = self
+            .session
+            .call_with_timeout::<ServerContentCheckUpdates>(&params, Duration::from_secs(120))
+            .await?;
+        Ok(result.updates)
+    }
+
+    /// Re-pin one item to a specific published `version` (id or number).
+    pub async fn content_set_version(
+        &self,
+        server: &str,
+        kind: ContentKind,
+        item: &str,
+        version: &str,
+        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
+    ) -> Result<Vec<InstalledContent>, IpcError> {
+        let id = job_id("server-content-set-version");
+        let params = ServerContentSetVersionParams {
+            server: server.to_string(),
+            kind,
+            item: item.to_string(),
+            version: version.to_string(),
+            id: id.clone(),
+        };
+        let session = self.session;
+        run_content_job(session, &id, on_progress, move || async move {
+            session
+                .call::<ServerContentSetVersion>(&params)
                 .await
                 .map(|_| ())
         })
