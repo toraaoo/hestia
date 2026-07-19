@@ -72,21 +72,26 @@ impl Process<'_> {
             .call::<EventsSubscribe>(&EventsSubscribeParams { id: id.to_string() })
             .await?;
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        self.session
-            .set_event_callback(Some(std::sync::Arc::new(move |event: &Event| {
-                let sent = match event.topic.as_str() {
-                    ProcessOutputEvent::TOPIC => {
+        self.session.set_event_callback(Some(std::sync::Arc::new(
+            move |event: &Event| match event.topic.as_str() {
+                ProcessOutputEvent::TOPIC => {
+                    if let Ok(e) =
                         serde_json::from_value::<ProcessOutputEvent>(event.payload.clone())
-                            .map(|e| tx.send(ProcessEvent::Output(e.line)))
+                    {
+                        for line in e.lines {
+                            let _ = tx.send(ProcessEvent::Output(line));
+                        }
                     }
-                    ProcessExitEvent::TOPIC => {
-                        serde_json::from_value::<ProcessExitEvent>(event.payload.clone())
-                            .map(|e| tx.send(ProcessEvent::Exit(e)))
+                }
+                ProcessExitEvent::TOPIC => {
+                    if let Ok(e) = serde_json::from_value::<ProcessExitEvent>(event.payload.clone())
+                    {
+                        let _ = tx.send(ProcessEvent::Exit(e));
                     }
-                    _ => return,
-                };
-                let _ = sent;
-            })));
+                }
+                _ => {}
+            },
+        )));
         Ok(rx)
     }
 
@@ -134,7 +139,9 @@ impl Process<'_> {
             if let Ok(out) =
                 serde_json::from_value::<proto::process::ProcessOutputEvent>(event.payload.clone())
             {
-                on_output(&out.line);
+                for line in &out.lines {
+                    on_output(line);
+                }
             }
         };
 

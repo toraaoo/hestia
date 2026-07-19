@@ -163,11 +163,14 @@ impl Topic for ProcessStartedEvent {
     const TOPIC: &'static str = "process.started";
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// A batch of a process's output lines, coalesced per tail poll so a chatty
+/// process (a game's startup log) can't flood subscribers with an event per
+/// line.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
 pub struct ProcessOutputEvent {
     pub id: String,
-    #[serde(flatten)]
-    pub line: ProcessLogLine,
+    pub lines: Vec<ProcessLogLine>,
 }
 impl Topic for ProcessOutputEvent {
     const TOPIC: &'static str = "process.output";

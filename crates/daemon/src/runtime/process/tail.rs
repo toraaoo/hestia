@@ -53,9 +53,19 @@ async fn run(
     let mut pending = Vec::new();
     loop {
         let finishing = done.load(Ordering::SeqCst);
+        // Coalesce every line read this pass into one event: a chatty startup
+        // log would otherwise emit thousands of per-line events and saturate a
+        // subscriber's main thread (the desktop re-renders per event).
+        let mut batch = Vec::new();
         drain(&path, &mut offset, &mut pending, |line| {
-            hub.publish(&output_event(&id, line));
+            batch.push(ProcessLogLine {
+                stream: LogStream::Stdout,
+                line,
+            });
         });
+        if !batch.is_empty() {
+            hub.publish(&output_event(&id, batch));
+        }
         if finishing {
             break;
         }
@@ -66,13 +76,10 @@ async fn run(
     }
 }
 
-fn output_event(id: &str, line: String) -> Event {
+fn output_event(id: &str, lines: Vec<ProcessLogLine>) -> Event {
     let event = ProcessOutputEvent {
         id: id.to_string(),
-        line: ProcessLogLine {
-            stream: LogStream::Stdout,
-            line,
-        },
+        lines,
     };
     Event {
         topic: <ProcessOutputEvent as proto::Topic>::TOPIC.to_string(),

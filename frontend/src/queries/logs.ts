@@ -23,11 +23,11 @@ export type LogsResult = UseQueryResult<ProcessLogLine[], HestiaError> & {
   lines: ProcessLogLine[];
 };
 
-// The daemon's `ProcessOutputEvent` flattens its `ProcessLogLine`, so the wire
-// shape is `{ id, stream, line }` — the log line's fields sit beside `id`, not
-// nested under `line`.
-interface ProcessOutputPayload extends ProcessLogLine {
+// The daemon coalesces a tail poll's lines into one event, so the wire shape is
+// `{ id, lines: ProcessLogLine[] }` — a batch, not a single line.
+interface ProcessOutputPayload {
   id: string;
+  lines: ProcessLogLine[];
 }
 
 export function useFollowedLogs(
@@ -46,16 +46,13 @@ export function useFollowedLogs(
   }
 
   useDaemonEvent<ProcessOutputPayload>('process.output', (payload) => {
-    if (!matchesRef.current?.(payload.id)) return;
-    const next: ProcessLogLine = {
-      stream: payload.stream,
-      line: payload.line,
-    };
-    setLive((lines) =>
-      lines.length >= limit
-        ? [...lines.slice(lines.length - limit + 1), next]
-        : [...lines, next],
-    );
+    if (!matchesRef.current?.(payload.id) || payload.lines.length === 0) return;
+    setLive((lines) => {
+      const merged = [...lines, ...payload.lines];
+      return merged.length > limit
+        ? merged.slice(merged.length - limit)
+        : merged;
+    });
   });
 
   const lines = useMemo(

@@ -1,5 +1,9 @@
 {
   "id": "process-1",
-  "stream": "stdout",
-  "line": "[Server] Done (5.231s)! For help, type \"help\""
+  "lines": [
+    {
+      "stream": "stdout",
+      "line": "[Server] Done (5.231s)! For help, type \"help\""
+    }
+  ]
 }
