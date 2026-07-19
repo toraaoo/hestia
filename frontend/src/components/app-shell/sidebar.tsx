@@ -6,6 +6,7 @@ import {
   HardDrivesIcon,
   PackageIcon,
   PlusIcon,
+  PushPinSlashIcon,
   SignOutIcon,
   StackIcon,
   StorefrontIcon,
@@ -31,48 +32,17 @@ import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries/accounts';
 import { useInstances } from '@/queries/instance';
-import { usePrefs } from '@/queries/prefs';
-import { useServers } from '@/queries/server';
+import { type PinnedEntry, pinKey, usePinned } from '@/queries/pinned';
+import { useServerPing, useServers } from '@/queries/server';
 
-const PINNED_ENTRIES_KEY = 'sidebar.pinned-entries';
-
-/** Stable empty fallback so the parse memo doesn't churn when nothing is pinned. */
-const NO_PINS: unknown[] = [];
-
-type PinnedKind = 'instance' | 'server';
-type PinnedEntry = { kind: PinnedKind; id: string };
 type ResolvedPin = PinnedEntry & {
   name: string;
   flavor: string;
   version: string;
   running: boolean;
+  /** Running session count — instances only; a server is always 0. */
+  sessions: number;
 };
-
-/** Validate the persisted blob, dropping malformed and duplicate entries. */
-function parsePinnedEntries(value: unknown): PinnedEntry[] {
-  if (!Array.isArray(value)) return [];
-
-  const entries: PinnedEntry[] = [];
-  const seen = new Set<string>();
-  for (const item of value) {
-    if (typeof item !== 'object' || item === null) continue;
-    const { kind, id } = item as Record<string, unknown>;
-    if ((kind !== 'instance' && kind !== 'server') || typeof id !== 'string') {
-      continue;
-    }
-    if (id === '') continue;
-
-    const key = `${kind}:${id}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    entries.push({ kind, id });
-  }
-  return entries;
-}
-
-function pinKey(pin: PinnedEntry): string {
-  return `${pin.kind}:${pin.id}`;
-}
 
 interface NavItem {
   to: string;
@@ -160,13 +130,10 @@ export function Sidebar() {
 function PinnedSection({ pathname }: { pathname: string }) {
   const instances = useInstances();
   const servers = useServers();
-  const { get, set, ready } = usePrefs();
+  const { pins: pinnedEntries, ready, isPinned, toggle, save } = usePinned();
 
   const instanceList = instances.data ?? [];
   const serverList = servers.data ?? [];
-
-  const raw = get<unknown>(PINNED_ENTRIES_KEY, NO_PINS);
-  const pinnedEntries = useMemo(() => parsePinnedEntries(raw), [raw]);
 
   const pinned = useMemo<ResolvedPin[]>(
     () =>
@@ -174,15 +141,17 @@ function PinnedSection({ pathname }: { pathname: string }) {
         if (pin.kind === 'instance') {
           const entry = instanceList.find((i) => i.id === pin.id);
           if (!entry) return [];
+          const sessions = (entry.sessions ?? []).filter(
+            (session) => session.state === 'running',
+          ).length;
           return [
             {
               ...pin,
               name: entry.name,
               flavor: entry.flavor,
               version: entry.gameVersion,
-              running: (entry.sessions ?? []).some(
-                (session) => session.state === 'running',
-              ),
+              running: sessions > 0,
+              sessions,
             },
           ];
         }
@@ -195,6 +164,7 @@ function PinnedSection({ pathname }: { pathname: string }) {
             flavor: entry.flavor,
             version: entry.gameVersion,
             running: entry.process?.state === 'running',
+            sessions: 0,
           },
         ];
       }),
@@ -203,28 +173,34 @@ function PinnedSection({ pathname }: { pathname: string }) {
 
   // Persist the pruned list when a pinned entry is deleted elsewhere. Both
   // lists must be loaded first, or a still-fetching query reads as empty and
-  // would wrongly drop live pins. The ref keeps the effect off `set`'s churn.
-  const setRef = useRef(set);
-  setRef.current = set;
+  // would wrongly drop live pins. The ref keeps the effect off `save`'s churn.
+  const saveRef = useRef(save);
+  saveRef.current = save;
   useEffect(() => {
     if (!ready || !instances.data || !servers.data) return;
     if (pinned.length === pinnedEntries.length) return;
-    setRef.current(
-      PINNED_ENTRIES_KEY,
-      pinned.map(({ kind, id }) => ({ kind, id })),
-    );
+    saveRef.current(pinned.map(({ kind, id }) => ({ kind, id })));
   }, [ready, instances.data, servers.data, pinned, pinnedEntries]);
 
-  const isPinned = (pin: PinnedEntry) =>
-    pinnedEntries.some((entry) => pinKey(entry) === pinKey(pin));
+  // Reorder previews locally while dragging; the drop commits it to prefs.
+  const [drag, setDrag] = useState<{
+    list: ResolvedPin[];
+    index: number;
+  } | null>(null);
+  const rows = drag?.list ?? pinned;
 
-  const togglePin = (pin: PinnedEntry) => {
-    set(
-      PINNED_ENTRIES_KEY,
-      isPinned(pin)
-        ? pinnedEntries.filter((entry) => pinKey(entry) !== pinKey(pin))
-        : [...pinnedEntries, pin],
-    );
+  const beginDrag = (index: number) => setDrag({ list: pinned, index });
+  const dragOver = (index: number) =>
+    setDrag((current) => {
+      if (!current || current.index === index) return current;
+      const list = [...current.list];
+      const [moved] = list.splice(current.index, 1);
+      list.splice(index, 0, moved);
+      return { list, index };
+    });
+  const endDrag = (commit: boolean) => {
+    if (commit && drag) save(drag.list.map(({ kind, id }) => ({ kind, id })));
+    setDrag(null);
   };
 
   const nothingToPin = instanceList.length === 0 && serverList.length === 0;
@@ -263,7 +239,7 @@ function PinnedSection({ pathname }: { pathname: string }) {
                     key={instance.id}
                     checked={isPinned({ kind: 'instance', id: instance.id })}
                     onCheckedChange={() =>
-                      togglePin({ kind: 'instance', id: instance.id })
+                      toggle({ kind: 'instance', id: instance.id })
                     }
                   >
                     {instance.name}
@@ -279,7 +255,7 @@ function PinnedSection({ pathname }: { pathname: string }) {
                     key={server.id}
                     checked={isPinned({ kind: 'server', id: server.id })}
                     onCheckedChange={() =>
-                      togglePin({ kind: 'server', id: server.id })
+                      toggle({ kind: 'server', id: server.id })
                     }
                   >
                     {server.name}
@@ -296,8 +272,19 @@ function PinnedSection({ pathname }: { pathname: string }) {
         </p>
       ) : (
         <div className="space-y-0.5">
-          {pinned.map((entry) => (
-            <PinnedLink key={pinKey(entry)} entry={entry} pathname={pathname} />
+          {rows.map((entry, index) => (
+            <PinnedLink
+              key={pinKey(entry)}
+              entry={entry}
+              pathname={pathname}
+              onUnpin={() => toggle({ kind: entry.kind, id: entry.id })}
+              draggable={rows.length > 1}
+              dragging={drag !== null && drag.index === index}
+              onDragStart={() => beginDrag(index)}
+              onDragEnter={() => dragOver(index)}
+              onDrop={() => endDrag(true)}
+              onDragEnd={() => endDrag(false)}
+            />
           ))}
         </div>
       )}
@@ -308,19 +295,50 @@ function PinnedSection({ pathname }: { pathname: string }) {
 function PinnedLink({
   entry,
   pathname,
+  onUnpin,
+  draggable,
+  dragging,
+  onDragStart,
+  onDragEnter,
+  onDrop,
+  onDragEnd,
 }: {
   entry: ResolvedPin;
   pathname: string;
+  onUnpin: () => void;
+  draggable: boolean;
+  dragging: boolean;
+  onDragStart: () => void;
+  onDragEnter: () => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
 }) {
   const active = pathname === `/${entry.kind}s/${entry.id}`;
-  const content = <PinnedLinkContent entry={entry} />;
+  const content = <PinnedLinkContent entry={entry} onUnpin={onUnpin} />;
+  const className = pinnedLinkClass(active, dragging);
+
+  const dragProps = {
+    draggable,
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.effectAllowed = 'move';
+      onDragStart();
+    },
+    onDragEnter,
+    onDragOver: (e: React.DragEvent) => e.preventDefault(),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      onDrop();
+    },
+    onDragEnd,
+  };
 
   if (entry.kind === 'server') {
     return (
       <Link
         to="/servers/$id"
         params={{ id: entry.id }}
-        className={pinnedLinkClass(active)}
+        className={className}
+        {...dragProps}
       >
         {content}
       </Link>
@@ -331,23 +349,31 @@ function PinnedLink({
     <Link
       to="/instances/$id"
       params={{ id: entry.id }}
-      className={pinnedLinkClass(active)}
+      className={className}
+      {...dragProps}
     >
       {content}
     </Link>
   );
 }
 
-function pinnedLinkClass(active: boolean) {
+function pinnedLinkClass(active: boolean, dragging: boolean) {
   return cn(
-    'flex items-center gap-2.5 px-3 py-1.5 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset',
+    'group/pin flex items-center gap-2.5 px-3 py-1.5 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset',
     active
       ? 'bg-muted text-foreground'
       : 'text-muted-foreground hover:bg-muted/60',
+    dragging && 'opacity-50',
   );
 }
 
-function PinnedLinkContent({ entry }: { entry: ResolvedPin }) {
+function PinnedLinkContent({
+  entry,
+  onUnpin,
+}: {
+  entry: ResolvedPin;
+  onUnpin: () => void;
+}) {
   const Icon = entry.kind === 'server' ? HardDrivesIcon : CubeIcon;
   return (
     <>
@@ -362,8 +388,45 @@ function PinnedLinkContent({ entry }: { entry: ResolvedPin }) {
           {entry.flavor} · {entry.version}
         </span>
       </span>
-      {entry.running && <StatusDot tone="on" />}
+      <span className="flex shrink-0 items-center gap-1.5 group-hover/pin:hidden group-focus-within/pin:hidden">
+        {entry.running && entry.kind === 'server' && (
+          <ServerPinPlayers id={entry.id} />
+        )}
+        {entry.running && entry.kind === 'instance' && entry.sessions > 1 && (
+          <span
+            className="font-mono text-[10px]"
+            title={m['entry.sessions_running']({ count: entry.sessions })}
+          >
+            ×{entry.sessions}
+          </span>
+        )}
+        {entry.running && <StatusDot tone="on" />}
+      </span>
+      <button
+        type="button"
+        aria-label={m['label.unpin']()}
+        title={m['label.unpin']()}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onUnpin();
+        }}
+        className="hidden shrink-0 text-muted-foreground outline-none group-focus-within/pin:block group-hover/pin:block hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <PushPinSlashIcon className="size-3.5" />
+      </button>
     </>
+  );
+}
+
+/** Server List Ping players, polled only while the pin is mounted running. */
+function ServerPinPlayers({ id }: { id: string }) {
+  const ping = useServerPing(id, true);
+  if (!ping.data) return null;
+  return (
+    <span className="font-mono text-[10px]" title={m['label.players']()}>
+      {ping.data.playersOnline}/{ping.data.playersMax}
+    </span>
   );
 }
 

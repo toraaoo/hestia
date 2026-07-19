@@ -65,7 +65,9 @@
     "latest": "mais recente",
     "pinned": "Fixados",
     "nothing_pinned": "Nada fixado ainda",
-    "pin_entries": "Fixar uma instância ou servidor"
+    "pin_entries": "Fixar uma instância ou servidor",
+    "pin": "Fixar na barra lateral",
+    "unpin": "Desafixar"
   },
   "status": {
     "preparing": "Preparando",
