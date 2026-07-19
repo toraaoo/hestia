@@ -15,8 +15,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
-import { LaunchProgressDialog } from '@/features/entries/provision-progress';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
 import {
@@ -141,16 +141,10 @@ export function PlayBar() {
           onClick={() => sel && launch.mutate(sel.id)}
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
-          <PlayIcon weight="fill" />
+          {busy ? <Spinner /> : <PlayIcon weight="fill" />}
           {m['action.play']()}
         </Button>
       )}
-
-      <LaunchProgressDialog
-        open={launch.isPending}
-        name={sel?.name ?? ''}
-        progress={launch.progress}
-      />
     </div>
   );
 }

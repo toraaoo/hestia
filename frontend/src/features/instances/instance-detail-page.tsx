@@ -19,6 +19,7 @@ import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -27,7 +28,6 @@ import {
 } from '@/features/content/install-modal';
 import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
 import { instances as mockInstances } from '@/features/entries/mock';
-import { LaunchProgressDialog } from '@/features/entries/provision-progress';
 import {
   type LiveResources,
   ResourceCards,
@@ -209,7 +209,7 @@ export function InstanceDetailPage({
                 className="bg-ember text-ember-foreground hover:bg-ember/90"
                 onClick={() => launch.mutate({})}
               >
-                <PlayIcon weight="fill" />
+                {launch.isPending ? <Spinner /> : <PlayIcon weight="fill" />}
                 {m['action.play']()}
               </Button>
             )}
@@ -393,12 +393,6 @@ export function InstanceDetailPage({
         entry={instanceTarget(instance)}
         open={addingContent}
         onOpenChange={setAddingContent}
-      />
-
-      <LaunchProgressDialog
-        open={launch.isPending}
-        name={instance.name}
-        progress={launch.progress}
       />
     </div>
   );

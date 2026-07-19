@@ -249,9 +249,10 @@
     "importing": "Importando {name}…",
     "backing_up": "Fazendo backup"
   },
-  "launch": {
-    "title": "Iniciando {name}",
-    "hint": "Materializando arquivos e iniciando o jogo…"
+  "jobs": {
+    "title": "Tarefas em segundo plano ({count})",
+    "failed": "A operação falhou.",
+    "more": "+{count} mais"
   },
   "error": {
     "pick_flavor": "Escolha uma distribuição para continuar.",

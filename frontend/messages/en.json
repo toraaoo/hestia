@@ -250,9 +250,10 @@
     "importing": "Importing {name}…",
     "backing_up": "Backing up"
   },
-  "launch": {
-    "title": "Launching {name}",
-    "hint": "Materialising files and starting the game…"
+  "jobs": {
+    "title": "Background jobs ({count})",
+    "failed": "Operation failed.",
+    "more": "+{count} more"
   },
   "error": {
     "pick_flavor": "Pick a flavor to continue.",

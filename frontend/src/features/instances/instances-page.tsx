@@ -16,7 +16,6 @@ import {
 } from '@/features/entries/collection';
 import { CreateEntryModal } from '@/features/entries/create-modal';
 import type { EntryCardData } from '@/features/entries/entry-card';
-import { LaunchProgressDialog } from '@/features/entries/provision-progress';
 import { EntryGridSkeleton } from '@/features/entries/skeleton';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
@@ -109,14 +108,6 @@ export function InstancesPage({
             kind="instance"
             open={creating}
             onOpenChange={setCreating}
-          />
-          <LaunchProgressDialog
-            open={launch.isPending}
-            name={
-              (instances.data ?? []).find((i) => i.id === launch.variables)
-                ?.name ?? ''
-            }
-            progress={launch.progress}
           />
         </>
       ) : (

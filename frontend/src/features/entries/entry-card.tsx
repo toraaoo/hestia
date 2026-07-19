@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
@@ -106,7 +107,7 @@ function ActionButton({
       }}
       className="bg-ember text-ember-foreground hover:bg-ember/90"
     >
-      <PlayIcon weight="fill" />
+      {entry.busy ? <Spinner /> : <PlayIcon weight="fill" />}
       {entry.kind === 'server' ? m['action.start']() : m['action.play']()}
     </Button>
   );
