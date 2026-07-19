@@ -28,7 +28,6 @@ import {
   instanceTarget,
 } from '@/features/content/install-modal';
 import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
-import { instances as mockInstances } from '@/features/entries/mock';
 import {
   type LiveResources,
   ResourceCards,
@@ -43,6 +42,7 @@ import {
   useInstanceConfig,
   useInstanceInfo,
   useInstanceLogs,
+  useInstanceProfiles,
   useInstanceWorlds,
   useLaunchInstance,
   useStopInstance,
@@ -86,6 +86,7 @@ export function InstanceDetailPage({
   const info = useInstanceInfo(id);
   const config = useInstanceConfig(id);
   const worlds = useInstanceWorlds(id);
+  const profiles = useInstanceProfiles(id);
   const [addingContent, setAddingContent] = useState(false);
   const launch = useLaunchInstance(id);
   const stop = useStopInstance(id);
@@ -146,9 +147,6 @@ export function InstanceDetailPage({
       });
   };
 
-  // Content and profiles are not wired yet — they render over a mock instance,
-  // as the server detail's content tab does (see `serverTarget(mockServers[0])`).
-  const mock = mockInstances[0];
   const worldNames = worlds.data ?? [];
 
   return (
@@ -234,7 +232,7 @@ export function InstanceDetailPage({
           </TabsTrigger>
           <TabsTrigger value="profiles">
             {m['profiles.tab']()}
-            <TabCount n={mock.profiles.length} />
+            <TabCount n={profiles.data?.profiles.length ?? 0} />
           </TabsTrigger>
           <TabsTrigger value="worlds">
             {m['tab.worlds']()}
@@ -357,7 +355,7 @@ export function InstanceDetailPage({
         </TabsContent>
 
         <TabsContent value="profiles" className="p-5">
-          <ProfilesPanel inst={mock} />
+          <ProfilesPanel instance={instance} running={running} />
         </TabsContent>
 
         <TabsContent value="worlds" className="p-5">

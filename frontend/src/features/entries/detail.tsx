@@ -26,8 +26,6 @@ import {
 import { KindChips } from '@/features/content/kind-chips';
 import { kindInfo } from '@/features/content/kinds';
 import { ChangeVersionModal } from '@/features/content/version-modal';
-import type { Backup } from '@/features/entries/mock';
-import { agoLabel, bytes } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import {
@@ -561,75 +559,6 @@ function ContentRow({
           }}
         />
       </div>
-    </div>
-  );
-}
-
-function backupKindLabel(kind: Backup['kind']): string {
-  switch (kind) {
-    case 'manual':
-      return m['backup.kind_manual']();
-    case 'scheduled':
-      return m['backup.kind_scheduled']();
-    case 'update':
-      return m['backup.kind_update']();
-  }
-}
-
-export function BackupList({ backups }: { backups: Backup[] }) {
-  const [list, setList] = useState(backups);
-
-  if (list.length === 0) {
-    return <Empty>{m['backup.none']()}</Empty>;
-  }
-  return (
-    <div className="divide-y divide-border border border-border">
-      {list.map((b) => (
-        <div key={b.id} className="flex items-center gap-3 px-3 py-2.5">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{agoLabel(b.createdUnix)}</span>
-              <Badge variant="secondary" className="shrink-0 capitalize">
-                {backupKindLabel(b.kind)}
-              </Badge>
-            </div>
-            <div className="font-mono text-[11px] text-muted-foreground">
-              {bytes(b.sizeBytes)}
-            </div>
-          </div>
-          <ConfirmDialog
-            trigger={
-              <Button variant="outline" size="sm">
-                {m['action.restore']()}
-              </Button>
-            }
-            title={m['backup.restore_title']()}
-            description={m['backup.restore_description']({
-              when: agoLabel(b.createdUnix),
-            })}
-            confirmLabel={m['action.restore']()}
-            onConfirm={() => {}}
-          />
-          <ConfirmDialog
-            trigger={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={m['backup.delete_aria']()}
-              >
-                <TrashIcon className="size-4" />
-              </Button>
-            }
-            title={m['backup.delete_title']()}
-            description={m['backup.delete_description']({
-              when: agoLabel(b.createdUnix),
-            })}
-            destructive
-            confirmLabel={m['action.delete']()}
-            onConfirm={() => setList((l) => l.filter((x) => x.id !== b.id))}
-          />
-        </div>
-      ))}
     </div>
   );
 }

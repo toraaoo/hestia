@@ -9,10 +9,19 @@ import {
   TextboxIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
+import { useQueries } from '@tanstack/react-query';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
+import type {
+  ContentKind,
+  ContentProfile,
+  InstalledContent,
+  InstanceInfo,
+} from '@/api';
 import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
+import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -34,43 +43,76 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import {
+  Progress,
+  ProgressLabel,
+  ProgressValue,
+} from '@/components/ui/progress';
 import { PickRow } from '@/features/content/pick-row';
-import type { ContentProfile, Instance } from '@/features/entries/mock';
-import { globalProfiles } from '@/features/profiles/mock';
 import { m } from '@/paraglide/messages.js';
+import {
+  instanceQueries,
+  useApplyInstanceProfile,
+  useCaptureInstanceProfile,
+  useCreateInstanceProfile,
+  useEditInstanceProfile,
+  useInstanceProfiles,
+  useReleaseInstanceProfile,
+  useRemoveInstanceProfile,
+  useRenameInstanceProfile,
+  useUseInstanceProfile,
+} from '@/queries/instance';
+import { useGlobalProfiles } from '@/queries/profile';
 
 /** The content kinds a profile selects over — never datapacks. */
-const selectableKinds = ['mod', 'resourcepack', 'shader'] as const;
+const selectableKinds: ContentKind[] = ['mod', 'resource_pack', 'shader'];
+
+const onToastError = {
+  onError: (error: Error) => toast.error(error.message),
+};
 
 /**
  * The instance's Profiles tab: named selections over the installed pool, the
- * active one enforced at launch. Local state over the mock — nothing talks to
- * a backend.
+ * active one enforced at launch. Members are pool filenames.
  */
-export function ProfilesPanel({ inst }: { inst: Instance }) {
-  const [profiles, setProfiles] = useState<ContentProfile[]>(inst.profiles);
-  const [active, setActive] = useState(inst.activeProfile);
+export function ProfilesPanel({
+  instance,
+  running,
+}: {
+  instance: InstanceInfo;
+  running: boolean;
+}) {
+  const id = instance.id;
+  const query = useInstanceProfiles(id);
+  const create = useCreateInstanceProfile(id);
+  const removeProfile = useRemoveInstanceProfile(id);
+  const rename = useRenameInstanceProfile(id);
+  const use = useUseInstanceProfile(id);
+  const edit = useEditInstanceProfile(id);
+  const capture = useCaptureInstanceProfile(id);
+  const release = useReleaseInstanceProfile(id);
+
   const [creating, setCreating] = useState(false);
   const [applying, setApplying] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
 
-  const pool = inst.content.filter((c) =>
-    selectableKinds.includes(c.kind as (typeof selectableKinds)[number]),
-  );
+  const poolLists = useQueries({
+    queries: selectableKinds.map((k) => instanceQueries.content(id, k)),
+  });
+  const pool = poolLists.flatMap((q) => q.data?.items ?? []);
 
-  const patch = (name: string, change: (p: ContentProfile) => ContentProfile) =>
-    setProfiles((list) => list.map((p) => (p.name === name ? change(p) : p)));
+  if (query.isPending) {
+    return (
+      <div className="space-y-2">
+        <Bone className="h-10" />
+        <Bone className="h-10" />
+      </div>
+    );
+  }
 
-  const remove = (name: string) => {
-    setProfiles((list) => list.filter((p) => p.name !== name));
-    if (active === name) setActive('');
-  };
-
-  const rename = (name: string, next: string) => {
-    patch(name, (p) => ({ ...p, name: next }));
-    if (active === name) setActive(next);
-  };
+  const active = query.data?.active ?? '';
+  const profiles = query.data?.profiles ?? [];
 
   return (
     <>
@@ -89,6 +131,7 @@ export function ProfilesPanel({ inst }: { inst: Instance }) {
             size="sm"
             variant="outline"
             data-icon="inline-start"
+            disabled={running}
             onClick={() => setApplying(true)}
           >
             <DownloadSimpleIcon weight="bold" />
@@ -116,15 +159,18 @@ export function ProfilesPanel({ inst }: { inst: Instance }) {
               profile={profile}
               poolSize={pool.length}
               active={active === profile.name}
+              running={running}
               onUse={() =>
-                setActive(active === profile.name ? '' : profile.name)
+                use.mutate(
+                  active === profile.name ? '' : profile.name,
+                  onToastError,
+                )
               }
               onEditMembers={() => setEditing(profile.name)}
               onRename={() => setRenaming(profile.name)}
-              onCaptureChange={(captured) =>
-                patch(profile.name, (p) => ({ ...p, captured }))
-              }
-              onRemove={() => remove(profile.name)}
+              onCapture={() => capture.mutate(profile.name, onToastError)}
+              onRelease={() => release.mutate(profile.name, onToastError)}
+              onRemove={() => removeProfile.mutate(profile.name, onToastError)}
             />
           ))}
         </div>
@@ -134,36 +180,60 @@ export function ProfilesPanel({ inst }: { inst: Instance }) {
         open={creating}
         onOpenChange={setCreating}
         taken={profiles.map((p) => p.name)}
-        onCreate={(name, seed) =>
-          setProfiles((list) => [
-            ...list,
+        pending={create.isPending}
+        onCreate={(name, seedFromPool) =>
+          create.mutate(
+            { name, seedFromPool },
             {
-              name,
-              members: seed ? pool.map((c) => c.id) : [],
-              captured: false,
+              onSuccess: () => setCreating(false),
+              onError: (error) => toast.error(error.message),
             },
-          ])
+          )
         }
       />
 
       <ApplyGlobalDialog
+        instanceId={id}
         open={applying}
         onOpenChange={setApplying}
-        version={inst.gameVersion}
+        version={instance.gameVersion}
       />
 
       <MembersDialog
         profile={profiles.find((p) => p.name === editing) ?? null}
         pool={pool}
+        pending={edit.isPending}
         onOpenChange={(open) => !open && setEditing(null)}
-        onSave={(name, members) => patch(name, (p) => ({ ...p, members }))}
+        onSave={(name, members) => {
+          const current = profiles.find((p) => p.name === name)?.members ?? [];
+          edit.mutate(
+            {
+              name,
+              add: members.filter((f) => !current.includes(f)),
+              remove: current.filter((f) => !members.includes(f)),
+            },
+            {
+              onSuccess: () => setEditing(null),
+              onError: (error) => toast.error(error.message),
+            },
+          );
+        }}
       />
 
       <RenameProfileDialog
         name={renaming}
         taken={profiles.map((p) => p.name)}
+        pending={rename.isPending}
         onOpenChange={(open) => !open && setRenaming(null)}
-        onRename={rename}
+        onRename={(name, newName) =>
+          rename.mutate(
+            { name, newName },
+            {
+              onSuccess: () => setRenaming(null),
+              onError: (error) => toast.error(error.message),
+            },
+          )
+        }
       />
     </>
   );
@@ -173,19 +243,23 @@ function ProfileRow({
   profile,
   poolSize,
   active,
+  running,
   onUse,
   onEditMembers,
   onRename,
-  onCaptureChange,
+  onCapture,
+  onRelease,
   onRemove,
 }: {
   profile: ContentProfile;
   poolSize: number;
   active: boolean;
+  running: boolean;
   onUse: () => void;
   onEditMembers: () => void;
   onRename: () => void;
-  onCaptureChange: (captured: boolean) => void;
+  onCapture: () => void;
+  onRelease: () => void;
   onRemove: () => void;
 }) {
   const [confirming, setConfirming] = useState<
@@ -252,7 +326,10 @@ function ProfileRow({
             <TextboxIcon />
             {m['profiles.rename']()}
           </DropdownMenuItem>
+          {/* Capture/release move the profile's settings store — the daemon
+              refuses them while a session could be writing through it. */}
           <DropdownMenuItem
+            disabled={running}
             onClick={() =>
               setConfirming(profile.captured ? 'release' : 'capture')
             }
@@ -293,7 +370,7 @@ function ProfileRow({
         confirmLabel={m['profiles.capture']()}
         onConfirm={() => {
           setConfirming(null);
-          onCaptureChange(true);
+          onCapture();
         }}
       />
       <ConfirmDialog
@@ -305,7 +382,7 @@ function ProfileRow({
         confirmLabel={m['profiles.release']()}
         onConfirm={() => {
           setConfirming(null);
-          onCaptureChange(false);
+          onRelease();
         }}
       />
     </div>
@@ -316,11 +393,13 @@ function CreateProfileDialog({
   open,
   onOpenChange,
   taken,
+  pending,
   onCreate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   taken: string[];
+  pending: boolean;
   onCreate: (name: string, seedFromPool: boolean) => void;
 }) {
   const [name, setName] = useState('');
@@ -380,11 +459,8 @@ function CreateProfileDialog({
             {m['action.cancel']()}
           </Button>
           <Button
-            disabled={invalid}
-            onClick={() => {
-              onCreate(trimmed, seed);
-              close(false);
-            }}
+            disabled={invalid || pending}
+            onClick={() => onCreate(trimmed, seed)}
           >
             {m['action.confirm']()}
           </Button>
@@ -397,11 +473,13 @@ function CreateProfileDialog({
 function MembersDialog({
   profile,
   pool,
+  pending,
   onOpenChange,
   onSave,
 }: {
   profile: ContentProfile | null;
-  pool: Instance['content'];
+  pool: InstalledContent[];
+  pending: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (name: string, members: string[]) => void;
 }) {
@@ -428,20 +506,20 @@ function MembersDialog({
           <Empty>{m['profiles.members_empty']()}</Empty>
         ) : (
           <div className="grid max-h-72 gap-2 overflow-y-auto p-1">
-            {pool.map((c) => {
-              const checked = members.includes(c.id);
+            {pool.map((item) => {
+              const checked = members.includes(item.filename);
               return (
                 <PickRow
-                  key={c.id}
-                  icon={contentIcon(c.kind)}
-                  title={c.name}
-                  subtitle={`${contentKindLabel[c.kind]()} · ${c.version}`}
+                  key={item.filename}
+                  icon={contentIcon(item.kind)}
+                  title={item.title || item.filename}
+                  subtitle={`${contentKindLabel[item.kind]()} · ${item.versionNumber || item.filename}`}
                   selected={checked}
                   onSelect={() =>
                     setSelected(
                       checked
-                        ? members.filter((id) => id !== c.id)
-                        : [...members, c.id],
+                        ? members.filter((f) => f !== item.filename)
+                        : [...members, item.filename],
                     )
                   }
                 />
@@ -454,9 +532,9 @@ function MembersDialog({
             {m['action.cancel']()}
           </Button>
           <Button
+            disabled={pending}
             onClick={() => {
               if (profile) onSave(profile.name, members);
-              close(false);
             }}
           >
             {m['action.apply']()}
@@ -470,11 +548,13 @@ function MembersDialog({
 function RenameProfileDialog({
   name,
   taken,
+  pending,
   onOpenChange,
   onRename,
 }: {
   name: string | null;
   taken: string[];
+  pending: boolean;
   onOpenChange: (open: boolean) => void;
   onRename: (name: string, next: string) => void;
 }) {
@@ -514,10 +594,9 @@ function RenameProfileDialog({
             {m['action.cancel']()}
           </Button>
           <Button
-            disabled={invalid}
+            disabled={invalid || pending}
             onClick={() => {
               if (name) onRename(name, trimmed);
-              close(false);
             }}
           >
             {m['profiles.rename']()}
@@ -529,19 +608,43 @@ function RenameProfileDialog({
 }
 
 function ApplyGlobalDialog({
+  instanceId,
   open,
   onOpenChange,
   version,
 }: {
+  instanceId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   version: string;
 }) {
+  const globals = useGlobalProfiles();
+  const apply = useApplyInstanceProfile(instanceId);
   const [picked, setPicked] = useState<string | null>(null);
 
+  const list = globals.data ?? [];
+  const progress = apply.progress;
+  const percent =
+    progress && progress.total > 0
+      ? Math.round((progress.current / progress.total) * 100)
+      : 0;
+
   const close = (next: boolean) => {
+    if (apply.isPending) return;
     if (!next) setPicked(null);
     onOpenChange(next);
+  };
+
+  const run = () => {
+    if (!picked) return;
+    apply.mutate(picked, {
+      onSuccess: (done) => {
+        for (const failure of done.failures) toast.error(failure.message);
+        setPicked(null);
+        onOpenChange(false);
+      },
+      onError: (error) => toast.error(error.message),
+    });
   };
 
   return (
@@ -553,11 +656,22 @@ function ApplyGlobalDialog({
             {m['profiles.apply_description']({ version })}
           </DialogDescription>
         </DialogHeader>
-        {globalProfiles.length === 0 ? (
+        {apply.isPending ? (
+          <div className="flex min-h-24 flex-col justify-center px-1">
+            <Progress value={percent}>
+              <ProgressLabel>
+                {progress?.detail ||
+                  progress?.phase ||
+                  m['profiles.apply_global']()}
+              </ProgressLabel>
+              <ProgressValue />
+            </Progress>
+          </div>
+        ) : list.length === 0 ? (
           <Empty>{m['profiles.global_empty']()}</Empty>
         ) : (
           <div className="grid gap-2 p-1">
-            {globalProfiles.map((profile) => (
+            {list.map((profile) => (
               <PickRow
                 key={profile.name}
                 icon={StackIcon}
@@ -572,10 +686,14 @@ function ApplyGlobalDialog({
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => close(false)}>
+          <Button
+            variant="outline"
+            disabled={apply.isPending}
+            onClick={() => close(false)}
+          >
             {m['action.cancel']()}
           </Button>
-          <Button disabled={picked === null} onClick={() => close(false)}>
+          <Button disabled={picked === null || apply.isPending} onClick={run}>
             {m['action.apply']()}
           </Button>
         </DialogFooter>

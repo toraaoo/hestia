@@ -1,7 +1,8 @@
 import { CaretRightIcon, PlusIcon, StackIcon } from '@phosphor-icons/react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import type { ContentKind } from '@/api';
+import { toast } from 'sonner';
+import type { ContentKind, GlobalProfile } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Empty } from '@/components/empty';
 import { Page } from '@/components/page';
@@ -19,11 +20,9 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { getProject } from '@/features/content/mock';
 import { type View, ViewToggle } from '@/features/entries/collection';
-import type { GlobalProfile } from '@/features/profiles/mock';
-import { globalProfiles } from '@/features/profiles/mock';
 import { m } from '@/paraglide/messages.js';
+import { useCreateGlobalProfile, useGlobalProfiles } from '@/queries/profile';
 
 /** The kinds a global profile can reference — the selectable pool kinds. */
 export const profileFilterKinds: ContentKind[] = [
@@ -34,8 +33,7 @@ export const profileFilterKinds: ContentKind[] = [
 
 /**
  * The global profiles list: a grid/list of cards searchable by name, each
- * opening its detail page. Local state over the mock — nothing talks to a
- * backend.
+ * opening its detail page.
  */
 export function ProfilesPage({
   view,
@@ -46,9 +44,11 @@ export function ProfilesPage({
 }) {
   const { query } = useSearch();
   const navigate = useNavigate();
-  const [profiles, setProfiles] = useState<GlobalProfile[]>(globalProfiles);
+  const list = useGlobalProfiles();
+  const create = useCreateGlobalProfile();
   const [creating, setCreating] = useState(false);
 
+  const profiles = list.data ?? [];
   const q = query.trim().toLowerCase();
   const filtered = profiles.filter((p) => !q || p.name.includes(q));
 
@@ -56,6 +56,7 @@ export function ProfilesPage({
     <Page
       title={m['profiles.page_title']()}
       subtitle={m['profiles.page_description']()}
+      loading={list.isPending}
       skeleton={
         <CardGridSkeleton
           grid="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3"
@@ -103,12 +104,19 @@ export function ProfilesPage({
         open={creating}
         onOpenChange={setCreating}
         taken={profiles.map((p) => p.name)}
-        onCreate={(name) => {
-          const profile = { name, entries: [] };
-          globalProfiles.push(profile);
-          setProfiles([...globalProfiles]);
-          navigate({ to: '/profiles/$name', params: { name } });
-        }}
+        pending={create.isPending}
+        onCreate={(name) =>
+          create.mutate(name, {
+            onSuccess: (profile) => {
+              setCreating(false);
+              navigate({
+                to: '/profiles/$name',
+                params: { name: profile.name },
+              });
+            },
+            onError: (error) => toast.error(error.message),
+          })
+        }
       />
     </Page>
   );
@@ -118,7 +126,7 @@ function entrySummary(profile: GlobalProfile): string {
   return (
     profile.entries
       .slice(0, 3)
-      .map((e) => getProject(e.slug)?.title ?? e.slug)
+      .map((e) => e.slug || e.projectId)
       .join(' · ') || m['profiles.no_entries']()
   );
 }
@@ -179,11 +187,13 @@ function CreateGlobalDialog({
   open,
   onOpenChange,
   taken,
+  pending,
   onCreate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   taken: string[];
+  pending: boolean;
   onCreate: (name: string) => void;
 }) {
   const [name, setName] = useState('');
@@ -226,13 +236,7 @@ function CreateGlobalDialog({
           <Button variant="outline" onClick={() => close(false)}>
             {m['action.cancel']()}
           </Button>
-          <Button
-            disabled={invalid}
-            onClick={() => {
-              onCreate(slug);
-              close(false);
-            }}
-          >
+          <Button disabled={invalid || pending} onClick={() => onCreate(slug)}>
             {m['action.confirm']()}
           </Button>
         </DialogFooter>

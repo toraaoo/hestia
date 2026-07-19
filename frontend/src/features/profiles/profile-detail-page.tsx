@@ -1,11 +1,14 @@
-import { PlusIcon, StackIcon, TrashIcon } from '@phosphor-icons/react';
+import { PlusIcon, StackIcon, TrashIcon, XIcon } from '@phosphor-icons/react';
+import { useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
-import type { ContentKind } from '@/api';
+import type { ContentKind, ProfileEntry } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
+import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -15,25 +18,31 @@ import {
 } from '@/features/content/install-modal';
 import { KindChips } from '@/features/content/kind-chips';
 import { kindInfo } from '@/features/content/kinds';
-import { getProject } from '@/features/content/mock';
-import { globalProfiles } from '@/features/profiles/mock';
 import { profileFilterKinds } from '@/features/profiles/profiles-page';
 import { m } from '@/paraglide/messages.js';
+import { contentQueries } from '@/queries/content';
+import {
+  useEditGlobalProfile,
+  useGlobalProfiles,
+  useRemoveGlobalProfile,
+} from '@/queries/profile';
 
-/** A profile reference as rendered on the detail page (mock, presentational). */
+/** A profile reference joined with its resolved project detail. */
 interface Reference {
-  slug: string;
+  ref: string;
   name: string;
   kind: ContentKind;
   source: string;
 }
 
+const entryRef = (entry: ProfileEntry) => entry.slug || entry.projectId;
+
 /**
  * A global profile's detail page — the same shape as an entry's content tab
- * (`ContentSection` + the install modal) for consistency. A reference renders
+ * (kind chips + rows + the install modal) for consistency. A reference renders
  * as a content row pinned to "latest": the profile stores references, never
- * jars, so each apply resolves the version per instance. Local state over the
- * mock — nothing talks to a backend.
+ * jars, so each apply resolves the version per instance. Titles and kinds come
+ * from each reference's project detail, fetched per row.
  */
 export function ProfileDetailPage({
   name,
@@ -45,8 +54,27 @@ export function ProfileDetailPage({
   onKindChange: (kind?: ContentKind) => void;
 }) {
   const navigate = useNavigate();
-  const profile = globalProfiles.find((p) => p.name === name);
+  const list = useGlobalProfiles();
+  const remove = useRemoveGlobalProfile();
+  const edit = useEditGlobalProfile();
   const [adding, setAdding] = useState(false);
+
+  const profile = (list.data ?? []).find((p) => p.name === name);
+
+  const projects = useQueries({
+    queries: (profile?.entries ?? []).map((entry) =>
+      contentQueries.project(entryRef(entry), entry.source),
+    ),
+  });
+
+  if (list.isPending) {
+    return (
+      <div className="space-y-4 p-6">
+        <Bone className="h-8 w-64" />
+        <Bone className="h-40" />
+      </div>
+    );
+  }
 
   if (!profile) {
     return (
@@ -56,16 +84,22 @@ export function ProfileDetailPage({
     );
   }
 
-  const items: Reference[] = profile.entries.map((entry) => {
-    const project = getProject(entry.slug);
+  const items: Reference[] = profile.entries.map((entry, index) => {
+    const project = projects[index]?.data;
     return {
-      slug: entry.slug,
-      name: project?.title ?? entry.slug,
+      ref: entryRef(entry),
+      name: project?.title ?? entryRef(entry),
       kind: project?.kind ?? 'mod',
       source: entry.source,
     };
   });
   const filtered = kind ? items.filter((i) => i.kind === kind) : items;
+
+  const removeReference = (ref: string) =>
+    edit.mutate(
+      { name: profile.name, remove: [ref] },
+      { onError: (error) => toast.error(error.message) },
+    );
 
   return (
     <div className="flex min-h-full flex-col">
@@ -91,13 +125,12 @@ export function ProfileDetailPage({
             description={m['profiles.remove_description']()}
             destructive
             confirmLabel={m['action.remove']()}
-            onConfirm={() => {
-              const at = globalProfiles.findIndex(
-                (p) => p.name === profile.name,
-              );
-              if (at >= 0) globalProfiles.splice(at, 1);
-              navigate({ to: '/profiles' });
-            }}
+            onConfirm={() =>
+              remove.mutate(profile.name, {
+                onSuccess: () => navigate({ to: '/profiles' }),
+                onError: (error) => toast.error(error.message),
+              })
+            }
           />
         }
       />
@@ -134,7 +167,7 @@ export function ProfileDetailPage({
               const Icon = contentIcon(ref.kind);
               return (
                 <div
-                  key={ref.slug}
+                  key={ref.ref}
                   className="flex items-center gap-3 px-3 py-2.5"
                 >
                   <Icon className="size-4 shrink-0 text-muted-foreground" />
@@ -145,6 +178,15 @@ export function ProfileDetailPage({
                       {m['label.latest']()}
                     </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={m['action.remove']()}
+                    disabled={edit.isPending}
+                    onClick={() => removeReference(ref.ref)}
+                  >
+                    <XIcon className="size-4" />
+                  </Button>
                 </div>
               );
             })}
