@@ -9,6 +9,7 @@ import {
 } from '@phosphor-icons/react';
 import { useQueries } from '@tanstack/react-query';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import type { ContentKind } from '@/api';
 import { type InstanceInfo, system } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
@@ -139,7 +140,10 @@ export function InstanceDetailPage({
   };
 
   const openFolder = () => {
-    if (info.data) void system.openPath(info.data.entryDir);
+    if (info.data)
+      system.openPath(info.data.entryDir).catch((error: Error) => {
+        toast.error(error.message);
+      });
   };
 
   // Content and profiles are not wired yet — they render over a mock instance,

@@ -5,6 +5,7 @@ import {
   PowerIcon,
 } from '@phosphor-icons/react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import type { ContentKind } from '@/api';
 import { type ServerInfo, system } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
@@ -148,7 +149,10 @@ export function ServerDetailPage({
               aria-label={m['detail.open_folder']()}
               disabled={!info.data}
               onClick={() => {
-                if (info.data) void system.openPath(info.data.entryDir);
+                if (info.data)
+                  system.openPath(info.data.entryDir).catch((error: Error) => {
+                    toast.error(error.message);
+                  });
               }}
             >
               <FolderOpenIcon className="size-4" />
