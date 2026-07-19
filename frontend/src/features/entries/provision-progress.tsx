@@ -153,9 +153,30 @@ export function ProvisionProgressView({
 }
 
 /**
+ * Delay a flag's rise by `ms`, but drop it immediately. Used to hold back a
+ * modal so a fast operation never flashes it — if the flag clears before the
+ * delay elapses, the modal is never shown.
+ */
+function useDelayedFlag(active: boolean, ms: number): boolean {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setShown(false);
+      return;
+    }
+    const timer = setTimeout(() => setShown(true), ms);
+    return () => clearTimeout(timer);
+  }, [active, ms]);
+  return shown;
+}
+
+/**
  * A non-dismissable dialog that follows an instance launch: materialising the
  * client jar, libraries, and assets streams the same phase gauge and download
- * speed as a server create. Open it while the launch job is pending.
+ * speed as a server create. Open it while the launch job is pending — when the
+ * instance is already materialised the launch settles before the dialog's
+ * short delay elapses, so playing it feels immediate instead of re-running a
+ * visible provisioning pass.
  */
 export function LaunchProgressDialog({
   open,
@@ -166,8 +187,9 @@ export function LaunchProgressDialog({
   name: string;
   progress: ProvisionProgress | null;
 }) {
+  const show = useDelayedFlag(open, 500);
   return (
-    <Dialog open={open}>
+    <Dialog open={show}>
       <DialogContent className="sm:max-w-lg" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{m['launch.title']({ name })}</DialogTitle>
