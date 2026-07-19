@@ -194,6 +194,26 @@ pub struct ProvisionProgress {
     pub items: u64,
 }
 
+impl ProvisionProgress {
+    /// Overall completion in `0.0..=1.0`. A multi-unit phase (`items > 0`)
+    /// fills monotonically across the whole batch — completed units plus the
+    /// current unit's fraction — so cached or instant units still advance the
+    /// bar instead of snapping back on each per-unit reset. Shared by the CLI
+    /// gauge, the daemon's progress coalescing, and the desktop's mirror.
+    pub fn ratio(&self) -> f64 {
+        let unit = if self.total > 0 {
+            (self.current as f64 / self.total as f64).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        if self.items > 0 {
+            ((self.item.saturating_sub(1) as f64 + unit) / self.items as f64).clamp(0.0, 1.0)
+        } else {
+            unit
+        }
+    }
+}
+
 fn u64_is_zero(value: &u64) -> bool {
     *value == 0
 }

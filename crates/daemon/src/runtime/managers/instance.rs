@@ -9,7 +9,7 @@ use proto::instance::{
 use proto::minecraft::ProvisionProgress;
 use proto::process::{LogSource, ProcessSpec, RestartPolicy};
 
-use super::job::{job_id, topic_event};
+use super::job::{coalesce_progress, job_id, topic_event};
 use crate::runtime::{
     instance_session_id, instance_session_prefix, EventHub, ProcessSupervisor, StartError,
 };
@@ -59,12 +59,13 @@ impl InstanceLaunchManager {
         tokio::spawn(async move {
             let progress_hub = hub.clone();
             let progress_id = job_id.clone();
-            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> = Box::new(move |p| {
-                progress_hub.publish(&topic_event(&InstanceLaunchProgressEvent {
-                    id: progress_id.clone(),
-                    progress: p.clone(),
+            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> =
+                Box::new(coalesce_progress(move |p| {
+                    progress_hub.publish(&topic_event(&InstanceLaunchProgressEvent {
+                        id: progress_id.clone(),
+                        progress: p.clone(),
+                    }));
                 }));
-            });
 
             let outcome = launch(
                 &engine,

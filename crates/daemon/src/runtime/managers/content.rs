@@ -7,7 +7,7 @@ use proto::content::{
 };
 use proto::minecraft::ProvisionProgress;
 
-use super::job::{job_id, topic_event, InFlight};
+use super::job::{coalesce_progress, job_id, topic_event, InFlight};
 use crate::runtime::{instance_process_id, server_process_id, EventHub};
 
 /// One content install or update for one entry — what `ContentManager::start`
@@ -180,12 +180,13 @@ impl ContentManager {
             let _claim = claim;
             let progress_hub = hub.clone();
             let progress_id = job_id.clone();
-            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> = Box::new(move |p| {
-                progress_hub.publish(&topic_event(&ContentProgressEvent {
-                    id: progress_id.clone(),
-                    progress: p.clone(),
+            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> =
+                Box::new(coalesce_progress(move |p| {
+                    progress_hub.publish(&topic_event(&ContentProgressEvent {
+                        id: progress_id.clone(),
+                        progress: p.clone(),
+                    }));
                 }));
-            });
 
             match job.run(&engine, on_progress.as_ref()).await {
                 Ok((items, failures)) => {

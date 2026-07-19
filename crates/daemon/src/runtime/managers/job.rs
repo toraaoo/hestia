@@ -8,6 +8,41 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use ipc::protocol::Event;
+use proto::minecraft::{ProvisionPhase, ProvisionProgress};
+
+/// Below this ratio delta a progress update is dropped, matching Modrinth's
+/// `emit_loading` (0.5%): a phase of thousands of tiny units (an instance's
+/// assets) otherwise emits an event per unit and floods the socket.
+const PROGRESS_EPSILON: f64 = 0.005;
+
+/// Coalesce a high-frequency progress stream so a phase made of thousands of
+/// tiny units can't flood every subscribed front-end (the desktop re-renders
+/// per event; the freeze this fixes). An update is forwarded only when its
+/// phase changes, its overall ratio advances past `PROGRESS_EPSILON`, or it is
+/// terminal — so the bar still lands on 100% and the label still switches
+/// promptly, while the intermediate ticks are dropped. Mirrors the CLI, which
+/// throttles at its render layer instead.
+pub(super) fn coalesce_progress<F>(emit: F) -> impl Fn(&ProvisionProgress) + Send + Sync
+where
+    F: Fn(&ProvisionProgress) + Send + Sync,
+{
+    let state = Mutex::new(None::<(ProvisionPhase, f64)>);
+    move |p: &ProvisionProgress| {
+        let ratio = p.ratio();
+        let mut last = state.lock().unwrap();
+        let forward = match *last {
+            Some((phase, sent)) => {
+                phase != p.phase || ratio >= 1.0 || (ratio - sent).abs() > PROGRESS_EPSILON
+            }
+            None => true,
+        };
+        if forward {
+            *last = Some((p.phase, ratio));
+            drop(last);
+            emit(p);
+        }
+    }
+}
 
 pub(super) fn topic_event<E: proto::Topic + serde::Serialize>(event: &E) -> Event {
     Event {

@@ -7,7 +7,7 @@ use proto::server::{
     ServerUpdateDoneEvent, ServerUpdateErrorEvent, ServerUpdateParams, ServerUpdateProgressEvent,
 };
 
-use super::job::{job_id, topic_event, InFlight};
+use super::job::{coalesce_progress, job_id, topic_event, InFlight};
 use crate::runtime::{server_info, EventHub};
 
 pub struct ServerCreateManager {
@@ -59,12 +59,13 @@ impl ServerCreateManager {
             let _claim = claim;
             let progress_hub = hub.clone();
             let progress_id = job_id.clone();
-            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> = Box::new(move |p| {
-                progress_hub.publish(&topic_event(&ServerCreateProgressEvent {
-                    id: progress_id.clone(),
-                    progress: p.clone(),
+            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> =
+                Box::new(coalesce_progress(move |p| {
+                    progress_hub.publish(&topic_event(&ServerCreateProgressEvent {
+                        id: progress_id.clone(),
+                        progress: p.clone(),
+                    }));
                 }));
-            });
 
             let spec = ServerCreateSpec {
                 name: params.name,
@@ -145,12 +146,13 @@ impl ServerUpdateManager {
             let _claim = claim;
             let progress_hub = hub.clone();
             let progress_id = job_id.clone();
-            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> = Box::new(move |p| {
-                progress_hub.publish(&topic_event(&ServerUpdateProgressEvent {
-                    id: progress_id.clone(),
-                    progress: p.clone(),
+            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> =
+                Box::new(coalesce_progress(move |p| {
+                    progress_hub.publish(&topic_event(&ServerUpdateProgressEvent {
+                        id: progress_id.clone(),
+                        progress: p.clone(),
+                    }));
                 }));
-            });
 
             let spec = ServerUpdateSpec {
                 server: server_id.clone(),
