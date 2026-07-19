@@ -9,3 +9,8 @@ import { invokeCommand } from './core/ipc';
 export function openPath(path: string): Promise<void> {
   return invokeCommand('plugin:opener|open_path', { path });
 }
+
+/** Open a URL in the user's default browser (markdown links, project pages). */
+export function openUrl(url: string): Promise<void> {
+  return invokeCommand('plugin:opener|open_url', { url });
+}

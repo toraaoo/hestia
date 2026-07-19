@@ -5,6 +5,7 @@ import type { ContentKind } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
+import { Markdown } from '@/components/markdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -88,9 +89,7 @@ export function ProjectDetailPage({
 
         <TabsContent value="description" className="p-5">
           <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
-            <p className="max-w-2xl whitespace-pre-line text-sm leading-relaxed text-foreground/90">
-              {p.description}
-            </p>
+            <Markdown className="max-w-2xl">{p.body || p.description}</Markdown>
 
             <aside className="space-y-4">
               <div className="divide-y divide-border border border-border p-3">
