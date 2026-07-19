@@ -78,6 +78,20 @@ impl JavaSettings {
         ]
     }
 
+    /// These settings with unset fields filled from `defaults` — how the
+    /// launcher-wide `defaults.*` config keys reach an entry that never set
+    /// its own.
+    pub fn or_defaults(&self, defaults: &JavaSettings) -> JavaSettings {
+        JavaSettings {
+            memory: self.memory.clone().or_else(|| defaults.memory.clone()),
+            jvm_args: if self.jvm_args.is_empty() {
+                defaults.jvm_args.clone()
+            } else {
+                self.jvm_args.clone()
+            },
+        }
+    }
+
     /// The JVM flags these settings inject: the memory pair first, then the
     /// extra args.
     pub fn flags(&self) -> Vec<String> {
@@ -93,7 +107,7 @@ impl JavaSettings {
 
 /// Validate and normalise a memory value: digits followed by one unit char
 /// (k/m/g, case-insensitive), the number nonzero, the unit upper-cased.
-fn normalize_memory(value: &str) -> Result<String> {
+pub(crate) fn normalize_memory(value: &str) -> Result<String> {
     let trimmed = value.trim();
     let unit = trimmed
         .chars()
@@ -111,7 +125,7 @@ fn normalize_memory(value: &str) -> Result<String> {
 }
 
 /// Split JVM args on whitespace; every token must start with `-`.
-fn parse_jvm_args(value: &str) -> Result<Vec<String>> {
+pub(crate) fn parse_jvm_args(value: &str) -> Result<Vec<String>> {
     let mut args = Vec::new();
     for token in value.split_whitespace() {
         if !token.starts_with('-') {
@@ -490,6 +504,18 @@ mod tests {
             memory: memory.map(str::to_string),
             jvm_args: jvm_args.iter().map(|a| a.to_string()).collect(),
         }
+    }
+
+    #[test]
+    fn or_defaults_fills_only_unset_fields() {
+        let defaults = settings(Some("8G"), &["-XX:+UseZGC"]);
+        let merged = settings(None, &[]).or_defaults(&defaults);
+        assert_eq!(merged.memory.as_deref(), Some("8G"));
+        assert_eq!(merged.jvm_args, ["-XX:+UseZGC"]);
+
+        let own = settings(Some("2G"), &["-XX:+UseG1GC"]).or_defaults(&defaults);
+        assert_eq!(own.memory.as_deref(), Some("2G"));
+        assert_eq!(own.jvm_args, ["-XX:+UseG1GC"]);
     }
 
     #[test]

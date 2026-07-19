@@ -115,7 +115,10 @@ impl Engine {
             None,
         )?;
         let java = self.installed_java(record.profile.java_major)?;
-        let plan = self.servers.launch_plan(&record, &java);
+        let jvm = record
+            .jvm
+            .or_defaults(&self.config.settings().java_defaults());
+        let plan = self.servers.launch_plan(&record, &java, &jvm);
         Ok((record, plan))
     }
 

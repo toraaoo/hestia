@@ -227,6 +227,9 @@ impl Engine {
         std::fs::write(&log_config, log4j::session_config(&log_file))
             .with_context(|| format!("cannot write {}", log_config.display()))?;
 
+        let jvm = record
+            .jvm
+            .or_defaults(&self.config.settings().java_defaults());
         let plan = launch::instance_plan(
             &record.profile,
             &java,
@@ -239,7 +242,7 @@ impl Engine {
                 log_config: Some(&log_config),
             },
             &account,
-            &record.jvm,
+            &jvm,
         );
         Ok((record, plan, log_file))
     }

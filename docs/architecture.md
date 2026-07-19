@@ -191,10 +191,14 @@ The subsystems behind the aggregate:
   `Settings` struct: a setting is a field with its default, persisted as JSON
   through serde. Internal code reads a `settings()` snapshot and writes through
   `update()`; the dotted-path `get`/`set` serve the `config.*` channels and reject
-  unknown keys and type-mismatched values — the struct *is* the validation.
-  (`Settings` is empty today; the only live keys are the reserved `home` and
-  `autostart`, which the daemon routes to the path pointer and the login
-  registration rather than the store.) `reload()` repoints it on a data-home
+  unknown keys and type-mismatched values — the struct *is* the validation,
+  plus a `normalize()` pass for value rules the type can't carry (the
+  `defaults.memory` / `defaults.jvm-args` keys reuse the per-entry
+  `memory`/`jvm-args` validation). Those JVM defaults fall back into any
+  server start or instance launch whose record leaves the matching per-entry
+  setting unset (`JavaSettings::or_defaults`). The reserved `home` and
+  `autostart` keys are routed by the daemon to the path pointer and the login
+  registration rather than the store. `reload()` repoints it on a data-home
   change.
 - **`download`** (`Downloader`) — streams a URL to disk through a `.part` temp file
   (via reqwest), hashing incrementally when a checksum is given and renaming into

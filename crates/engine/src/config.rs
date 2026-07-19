@@ -9,12 +9,58 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::minecraft::launch::{normalize_memory, parse_jvm_args, JavaSettings};
+
 /// The config schema. A setting is a typed field with its default; a nested
 /// struct becomes a sub-object. The reserved keys (home, autostart) are routed
 /// by the daemon's config service, not stored here.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
-pub struct Settings {}
+pub struct Settings {
+    /// JVM defaults applied to any server or instance whose record leaves the
+    /// matching per-entry setting unset.
+    pub defaults: JvmDefaults,
+}
+
+/// The launcher-wide JVM defaults (`defaults.memory`, `defaults.jvm-args`);
+/// empty means no default. Plain strings so the dotted-path get/set always
+/// finds both keys.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct JvmDefaults {
+    pub memory: String,
+    pub jvm_args: String,
+}
+
+impl Settings {
+    /// Validate and canonicalise after a raw dotted-path set — the same rules
+    /// the per-entry `memory`/`jvm-args` keys enforce.
+    fn normalize(&mut self) -> Result<(), String> {
+        if !self.defaults.memory.trim().is_empty() {
+            self.defaults.memory =
+                normalize_memory(&self.defaults.memory).map_err(|e| e.to_string())?;
+        } else {
+            self.defaults.memory = String::new();
+        }
+        self.defaults.jvm_args = parse_jvm_args(&self.defaults.jvm_args)
+            .map_err(|e| e.to_string())?
+            .join(" ");
+        Ok(())
+    }
+
+    /// The JVM defaults as launch settings, for `JavaSettings::or_defaults`.
+    pub fn java_defaults(&self) -> JavaSettings {
+        JavaSettings {
+            memory: (!self.defaults.memory.is_empty()).then(|| self.defaults.memory.clone()),
+            jvm_args: self
+                .defaults
+                .jvm_args
+                .split_whitespace()
+                .map(str::to_string)
+                .collect(),
+        }
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -27,6 +73,8 @@ pub enum ConfigError {
         key: String,
         source: serde_json::Error,
     },
+    #[error("invalid value for {key}: {message}")]
+    Rejected { key: String, message: String },
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -83,10 +131,16 @@ impl Config {
             }
             *node = value;
         }
-        let settings: Settings =
+        let mut settings: Settings =
             serde_json::from_value(doc).map_err(|source| ConfigError::InvalidValue {
                 key: key.to_string(),
                 source,
+            })?;
+        settings
+            .normalize()
+            .map_err(|message| ConfigError::Rejected {
+                key: key.to_string(),
+                message,
             })?;
         inner.settings = settings;
         save_settings(&inner.path, &inner.settings)?;

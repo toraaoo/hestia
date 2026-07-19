@@ -270,7 +270,7 @@ impl Servers {
     /// stops it right after, before it binds ports or generates a world. The
     /// file is the ground truth `config_set` validates against.
     async fn generate_properties(&self, record: &ServerRecord, java: &Path) -> Result<()> {
-        let plan = self.launch_plan(record, java);
+        let plan = self.launch_plan(record, java, &record.jvm);
         let mut child = tokio::process::Command::new(&plan.program)
             .args(&plan.args)
             .current_dir(&plan.cwd)
@@ -417,13 +417,13 @@ impl Servers {
         Ok(true)
     }
 
-    pub fn launch_plan(&self, record: &ServerRecord, java: &Path) -> LaunchPlan {
-        launch::server_plan(
-            &record.profile,
-            java,
-            &self.data_dir(&record.id),
-            &record.jvm,
-        )
+    pub fn launch_plan(
+        &self,
+        record: &ServerRecord,
+        java: &Path,
+        jvm: &JavaSettings,
+    ) -> LaunchPlan {
+        launch::server_plan(&record.profile, java, &self.data_dir(&record.id), jvm)
     }
 
     /// Read one setting: a reserved JVM or backup key from the record, or any

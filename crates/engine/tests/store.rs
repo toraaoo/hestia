@@ -19,8 +19,32 @@ fn config_rejects_unknown_keys() {
     let cfg = Config::new(dir.join("config"));
     assert!(cfg.get("launcher.memory").is_err());
     assert!(cfg.set("launcher.memory", serde_json::json!(4096)).is_err());
-    // Empty schema serializes to an empty object.
-    assert_eq!(cfg.all(), serde_json::json!({}));
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn config_jvm_defaults_validate_and_normalise() {
+    let dir = temp_dir("config-defaults");
+    let cfg = Config::new(dir.join("config"));
+
+    cfg.set("defaults.memory", serde_json::json!("4g")).unwrap();
+    assert_eq!(cfg.get("defaults.memory").unwrap(), serde_json::json!("4G"));
+    assert!(cfg
+        .set("defaults.memory", serde_json::json!("lots"))
+        .is_err());
+
+    cfg.set("defaults.jvm-args", serde_json::json!("-XX:+UseG1GC"))
+        .unwrap();
+    assert!(cfg
+        .set("defaults.jvm-args", serde_json::json!("not-a-flag stray"))
+        .is_err());
+
+    // Clearing both leaves no default applied at launch.
+    cfg.set("defaults.memory", serde_json::json!("")).unwrap();
+    cfg.set("defaults.jvm-args", serde_json::json!("")).unwrap();
+    let defaults = cfg.settings().java_defaults();
+    assert!(defaults.memory.is_none());
+    assert!(defaults.jvm_args.is_empty());
     std::fs::remove_dir_all(&dir).ok();
 }
 
