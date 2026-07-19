@@ -288,7 +288,8 @@
     "by_author": "by {name}",
     "downloads": "{count} downloads",
     "followers": "{count} followers",
-    "project_missing": "That project could not be found."
+    "project_missing": "That project could not be found.",
+    "loading_more": "Loading more…"
   },
   "content": {
     "add": "Add content",

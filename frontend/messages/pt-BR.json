@@ -287,7 +287,8 @@
     "by_author": "por {name}",
     "downloads": "{count} downloads",
     "followers": "{count} seguidores",
-    "project_missing": "Esse projeto não foi encontrado."
+    "project_missing": "Esse projeto não foi encontrado.",
+    "loading_more": "Carregando mais…"
   },
   "content": {
     "add": "Adicionar conteúdo",

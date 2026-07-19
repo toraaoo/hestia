@@ -3,7 +3,11 @@
  * installing into an entry lives on the server/instance hooks). An empty
  * `source` selects the default source.
  */
-import { queryOptions, useQuery } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  queryOptions,
+  useQuery,
+} from '@tanstack/react-query';
 import type { SearchQuery, VersionQuery } from '../api';
 import * as api from '../api/content';
 import { keys } from './keys';
@@ -22,6 +26,9 @@ export const contentQueries = {
       queryKey: keys.content.search(query),
       queryFn: () => api.search(query),
       staleTime: BROWSE_STALE_MS,
+      // Keep the current hits on screen while a larger page (or a new filter)
+      // loads, so paginating never flashes the grid back to a skeleton.
+      placeholderData: keepPreviousData,
     }),
   project: (project: string, source = '') =>
     queryOptions({

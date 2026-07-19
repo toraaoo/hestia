@@ -1,13 +1,12 @@
 import { useQueries } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { ContentKind, ContentProject } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
 import { chipClass } from '@/components/chip';
 import { Page } from '@/components/page';
 import { Bone, CardGridSkeleton } from '@/components/skeleton';
-import { Button } from '@/components/ui/button';
 import { ContentCard } from '@/features/content/content-card';
 import { contentKinds, kindInfo } from '@/features/content/kinds';
 import { m } from '@/paraglide/messages.js';
@@ -33,6 +32,7 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
   });
 
   const loading = searches.some((s) => s.isPending);
+  const fetchingMore = searches.some((s) => s.isFetching);
   const hits = searches
     .flatMap((s) => s.data?.hits ?? [])
     .filter(
@@ -43,6 +43,28 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
   const hasMore = kind
     ? (searches[0]?.data?.total ?? 0) > hits.length
     : searches.some((s) => (s.data?.total ?? 0) > (s.data?.hits.length ?? 0));
+
+  // A new query or kind starts paging over — otherwise a fresh search would
+  // fetch the whole grown page at once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on inputs.
+  useEffect(() => setLimit(PAGE), [q, kind]);
+
+  // Grow the page when the sentinel scrolls into view (infinite scroll).
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !fetchingMore) {
+          setLimit((l) => l + PAGE);
+        }
+      },
+      { rootMargin: '600px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, fetchingMore]);
 
   return (
     <Page
@@ -99,14 +121,11 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
             ))}
           </div>
           {hasMore && (
-            <div className="mt-5 flex justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setLimit((l) => l + PAGE)}
-              >
-                {m['action.show_more']()}
-              </Button>
+            <div
+              ref={sentinelRef}
+              className="mt-5 flex justify-center py-4 text-xs text-muted-foreground"
+            >
+              {fetchingMore ? m['browse.loading_more']() : null}
             </div>
           )}
         </>
