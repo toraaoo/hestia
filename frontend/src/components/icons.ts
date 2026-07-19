@@ -10,7 +10,7 @@ import {
   StackIcon,
 } from '@phosphor-icons/react';
 
-import type { ContentKind } from '@/lib/mock';
+import type { ContentKind } from '@/api';
 import { m } from '@/paraglide/messages.js';
 
 /** Icon for a library entry kind — instances, hosted servers, profiles. */
@@ -25,11 +25,11 @@ export function contentIcon(kind: ContentKind): Icon {
   switch (kind) {
     case 'mod':
       return PuzzlePieceIcon;
-    case 'resourcepack':
+    case 'resource_pack':
       return ImagesIcon;
     case 'shader':
       return SparkleIcon;
-    case 'datapack':
+    case 'data_pack':
       return DatabaseIcon;
     case 'modpack':
       return PackageIcon;
@@ -38,8 +38,8 @@ export function contentIcon(kind: ContentKind): Icon {
 
 export const contentKindLabel: Record<ContentKind, () => string> = {
   mod: m['kind.mod'],
-  resourcepack: m['kind.resourcepack'],
+  resource_pack: m['kind.resourcepack'],
   shader: m['kind.shader'],
-  datapack: m['kind.datapack'],
+  data_pack: m['kind.datapack'],
   modpack: m['kind.modpack'],
 };

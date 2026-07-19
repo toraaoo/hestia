@@ -1,11 +1,10 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-
+import type { ContentKind } from '@/api';
 import {
   InstanceDetailPage,
   type InstanceTab,
   instanceContentKinds,
 } from '@/features/instances/instance-detail-page';
-import type { ContentKind } from '@/lib/mock';
 import { ensureSignedIn } from '@/queries';
 
 const tabs: InstanceTab[] = [

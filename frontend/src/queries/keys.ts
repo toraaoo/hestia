@@ -74,6 +74,8 @@ export const keys = {
     content: (id: string) => [...keys.servers.detail(id), 'content'] as const,
     contentList: (id: string, kind: ContentKind) =>
       [...keys.servers.content(id), kind] as const,
+    contentUpdates: (id: string, kind: ContentKind) =>
+      [...keys.servers.content(id), 'updates', kind] as const,
   },
   instances: {
     all: ['instances'] as const,
@@ -101,6 +103,8 @@ export const keys = {
     content: (id: string) => [...keys.instances.detail(id), 'content'] as const,
     contentList: (id: string, kind: ContentKind) =>
       [...keys.instances.content(id), kind] as const,
+    contentUpdates: (id: string, kind: ContentKind) =>
+      [...keys.instances.content(id), 'updates', kind] as const,
     profiles: (id: string) =>
       [...keys.instances.detail(id), 'profiles'] as const,
   },

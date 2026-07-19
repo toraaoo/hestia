@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
-
+import type { ContentKind } from '@/api';
 import { ProfileDetailPage } from '@/features/profiles/profile-detail-page';
 import { profileFilterKinds } from '@/features/profiles/profiles-page';
-import type { ContentKind } from '@/lib/mock';
 
 export const Route = createFileRoute('/_app/profiles/$name')({
   validateSearch: (

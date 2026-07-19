@@ -1,6 +1,7 @@
 import { MagnifyingGlassIcon } from '@phosphor-icons/react';
 import { useState } from 'react';
 
+import type { ContentVersion, InstalledContent } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,41 +13,48 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import type { ContentVersion } from '@/features/content/mock';
-import { getProject, projectVersions } from '@/features/content/mock';
-import type { InstalledContent } from '@/features/entries/mock';
 import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+import { useContentVersions } from '@/queries/content';
 
 /**
- * Pick a specific published version of an installed item — the mock stand-in
- * for `content.versions`, presented like the create wizard's version picker
- * (search over a selectable list). The swap itself applies at the next launch.
+ * Pick a specific published version of an installed item — real
+ * `content.versions`, presented like the create wizard's version picker
+ * (search over a selectable list). The re-pin applies at the next launch.
  */
 export function ChangeVersionModal({
   item,
+  loader,
+  gameVersion,
   onOpenChange,
   onPick,
 }: {
   /** The installed item being re-pinned, or `null` when closed. */
   item: InstalledContent | null;
+  loader?: string;
+  gameVersion?: string;
   onOpenChange: (open: boolean) => void;
   onPick: (item: InstalledContent, version: ContentVersion) => void;
 }) {
   const [search, setSearch] = useState('');
   const [pickedId, setPickedId] = useState<string | null>(null);
 
-  const project = item ? getProject(item.id) : undefined;
-  const versions = project ? projectVersions(project) : [];
+  const versions = useContentVersions({
+    source: item?.source ?? '',
+    project: item?.projectId ?? '',
+    loader,
+    gameVersion,
+  });
+  const list = item ? (versions.data ?? []) : [];
   const q = search.trim().toLowerCase();
-  const shown = versions.filter(
+  const shown = list.filter(
     (v) =>
       !q ||
       v.versionNumber.toLowerCase().includes(q) ||
       v.gameVersions.some((g) => g.toLowerCase().includes(q)),
   );
-  const picked = versions.find((v) => v.id === pickedId) ?? null;
+  const picked = list.find((v) => v.id === pickedId) ?? null;
 
   const close = (next: boolean) => {
     if (!next) {
@@ -61,7 +69,7 @@ export function ChangeVersionModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {m['content.change_version_title']({ name: item?.name ?? '' })}
+            {m['content.change_version_title']({ name: item?.title ?? '' })}
           </DialogTitle>
           <DialogDescription>
             {m['content.change_version_description']()}
@@ -80,13 +88,17 @@ export function ChangeVersionModal({
           </div>
 
           <div className="max-h-64 divide-y divide-border overflow-y-auto border border-border">
-            {shown.length === 0 ? (
+            {versions.isPending ? (
+              <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                …
+              </p>
+            ) : shown.length === 0 ? (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
                 {m['wizard.no_versions_match']()}
               </p>
             ) : (
               shown.map((v) => {
-                const current = v.versionNumber === item?.version;
+                const current = v.versionNumber === item?.versionNumber;
                 const selected = pickedId === v.id;
                 return (
                   <button
@@ -113,7 +125,7 @@ export function ChangeVersionModal({
                       </span>
                       <span className="block truncate text-[11px] text-muted-foreground">
                         {v.gameVersions.join(', ')} ·{' '}
-                        {agoLabel(v.publishedUnix)}
+                        {agoLabel(Date.parse(v.datePublished) / 1000)}
                       </span>
                     </span>
                     {v.channel !== 'release' && (
@@ -141,7 +153,7 @@ export function ChangeVersionModal({
             {m['action.cancel']()}
           </Button>
           <Button
-            disabled={!picked || picked.versionNumber === item?.version}
+            disabled={!picked || picked.versionNumber === item?.versionNumber}
             onClick={() => {
               if (item && picked) onPick(item, picked);
               close(false);

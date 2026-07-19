@@ -7,8 +7,9 @@ import {
   PowerIcon,
   UploadSimpleIcon,
 } from '@phosphor-icons/react';
+import { useQueries } from '@tanstack/react-query';
 import { useState } from 'react';
-
+import type { ContentKind } from '@/api';
 import { type InstanceInfo, system } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
@@ -34,9 +35,9 @@ import {
 import { InstanceSettingsTab } from '@/features/instances/settings-tab';
 import { ProfilesPanel } from '@/features/profiles/profiles-panel';
 import { agoLabel, bytes, memGb } from '@/lib/format';
-import type { ContentKind } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
 import {
+  instanceQueries,
   useInstance,
   useInstanceConfig,
   useInstanceInfo,
@@ -58,9 +59,9 @@ export type InstanceTab =
 /** The content kinds an instance takes (see `instance.content.add`). */
 export const instanceContentKinds: ContentKind[] = [
   'mod',
-  'resourcepack',
+  'resource_pack',
   'shader',
-  'datapack',
+  'data_pack',
 ];
 
 function runningSessions(instance: InstanceInfo): number {
@@ -87,6 +88,15 @@ export function InstanceDetailPage({
   const [addingContent, setAddingContent] = useState(false);
   const launch = useLaunchInstance(id);
   const stop = useStopInstance(id);
+  // Shared with the content tab's own per-kind queries (cached), just for the
+  // headline count.
+  const contentLists = useQueries({
+    queries: instanceContentKinds.map((k) => instanceQueries.content(id, k)),
+  });
+  const contentCount = contentLists.reduce(
+    (n, q) => n + (q.data?.items.length ?? 0),
+    0,
+  );
 
   const instance = query.data;
   const sessions = instance ? runningSessions(instance) : 0;
@@ -216,7 +226,7 @@ export function InstanceDetailPage({
           <TabsTrigger value="overview">{m['tab.overview']()}</TabsTrigger>
           <TabsTrigger value="content">
             {m['tab.content']()}
-            <TabCount n={mock.content.length} />
+            <TabCount n={contentCount} />
           </TabsTrigger>
           <TabsTrigger value="profiles">
             {m['profiles.tab']()}
@@ -237,15 +247,12 @@ export function InstanceDetailPage({
                 {m['entry.overview_summary']({
                   flavor: instance.flavor,
                   version: instance.gameVersion,
-                  mods: mock.content.length,
+                  mods: contentCount,
                   worlds: worldNames.length,
                 })}
               </p>
               <div className="grid grid-cols-3 gap-3">
-                <StatCard
-                  value={mock.content.length}
-                  label={m['label.content']()}
-                />
+                <StatCard value={contentCount} label={m['label.content']()} />
                 <StatCard
                   value={worldNames.length}
                   label={m['label.worlds']()}
@@ -322,7 +329,12 @@ export function InstanceDetailPage({
 
         <TabsContent value="content" className="p-5">
           <ContentSection
-            items={mock.content}
+            entry={{
+              kind: 'instance',
+              id,
+              flavor: instance.flavor,
+              gameVersion: instance.gameVersion,
+            }}
             kinds={instanceContentKinds}
             kind={contentKind}
             onKindChange={onContentKindChange}
@@ -378,7 +390,7 @@ export function InstanceDetailPage({
       </Tabs>
 
       <ContentInstallModal
-        entry={instanceTarget(mock)}
+        entry={instanceTarget(instance)}
         open={addingContent}
         onOpenChange={setAddingContent}
       />

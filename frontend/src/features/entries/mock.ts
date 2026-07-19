@@ -4,7 +4,7 @@
  * pages mirror actual functionality. Nothing talks to a backend.
  */
 
-import type { ContentKind } from '@/lib/mock';
+import type { ContentKind } from '@/api';
 
 /** An installed piece of content, from `content.list`. */
 export interface InstalledContent {
@@ -122,7 +122,7 @@ export const instances: Instance[] = [
       {
         id: 'faithful',
         name: 'Faithful 32x',
-        kind: 'resourcepack',
+        kind: 'resource_pack',
         source: 'modrinth',
         version: '1.21',
         enabled: false,
@@ -274,7 +274,7 @@ export const servers: Server[] = [
       {
         id: 'vanilla-tweaks',
         name: 'VanillaTweaks',
-        kind: 'datapack',
+        kind: 'data_pack',
         source: 'file',
         version: '—',
         enabled: true,

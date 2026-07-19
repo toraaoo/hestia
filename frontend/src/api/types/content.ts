@@ -154,6 +154,22 @@ export interface InstalledContent {
    * apply tags its installs `profile:<name>`.
    */
   origin: string;
+  /** Whether the game loads this item; a disabled item keeps its managed copy. */
+  enabled: boolean;
+}
+
+/** One installed item's update status, from `content.check_updates`. */
+export interface ContentUpdate {
+  filename: string;
+  projectId: string;
+  /** For a datapack: the world the copy lives in; empty for other kinds. */
+  world: string;
+  currentVersionId: string;
+  currentVersionNumber: string;
+  latestVersionId: string;
+  latestVersionNumber: string;
+  /** True when the newest compatible version differs from the current pin. */
+  updatable: boolean;
 }
 
 export interface ContentList {

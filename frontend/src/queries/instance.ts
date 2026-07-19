@@ -91,6 +91,14 @@ export const instanceQueries = {
       queryKey: keys.instances.contentList(id, kind),
       queryFn: () => api.content.list(id, kind),
     }),
+  contentUpdates: (id: string, kind: ContentKind) =>
+    queryOptions({
+      queryKey: keys.instances.contentUpdates(id, kind),
+      queryFn: () => api.content.checkUpdates(id, kind),
+      // A network resolve per item — refetch only when explicitly asked.
+      staleTime: Number.POSITIVE_INFINITY,
+      enabled: false,
+    }),
   /** The active profile name and every content profile of the instance. */
   profiles: (id: string) =>
     queryOptions({
@@ -290,6 +298,35 @@ export const instanceMutations = {
           keys.instances.profiles(id),
         ],
       }),
+    enable: (id: string) =>
+      mutation<
+        void,
+        { kind: ContentKind; item: string; enabled: boolean; worlds?: string[] }
+      >({
+        mutationKey: [...keys.instances.content(id), 'enable'],
+        mutationFn: ({ kind, item, enabled, worlds }) =>
+          api.content.enable(id, kind, item, enabled, worlds),
+        invalidates: () => [keys.instances.content(id)],
+      }),
+    setVersion: (id: string) =>
+      jobMutation<
+        ContentDone,
+        { kind: ContentKind; item: string; version: string }
+      >({
+        mutationKey: [...keys.instances.content(id), 'set-version'],
+        meta: ({ kind }) => ({
+          kind: 'content.update',
+          label: `pin ${kind}`,
+          entry: { kind: 'instance', id },
+        }),
+        run: ({ kind, item, version }, onProgress) =>
+          api.content.setVersion(id, kind, item, version, onProgress),
+        // A pin can change a member's filename in every profile.
+        invalidates: () => [
+          keys.instances.content(id),
+          keys.instances.profiles(id),
+        ],
+      }),
   },
 };
 
@@ -379,6 +416,11 @@ export function useInstanceContent(id: string, kind: ContentKind) {
   return useQuery(instanceQueries.content(id, kind));
 }
 
+/** Update availability — disabled until `refetch()` is called (network per item). */
+export function useInstanceContentUpdates(id: string, kind: ContentKind) {
+  return useQuery(instanceQueries.contentUpdates(id, kind));
+}
+
 export function useCreateInstance() {
   return useMutation(instanceMutations.create());
 }
@@ -457,4 +499,12 @@ export function useRemoveInstanceContent(id: string) {
 
 export function useUpdateInstanceContent(id: string) {
   return useJobMutation(instanceMutations.content.update(id));
+}
+
+export function useEnableInstanceContent(id: string) {
+  return useMutation(instanceMutations.content.enable(id));
+}
+
+export function useSetInstanceContentVersion(id: string) {
+  return useJobMutation(instanceMutations.content.setVersion(id));
 }

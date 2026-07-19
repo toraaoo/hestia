@@ -5,12 +5,12 @@ import {
   PowerIcon,
 } from '@phosphor-icons/react';
 import { useMemo, useState } from 'react';
-
+import type { ContentKind } from '@/api';
 import { type ServerInfo, system } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { entryIcon } from '@/components/icons';
-import { Stat, TabCount } from '@/components/page';
+import { Stat } from '@/components/page';
 import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,6 @@ import {
   serverTarget,
 } from '@/features/content/install-modal';
 import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
-import { servers as mockServers } from '@/features/entries/mock';
 import {
   type LiveResources,
   ResourceCards,
@@ -31,7 +30,6 @@ import { ServerBackupsTab } from '@/features/servers/backups-tab';
 import { ServerConsoleTab } from '@/features/servers/console-tab';
 import { ServerSettingsTab } from '@/features/servers/settings-tab';
 import { agoLabel, bytes, memGb } from '@/lib/format';
-import type { ContentKind } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
 import { useProcessMetrics } from '@/queries/metrics';
 import {
@@ -51,7 +49,7 @@ export type ServerTab =
   | 'settings';
 
 /** The content kinds a server takes (see `server.content.add`). */
-export const serverContentKinds: ContentKind[] = ['mod', 'datapack'];
+export const serverContentKinds: ContentKind[] = ['mod', 'data_pack'];
 
 function isRunning(server: ServerInfo): boolean {
   return server.process?.state === 'running';
@@ -120,8 +118,6 @@ export function ServerDetailPage({
       mem: s.memBytes / (1024 * 1024),
     })),
   };
-
-  const contentItems = mockServers[0].content;
 
   return (
     <div className="flex h-full flex-col">
@@ -197,10 +193,7 @@ export function ServerDetailPage({
         <TabsList variant="line" className="h-auto gap-6 px-5">
           <TabsTrigger value="overview">{m['tab.overview']()}</TabsTrigger>
           <TabsTrigger value="console">{m['tab.console']()}</TabsTrigger>
-          <TabsTrigger value="content">
-            {m['tab.content']()}
-            <TabCount n={contentItems.length} />
-          </TabsTrigger>
+          <TabsTrigger value="content">{m['tab.content']()}</TabsTrigger>
           <TabsTrigger value="backups">{m['tab.backups']()}</TabsTrigger>
           <TabsTrigger value="settings">{m['tab.settings']()}</TabsTrigger>
         </TabsList>
@@ -267,7 +260,12 @@ export function ServerDetailPage({
 
         <TabsContent value="content" className="p-5">
           <ContentSection
-            items={contentItems}
+            entry={{
+              kind: 'server',
+              id,
+              flavor: server.flavor,
+              gameVersion: server.gameVersion,
+            }}
             kinds={serverContentKinds}
             kind={contentKind}
             onKindChange={onContentKindChange}
@@ -299,7 +297,7 @@ export function ServerDetailPage({
       </Tabs>
 
       <ContentInstallModal
-        entry={serverTarget(mockServers[0])}
+        entry={serverTarget(server)}
         open={addingContent}
         onOpenChange={setAddingContent}
       />

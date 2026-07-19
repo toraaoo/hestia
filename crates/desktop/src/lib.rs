@@ -7,6 +7,7 @@ use bridge::Bridge;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Bridge::default())
         .setup(|app| {
             bridge::watch(app.handle().clone());

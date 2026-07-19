@@ -9,6 +9,7 @@ export function DetailHero({
   parentTo,
   parentParams,
   icon: Icon,
+  iconUrl,
   name,
   badges,
   actions,
@@ -17,6 +18,8 @@ export function DetailHero({
   parentTo: LinkProps['to'];
   parentParams?: LinkProps['params'];
   icon: Icon;
+  /** A remote icon (a content project's) shown in place of the glyph. */
+  iconUrl?: string;
   name: string;
   badges: ReactNode;
   actions: ReactNode;
@@ -36,8 +39,12 @@ export function DetailHero({
       </div>
 
       <div className="flex items-end gap-4 bg-muted/25 px-5 pt-8 pb-5">
-        <span className="grid size-16 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
-          <Icon className="size-8" />
+        <span className="grid size-16 shrink-0 place-items-center overflow-hidden bg-muted text-muted-foreground ring-1 ring-border">
+          {iconUrl ? (
+            <img src={iconUrl} alt="" className="size-full object-cover" />
+          ) : (
+            <Icon className="size-8" />
+          )}
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-heading text-xl font-semibold">

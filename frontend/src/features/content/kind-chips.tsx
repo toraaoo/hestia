@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
-
+import type { ContentKind } from '@/api';
 import { chipClass } from '@/components/chip';
 import { kindInfo } from '@/features/content/kinds';
-import type { ContentKind } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
 
 /**

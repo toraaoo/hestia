@@ -31,6 +31,7 @@ export {
 } from './core/ipc';
 export { type JobOptions, type JobTopics, jobId, runJob } from './core/jobs';
 export * as daemon from './daemon';
+export * as dialog from './dialog';
 export * as download from './download';
 export * as instance from './instance';
 export * as java from './java';

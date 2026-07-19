@@ -14,6 +14,7 @@ import type {
   ContentDone,
   ContentKind,
   ContentList,
+  ContentUpdate,
 } from './types/content';
 import type {
   ConfigEntry,
@@ -237,7 +238,11 @@ export const content = {
     const id = jobId('server-content');
     return runJob<ContentDone>({
       id,
-      topics: { done: 'content.done', error: 'content.error' },
+      topics: {
+        progress: 'content.progress',
+        done: 'content.done',
+        error: 'content.error',
+      },
       onProgress,
       start: () => call('server.content.add', { server, ...spec, id }),
     });
@@ -266,9 +271,65 @@ export const content = {
     const id = jobId('server-content-update');
     return runJob<ContentDone>({
       id,
-      topics: { done: 'content.done', error: 'content.error' },
+      topics: {
+        progress: 'content.progress',
+        done: 'content.done',
+        error: 'content.error',
+      },
       onProgress,
       start: () => call('server.content.update', { server, kind, item, id }),
+    });
+  },
+
+  /** Enable or disable one installed item; applies at the next start. */
+  async enable(
+    server: string,
+    kind: ContentKind,
+    item: string,
+    enabled: boolean,
+    worlds: string[] = [],
+  ): Promise<void> {
+    await call('server.content.enable', {
+      server,
+      kind,
+      item,
+      enabled,
+      worlds,
+    });
+  },
+
+  /** Which platform items of the kind have a newer compatible version. */
+  async checkUpdates(
+    server: string,
+    kind: ContentKind,
+  ): Promise<ContentUpdate[]> {
+    const result = await call<{ updates: ContentUpdate[] }>(
+      'server.content.check_updates',
+      { server, kind },
+      { timeoutMs: 120_000 },
+    );
+    return result.updates;
+  },
+
+  /** Re-pin one item to a specific published version (id or number). */
+  setVersion(
+    server: string,
+    kind: ContentKind,
+    item: string,
+    version: string,
+    onProgress?: OnProgress,
+  ): Promise<ContentDone> {
+    const id = jobId('server-content-set-version');
+    return runJob<ContentDone>({
+      id,
+      topics: {
+        progress: 'content.progress',
+        done: 'content.done',
+        error: 'content.error',
+      },
+      onProgress,
+      start: () =>
+        call('server.content.set_version', { server, kind, item, version, id }),
     });
   },
 };

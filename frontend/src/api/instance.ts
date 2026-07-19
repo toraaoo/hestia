@@ -12,6 +12,7 @@ import type {
   ContentDone,
   ContentKind,
   ContentList,
+  ContentUpdate,
 } from './types/content';
 import type {
   ContentProfile,
@@ -281,7 +282,11 @@ export const content = {
     const id = jobId('instance-content');
     return runJob<ContentDone>({
       id,
-      topics: { done: 'content.done', error: 'content.error' },
+      topics: {
+        progress: 'content.progress',
+        done: 'content.done',
+        error: 'content.error',
+      },
       onProgress,
       start: () => call('instance.content.add', { instance, ...spec, id }),
     });
@@ -310,10 +315,72 @@ export const content = {
     const id = jobId('instance-content-update');
     return runJob<ContentDone>({
       id,
-      topics: { done: 'content.done', error: 'content.error' },
+      topics: {
+        progress: 'content.progress',
+        done: 'content.done',
+        error: 'content.error',
+      },
       onProgress,
       start: () =>
         call('instance.content.update', { instance, kind, item, id }),
+    });
+  },
+
+  /** Enable or disable one installed item; applies at the next launch. */
+  async enable(
+    instance: string,
+    kind: ContentKind,
+    item: string,
+    enabled: boolean,
+    worlds: string[] = [],
+  ): Promise<void> {
+    await call('instance.content.enable', {
+      instance,
+      kind,
+      item,
+      enabled,
+      worlds,
+    });
+  },
+
+  /** Which platform items of the kind have a newer compatible version. */
+  async checkUpdates(
+    instance: string,
+    kind: ContentKind,
+  ): Promise<ContentUpdate[]> {
+    const result = await call<{ updates: ContentUpdate[] }>(
+      'instance.content.check_updates',
+      { instance, kind },
+      { timeoutMs: 120_000 },
+    );
+    return result.updates;
+  },
+
+  /** Re-pin one item to a specific published version (id or number). */
+  setVersion(
+    instance: string,
+    kind: ContentKind,
+    item: string,
+    version: string,
+    onProgress?: OnProgress,
+  ): Promise<ContentDone> {
+    const id = jobId('instance-content-set-version');
+    return runJob<ContentDone>({
+      id,
+      topics: {
+        progress: 'content.progress',
+        done: 'content.done',
+        error: 'content.error',
+      },
+      onProgress,
+      start: () =>
+        call('instance.content.set_version', {
+          instance,
+          kind,
+          item,
+          version,
+          id,
+        }),
     });
   },
 };

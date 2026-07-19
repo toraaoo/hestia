@@ -104,6 +104,14 @@ export const serverQueries = {
       queryKey: keys.servers.contentList(id, kind),
       queryFn: () => api.content.list(id, kind),
     }),
+  contentUpdates: (id: string, kind: ContentKind) =>
+    queryOptions({
+      queryKey: keys.servers.contentUpdates(id, kind),
+      queryFn: () => api.content.checkUpdates(id, kind),
+      // A network resolve per item — refetch only when explicitly asked.
+      staleTime: Number.POSITIVE_INFINITY,
+      enabled: false,
+    }),
 };
 
 export const serverMutations = {
@@ -244,6 +252,31 @@ export const serverMutations = {
           api.content.update(id, kind, item, onProgress),
         invalidates: () => [keys.servers.content(id)],
       }),
+    enable: (id: string) =>
+      mutation<
+        void,
+        { kind: ContentKind; item: string; enabled: boolean; worlds?: string[] }
+      >({
+        mutationKey: [...keys.servers.content(id), 'enable'],
+        mutationFn: ({ kind, item, enabled, worlds }) =>
+          api.content.enable(id, kind, item, enabled, worlds),
+        invalidates: () => [keys.servers.content(id)],
+      }),
+    setVersion: (id: string) =>
+      jobMutation<
+        ContentDone,
+        { kind: ContentKind; item: string; version: string }
+      >({
+        mutationKey: [...keys.servers.content(id), 'set-version'],
+        meta: ({ kind }) => ({
+          kind: 'content.update',
+          label: `pin ${kind}`,
+          entry: { kind: 'server', id },
+        }),
+        run: ({ kind, item, version }, onProgress) =>
+          api.content.setVersion(id, kind, item, version, onProgress),
+        invalidates: () => [keys.servers.content(id)],
+      }),
   },
 };
 
@@ -333,6 +366,11 @@ export function useServerContent(id: string, kind: ContentKind) {
   return useQuery(serverQueries.content(id, kind));
 }
 
+/** Update availability — disabled until `refetch()` is called (network per item). */
+export function useServerContentUpdates(id: string, kind: ContentKind) {
+  return useQuery(serverQueries.contentUpdates(id, kind));
+}
+
 export function useCreateServer() {
   return useJobMutation(serverMutations.create());
 }
@@ -395,4 +433,12 @@ export function useRemoveServerContent(id: string) {
 
 export function useUpdateServerContent(id: string) {
   return useJobMutation(serverMutations.content.update(id));
+}
+
+export function useEnableServerContent(id: string) {
+  return useMutation(serverMutations.content.enable(id));
+}
+
+export function useSetServerContentVersion(id: string) {
+  return useJobMutation(serverMutations.content.setVersion(id));
 }

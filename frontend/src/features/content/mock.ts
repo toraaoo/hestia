@@ -3,7 +3,7 @@
  * `content.project`. Nothing talks to a backend.
  */
 
-import type { ContentKind } from '@/lib/mock';
+import type { ContentKind } from '@/api';
 
 const DAY = 86_400;
 const nowSec = Math.floor(Date.now() / 1000);
@@ -100,7 +100,7 @@ export const contentProjects: ContentProject[] = [
     author: 'Faithful Team',
     description:
       'A faithful, higher-resolution take on the default texture pack.',
-    kind: 'resourcepack',
+    kind: 'resource_pack',
     downloads: 9_400_000,
     follows: 18_700,
     categories: ['Vanilla-like'],
@@ -144,9 +144,9 @@ function kindLoaders(kind: ContentKind): string[] {
     case 'mod':
     case 'modpack':
       return ['fabric'];
-    case 'datapack':
+    case 'data_pack':
       return ['datapack'];
-    case 'resourcepack':
+    case 'resource_pack':
       return ['minecraft'];
     case 'shader':
       return ['iris', 'optifine'];

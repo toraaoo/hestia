@@ -25,6 +25,7 @@ tauri-build = { version = "2.6.3", features = [] }
 [dependencies]
 tauri = { version = "2.11.5", features = [] }
 tauri-plugin-opener = "2.5.4"
+tauri-plugin-dialog = "2"
 client = { workspace = true }
 common = { workspace = true }
 serde = { workspace = true }

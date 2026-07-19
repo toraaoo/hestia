@@ -2,8 +2,10 @@ import { PlusIcon, StackIcon, TrashIcon } from '@phosphor-icons/react';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 
+import type { ContentKind } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
+import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -11,13 +13,20 @@ import {
   ContentInstallModal,
   profileTarget,
 } from '@/features/content/install-modal';
+import { KindChips } from '@/features/content/kind-chips';
+import { kindInfo } from '@/features/content/kinds';
 import { getProject } from '@/features/content/mock';
-import { ContentSection } from '@/features/entries/detail';
-import type { InstalledContent } from '@/features/entries/mock';
 import { globalProfiles } from '@/features/profiles/mock';
 import { profileFilterKinds } from '@/features/profiles/profiles-page';
-import type { ContentKind } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
+
+/** A profile reference as rendered on the detail page (mock, presentational). */
+interface Reference {
+  slug: string;
+  name: string;
+  kind: ContentKind;
+  source: string;
+}
 
 /**
  * A global profile's detail page — the same shape as an entry's content tab
@@ -47,18 +56,16 @@ export function ProfileDetailPage({
     );
   }
 
-  const items: InstalledContent[] = profile.entries.map((entry) => {
+  const items: Reference[] = profile.entries.map((entry) => {
     const project = getProject(entry.slug);
     return {
-      id: entry.slug,
+      slug: entry.slug,
       name: project?.title ?? entry.slug,
       kind: project?.kind ?? 'mod',
       source: entry.source,
-      version: m['label.latest'](),
-      enabled: true,
-      updatable: false,
     };
   });
+  const filtered = kind ? items.filter((i) => i.kind === kind) : items;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -96,11 +103,11 @@ export function ProfileDetailPage({
       />
 
       <div className="flex-1 p-5">
-        <ContentSection
-          items={items}
+        <KindChips
           kinds={profileFilterKinds}
           kind={kind}
           onKindChange={onKindChange}
+          count={(k) => items.filter((i) => i.kind === k).length}
           action={
             <Button
               size="sm"
@@ -113,6 +120,36 @@ export function ProfileDetailPage({
             </Button>
           }
         />
+        {filtered.length === 0 ? (
+          <Empty>
+            {kind
+              ? m['content.none_of_kind']({
+                  kind: kindInfo[kind].label().toLowerCase(),
+                })
+              : m['content.none_installed']()}
+          </Empty>
+        ) : (
+          <div className="divide-y divide-border border border-border">
+            {filtered.map((ref) => {
+              const Icon = contentIcon(ref.kind);
+              return (
+                <div
+                  key={ref.slug}
+                  className="flex items-center gap-3 px-3 py-2.5"
+                >
+                  <Icon className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm">{ref.name}</div>
+                    <div className="truncate font-mono text-[11px] text-muted-foreground">
+                      {contentKindLabel[ref.kind]()} · {ref.source} ·{' '}
+                      {m['label.latest']()}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <ContentInstallModal

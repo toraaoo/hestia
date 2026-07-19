@@ -1,7 +1,7 @@
 import { CaretRightIcon, PlusIcon, StackIcon } from '@phosphor-icons/react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-
+import type { ContentKind } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Empty } from '@/components/empty';
 import { Page } from '@/components/page';
@@ -23,13 +23,12 @@ import { getProject } from '@/features/content/mock';
 import { type View, ViewToggle } from '@/features/entries/collection';
 import type { GlobalProfile } from '@/features/profiles/mock';
 import { globalProfiles } from '@/features/profiles/mock';
-import type { ContentKind } from '@/lib/mock';
 import { m } from '@/paraglide/messages.js';
 
 /** The kinds a global profile can reference — the selectable pool kinds. */
 export const profileFilterKinds: ContentKind[] = [
   'mod',
-  'resourcepack',
+  'resource_pack',
   'shader',
 ];
 

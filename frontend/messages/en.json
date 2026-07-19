@@ -36,7 +36,8 @@
     "equip": "Equip",
     "edit": "Edit",
     "restart": "Restart",
-    "more": "More"
+    "more": "More",
+    "show_more": "Show more"
   },
   "label": {
     "all": "All",
@@ -318,7 +319,15 @@
     "current_version": "current",
     "import_file": "Import a local file",
     "import_file_hint": "Installs as-is — no updates or dependency resolution.",
-    "local_file": "local file"
+    "local_file": "local file",
+    "enable": "Enable",
+    "disable": "Disable",
+    "enabled": "Enabled",
+    "check_updates": "Check for updates",
+    "checking_updates": "Checking…",
+    "up_to_date": "Everything is up to date",
+    "update_available": "Update available",
+    "untracked_note": "{count} untracked file(s) in the game dir: {files}"
   },
   "backup": {
     "create": "Create backup",
