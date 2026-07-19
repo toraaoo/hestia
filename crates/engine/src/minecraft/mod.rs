@@ -17,6 +17,11 @@ use proto::minecraft::{Flavor, GameVersion, InstanceProfile, ServerProfile};
 
 use provider::{InstanceProvider, ResolveRequest, ServerProvider};
 
+/// The Java majors Minecraft launch profiles ever require: 8 (pre-1.17),
+/// 16 (1.17), 17 (1.18–1.20.4), 21 (1.20.5+). Catalogue surfaces (the
+/// installable-releases list) are filtered to these.
+pub const REQUIRED_JAVA_MAJORS: [i32; 4] = [8, 16, 17, 21];
+
 pub struct Minecraft {
     servers: Vec<Box<dyn ServerProvider>>,
     instances: Vec<Box<dyn InstanceProvider>>,

@@ -278,6 +278,8 @@ fn read_runtime(install_dir: &Path) -> Option<JavaRuntime> {
             .to_string(),
         home,
         executable,
+        // Usage is a cross-store question; the daemon's list handler fills it.
+        in_use: false,
     })
 }
 

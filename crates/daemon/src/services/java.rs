@@ -17,13 +17,40 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .releases()
             .await
             .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+        // The launcher only ever launches Minecraft, so offering every
+        // vendor-supported major is noise.
+        let releases = releases
+            .into_iter()
+            .filter(|r| engine::REQUIRED_JAVA_MAJORS.contains(&r.major))
+            .collect();
         Ok(JavaReleasesResult { releases })
     });
 
     on.handle::<JavaList, _, _>(|_: Empty, ctx| async move {
-        Ok(JavaListResult {
-            runtimes: ctx.runtime.engine().java().installed(),
-        })
+        let engine = ctx.runtime.engine();
+        let required: std::collections::HashSet<i32> = engine
+            .servers()
+            .list()
+            .iter()
+            .map(|r| r.profile.java_major)
+            .chain(
+                engine
+                    .instances()
+                    .list()
+                    .iter()
+                    .map(|r| r.profile.java_major),
+            )
+            .collect();
+        let runtimes = engine
+            .java()
+            .installed()
+            .into_iter()
+            .map(|mut runtime| {
+                runtime.in_use = required.contains(&runtime.major);
+                runtime
+            })
+            .collect();
+        Ok(JavaListResult { runtimes })
     });
 
     on.handle::<JavaInstall, _, _>(|p, ctx| async move {

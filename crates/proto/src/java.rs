@@ -19,6 +19,8 @@ pub struct JavaRuntime {
     pub release_name: String,
     pub home: PathBuf,
     pub executable: PathBuf,
+    /// Whether an existing server or instance launches with this major.
+    pub in_use: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]

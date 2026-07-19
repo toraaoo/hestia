@@ -31,7 +31,7 @@ pub use engine::{Engine, ServerCreateSpec, ServerUpdateSpec};
 pub use instances::{InstanceRecord, Instances};
 pub use java::{Java, JavaInstallOutcome};
 pub use minecraft::launch::{JavaSettings, LaunchPlan};
-pub use minecraft::Minecraft;
+pub use minecraft::{Minecraft, REQUIRED_JAVA_MAJORS};
 pub use profiles::Profiles;
 pub use servers::{RconConfig, ServerRecord, Servers};
 pub use skins::Skins;
