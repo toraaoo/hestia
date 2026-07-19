@@ -4,15 +4,20 @@
  * `source` selects the default source.
  */
 import {
+  infiniteQueryOptions,
   keepPreviousData,
   queryOptions,
+  useInfiniteQuery,
   useQuery,
 } from '@tanstack/react-query';
-import type { SearchQuery, VersionQuery } from '../api';
+import type { ContentKind, SearchQuery, VersionQuery } from '../api';
 import * as api from '../api/content';
 import { keys } from './keys';
 
 const BROWSE_STALE_MS = 60_000;
+
+/** Hits fetched per page when paging the browse grid. */
+export const SEARCH_PAGE = 20;
 
 export const contentQueries = {
   sources: () =>
@@ -26,8 +31,30 @@ export const contentQueries = {
       queryKey: keys.content.search(query),
       queryFn: () => api.search(query),
       staleTime: BROWSE_STALE_MS,
-      // Keep the current hits on screen while a larger page (or a new filter)
-      // loads, so paginating never flashes the grid back to a skeleton.
+      // A single observer transitions keys cleanly, so keep the current hits on
+      // screen while a new query loads (search-as-you-type never blanks).
+      placeholderData: keepPreviousData,
+    }),
+  // The browse grid pages by offset: pages accumulate under one stable key, so
+  // scrolling appends rather than refetching a growing window. "All" fans out
+  // over every kind for a page (a source search is scoped to one kind) and the
+  // grid merges them. `keepPreviousData` keeps the old results on screen while
+  // a new filter loads.
+  searchPaged: (kinds: ContentKind[], query: string) =>
+    infiniteQueryOptions({
+      queryKey: keys.content.searchPaged(kinds, query),
+      queryFn: ({ pageParam }) =>
+        Promise.all(
+          kinds.map((kind) =>
+            api.search({ kind, query, limit: SEARCH_PAGE, offset: pageParam }),
+          ),
+        ),
+      initialPageParam: 0,
+      getNextPageParam: (lastPage, _pages, lastParam) =>
+        lastPage.some((r) => r.offset + r.hits.length < r.total)
+          ? lastParam + SEARCH_PAGE
+          : undefined,
+      staleTime: BROWSE_STALE_MS,
       placeholderData: keepPreviousData,
     }),
   project: (project: string, source = '') =>
@@ -57,6 +84,10 @@ export function useContentSources() {
 
 export function useContentSearch(query: SearchQuery) {
   return useQuery(contentQueries.search(query));
+}
+
+export function useContentSearchPaged(kinds: ContentKind[], query: string) {
+  return useInfiniteQuery(contentQueries.searchPaged(kinds, query));
 }
 
 export function useContentProject(project: string, source = '') {
