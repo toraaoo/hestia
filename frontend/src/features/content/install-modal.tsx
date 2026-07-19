@@ -2,6 +2,7 @@ import {
   CaretLeftIcon,
   CaretRightIcon,
   UploadSimpleIcon,
+  XIcon,
 } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -120,6 +121,12 @@ const entryTypeLabel = (type: Target['type']): string =>
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
+/** A local file staged for import, tagged with the kind it installs as. */
+interface PickedFile {
+  path: string;
+  kind: ContentKind;
+}
+
 /** Every entry, from all three stores, merged into a common target shape. */
 function useTargets(): Target[] {
   const servers = useServers();
@@ -159,10 +166,12 @@ export function ContentInstallModal({
 
   const [step, setStep] = useState(0);
   const [targetId, setTargetId] = useState(entry?.id ?? '');
-  const [picked, setPicked] = useState<ContentProject | null>(project ?? null);
-  const [file, setFile] = useState<string | null>(null);
+  const [picked, setPicked] = useState<ContentProject[]>(
+    project ? [project] : [],
+  );
+  const [files, setFiles] = useState<PickedFile[]>([]);
   const [kindFilter, setKindFilter] = useState<ContentKind | null>(null);
-  const [versionId, setVersionId] = useState('');
+  const [versionIds, setVersionIds] = useState<Record<string, string>>({});
   const [worlds, setWorlds] = useState<string[]>([]);
 
   const [installing, setInstalling] = useState(false);
@@ -176,10 +185,10 @@ export function ContentInstallModal({
     if (!open) return;
     setStep(0);
     setTargetId(entry?.id ?? '');
-    setPicked(project ?? null);
-    setFile(null);
+    setPicked(project ? [project] : []);
+    setFiles([]);
     setKindFilter(null);
-    setVersionId('');
+    setVersionIds({});
     setWorlds([]);
     setInstalling(false);
     setProgress(0);
@@ -188,19 +197,12 @@ export function ContentInstallModal({
   }, [open]);
 
   const target = targets.find((t) => t.id === targetId) ?? entry ?? null;
-  // The kinds this target accepts, in the order the chips present them.
-  const acceptedKinds = target
-    ? ACCEPTS[target.type].filter((k) => targetTakesKind(target, k))
-    : [];
-  // In entry mode the kind comes from the active filter (which scopes search),
-  // defaulting to the first accepted kind so it is never null — a null kind
-  // both drops the version loader filter and is rejected by the install; in
-  // browse mode it is the project's own kind.
-  const kind: ContentKind | null =
-    mode === 'browse'
-      ? (picked?.kind ?? null)
-      : (kindFilter ?? acceptedKinds[0] ?? null);
-  const needsWorlds = kind === 'data_pack' && target?.type === 'instance';
+  const selectedCount = picked.length + files.length;
+  const selectedKinds = [
+    ...new Set([...picked.map((p) => p.kind), ...files.map((f) => f.kind)]),
+  ];
+  const needsWorlds =
+    selectedKinds.includes('data_pack') && target?.type === 'instance';
   const isProfile = target?.type === 'profile';
 
   const pickStep = mode === 'browse' ? 'target' : 'content';
@@ -211,12 +213,12 @@ export function ContentInstallModal({
   const stepId = steps[Math.min(step, steps.length - 1)];
 
   const Icon =
-    mode === 'browse' && picked
-      ? contentIcon(picked.kind)
+    mode === 'browse' && project
+      ? contentIcon(project.kind)
       : entryIcon(entry?.type ?? 'instance');
   const title =
     mode === 'browse'
-      ? m['content.install_title']({ name: picked?.title ?? '' })
+      ? m['content.install_title']({ name: project?.title ?? '' })
       : m['content.add_to_title']({ name: entry?.name ?? '' });
 
   const hint = installing
@@ -233,7 +235,7 @@ export function ContentInstallModal({
     stepId === 'target'
       ? !!targetId
       : stepId === 'content'
-        ? !!picked || !!file
+        ? selectedCount > 0
         : stepId === 'worlds'
           ? worlds.length > 0
           : true;
@@ -248,31 +250,38 @@ export function ContentInstallModal({
       setProgress(p.total > 0 ? Math.round((p.current / p.total) * 100) : 0);
     };
     try {
-      if (isProfile && picked) {
-        await profileApi.edit(target.name, { add: [projectRef(picked)] });
+      if (isProfile && picked.length > 0) {
+        await profileApi.edit(target.name, { add: picked.map(projectRef) });
       } else if (target.type !== 'profile') {
-        const items = file
-          ? [{ path: file }]
-          : [
-              {
-                project: projectRef(picked as ContentProject),
-                version: versionId,
-              },
-            ];
-        const spec = {
-          kind: kind as ContentKind,
-          items,
-          worlds: needsWorlds ? worlds : [],
-        };
         const add =
           target.type === 'server'
             ? serverApi.content.add
             : instanceApi.content.add;
-        const done = await add(target.id, spec, onProgress);
-        // A batch "succeeds" even when every item failed to resolve/install;
-        // surface those per-item failures instead of closing as if installed.
-        if (done.failures.length > 0) {
-          setError(done.failures.map((f) => f.message).join('; '));
+        // The wire spec is per-kind, so a mixed selection installs as one
+        // batch per kind; failures aggregate across batches.
+        const failures: string[] = [];
+        for (const k of selectedKinds) {
+          const items = [
+            ...picked
+              .filter((p) => p.kind === k)
+              .map((p) => ({
+                project: projectRef(p),
+                version: versionIds[projectRef(p)] ?? '',
+              })),
+            ...files.filter((f) => f.kind === k).map((f) => ({ path: f.path })),
+          ];
+          const spec = {
+            kind: k,
+            items,
+            worlds: k === 'data_pack' && needsWorlds ? worlds : [],
+          };
+          const done = await add(target.id, spec, onProgress);
+          // A batch "succeeds" even when every item failed to resolve/install;
+          // surface those per-item failures instead of closing as if installed.
+          failures.push(...done.failures.map((f) => f.message));
+        }
+        if (failures.length > 0) {
+          setError(failures.join('; '));
           setInstalling(false);
           return;
         }
@@ -314,9 +323,9 @@ export function ContentInstallModal({
             <div className="flex max-h-[58vh] min-h-[16rem] flex-col overflow-hidden p-1">
               {stepId === 'target' ? (
                 <TargetStep
-                  kind={picked?.kind ?? 'mod'}
+                  kind={project?.kind ?? 'mod'}
                   targets={targets.filter(
-                    (t) => picked && targetTakesKind(t, picked.kind),
+                    (t) => project && targetTakesKind(t, project.kind),
                   )}
                   selectedId={targetId}
                   onSelect={(t) => {
@@ -329,25 +338,29 @@ export function ContentInstallModal({
                   <ContentStep
                     target={target}
                     kind={kindFilter}
-                    onKindChange={(k) => {
-                      setKindFilter(k);
-                      setPicked(null);
-                      setFile(null);
-                      setVersionId('');
+                    onKindChange={setKindFilter}
+                    picked={picked}
+                    files={files}
+                    onToggle={(p) => {
+                      const ref = projectRef(p);
+                      setPicked((prev) =>
+                        prev.some((x) => projectRef(x) === ref)
+                          ? prev.filter((x) => projectRef(x) !== ref)
+                          : [...prev, p],
+                      );
+                      setVersionIds(({ [ref]: _, ...rest }) => rest);
                     }}
-                    selectedId={picked ? projectRef(picked) : ''}
-                    file={file}
-                    onSelect={(p) => {
-                      setPicked(p);
-                      setFile(null);
-                      setVersionId('');
-                      setWorlds([]);
-                    }}
-                    onPickFile={(path) => {
-                      setFile(path);
-                      setPicked(null);
-                      setVersionId('');
-                    }}
+                    onAddFiles={(paths, k) =>
+                      setFiles((prev) => [
+                        ...prev,
+                        ...paths
+                          .filter((p) => !prev.some((f) => f.path === p))
+                          .map((path) => ({ path, kind: k })),
+                      ])
+                    }
+                    onRemoveFile={(path) =>
+                      setFiles((prev) => prev.filter((f) => f.path !== path))
+                    }
                   />
                 )
               ) : stepId === 'worlds' ? (
@@ -366,11 +379,14 @@ export function ContentInstallModal({
                 <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
                   <ReviewStep
                     target={target}
-                    project={picked}
-                    file={file}
-                    kind={kind}
-                    versionId={versionId}
-                    onVersion={setVersionId}
+                    picked={picked}
+                    files={files}
+                    versionIds={versionIds}
+                    onVersion={(ref, id) =>
+                      setVersionIds(({ [ref]: _, ...rest }) =>
+                        id ? { ...rest, [ref]: id } : rest,
+                      )
+                    }
                     worlds={needsWorlds ? worlds : undefined}
                   />
                 </div>
@@ -383,11 +399,17 @@ export function ContentInstallModal({
             </div>
 
             <DialogFooter className="items-center">
-              <StepDots
-                steps={steps}
-                active={Math.min(step, steps.length - 1)}
-                className="mr-auto"
-              />
+              <div className="mr-auto flex items-center gap-3">
+                <StepDots
+                  steps={steps}
+                  active={Math.min(step, steps.length - 1)}
+                />
+                {mode === 'entry' && selectedCount > 0 && (
+                  <span className="text-[11px] text-muted-foreground">
+                    {m['content.selected_count']({ count: selectedCount })}
+                  </span>
+                )}
+              </div>
               {step === 0 ? (
                 <Button
                   type="button"
@@ -538,22 +560,25 @@ function ContentStep({
   target,
   kind,
   onKindChange,
-  selectedId,
-  file,
-  onSelect,
-  onPickFile,
+  picked,
+  files,
+  onToggle,
+  onAddFiles,
+  onRemoveFile,
 }: {
   target: Target;
   kind: ContentKind | null;
   onKindChange: (kind: ContentKind | null) => void;
-  selectedId: string;
-  file: string | null;
-  onSelect: (p: ContentProject) => void;
-  onPickFile: (path: string) => void;
+  picked: ContentProject[];
+  files: PickedFile[];
+  onToggle: (p: ContentProject) => void;
+  onAddFiles: (paths: string[], kind: ContentKind) => void;
+  onRemoveFile: (path: string) => void;
 }) {
   const [search, setSearch] = useState('');
   const kinds = ACCEPTS[target.type].filter((k) => targetTakesKind(target, k));
   const activeKind = kind ?? kinds[0];
+  const pickedRefs = new Set(picked.map(projectRef));
 
   const results = useQuery(
     contentQueries.search({
@@ -583,7 +608,30 @@ function ContentStep({
 
           {/* A global profile stores project references, never files. */}
           {target.type !== 'profile' && (
-            <FileImportButton file={file} onPickFile={onPickFile} />
+            <FileImportButton
+              onPickFiles={(paths) => onAddFiles(paths, activeKind)}
+            />
+          )}
+
+          {/* The selection survives searches and kind switches; chips keep
+              every picked item visible and removable from any view. */}
+          {picked.length + files.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {picked.map((p) => (
+                <SelectionChip
+                  key={projectRef(p)}
+                  label={p.title}
+                  onRemove={() => onToggle(p)}
+                />
+              ))}
+              {files.map((f) => (
+                <SelectionChip
+                  key={f.path}
+                  label={fileName(f.path)}
+                  onRemove={() => onRemoveFile(f.path)}
+                />
+              ))}
+            </div>
           )}
         </>
       }
@@ -604,8 +652,8 @@ function ContentStep({
               icon={contentIcon(p.kind)}
               title={p.title}
               subtitle={`${contentKindLabel[p.kind]()} · ${m['browse.by_author']({ name: p.author })}`}
-              selected={selectedId === projectRef(p)}
-              onSelect={() => onSelect(p)}
+              selected={pickedRefs.has(projectRef(p))}
+              onSelect={() => onToggle(p)}
             />
           ))}
         </div>
@@ -614,30 +662,43 @@ function ContentStep({
   );
 }
 
-function FileImportButton({
-  file,
-  onPickFile,
+function SelectionChip({
+  label,
+  onRemove,
 }: {
-  file: string | null;
-  onPickFile: (path: string) => void;
+  label: string;
+  onRemove: () => void;
 }) {
   return (
     <button
       type="button"
-      aria-pressed={file !== null}
+      onClick={onRemove}
+      className={cn(chipClass(true), 'flex items-center gap-1')}
+    >
+      <span className="max-w-40 truncate">{label}</span>
+      <XIcon weight="bold" className="size-3 shrink-0" />
+    </button>
+  );
+}
+
+function FileImportButton({
+  onPickFiles,
+}: {
+  onPickFiles: (paths: string[]) => void;
+}) {
+  return (
+    <button
+      type="button"
       onClick={async () => {
-        const path = await dialog.pickContentFile();
-        if (path) onPickFile(path);
+        const paths = await dialog.pickContentFiles();
+        if (paths.length > 0) onPickFiles(paths);
       }}
-      className={cn(
-        'mb-2 flex w-full items-center gap-3 border border-dashed p-3 text-left outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
-        file ? 'border-ember bg-muted' : 'border-border hover:bg-muted/60',
-      )}
+      className="mb-2 flex w-full items-center gap-3 border border-dashed border-border p-3 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring"
     >
       <UploadSimpleIcon className="size-4 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm">
-          {file ? fileName(file) : m['content.import_file']()}
+          {m['content.import_file']()}
         </span>
         <span className="block truncate text-[11px] text-muted-foreground">
           {m['content.import_file_hint']()}
@@ -699,46 +760,24 @@ function WorldsStep({
 
 function ReviewStep({
   target,
-  project,
-  file,
-  kind,
-  versionId,
+  picked,
+  files,
+  versionIds,
   onVersion,
   worlds,
 }: {
   target: Target | null;
-  project: ContentProject | null;
-  file: string | null;
-  kind: ContentKind | null;
-  versionId: string;
-  onVersion: (id: string) => void;
+  picked: ContentProject[];
+  files: PickedFile[];
+  versionIds: Record<string, string>;
+  onVersion: (ref: string, id: string) => void;
   worlds?: string[];
 }) {
   const isProfile = target?.type === 'profile';
-  const versions = useQuery({
-    ...contentQueries.versions({
-      source: project?.source ?? '',
-      project: project ? projectRef(project) : '',
-      loader:
-        !isProfile && kind === 'mod'
-          ? (target?.flavor ?? undefined)
-          : undefined,
-      gameVersion: !isProfile ? target?.gameVersion || undefined : undefined,
-    }),
-    enabled: !!project && !file,
-  });
-  const list = versions.data ?? [];
-  const resolved = list.find((v) => v.id === versionId) ?? list[0];
-  const requiredDeps =
-    resolved?.dependencies.filter((d) => d.kind === 'required').length ?? 0;
 
   return (
     <div className="flex flex-col gap-4 p-1">
       <div className="divide-y divide-border border border-border">
-        <ReviewRow
-          label={m['label.content']()}
-          value={project?.title ?? (file ? fileName(file) : '—')}
-        />
         <ReviewRow label={m['label.target']()} value={target?.name ?? '—'} />
         {worlds && (
           <ReviewRow
@@ -748,40 +787,86 @@ function ReviewStep({
             }
           />
         )}
-        {file ? (
-          <ReviewRow
-            label={m['label.version']()}
-            value={m['content.local_file']()}
-          />
-        ) : isProfile ? null : (
-          <div className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
-            <span className="text-xs text-muted-foreground">
-              {m['label.version']()}
-            </span>
-            <div className="flex items-center gap-2">
-              {resolved && !versionId && (
-                <Badge variant="secondary" className="shrink-0">
-                  {m['label.latest']()}
-                </Badge>
-              )}
-              {resolved && (
-                <VersionCombobox
-                  versions={list}
-                  value={resolved}
-                  onChange={(v) =>
-                    onVersion(v && v.id !== list[0]?.id ? v.id : '')
-                  }
-                />
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
-      {project && !file && requiredDeps > 0 && (
-        <p className="text-[11px] text-muted-foreground">
-          {m['content.dependencies']({ count: requiredDeps })}
-        </p>
+      <div className="divide-y divide-border border border-border">
+        {picked.map((p) => (
+          <ReviewItemRow
+            key={projectRef(p)}
+            target={target}
+            project={p}
+            isProfile={isProfile}
+            versionId={versionIds[projectRef(p)] ?? ''}
+            onVersion={(id) => onVersion(projectRef(p), id)}
+          />
+        ))}
+        {files.map((f) => (
+          <ReviewRow
+            key={f.path}
+            label={fileName(f.path)}
+            value={m['content.local_file']()}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReviewItemRow({
+  target,
+  project,
+  isProfile,
+  versionId,
+  onVersion,
+}: {
+  target: Target | null;
+  project: ContentProject;
+  isProfile: boolean;
+  versionId: string;
+  onVersion: (id: string) => void;
+}) {
+  const versions = useQuery({
+    ...contentQueries.versions({
+      source: project.source,
+      project: projectRef(project),
+      loader:
+        !isProfile && project.kind === 'mod'
+          ? (target?.flavor ?? undefined)
+          : undefined,
+      gameVersion: !isProfile ? target?.gameVersion || undefined : undefined,
+    }),
+    enabled: !isProfile,
+  });
+  const list = versions.data ?? [];
+  const resolved = list.find((v) => v.id === versionId) ?? list[0];
+  const requiredDeps =
+    resolved?.dependencies.filter((d) => d.kind === 'required').length ?? 0;
+
+  return (
+    <div className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
+      <div className="min-w-0">
+        <span className="block truncate">{project.title}</span>
+        <span className="block truncate text-[11px] text-muted-foreground">
+          {contentKindLabel[project.kind]()}
+          {requiredDeps > 0 &&
+            ` · ${m['content.dependencies']({ count: requiredDeps })}`}
+        </span>
+      </div>
+      {!isProfile && (
+        <div className="flex shrink-0 items-center gap-2">
+          {resolved && !versionId && (
+            <Badge variant="secondary" className="shrink-0">
+              {m['label.latest']()}
+            </Badge>
+          )}
+          {resolved && (
+            <VersionCombobox
+              versions={list}
+              value={resolved}
+              onChange={(v) => onVersion(v && v.id !== list[0]?.id ? v.id : '')}
+            />
+          )}
+        </div>
       )}
     </div>
   );

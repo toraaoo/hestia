@@ -10,14 +10,15 @@ import { open } from '@tauri-apps/plugin-dialog';
 const CONTENT_EXTENSIONS = ['jar', 'zip', 'mrpack'];
 
 /**
- * Pick one content file and return its absolute path, or `null` if the dialog
- * was dismissed. The path is passed straight to `content.add`'s `path` field.
+ * Pick content files and return their absolute paths (empty if the dialog was
+ * dismissed). Each path is passed straight to `content.add`'s `path` field.
  */
-export async function pickContentFile(): Promise<string | null> {
+export async function pickContentFiles(): Promise<string[]> {
   const selection = await open({
-    multiple: false,
+    multiple: true,
     directory: false,
     filters: [{ name: 'Content', extensions: CONTENT_EXTENSIONS }],
   });
-  return typeof selection === 'string' ? selection : null;
+  if (Array.isArray(selection)) return selection;
+  return typeof selection === 'string' ? [selection] : [];
 }

@@ -14,6 +14,7 @@ import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   DropdownMenu,
@@ -27,6 +28,7 @@ import { kindInfo } from '@/features/content/kinds';
 import { ChangeVersionModal } from '@/features/content/version-modal';
 import type { Backup } from '@/features/entries/mock';
 import { agoLabel, bytes } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import {
   instanceQueries,
@@ -87,6 +89,9 @@ export interface EntryTarget {
 
 /** How the daemon matches an item: its project id, else its filename. */
 const installedRef = (i: InstalledContent) => i.projectId || i.filename;
+
+/** A stable identity for one installed row (a datapack repeats per world). */
+const rowKey = (i: InstalledContent) => `${i.kind}:${i.filename}:${i.world}`;
 
 /** The world folder to narrow a datapack toggle/removal to (else none). */
 const itemWorlds = (i: InstalledContent): string[] =>
@@ -245,6 +250,10 @@ function ContentSectionView({
   const checking = updates.some((q) => q.isFetching);
   const filtered = kind ? items.filter((c) => c.kind === kind) : items;
 
+  // null = not selecting; a set of row keys while the select mode is active.
+  const [selected, setSelected] = useState<Set<string> | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
   return (
     <>
       <KindChips
@@ -253,25 +262,56 @@ function ContentSectionView({
         onKindChange={onKindChange}
         count={(k) => items.filter((c) => c.kind === k).length}
         action={
-          <div className="flex items-center gap-2">
-            {items.length > 0 && (
+          selected ? (
+            <div className="flex items-center gap-2">
               <Button
                 size="sm"
                 variant="outline"
-                data-icon="inline-start"
-                disabled={checking}
-                onClick={() => {
-                  for (const q of updates) void q.refetch();
-                }}
+                onClick={() => setSelected(null)}
               >
-                <ArrowsClockwiseIcon weight="bold" />
-                {checking
-                  ? m['content.checking_updates']()
-                  : m['content.check_updates']()}
+                {m['action.cancel']()}
               </Button>
-            )}
-            {action}
-          </div>
+              <Button
+                size="sm"
+                variant="destructive"
+                data-icon="inline-start"
+                disabled={selected.size === 0}
+                onClick={() => setConfirming(true)}
+              >
+                <TrashIcon weight="bold" />
+                {m['content.remove_count']({ count: selected.size })}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              {items.length > 0 && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelected(new Set())}
+                  >
+                    {m['content.select']()}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-icon="inline-start"
+                    disabled={checking}
+                    onClick={() => {
+                      for (const q of updates) void q.refetch();
+                    }}
+                  >
+                    <ArrowsClockwiseIcon weight="bold" />
+                    {checking
+                      ? m['content.checking_updates']()
+                      : m['content.check_updates']()}
+                  </Button>
+                </>
+              )}
+              {action}
+            </div>
+          )
         }
       />
       {filtered.length === 0 && kind ? (
@@ -286,8 +326,34 @@ function ContentSectionView({
           items={filtered}
           updatable={updatable}
           handlers={handlers}
+          selected={selected}
+          onToggleSelect={(key) =>
+            setSelected((prev) => {
+              const next = new Set(prev);
+              if (next.has(key)) next.delete(key);
+              else next.add(key);
+              return next;
+            })
+          }
         />
       )}
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={m['content.remove_selected_title']()}
+        description={m['content.remove_selected_description']({
+          count: selected?.size ?? 0,
+        })}
+        destructive
+        confirmLabel={m['action.remove']()}
+        onConfirm={() => {
+          setConfirming(false);
+          for (const item of items) {
+            if (selected?.has(rowKey(item))) handlers.onRemove(item);
+          }
+          setSelected(null);
+        }}
+      />
       {untracked.length > 0 && (
         <p className="mt-3 text-[11px] text-muted-foreground">
           {m['content.untracked_note']({
@@ -305,11 +371,15 @@ function ContentList({
   items,
   updatable,
   handlers,
+  selected,
+  onToggleSelect,
 }: {
   entry: EntryTarget;
   items: InstalledContent[];
   updatable: Set<string>;
   handlers: RowHandlers;
+  selected: Set<string> | null;
+  onToggleSelect: (key: string) => void;
 }) {
   const [changing, setChanging] = useState<InstalledContent | null>(null);
 
@@ -321,11 +391,13 @@ function ContentList({
       <div className="divide-y divide-border border border-border">
         {items.map((c) => (
           <ContentRow
-            key={`${c.kind}:${c.filename}:${c.world}`}
+            key={rowKey(c)}
             item={c}
             updatable={updatable.has(c.filename)}
             handlers={handlers}
             onChangeVersion={() => setChanging(c)}
+            checked={selected ? selected.has(rowKey(c)) : undefined}
+            onToggle={() => onToggleSelect(rowKey(c))}
           />
         ))}
       </div>
@@ -345,13 +417,19 @@ function ContentRow({
   updatable,
   handlers,
   onChangeVersion,
+  checked,
+  onToggle,
 }: {
   item: InstalledContent;
   updatable: boolean;
   handlers: RowHandlers;
   onChangeVersion: () => void;
+  /** Set while the batch-select mode is active; undefined otherwise. */
+  checked?: boolean;
+  onToggle: () => void;
 }) {
   const [removing, setRemoving] = useState(false);
+  const selecting = checked !== undefined;
   const Icon = contentIcon(item.kind);
   // A local-file import has no project page to open and no versions to move
   // between — its only action is enable/disable and removal.
@@ -382,6 +460,21 @@ function ContentRow({
     </>
   );
 
+  if (selecting) {
+    const id = `select-${rowKey(item)}`;
+    return (
+      <label
+        htmlFor={id}
+        className={cn(
+          'flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60',
+          !item.enabled && 'opacity-60',
+        )}
+      >
+        <Checkbox id={id} checked={checked} onCheckedChange={onToggle} />
+        {body}
+      </label>
+    );
+  }
   return (
     <div className={item.enabled ? undefined : 'opacity-60'}>
       <div className="flex items-center gap-3 px-3 py-2.5">

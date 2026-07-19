@@ -331,7 +331,12 @@
     "checking_updates": "Checking…",
     "up_to_date": "Everything is up to date",
     "update_available": "Update available",
-    "untracked_note": "{count} untracked file(s) in the game dir: {files}"
+    "untracked_note": "{count} untracked file(s) in the game dir: {files}",
+    "selected_count": "{count} selected",
+    "select": "Select",
+    "remove_count": "Remove ({count})",
+    "remove_selected_title": "Remove selected content?",
+    "remove_selected_description": "{count} item(s) will be removed. Their files are deleted; the change applies at the next start."
   },
   "backup": {
     "create": "Create backup",

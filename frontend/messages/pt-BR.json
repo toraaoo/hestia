@@ -322,7 +322,12 @@
     "current_version": "atual",
     "import_file": "Importar um arquivo local",
     "import_file_hint": "Instala como está — sem atualizações nem resolução de dependências.",
-    "local_file": "arquivo local"
+    "local_file": "arquivo local",
+    "selected_count": "{count} selecionado(s)",
+    "select": "Selecionar",
+    "remove_count": "Remover ({count})",
+    "remove_selected_title": "Remover o conteúdo selecionado?",
+    "remove_selected_description": "{count} item(ns) serão removidos. Seus arquivos são excluídos; a mudança se aplica na próxima inicialização."
   },
   "backup": {
     "create": "Criar backup",
