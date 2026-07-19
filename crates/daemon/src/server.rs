@@ -99,6 +99,12 @@ async fn serve_connection(
         }
     });
 
+    // Requests on one connection are dispatched concurrently: a client
+    // multiplexes replies by id, so a slow handler must not head-of-line block
+    // the rest. This matters most for the desktop, which funnels every call
+    // over a single shared connection — a long launch/materialize would
+    // otherwise stall every other request and freeze the UI. Each handler owns
+    // its own `out` clone and replies out of order through the writer task.
     while let Ok(Some(frame)) = reader.recv().await {
         let req = match decode_request(&frame) {
             Ok(r) => r,
@@ -111,16 +117,20 @@ async fn serve_connection(
                 continue;
             }
         };
-        let id = req.id;
+        let out = out_tx.clone();
         let ctx = HandlerContext {
             runtime: runtime.clone(),
             conn_id,
             out: out_tx.clone(),
             peer,
         };
-        let mut res = router.route(req, ctx).await;
-        res.id = id;
-        let _ = out_tx.send(encode_response(&res));
+        let router = router.clone();
+        tokio::spawn(async move {
+            let id = req.id;
+            let mut res = router.route(req, ctx).await;
+            res.id = id;
+            let _ = out.send(encode_response(&res));
+        });
     }
 
     runtime.hub().unsubscribe(conn_id);
