@@ -61,12 +61,14 @@ export const contentQueries = {
     queryOptions({
       queryKey: keys.content.project(source, project),
       queryFn: () => api.project(project, source),
+      enabled: project.length > 0,
       staleTime: BROWSE_STALE_MS,
     }),
   versions: (query: VersionQuery) =>
     queryOptions({
       queryKey: keys.content.versions(query),
       queryFn: () => api.versions(query),
+      enabled: query.project.length > 0,
       staleTime: BROWSE_STALE_MS,
     }),
   /** Downloads and reads the `.mrpack` index — mount deliberately. */
