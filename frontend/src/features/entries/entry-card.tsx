@@ -22,7 +22,7 @@ export interface EntryCardData {
   ready: boolean;
   /** One-line footer: "Last played 2h ago" / ":25565 · 3 online". */
   subtitle: string;
-  /** Wired quick actions; absent leaves the button inert (mock surfaces). */
+  /** Wired quick actions; absent leaves the button inert. */
   onStart?: () => void;
   onStop?: () => void;
   busy?: boolean;

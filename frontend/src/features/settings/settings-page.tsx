@@ -1,6 +1,5 @@
 import { BroomIcon, CoffeeIcon, TrashIcon } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
-import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Page } from '@/components/page';
@@ -24,7 +23,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { StatusDot } from '@/components/ui/status-dot';
-import { javaReleases, javaRuntimes } from '@/features/settings/mock';
 import { settingsDefaults, settingsSchema } from '@/features/settings/schema';
 import { useAppForm } from '@/hooks/form';
 import { type Locale, useLocale } from '@/hooks/locale';
@@ -33,6 +31,14 @@ import { m } from '@/paraglide/messages.js';
 import { locales } from '@/paraglide/runtime.js';
 import { useCacheInfo, useClearCache } from '@/queries/cache';
 import { useDaemon } from '@/queries/daemon';
+import { useInstances } from '@/queries/instance';
+import {
+  useInstallJava,
+  useJavaReleases,
+  useJavaRuntimes,
+  useUninstallJava,
+} from '@/queries/java';
+import { useServers } from '@/queries/server';
 
 /** Endonyms — a language always names itself, whatever locale is active. */
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -71,10 +77,25 @@ function LanguageField() {
 }
 
 export function SettingsPage() {
-  const [runtimes, setRuntimes] = useState(javaRuntimes);
   const daemon = useDaemon();
   const cache = useCacheInfo();
   const clearCache = useClearCache();
+  const runtimesQuery = useJavaRuntimes();
+  const releasesQuery = useJavaReleases();
+  const install = useInstallJava();
+  const uninstall = useUninstallJava();
+  const servers = useServers();
+  const instances = useInstances();
+
+  const runtimes = runtimesQuery.data ?? [];
+  const releases = releasesQuery.data ?? [];
+  // The wire runtime carries no usage flag: a major is "in use" when an
+  // existing entry launches with it.
+  const majorsInUse = new Set([
+    ...(servers.data ?? []).map((s) => s.javaMajor),
+    ...(instances.data ?? []).map((i) => i.javaMajor),
+  ]);
+  const installedMajors = new Set(runtimes.map((rt) => rt.major));
 
   const form = useAppForm({
     defaultValues: settingsDefaults,
@@ -180,68 +201,89 @@ export function SettingsPage() {
 
               <Field>
                 <FieldLabel>{m['settings.installed_runtimes']()}</FieldLabel>
-                <div className="divide-y divide-border border border-border">
-                  {runtimes.map((rt) => (
-                    <div
-                      key={`${rt.vendor}-${rt.major}`}
-                      className="flex items-center gap-3 px-3 py-2"
-                    >
-                      <CoffeeIcon className="size-4 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm">
-                          {rt.vendor} {rt.major}
+                {runtimesQuery.isPending ? (
+                  <div className="space-y-2">
+                    <Bone className="h-10" />
+                    <Bone className="h-10" />
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border border border-border">
+                    {runtimes.map((rt) => {
+                      const inUse = majorsInUse.has(rt.major);
+                      return (
+                        <div
+                          key={`${rt.vendor}-${rt.major}`}
+                          className="flex items-center gap-3 px-3 py-2"
+                        >
+                          <CoffeeIcon className="size-4 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm">
+                              {rt.vendor} {rt.major}
+                            </div>
+                            <div className="font-mono text-[11px] text-muted-foreground">
+                              {rt.releaseName}
+                            </div>
+                          </div>
+                          {inUse && (
+                            <Badge variant="secondary">
+                              {m['settings.in_use']()}
+                            </Badge>
+                          )}
+                          <ConfirmDialog
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={m['settings.uninstall_runtime']()}
+                                disabled={inUse || uninstall.isPending}
+                              >
+                                <TrashIcon className="size-4" />
+                              </Button>
+                            }
+                            title={m['settings.uninstall_runtime_title']()}
+                            description={m[
+                              'settings.uninstall_runtime_description'
+                            ]({ name: `${rt.vendor} ${rt.major}` })}
+                            destructive
+                            confirmLabel={m['action.uninstall']()}
+                            onConfirm={() =>
+                              uninstall.mutate(rt.major, {
+                                onError: (error) => toast.error(error.message),
+                              })
+                            }
+                          />
                         </div>
-                        <div className="font-mono text-[11px] text-muted-foreground">
-                          {rt.version}
-                        </div>
-                      </div>
-                      {rt.inUse && (
-                        <Badge variant="secondary">
-                          {m['settings.in_use']()}
-                        </Badge>
-                      )}
-                      <ConfirmDialog
-                        trigger={
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={m['settings.uninstall_runtime']()}
-                            disabled={rt.inUse}
-                          >
-                            <TrashIcon className="size-4" />
-                          </Button>
-                        }
-                        title={m['settings.uninstall_runtime_title']()}
-                        description={m[
-                          'settings.uninstall_runtime_description'
-                        ]({ name: `${rt.vendor} ${rt.major}` })}
-                        destructive
-                        confirmLabel={m['action.uninstall']()}
-                        onConfirm={() =>
-                          setRuntimes((rts) =>
-                            rts.filter((r) => r.major !== rt.major),
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <span className="mr-1 text-xs text-muted-foreground">
                     {m['settings.install_prompt']()}
                   </span>
-                  {javaReleases.map((r) => (
-                    <Button
-                      key={r.major}
-                      variant="outline"
-                      size="xs"
-                      disabled={r.installed}
-                    >
-                      {r.major}
-                      {r.lts ? ' LTS' : ''}
-                      {r.installed ? ' ✓' : ''}
-                    </Button>
-                  ))}
+                  {releases.map((r) => {
+                    const installed = installedMajors.has(r.major);
+                    return (
+                      <Button
+                        key={r.major}
+                        variant="outline"
+                        size="xs"
+                        disabled={installed || install.isPending}
+                        onClick={() =>
+                          install.mutate(
+                            { major: r.major },
+                            {
+                              onError: (error) => toast.error(error.message),
+                            },
+                          )
+                        }
+                      >
+                        {r.major}
+                        {r.lts ? ' LTS' : ''}
+                        {installed ? ' ✓' : ''}
+                      </Button>
+                    );
+                  })}
                 </div>
               </Field>
             </FieldGroup>
