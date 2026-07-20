@@ -27,6 +27,7 @@ export {
   TIMEOUT,
   TRANSPORT,
   tryCall,
+  UNAUTHORIZED,
   UNKNOWN_CHANNEL,
 } from './core/ipc';
 export { type JobOptions, type JobTopics, jobId, runJob } from './core/jobs';

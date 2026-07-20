@@ -10,7 +10,13 @@ import {
   type QueryKey,
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { HestiaError } from '../api';
+import { type HestiaError, UNAUTHORIZED } from '../api';
+
+// The instance surface is gated on a signed-in account (the router answers
+// `unauthorized` before an account exists). Every gated feature is already
+// hidden behind the sign-in UI, so these are expected on first launch — never
+// a toast.
+const silent = (error: HestiaError) => error.code === UNAUTHORIZED;
 
 declare module '@tanstack/react-query' {
   interface Register {
@@ -25,12 +31,13 @@ export const queryClient = new QueryClient({
     onError: (error, query) => {
       // A query may opt out of the toast (e.g. a ping a stopped server can't
       // answer) via meta.silent.
-      if (query.meta?.silent) return;
+      if (query.meta?.silent || silent(error)) return;
       toast.error(error.message, { id: query.queryHash });
     },
   }),
   mutationCache: new MutationCache({
     onError: (error) => {
+      if (silent(error)) return;
       toast.error(error.message);
     },
   }),

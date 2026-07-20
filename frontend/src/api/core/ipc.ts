@@ -21,6 +21,7 @@ export const NOT_FOUND = 'not_found';
 export const BAD_REQUEST = 'bad_request';
 export const HANDLER_ERROR = 'handler_error';
 export const UNKNOWN_CHANNEL = 'unknown_channel';
+export const UNAUTHORIZED = 'unauthorized';
 /** Error codes raised by the shell's bridge for transport failures. */
 export const TIMEOUT = 'timeout';
 export const CONNECTION_LOST = 'connection_lost';
