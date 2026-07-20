@@ -3,7 +3,7 @@ use std::sync::Arc;
 use engine::Engine;
 use proto::java::{JavaInstallDoneEvent, JavaInstallErrorEvent};
 
-use super::job::{job_id, topic_event, InFlight};
+use super::job::{coalesce_progress, job_id, topic_event, InFlight};
 use crate::runtime::EventHub;
 
 pub struct JavaInstallManager {
@@ -39,12 +39,12 @@ impl JavaInstallManager {
             let _claim = claim;
             let progress_hub = hub.clone();
             let progress_id = job_id.clone();
-            let on_progress = move |p: &proto::java::JavaInstallProgress| {
+            let on_progress = coalesce_progress(move |p: &proto::java::JavaInstallProgress| {
                 progress_hub.publish(&topic_event(&proto::java::JavaInstallProgressEvent {
                     id: progress_id.clone(),
                     progress: p.clone(),
                 }));
-            };
+            });
 
             let result = engine
                 .java()

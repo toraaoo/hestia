@@ -60,7 +60,7 @@ impl InstanceLaunchManager {
             let progress_hub = hub.clone();
             let progress_id = job_id.clone();
             let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> =
-                Box::new(coalesce_progress(move |p| {
+                Box::new(coalesce_progress(move |p: &ProvisionProgress| {
                     progress_hub.publish(&topic_event(&InstanceLaunchProgressEvent {
                         id: progress_id.clone(),
                         progress: p.clone(),

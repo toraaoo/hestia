@@ -40,6 +40,19 @@ pub struct JavaInstallProgress {
     pub total: u64,
 }
 
+impl JavaInstallProgress {
+    /// Completion of the current phase in `0.0..=1.0`; a phase with unknown
+    /// extent (`total == 0`) reports 0. Keyed on with the phase by the daemon's
+    /// progress coalescing.
+    pub fn ratio(&self) -> f64 {
+        if self.total > 0 {
+            (self.current as f64 / self.total as f64).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default)]
 pub struct JavaReleasesResult {

@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use ipc::protocol::Event;
+use proto::java::{JavaInstallPhase, JavaInstallProgress};
 use proto::minecraft::{ProvisionPhase, ProvisionProgress};
 
 /// Below this ratio delta a progress update is dropped, matching Modrinth's
@@ -15,29 +16,59 @@ use proto::minecraft::{ProvisionPhase, ProvisionProgress};
 /// assets) otherwise emits an event per unit and floods the socket.
 const PROGRESS_EPSILON: f64 = 0.005;
 
+/// A progress payload the coalescer can throttle: a phase discriminant (a
+/// change forces a forward so the label switches promptly) and an overall
+/// `0.0..=1.0` completion ratio.
+pub(super) trait Coalescible {
+    type Phase: Copy + PartialEq + Send;
+    fn phase(&self) -> Self::Phase;
+    fn ratio(&self) -> f64;
+}
+
+impl Coalescible for ProvisionProgress {
+    type Phase = ProvisionPhase;
+    fn phase(&self) -> ProvisionPhase {
+        self.phase
+    }
+    fn ratio(&self) -> f64 {
+        ProvisionProgress::ratio(self)
+    }
+}
+
+impl Coalescible for JavaInstallProgress {
+    type Phase = JavaInstallPhase;
+    fn phase(&self) -> JavaInstallPhase {
+        self.phase
+    }
+    fn ratio(&self) -> f64 {
+        JavaInstallProgress::ratio(self)
+    }
+}
+
 /// Coalesce a high-frequency progress stream so a phase made of thousands of
-/// tiny units can't flood every subscribed front-end (the desktop re-renders
-/// per event; the freeze this fixes). An update is forwarded only when its
-/// phase changes, its overall ratio advances past `PROGRESS_EPSILON`, or it is
-/// terminal — so the bar still lands on 100% and the label still switches
-/// promptly, while the intermediate ticks are dropped. Mirrors the CLI, which
-/// throttles at its render layer instead.
-pub(super) fn coalesce_progress<F>(emit: F) -> impl Fn(&ProvisionProgress) + Send + Sync
+/// tiny units (or a per-chunk download) can't flood every subscribed front-end
+/// (the desktop re-renders per event; the freeze this fixes). An update is
+/// forwarded only when its phase changes, its overall ratio advances past
+/// `PROGRESS_EPSILON`, or it is terminal — so the bar still lands on 100% and
+/// the label still switches promptly, while the intermediate ticks are dropped.
+/// Mirrors the CLI, which throttles at its render layer instead.
+pub(super) fn coalesce_progress<P, F>(emit: F) -> impl Fn(&P) + Send + Sync
 where
-    F: Fn(&ProvisionProgress) + Send + Sync,
+    P: Coalescible,
+    F: Fn(&P) + Send + Sync,
 {
-    let state = Mutex::new(None::<(ProvisionPhase, f64)>);
-    move |p: &ProvisionProgress| {
+    let state = Mutex::new(None::<(P::Phase, f64)>);
+    move |p: &P| {
         let ratio = p.ratio();
         let mut last = state.lock().unwrap();
         let forward = match *last {
             Some((phase, sent)) => {
-                phase != p.phase || ratio >= 1.0 || (ratio - sent).abs() > PROGRESS_EPSILON
+                phase != p.phase() || ratio >= 1.0 || (ratio - sent).abs() > PROGRESS_EPSILON
             }
             None => true,
         };
         if forward {
-            *last = Some((p.phase, ratio));
+            *last = Some((p.phase(), ratio));
             drop(last);
             emit(p);
         }
