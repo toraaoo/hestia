@@ -29,7 +29,7 @@ pub enum LogSource {
 
 /// A request to launch a process under the daemon's supervisor.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProcessSpec {
     /// Client-supplied id; empty asks the daemon to allocate one.
     pub id: String,
@@ -56,7 +56,7 @@ pub enum ProcessState {
 
 /// A snapshot of one tracked process.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProcessInfo {
     pub id: String,
     pub pid: u32,
@@ -78,14 +78,14 @@ pub enum LogStream {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProcessLogLine {
     pub stream: LogStream,
     pub line: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProcessStartResult {
     pub id: String,
     pub pid: u32,
@@ -100,7 +100,7 @@ impl Contract for ProcessStart {
 
 /// Names a single tracked process by id (stop / status / logs share it).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProcessRef {
     pub id: String,
 }
@@ -113,7 +113,7 @@ impl Contract for ProcessStop {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProcessListResult {
     pub processes: Vec<ProcessInfo>,
 }
@@ -133,7 +133,7 @@ impl Contract for ProcessStatus {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProcessLogsParams {
     pub id: String,
     /// Return only the last `tail` lines when set; all buffered lines otherwise.
@@ -142,7 +142,7 @@ pub struct ProcessLogsParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProcessLogsResult {
     pub lines: Vec<ProcessLogLine>,
 }
@@ -155,6 +155,7 @@ impl Contract for ProcessLogs {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessStartedEvent {
     pub id: String,
     pub pid: u32,
@@ -167,7 +168,7 @@ impl Topic for ProcessStartedEvent {
 /// process (a game's startup log) can't flood subscribers with an event per
 /// line.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProcessOutputEvent {
     pub id: String,
     pub lines: Vec<ProcessLogLine>,
@@ -178,7 +179,7 @@ impl Topic for ProcessOutputEvent {
 
 /// One running process's resource sample; `cpu_pct` is 100 per full core.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProcessMetrics {
     pub id: String,
     pub cpu_pct: f32,
@@ -186,6 +187,7 @@ pub struct ProcessMetrics {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessMetricsEvent {
     pub samples: Vec<ProcessMetrics>,
 }
@@ -194,6 +196,7 @@ impl Topic for ProcessMetricsEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessExitEvent {
     pub id: String,
     pub state: ProcessState,

@@ -3,8 +3,10 @@
   "kind": "mod",
   "query": "sodium",
   "loader": "fabric",
-  "game_version": "1.21.1",
-  "categories": ["optimization"],
+  "gameVersion": "1.21.1",
+  "categories": [
+    "optimization"
+  ],
   "sort": "relevance",
   "limit": 20,
   "offset": 0

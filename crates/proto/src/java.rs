@@ -5,14 +5,14 @@ use serde::{Deserialize, Serialize};
 use crate::contract::{Contract, Empty, Topic};
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct JavaRelease {
     pub major: i32,
     pub lts: bool,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct JavaRuntime {
     pub vendor: String,
     pub major: i32,
@@ -32,6 +32,7 @@ pub enum JavaInstallPhase {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct JavaInstallProgress {
     pub phase: JavaInstallPhase,
     #[serde(default)]
@@ -54,7 +55,7 @@ impl JavaInstallProgress {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct JavaReleasesResult {
     pub releases: Vec<JavaRelease>,
 }
@@ -67,7 +68,7 @@ impl Contract for JavaReleases {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct JavaListResult {
     pub runtimes: Vec<JavaRuntime>,
 }
@@ -80,7 +81,7 @@ impl Contract for JavaList {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct JavaInstallParams {
     pub major: i32,
     pub id: String,
@@ -88,7 +89,7 @@ pub struct JavaInstallParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct JavaInstallResult {
     pub id: String,
 }
@@ -101,7 +102,7 @@ impl Contract for JavaInstall {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct JavaUninstallParams {
     pub major: i32,
 }
@@ -114,6 +115,7 @@ impl Contract for JavaUninstall {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct JavaInstallProgressEvent {
     pub id: String,
     #[serde(flatten)]
@@ -124,6 +126,7 @@ impl Topic for JavaInstallProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct JavaInstallDoneEvent {
     pub id: String,
     pub runtime: JavaRuntime,
@@ -135,6 +138,7 @@ impl Topic for JavaInstallDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct JavaInstallErrorEvent {
     pub id: String,
     pub message: String,

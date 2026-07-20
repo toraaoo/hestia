@@ -44,7 +44,7 @@ impl Contract for InstanceLoaders {
 /// An instance can run more than once concurrently (each launch is a session),
 /// so this is a list, not a single process.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceInfo {
     pub id: String,
     pub name: String,
@@ -59,7 +59,7 @@ pub struct InstanceInfo {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceCreateParams {
     /// Display name; defaults to `<flavor>-<version>` when empty.
     pub name: String,
@@ -74,7 +74,7 @@ pub struct InstanceCreateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceCreateResult {
     pub instance: InstanceInfo,
 }
@@ -87,7 +87,7 @@ impl Contract for InstanceCreate {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceUpdateParams {
     /// Instance name or id.
     pub instance: String,
@@ -102,7 +102,7 @@ pub struct InstanceUpdateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceUpdateResult {
     pub instance: InstanceInfo,
 }
@@ -115,7 +115,7 @@ impl Contract for InstanceUpdate {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceListResult {
     pub instances: Vec<InstanceInfo>,
 }
@@ -129,7 +129,7 @@ impl Contract for InstanceList {
 
 /// Names one managed instance by id or name (remove / stop).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceRef {
     pub instance: String,
 }
@@ -138,7 +138,7 @@ pub struct InstanceRef {
 /// locations, and footprint — everything independent of the live sessions.
 /// The disk figure is a directory walk, so this is fetched on demand.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceDetails {
     pub id: String,
     pub name: String,
@@ -164,7 +164,7 @@ impl Contract for InstanceInfoQuery {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceWorldsResult {
     /// Save-world folder names under the instance's `data/saves/`, sorted.
     pub worlds: Vec<String>,
@@ -185,7 +185,7 @@ impl Contract for InstanceRemove {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceRenameParams {
     /// The instance to rename, by its current name or id.
     pub instance: String,
@@ -201,7 +201,7 @@ impl Contract for InstanceRename {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceStopParams {
     pub instance: String,
     /// A specific session id to stop; all of the instance's sessions otherwise.
@@ -217,7 +217,7 @@ impl Contract for InstanceStop {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceLogsParams {
     pub instance: String,
     /// A specific session id; the newest running (else newest) session otherwise.
@@ -236,14 +236,14 @@ impl Contract for InstanceLogs {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceConfigGetParams {
     pub instance: String,
     pub key: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceConfigGetResult {
     pub value: String,
 }
@@ -256,7 +256,7 @@ impl Contract for InstanceConfigGet {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceConfigSetParams {
     pub instance: String,
     pub key: String,
@@ -271,7 +271,7 @@ impl Contract for InstanceConfigSet {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceConfigListResult {
     pub entries: Vec<ConfigEntry>,
 }
@@ -288,7 +288,7 @@ impl Contract for InstanceConfigList {
 /// one index field always present and unique. No profile active = every pool
 /// item is mirrored.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Profile {
     pub name: String,
     pub members: Vec<String>,
@@ -299,7 +299,7 @@ pub struct Profile {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileListResult {
     /// The active profile's name; empty when none is active.
     pub active: String,
@@ -314,7 +314,7 @@ impl Contract for InstanceProfileList {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileCreateParams {
     pub instance: String,
     pub name: String,
@@ -331,7 +331,7 @@ impl Contract for InstanceProfileCreate {
 
 /// Names one profile of one instance (remove / use).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileRef {
     pub instance: String,
     pub name: String,
@@ -346,7 +346,7 @@ impl Contract for InstanceProfileRemove {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileRenameParams {
     pub instance: String,
     pub name: String,
@@ -391,7 +391,7 @@ impl Contract for InstanceProfileRelease {
 /// resolved server-side; one that matches nothing — or only a datapack — is a
 /// `bad_request`.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileEditParams {
     pub instance: String,
     pub name: String,
@@ -407,7 +407,7 @@ impl Contract for InstanceProfileEdit {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceLaunchParams {
     pub instance: String,
     /// Account name or uuid; empty picks the sole signed-in account.
@@ -427,7 +427,7 @@ pub struct InstanceLaunchParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceLaunchResult {
     pub id: String,
 }
@@ -440,6 +440,7 @@ impl Contract for InstanceLaunch {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct InstanceLaunchProgressEvent {
     pub id: String,
     #[serde(flatten)]
@@ -450,6 +451,7 @@ impl Topic for InstanceLaunchProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct InstanceLaunchDoneEvent {
     pub id: String,
     pub process_id: String,
@@ -460,6 +462,7 @@ impl Topic for InstanceLaunchDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct InstanceLaunchErrorEvent {
     pub id: String,
     pub message: String,

@@ -1,7 +1,11 @@
 {
   "id": "server-a1b2c3",
   "program": "java",
-  "args": ["-jar", "server.jar", "--nogui"],
+  "args": [
+    "-jar",
+    "server.jar",
+    "--nogui"
+  ],
   "cwd": "/home/user/.hestia/servers/a1b2c3",
   "env": {},
   "restart": "never",

@@ -9,12 +9,13 @@ pub const HOME_KEY: &str = "home";
 pub const AUTOSTART_KEY: &str = "autostart";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ConfigGetParams {
     pub key: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ConfigGetResult {
     pub value: Value,
 }
@@ -27,6 +28,7 @@ impl Contract for ConfigGet {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ConfigSetParams {
     pub key: String,
     pub value: Value,
@@ -40,7 +42,7 @@ impl Contract for ConfigSet {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ConfigListResult {
     pub entries: Value,
 }

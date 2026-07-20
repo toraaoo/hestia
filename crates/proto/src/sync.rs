@@ -20,7 +20,7 @@ use crate::contract::{Contract, Empty};
 /// (copied newest-wins, `options.txt` key-merged) and whole `folders` (linked
 /// into the shared store — every instance opens the same physical directory).
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SyncTargets {
     pub files: BTreeSet<String>,
     pub folders: BTreeSet<String>,
@@ -28,7 +28,7 @@ pub struct SyncTargets {
 
 /// The sync store location plus the current targets.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SyncConfig {
     pub shared_dir: PathBuf,
     pub targets: SyncTargets,
@@ -44,7 +44,7 @@ impl Contract for SyncGet {
 /// Replace the target set wholesale. The daemon validates each path
 /// (relative, no `..` escape, not a launcher-managed directory) before persisting.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SyncSetParams {
     pub targets: SyncTargets,
 }
@@ -71,7 +71,7 @@ pub enum LinkState {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct TargetLinkState {
     pub target: String,
     pub state: LinkState,
@@ -79,7 +79,7 @@ pub struct TargetLinkState {
 
 /// One instance's per-folder-target link states.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceSyncStatus {
     pub id: String,
     pub name: String,
@@ -87,7 +87,7 @@ pub struct InstanceSyncStatus {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SyncStatusResult {
     pub instances: Vec<InstanceSyncStatus>,
 }
@@ -104,7 +104,7 @@ impl Contract for SyncStatus {
 /// link the emptied folder. All-or-nothing per target — a name collision with
 /// the store refuses that whole target.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SyncAdoptParams {
     /// Instance name or id.
     pub instance: String,
@@ -114,7 +114,7 @@ pub struct SyncAdoptParams {
 
 /// What adopt did per target.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SyncAdoptResult {
     /// Targets now linked (adopted by this call or already linked).
     pub adopted: Vec<String>,

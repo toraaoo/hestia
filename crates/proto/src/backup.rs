@@ -46,7 +46,7 @@ impl BackupKind {
 
 /// One stored backup archive.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct BackupInfo {
     pub id: String,
     pub kind: BackupKind,
@@ -55,7 +55,7 @@ pub struct BackupInfo {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct BackupListResult {
     pub backups: Vec<BackupInfo>,
 }
@@ -63,13 +63,13 @@ pub struct BackupListResult {
 /// The immediate answer of a backup create/restore call: the job whose
 /// events carry the outcome.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct BackupJobResult {
     pub id: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ServerBackupCreateParams {
     /// Server name or id.
     pub server: String,
@@ -78,7 +78,7 @@ pub struct ServerBackupCreateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ServerBackupRestoreParams {
     /// Server name or id.
     pub server: String,
@@ -90,7 +90,7 @@ pub struct ServerBackupRestoreParams {
 
 /// Names one backup of one server (remove).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ServerBackupRef {
     pub server: String,
     pub backup: String,
@@ -125,6 +125,7 @@ impl Contract for ServerBackupRemove {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct BackupProgressEvent {
     pub id: String,
     #[serde(flatten)]
@@ -135,6 +136,7 @@ impl Topic for BackupProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct BackupDoneEvent {
     pub id: String,
     pub backup: BackupInfo,
@@ -144,6 +146,7 @@ impl Topic for BackupDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct BackupErrorEvent {
     pub id: String,
     pub message: String,

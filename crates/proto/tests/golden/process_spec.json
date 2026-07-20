@@ -8,7 +8,7 @@
   ],
   "cwd": "/home/user/.hestia/instances/main",
   "env": {
-    "JAVA_TOOL_OPTIONS": "-Xmx4G"
+    "JAVATOOLOPTIONS": "-Xmx4G"
   },
   "restart": "on_failure",
   "log": "capture"

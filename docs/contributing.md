@@ -59,14 +59,14 @@ use serde::{Deserialize, Serialize};
 use crate::contract::{Contract, Empty};
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Instance {
     pub id: String,
     pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceListResult {
     pub instances: Vec<Instance>,
 }
@@ -81,7 +81,19 @@ impl Contract for InstanceList {
 
 Add `pub mod instances;` to `crates/proto/src/lib.rs`. Use `#[serde(default)]` on
 payloads so an older/newer peer that omits a field still decodes (additive fields
-need no protocol bump). For a daemon→client push, implement `Topic` instead of
+need no protocol bump).
+
+**The wire is camelCase.** Every fielded proto struct carries
+`#[serde(rename_all = "camelCase")]`, so the socket speaks camelCase and the
+front-ends consume it with no key conversion (the frontend's type mirrors are
+camelCase). Rust field names stay `snake_case`; only the serialized form is
+renamed. **Enums are the exception** — their variant *values* stay
+`snake_case`/`lowercase` (the frontend's string-literal union types depend on
+them), so leave an enum's existing `rename_all` alone. `tests/casing.rs` enforces
+the struct rule: a new serialized struct without the attribute fails the build.
+The one deliberate non-camel exception is the `config.*` key vocabulary
+(`jvm-args`, `backup-interval`, …), which stays kebab-case — see
+[architecture.md](architecture.md). For a daemon→client push, implement `Topic` instead of
 `Contract` — the type is its own event payload:
 
 ```rust

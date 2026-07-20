@@ -86,6 +86,16 @@ Every request crosses the same seam. Two crates own it.
 the socket marshal through **one** definition per channel, so the daemon and every
 client cannot disagree — a mismatch is a compile error, not a runtime surprise.
 
+**The wire is camelCase.** Every fielded proto struct carries
+`#[serde(rename_all = "camelCase")]` (Rust field names stay `snake_case`; only the
+serialized form is renamed), so the socket speaks camelCase to the CLI and the
+desktop alike — the webview consumes it directly, with no key conversion. Enum
+variant *values* stay `snake_case`/`lowercase` (the front-end's string-literal
+types depend on them), so enums keep their own `rename_all`. `tests/casing.rs`
+fails the build if a new serialized struct omits the attribute. The single
+deliberate exception is the `config.*` key vocabulary, which stays kebab-case
+(see the config decision note below).
+
 A **`Contract`** (`contract.rs`) names its channel once and pairs it with request
 and response payload types:
 

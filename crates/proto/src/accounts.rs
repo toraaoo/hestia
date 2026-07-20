@@ -14,20 +14,20 @@ pub enum LoginMethod {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Account {
     pub uuid: String,
     pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct AccountLoginBeginParams {
     pub method: LoginMethod,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct AccountLoginBeginResult {
     pub id: String,
     pub method: LoginMethod,
@@ -47,6 +47,7 @@ impl Contract for AccountLoginBegin {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountLoginCompleteParams {
     pub id: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -54,7 +55,7 @@ pub struct AccountLoginCompleteParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct AccountLoginCompleteResult {
     pub account: Account,
 }
@@ -67,7 +68,7 @@ impl Contract for AccountLoginComplete {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct AccountListResult {
     pub accounts: Vec<Account>,
     /// The account launches use when none is named.
@@ -83,14 +84,14 @@ impl Contract for AccountList {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct AccountSwitchParams {
     /// Name or uuid.
     pub account: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct AccountSwitchResult {
     pub account: Account,
 }
@@ -103,6 +104,7 @@ impl Contract for AccountSwitch {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountRemoveParams {
     /// Name or uuid.
     pub account: String,

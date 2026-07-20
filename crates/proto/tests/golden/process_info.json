@@ -2,8 +2,11 @@
   "id": "process-1",
   "pid": 5150,
   "program": "java",
-  "args": ["-jar", "server.jar"],
+  "args": [
+    "-jar",
+    "server.jar"
+  ],
   "state": "exited",
-  "exit_code": 0,
-  "started_unix": 1751000000
+  "exitCode": 0,
+  "startedUnix": 1751000000
 }

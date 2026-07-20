@@ -2,7 +2,7 @@
   "id": "vanilla-1-21-1",
   "name": "vanilla-1.21.1",
   "flavor": "vanilla",
-  "game_version": "1.21.1",
-  "java_major": 21,
-  "created_unix": 1751000000
+  "gameVersion": "1.21.1",
+  "javaMajor": 21,
+  "createdUnix": 1751000000
 }

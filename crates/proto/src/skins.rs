@@ -27,7 +27,7 @@ pub enum SkinSource {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Skin {
     /// The texture hash — the stable identity a library row and an equip name.
     pub key: String,
@@ -41,7 +41,7 @@ pub struct Skin {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Cape {
     pub id: String,
     pub name: String,
@@ -51,14 +51,14 @@ pub struct Cape {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SkinListParams {
     /// Name or uuid; empty uses the default account.
     pub account: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SkinListResult {
     /// Library entries, then the vanilla defaults, then — only when neither
     /// covers it — the account's equipped external skin. At most one entry is
@@ -76,7 +76,7 @@ impl Contract for SkinList {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SkinAddParams {
     /// Name or uuid; empty uses the default account.
     pub account: String,
@@ -88,7 +88,7 @@ pub struct SkinAddParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SkinAddResult {
     pub skin: Skin,
 }
@@ -101,7 +101,7 @@ impl Contract for SkinAdd {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SkinEquipParams {
     /// Name or uuid; empty uses the default account.
     pub account: String,
@@ -117,7 +117,7 @@ impl Contract for SkinEquip {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SkinResetParams {
     /// Name or uuid; empty uses the default account.
     pub account: String,
@@ -131,7 +131,7 @@ impl Contract for SkinReset {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SkinUpdateParams {
     /// Name or uuid; empty uses the default account.
     pub account: String,
@@ -143,7 +143,7 @@ pub struct SkinUpdateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SkinUpdateResult {
     /// The updated library entry. A label-only update never touches Mojang,
     /// so `equipped` here is authoritative only from `skin.list`.
@@ -158,7 +158,7 @@ impl Contract for SkinUpdate {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct SkinRemoveParams {
     /// The library entry to remove. The equipped Mojang skin is untouched.
     pub key: String,
@@ -172,7 +172,7 @@ impl Contract for SkinRemove {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct CapeEquipParams {
     /// Name or uuid; empty uses the default account.
     pub account: String,
@@ -188,7 +188,7 @@ impl Contract for CapeEquip {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct CapeClearParams {
     /// Name or uuid; empty uses the default account.
     pub account: String,

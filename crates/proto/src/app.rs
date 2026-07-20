@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::contract::{Contract, Empty};
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct AppInfoResult {
     pub name: String,
     pub version: String,

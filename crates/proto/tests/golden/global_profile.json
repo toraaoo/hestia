@@ -3,12 +3,12 @@
   "entries": [
     {
       "source": "modrinth",
-      "project_id": "AANobbMI",
+      "projectId": "AANobbMI",
       "slug": "sodium"
     },
     {
       "source": "modrinth",
-      "project_id": "gvQqBUqZ",
+      "projectId": "gvQqBUqZ",
       "slug": "lithium"
     }
   ]

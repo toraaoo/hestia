@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::contract::{Contract, Empty};
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct DaemonStatusResult {
     pub pid: i64,
     pub version: String,
@@ -22,14 +22,14 @@ impl Contract for DaemonStatus {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct DaemonStopParams {
     /// When false (the default), supervised processes keep running.
     pub stop_processes: bool,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct DaemonStopResult {
     pub stopping: bool,
 }

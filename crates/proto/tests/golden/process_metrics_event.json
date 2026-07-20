@@ -1,6 +1,14 @@
 {
   "samples": [
-    { "id": "server-fabric-1-21-1", "cpu_pct": 34.5, "mem_bytes": 2736783360 },
-    { "id": "instance-aether-3f9a2c7d_1", "cpu_pct": 47.0, "mem_bytes": 4488954112 }
+    {
+      "id": "server-fabric-1-21-1",
+      "cpuPct": 34.5,
+      "memBytes": 2736783360
+    },
+    {
+      "id": "instance-aether-3f9a2c7d_1",
+      "cpuPct": 47.0,
+      "memBytes": 4488954112
+    }
   ]
 }

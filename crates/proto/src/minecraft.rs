@@ -12,7 +12,7 @@ use crate::download::Checksum;
 /// A distribution offered by a domain: the first level of the `available`
 /// selector (`vanilla`, `fabric`, …).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Flavor {
     pub id: String,
     pub name: String,
@@ -21,7 +21,7 @@ pub struct Flavor {
 /// One key/value setting, shared by the server and instance `config` channels
 /// and their create-time settings list.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ConfigEntry {
     pub key: String,
     pub value: String,
@@ -39,7 +39,7 @@ pub enum VersionKind {
 
 /// A game version a flavor can target.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct GameVersion {
     pub id: String,
     pub kind: VersionKind,
@@ -48,7 +48,7 @@ pub struct GameVersion {
 
 /// A single downloadable file, the shared shape for every artifact in a profile.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Artifact {
     pub url: String,
     pub filename: String,
@@ -60,7 +60,7 @@ pub struct Artifact {
 /// A classpath dependency, resolved to its download and its path under the
 /// libraries root (Maven layout).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Library {
     pub name: String,
     pub path: String,
@@ -69,7 +69,7 @@ pub struct Library {
 
 /// The asset index a client version pins (`assetIndex` in a vanilla profile).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct AssetIndex {
     pub id: String,
     pub artifact: Artifact,
@@ -78,7 +78,7 @@ pub struct AssetIndex {
 
 /// The resolved launch profile for a Minecraft *server*.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ServerProfile {
     pub flavor: String,
     pub game_version: String,
@@ -92,7 +92,7 @@ pub struct ServerProfile {
 
 /// The resolved launch profile for a Minecraft *client* (instance).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfile {
     pub flavor: String,
     pub game_version: String,
@@ -117,25 +117,25 @@ pub fn downgrade_between(versions: &[GameVersion], from: &str, to: &str) -> Opti
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct FlavorsResult {
     pub flavors: Vec<Flavor>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct VersionsParams {
     pub flavor: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct VersionsResult {
     pub versions: Vec<GameVersion>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct LoadersParams {
     pub flavor: String,
     pub version: String,
@@ -144,13 +144,13 @@ pub struct LoadersParams {
 /// Loader builds newest-first; empty for a flavor with no pickable loader
 /// version (vanilla, and loaders that pin one build per game version).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct LoadersResult {
     pub loaders: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ResolveParams {
     pub flavor: String,
     pub version: String,
@@ -181,7 +181,7 @@ pub enum ProvisionPhase {
 /// the job runs, as dependency resolution discovers more work. Both are zero
 /// for a single-unit phase.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProvisionProgress {
     pub phase: ProvisionPhase,
     pub current: u64,

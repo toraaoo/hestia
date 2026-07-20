@@ -29,6 +29,7 @@ impl HashAlgorithm {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Checksum {
     pub algorithm: HashAlgorithm,
     #[serde(default)]
@@ -45,6 +46,7 @@ impl Checksum {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DownloadSpec {
     #[serde(default)]
     pub id: String,
@@ -57,14 +59,14 @@ pub struct DownloadSpec {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct DownloadProgress {
     pub downloaded: u64,
     pub total: u64,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct DownloadStartResult {
     pub id: String,
 }
@@ -77,6 +79,7 @@ impl Contract for DownloadStart {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DownloadProgressEvent {
     pub id: String,
     #[serde(flatten)]
@@ -87,6 +90,7 @@ impl Topic for DownloadProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DownloadDoneEvent {
     pub id: String,
     pub path: PathBuf,
@@ -96,6 +100,7 @@ impl Topic for DownloadDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DownloadErrorEvent {
     pub id: String,
     pub message: String,

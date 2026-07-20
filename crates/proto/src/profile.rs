@@ -11,7 +11,7 @@ use crate::contract::{Contract, Empty};
 /// One project reference of a global profile. `slug` is carried for display
 /// and matching; `source` + `project_id` identify the project.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProfileEntry {
     pub source: String,
     pub project_id: String,
@@ -19,14 +19,14 @@ pub struct ProfileEntry {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct GlobalProfile {
     pub name: String,
     pub entries: Vec<ProfileEntry>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProfileListResult {
     pub profiles: Vec<GlobalProfile>,
 }
@@ -40,7 +40,7 @@ impl Contract for ProfileList {
 
 /// Names one global profile (create / remove).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProfileRef {
     pub name: String,
 }
@@ -62,7 +62,7 @@ impl Contract for ProfileRemove {
 /// `add`/`remove` are project references (slug or id); adds are resolved
 /// through the content registry on `source` (empty = the default source).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct ProfileEditParams {
     pub name: String,
     pub source: String,
@@ -82,7 +82,7 @@ impl Contract for ProfileEdit {
 /// an entry with no compatible version is reported as a failure and the batch
 /// continues. Applying never removes de-listed content.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileApplyParams {
     pub instance: String,
     pub profile: String,
