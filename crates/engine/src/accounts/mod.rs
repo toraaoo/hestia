@@ -48,6 +48,7 @@ struct LoginSession {
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 struct StoredAccount {
     uuid: String,
     name: String,
@@ -60,6 +61,7 @@ struct StoredAccount {
 }
 
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 struct AccountsFile {
     #[serde(default)]
     accounts: Vec<StoredAccount>,

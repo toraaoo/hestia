@@ -20,6 +20,7 @@ const RECORD: &str = "instance.json";
 const DATA: &str = "data";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct InstanceRecord {
     pub id: String,
     pub name: String,

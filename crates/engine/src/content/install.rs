@@ -21,6 +21,7 @@ use crate::registry;
 const INDEX: &str = "content.json";
 
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 struct Index {
     items: Vec<InstalledContent>,
 }

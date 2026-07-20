@@ -20,12 +20,14 @@ const FILE: &str = "profiles.json";
 const RESERVED: &str = "none";
 
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 struct Stored {
     active: String,
     profiles: BTreeMap<String, Members>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 struct Members {
     members: Vec<String>,
 }

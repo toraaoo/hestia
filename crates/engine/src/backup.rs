@@ -38,7 +38,7 @@ const MIN_INTERVAL: Duration = Duration::from_secs(5 * 60);
 /// daemon archives the running server and how many scheduled archives to keep
 /// (manual and pre-update backups are never pruned).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct BackupSettings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interval: Option<String>,

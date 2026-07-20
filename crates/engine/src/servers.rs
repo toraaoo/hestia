@@ -35,12 +35,14 @@ const GENERATE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60)
 const MANAGED_PROPERTIES: &[&str] = &["server-port", "enable-rcon", "rcon.port", "rcon.password"];
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct RconConfig {
     pub port: u16,
     pub password: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ServerRecord {
     pub id: String,
     pub name: String,

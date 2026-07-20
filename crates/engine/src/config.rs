@@ -6,6 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use proto::naming;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -15,18 +16,20 @@ use crate::minecraft::launch::{normalize_memory, parse_jvm_args, JavaSettings};
 /// struct becomes a sub-object. The reserved keys (home, autostart) are routed
 /// by the daemon's config service, not stored here.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Settings {
     /// JVM defaults applied to any server or instance whose record leaves the
     /// matching per-entry setting unset.
     pub defaults: JvmDefaults,
 }
 
-/// The launcher-wide JVM defaults (`defaults.memory`, `defaults.jvm-args`);
-/// empty means no default. Plain strings so the dotted-path get/set always
-/// finds both keys.
+/// The launcher-wide JVM defaults, addressed by the kebab-case config keys
+/// `defaults.memory` / `defaults.jvm-args`. Serializes camelCase like every
+/// other struct (`jvmArgs` on disk); the dotted-path get/set translates the
+/// kebab key to the camel field via `naming::config_key_to_field`. Plain
+/// strings so both keys always resolve.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default, rename_all = "kebab-case")]
+#[serde(default, rename_all = "camelCase")]
 pub struct JvmDefaults {
     pub memory: String,
     pub jvm_args: String,
@@ -148,10 +151,14 @@ impl Config {
         Ok(())
     }
 
-    /// The effective settings as a JSON object.
+    /// The effective settings as a JSON object, keyed by the kebab-case
+    /// `config.*` vocabulary the user sets (`defaults.jvm-args`), not the
+    /// camelCase serialized fields.
     pub fn all(&self) -> Value {
         let inner = self.inner.lock().unwrap();
-        serde_json::to_value(&inner.settings).unwrap_or_else(|_| Value::Object(Default::default()))
+        let settings = serde_json::to_value(&inner.settings)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
+        naming::settings_to_config_keys(settings)
     }
 
     pub fn reload(&self, path: PathBuf) {
@@ -178,13 +185,17 @@ fn save_settings(path: &Path, settings: &Settings) -> Result<(), ConfigError> {
     Ok(())
 }
 
+// The config keys are kebab-case (`defaults.jvm-args`); the settings serialize
+// camelCase, so each segment is translated to its field name before lookup.
 fn find_node<'a>(root: &'a Value, key: &str) -> Option<&'a Value> {
     let mut node = root;
     for segment in key.split('.') {
         if segment.is_empty() {
             return None;
         }
-        node = node.as_object()?.get(segment)?;
+        node = node
+            .as_object()?
+            .get(&naming::config_key_to_field(segment))?;
     }
     Some(node)
 }
@@ -195,7 +206,9 @@ fn find_node_mut<'a>(root: &'a mut Value, key: &str) -> Option<&'a mut Value> {
         if segment.is_empty() {
             return None;
         }
-        node = node.as_object_mut()?.get_mut(segment)?;
+        node = node
+            .as_object_mut()?
+            .get_mut(&naming::config_key_to_field(segment))?;
     }
     Some(node)
 }

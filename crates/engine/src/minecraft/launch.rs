@@ -21,7 +21,7 @@ pub const JVM_ARGS_KEY: &str = "jvm-args";
 /// Per-entry JVM tuning stored on a server/instance record: a single memory
 /// value driving both `-Xms`/`-Xmx`, plus extra flags injected at launch.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct JavaSettings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memory: Option<String>,

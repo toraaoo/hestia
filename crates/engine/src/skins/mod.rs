@@ -26,6 +26,7 @@ const INDEX_FILE: &str = "library.json";
 const PROFILE_TTL: Duration = Duration::from_secs(30);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LibraryEntry {
     pub key: String,
     #[serde(default)]
@@ -35,6 +36,7 @@ pub struct LibraryEntry {
 }
 
 #[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 struct LibraryFile {
     #[serde(default)]
     skins: Vec<LibraryEntry>,
