@@ -54,6 +54,7 @@ import { PickRow } from '@/features/content/pick-row';
 import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+import { invalidate, keys } from '@/queries';
 import { contentQueries } from '@/queries/content';
 import { useInstances } from '@/queries/instance';
 import { useGlobalProfiles } from '@/queries/profile';
@@ -285,6 +286,15 @@ export function ContentInstallModal({
           setInstalling(false);
           return;
         }
+      }
+      if (isProfile) {
+        invalidate(keys.profiles.all);
+      } else if (target.type === 'instance') {
+        invalidate(keys.instances.content(target.id));
+        invalidate(keys.instances.info(target.id));
+      } else if (target.type === 'server') {
+        invalidate(keys.servers.content(target.id));
+        invalidate(keys.servers.info(target.id));
       }
       onOpenChange(false);
     } catch (e) {
