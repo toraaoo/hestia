@@ -12,6 +12,14 @@ import type {
   VersionQuery,
 } from '../api';
 
+/**
+ * Root for the server/instance footprint (`info`) queries. Each is a directory
+ * walk, so it lives outside its entry's `all`/`detail` subtree: a lifecycle
+ * sweep (start/stop/launch) or a reconnect must never trigger the walk. The
+ * ops that actually change on-disk size invalidate it explicitly instead.
+ */
+export const FOOTPRINT = 'footprint';
+
 export const keys = {
   app: {
     all: ['app'] as const,
@@ -67,7 +75,7 @@ export const keys = {
     profile: (params: ResolveParams) =>
       [...keys.servers.all, 'profile', params] as const,
     detail: (id: string) => [...keys.servers.all, 'detail', id] as const,
-    info: (id: string) => [...keys.servers.detail(id), 'info'] as const,
+    info: (id: string) => [FOOTPRINT, 'server', id] as const,
     ping: (id: string) => [...keys.servers.detail(id), 'ping'] as const,
     logs: (id: string, tail?: number) =>
       [...keys.servers.detail(id), 'logs', tail ?? null] as const,
@@ -92,7 +100,7 @@ export const keys = {
     profile: (params: ResolveParams) =>
       [...keys.instances.all, 'profile', params] as const,
     detail: (id: string) => [...keys.instances.all, 'detail', id] as const,
-    info: (id: string) => [...keys.instances.detail(id), 'info'] as const,
+    info: (id: string) => [FOOTPRINT, 'instance', id] as const,
     worlds: (id: string) => [...keys.instances.detail(id), 'worlds'] as const,
     logs: (id: string, session?: string, tail?: number) =>
       [

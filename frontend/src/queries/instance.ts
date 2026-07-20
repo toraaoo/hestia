@@ -112,26 +112,30 @@ export const instanceMutations = {
     mutation<InstanceInfo, InstanceCreateParams>({
       mutationKey: [...keys.instances.all, 'create'],
       mutationFn: (params) => api.create(params),
-      invalidates: () => [keys.instances.all],
+      invalidates: () => [keys.instances.list()],
     }),
   /** The instance pays for the new version at its next launch. */
   update: (id: string) =>
     mutation<InstanceInfo, Omit<InstanceUpdateParams, 'instance'>>({
       mutationKey: [...keys.instances.detail(id), 'update'],
       mutationFn: (params) => api.update({ ...params, instance: id }),
-      invalidates: () => [keys.instances.all],
+      invalidates: () => [
+        keys.instances.list(),
+        keys.instances.detail(id),
+        keys.instances.info(id),
+      ],
     }),
   rename: (id: string) =>
     mutation<InstanceInfo, string>({
       mutationKey: [...keys.instances.detail(id), 'rename'],
       mutationFn: (name) => api.rename(id, name),
-      invalidates: () => [keys.instances.all],
+      invalidates: () => [keys.instances.list(), keys.instances.detail(id)],
     }),
   remove: (id: string) =>
     mutation({
       mutationKey: [...keys.instances.detail(id), 'remove'],
       mutationFn: () => api.remove(id),
-      invalidates: () => [keys.instances.all, keys.processes.all],
+      invalidates: () => [keys.instances.list(), keys.processes.list()],
     }),
   /** Materialise files and spawn the game as the signed-in account. */
   launch: (id: string) =>
@@ -144,14 +148,22 @@ export const instanceMutations = {
       }),
       run: (params, onProgress) =>
         api.launch({ ...params, instance: id }, onProgress),
-      invalidates: () => [keys.instances.all, keys.processes.all],
+      invalidates: () => [
+        keys.instances.list(),
+        keys.instances.detail(id),
+        keys.processes.list(),
+      ],
     }),
   /** Stops one named session, or every session of the instance. */
   stop: (id: string) =>
     mutation<void, { session?: string }>({
       mutationKey: [...keys.instances.detail(id), 'stop'],
       mutationFn: ({ session }) => api.stop(id, session),
-      invalidates: () => [keys.instances.all, keys.processes.all],
+      invalidates: () => [
+        keys.instances.list(),
+        keys.instances.detail(id),
+        keys.processes.list(),
+      ],
     }),
   /**
    * Id-by-variable variants for list rows, which can't call a per-id hook. A
@@ -167,13 +179,21 @@ export const instanceMutations = {
         entry: { kind: 'instance', id },
       }),
       run: (id, onProgress) => api.launch({ instance: id }, onProgress),
-      invalidates: () => [keys.instances.all, keys.processes.all],
+      invalidates: (id) => [
+        keys.instances.list(),
+        keys.instances.detail(id),
+        keys.processes.list(),
+      ],
     }),
   stopAny: () =>
     mutation<void, string>({
       mutationKey: [...keys.instances.all, 'stop'],
       mutationFn: (id) => api.stop(id),
-      invalidates: () => [keys.instances.all, keys.processes.all],
+      invalidates: (id) => [
+        keys.instances.list(),
+        keys.instances.detail(id),
+        keys.processes.list(),
+      ],
     }),
   /** `memory` and `jvm-args` only. */
   setConfig: (id: string) =>
@@ -254,6 +274,7 @@ export const instanceMutations = {
         invalidates: () => [
           keys.instances.content(id),
           keys.instances.profiles(id),
+          keys.instances.info(id),
         ],
       }),
   },
@@ -268,7 +289,10 @@ export const instanceMutations = {
           entry: { kind: 'instance', id },
         }),
         run: (spec, onProgress) => api.content.add(id, spec, onProgress),
-        invalidates: () => [keys.instances.content(id)],
+        invalidates: () => [
+          keys.instances.content(id),
+          keys.instances.info(id),
+        ],
       }),
     remove: (id: string) =>
       mutation<void, { kind: ContentKind; item: string; worlds?: string[] }>({
@@ -279,6 +303,7 @@ export const instanceMutations = {
         invalidates: () => [
           keys.instances.content(id),
           keys.instances.profiles(id),
+          keys.instances.info(id),
         ],
       }),
     /** `item` empty updates every platform-sourced item of the kind. */
@@ -296,6 +321,7 @@ export const instanceMutations = {
         invalidates: () => [
           keys.instances.content(id),
           keys.instances.profiles(id),
+          keys.instances.info(id),
         ],
       }),
     enable: (id: string) =>
@@ -306,7 +332,10 @@ export const instanceMutations = {
         mutationKey: [...keys.instances.content(id), 'enable'],
         mutationFn: ({ kind, item, enabled, worlds }) =>
           api.content.enable(id, kind, item, enabled, worlds),
-        invalidates: () => [keys.instances.content(id)],
+        invalidates: () => [
+          keys.instances.content(id),
+          keys.instances.info(id),
+        ],
       }),
     setVersion: (id: string) =>
       jobMutation<
@@ -325,6 +354,7 @@ export const instanceMutations = {
         invalidates: () => [
           keys.instances.content(id),
           keys.instances.profiles(id),
+          keys.instances.info(id),
         ],
       }),
   },

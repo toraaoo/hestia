@@ -123,7 +123,7 @@ export const serverMutations = {
         label: `create ${params.name || `${params.flavor} ${params.version}`}`,
       }),
       run: (params, onProgress) => api.create(params, onProgress),
-      invalidates: () => [keys.servers.all],
+      invalidates: () => [keys.servers.list()],
     }),
   update: (id: string) =>
     jobMutation<ServerInfo, Omit<ServerUpdateParams, 'server'>>({
@@ -135,44 +135,64 @@ export const serverMutations = {
       }),
       run: (params, onProgress) =>
         api.update({ ...params, server: id }, onProgress),
-      invalidates: () => [keys.servers.all],
+      invalidates: () => [
+        keys.servers.list(),
+        keys.servers.detail(id),
+        keys.servers.info(id),
+      ],
     }),
   rename: (id: string) =>
     mutation<ServerInfo, string>({
       mutationKey: [...keys.servers.detail(id), 'rename'],
       mutationFn: (name) => api.rename(id, name),
-      invalidates: () => [keys.servers.all],
+      invalidates: () => [keys.servers.list(), keys.servers.detail(id)],
     }),
   remove: (id: string) =>
     mutation({
       mutationKey: [...keys.servers.detail(id), 'remove'],
       mutationFn: () => api.remove(id),
-      invalidates: () => [keys.servers.all, keys.processes.all],
+      invalidates: () => [keys.servers.list(), keys.processes.list()],
     }),
   start: (id: string) =>
     mutation<{ processId: string; pid: number }>({
       mutationKey: [...keys.servers.detail(id), 'start'],
       mutationFn: () => api.start(id),
-      invalidates: () => [keys.servers.all, keys.processes.all],
+      invalidates: () => [
+        keys.servers.list(),
+        keys.servers.detail(id),
+        keys.processes.list(),
+      ],
     }),
   stop: (id: string) =>
     mutation({
       mutationKey: [...keys.servers.detail(id), 'stop'],
       mutationFn: () => api.stop(id),
-      invalidates: () => [keys.servers.all, keys.processes.all],
+      invalidates: () => [
+        keys.servers.list(),
+        keys.servers.detail(id),
+        keys.processes.list(),
+      ],
     }),
   /** Id-by-variable variants for list rows, which can't call a per-id hook. */
   startAny: () =>
     mutation<{ processId: string; pid: number }, string>({
       mutationKey: [...keys.servers.all, 'start'],
       mutationFn: (id) => api.start(id),
-      invalidates: () => [keys.servers.all, keys.processes.all],
+      invalidates: (id) => [
+        keys.servers.list(),
+        keys.servers.detail(id),
+        keys.processes.list(),
+      ],
     }),
   stopAny: () =>
     mutation<void, string>({
       mutationKey: [...keys.servers.all, 'stop'],
       mutationFn: (id) => api.stop(id),
-      invalidates: () => [keys.servers.all, keys.processes.all],
+      invalidates: (id) => [
+        keys.servers.list(),
+        keys.servers.detail(id),
+        keys.processes.list(),
+      ],
     }),
   /** One console command over RCON; touches no cached state. */
   command: (id: string) =>
@@ -197,7 +217,7 @@ export const serverMutations = {
           entry: { kind: 'server', id },
         }),
         run: (_variables, onProgress) => api.backup.create(id, onProgress),
-        invalidates: () => [keys.servers.backups(id)],
+        invalidates: () => [keys.servers.backups(id), keys.servers.info(id)],
       }),
     /** Refused while the server runs or is busy; swaps `data/` wholesale. */
     restore: (id: string) =>
@@ -210,13 +230,13 @@ export const serverMutations = {
         }),
         run: (backupId, onProgress) =>
           api.backup.restore(id, backupId, onProgress),
-        invalidates: () => [keys.servers.detail(id)],
+        invalidates: () => [keys.servers.detail(id), keys.servers.info(id)],
       }),
     remove: (id: string) =>
       mutation<void, string>({
         mutationKey: [...keys.servers.backups(id), 'remove'],
         mutationFn: (backupId) => api.backup.remove(id, backupId),
-        invalidates: () => [keys.servers.backups(id)],
+        invalidates: () => [keys.servers.backups(id), keys.servers.info(id)],
       }),
   },
   content: {
@@ -230,14 +250,14 @@ export const serverMutations = {
           entry: { kind: 'server', id },
         }),
         run: (spec, onProgress) => api.content.add(id, spec, onProgress),
-        invalidates: () => [keys.servers.content(id)],
+        invalidates: () => [keys.servers.content(id), keys.servers.info(id)],
       }),
     remove: (id: string) =>
       mutation<void, { kind: ContentKind; item: string; worlds?: string[] }>({
         mutationKey: [...keys.servers.content(id), 'remove'],
         mutationFn: ({ kind, item, worlds }) =>
           api.content.remove(id, kind, item, worlds),
-        invalidates: () => [keys.servers.content(id)],
+        invalidates: () => [keys.servers.content(id), keys.servers.info(id)],
       }),
     /** `item` empty updates every platform-sourced item of the kind. */
     update: (id: string) =>
@@ -250,7 +270,7 @@ export const serverMutations = {
         }),
         run: ({ kind, item }, onProgress) =>
           api.content.update(id, kind, item, onProgress),
-        invalidates: () => [keys.servers.content(id)],
+        invalidates: () => [keys.servers.content(id), keys.servers.info(id)],
       }),
     enable: (id: string) =>
       mutation<
@@ -260,7 +280,7 @@ export const serverMutations = {
         mutationKey: [...keys.servers.content(id), 'enable'],
         mutationFn: ({ kind, item, enabled, worlds }) =>
           api.content.enable(id, kind, item, enabled, worlds),
-        invalidates: () => [keys.servers.content(id)],
+        invalidates: () => [keys.servers.content(id), keys.servers.info(id)],
       }),
     setVersion: (id: string) =>
       jobMutation<
@@ -275,7 +295,7 @@ export const serverMutations = {
         }),
         run: ({ kind, item, version }, onProgress) =>
           api.content.setVersion(id, kind, item, version, onProgress),
-        invalidates: () => [keys.servers.content(id)],
+        invalidates: () => [keys.servers.content(id), keys.servers.info(id)],
       }),
   },
 };
