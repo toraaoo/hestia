@@ -11,6 +11,8 @@ export interface JavaRuntime {
   releaseName: string;
   home: string;
   executable: string;
+  /** Whether an existing server or instance launches with this major. */
+  inUse: boolean;
 }
 
 export type JavaInstallPhase = 'resolving' | 'downloading' | 'extracting';

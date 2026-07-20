@@ -1,19 +1,22 @@
 import { BroomIcon, CoffeeIcon, TrashIcon } from '@phosphor-icons/react';
-import { revalidateLogic } from '@tanstack/react-form';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Page } from '@/components/page';
 import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Field,
+  FieldDescription,
   FieldGroup,
   FieldLabel,
   FieldLegend,
   FieldSet,
 } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -22,23 +25,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 import { StatusDot } from '@/components/ui/status-dot';
-import { settingsDefaults, settingsSchema } from '@/features/settings/schema';
-import { useAppForm } from '@/hooks/form';
 import { type Locale, useLocale } from '@/hooks/locale';
-import { bytes } from '@/lib/format';
+import { bytes, memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { locales } from '@/paraglide/runtime.js';
 import { useCacheInfo, useClearCache } from '@/queries/cache';
+import { useConfig, useSetConfig } from '@/queries/config';
 import { useDaemon } from '@/queries/daemon';
-import { useInstances } from '@/queries/instance';
 import {
   useInstallJava,
   useJavaReleases,
   useJavaRuntimes,
   useUninstallJava,
 } from '@/queries/java';
-import { useServers } from '@/queries/server';
+
+/** The daemon config entries the settings page reads (`config.list`). */
+interface ConfigEntries {
+  home?: string;
+  autostart?: boolean;
+  defaults?: { memory?: string; 'jvm-args'?: string };
+}
 
 /** Endonyms — a language always names itself, whatever locale is active. */
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -80,34 +88,33 @@ export function SettingsPage() {
   const daemon = useDaemon();
   const cache = useCacheInfo();
   const clearCache = useClearCache();
+  const config = useConfig();
+  const setConfig = useSetConfig();
   const runtimesQuery = useJavaRuntimes();
   const releasesQuery = useJavaReleases();
   const install = useInstallJava();
   const uninstall = useUninstallJava();
-  const servers = useServers();
-  const instances = useInstances();
 
+  const entries = (config.data ?? {}) as ConfigEntries;
   const runtimes = runtimesQuery.data ?? [];
   const releases = releasesQuery.data ?? [];
-  // The wire runtime carries no usage flag: a major is "in use" when an
-  // existing entry launches with it.
-  const majorsInUse = new Set([
-    ...(servers.data ?? []).map((s) => s.javaMajor),
-    ...(instances.data ?? []).map((i) => i.javaMajor),
-  ]);
   const installedMajors = new Set(runtimes.map((rt) => rt.major));
 
-  const form = useAppForm({
-    defaultValues: settingsDefaults,
-    validationLogic: revalidateLogic(),
-    validators: { onDynamic: settingsSchema() },
-    onSubmit: async () => {},
-  });
+  const commitConfig = (key: string, value: unknown) =>
+    setConfig.mutate(
+      { key, value },
+      { onError: (error) => toast.error(error.message) },
+    );
+
+  const defaultMemory = entries.defaults?.memory ?? '';
+  const [memoryDraft, setMemoryDraft] = useState<number | null>(null);
+  const memoryValue = memoryDraft ?? (defaultMemory ? memGb(defaultMemory) : 4);
 
   return (
     <Page
       title={m['nav.settings']()}
       subtitle={m['settings.subtitle']()}
+      loading={config.isPending}
       skeleton={
         <div className="max-w-2xl space-y-8">
           {[0, 1, 2].map((group) => (
@@ -124,80 +131,94 @@ export function SettingsPage() {
         </div>
       }
     >
-      <form
-        className="max-w-2xl"
-        onSubmit={(e) => {
-          e.preventDefault();
-          form.handleSubmit();
-        }}
-      >
+      <div className="max-w-2xl">
         <FieldGroup>
           <FieldSet>
             <FieldLegend>{m['settings.general']()}</FieldLegend>
             <FieldGroup>
               <LanguageField />
 
-              <form.AppField name="theme">
-                {(field) => (
-                  <field.SelectField
-                    label={m['settings.theme']()}
-                    options={[
-                      { value: 'dark', label: m['settings.theme_dark']() },
-                      { value: 'system', label: m['settings.theme_system']() },
-                    ]}
-                    triggerClassName="w-full"
-                  />
-                )}
-              </form.AppField>
+              <Field>
+                <FieldLabel htmlFor="data-dir">
+                  {m['settings.data_dir']()}
+                </FieldLabel>
+                <Input
+                  id="data-dir"
+                  key={entries.home ?? ''}
+                  defaultValue={entries.home ?? ''}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.currentTarget.blur();
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value.trim();
+                    if (value && value !== entries.home)
+                      commitConfig('home', value);
+                  }}
+                />
+                <FieldDescription>
+                  {m['settings.data_dir_hint']()}
+                </FieldDescription>
+              </Field>
 
-              <form.AppField name="dataDir">
-                {(field) => (
-                  <field.TextField
-                    label={m['settings.data_dir']()}
-                    description={m['settings.data_dir_hint']()}
-                  />
-                )}
-              </form.AppField>
-
-              <form.AppField name="startAtLogin">
-                {(field) => (
-                  <field.CheckboxField label={m['settings.start_at_login']()} />
-                )}
-              </form.AppField>
-
-              <form.AppField name="keepOpen">
-                {(field) => (
-                  <field.CheckboxField label={m['settings.keep_open']()} />
-                )}
-              </form.AppField>
+              <CheckboxRow
+                id="start-at-login"
+                label={m['settings.start_at_login']()}
+                checked={entries.autostart ?? false}
+                onChange={(checked) => commitConfig('autostart', checked)}
+              />
             </FieldGroup>
           </FieldSet>
 
           <FieldSet>
             <FieldLegend>{m['settings.java_performance']()}</FieldLegend>
             <FieldGroup>
-              <form.AppField name="memory">
-                {(field) => (
-                  <field.SliderField
-                    label={m['settings.default_memory']()}
-                    formatValue={(v) => m['wizard.gb']({ value: v })}
-                    sliderClassName="max-w-md"
-                    min={2}
-                    max={32}
-                    step={1}
-                    description={m['settings.default_memory_hint']()}
-                  />
-                )}
-              </form.AppField>
+              <Field>
+                <FieldLabel htmlFor="default-memory">
+                  {m['settings.default_memory']()} —{' '}
+                  {defaultMemory || memoryDraft !== null
+                    ? m['wizard.gb']({ value: memoryValue })
+                    : m['settings.no_default']()}
+                </FieldLabel>
+                <Slider
+                  id="default-memory"
+                  className="max-w-md"
+                  min={2}
+                  max={32}
+                  step={1}
+                  value={memoryValue}
+                  onValueChange={(v) =>
+                    setMemoryDraft(Array.isArray(v) ? v[0] : v)
+                  }
+                  onValueCommitted={(v) => {
+                    setMemoryDraft(null);
+                    const gb = Array.isArray(v) ? v[0] : v;
+                    commitConfig('defaults.memory', `${gb}G`);
+                  }}
+                />
+                <FieldDescription>
+                  {m['settings.default_memory_hint']()}
+                </FieldDescription>
+              </Field>
 
-              <form.AppField name="jvmArgs">
-                {(field) => (
-                  <field.TextField
-                    label={m['settings.default_jvm_args']()}
-                    inputClassName="font-mono"
-                  />
-                )}
-              </form.AppField>
+              <Field>
+                <FieldLabel htmlFor="default-jvm-args">
+                  {m['settings.default_jvm_args']()}
+                </FieldLabel>
+                <Input
+                  id="default-jvm-args"
+                  className="font-mono"
+                  key={entries.defaults?.['jvm-args'] ?? ''}
+                  defaultValue={entries.defaults?.['jvm-args'] ?? ''}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.currentTarget.blur();
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value.trim();
+                    if (value !== (entries.defaults?.['jvm-args'] ?? ''))
+                      commitConfig('defaults.jvm-args', value);
+                  }}
+                />
+              </Field>
 
               <Field>
                 <FieldLabel>{m['settings.installed_runtimes']()}</FieldLabel>
@@ -208,53 +229,52 @@ export function SettingsPage() {
                   </div>
                 ) : (
                   <div className="divide-y divide-border border border-border">
-                    {runtimes.map((rt) => {
-                      const inUse = majorsInUse.has(rt.major);
-                      return (
-                        <div
-                          key={`${rt.vendor}-${rt.major}`}
-                          className="flex items-center gap-3 px-3 py-2"
-                        >
-                          <CoffeeIcon className="size-4 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm">
-                              {rt.vendor} {rt.major}
-                            </div>
-                            <div className="font-mono text-[11px] text-muted-foreground">
-                              {rt.releaseName}
-                            </div>
+                    {runtimes.map((rt) => (
+                      <div
+                        key={`${rt.vendor}-${rt.major}`}
+                        className="flex items-center gap-3 px-3 py-2"
+                      >
+                        <CoffeeIcon className="size-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm">
+                            {rt.vendor} {rt.major}
                           </div>
-                          {inUse && (
-                            <Badge variant="secondary">
-                              {m['settings.in_use']()}
-                            </Badge>
-                          )}
-                          <ConfirmDialog
-                            trigger={
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={m['settings.uninstall_runtime']()}
-                                disabled={inUse || uninstall.isPending}
-                              >
-                                <TrashIcon className="size-4" />
-                              </Button>
-                            }
-                            title={m['settings.uninstall_runtime_title']()}
-                            description={m[
-                              'settings.uninstall_runtime_description'
-                            ]({ name: `${rt.vendor} ${rt.major}` })}
-                            destructive
-                            confirmLabel={m['action.uninstall']()}
-                            onConfirm={() =>
-                              uninstall.mutate(rt.major, {
-                                onError: (error) => toast.error(error.message),
-                              })
-                            }
-                          />
+                          <div className="font-mono text-[11px] text-muted-foreground">
+                            {rt.releaseName}
+                          </div>
                         </div>
-                      );
-                    })}
+                        {rt.inUse && (
+                          <Badge variant="secondary">
+                            {m['settings.in_use']()}
+                          </Badge>
+                        )}
+                        <ConfirmDialog
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={m['settings.uninstall_runtime']()}
+                              disabled={rt.inUse || uninstall.isPending}
+                            >
+                              <TrashIcon className="size-4" />
+                            </Button>
+                          }
+                          title={m['settings.uninstall_runtime_title']()}
+                          description={m[
+                            'settings.uninstall_runtime_description'
+                          ]({
+                            name: `${rt.vendor} ${rt.major}`,
+                          })}
+                          destructive
+                          confirmLabel={m['action.uninstall']()}
+                          onConfirm={() =>
+                            uninstall.mutate(rt.major, {
+                              onError: (error) => toast.error(error.message),
+                            })
+                          }
+                        />
+                      </div>
+                    ))}
                   </div>
                 )}
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -327,15 +347,6 @@ export function SettingsPage() {
                 />
               </Field>
 
-              <form.AppField name="shared">
-                {(field) => (
-                  <field.TextField
-                    label={m['settings.shared_config']()}
-                    description={m['settings.shared_config_hint']()}
-                  />
-                )}
-              </form.AppField>
-
               <Field orientation="horizontal">
                 <FieldLabel className="flex-1 gap-2 font-normal">
                   <StatusDot tone={daemon.connected ? 'on' : 'off'} />
@@ -382,7 +393,32 @@ export function SettingsPage() {
             </FieldGroup>
           </FieldSet>
         </FieldGroup>
-      </form>
+      </div>
     </Page>
+  );
+}
+
+function CheckboxRow({
+  id,
+  label,
+  checked,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <Field orientation="horizontal">
+      <Checkbox
+        id={id}
+        checked={checked}
+        onCheckedChange={(c) => onChange(c === true)}
+      />
+      <FieldLabel htmlFor={id} className="font-normal">
+        {label}
+      </FieldLabel>
+    </Field>
   );
 }

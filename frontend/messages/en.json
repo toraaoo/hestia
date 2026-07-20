@@ -403,7 +403,8 @@
     "clear_cache_title": "Clear download cache?",
     "clear_cache_description": "Frees the cached downloads. Files are re-fetched from the network the next time they're needed.",
     "shared_config": "Shared config",
-    "shared_config_hint": "Files synced across entries."
+    "shared_config_hint": "Files synced across entries.",
+    "no_default": "No default set"
   },
   "skins": {
     "subtitle": "Your Minecraft character",

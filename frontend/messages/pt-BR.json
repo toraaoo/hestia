@@ -394,7 +394,8 @@
     "clear_cache_title": "Limpar o cache de downloads?",
     "clear_cache_description": "Libera os downloads em cache. Os arquivos são baixados novamente da rede na próxima vez que forem necessários.",
     "shared_config": "Configuração compartilhada",
-    "shared_config_hint": "Arquivos sincronizados entre entradas."
+    "shared_config_hint": "Arquivos sincronizados entre entradas.",
+    "no_default": "Nenhum padrão definido"
   },
   "skins": {
     "subtitle": "Seu personagem do Minecraft",
