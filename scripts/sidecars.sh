@@ -1,28 +1,44 @@
 #!/usr/bin/env bash
-# Build the CLI, daemon, and tray as release binaries and stage them as Tauri
-# sidecars, so `cargo tauri build` bundles them into every desktop installer.
+# Build the CLI, daemon, and tray and stage them as Tauri sidecars, so
+# `cargo tauri build` bundles them into every desktop installer.
+#
+# Release is the default (what installers ship). `--debug` stages debug builds
+# instead: the daemon's `debug_assertions` then keep dev data under <repo>/.hestia
+# rather than the real ~/.hestia — used by `scripts/dev.sh --desktop`.
 #
 # Tauri's externalBin requires each binary to carry the target-triple suffix
 # (e.g. hestiad-x86_64-unknown-linux-gnu); the installer strips it on install.
 #
-#   scripts/sidecars.sh                 # host target
+#   scripts/sidecars.sh                 # host target, release
 #   scripts/sidecars.sh <target-triple> # cross target (passed to cargo --target)
+#   scripts/sidecars.sh --debug         # host target, debug (dev sidecars)
 #   scripts/sidecars.sh --ensure        # ensure the staged set is current
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [ "${1:-}" = "--ensure" ]; then
-  shift
-fi
+profile="release"
+triple=""
+for arg in "$@"; do
+  case "$arg" in
+    --ensure) ;;
+    --debug) profile="debug" ;;
+    --release) profile="release" ;;
+    *) triple="$arg" ;;
+  esac
+done
 
-triple="${1:-$(rustc -vV | sed -n 's/^host: //p')}"
+cross=1
+[ -n "$triple" ] || { triple="$(rustc -vV | sed -n 's/^host: //p')"; cross=0; }
 [ -n "$triple" ] || { echo "could not determine target triple" >&2; exit 1; }
 
+build_args=()
+[ "$profile" = "release" ] && build_args=(--release)
+
 target_args=()
-srcdir="target/release"
-if [ -n "${1:-}" ]; then
+srcdir="target/$profile"
+if [ "$cross" -eq 1 ]; then
   target_args=(--target "$triple")
-  srcdir="target/$triple/release"
+  srcdir="target/$triple/$profile"
 fi
 
 ext=""
@@ -32,8 +48,8 @@ esac
 
 dest="crates/desktop/binaries"
 
-echo "building sidecars for $triple"
-cargo build --release "${target_args[@]}" -p cli -p daemon -p tray
+echo "building $profile sidecars for $triple"
+cargo build "${build_args[@]}" "${target_args[@]}" -p cli -p daemon -p tray
 
 mkdir -p "$dest"
 for bin in hestia hestiad tray; do

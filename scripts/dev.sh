@@ -37,10 +37,12 @@ PATH="$(strip_installed_hestia)"
 export HESTIA_SOCK="${HESTIA_SOCK:-${XDG_RUNTIME_DIR:-/tmp}/hestiad-dev-$(id -u).sock}"
 
 # Desktop launcher with Vite HMR: Tauri drives the frontend dev server itself.
+# Stage debug sidecars so the daemon Tauri spawns keeps its debug_assertions —
+# and thus data under <repo>/.hestia, matching the plain dev path above.
 if [ "${1:-}" = "--desktop" ]; then
     shift
     log "Desktop shell with frontend HMR (cargo tauri dev)"
-    scripts/sidecars.sh --ensure
+    scripts/sidecars.sh --ensure --debug
     cd crates/desktop
     exec cargo tauri dev "$@"
 fi
