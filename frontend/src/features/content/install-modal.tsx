@@ -543,7 +543,7 @@ function TargetStep({
           {m['browse.nothing_matches']()}
         </p>
       ) : (
-        <div className="grid gap-2">
+        <div className="grid gap-2 p-0.5">
           {shown.map((t) => (
             <PickRow
               key={t.id}
@@ -655,10 +655,11 @@ function ContentStep({
           {m['browse.nothing_matches']()}
         </p>
       ) : (
-        <div className="grid gap-2">
+        <div className="grid gap-2 p-0.5">
           {hits.map((p) => (
             <PickRow
               key={`${p.source}:${p.id}`}
+              variant="add"
               icon={contentIcon(p.kind)}
               title={p.title}
               subtitle={`${contentKindLabel[p.kind]()} · ${m['browse.by_author']({ name: p.author })}`}
@@ -742,7 +743,7 @@ function WorldsStep({
     );
   }
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 p-0.5">
       {list.map((w) => {
         const checked = selected.includes(w);
         const id = `world-${w}`;
@@ -751,8 +752,10 @@ function WorldsStep({
             key={w}
             htmlFor={id}
             className={cn(
-              'flex cursor-pointer items-center gap-2.5 px-3 py-2.5 text-sm ring-1 transition-colors',
-              checked ? 'bg-muted ring-ember' : 'ring-border hover:bg-muted/60',
+              'flex cursor-pointer items-center gap-2.5 border px-3 py-2.5 text-sm transition-colors',
+              checked
+                ? 'border-ember bg-ember/5'
+                : 'border-border hover:bg-muted/60',
             )}
           >
             <Checkbox
