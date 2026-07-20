@@ -99,9 +99,12 @@ mod backend {
 
     pub fn enable() -> Result<()> {
         let exe = std::env::current_exe().context("cannot resolve daemon executable path")?;
-        // /TR carries the command as one token: the exe path is quoted (it may
-        // contain spaces) and its inner quotes are escaped for the tokenizer.
-        let tr = format!("\\\"{}\\\" serve", exe.display());
+        // /TR needs the exe path quoted (it may contain spaces). Pass real
+        // quotes: `Command` already escapes each argument for CreateProcess, so
+        // schtasks receives these quotes verbatim. Pre-escaping them (`\"`) is
+        // double-encoded here and stored literally, leaving Task Scheduler a
+        // broken path that fails to launch at logon with 0x80070002.
+        let tr = format!("\"{}\" serve", exe.display());
         let out = schtasks(&[
             "/Create",
             "/F",
