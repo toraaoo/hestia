@@ -171,7 +171,9 @@
     "stop_instance_description": "The running game session is closed. Unsaved progress may be lost.",
     "stop_sessions_description": "All {count} running sessions are closed. Unsaved progress may be lost.",
     "overview_summary": "A {flavor} {version} instance with {mods} mods across {worlds} worlds.",
-    "type_profile": "profile"
+    "type_profile": "profile",
+    "change_icon": "Change icon",
+    "reset_icon": "Reset icon"
   },
   "tab": {
     "overview": "Overview",

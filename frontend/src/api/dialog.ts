@@ -22,3 +22,15 @@ export async function pickContentFiles(): Promise<string[]> {
   if (Array.isArray(selection)) return selection;
   return typeof selection === 'string' ? [selection] : [];
 }
+
+/** Pick one image and return its absolute path, or null when dismissed. */
+export async function pickImage(): Promise<string | null> {
+  const selection = await open({
+    multiple: false,
+    directory: false,
+    filters: [
+      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] },
+    ],
+  });
+  return typeof selection === 'string' ? selection : null;
+}

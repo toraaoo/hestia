@@ -170,7 +170,9 @@
     "stop_instance_description": "A sessão de jogo em execução será fechada. Progresso não salvo pode ser perdido.",
     "stop_sessions_description": "Todas as {count} sessões em execução serão fechadas. Progresso não salvo pode ser perdido.",
     "overview_summary": "Uma instância {flavor} {version} com {mods} mods em {worlds} mundos.",
-    "type_profile": "perfil"
+    "type_profile": "perfil",
+    "change_icon": "Alterar ícone",
+    "reset_icon": "Restaurar ícone"
   },
   "tab": {
     "overview": "Visão geral",

@@ -18,7 +18,10 @@ pub fn run() {
             commands::auth::account_login_sisu,
             commands::prefs::prefs_list,
             commands::prefs::prefs_set,
-            commands::prefs::prefs_remove
+            commands::prefs::prefs_remove,
+            commands::icons::icons_list,
+            commands::icons::icon_set,
+            commands::icons::icon_remove
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

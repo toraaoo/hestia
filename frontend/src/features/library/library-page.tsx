@@ -1,6 +1,7 @@
 import { PlusIcon, SignInIcon } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
+import { iconUrl } from '@/api/icons';
 import { useSearch } from '@/components/app-shell/search-context';
 import { entryIcon } from '@/components/icons';
 import { Page, Section } from '@/components/page';
@@ -26,6 +27,7 @@ import type { EntryCardData } from '@/features/entries/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/skeleton';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
+import { useEntryIcons } from '@/queries/icons';
 import {
   useInstances,
   useLaunchInstanceAny,
@@ -68,6 +70,7 @@ export function LibraryPage({
   const launchInstance = useLaunchInstanceAny();
   const stopInstance = useStopInstanceAny();
   const prefs = usePrefs();
+  const icons = useEntryIcons();
 
   const [newKind, setNewKind] = useState<'server' | 'instance'>('instance');
   const [creating, setCreating] = useState(false);
@@ -82,14 +85,18 @@ export function LibraryPage({
       : undefined;
   const serverCards: EntryCardData[] = useMemo(
     () =>
-      (servers.data ?? []).map((server) =>
-        serverToCard(server, {
-          busy: serverBusy === server.id,
-          onStart: () => startServer.mutate(server.id),
-          onStop: () => stopServer.mutate(server.id),
-        }),
-      ),
-    [servers.data, serverBusy, startServer, stopServer],
+      (servers.data ?? []).map((server) => {
+        const icon = icons.data?.[server.id];
+        return {
+          ...serverToCard(server, {
+            busy: serverBusy === server.id,
+            onStart: () => startServer.mutate(server.id),
+            onStop: () => stopServer.mutate(server.id),
+          }),
+          iconUrl: icon ? iconUrl(icon) : undefined,
+        };
+      }),
+    [servers.data, serverBusy, startServer, stopServer, icons.data],
   );
 
   const instanceBusy =
@@ -100,19 +107,30 @@ export function LibraryPage({
       : undefined;
   const instanceCards: EntryCardData[] = useMemo(
     () =>
-      (instances.data ?? []).map((instance) =>
-        instanceToCard(
-          instance,
-          {
-            busy: instanceBusy === instance.id,
-            onStart: () => launchInstance.mutate(instance.id),
-            onStop: () => stopInstance.mutate(instance.id),
-          },
-          prefs.get<Playtime | null>(playtimeKey(instance.id), null)
-            ?.lastPlayedUnix,
-        ),
-      ),
-    [instances.data, instanceBusy, launchInstance, stopInstance, prefs],
+      (instances.data ?? []).map((instance) => {
+        const icon = icons.data?.[instance.id];
+        return {
+          ...instanceToCard(
+            instance,
+            {
+              busy: instanceBusy === instance.id,
+              onStart: () => launchInstance.mutate(instance.id),
+              onStop: () => stopInstance.mutate(instance.id),
+            },
+            prefs.get<Playtime | null>(playtimeKey(instance.id), null)
+              ?.lastPlayedUnix,
+          ),
+          iconUrl: icon ? iconUrl(icon) : undefined,
+        };
+      }),
+    [
+      instances.data,
+      instanceBusy,
+      launchInstance,
+      stopInstance,
+      prefs,
+      icons.data,
+    ],
   );
 
   const serverFlavors = useMemo(() => flavorsOf(serverCards), [serverCards]);

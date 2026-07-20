@@ -22,6 +22,8 @@ export interface EntryCardData {
   ready: boolean;
   /** One-line footer: "Last played 2h ago" / ":25565 · 3 online". */
   subtitle: string;
+  /** A custom icon shown in place of the kind glyph. */
+  iconUrl?: string;
   /** Wired quick actions; absent leaves the button inert. */
   onStart?: () => void;
   onStop?: () => void;
@@ -158,7 +160,15 @@ export function EntryCard({ entry }: { entry: EntryCardData }) {
     >
       <Card className="gap-0 overflow-hidden py-0 transition-colors group-hover:border-ember/40">
         <div className="relative flex h-24 items-center justify-center border-b border-border bg-muted/40">
-          <Icon className="size-9 text-muted-foreground/40" />
+          {entry.iconUrl ? (
+            <img
+              src={entry.iconUrl}
+              alt=""
+              className="size-full object-cover"
+            />
+          ) : (
+            <Icon className="size-9 text-muted-foreground/40" />
+          )}
           {status && (
             <div className="absolute top-2 left-2">
               <StatusBadge status={status} />
@@ -204,8 +214,12 @@ export function EntryRow({ entry }: { entry: EntryCardData }) {
         'group flex items-center gap-3 px-3 py-2.5 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset',
       )}
     >
-      <span className="grid size-9 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
-        <Icon className="size-4.5" />
+      <span className="grid size-9 shrink-0 place-items-center overflow-hidden bg-muted text-muted-foreground ring-1 ring-border">
+        {entry.iconUrl ? (
+          <img src={entry.iconUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <Icon className="size-4.5" />
+        )}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

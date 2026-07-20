@@ -28,6 +28,7 @@ import {
   instanceTarget,
 } from '@/features/content/install-modal';
 import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
+import { EntryIconMenu } from '@/features/entries/icon-menu';
 import {
   type LiveResources,
   ResourceCards,
@@ -36,6 +37,7 @@ import { InstanceSettingsTab } from '@/features/instances/settings-tab';
 import { ProfilesPanel } from '@/features/profiles/profiles-panel';
 import { agoLabel, bytes, memGb, uptime } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
+import { useEntryIconUrl } from '@/queries/icons';
 import {
   instanceQueries,
   useInstance,
@@ -89,6 +91,7 @@ export function InstanceDetailPage({
   const worlds = useInstanceWorlds(id);
   const profiles = useInstanceProfiles(id);
   const playtime = usePlaytime(id);
+  const heroIconUrl = useEntryIconUrl(id);
   const [addingContent, setAddingContent] = useState(false);
   const launch = useLaunchInstance(id);
   const stop = useStopInstance(id);
@@ -157,6 +160,8 @@ export function InstanceDetailPage({
         parentLabel={m['nav.library']()}
         parentTo="/instances"
         icon={entryIcon('instance')}
+        iconUrl={heroIconUrl}
+        iconAction={<EntryIconMenu id={id} />}
         name={instance.name}
         badges={
           <>
