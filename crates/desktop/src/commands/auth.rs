@@ -51,10 +51,11 @@ pub async fn account_login_sisu(
         .title("Sign in to Microsoft")
         .inner_size(520.0, 720.0)
         .decorations(false)
-        .always_on_top(true)
+        .focused(true)
         .center()
         .build()
         .map_err(|e| other(format!("could not open the sign-in window: {e}")))?;
+    let _ = window.set_focus();
     let _ = window.request_user_attention(Some(UserAttentionType::Critical));
 
     let started = Instant::now();
