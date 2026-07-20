@@ -6,7 +6,6 @@
  * and job id happens here, where many concurrent listeners are natural.
  */
 import { listen } from '@tauri-apps/api/event';
-import { camelizeKeys } from 'humps';
 
 export const EVENT_CHANNEL = 'hestia:event';
 export const CONNECTION_CHANNEL = 'hestia:connection';
@@ -28,14 +27,9 @@ let connectionListener: Promise<unknown> | null = null;
 
 async function ensureEventListener(): Promise<void> {
   eventListener ??= listen<DaemonEvent>(EVENT_CHANNEL, (event) => {
-    // The wire payload is snake_case; camelize it here so every topic handler
-    // sees the same camelCase shape the type mirrors describe. `topic` is the
-    // envelope's own field and stays as-is.
-    const camelized: DaemonEvent = {
-      topic: event.payload.topic,
-      payload: camelizeKeys(event.payload.payload) as Record<string, unknown>,
-    };
-    for (const handler of [...eventHandlers]) handler(camelized);
+    // The wire is camelCase (proto's `rename_all`), so the payload already
+    // matches the type mirrors — forwarded through with no conversion.
+    for (const handler of [...eventHandlers]) handler(event.payload);
   });
   await eventListener;
 }

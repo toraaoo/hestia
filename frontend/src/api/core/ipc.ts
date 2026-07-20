@@ -3,15 +3,12 @@
  * command forwards `{ channel, payload }` over the local socket and answers
  * with the response payload or a `{ code, message }` rejection.
  *
- * The wire is snake_case (it mirrors `crates/proto`); the TS side is camelCase.
- * This seam is where the two meet: every outbound payload is decamelized to the
- * wire shape and every response is camelized back, so the rest of the frontend
- * only ever sees camelCase and the type mirrors read like idiomatic TS. Pass
- * `raw` for the schema-less channels whose keys are user data, not struct
- * fields (`config.*`), where blind key conversion would corrupt them.
+ * The wire is camelCase — `crates/proto` carries `rename_all = "camelCase"`, so
+ * the daemon speaks the same shape the type mirrors describe and no key
+ * conversion happens here. (A dynamic-key payload like `config.*`'s opaque
+ * value therefore also passes through untouched.)
  */
 import { invoke } from '@tauri-apps/api/core';
-import { camelizeKeys, decamelizeKeys } from 'humps';
 
 /** Default per-call timeout, matching the client SDK's `CALL_TIMEOUT`. */
 export const CALL_TIMEOUT_MS = 10_000;
@@ -43,12 +40,6 @@ export function isNotFound(error: unknown): boolean {
 
 export interface CallOptions {
   timeoutMs?: number;
-  /**
-   * Skip snake_case⇄camelCase key conversion in both directions. For channels
-   * whose payload keys are user data rather than struct fields (`config.*`),
-   * where converting them would rewrite the keys themselves.
-   */
-  raw?: boolean;
 }
 
 function toHestiaError(raw: unknown): HestiaError {
@@ -64,14 +55,13 @@ export async function call<T>(
   params: unknown = {},
   options: CallOptions = {},
 ): Promise<T> {
-  const payload = params ?? {};
   try {
     const result = await invoke<unknown>('ipc_call', {
       channel,
-      payload: options.raw ? payload : decamelizeKeys(payload),
+      payload: params ?? {},
       timeoutMs: options.timeoutMs,
     });
-    return (options.raw ? result : camelizeKeys(result)) as T;
+    return result as T;
   } catch (raw) {
     throw toHestiaError(raw);
   }
