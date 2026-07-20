@@ -120,8 +120,9 @@ export function CreateEntryModal({
           toast.success(m['toast.created']({ name: instance.name }));
         }
         onOpenChange(false);
-      } catch (error) {
-        toast.error(errorMessage(error));
+      } catch {
+        // The global mutation error handler surfaces the toast; swallow here so
+        // the dialog stays open without a second notification.
       }
     },
   });
@@ -624,10 +625,6 @@ function instanceParams(value: any) {
     loaderVersion: value.version.loaderVersion || undefined,
     config: [{ key: 'memory', value: `${d.memory}G` }],
   };
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function StepForm({
