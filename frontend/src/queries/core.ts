@@ -13,6 +13,8 @@ export interface MutationSpec<TData, TVariables> {
   mutationFn: (variables: TVariables) => Promise<TData>;
   /** Applies the expected outcome to the cache now; the undo runs on error. */
   optimistic?: (variables: TVariables) => (() => void) | undefined;
+  /** Seed the cache from the server's answer before the settle invalidation. */
+  onSuccess?: (data: TData, variables: TVariables) => void;
   /** Key prefixes swept when the mutation settles, success or error. */
   invalidates?: (variables: TVariables) => QueryKey[];
 }
@@ -30,6 +32,7 @@ export function mutation<TData = void, TVariables = void>(
     onMutate: spec.optimistic
       ? (variables) => ({ undo: spec.optimistic?.(variables) })
       : undefined,
+    onSuccess: spec.onSuccess,
     onError: (_error, _variables, context) => {
       context?.undo?.();
     },

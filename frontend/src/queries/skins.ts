@@ -51,6 +51,20 @@ export const skinMutations = {
     >({
       mutationKey: [...keys.skins.all, 'add'],
       mutationFn: (params) => api.add(params),
+      onSuccess: (skin) =>
+        queryClient.setQueryData<SkinList>(keys.skins.list(''), (prev) =>
+          prev
+            ? {
+                ...prev,
+                skins: [
+                  skin,
+                  ...prev.skins
+                    .filter((s) => s.key !== skin.key)
+                    .map((s) => ({ ...s, equipped: false })),
+                ],
+              }
+            : prev,
+        ),
       invalidates: () => [keys.skins.all],
     }),
   update: () =>
