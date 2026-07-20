@@ -224,6 +224,8 @@ function ChangeVersionDialog({
     [versions.data, instance.gameVersion],
   );
 
+  const pending = update.isPending;
+
   const apply = async () => {
     if (!version) return;
     try {
@@ -236,13 +238,17 @@ function ChangeVersionDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{m['entry_settings.change_version']()}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
-          <Select value={version} onValueChange={(v) => setVersion(v ?? '')}>
+          <Select
+            value={version}
+            onValueChange={(v) => setVersion(v ?? '')}
+            disabled={pending}
+          >
             <SelectTrigger className="w-full">
               <SelectValue placeholder={m['label.version']()} />
             </SelectTrigger>
@@ -262,16 +268,21 @@ function ChangeVersionDialog({
               id="allow-downgrade"
               checked={downgrade}
               onCheckedChange={(c) => setDowngrade(c === true)}
+              disabled={pending}
             />
             {m['entry_settings.allow_downgrade']()}
           </label>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={pending}
+          >
             {m['action.cancel']()}
           </Button>
-          <Button onClick={apply} disabled={!version || update.isPending}>
-            {update.isPending
+          <Button onClick={apply} disabled={!version || pending}>
+            {pending
               ? m['status.preparing']()
               : m['entry_settings.change_version']()}
           </Button>
