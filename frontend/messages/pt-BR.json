@@ -482,5 +482,21 @@
     "search_placeholder": "Buscar perfis",
     "none_match": "Nenhum perfil corresponde.",
     "missing": "Este perfil não existe."
+  },
+  "sync": {
+    "section": "Compartilhado entre instâncias",
+    "description": "Arquivos são copiados e mesclados a cada inicialização; pastas são vinculadas a um armazenamento compartilhado.",
+    "files": "Arquivos copiados",
+    "folders": "Pastas vinculadas",
+    "add_file_placeholder": "options.txt",
+    "add_folder_placeholder": "saves",
+    "status_title": "Estado dos vínculos por instância",
+    "state_linked": "vinculada",
+    "state_pending": "vincula na próxima inicialização",
+    "state_cannot_link": "requer adoção",
+    "adopt": "Adotar",
+    "adopt_description": "Move o conteúdo existente das pastas da instância para o armazenamento compartilhado e as vincula. A instância precisa estar parada.",
+    "adopted": "Adotado: {targets}",
+    "no_folder_targets": "Nenhuma pasta configurada."
   }
 }

@@ -491,5 +491,21 @@
     "search_placeholder": "Search profiles",
     "none_match": "No profiles match.",
     "missing": "This profile does not exist."
+  },
+  "sync": {
+    "section": "Shared between instances",
+    "description": "Files are copied and merged at each launch; folders are linked into one shared store.",
+    "files": "Copied files",
+    "folders": "Linked folders",
+    "add_file_placeholder": "options.txt",
+    "add_folder_placeholder": "saves",
+    "status_title": "Instance link status",
+    "state_linked": "linked",
+    "state_pending": "links at next launch",
+    "state_cannot_link": "needs adopt",
+    "adopt": "Adopt",
+    "adopt_description": "Moves the instance’s existing folder contents into the shared store and links them. The instance must be stopped.",
+    "adopted": "Adopted: {targets}",
+    "no_folder_targets": "No folder targets configured."
   }
 }

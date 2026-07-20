@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { StatusDot } from '@/components/ui/status-dot';
+import { SyncSection } from '@/features/settings/sync-section';
 import { type Locale, useLocale } from '@/hooks/locale';
 import { bytes, memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
@@ -308,6 +309,8 @@ export function SettingsPage() {
               </Field>
             </FieldGroup>
           </FieldSet>
+
+          <SyncSection />
 
           <FieldSet>
             <FieldLegend>{m['settings.storage_daemon']()}</FieldLegend>
