@@ -31,6 +31,7 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries/accounts';
+import { useEntryIconUrl } from '@/queries/icons';
 import { useInstances } from '@/queries/instance';
 import { type PinnedEntry, pinKey, usePinned } from '@/queries/pinned';
 import { useServerPing, useServers } from '@/queries/server';
@@ -375,10 +376,15 @@ function PinnedLinkContent({
   onUnpin: () => void;
 }) {
   const Icon = entry.kind === 'server' ? HardDrivesIcon : CubeIcon;
+  const iconUrl = useEntryIconUrl(entry.id);
   return (
     <>
-      <span className="grid size-6 shrink-0 place-items-center bg-muted ring-1 ring-border">
-        <Icon className="size-3.5" />
+      <span className="grid size-6 shrink-0 place-items-center overflow-hidden bg-muted ring-1 ring-border">
+        {iconUrl ? (
+          <img src={iconUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <Icon className="size-3.5" />
+        )}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs text-foreground">
