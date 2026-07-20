@@ -1196,6 +1196,22 @@ the app has a UI to show.
 > exits at startup when another instance holds it — per-endpoint, so a dev
 > daemon's tray and the session's tray coexist.
 
+> **The tray and desktop must not share a GApplication id.** On Linux both
+> front-ends go through `tao`, which creates a `gtk::Application` with
+> `ApplicationFlags::empty()` and registers it — so GApplication acquires the
+> D-Bus name equal to the app id and enforces single-instance by name
+> ownership. When the tray reused `common::app::ID` (the desktop shell's Tauri
+> `identifier`), whichever process started second registered as a *remote*
+> instance and never showed — the tray blocked the desktop and vice versa. The
+> tray now registers under its own `common::app::TRAY_ID`
+> (`…hestia.tray`), decoupling the two. Single-instance *within* each
+> front-end is enforced deliberately, not accidentally: the tray by its
+> per-endpoint runtime lock (above), and the desktop by
+> `tauri-plugin-single-instance` — a second `hestia-desktop` (e.g. the tray's
+> left-click) hands its args to the running instance and exits, and the plugin
+> callback shows/unminimises/focuses the existing `main` window. So only one
+> tray and one desktop ever run, and re-launching surfaces what is already open.
+
 ## What's built vs. pending
 
 **Built end-to-end:** the workspace and its enforced dependency graph; logging,

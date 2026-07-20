@@ -112,7 +112,9 @@ fn build_event_loop() -> tao::event_loop::EventLoop<UserEvent> {
     glib::set_application_name(common::app::NAME);
 
     let mut builder = EventLoopBuilder::<UserEvent>::with_user_event();
-    builder.with_app_id(common::app::ID);
+    // Distinct from the desktop shell's id so the two GApplications don't
+    // collide on the D-Bus name (see common::app::TRAY_ID).
+    builder.with_app_id(common::app::TRAY_ID);
     builder.build()
 }
 
