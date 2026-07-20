@@ -74,6 +74,14 @@ const TOPICS: Record<string, (payload: Record<string, unknown>) => QueryKey[]> =
     'content.done': () => [keys.servers.list(), keys.instances.list()],
   };
 
+/** The key prefixes a daemon topic outdates — exported for the regression test. */
+export function invalidationKeys(
+  topic: string,
+  payload: Record<string, unknown>,
+): QueryKey[] {
+  return TOPICS[topic]?.(payload) ?? [];
+}
+
 let started = false;
 
 /** Install the feed once, at app bootstrap. */
@@ -81,9 +89,8 @@ export function startInvalidation(): void {
   if (started) return;
   started = true;
   onDaemonEvent((event) => {
-    const mapped = TOPICS[event.topic];
-    if (!mapped) return;
-    for (const key of mapped(event.payload)) invalidate(key);
+    for (const key of invalidationKeys(event.topic, event.payload))
+      invalidate(key);
   }).catch(() => {
     // Outside the Tauri shell there are no daemon events to hear.
   });

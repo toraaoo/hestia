@@ -140,3 +140,65 @@ impl<K: Eq + Hash> Drop for Claim<K> {
         self.active.lock().unwrap().remove(&self.key);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use proto::java::{JavaInstallPhase, JavaInstallProgress};
+
+    use super::*;
+
+    fn downloading(current: u64, total: u64) -> JavaInstallProgress {
+        JavaInstallProgress {
+            phase: JavaInstallPhase::Downloading,
+            current,
+            total,
+        }
+    }
+
+    #[test]
+    fn coalesces_sub_epsilon_java_ticks() {
+        let emitted = AtomicUsize::new(0);
+        let forward = coalesce_progress(|_: &JavaInstallProgress| {
+            emitted.fetch_add(1, Ordering::SeqCst);
+        });
+
+        // A per-chunk download flood: one tick per 0.1% of a large archive.
+        for i in 0..=1000u64 {
+            forward(&downloading(i, 1000));
+        }
+
+        // Far fewer than the 1001 ticks: forwarded only past each 0.5% step
+        // (~200) plus the first and the terminal 100%.
+        let count = emitted.load(Ordering::SeqCst);
+        assert!(count > 0, "the first tick and completion must forward");
+        assert!(
+            count <= 210,
+            "sub-epsilon ticks must be dropped, got {count}"
+        );
+    }
+
+    #[test]
+    fn forwards_on_phase_change() {
+        let emitted = AtomicUsize::new(0);
+        let forward = coalesce_progress(|_: &JavaInstallProgress| {
+            emitted.fetch_add(1, Ordering::SeqCst);
+        });
+
+        forward(&JavaInstallProgress {
+            phase: JavaInstallPhase::Resolving,
+            current: 0,
+            total: 0,
+        });
+        // Same zero ratio, new phase: a phase switch always forwards.
+        forward(&downloading(0, 0));
+        forward(&JavaInstallProgress {
+            phase: JavaInstallPhase::Extracting,
+            current: 0,
+            total: 0,
+        });
+
+        assert_eq!(emitted.load(Ordering::SeqCst), 3);
+    }
+}
