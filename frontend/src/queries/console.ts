@@ -5,7 +5,7 @@
  * the daemon's log file persists server output, but a command's echo and its
  * RCON reply live only here.
  */
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 export interface ConsoleEntry {
   kind: 'echo' | 'reply' | 'error';
@@ -16,12 +16,20 @@ const MAX_ENTRIES = 500;
 const EMPTY: ConsoleEntry[] = [];
 
 const histories = new Map<string, ConsoleEntry[]>();
-const listeners = new Set<() => void>();
+// Listeners are keyed by server id so one server's push wakes only its own
+// console, never every open console.
+const listeners = new Map<string, Set<() => void>>();
 
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
+function subscribe(id: string, listener: () => void): () => void {
+  let set = listeners.get(id);
+  if (!set) {
+    set = new Set();
+    listeners.set(id, set);
+  }
+  set.add(listener);
   return () => {
-    listeners.delete(listener);
+    set.delete(listener);
+    if (set.size === 0) listeners.delete(id);
   };
 }
 
@@ -32,9 +40,13 @@ export function pushConsoleEntry(id: string, entry: ConsoleEntry): void {
     id,
     next.length > MAX_ENTRIES ? next.slice(next.length - MAX_ENTRIES) : next,
   );
-  for (const listener of listeners) listener();
+  for (const listener of listeners.get(id) ?? []) listener();
 }
 
 export function useConsoleHistory(id: string): ConsoleEntry[] {
-  return useSyncExternalStore(subscribe, () => histories.get(id) ?? EMPTY);
+  const subscribeId = useCallback(
+    (listener: () => void) => subscribe(id, listener),
+    [id],
+  );
+  return useSyncExternalStore(subscribeId, () => histories.get(id) ?? EMPTY);
 }

@@ -1,13 +1,16 @@
 /**
  * The job driver, mirroring the client SDK's `Session::run_job`: generate a
- * job id, subscribe to it, start the job, then settle on its done/error
- * topic while streaming progress. The id is client-generated and subscribed
- * *before* the start call, so even a job that finishes instantly cannot slip
- * its terminal event past us.
+ * job id, listen for its events, start the job, then settle on its done/error
+ * topic while streaming progress. The event handler is installed *before* the
+ * start call, so even a job that finishes instantly cannot slip its terminal
+ * event past us. No per-job `events.subscribe` is issued: the desktop bridge
+ * already holds one connection subscribed to every daemon event, so a second
+ * subscription would only duplicate delivery (and leak a daemon-side sub that
+ * is pruned only on disconnect).
  */
 import type { ProvisionProgress } from '../types/minecraft';
 import { onDaemonEvent } from './events';
-import { call, HANDLER_ERROR, HestiaError } from './ipc';
+import { HANDLER_ERROR, HestiaError } from './ipc';
 
 let counter = 0;
 
@@ -67,7 +70,6 @@ export async function runJob<
   });
 
   try {
-    await call('events.subscribe', { id });
     await options.start();
     return await outcome;
   } finally {

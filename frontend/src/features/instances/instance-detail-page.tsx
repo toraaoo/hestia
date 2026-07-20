@@ -15,6 +15,7 @@ import { type InstanceInfo, system } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { entryIcon } from '@/components/icons';
+import { LogView } from '@/components/log-view';
 import { Stat, TabCount } from '@/components/page';
 import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -440,12 +441,9 @@ function InstanceLogsTab({
   }
 
   return (
-    <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto border border-border bg-card p-3 font-mono text-[11px] wrap-break-word whitespace-pre-wrap text-muted-foreground">
-      <span className="sr-only">{name}</span>
-      {logs.lines.map((entry, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: log lines have no stable id.
-        <div key={index}>{entry.line}</div>
-      ))}
-    </div>
+    <LogView
+      aria-label={name}
+      rows={logs.lines.map((entry) => ({ text: entry.line }))}
+    />
   );
 }
