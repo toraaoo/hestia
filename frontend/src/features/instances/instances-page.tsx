@@ -1,6 +1,5 @@
 import { PlusIcon } from '@phosphor-icons/react';
 import { useMemo, useState } from 'react';
-
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
 import { SignInGate } from '@/components/sign-in-gate';
@@ -24,6 +23,8 @@ import {
   useLaunchInstanceAny,
   useStopInstanceAny,
 } from '@/queries/instance';
+import { usePrefs } from '@/queries/prefs';
+import { type Playtime, playtimeKey } from '@/queries/sessions';
 
 export function InstancesPage({
   view,
@@ -41,6 +42,7 @@ export function InstancesPage({
   const instances = useInstances();
   const launch = useLaunchInstanceAny();
   const stop = useStopInstanceAny();
+  const prefs = usePrefs();
   const [creating, setCreating] = useState(false);
 
   const busyId =
@@ -51,13 +53,18 @@ export function InstancesPage({
   const cards: EntryCardData[] = useMemo(
     () =>
       (instances.data ?? []).map((instance) =>
-        instanceToCard(instance, {
-          busy: busyId === instance.id,
-          onStart: () => launch.mutate(instance.id),
-          onStop: () => stop.mutate(instance.id),
-        }),
+        instanceToCard(
+          instance,
+          {
+            busy: busyId === instance.id,
+            onStart: () => launch.mutate(instance.id),
+            onStop: () => stop.mutate(instance.id),
+          },
+          prefs.get<Playtime | null>(playtimeKey(instance.id), null)
+            ?.lastPlayedUnix,
+        ),
       ),
-    [instances.data, busyId, launch, stop],
+    [instances.data, busyId, launch, stop, prefs],
   );
 
   const flavors = useMemo(() => flavorsOf(cards), [cards]);

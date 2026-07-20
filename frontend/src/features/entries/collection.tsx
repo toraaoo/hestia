@@ -22,6 +22,7 @@ import {
   type EntryCardData,
   EntryRow,
 } from '@/features/entries/entry-card';
+import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
@@ -69,6 +70,7 @@ export function serverToCard(
 export function instanceToCard(
   instance: InstanceInfo,
   actions: CardActions,
+  lastPlayedUnix?: number,
 ): EntryCardData {
   const running = runningSessions(instance);
   return {
@@ -82,7 +84,9 @@ export function instanceToCard(
     subtitle:
       running > 0
         ? m['entry.sessions_running']({ count: running })
-        : m['status.stopped'](),
+        : lastPlayedUnix
+          ? `${m['label.last_played']()} ${agoLabel(lastPlayedUnix)}`
+          : m['status.stopped'](),
     busy: actions.busy,
     onStart: actions.onStart,
     onStop: actions.onStop,

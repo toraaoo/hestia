@@ -67,7 +67,8 @@
     "nothing_pinned": "Nada fixado ainda",
     "pin_entries": "Fixar uma instância ou servidor",
     "pin": "Fixar na barra lateral",
-    "unpin": "Desafixar"
+    "unpin": "Desafixar",
+    "playtime": "Tempo jogado"
   },
   "status": {
     "preparing": "Preparando",

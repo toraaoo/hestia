@@ -34,7 +34,7 @@ import {
 } from '@/features/entries/resource-panel';
 import { InstanceSettingsTab } from '@/features/instances/settings-tab';
 import { ProfilesPanel } from '@/features/profiles/profiles-panel';
-import { agoLabel, bytes, memGb } from '@/lib/format';
+import { agoLabel, bytes, memGb, uptime } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import {
   instanceQueries,
@@ -48,6 +48,7 @@ import {
   useStopInstance,
 } from '@/queries/instance';
 import { useProcessMetrics } from '@/queries/metrics';
+import { usePlaytime } from '@/queries/sessions';
 
 export type InstanceTab =
   | 'overview'
@@ -87,6 +88,7 @@ export function InstanceDetailPage({
   const config = useInstanceConfig(id);
   const worlds = useInstanceWorlds(id);
   const profiles = useInstanceProfiles(id);
+  const playtime = usePlaytime(id);
   const [addingContent, setAddingContent] = useState(false);
   const launch = useLaunchInstance(id);
   const stop = useStopInstance(id);
@@ -279,6 +281,22 @@ export function InstanceDetailPage({
                   <Stat
                     label={m['label.created']()}
                     value={agoLabel(instance.createdUnix)}
+                  />
+                  <Stat
+                    label={m['label.last_played']()}
+                    value={
+                      playtime?.lastPlayedUnix
+                        ? agoLabel(playtime.lastPlayedUnix)
+                        : '—'
+                    }
+                  />
+                  <Stat
+                    label={m['label.playtime']()}
+                    value={
+                      playtime?.totalSeconds
+                        ? uptime(playtime.totalSeconds)
+                        : '—'
+                    }
                   />
                   <Stat
                     label={m['label.disk']()}

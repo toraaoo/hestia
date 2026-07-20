@@ -68,7 +68,8 @@
     "nothing_pinned": "Nothing pinned yet",
     "pin_entries": "Pin an instance or server",
     "pin": "Pin to sidebar",
-    "unpin": "Unpin"
+    "unpin": "Unpin",
+    "playtime": "Time played"
   },
   "status": {
     "preparing": "Preparing",

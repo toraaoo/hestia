@@ -1,7 +1,6 @@
 import { PlusIcon, SignInIcon } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-
 import { useSearch } from '@/components/app-shell/search-context';
 import { entryIcon } from '@/components/icons';
 import { Page, Section } from '@/components/page';
@@ -32,11 +31,13 @@ import {
   useLaunchInstanceAny,
   useStopInstanceAny,
 } from '@/queries/instance';
+import { usePrefs } from '@/queries/prefs';
 import {
   useServers,
   useStartServerAny,
   useStopServerAny,
 } from '@/queries/server';
+import { type Playtime, playtimeKey } from '@/queries/sessions';
 
 const InstanceIcon = entryIcon('instance');
 const ServerIcon = entryIcon('server');
@@ -66,6 +67,7 @@ export function LibraryPage({
   const instances = useInstances();
   const launchInstance = useLaunchInstanceAny();
   const stopInstance = useStopInstanceAny();
+  const prefs = usePrefs();
 
   const [newKind, setNewKind] = useState<'server' | 'instance'>('instance');
   const [creating, setCreating] = useState(false);
@@ -99,13 +101,18 @@ export function LibraryPage({
   const instanceCards: EntryCardData[] = useMemo(
     () =>
       (instances.data ?? []).map((instance) =>
-        instanceToCard(instance, {
-          busy: instanceBusy === instance.id,
-          onStart: () => launchInstance.mutate(instance.id),
-          onStop: () => stopInstance.mutate(instance.id),
-        }),
+        instanceToCard(
+          instance,
+          {
+            busy: instanceBusy === instance.id,
+            onStart: () => launchInstance.mutate(instance.id),
+            onStop: () => stopInstance.mutate(instance.id),
+          },
+          prefs.get<Playtime | null>(playtimeKey(instance.id), null)
+            ?.lastPlayedUnix,
+        ),
       ),
-    [instances.data, instanceBusy, launchInstance, stopInstance],
+    [instances.data, instanceBusy, launchInstance, stopInstance, prefs],
   );
 
   const serverFlavors = useMemo(() => flavorsOf(serverCards), [serverCards]);
