@@ -1169,14 +1169,16 @@ A resident system-tray helper, built on Tauri's own tray crates
 [tao](https://github.com/tauri-apps/tao) event loop; gtk/StatusNotifier on
 Linux, native on Windows) and wearing the desktop app's icon (embedded from
 `crates/desktop/icons/` at build time, so both front-ends share one face). The
-menu is a status header (version + running/stopped), a start/restart action, a
-start-at-login toggle bound to the reserved `autostart` config key, and a quit
-that stops the daemon too (supervised workloads keep running, as with any
-daemon stop). A worker thread polls the daemon every two seconds over the
-client SDK and reports state changes to the event loop; menu actions travel the
-other way over an mpsc channel, so the UI thread never blocks on the socket.
-Left-click is deliberately inert for now — it will launch the desktop app once
-the app has a UI to show.
+menu is an **Open Hestia** action, a status header (version + running/stopped),
+a start/restart action, a start-at-login toggle bound to the reserved
+`autostart` config key, and a quit that stops the daemon too (supervised
+workloads keep running, as with any daemon stop). A worker thread polls the
+daemon every two seconds over the client SDK and reports state changes to the
+event loop; menu actions travel the other way over an mpsc channel, so the UI
+thread never blocks on the socket. Left-click launches the desktop shell (the
+same as the **Open Hestia** item) — the `hestia-desktop` binary beside the
+tray, spawned detached; a second launch re-focuses the running window rather
+than opening another (see the single-instance note below).
 
 > **The daemon spawns the tray; the tray outlives the daemon.** `hestiad`
 > spawns the tray on every serve (detached, like every workload), so the tray
@@ -1248,15 +1250,15 @@ backups (datapacks install into their world, which the world backup already
 covers); the kind-first browse and management CLI (`hestia mod search`,
 `instance <name> mod add|list|remove|update`, `hestia search`); the CLI
 front-end over all of it; and the system tray (spawned by every serving
-daemon, quick actions for start/restart/autostart/quit).
+daemon, quick actions for open/start/restart/autostart/quit, left-click
+launches the desktop shell).
 
 **Pending:** natives-classifier extraction for pre-1.19 clients (the resolver
 skips legacy `natives-<os>` classifier libraries, so old versions launch
 without their LWJGL natives) and the legacy (virtual) asset layout; installing
 a resolved modpack (its files and `overrides/`, e.g. `instance create
---modpack`); the desktop UI over the wired shell (the daemon bridge and typed
-API/hooks layer are in place; pages are not); and the tray's left-click
-launching the desktop app.
+--modpack`); and the desktop UI over the wired shell (the daemon bridge and
+typed API/hooks layer are in place; pages are not).
 
 > **Server provisioning is front-loaded by design.** A server is a long-lived,
 > repeatedly-started thing, often driven headless/scripted — `create` pays the

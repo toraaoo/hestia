@@ -46,11 +46,11 @@ it's just as comfortable from a terminal as from a window.
 > instance's version/loader and installed as ordinary origin-tagged content
 > (all a daemon/desktop surface, no CLI verbs). Vanilla and Fabric are the
 > shipped flavors, Modrinth the shipped content source. A **system tray**
-> accompanies every serving daemon — status, start/restart, a start-at-login
-> toggle, quit. The **desktop shell** talks to the daemon through a generic
+> accompanies every serving daemon — open the app, status, start/restart, a
+> start-at-login toggle, quit; a left-click (or the Open item) launches the
+> desktop shell. The **desktop shell** talks to the daemon through a generic
 > Tauri IPC bridge with a typed TS API layer (React Query hooks included).
-> Still to come: installing a whole modpack, the desktop UI itself, and the
-> tray's left-click launching the desktop app.
+> Still to come: installing a whole modpack and the desktop UI itself.
 
 ## Front-ends
 

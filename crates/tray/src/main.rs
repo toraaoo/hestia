@@ -5,6 +5,7 @@
 //! action. One tray runs per user session — a duplicate exits at startup, so
 //! the daemon can spawn unconditionally on every start.
 
+mod desktop;
 mod icon;
 mod lock;
 mod menu;
@@ -15,7 +16,7 @@ use std::process::ExitCode;
 use tao::event::{Event, StartCause};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tray_icon::menu::MenuEvent;
-use tray_icon::{TrayIcon, TrayIconBuilder};
+use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
 use crate::menu::TrayMenu;
 use crate::worker::DaemonState;
@@ -23,6 +24,7 @@ use crate::worker::DaemonState;
 pub enum UserEvent {
     State(DaemonState),
     Menu(MenuEvent),
+    OpenDesktop,
     Exit,
 }
 
@@ -51,6 +53,20 @@ fn main() -> ExitCode {
     let menu_proxy = event_loop.create_proxy();
     MenuEvent::set_event_handler(Some(move |event| {
         let _ = menu_proxy.send_event(UserEvent::Menu(event));
+    }));
+
+    let click_proxy = event_loop.create_proxy();
+    TrayIconEvent::set_event_handler(Some(move |event| {
+        // Left-click (on release) opens the desktop app; right-click still
+        // shows the menu, so only a completed left-click is forwarded.
+        if let TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        } = event
+        {
+            let _ = click_proxy.send_event(UserEvent::OpenDesktop);
+        }
     }));
 
     let menu = TrayMenu::new();
@@ -83,6 +99,7 @@ fn main() -> ExitCode {
                     let _ = actions.send(action);
                 }
             }
+            Event::UserEvent(UserEvent::OpenDesktop) => desktop::launch(),
             Event::UserEvent(UserEvent::Exit) => {
                 // Drop the icon before exiting so it never lingers in the tray.
                 tray.take();
@@ -94,8 +111,8 @@ fn main() -> ExitCode {
 }
 
 fn build_tray(menu: &TrayMenu, icon: tray_icon::Icon) -> tray_icon::Result<TrayIcon> {
-    // Left-click is deliberately inert for now; it will launch the desktop app
-    // once the shell is wired to the daemon.
+    // Left-click opens the desktop app (handled via TrayIconEvent), so the menu
+    // stays on right-click only.
     TrayIconBuilder::new()
         .with_icon(icon)
         .with_menu(Box::new(menu.menu().clone()))

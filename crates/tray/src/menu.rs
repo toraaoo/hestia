@@ -6,6 +6,7 @@ use crate::worker::{Action, DaemonState};
 
 pub struct TrayMenu {
     menu: Menu,
+    open: MenuItem,
     status: MenuItem,
     daemon: MenuItem,
     autostart: CheckMenuItem,
@@ -15,6 +16,7 @@ pub struct TrayMenu {
 impl TrayMenu {
     pub fn new() -> Self {
         let initial = DaemonState::default();
+        let open = MenuItem::new(format!("Open {}", common::app::NAME), true, None);
         let status = MenuItem::new(status_text(&initial), false, None);
         let daemon = MenuItem::new("Start daemon", false, None);
         let autostart = CheckMenuItem::new("Start at login", false, false, None);
@@ -22,6 +24,8 @@ impl TrayMenu {
 
         let menu = Menu::new();
         let _ = menu.append_items(&[
+            &open,
+            &PredefinedMenuItem::separator(),
             &status,
             &PredefinedMenuItem::separator(),
             &daemon,
@@ -32,6 +36,7 @@ impl TrayMenu {
 
         TrayMenu {
             menu,
+            open,
             status,
             daemon,
             autostart,
@@ -57,7 +62,9 @@ impl TrayMenu {
 
     pub fn action_for(&self, event: &MenuEvent, state: &DaemonState) -> Option<Action> {
         let id = event.id();
-        if id == self.daemon.id() {
+        if id == self.open.id() {
+            Some(Action::OpenDesktop)
+        } else if id == self.daemon.id() {
             Some(if state.running {
                 Action::Restart
             } else {

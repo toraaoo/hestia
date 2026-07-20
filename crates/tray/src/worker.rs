@@ -26,6 +26,7 @@ pub enum Action {
     Start,
     Restart,
     SetAutostart(bool),
+    OpenDesktop,
     Quit,
 }
 
@@ -104,6 +105,7 @@ impl Worker {
                     self.autostart = fetch_autostart(&self.rt, c);
                 }
             }
+            Action::OpenDesktop => crate::desktop::launch(),
             Action::Quit => unreachable!("quit is handled by the worker loop"),
         }
     }
