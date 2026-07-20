@@ -41,6 +41,7 @@ import {
   useJavaRuntimes,
   useUninstallJava,
 } from '@/queries/java';
+import { usePrefs } from '@/queries/prefs';
 
 /** The daemon config entries the settings page reads (`config.list`). */
 interface ConfigEntries {
@@ -91,6 +92,7 @@ export function SettingsPage() {
   const clearCache = useClearCache();
   const config = useConfig();
   const setConfig = useSetConfig();
+  const prefs = usePrefs();
   const runtimesQuery = useJavaRuntimes();
   const releasesQuery = useJavaReleases();
   const install = useInstallJava();
@@ -115,7 +117,7 @@ export function SettingsPage() {
     <Page
       title={m['nav.settings']()}
       subtitle={m['settings.subtitle']()}
-      loading={config.isPending}
+      loading={config.isPending || !prefs.ready}
       skeleton={
         <div className="max-w-2xl space-y-8">
           {[0, 1, 2].map((group) => (
@@ -166,6 +168,13 @@ export function SettingsPage() {
                 label={m['settings.start_at_login']()}
                 checked={entries.autostart ?? false}
                 onChange={(checked) => commitConfig('autostart', checked)}
+              />
+
+              <CheckboxRow
+                id="keep-open"
+                label={m['settings.keep_open']()}
+                checked={prefs.get('keepOpen', true)}
+                onChange={(checked) => prefs.set('keepOpen', checked)}
               />
             </FieldGroup>
           </FieldSet>

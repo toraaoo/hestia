@@ -1,9 +1,11 @@
 /**
  * Desktop-side session tracking over the daemon's process events: per-instance
- * last-played and accumulated playtime persisted into prefs. Prefs-based by
- * design — only sessions this window observes are counted; a CLI-launched
- * game with the desktop closed is not.
+ * last-played and accumulated playtime persisted into prefs, plus the
+ * keep-open behavior (hide the window while a game runs, restore when the
+ * last session exits). Prefs-based by design — only sessions this window
+ * observes are counted; a CLI-launched game with the desktop closed is not.
  */
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { onDaemonEvent } from '../api';
 import * as prefsApi from '../api/prefs';
 import { queryClient } from './client';
@@ -18,9 +20,13 @@ export interface Playtime {
 
 export const playtimeKey = (instanceId: string) => `playtime.${instanceId}`;
 
+/** The prefs key for "keep the launcher open while a game runs". */
+export const KEEP_OPEN_KEY = 'keepOpen';
+
 const SESSION_ID = /^instance-(.+)_\d+$/;
 
 const live = new Map<string, { instanceId: string; startedUnix: number }>();
+let hidden = false;
 let started = false;
 
 async function prefs(): Promise<Record<string, unknown>> {
@@ -63,6 +69,25 @@ async function recordExit(
   });
 }
 
+async function keepOpen(): Promise<boolean> {
+  const all = await prefs();
+  return (all[KEEP_OPEN_KEY] as boolean | undefined) ?? true;
+}
+
+async function hideWindow(): Promise<void> {
+  if (hidden) return;
+  hidden = true;
+  await getCurrentWindow().hide();
+}
+
+async function restoreWindow(): Promise<void> {
+  if (!hidden) return;
+  hidden = false;
+  const window = getCurrentWindow();
+  await window.show();
+  await window.setFocus();
+}
+
 async function onStarted(payload: Record<string, unknown>): Promise<void> {
   const match = SESSION_ID.exec(String(payload.id ?? ''));
   if (!match) return;
@@ -72,6 +97,7 @@ async function onStarted(payload: Record<string, unknown>): Promise<void> {
     startedUnix: Math.floor(Date.now() / 1000),
   });
   await recordStart(instanceId);
+  if (!(await keepOpen())) await hideWindow();
 }
 
 async function onExit(payload: Record<string, unknown>): Promise<void> {
@@ -79,6 +105,7 @@ async function onExit(payload: Record<string, unknown>): Promise<void> {
   if (!session) return;
   live.delete(String(payload.id));
   await recordExit(session.instanceId, session.startedUnix);
+  if (live.size === 0) await restoreWindow();
 }
 
 /** Adopt sessions already running when the window opens: the supervisor
