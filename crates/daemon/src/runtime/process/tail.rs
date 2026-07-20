@@ -19,6 +19,14 @@ use crate::runtime::event_hub::EventHub;
 const POLL: Duration = Duration::from_millis(250);
 const CHUNK: usize = 64 * 1024;
 
+/// Cap on lines per `process.output` event. A pass coalesces every line it read
+/// into one event (below), but a large initial backlog — the first tail of a
+/// long file — would otherwise become one unbounded event: a single giant
+/// deserialize + render spike on a subscriber. Splitting the outlier into a few
+/// bounded events keeps the steady-state one-event-per-pass while never handing
+/// a subscriber more than this many lines at once.
+const MAX_LINES_PER_EVENT: usize = 500;
+
 pub struct Tailer {
     done: Arc<AtomicBool>,
     wake: Arc<Notify>,
@@ -55,13 +63,18 @@ async fn run(
         let finishing = done.load(Ordering::SeqCst);
         // Coalesce every line read this pass into one event: a chatty startup
         // log would otherwise emit thousands of per-line events and saturate a
-        // subscriber's main thread (the desktop re-renders per event).
+        // subscriber's main thread (the desktop re-renders per event). The
+        // batch is capped at MAX_LINES_PER_EVENT so an initial backlog degrades
+        // to a few bounded events instead of one huge one.
         let mut batch = Vec::new();
         drain(&path, &mut offset, &mut pending, |line| {
             batch.push(ProcessLogLine {
                 stream: LogStream::Stdout,
                 line,
             });
+            if batch.len() >= MAX_LINES_PER_EVENT {
+                hub.publish(&output_event(&id, std::mem::take(&mut batch)));
+            }
         });
         if !batch.is_empty() {
             hub.publish(&output_event(&id, batch));
