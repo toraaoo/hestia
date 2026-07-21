@@ -54,6 +54,12 @@ pub struct InstanceInfo {
     pub loader_version: Option<String>,
     pub java_major: i32,
     pub created_unix: i64,
+    /// Unix time of the most recent launch; `None` until first played — the
+    /// signal the desktop uses to show a first-launch progress modal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_played_unix: Option<i64>,
+    /// Cumulative seconds played across every session the daemon has observed.
+    pub playtime_seconds: i64,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub sessions: Vec<ProcessInfo>,
 }
@@ -148,6 +154,11 @@ pub struct InstanceDetails {
     pub loader_version: Option<String>,
     pub java_major: i32,
     pub created_unix: i64,
+    /// Unix time of the most recent launch; `None` until first played.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_played_unix: Option<i64>,
+    /// Cumulative seconds played across every observed session.
+    pub playtime_seconds: i64,
     /// The entry root (`instances/<id>/`) — hestia's namespace.
     pub entry_dir: String,
     /// The game's working directory (`instances/<id>/data/`).

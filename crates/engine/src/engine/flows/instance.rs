@@ -62,6 +62,8 @@ impl Engine {
             loader_version: record.profile.loader_version,
             java_major: record.profile.java_major,
             created_unix: record.created_unix,
+            last_played_unix: record.last_played_unix,
+            playtime_seconds: record.playtime_seconds,
             disk_bytes: crate::usage::dir_size(&entry_dir),
             entry_dir: entry_dir.to_string_lossy().into_owned(),
             data_dir: data_dir.to_string_lossy().into_owned(),

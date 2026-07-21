@@ -155,7 +155,12 @@ async fn launch(
         restart: RestartPolicy::Never,
     };
     match processes.start(spec).await {
-        Ok(info) => Ok((info.id, info.pid)),
+        Ok(info) => {
+            if let Err(e) = engine.instances().mark_launched(instance_id) {
+                tracing::warn!(instance = %instance_id, error = %e, "failed to stamp last-played");
+            }
+            Ok((info.id, info.pid))
+        }
         Err(StartError::EmptyProgram | StartError::InvalidId) => {
             Err("invalid launch plan".to_string())
         }

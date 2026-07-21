@@ -26,7 +26,7 @@ pub use managers::{
     JavaInstallManager, ServerCreateManager, ServerUpdateManager,
 };
 pub use metrics::spawn_metrics_sampler;
-pub use process::{ProcessSupervisor, StartError};
+pub use process::{ExitObserver, ProcessSupervisor, StartError};
 pub use router::{Channels, Router, ServiceError};
 pub use scheduler::spawn_backup_scheduler;
 
@@ -53,6 +53,22 @@ pub fn instance_session_id(id: &str, seq: u32) -> String {
 /// The prefix every session key of one instance shares.
 pub fn instance_session_prefix(id: &str) -> String {
     format!("instance-{id}_")
+}
+
+/// The instance id embedded in a session key (`instance-<id>_<seq>`).
+pub fn instance_id_of_session(session_id: &str) -> Option<String> {
+    session_id
+        .strip_prefix("instance-")
+        .and_then(|rest| rest.rsplit_once('_'))
+        .map(|(id, _seq)| id.to_string())
+}
+
+fn now_unix() -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 pub fn server_info(
@@ -86,6 +102,8 @@ pub fn instance_info(
         loader_version: record.profile.loader_version,
         java_major: record.profile.java_major,
         created_unix: record.created_unix,
+        last_played_unix: record.last_played_unix,
+        playtime_seconds: record.playtime_seconds,
         sessions,
     }
 }
@@ -113,9 +131,23 @@ impl Runtime {
         let hub = Arc::new(EventHub::default());
         let java_installs = JavaInstallManager::new(engine.clone(), hub.clone());
         let downloads = DownloadManager::new(engine.clone(), hub.clone());
+        let playtime_engine = engine.clone();
+        let on_exit: ExitObserver = Arc::new(move |info: &proto::process::ProcessInfo| {
+            let Some(instance_id) = instance_id_of_session(&info.id) else {
+                return;
+            };
+            let elapsed = now_unix() - info.started_unix;
+            if let Err(e) = playtime_engine
+                .instances()
+                .add_playtime(&instance_id, elapsed)
+            {
+                tracing::warn!(instance = %instance_id, error = %e, "failed to record playtime");
+            }
+        });
         let processes = Arc::new(ProcessSupervisor::new(
             hub.clone(),
             engine.data_home().join("processes"),
+            Some(on_exit),
         ));
         let server_creates = ServerCreateManager::new(engine.clone(), hub.clone());
         let server_updates = ServerUpdateManager::new(engine.clone(), hub.clone());

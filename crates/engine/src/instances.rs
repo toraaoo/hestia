@@ -25,6 +25,12 @@ pub struct InstanceRecord {
     pub id: String,
     pub name: String,
     pub created_unix: i64,
+    /// Unix time of the most recent launch; `None` until first played.
+    #[serde(default)]
+    pub last_played_unix: Option<i64>,
+    /// Cumulative seconds played, accumulated as each session exits.
+    #[serde(default)]
+    pub playtime_seconds: i64,
     /// Per-entry JVM tuning (memory, extra flags) injected at each launch.
     #[serde(default)]
     pub jvm: JavaSettings,
@@ -82,6 +88,8 @@ impl Instances {
             id: id.clone(),
             name: name.to_string(),
             created_unix: registry::now_unix(),
+            last_played_unix: None,
+            playtime_seconds: 0,
             jvm: JavaSettings::default(),
             profile,
         };
@@ -109,6 +117,29 @@ impl Instances {
             "instance updated"
         );
         Ok(record)
+    }
+
+    /// Stamp the most-recent-launch time. Called when a session spawns, so the
+    /// next launch no longer counts as a first play.
+    pub fn mark_launched(&self, id: &str) -> Result<()> {
+        let mut record = self
+            .get(id)
+            .with_context(|| format!("unknown instance: {id}"))?;
+        record.last_played_unix = Some(registry::now_unix());
+        registry::write_record(&self.instance_dir(&record.id), RECORD, &record)
+    }
+
+    /// Add an exited session's duration to the cumulative playtime. A
+    /// non-positive duration is a no-op.
+    pub fn add_playtime(&self, id: &str, seconds: i64) -> Result<()> {
+        if seconds <= 0 {
+            return Ok(());
+        }
+        let mut record = self
+            .get(id)
+            .with_context(|| format!("unknown instance: {id}"))?;
+        record.playtime_seconds += seconds;
+        registry::write_record(&self.instance_dir(&record.id), RECORD, &record)
     }
 
     /// Read one JVM setting (`memory` / `jvm-args`); `Ok(None)` means unset. An

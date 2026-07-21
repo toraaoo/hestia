@@ -97,18 +97,23 @@ enum Watched {
     },
 }
 
+/// Notified once when a supervised process terminally exits, with its final info.
+pub type ExitObserver = Arc<dyn Fn(&ProcessInfo) + Send + Sync>;
+
 pub struct ProcessSupervisor {
     hub: Arc<EventHub>,
     dir: PathBuf,
     table: Mutex<HashMap<String, Arc<Entry>>>,
+    on_exit: Option<ExitObserver>,
 }
 
 impl ProcessSupervisor {
-    pub fn new(hub: Arc<EventHub>, dir: PathBuf) -> Self {
+    pub fn new(hub: Arc<EventHub>, dir: PathBuf, on_exit: Option<ExitObserver>) -> Self {
         ProcessSupervisor {
             hub,
             dir,
             table: Mutex::new(HashMap::new()),
+            on_exit,
         }
     }
 
@@ -176,6 +181,7 @@ impl ProcessSupervisor {
             self.hub.clone(),
             proc_dir,
             io.tail_from,
+            self.on_exit.clone(),
         ));
         Ok(snapshot)
     }
@@ -231,6 +237,7 @@ impl ProcessSupervisor {
                     self.hub.clone(),
                     proc_dir,
                     tail_from,
+                    self.on_exit.clone(),
                 ));
             } else {
                 tracing::info!(id = %record.id, pid = record.pid, "process exited while unsupervised");
@@ -448,6 +455,7 @@ async fn supervise(
     hub: Arc<EventHub>,
     proc_dir: PathBuf,
     mut tail_from: u64,
+    on_exit: Option<ExitObserver>,
 ) {
     let mut attempts = 0u32;
     loop {
@@ -492,6 +500,9 @@ async fn supervise(
             && attempts < MAX_RESTARTS;
         if !should_restart {
             records::remove(&proc_dir);
+            if let Some(observe) = &on_exit {
+                observe(&entry.snapshot());
+            }
             return;
         }
 

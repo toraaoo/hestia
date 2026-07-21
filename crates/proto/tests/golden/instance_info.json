@@ -4,5 +4,6 @@
   "flavor": "vanilla",
   "gameVersion": "1.21.1",
   "javaMajor": 21,
-  "createdUnix": 1751000000
+  "createdUnix": 1751000000,
+  "playtimeSeconds": 0
 }
