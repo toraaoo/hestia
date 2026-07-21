@@ -1,5 +1,5 @@
 import { DownloadSimpleIcon, PlusIcon } from '@phosphor-icons/react';
-import { useQueries } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -8,17 +8,7 @@ import { Empty } from '@/components/empty';
 import { Bone } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
 import { m } from '@/paraglide/messages.js';
-import {
-  instanceQueries,
-  useCaptureInstanceProfile,
-  useCreateInstanceProfile,
-  useEditInstanceProfile,
-  useInstanceProfiles,
-  useReleaseInstanceProfile,
-  useRemoveInstanceProfile,
-  useRenameInstanceProfile,
-  useUseInstanceProfile,
-} from '@/queries/instance';
+import { instanceMutations, instanceQueries } from '@/queries/instance';
 
 import { ApplyGlobalDialog } from './dialogs/apply-global';
 import { CreateProfileDialog } from './dialogs/create';
@@ -45,14 +35,14 @@ export function ProfilesPanel({
   running: boolean;
 }) {
   const id = instance.id;
-  const query = useInstanceProfiles(id);
-  const create = useCreateInstanceProfile(id);
-  const removeProfile = useRemoveInstanceProfile(id);
-  const rename = useRenameInstanceProfile(id);
-  const use = useUseInstanceProfile(id);
-  const edit = useEditInstanceProfile(id);
-  const capture = useCaptureInstanceProfile(id);
-  const release = useReleaseInstanceProfile(id);
+  const query = useQuery(instanceQueries.profiles(id));
+  const create = useMutation(instanceMutations.profiles.create(id));
+  const removeProfile = useMutation(instanceMutations.profiles.remove(id));
+  const rename = useMutation(instanceMutations.profiles.rename(id));
+  const use = useMutation(instanceMutations.profiles.use(id));
+  const edit = useMutation(instanceMutations.profiles.edit(id));
+  const capture = useMutation(instanceMutations.profiles.capture(id));
+  const release = useMutation(instanceMutations.profiles.release(id));
 
   const [creating, setCreating] = useState(false);
   const [applying, setApplying] = useState(false);

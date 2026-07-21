@@ -1,7 +1,8 @@
+import { useQuery } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import { useInstanceWorlds } from '@/queries/instance';
+import { instanceQueries } from '@/queries/instance';
 
 export function WorldsStep({
   instanceId,
@@ -12,7 +13,7 @@ export function WorldsStep({
   selected: string[];
   onToggle: (world: string, on: boolean) => void;
 }) {
-  const query = useInstanceWorlds(instanceId);
+  const query = useQuery(instanceQueries.worlds(instanceId));
   const list = query.data ?? [];
 
   if (!query.isPending && list.length === 0) {

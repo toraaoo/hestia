@@ -1,4 +1,5 @@
 import { PlusIcon, SignInIcon } from '@phosphor-icons/react';
+import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { useSearch } from '@/components/app-shell/search-context';
@@ -27,12 +28,8 @@ import { CreateEntryModal } from '@/features/entries/create';
 import { useLaunchModal } from '@/features/instances/launch-modal';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
-import { useInstances, useStopInstanceAny } from '@/queries/instance';
-import {
-  useServers,
-  useStartServerAny,
-  useStopServerAny,
-} from '@/queries/server';
+import { instanceMutations, useInstances } from '@/queries/instance';
+import { serverMutations, useServers } from '@/queries/server';
 
 const InstanceIcon = entryIcon('instance');
 const ServerIcon = entryIcon('server');
@@ -56,12 +53,12 @@ export function LibraryPage({
   const { signedIn, ready } = useAccounts();
 
   const servers = useServers();
-  const startServer = useStartServerAny();
-  const stopServer = useStopServerAny();
+  const startServer = useMutation(serverMutations.startAny());
+  const stopServer = useMutation(serverMutations.stopAny());
 
   const instances = useInstances();
   const { launch: launchInstance, isLaunching } = useLaunchModal();
-  const stopInstance = useStopInstanceAny();
+  const stopInstance = useMutation(instanceMutations.stopAny());
 
   const [newKind, setNewKind] = useState<'server' | 'instance'>('instance');
   const [creating, setCreating] = useState(false);

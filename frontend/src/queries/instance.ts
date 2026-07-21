@@ -5,7 +5,7 @@
  * plain (long) calls, not jobs; `launch` is the job that materialises files
  * and spawns the game.
  */
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import type {
   ConfigEntry,
   ContentDone,
@@ -18,10 +18,10 @@ import type {
   ResolveParams,
 } from '../api';
 import * as api from '../api/instance';
-import { CATALOG_STALE_MS, mutation, type QueryFlags } from './core';
+import { CATALOG_STALE_MS, mutation } from './core';
 import { entryContentFactories } from './entry-content';
 import { useEntryIconLookup } from './icons';
-import { jobMutation, useJobMutation } from './jobs';
+import { jobMutation } from './jobs';
 import { keys } from './keys';
 import { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
 
@@ -285,19 +285,6 @@ export function useInstances() {
   });
 }
 
-/** The instance's static, informational view (locations + disk footprint). */
-export function useInstanceInfo(id: string) {
-  return useQuery(instanceQueries.info(id));
-}
-
-export function useLaunchInstanceAny() {
-  return useJobMutation(instanceMutations.launchAny());
-}
-
-export function useStopInstanceAny() {
-  return useMutation(instanceMutations.stopAny());
-}
-
 /** One instance, selected out of the list query (there is no status channel). */
 export function useInstance(id: string) {
   const iconFor = useEntryIconLookup();
@@ -308,39 +295,6 @@ export function useInstance(id: string) {
       return instance ? { ...instance, iconUrl: iconFor(instance.id) } : null;
     },
   });
-}
-
-export function useInstanceFlavors({ enabled = true }: QueryFlags = {}) {
-  return useQuery({ ...instanceQueries.flavors(), enabled });
-}
-
-export function useInstanceVersions(
-  flavor: string,
-  { enabled = true }: QueryFlags = {},
-) {
-  return useQuery({ ...instanceQueries.versions(flavor), enabled });
-}
-
-export function useInstanceLoaders(
-  flavor: string,
-  version: string,
-  { enabled = true }: QueryFlags = {},
-) {
-  return useQuery({
-    ...instanceQueries.loaders(flavor, version),
-    enabled: enabled && flavor !== '' && version !== '',
-  });
-}
-
-export function useInstanceProfile(params: ResolveParams) {
-  return useQuery(instanceQueries.profile(params));
-}
-
-export function useInstanceWorlds(
-  id: string,
-  { enabled = true }: QueryFlags = {},
-) {
-  return useQuery({ ...instanceQueries.worlds(id), enabled });
 }
 
 /** Follows the named session, or every session of the instance. */
@@ -366,109 +320,4 @@ export function useInstanceLogs(
       : null,
     options.limit,
   );
-}
-
-export function useInstanceConfig(id: string) {
-  return useQuery(instanceQueries.config(id));
-}
-
-export function useInstanceConfigValue(id: string, key: string) {
-  return useQuery(instanceQueries.configValue(id, key));
-}
-
-export function useInstanceContent(
-  id: string,
-  kind: ContentKind,
-  { enabled = true }: QueryFlags = {},
-) {
-  return useQuery({ ...instanceQueries.content(id, kind), enabled });
-}
-
-/** Update availability — disabled until `refetch()` is called (network per item). */
-export function useInstanceContentUpdates(id: string, kind: ContentKind) {
-  return useQuery(instanceQueries.contentUpdates(id, kind));
-}
-
-export function useCreateInstance() {
-  return useMutation(instanceMutations.create());
-}
-
-export function useUpdateInstance(id: string) {
-  return useMutation(instanceMutations.update(id));
-}
-
-export function useRenameInstance(id: string) {
-  return useMutation(instanceMutations.rename(id));
-}
-
-export function useRemoveInstance(id: string) {
-  return useMutation(instanceMutations.remove(id));
-}
-
-export function useStopInstance(id: string) {
-  return useMutation(instanceMutations.stop(id));
-}
-
-export function useSetInstanceConfig(id: string) {
-  return useMutation(instanceMutations.setConfig(id));
-}
-
-export function useInstanceProfiles(id: string) {
-  return useQuery(instanceQueries.profiles(id));
-}
-
-export function useCreateInstanceProfile(id: string) {
-  return useMutation(instanceMutations.profiles.create(id));
-}
-
-export function useRemoveInstanceProfile(id: string) {
-  return useMutation(instanceMutations.profiles.remove(id));
-}
-
-export function useRenameInstanceProfile(id: string) {
-  return useMutation(instanceMutations.profiles.rename(id));
-}
-
-/** Sets the active profile (empty clears it); applied at the next launch. */
-export function useUseInstanceProfile(id: string) {
-  return useMutation(instanceMutations.profiles.use(id));
-}
-
-export function useEditInstanceProfile(id: string) {
-  return useMutation(instanceMutations.profiles.edit(id));
-}
-
-/** Capture the profile's settings store; the instance must be stopped. */
-export function useCaptureInstanceProfile(id: string) {
-  return useMutation(instanceMutations.profiles.capture(id));
-}
-
-/** Release the captured store; the instance must be stopped. */
-export function useReleaseInstanceProfile(id: string) {
-  return useMutation(instanceMutations.profiles.release(id));
-}
-
-/** Apply a global profile into the instance's pool (a content job). */
-export function useApplyInstanceProfile(id: string) {
-  return useJobMutation(instanceMutations.profiles.apply(id));
-}
-
-export function useAddInstanceContent(id: string) {
-  return useJobMutation(instanceMutations.content.add(id));
-}
-
-export function useRemoveInstanceContent(id: string) {
-  return useMutation(instanceMutations.content.remove(id));
-}
-
-export function useUpdateInstanceContent(id: string) {
-  return useJobMutation(instanceMutations.content.update(id));
-}
-
-export function useEnableInstanceContent(id: string) {
-  return useMutation(instanceMutations.content.enable(id));
-}
-
-export function useSetInstanceContentVersion(id: string) {
-  return useJobMutation(instanceMutations.content.setVersion(id));
 }

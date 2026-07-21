@@ -1,7 +1,6 @@
 import { StackIcon } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-
 import { Empty } from '@/components/empty';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +18,8 @@ import {
 } from '@/components/ui/progress';
 import { PickRow } from '@/features/content/components/pick-row';
 import { m } from '@/paraglide/messages.js';
-import { useApplyInstanceProfile } from '@/queries/instance';
+import { instanceMutations } from '@/queries/instance';
+import { useJobMutation } from '@/queries/jobs';
 import { useGlobalProfiles } from '@/queries/profile';
 
 export function ApplyGlobalDialog({
@@ -34,7 +34,7 @@ export function ApplyGlobalDialog({
   version: string;
 }) {
   const globals = useGlobalProfiles();
-  const apply = useApplyInstanceProfile(instanceId);
+  const apply = useJobMutation(instanceMutations.profiles.apply(instanceId));
   const [picked, setPicked] = useState<string | null>(null);
 
   const list = globals.data ?? [];

@@ -20,9 +20,10 @@ import {
 } from '@/components/ui/progress';
 import { projectRef } from '@/features/content/components/content-card';
 import { m } from '@/paraglide/messages.js';
-import { useAddInstanceContent } from '@/queries/instance';
+import { instanceMutations } from '@/queries/instance';
+import { useJobMutation } from '@/queries/jobs';
 import { useEditGlobalProfile } from '@/queries/profile';
-import { useAddServerContent } from '@/queries/server';
+import { serverMutations } from '@/queries/server';
 
 import { ContentStep } from './steps/content';
 import { ReviewStep } from './steps/review';
@@ -70,8 +71,8 @@ export function ContentInstallModal({
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState('');
 
-  const addServer = useAddServerContent(targetId);
-  const addInstance = useAddInstanceContent(targetId);
+  const addServer = useJobMutation(serverMutations.content.add(targetId));
+  const addInstance = useJobMutation(instanceMutations.content.add(targetId));
   const editProfile = useEditGlobalProfile();
 
   // Reset when (re)opened, keeping whichever side the caller fixed.

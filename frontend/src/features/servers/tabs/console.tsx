@@ -1,3 +1,4 @@
+import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { Empty } from '@/components/empty';
@@ -9,7 +10,7 @@ import {
   pushConsoleEntry,
   useConsoleHistory,
 } from '@/queries/console';
-import { useServerCommand, useServerLogs } from '@/queries/server';
+import { serverMutations, useServerLogs } from '@/queries/server';
 
 export function ServerConsoleTab({
   id,
@@ -21,7 +22,7 @@ export function ServerConsoleTab({
   name: string;
 }) {
   const logs = useServerLogs(id, { follow: running, tail: 500 });
-  const command = useServerCommand(id);
+  const command = useMutation(serverMutations.command(id));
   const [line, setLine] = useState('');
   const entries = useConsoleHistory(id);
 

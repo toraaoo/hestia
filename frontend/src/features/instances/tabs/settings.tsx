@@ -1,4 +1,5 @@
 import { ArrowsClockwiseIcon, TrashIcon } from '@phosphor-icons/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -31,13 +32,7 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
-import {
-  useInstanceVersions,
-  useRemoveInstance,
-  useRenameInstance,
-  useSetInstanceConfig,
-  useUpdateInstance,
-} from '@/queries/instance';
+import { instanceMutations, instanceQueries } from '@/queries/instance';
 
 function configValue(config: ConfigEntry[] | undefined, key: string): string {
   return config?.find((e) => e.key === key)?.value ?? '';
@@ -53,9 +48,9 @@ export function InstanceSettingsTab({
   running: boolean;
 }) {
   const navigate = useNavigate();
-  const rename = useRenameInstance(instance.id);
-  const setConfig = useSetInstanceConfig(instance.id);
-  const remove = useRemoveInstance(instance.id);
+  const rename = useMutation(instanceMutations.rename(instance.id));
+  const setConfig = useMutation(instanceMutations.setConfig(instance.id));
+  const remove = useMutation(instanceMutations.remove(instance.id));
 
   const [name, setName] = useState(instance.name);
   const [memory, setMemory] = useState(4);
@@ -214,8 +209,8 @@ function ChangeVersionDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const versions = useInstanceVersions(instance.flavor);
-  const update = useUpdateInstance(instance.id);
+  const versions = useQuery(instanceQueries.versions(instance.flavor));
+  const update = useMutation(instanceMutations.update(instance.id));
   const [version, setVersion] = useState('');
   const [downgrade, setDowngrade] = useState(false);
 

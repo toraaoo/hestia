@@ -1,4 +1,5 @@
 import { PlusIcon } from '@phosphor-icons/react';
+import { useMutation } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
@@ -16,11 +17,7 @@ import type { EntryCardModel } from '@/features/entries/components/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/components/skeleton';
 import { CreateEntryModal } from '@/features/entries/create';
 import { m } from '@/paraglide/messages.js';
-import {
-  useServers,
-  useStartServerAny,
-  useStopServerAny,
-} from '@/queries/server';
+import { serverMutations, useServers } from '@/queries/server';
 
 export function ServersPage({
   view,
@@ -35,8 +32,8 @@ export function ServersPage({
 }) {
   const { query } = useSearch();
   const servers = useServers();
-  const start = useStartServerAny();
-  const stop = useStopServerAny();
+  const start = useMutation(serverMutations.startAny());
+  const stop = useMutation(serverMutations.stopAny());
   const [creating, setCreating] = useState(false);
 
   const busyId =

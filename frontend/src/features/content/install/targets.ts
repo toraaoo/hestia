@@ -1,5 +1,5 @@
+import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-
 import type {
   ContentKind,
   GlobalProfile,
@@ -7,9 +7,9 @@ import type {
   ServerInfo,
 } from '@/api';
 import { m } from '@/paraglide/messages.js';
-import { useInstanceContent, useInstances } from '@/queries/instance';
+import { instanceQueries, useInstances } from '@/queries/instance';
 import { useGlobalProfiles } from '@/queries/profile';
-import { useServerContent, useServers } from '@/queries/server';
+import { serverQueries, useServers } from '@/queries/server';
 
 /** An entry the content can be installed into, drawn from every store. */
 export interface Target {
@@ -104,10 +104,12 @@ export function useInstalledRefs(
   target: Target,
   kind: ContentKind,
 ): Set<string> {
-  const server = useServerContent(target.id, kind, {
+  const server = useQuery({
+    ...serverQueries.content(target.id, kind),
     enabled: target.type === 'server',
   });
-  const instance = useInstanceContent(target.id, kind, {
+  const instance = useQuery({
+    ...instanceQueries.content(target.id, kind),
     enabled: target.type === 'instance',
   });
   const items = (target.type === 'server' ? server : instance).data?.items;

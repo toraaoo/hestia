@@ -1,4 +1,5 @@
 import { ArrowsClockwiseIcon, TrashIcon } from '@phosphor-icons/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -31,13 +32,8 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
-import {
-  useRemoveServer,
-  useRenameServer,
-  useServerVersions,
-  useSetServerConfig,
-  useUpdateServer,
-} from '@/queries/server';
+import { useJobMutation } from '@/queries/jobs';
+import { serverMutations, serverQueries } from '@/queries/server';
 
 const INTERVALS = ['off', '6h', '12h', '1d'];
 
@@ -55,9 +51,9 @@ export function ServerSettingsTab({
   running: boolean;
 }) {
   const navigate = useNavigate();
-  const rename = useRenameServer(server.id);
-  const setConfig = useSetServerConfig(server.id);
-  const remove = useRemoveServer(server.id);
+  const rename = useMutation(serverMutations.rename(server.id));
+  const setConfig = useMutation(serverMutations.setConfig(server.id));
+  const remove = useMutation(serverMutations.remove(server.id));
 
   const [name, setName] = useState(server.name);
   const [memory, setMemory] = useState(4);
@@ -265,8 +261,8 @@ function ChangeVersionDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const versions = useServerVersions(server.flavor);
-  const update = useUpdateServer(server.id);
+  const versions = useQuery(serverQueries.versions(server.flavor));
+  const update = useJobMutation(serverMutations.update(server.id));
   const [version, setVersion] = useState('');
   const [downgrade, setDowngrade] = useState(false);
 

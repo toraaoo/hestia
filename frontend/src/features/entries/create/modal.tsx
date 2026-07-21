@@ -1,5 +1,6 @@
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -25,9 +26,9 @@ import {
 } from '@/features/entries/lib/schema';
 import { useAppForm } from '@/hooks/form';
 import { m } from '@/paraglide/messages.js';
-import { useCreateInstance, useInstanceFlavors } from '@/queries/instance';
-import { backgroundJob, foregroundJob } from '@/queries/jobs';
-import { useCreateServer, useServerFlavors } from '@/queries/server';
+import { instanceMutations, instanceQueries } from '@/queries/instance';
+import { backgroundJob, foregroundJob, useJobMutation } from '@/queries/jobs';
+import { serverMutations, serverQueries } from '@/queries/server';
 
 import {
   FlavorOption,
@@ -60,16 +61,22 @@ export function CreateEntryModal({
   const [search, setSearch] = useState('');
   const [showSnapshots, setShowSnapshots] = useState(false);
 
-  const serverFlavors = useServerFlavors({ enabled: kind === 'server' });
-  const instanceFlavors = useInstanceFlavors({ enabled: kind === 'instance' });
+  const serverFlavors = useQuery({
+    ...serverQueries.flavors(),
+    enabled: kind === 'server',
+  });
+  const instanceFlavors = useQuery({
+    ...instanceQueries.flavors(),
+    enabled: kind === 'instance',
+  });
   const flavorsQuery = kind === 'server' ? serverFlavors : instanceFlavors;
   const flavors: Flavor[] = useMemo(
     () => flavorsQuery.data ?? [],
     [flavorsQuery.data],
   );
 
-  const createServer = useCreateServer();
-  const createInstance = useCreateInstance();
+  const createServer = useJobMutation(serverMutations.create());
+  const createInstance = useMutation(instanceMutations.create());
   const creating = createServer.isPending || createInstance.isPending;
   const progress = createServer.progress;
   const job = createServer.job;

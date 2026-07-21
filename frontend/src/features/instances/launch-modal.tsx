@@ -10,8 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import { ProvisionProgressView } from '@/features/entries/components/provision-progress';
 import { m } from '@/paraglide/messages.js';
-import { useLaunchInstanceAny } from '@/queries/instance';
-import { backgroundJob, foregroundJob } from '@/queries/jobs';
+import { instanceMutations } from '@/queries/instance';
+import { backgroundJob, foregroundJob, useJobMutation } from '@/queries/jobs';
 
 interface LaunchModal {
   launch: (instance: InstanceInfo) => void;
@@ -39,7 +39,7 @@ export function LaunchModalProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const mutation = useLaunchInstanceAny();
+  const mutation = useJobMutation(instanceMutations.launchAny());
   const [target, setTarget] = useState<{ id: string; name: string } | null>(
     null,
   );

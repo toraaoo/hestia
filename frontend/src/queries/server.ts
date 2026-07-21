@@ -4,12 +4,7 @@
  * too, but keying by id means a rename never strands a cache entry or a
  * mutation key.
  */
-import {
-  queryOptions,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   BackupInfo,
   ConfigEntry,
@@ -20,10 +15,10 @@ import type {
   ServerUpdateParams,
 } from '../api';
 import * as api from '../api/server';
-import { CATALOG_STALE_MS, mutation, type QueryFlags } from './core';
+import { CATALOG_STALE_MS, mutation } from './core';
 import { entryContentFactories } from './entry-content';
 import { useEntryIconLookup } from './icons';
-import { jobMutation, useJobMutation } from './jobs';
+import { jobMutation } from './jobs';
 import { keys } from './keys';
 import { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
 
@@ -52,6 +47,9 @@ export const serverQueries = {
       queryKey: keys.servers.ping(id),
       queryFn: () => api.ping(id),
       meta: { silent: true },
+      // Live players/MOTD while enabled; the caller gates on `running`.
+      refetchInterval: 5000,
+      retry: false,
     }),
   flavors: () =>
     queryOptions({
@@ -272,49 +270,11 @@ export function useServer(id: string) {
 }
 
 /**
- * The server's informational view (locations + footprint) — a directory walk,
- * on its own cadence.
+ * Live logs — a fetched tail plus streamed output. Kept as a hook because it
+ * composes the follow matcher; every other read/write is consumed directly
+ * through `serverQueries`/`serverMutations` (with `useQuery`/`useMutation`/
+ * `useJobMutation`, spreading `{ enabled }` at the call site when gated).
  */
-export function useServerInfo(id: string) {
-  return useQuery(serverQueries.info(id));
-}
-
-/** A running server's live ping (players/MOTD); polls while `enabled`. */
-export function useServerPing(id: string, enabled: boolean) {
-  return useQuery({
-    ...serverQueries.ping(id),
-    enabled,
-    refetchInterval: enabled ? 5000 : false,
-    retry: false,
-  });
-}
-
-export function useServerFlavors({ enabled = true }: QueryFlags = {}) {
-  return useQuery({ ...serverQueries.flavors(), enabled });
-}
-
-export function useServerVersions(
-  flavor: string,
-  { enabled = true }: QueryFlags = {},
-) {
-  return useQuery({ ...serverQueries.versions(flavor), enabled });
-}
-
-export function useServerLoaders(
-  flavor: string,
-  version: string,
-  { enabled = true }: QueryFlags = {},
-) {
-  return useQuery({
-    ...serverQueries.loaders(flavor, version),
-    enabled: enabled && flavor !== '' && version !== '',
-  });
-}
-
-export function useServerProfile(params: ResolveParams) {
-  return useQuery(serverQueries.profile(params));
-}
-
 export function useServerLogs(
   id: string,
   options: LogsOptions = {},
@@ -328,101 +288,4 @@ export function useServerLogs(
     options.follow ? (processId) => processId === `server-${id}` : null,
     options.limit,
   );
-}
-
-export function useServerConfig(id: string) {
-  return useQuery(serverQueries.config(id));
-}
-
-export function useServerConfigValue(id: string, key: string) {
-  return useQuery(serverQueries.configValue(id, key));
-}
-
-export function useServerBackups(id: string) {
-  return useQuery(serverQueries.backups(id));
-}
-
-export function useServerContent(
-  id: string,
-  kind: ContentKind,
-  { enabled = true }: QueryFlags = {},
-) {
-  return useQuery({ ...serverQueries.content(id, kind), enabled });
-}
-
-/** Update availability — disabled until `refetch()` is called (network per item). */
-export function useServerContentUpdates(id: string, kind: ContentKind) {
-  return useQuery(serverQueries.contentUpdates(id, kind));
-}
-
-export function useCreateServer() {
-  return useJobMutation(serverMutations.create());
-}
-
-export function useUpdateServer(id: string) {
-  return useJobMutation(serverMutations.update(id));
-}
-
-export function useRenameServer(id: string) {
-  return useMutation(serverMutations.rename(id));
-}
-
-export function useRemoveServer(id: string) {
-  return useMutation(serverMutations.remove(id));
-}
-
-export function useStartServer(id: string) {
-  return useMutation(serverMutations.start(id));
-}
-
-export function useStopServer(id: string) {
-  return useMutation(serverMutations.stop(id));
-}
-
-export function useStartServerAny() {
-  return useMutation(serverMutations.startAny());
-}
-
-export function useStopServerAny() {
-  return useMutation(serverMutations.stopAny());
-}
-
-export function useServerCommand(id: string) {
-  return useMutation(serverMutations.command(id));
-}
-
-export function useSetServerConfig(id: string) {
-  return useMutation(serverMutations.setConfig(id));
-}
-
-export function useCreateServerBackup(id: string) {
-  return useJobMutation(serverMutations.backup.create(id));
-}
-
-export function useRestoreServerBackup(id: string) {
-  return useJobMutation(serverMutations.backup.restore(id));
-}
-
-export function useRemoveServerBackup(id: string) {
-  return useMutation(serverMutations.backup.remove(id));
-}
-
-export function useAddServerContent(id: string) {
-  return useJobMutation(serverMutations.content.add(id));
-}
-
-export function useRemoveServerContent(id: string) {
-  return useMutation(serverMutations.content.remove(id));
-}
-
-export function useUpdateServerContent(id: string) {
-  return useJobMutation(serverMutations.content.update(id));
-}
-
-export function useEnableServerContent(id: string) {
-  return useMutation(serverMutations.content.enable(id));
-}
-
-export function useSetServerContentVersion(id: string) {
-  return useJobMutation(serverMutations.content.setVersion(id));
 }

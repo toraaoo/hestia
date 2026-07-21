@@ -1,4 +1,5 @@
 import { PlusIcon } from '@phosphor-icons/react';
+import { useMutation } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
@@ -19,7 +20,7 @@ import { CreateEntryModal } from '@/features/entries/create';
 import { useLaunchModal } from '@/features/instances/launch-modal';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
-import { useInstances, useStopInstanceAny } from '@/queries/instance';
+import { instanceMutations, useInstances } from '@/queries/instance';
 
 export function InstancesPage({
   view,
@@ -36,7 +37,7 @@ export function InstancesPage({
   const { signedIn, ready } = useAccounts();
   const instances = useInstances();
   const { launch, isLaunching } = useLaunchModal();
-  const stop = useStopInstanceAny();
+  const stop = useMutation(instanceMutations.stopAny());
   const [creating, setCreating] = useState(false);
 
   const cards: EntryCardModel[] = useMemo(

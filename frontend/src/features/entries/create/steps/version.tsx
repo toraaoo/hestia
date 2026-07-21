@@ -1,12 +1,12 @@
+import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
-
 import type { GameVersion } from '@/api';
 import { SearchInput } from '@/components/search-input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FieldError } from '@/components/ui/field';
 import { m } from '@/paraglide/messages.js';
-import { useInstanceLoaders, useInstanceVersions } from '@/queries/instance';
-import { useServerLoaders, useServerVersions } from '@/queries/server';
+import { instanceQueries } from '@/queries/instance';
+import { serverQueries } from '@/queries/server';
 
 import { type Kind, VersionRow, type WizardForm } from '../fields';
 
@@ -30,20 +30,25 @@ export function VersionStep({
 }) {
   const selected = form.state.values.version.version as string;
 
-  const serverVersions = useServerVersions(flavor, {
+  const serverVersions = useQuery({
+    ...serverQueries.versions(flavor),
     enabled: kind === 'server',
   });
-  const instanceVersions = useInstanceVersions(flavor, {
+  const instanceVersions = useQuery({
+    ...instanceQueries.versions(flavor),
     enabled: kind === 'instance',
   });
   const versionsQuery = kind === 'server' ? serverVersions : instanceVersions;
   const versions: GameVersion[] = versionsQuery.data ?? [];
 
-  const serverLoaders = useServerLoaders(flavor, selected, {
-    enabled: kind === 'server',
+  // Loaders resolve only once a version is chosen, so gate on both.
+  const serverLoaders = useQuery({
+    ...serverQueries.loaders(flavor, selected),
+    enabled: kind === 'server' && flavor !== '' && selected !== '',
   });
-  const instanceLoaders = useInstanceLoaders(flavor, selected, {
-    enabled: kind === 'instance',
+  const instanceLoaders = useQuery({
+    ...instanceQueries.loaders(flavor, selected),
+    enabled: kind === 'instance' && flavor !== '' && selected !== '',
   });
   const loadersQuery = kind === 'server' ? serverLoaders : instanceLoaders;
   const loaders = loadersQuery.data;

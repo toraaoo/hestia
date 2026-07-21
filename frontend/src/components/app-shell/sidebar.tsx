@@ -12,6 +12,7 @@ import {
   StorefrontIcon,
   TShirtIcon,
 } from '@phosphor-icons/react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccountAvatar } from '@/components/app-shell/account-avatar';
@@ -33,7 +34,7 @@ import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries/accounts';
 import { useInstances } from '@/queries/instance';
 import { type PinnedEntry, pinKey, usePinned } from '@/queries/pinned';
-import { useServerPing, useServers } from '@/queries/server';
+import { serverQueries, useServers } from '@/queries/server';
 
 type ResolvedPin = PinnedEntry & {
   name: string;
@@ -428,7 +429,7 @@ function PinnedLinkContent({
 
 /** Server List Ping players, polled only while the pin is mounted running. */
 function ServerPinPlayers({ id }: { id: string }) {
-  const ping = useServerPing(id, true);
+  const ping = useQuery(serverQueries.ping(id));
   if (!ping.data) return null;
   return (
     <span className="font-mono text-[10px]" title={m['label.players']()}>

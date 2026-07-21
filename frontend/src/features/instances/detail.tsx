@@ -7,7 +7,7 @@ import {
   PowerIcon,
   UploadSimpleIcon,
 } from '@phosphor-icons/react';
-import { useQueries } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type { ContentKind } from '@/api';
@@ -40,13 +40,9 @@ import { ProfilesPanel } from '@/features/profiles/panel';
 import { agoLabel, bytes, memGb, uptime } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import {
+  instanceMutations,
   instanceQueries,
   useInstance,
-  useInstanceConfig,
-  useInstanceInfo,
-  useInstanceProfiles,
-  useInstanceWorlds,
-  useStopInstance,
 } from '@/queries/instance';
 import { useProcessMetrics } from '@/queries/metrics';
 
@@ -84,13 +80,13 @@ export function InstanceDetailPage({
   onContentKindChange: (kind?: ContentKind) => void;
 }) {
   const query = useInstance(id);
-  const info = useInstanceInfo(id);
-  const config = useInstanceConfig(id);
-  const worlds = useInstanceWorlds(id);
-  const profiles = useInstanceProfiles(id);
+  const info = useQuery(instanceQueries.info(id));
+  const config = useQuery(instanceQueries.config(id));
+  const worlds = useQuery(instanceQueries.worlds(id));
+  const profiles = useQuery(instanceQueries.profiles(id));
   const [addingContent, setAddingContent] = useState(false);
   const { launch, isLaunching } = useLaunchModal();
-  const stop = useStopInstance(id);
+  const stop = useMutation(instanceMutations.stop(id));
   // Shared with the content tab's own per-kind queries (cached), just for the
   // headline count.
   const contentLists = useQueries({

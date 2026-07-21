@@ -1,4 +1,5 @@
 import { CaretUpDownIcon, PlayIcon, PowerIcon } from '@phosphor-icons/react';
+import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
@@ -20,7 +21,7 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { useLaunchModal } from '@/features/instances/launch-modal';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
-import { useInstances, useStopInstanceAny } from '@/queries/instance';
+import { instanceMutations, useInstances } from '@/queries/instance';
 
 function isRunning(instance: InstanceInfo): boolean {
   return (instance.sessions ?? []).some((s) => s.state === 'running');
@@ -35,7 +36,7 @@ export function PlayBar() {
   const { signedIn } = useAccounts();
   const instances = useInstances();
   const { launch, isLaunching } = useLaunchModal();
-  const stop = useStopInstanceAny();
+  const stop = useMutation(instanceMutations.stopAny());
 
   const list = instances.data ?? [];
   const [selId, setSelId] = useState<string | null>(null);

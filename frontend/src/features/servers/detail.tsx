@@ -4,6 +4,7 @@ import {
   PlusIcon,
   PowerIcon,
 } from '@phosphor-icons/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ContentKind } from '@/api';
@@ -31,14 +32,7 @@ import { ServerSettingsTab } from '@/features/servers/tabs/settings';
 import { agoLabel, bytes, memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { useProcessMetrics } from '@/queries/metrics';
-import {
-  useServer,
-  useServerConfig,
-  useServerInfo,
-  useServerPing,
-  useStartServer,
-  useStopServer,
-} from '@/queries/server';
+import { serverMutations, serverQueries, useServer } from '@/queries/server';
 
 export type ServerTab =
   | 'overview'
@@ -68,15 +62,15 @@ export function ServerDetailPage({
   onContentKindChange: (kind?: ContentKind) => void;
 }) {
   const query = useServer(id);
-  const info = useServerInfo(id);
-  const config = useServerConfig(id);
+  const info = useQuery(serverQueries.info(id));
+  const config = useQuery(serverQueries.config(id));
   const [addingContent, setAddingContent] = useState(false);
-  const start = useStartServer(id);
-  const stop = useStopServer(id);
+  const start = useMutation(serverMutations.start(id));
+  const stop = useMutation(serverMutations.stop(id));
 
   const server = query.data;
   const running = server ? isRunning(server) : false;
-  const ping = useServerPing(id, running);
+  const ping = useQuery({ ...serverQueries.ping(id), enabled: running });
   const metrics = useProcessMetrics(server?.process?.id ?? null);
 
   const memoryLimitGb = useMemo(() => {

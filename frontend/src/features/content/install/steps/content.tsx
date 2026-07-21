@@ -1,4 +1,5 @@
 import { UploadSimpleIcon } from '@phosphor-icons/react';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { type ContentKind, type ContentProject, dialog } from '@/api';
@@ -9,7 +10,7 @@ import { PickRow } from '@/features/content/components/pick-row';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
 import { useContentSearch } from '@/queries/content';
-import { useInstanceWorlds } from '@/queries/instance';
+import { instanceQueries } from '@/queries/instance';
 
 import { FilterBar } from '../filter-bar';
 import {
@@ -37,7 +38,8 @@ export function ContentStep({
   const [search, setSearch] = useState('');
   const kinds = ACCEPTS[target.type].filter((k) => targetTakesKind(target, k));
   // Datapacks land inside a world; an instance with none can take none.
-  const worlds = useInstanceWorlds(target.id, {
+  const worlds = useQuery({
+    ...instanceQueries.worlds(target.id),
     enabled: target.type === 'instance',
   });
   const noWorlds = target.type === 'instance' && worlds.data?.length === 0;

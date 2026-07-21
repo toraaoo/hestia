@@ -1,4 +1,5 @@
 import { PlusIcon, TrashIcon } from '@phosphor-icons/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import type { BackupInfo, BackupKind, ConfigEntry } from '@/api';
@@ -8,12 +9,8 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { agoLabel, bytes } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
-import {
-  useCreateServerBackup,
-  useRemoveServerBackup,
-  useRestoreServerBackup,
-  useServerBackups,
-} from '@/queries/server';
+import { useJobMutation } from '@/queries/jobs';
+import { serverMutations, serverQueries } from '@/queries/server';
 
 function kindLabel(kind: BackupKind): string {
   switch (kind) {
@@ -35,10 +32,10 @@ export function ServerBackupsTab({
   running: boolean;
   config?: ConfigEntry[];
 }) {
-  const backups = useServerBackups(id);
-  const create = useCreateServerBackup(id);
-  const restore = useRestoreServerBackup(id);
-  const remove = useRemoveServerBackup(id);
+  const backups = useQuery(serverQueries.backups(id));
+  const create = useJobMutation(serverMutations.backup.create(id));
+  const restore = useJobMutation(serverMutations.backup.restore(id));
+  const remove = useMutation(serverMutations.backup.remove(id));
 
   const interval = config?.find((e) => e.key === 'backup-interval')?.value;
   const retention = config?.find((e) => e.key === 'backup-retention')?.value;
