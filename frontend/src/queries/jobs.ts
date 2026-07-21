@@ -200,14 +200,17 @@ export interface JobSpec<TData, TVariables, TProgress> {
 }
 
 /**
- * `UseMutationOptions` that also carry the job descriptor, so plain
- * `useMutation` works (global tracking only) and `useJobMutation` can
- * additionally follow the run it starts.
+ * `UseMutationOptions` carrying the job descriptor but **no** `mutationFn`:
+ * `useJobMutation` is the single owner of the `startJob` call, so there is
+ * exactly one path that starts a job. These options are not meant for plain
+ * `useMutation` — that would have no `mutationFn` to run.
  */
-export type JobMutationOptions<TData, TVariables, TProgress> =
-  UseMutationOptions<TData, HestiaError, TVariables> & {
-    job: Pick<JobSpec<TData, TVariables, TProgress>, 'meta' | 'run'>;
-  };
+export type JobMutationOptions<TData, TVariables, TProgress> = Omit<
+  UseMutationOptions<TData, HestiaError, TVariables>,
+  'mutationFn'
+> & {
+  job: Pick<JobSpec<TData, TVariables, TProgress>, 'meta' | 'run'>;
+};
 
 export function jobMutation<
   TData,
@@ -219,10 +222,6 @@ export function jobMutation<
   return {
     mutationKey: spec.mutationKey,
     job: { meta: spec.meta, run: spec.run },
-    mutationFn: (variables) =>
-      startJob(spec.meta(variables), (onProgress: (p: TProgress) => void) =>
-        spec.run(variables, onProgress),
-      ).result,
     onSettled: (_data, _error, variables) => {
       for (const key of spec.invalidates?.(variables) ?? []) invalidate(key);
     },
@@ -239,11 +238,19 @@ export type JobMutationResult<TData, TVariables, TProgress> = UseMutationResult<
   progress: TProgress | null;
 };
 
-/** `useMutation` plus live progress for the job this call site starts. */
+/**
+ * `useMutation` plus live progress for the job(s) this call site starts.
+ *
+ * A hook instance can fire more than once; the exposed `job` follows the
+ * newest run that is still running (falling back to the most recent), so a
+ * second trigger never freezes the first run's progress while it is live.
+ * Every run is tracked in the global store regardless, so concurrent jobs are
+ * never lost — a fan-out surface reads them through `useEntryJobs`.
+ */
 export function useJobMutation<TData, TVariables, TProgress>(
   options: JobMutationOptions<TData, TVariables, TProgress>,
 ): JobMutationResult<TData, TVariables, TProgress> {
-  const [jobRef, setJobRef] = useState<string | null>(null);
+  const [startedIds, setStartedIds] = useState<string[]>([]);
   const mutation = useMutation<TData, HestiaError, TVariables>({
     ...options,
     mutationFn: (variables) => {
@@ -251,10 +258,19 @@ export function useJobMutation<TData, TVariables, TProgress>(
         options.job.meta(variables),
         (onProgress) => options.job.run(variables, onProgress),
       );
-      setJobRef(handle.id);
+      setStartedIds((ids) => [...ids, handle.id]);
       return handle.result;
     },
   });
-  const job = useJob(jobRef) as Job<TProgress> | null;
+  const all = useJobs();
+  const job = useMemo(() => {
+    const mine = startedIds
+      .map((id) => all.find((entry) => entry.id === id))
+      .filter((entry): entry is Job => entry !== undefined);
+    const running = mine.filter((entry) => entry.status === 'running');
+    return (
+      ((running.at(-1) ?? mine.at(-1)) as Job<TProgress> | undefined) ?? null
+    );
+  }, [all, startedIds]);
   return { ...mutation, job, progress: job?.progress ?? null };
 }
