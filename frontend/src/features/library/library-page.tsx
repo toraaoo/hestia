@@ -24,20 +24,15 @@ import {
 import { CreateEntryModal } from '@/features/entries/create-modal';
 import type { EntryCardData } from '@/features/entries/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/skeleton';
+import { useLaunchModal } from '@/features/instances/launch-modal';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
-import {
-  useInstances,
-  useLaunchInstanceAny,
-  useStopInstanceAny,
-} from '@/queries/instance';
-import { usePrefs } from '@/queries/prefs';
+import { useInstances, useStopInstanceAny } from '@/queries/instance';
 import {
   useServers,
   useStartServerAny,
   useStopServerAny,
 } from '@/queries/server';
-import { type Playtime, playtimeKey } from '@/queries/sessions';
 
 const InstanceIcon = entryIcon('instance');
 const ServerIcon = entryIcon('server');
@@ -65,9 +60,8 @@ export function LibraryPage({
   const stopServer = useStopServerAny();
 
   const instances = useInstances();
-  const launchInstance = useLaunchInstanceAny();
+  const { launch: launchInstance, isLaunching } = useLaunchModal();
   const stopInstance = useStopInstanceAny();
-  const prefs = usePrefs();
 
   const [newKind, setNewKind] = useState<'server' | 'instance'>('instance');
   const [creating, setCreating] = useState(false);
@@ -93,28 +87,24 @@ export function LibraryPage({
     [servers.data, serverBusy, startServer, stopServer],
   );
 
-  const instanceBusy =
-    launchInstance.isPending || stopInstance.isPending
-      ? ((launchInstance.variables ?? stopInstance.variables) as
-          | string
-          | undefined)
-      : undefined;
   const instanceCards: EntryCardData[] = useMemo(
     () =>
       (instances.data ?? []).map((instance) => ({
         ...instanceToCard(
           instance,
           {
-            busy: instanceBusy === instance.id,
-            onStart: () => launchInstance.mutate(instance.id),
+            busy:
+              isLaunching(instance.id) ||
+              (stopInstance.isPending &&
+                stopInstance.variables === instance.id),
+            onStart: () => launchInstance(instance),
             onStop: () => stopInstance.mutate(instance.id),
           },
-          prefs.get<Playtime | null>(playtimeKey(instance.id), null)
-            ?.lastPlayedUnix,
+          instance.lastPlayedUnix,
         ),
         iconUrl: instance.iconUrl,
       })),
-    [instances.data, instanceBusy, launchInstance, stopInstance, prefs],
+    [instances.data, isLaunching, launchInstance, stopInstance],
   );
 
   const serverFlavors = useMemo(() => flavorsOf(serverCards), [serverCards]);

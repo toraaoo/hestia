@@ -17,13 +17,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
+import { useLaunchModal } from '@/features/instances/launch-modal';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
-import {
-  useInstances,
-  useLaunchInstanceAny,
-  useStopInstanceAny,
-} from '@/queries/instance';
+import { useInstances, useStopInstanceAny } from '@/queries/instance';
 
 function isRunning(instance: InstanceInfo): boolean {
   return (instance.sessions ?? []).some((s) => s.state === 'running');
@@ -37,7 +34,7 @@ function isRunning(instance: InstanceInfo): boolean {
 export function PlayBar() {
   const { signedIn } = useAccounts();
   const instances = useInstances();
-  const launch = useLaunchInstanceAny();
+  const { launch, isLaunching } = useLaunchModal();
   const stop = useStopInstanceAny();
 
   const list = instances.data ?? [];
@@ -47,7 +44,7 @@ export function PlayBar() {
   const Icon = entryIcon('instance');
   const running = sel ? isRunning(sel) : false;
   const busy =
-    (launch.isPending && launch.variables === sel?.id) ||
+    (sel ? isLaunching(sel.id) : false) ||
     (stop.isPending && stop.variables === sel?.id);
 
   return (
@@ -146,7 +143,7 @@ export function PlayBar() {
           data-icon="inline-start"
           disabled={!signedIn || !sel || busy}
           title={signedIn ? undefined : m['playbar.sign_in_required']()}
-          onClick={() => sel && launch.mutate(sel.id)}
+          onClick={() => sel && launch(sel)}
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
           {busy ? <Spinner /> : <PlayIcon weight="fill" />}

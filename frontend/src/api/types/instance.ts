@@ -14,6 +14,10 @@ export interface InstanceInfo {
   loaderVersion?: string;
   javaMajor: number;
   createdUnix: number;
+  /** Unix time of the most recent launch; absent until first played. */
+  lastPlayedUnix?: number;
+  /** Cumulative seconds played across every observed session. */
+  playtimeSeconds: number;
   sessions?: ProcessInfo[];
   /**
    * Client-derived from the desktop icon store; absent when the entry keeps
@@ -35,6 +39,10 @@ export interface InstanceDetails {
   loaderVersion?: string;
   javaMajor: number;
   createdUnix: number;
+  /** Unix time of the most recent launch; absent until first played. */
+  lastPlayedUnix?: number;
+  /** Cumulative seconds played across every observed session. */
+  playtimeSeconds: number;
   /** The entry root (`instances/<id>/`) — hestia's namespace. */
   entryDir: string;
   /** The game's working directory (`instances/<id>/data/`). */

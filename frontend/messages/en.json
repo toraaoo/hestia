@@ -132,6 +132,10 @@
     "all_instances": "All instances",
     "sign_in_required": "Sign in to play"
   },
+  "launch": {
+    "title": "Launching {name}",
+    "preparing": "Preparing files for the first launch…"
+  },
   "welcome": {
     "title": "Welcome to Hestia",
     "body": "Sign in with a Microsoft account to create and play instances. You can browse servers and settings without one.",

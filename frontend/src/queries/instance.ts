@@ -15,7 +15,6 @@ import type {
   InstanceCreateParams,
   InstanceInfo,
   InstanceLaunchDone,
-  InstanceLaunchParams,
   InstanceUpdateParams,
   ResolveParams,
 } from '../api';
@@ -137,23 +136,6 @@ export const instanceMutations = {
       mutationKey: [...keys.instances.detail(id), 'remove'],
       mutationFn: () => api.remove(id),
       invalidates: () => [keys.instances.list(), keys.processes.list()],
-    }),
-  /** Materialise files and spawn the game as the signed-in account. */
-  launch: (id: string) =>
-    jobMutation<InstanceLaunchDone, Omit<InstanceLaunchParams, 'instance'>>({
-      mutationKey: [...keys.instances.detail(id), 'launch'],
-      meta: () => ({
-        kind: 'instance.launch',
-        label: 'launch',
-        entry: { kind: 'instance', id },
-      }),
-      run: (params, onProgress) =>
-        api.launch({ ...params, instance: id }, onProgress),
-      invalidates: () => [
-        keys.instances.list(),
-        keys.instances.detail(id),
-        keys.processes.list(),
-      ],
     }),
   /** Stops one named session, or every session of the instance. */
   stop: (id: string) =>
@@ -491,10 +473,6 @@ export function useRenameInstance(id: string) {
 
 export function useRemoveInstance(id: string) {
   return useMutation(instanceMutations.remove(id));
-}
-
-export function useLaunchInstance(id: string) {
-  return useJobMutation(instanceMutations.launch(id));
 }
 
 export function useStopInstance(id: string) {

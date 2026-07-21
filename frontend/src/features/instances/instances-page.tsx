@@ -16,15 +16,10 @@ import {
 import { CreateEntryModal } from '@/features/entries/create-modal';
 import type { EntryCardData } from '@/features/entries/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/skeleton';
+import { useLaunchModal } from '@/features/instances/launch-modal';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
-import {
-  useInstances,
-  useLaunchInstanceAny,
-  useStopInstanceAny,
-} from '@/queries/instance';
-import { usePrefs } from '@/queries/prefs';
-import { type Playtime, playtimeKey } from '@/queries/sessions';
+import { useInstances, useStopInstanceAny } from '@/queries/instance';
 
 export function InstancesPage({
   view,
@@ -40,15 +35,9 @@ export function InstancesPage({
   const { query } = useSearch();
   const { signedIn, ready } = useAccounts();
   const instances = useInstances();
-  const launch = useLaunchInstanceAny();
+  const { launch, isLaunching } = useLaunchModal();
   const stop = useStopInstanceAny();
-  const prefs = usePrefs();
   const [creating, setCreating] = useState(false);
-
-  const busyId =
-    launch.isPending || stop.isPending
-      ? ((launch.variables ?? stop.variables) as string | undefined)
-      : undefined;
 
   const cards: EntryCardData[] = useMemo(
     () =>
@@ -56,16 +45,17 @@ export function InstancesPage({
         ...instanceToCard(
           instance,
           {
-            busy: busyId === instance.id,
-            onStart: () => launch.mutate(instance.id),
+            busy:
+              isLaunching(instance.id) ||
+              (stop.isPending && stop.variables === instance.id),
+            onStart: () => launch(instance),
             onStop: () => stop.mutate(instance.id),
           },
-          prefs.get<Playtime | null>(playtimeKey(instance.id), null)
-            ?.lastPlayedUnix,
+          instance.lastPlayedUnix,
         ),
         iconUrl: instance.iconUrl,
       })),
-    [instances.data, busyId, launch, stop, prefs],
+    [instances.data, isLaunching, launch, stop],
   );
 
   const flavors = useMemo(() => flavorsOf(cards), [cards]);

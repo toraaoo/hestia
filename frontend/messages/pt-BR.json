@@ -131,6 +131,10 @@
     "all_instances": "Todas as instâncias",
     "sign_in_required": "Entre para jogar"
   },
+  "launch": {
+    "title": "Iniciando {name}",
+    "preparing": "Preparando os arquivos para a primeira execução…"
+  },
   "welcome": {
     "title": "Bem-vindo ao Hestia",
     "body": "Entre com uma conta Microsoft para criar e jogar instâncias. Você pode navegar por servidores e configurações sem uma.",

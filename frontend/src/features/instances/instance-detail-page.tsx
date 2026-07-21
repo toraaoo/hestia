@@ -34,6 +34,7 @@ import {
   type LiveResources,
   ResourceCards,
 } from '@/features/entries/resource-panel';
+import { useLaunchModal } from '@/features/instances/launch-modal';
 import { InstanceSettingsTab } from '@/features/instances/settings-tab';
 import { ProfilesPanel } from '@/features/profiles/profiles-panel';
 import { agoLabel, bytes, memGb, uptime } from '@/lib/format';
@@ -46,11 +47,9 @@ import {
   useInstanceLogs,
   useInstanceProfiles,
   useInstanceWorlds,
-  useLaunchInstance,
   useStopInstance,
 } from '@/queries/instance';
 import { useProcessMetrics } from '@/queries/metrics';
-import { usePlaytime } from '@/queries/sessions';
 
 export type InstanceTab =
   | 'overview'
@@ -90,9 +89,8 @@ export function InstanceDetailPage({
   const config = useInstanceConfig(id);
   const worlds = useInstanceWorlds(id);
   const profiles = useInstanceProfiles(id);
-  const playtime = usePlaytime(id);
   const [addingContent, setAddingContent] = useState(false);
-  const launch = useLaunchInstance(id);
+  const { launch, isLaunching } = useLaunchModal();
   const stop = useStopInstance(id);
   // Shared with the content tab's own per-kind queries (cached), just for the
   // headline count.
@@ -213,11 +211,11 @@ export function InstanceDetailPage({
             ) : (
               <Button
                 data-icon="inline-start"
-                disabled={launch.isPending}
+                disabled={isLaunching(id)}
                 className="bg-ember text-ember-foreground hover:bg-ember/90"
-                onClick={() => launch.mutate({})}
+                onClick={() => launch(instance)}
               >
-                {launch.isPending ? <Spinner /> : <PlayIcon weight="fill" />}
+                {isLaunching(id) ? <Spinner /> : <PlayIcon weight="fill" />}
                 {m['action.play']()}
               </Button>
             )}
@@ -289,16 +287,16 @@ export function InstanceDetailPage({
                   <Stat
                     label={m['label.last_played']()}
                     value={
-                      playtime?.lastPlayedUnix
-                        ? agoLabel(playtime.lastPlayedUnix)
+                      info.data?.lastPlayedUnix
+                        ? agoLabel(info.data.lastPlayedUnix)
                         : '—'
                     }
                   />
                   <Stat
                     label={m['label.playtime']()}
                     value={
-                      playtime?.totalSeconds
-                        ? uptime(playtime.totalSeconds)
+                      info.data?.playtimeSeconds
+                        ? uptime(info.data.playtimeSeconds)
                         : '—'
                     }
                   />
