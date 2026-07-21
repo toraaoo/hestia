@@ -153,6 +153,26 @@ pub fn age_label(created_unix: i64) -> String {
     }
 }
 
+/// "how long ago" for an optional last-played stamp; `-` when never played.
+pub fn last_played_label(last_played_unix: Option<i64>) -> String {
+    last_played_unix.map_or_else(|| "-".to_string(), age_label)
+}
+
+/// Compact cumulative-duration label, e.g. `3h 20m`, `12m`, `-` when zero.
+pub fn playtime_label(seconds: i64) -> String {
+    let seconds = seconds.max(0);
+    if seconds == 0 {
+        return "-".to_string();
+    }
+    let (h, m) = (seconds / 3600, (seconds % 3600) / 60);
+    match (h, m) {
+        (0, 0) => "<1m".to_string(),
+        (0, m) => format!("{m}m"),
+        (h, 0) => format!("{h}h"),
+        (h, m) => format!("{h}h {m}m"),
+    }
+}
+
 /// Return the chosen flavor id: validated when `provided`, otherwise picked from
 /// an interactive selector.
 pub fn pick_flavor(flavors: Vec<Flavor>, provided: Option<String>) -> Result<String> {

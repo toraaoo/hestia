@@ -94,12 +94,20 @@ pub(super) async fn list(client: &Client) -> Result<()> {
                 i.game_version.clone(),
                 i.loader_version.clone().unwrap_or_else(|| "-".into()),
                 mc::sessions_label(&i.sessions),
+                mc::last_played_label(i.last_played_unix),
             ]
         })
         .collect();
     ui::show(View::table(
         "instances",
-        ["NAME", "FLAVOR", "VERSION", "LOADER", "STATE"],
+        [
+            "NAME",
+            "FLAVOR",
+            "VERSION",
+            "LOADER",
+            "STATE",
+            "LAST PLAYED",
+        ],
         rows,
     ))
 }
@@ -116,6 +124,8 @@ pub(super) fn show_info(info: &InstanceInfo) -> Result<()> {
         ),
         ("java", info.java_major.to_string()),
         ("state", mc::sessions_label(&info.sessions)),
+        ("last played", mc::last_played_label(info.last_played_unix)),
+        ("playtime", mc::playtime_label(info.playtime_seconds)),
     ]))?;
     show_sessions(&info.sessions)
 }
@@ -134,6 +144,8 @@ pub(super) fn show_detail(info: &InstanceDetails, sessions: &[ProcessInfo]) -> R
         ),
         ("java", info.java_major.to_string()),
         ("state", mc::sessions_label(sessions)),
+        ("last played", mc::last_played_label(info.last_played_unix)),
+        ("playtime", mc::playtime_label(info.playtime_seconds)),
         ("disk", ui::human_bytes(info.disk_bytes)),
         ("folder", info.entry_dir.clone()),
         ("data", info.data_dir.clone()),
