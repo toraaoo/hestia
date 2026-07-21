@@ -25,9 +25,9 @@ import {
   type LiveResources,
   ResourceCards,
 } from '@/features/entries/resource-panel';
-import { ServerBackupsTab } from '@/features/servers/backups-tab';
-import { ServerConsoleTab } from '@/features/servers/console-tab';
-import { ServerSettingsTab } from '@/features/servers/settings-tab';
+import { ServerBackupsTab } from '@/features/servers/tabs/backups';
+import { ServerConsoleTab } from '@/features/servers/tabs/console';
+import { ServerSettingsTab } from '@/features/servers/tabs/settings';
 import { agoLabel, bytes, memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { useProcessMetrics } from '@/queries/metrics';

@@ -4,7 +4,7 @@ import {
   ServerDetailPage,
   type ServerTab,
   serverContentKinds,
-} from '@/features/servers/server-detail-page';
+} from '@/features/servers/detail';
 
 const tabs: ServerTab[] = ['console', 'content', 'backups', 'settings'];
 

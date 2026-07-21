@@ -15,7 +15,6 @@ import { type InstanceInfo, system } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { entryIcon } from '@/components/icons';
-import { LogView } from '@/components/log-view';
 import { Stat, TabCount } from '@/components/page';
 import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +34,8 @@ import {
   ResourceCards,
 } from '@/features/entries/resource-panel';
 import { useLaunchModal } from '@/features/instances/launch-modal';
-import { InstanceSettingsTab } from '@/features/instances/settings-tab';
+import { InstanceLogsTab } from '@/features/instances/tabs/logs';
+import { InstanceSettingsTab } from '@/features/instances/tabs/settings';
 import { ProfilesPanel } from '@/features/profiles/profiles-panel';
 import { agoLabel, bytes, memGb, uptime } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
@@ -44,7 +44,6 @@ import {
   useInstance,
   useInstanceConfig,
   useInstanceInfo,
-  useInstanceLogs,
   useInstanceProfiles,
   useInstanceWorlds,
   useStopInstance,
@@ -417,29 +416,5 @@ export function InstanceDetailPage({
         onOpenChange={setAddingContent}
       />
     </div>
-  );
-}
-
-/** The newest running session's captured output, followed while it runs. */
-function InstanceLogsTab({
-  id,
-  running,
-  name,
-}: {
-  id: string;
-  running: boolean;
-  name: string;
-}) {
-  const logs = useInstanceLogs(id, { follow: running, tail: 500 });
-
-  if (logs.lines.length === 0) {
-    return <Empty className="h-full">{m['detail.logs_empty']()}</Empty>;
-  }
-
-  return (
-    <LogView
-      aria-label={name}
-      rows={logs.lines.map((entry) => ({ text: entry.line }))}
-    />
   );
 }

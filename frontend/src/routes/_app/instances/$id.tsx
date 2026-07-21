@@ -4,7 +4,7 @@ import {
   InstanceDetailPage,
   type InstanceTab,
   instanceContentKinds,
-} from '@/features/instances/instance-detail-page';
+} from '@/features/instances/detail';
 import { ensureSignedIn } from '@/queries';
 
 const tabs: InstanceTab[] = [
