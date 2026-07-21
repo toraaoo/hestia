@@ -21,6 +21,7 @@ import type {
 } from '../api';
 import * as api from '../api/instance';
 import { mutation, type QueryFlags } from './core';
+import { useEntryIconLookup } from './icons';
 import { jobMutation, useJobMutation } from './jobs';
 import { keys } from './keys';
 import { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
@@ -361,7 +362,15 @@ export const instanceMutations = {
 };
 
 export function useInstances() {
-  return useQuery(instanceQueries.list());
+  const iconFor = useEntryIconLookup();
+  return useQuery({
+    ...instanceQueries.list(),
+    select: (instances) =>
+      instances.map((instance) => ({
+        ...instance,
+        iconUrl: iconFor(instance.id),
+      })),
+  });
 }
 
 /** The instance's static, informational view (locations + disk footprint). */
@@ -379,10 +388,13 @@ export function useStopInstanceAny() {
 
 /** One instance, selected out of the list query (there is no status channel). */
 export function useInstance(id: string) {
+  const iconFor = useEntryIconLookup();
   return useQuery({
     ...instanceQueries.list(),
-    select: (instances: InstanceInfo[]) =>
-      instances.find((instance) => instance.id === id) ?? null,
+    select: (instances: InstanceInfo[]) => {
+      const instance = instances.find((entry) => entry.id === id);
+      return instance ? { ...instance, iconUrl: iconFor(instance.id) } : null;
+    },
   });
 }
 

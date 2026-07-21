@@ -15,6 +15,11 @@ export interface InstanceInfo {
   javaMajor: number;
   createdUnix: number;
   sessions?: ProcessInfo[];
+  /**
+   * Client-derived from the desktop icon store; absent when the entry keeps
+   * its kind glyph. Not part of the wire record — the query hooks attach it.
+   */
+  iconUrl?: string;
 }
 
 /**

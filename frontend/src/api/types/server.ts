@@ -21,6 +21,11 @@ export interface ServerInfo {
   /** True once RCON is configured. */
   console: boolean;
   process?: ProcessInfo;
+  /**
+   * Client-derived from the desktop icon store; absent when the entry keeps
+   * its kind glyph. Not part of the wire record — the query hooks attach it.
+   */
+  iconUrl?: string;
 }
 
 /**

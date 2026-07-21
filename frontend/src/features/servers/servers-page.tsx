@@ -1,6 +1,5 @@
 import { PlusIcon } from '@phosphor-icons/react';
 import { useMemo, useState } from 'react';
-import { iconUrl } from '@/api/icons';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,6 @@ import { CreateEntryModal } from '@/features/entries/create-modal';
 import type { EntryCardData } from '@/features/entries/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/skeleton';
 import { m } from '@/paraglide/messages.js';
-import { useEntryIcons } from '@/queries/icons';
 import {
   useServers,
   useStartServerAny,
@@ -39,7 +37,6 @@ export function ServersPage({
   const servers = useServers();
   const start = useStartServerAny();
   const stop = useStopServerAny();
-  const icons = useEntryIcons();
   const [creating, setCreating] = useState(false);
 
   const busyId =
@@ -49,18 +46,15 @@ export function ServersPage({
 
   const cards: EntryCardData[] = useMemo(
     () =>
-      (servers.data ?? []).map((server) => {
-        const icon = icons.data?.[server.id];
-        return {
-          ...serverToCard(server, {
-            busy: busyId === server.id,
-            onStart: () => start.mutate(server.id),
-            onStop: () => stop.mutate(server.id),
-          }),
-          iconUrl: icon ? iconUrl(icon) : undefined,
-        };
-      }),
-    [servers.data, busyId, start, stop, icons.data],
+      (servers.data ?? []).map((server) => ({
+        ...serverToCard(server, {
+          busy: busyId === server.id,
+          onStart: () => start.mutate(server.id),
+          onStop: () => stop.mutate(server.id),
+        }),
+        iconUrl: server.iconUrl,
+      })),
+    [servers.data, busyId, start, stop],
   );
 
   const flavors = useMemo(() => flavorsOf(cards), [cards]);

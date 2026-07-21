@@ -60,8 +60,16 @@ export function PlayBar() {
               disabled={list.length === 0}
               className="-ml-2 flex h-14 w-72 items-center gap-3 px-2 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset aria-expanded:bg-muted disabled:opacity-50"
             >
-              <span className="grid size-11 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
-                <Icon className="size-6" />
+              <span className="grid size-11 shrink-0 place-items-center overflow-hidden bg-muted text-muted-foreground ring-1 ring-border">
+                {sel?.iconUrl ? (
+                  <img
+                    src={sel.iconUrl}
+                    alt=""
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <Icon className="size-6" />
+                )}
               </span>
               <span className="min-w-0 flex-1 leading-tight">
                 <span className="block text-[11px] tracking-wide text-muted-foreground uppercase">

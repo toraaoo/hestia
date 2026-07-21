@@ -23,6 +23,7 @@ import type {
 } from '../api';
 import * as api from '../api/server';
 import { mutation, type QueryFlags } from './core';
+import { useEntryIconLookup } from './icons';
 import { jobMutation, useJobMutation } from './jobs';
 import { keys } from './keys';
 import { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
@@ -301,12 +302,18 @@ export const serverMutations = {
 };
 
 export function useServers() {
-  return useQuery(serverQueries.list());
+  const iconFor = useEntryIconLookup();
+  return useQuery({
+    ...serverQueries.list(),
+    select: (servers) =>
+      servers.map((server) => ({ ...server, iconUrl: iconFor(server.id) })),
+  });
 }
 
 /** One server's status, seeded from the list cache so a row costs no call. */
 export function useServer(id: string) {
   const queryClient = useQueryClient();
+  const iconFor = useEntryIconLookup();
   return useQuery({
     ...serverQueries.detail(id),
     initialData: () =>
@@ -315,6 +322,7 @@ export function useServer(id: string) {
         ?.find((server) => server.id === id),
     initialDataUpdatedAt: () =>
       queryClient.getQueryState(keys.servers.list())?.dataUpdatedAt,
+    select: (server) => ({ ...server, iconUrl: iconFor(server.id) }),
   });
 }
 

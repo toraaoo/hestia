@@ -1,6 +1,5 @@
 import { PlusIcon } from '@phosphor-icons/react';
 import { useMemo, useState } from 'react';
-import { iconUrl } from '@/api/icons';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Page } from '@/components/page';
 import { SignInGate } from '@/components/sign-in-gate';
@@ -19,7 +18,6 @@ import type { EntryCardData } from '@/features/entries/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/skeleton';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
-import { useEntryIcons } from '@/queries/icons';
 import {
   useInstances,
   useLaunchInstanceAny,
@@ -45,7 +43,6 @@ export function InstancesPage({
   const launch = useLaunchInstanceAny();
   const stop = useStopInstanceAny();
   const prefs = usePrefs();
-  const icons = useEntryIcons();
   const [creating, setCreating] = useState(false);
 
   const busyId =
@@ -55,23 +52,20 @@ export function InstancesPage({
 
   const cards: EntryCardData[] = useMemo(
     () =>
-      (instances.data ?? []).map((instance) => {
-        const icon = icons.data?.[instance.id];
-        return {
-          ...instanceToCard(
-            instance,
-            {
-              busy: busyId === instance.id,
-              onStart: () => launch.mutate(instance.id),
-              onStop: () => stop.mutate(instance.id),
-            },
-            prefs.get<Playtime | null>(playtimeKey(instance.id), null)
-              ?.lastPlayedUnix,
-          ),
-          iconUrl: icon ? iconUrl(icon) : undefined,
-        };
-      }),
-    [instances.data, busyId, launch, stop, prefs, icons.data],
+      (instances.data ?? []).map((instance) => ({
+        ...instanceToCard(
+          instance,
+          {
+            busy: busyId === instance.id,
+            onStart: () => launch.mutate(instance.id),
+            onStop: () => stop.mutate(instance.id),
+          },
+          prefs.get<Playtime | null>(playtimeKey(instance.id), null)
+            ?.lastPlayedUnix,
+        ),
+        iconUrl: instance.iconUrl,
+      })),
+    [instances.data, busyId, launch, stop, prefs],
   );
 
   const flavors = useMemo(() => flavorsOf(cards), [cards]);

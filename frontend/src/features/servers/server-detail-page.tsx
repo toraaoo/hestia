@@ -33,7 +33,6 @@ import { ServerConsoleTab } from '@/features/servers/console-tab';
 import { ServerSettingsTab } from '@/features/servers/settings-tab';
 import { agoLabel, bytes, memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
-import { useEntryIconUrl } from '@/queries/icons';
 import { useProcessMetrics } from '@/queries/metrics';
 import {
   useServer,
@@ -82,7 +81,6 @@ export function ServerDetailPage({
   const running = server ? isRunning(server) : false;
   const ping = useServerPing(id, running);
   const metrics = useProcessMetrics(server?.process?.id ?? null);
-  const heroIconUrl = useEntryIconUrl(id);
 
   const memoryLimitGb = useMemo(() => {
     const value = config.data?.find((e) => e.key === 'memory')?.value;
@@ -129,7 +127,7 @@ export function ServerDetailPage({
         parentLabel={m['nav.servers']()}
         parentTo="/servers"
         icon={entryIcon('server')}
-        iconUrl={heroIconUrl}
+        iconUrl={server.iconUrl}
         iconAction={<EntryIconMenu id={id} />}
         name={server.name}
         badges={
