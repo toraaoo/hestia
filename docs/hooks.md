@@ -309,7 +309,7 @@ marks a job mutation — pair with `useJobMutation` semantics above.
 | `useUpdateInstance(id)` | `instance.update` | `{ version, loader_version?, allow_downgrade? }` |
 | `useRenameInstance(id)` | `instance.rename` | `name: string` |
 | `useRemoveInstance(id)` | `instance.remove` | — |
-| `useLaunchInstance(id)` *(job)* | `instance.launch` | `{ account?, new_session?, profile? }` |
+| `useLaunchInstanceAny()` *(job)* | `instance.launch` | `id: string` |
 | `useStopInstance(id)` | `instance.stop` | `{ session? }` |
 | `useSetInstanceConfig(id)` | `instance.config.set` | `{ key, value }` |
 | `useAddInstanceContent(id)` *(job)* | `instance.content.add` | `ContentAddSpec` |

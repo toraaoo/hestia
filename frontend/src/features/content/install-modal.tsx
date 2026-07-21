@@ -13,11 +13,7 @@ import {
   dialog,
   type GlobalProfile,
   type InstanceInfo,
-  instance as instanceApi,
-  type ProvisionProgress,
-  profile as profileApi,
   type ServerInfo,
-  server as serverApi,
 } from '@/api';
 import { chipClass } from '@/components/chip';
 import { contentIcon, contentKindLabel, entryIcon } from '@/components/icons';
@@ -53,15 +49,19 @@ import { PickRow } from '@/features/content/pick-row';
 import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import { invalidate, keys } from '@/queries';
 import { useContentSearch, useContentVersions } from '@/queries/content';
 import {
+  useAddInstanceContent,
   useInstanceContent,
   useInstances,
   useInstanceWorlds,
 } from '@/queries/instance';
-import { useGlobalProfiles } from '@/queries/profile';
-import { useServerContent, useServers } from '@/queries/server';
+import { useEditGlobalProfile, useGlobalProfiles } from '@/queries/profile';
+import {
+  useAddServerContent,
+  useServerContent,
+  useServers,
+} from '@/queries/server';
 
 /** An entry the content can be installed into, drawn from every store. */
 export interface Target {
@@ -179,9 +179,11 @@ export function ContentInstallModal({
   const [worlds, setWorlds] = useState<string[]>([]);
 
   const [installing, setInstalling] = useState(false);
-  const [phase, setPhase] = useState('');
-  const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
+
+  const addServer = useAddServerContent(targetId);
+  const addInstance = useAddInstanceContent(targetId);
+  const editProfile = useEditGlobalProfile();
 
   // Reset when (re)opened, keeping whichever side the caller fixed.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset only on open.
@@ -195,8 +197,6 @@ export function ContentInstallModal({
     setVersionIds({});
     setWorlds([]);
     setInstalling(false);
-    setProgress(0);
-    setPhase('');
     setError('');
   }, [open]);
 
@@ -256,23 +256,26 @@ export function ContentInstallModal({
           ? worlds.length > 0
           : selectedCount > 0;
 
+  const liveProgress =
+    (target?.type === 'server' ? addServer : addInstance).progress ?? null;
+  const progressPct =
+    liveProgress && liveProgress.total > 0
+      ? Math.round((liveProgress.current / liveProgress.total) * 100)
+      : 0;
+  const progressPhase = liveProgress?.detail || liveProgress?.phase || '';
+
   async function install() {
     if (!target) return;
     setInstalling(true);
     setError('');
-    setProgress(0);
-    const onProgress = (p: ProvisionProgress) => {
-      setPhase(p.detail || p.phase);
-      setProgress(p.total > 0 ? Math.round((p.current / p.total) * 100) : 0);
-    };
     try {
       if (isProfile && picked.length > 0) {
-        await profileApi.edit(target.name, { add: picked.map(projectRef) });
+        await editProfile.mutateAsync({
+          name: target.name,
+          add: picked.map(projectRef),
+        });
       } else if (target.type !== 'profile') {
-        const add =
-          target.type === 'server'
-            ? serverApi.content.add
-            : instanceApi.content.add;
+        const add = target.type === 'server' ? addServer : addInstance;
         // The wire spec is per-kind, so a mixed selection installs as one
         // batch per kind; failures aggregate across batches.
         const failures: string[] = [];
@@ -286,12 +289,11 @@ export function ContentInstallModal({
               })),
             ...files.filter((f) => f.kind === k).map((f) => ({ path: f.path })),
           ];
-          const spec = {
+          const done = await add.mutateAsync({
             kind: k,
             items,
             worlds: k === 'data_pack' && needsWorlds ? worlds : [],
-          };
-          const done = await add(target.id, spec, onProgress);
+          });
           // A batch "succeeds" even when every item failed to resolve/install;
           // surface those per-item failures instead of closing as if installed.
           failures.push(...done.failures.map((f) => f.message));
@@ -301,15 +303,6 @@ export function ContentInstallModal({
           setInstalling(false);
           return;
         }
-      }
-      if (isProfile) {
-        invalidate(keys.profiles.all);
-      } else if (target.type === 'instance') {
-        invalidate(keys.instances.content(target.id));
-        invalidate(keys.instances.info(target.id));
-      } else if (target.type === 'server') {
-        invalidate(keys.servers.content(target.id));
-        invalidate(keys.servers.info(target.id));
       }
       onOpenChange(false);
     } catch (e) {
@@ -336,9 +329,9 @@ export function ContentInstallModal({
 
         {installing ? (
           <div className="flex min-h-72 flex-col justify-center px-1">
-            <Progress value={progress}>
+            <Progress value={progressPct}>
               <ProgressLabel>
-                {phase || m['content.installing']()}
+                {progressPhase || m['content.installing']()}
               </ProgressLabel>
               <ProgressValue />
             </Progress>
