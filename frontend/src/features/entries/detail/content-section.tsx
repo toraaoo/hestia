@@ -6,8 +6,8 @@ import type { ContentVersion, InstalledContent } from '@/api';
 import { Empty } from '@/components/empty';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { KindChips } from '@/features/content/kind-chips';
-import { kindInfo } from '@/features/content/kinds';
+import { KindChips } from '@/features/content/components/kind-chips';
+import { kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
 import {
   instanceQueries,

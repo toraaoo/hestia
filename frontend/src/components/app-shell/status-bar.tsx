@@ -14,7 +14,7 @@ import { StatusDot } from '@/components/ui/status-dot';
 import {
   overallRatio,
   ProvisionProgressView,
-} from '@/features/entries/provision-progress';
+} from '@/features/entries/components/provision-progress';
 import { m } from '@/paraglide/messages.js';
 import { useDaemon } from '@/queries/daemon';
 import { useInstances } from '@/queries/instance';

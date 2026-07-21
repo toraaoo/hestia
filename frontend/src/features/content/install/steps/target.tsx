@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { ContentKind } from '@/api';
 import { contentKindLabel, entryIcon } from '@/components/icons';
 import { PickerPanel } from '@/components/picker-panel';
-import { PickRow } from '@/features/content/pick-row';
+import { PickRow } from '@/features/content/components/pick-row';
 import { m } from '@/paraglide/messages.js';
 
 import { FilterBar } from '../filter-bar';

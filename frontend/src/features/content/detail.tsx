@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContentInstallModal } from '@/features/content/install';
-import { kindInfo } from '@/features/content/kinds';
+import { kindInfo } from '@/features/content/lib/kinds';
 import { agoLabel, compact } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { useContentProject, useContentVersions } from '@/queries/content';

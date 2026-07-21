@@ -18,7 +18,7 @@ import {
   ProgressLabel,
   ProgressValue,
 } from '@/components/ui/progress';
-import { projectRef } from '@/features/content/content-card';
+import { projectRef } from '@/features/content/components/content-card';
 import { m } from '@/paraglide/messages.js';
 import { useAddInstanceContent } from '@/queries/instance';
 import { useEditGlobalProfile } from '@/queries/profile';

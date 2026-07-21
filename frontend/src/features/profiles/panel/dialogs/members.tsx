@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { PickRow } from '@/features/content/pick-row';
+import { PickRow } from '@/features/content/components/pick-row';
 import { m } from '@/paraglide/messages.js';
 
 export function MembersDialog({

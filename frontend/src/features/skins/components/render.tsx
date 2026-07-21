@@ -7,7 +7,7 @@ import {
   CAPE_W,
   drawCapeFront,
   loadTexture,
-} from '@/features/skins/texture';
+} from '@/features/skins/lib/texture';
 import { cn } from '@/lib/utils';
 
 const POSE_WIDTH = 160;

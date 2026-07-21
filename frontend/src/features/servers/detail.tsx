@@ -19,12 +19,12 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContentInstallModal, serverTarget } from '@/features/content/install';
-import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
-import { EntryIconMenu } from '@/features/entries/icon-menu';
+import { EntryIconMenu } from '@/features/entries/components/icon-menu';
 import {
   type LiveResources,
   ResourceCards,
-} from '@/features/entries/resource-panel';
+} from '@/features/entries/components/resource-panel';
+import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
 import { ServerBackupsTab } from '@/features/servers/tabs/backups';
 import { ServerConsoleTab } from '@/features/servers/tabs/console';
 import { ServerSettingsTab } from '@/features/servers/tabs/settings';

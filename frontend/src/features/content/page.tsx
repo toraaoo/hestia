@@ -6,8 +6,8 @@ import { useSearch } from '@/components/app-shell/search-context';
 import { chipClass } from '@/components/chip';
 import { Page } from '@/components/page';
 import { Bone, CardGridSkeleton } from '@/components/skeleton';
-import { ContentCard } from '@/features/content/content-card';
-import { contentKinds, kindInfo } from '@/features/content/kinds';
+import { ContentCard } from '@/features/content/components/content-card';
+import { contentKinds, kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
 import { useContentSearchPaged } from '@/queries/content';
 

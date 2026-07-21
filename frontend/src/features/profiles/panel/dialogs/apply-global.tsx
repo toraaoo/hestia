@@ -17,7 +17,7 @@ import {
   ProgressLabel,
   ProgressValue,
 } from '@/components/ui/progress';
-import { PickRow } from '@/features/content/pick-row';
+import { PickRow } from '@/features/content/components/pick-row';
 import { m } from '@/paraglide/messages.js';
 import { useApplyInstanceProfile } from '@/queries/instance';
 import { useGlobalProfiles } from '@/queries/profile';

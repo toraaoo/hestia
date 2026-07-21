@@ -15,14 +15,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ProvisionProgressView } from '@/features/entries/provision-progress';
+import { ProvisionProgressView } from '@/features/entries/components/provision-progress';
 import {
   createWizardDefaults,
   createWizardSchema,
   detailsStepSchema,
   flavorStepSchema,
   versionStepSchema,
-} from '@/features/entries/schema';
+} from '@/features/entries/lib/schema';
 import { useAppForm } from '@/hooks/form';
 import { m } from '@/paraglide/messages.js';
 import { useCreateInstance, useInstanceFlavors } from '@/queries/instance';

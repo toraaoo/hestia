@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ProvisionProgressView } from '@/features/entries/provision-progress';
+import { ProvisionProgressView } from '@/features/entries/components/provision-progress';
 import { m } from '@/paraglide/messages.js';
 import { useLaunchInstanceAny } from '@/queries/instance';
 import { backgroundJob, foregroundJob } from '@/queries/jobs';

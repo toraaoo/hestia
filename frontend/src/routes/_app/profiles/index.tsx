@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import type { View } from '@/features/entries/collection';
+import type { View } from '@/features/entries/components/collection';
 import { ProfilesPage } from '@/features/profiles/page';
 
 export const Route = createFileRoute('/_app/profiles/')({

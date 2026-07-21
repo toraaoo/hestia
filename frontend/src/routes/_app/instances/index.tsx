@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import type { View } from '@/features/entries/collection';
+import type { View } from '@/features/entries/components/collection';
 import { InstancesPage } from '@/features/instances/page';
 
 export const Route = createFileRoute('/_app/instances/')({

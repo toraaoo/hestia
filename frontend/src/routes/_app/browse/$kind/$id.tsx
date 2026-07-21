@@ -1,10 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-
-import { kindBySlug } from '@/features/content/kinds';
-import {
-  ProjectDetailPage,
-  type ProjectTab,
-} from '@/features/content/project-detail';
+import { ProjectDetailPage, type ProjectTab } from '@/features/content/detail';
+import { kindBySlug } from '@/features/content/lib/kinds';
 
 export const Route = createFileRoute('/_app/browse/$kind/$id')({
   validateSearch: (search: Record<string, unknown>): { tab?: ProjectTab } => ({

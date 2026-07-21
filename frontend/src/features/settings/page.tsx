@@ -18,8 +18,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { StatusDot } from '@/components/ui/status-dot';
-import { CheckboxRow, LanguageField } from '@/features/settings/fields';
-import { SyncSection } from '@/features/settings/sync-section';
+import {
+  CheckboxRow,
+  LanguageField,
+} from '@/features/settings/components/fields';
+import { SyncSection } from '@/features/settings/components/sync-section';
 import { bytes, memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { useCacheInfo, useClearCache } from '@/queries/cache';

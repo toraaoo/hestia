@@ -27,12 +27,12 @@ import {
   ContentInstallModal,
   instanceTarget,
 } from '@/features/content/install';
-import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
-import { EntryIconMenu } from '@/features/entries/icon-menu';
+import { EntryIconMenu } from '@/features/entries/components/icon-menu';
 import {
   type LiveResources,
   ResourceCards,
-} from '@/features/entries/resource-panel';
+} from '@/features/entries/components/resource-panel';
+import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
 import { useLaunchModal } from '@/features/instances/launch-modal';
 import { InstanceLogsTab } from '@/features/instances/tabs/logs';
 import { InstanceSettingsTab } from '@/features/instances/tabs/settings';

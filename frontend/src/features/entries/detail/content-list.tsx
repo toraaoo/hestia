@@ -22,7 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { kindInfo } from '@/features/content/kinds';
+import { kindInfo } from '@/features/content/lib/kinds';
 import { ChangeVersionModal } from '@/features/content/version-modal';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';

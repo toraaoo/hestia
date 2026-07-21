@@ -11,10 +11,10 @@ import {
   serverToCard,
   type View,
   ViewToggle,
-} from '@/features/entries/collection';
+} from '@/features/entries/components/collection';
+import type { EntryCardData } from '@/features/entries/components/entry-card';
+import { EntryGridSkeleton } from '@/features/entries/components/skeleton';
 import { CreateEntryModal } from '@/features/entries/create';
-import type { EntryCardData } from '@/features/entries/entry-card';
-import { EntryGridSkeleton } from '@/features/entries/skeleton';
 import { m } from '@/paraglide/messages.js';
 import {
   useServers,

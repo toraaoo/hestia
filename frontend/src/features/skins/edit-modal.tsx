@@ -13,9 +13,9 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { CapeCard, CapeGrid } from '@/features/skins/cards/cape-card';
-import { SkinModel } from '@/features/skins/render';
-import { readTextureFile } from '@/features/skins/texture';
+import { CapeCard, CapeGrid } from '@/features/skins/components/cape-card';
+import { SkinModel } from '@/features/skins/components/render';
+import { readTextureFile } from '@/features/skins/lib/texture';
 import { m } from '@/paraglide/messages.js';
 
 export interface SkinDraft {

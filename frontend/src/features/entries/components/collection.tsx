@@ -21,7 +21,7 @@ import {
   EntryCard,
   type EntryCardData,
   EntryRow,
-} from '@/features/entries/entry-card';
+} from '@/features/entries/components/entry-card';
 import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';

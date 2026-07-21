@@ -12,7 +12,7 @@ import {
   ComboboxItem,
   ComboboxList,
 } from '@/components/ui/combobox';
-import { projectRef } from '@/features/content/content-card';
+import { projectRef } from '@/features/content/components/content-card';
 import { agoLabel } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { useContentVersions } from '@/queries/content';
