@@ -22,7 +22,7 @@ import type {
   ServerUpdateParams,
 } from '../api';
 import * as api from '../api/server';
-import { mutation } from './core';
+import { mutation, type QueryFlags } from './core';
 import { jobMutation, useJobMutation } from './jobs';
 import { keys } from './keys';
 import { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
@@ -336,18 +336,25 @@ export function useServerPing(id: string, enabled: boolean) {
   });
 }
 
-export function useServerFlavors() {
-  return useQuery(serverQueries.flavors());
+export function useServerFlavors({ enabled = true }: QueryFlags = {}) {
+  return useQuery({ ...serverQueries.flavors(), enabled });
 }
 
-export function useServerVersions(flavor: string) {
-  return useQuery(serverQueries.versions(flavor));
+export function useServerVersions(
+  flavor: string,
+  { enabled = true }: QueryFlags = {},
+) {
+  return useQuery({ ...serverQueries.versions(flavor), enabled });
 }
 
-export function useServerLoaders(flavor: string, version: string) {
+export function useServerLoaders(
+  flavor: string,
+  version: string,
+  { enabled = true }: QueryFlags = {},
+) {
   return useQuery({
     ...serverQueries.loaders(flavor, version),
-    enabled: flavor !== '' && version !== '',
+    enabled: enabled && flavor !== '' && version !== '',
   });
 }
 
@@ -385,7 +392,7 @@ export function useServerBackups(id: string) {
 export function useServerContent(
   id: string,
   kind: ContentKind,
-  enabled = true,
+  { enabled = true }: QueryFlags = {},
 ) {
   return useQuery({ ...serverQueries.content(id, kind), enabled });
 }

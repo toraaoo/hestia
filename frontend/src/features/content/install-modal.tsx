@@ -587,12 +587,12 @@ function TargetStep({
  * installable pool, so it reports nothing.
  */
 function useInstalledRefs(target: Target, kind: ContentKind): Set<string> {
-  const server = useServerContent(target.id, kind, target.type === 'server');
-  const instance = useInstanceContent(
-    target.id,
-    kind,
-    target.type === 'instance',
-  );
+  const server = useServerContent(target.id, kind, {
+    enabled: target.type === 'server',
+  });
+  const instance = useInstanceContent(target.id, kind, {
+    enabled: target.type === 'instance',
+  });
   const items = (target.type === 'server' ? server : instance).data?.items;
   return useMemo(
     () =>
@@ -623,7 +623,9 @@ function ContentStep({
   const [search, setSearch] = useState('');
   const kinds = ACCEPTS[target.type].filter((k) => targetTakesKind(target, k));
   // Datapacks land inside a world; an instance with none can take none.
-  const worlds = useInstanceWorlds(target.id, target.type === 'instance');
+  const worlds = useInstanceWorlds(target.id, {
+    enabled: target.type === 'instance',
+  });
   const noWorlds = target.type === 'instance' && worlds.data?.length === 0;
   const datapackBlocked = (k: ContentKind) => k === 'data_pack' && noWorlds;
   const activeKind = kind ?? kinds[0];
@@ -878,7 +880,7 @@ function ReviewItemRow({
           : undefined,
       gameVersion: !isProfile ? target?.gameVersion || undefined : undefined,
     },
-    !isProfile,
+    { enabled: !isProfile },
   );
   const list = versions.data ?? [];
   const resolved = list.find((v) => v.id === versionId) ?? list[0];

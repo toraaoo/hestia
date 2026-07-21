@@ -1,5 +1,4 @@
 import { PlusIcon } from '@phosphor-icons/react';
-import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 
 import type { Skin } from '@/api';
@@ -22,13 +21,13 @@ import {
 import { readTextureFile } from '@/features/skins/texture';
 import { m } from '@/paraglide/messages.js';
 import {
-  skinQueries,
   useAccounts,
   useAddSkin,
   useClearCape,
   useEquipCape,
   useEquipSkin,
   useRemoveSkin,
+  useSkins,
   useUpdateSkin,
 } from '@/queries';
 
@@ -36,7 +35,7 @@ const BASE64_PREFIX = /^data:image\/png;base64,/;
 
 export function SkinsPage() {
   const { signedIn, isPending: accountsPending } = useAccounts();
-  const list = useQuery({ ...skinQueries.list(''), enabled: signedIn });
+  const list = useSkins('', { enabled: signedIn });
 
   const add = useAddSkin();
   const update = useUpdateSkin();

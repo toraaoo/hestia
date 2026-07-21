@@ -20,7 +20,7 @@ import type {
   ResolveParams,
 } from '../api';
 import * as api from '../api/instance';
-import { mutation } from './core';
+import { mutation, type QueryFlags } from './core';
 import { jobMutation, useJobMutation } from './jobs';
 import { keys } from './keys';
 import { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
@@ -386,18 +386,25 @@ export function useInstance(id: string) {
   });
 }
 
-export function useInstanceFlavors() {
-  return useQuery(instanceQueries.flavors());
+export function useInstanceFlavors({ enabled = true }: QueryFlags = {}) {
+  return useQuery({ ...instanceQueries.flavors(), enabled });
 }
 
-export function useInstanceVersions(flavor: string) {
-  return useQuery(instanceQueries.versions(flavor));
+export function useInstanceVersions(
+  flavor: string,
+  { enabled = true }: QueryFlags = {},
+) {
+  return useQuery({ ...instanceQueries.versions(flavor), enabled });
 }
 
-export function useInstanceLoaders(flavor: string, version: string) {
+export function useInstanceLoaders(
+  flavor: string,
+  version: string,
+  { enabled = true }: QueryFlags = {},
+) {
   return useQuery({
     ...instanceQueries.loaders(flavor, version),
-    enabled: flavor !== '' && version !== '',
+    enabled: enabled && flavor !== '' && version !== '',
   });
 }
 
@@ -405,7 +412,10 @@ export function useInstanceProfile(params: ResolveParams) {
   return useQuery(instanceQueries.profile(params));
 }
 
-export function useInstanceWorlds(id: string, enabled = true) {
+export function useInstanceWorlds(
+  id: string,
+  { enabled = true }: QueryFlags = {},
+) {
   return useQuery({ ...instanceQueries.worlds(id), enabled });
 }
 
@@ -445,7 +455,7 @@ export function useInstanceConfigValue(id: string, key: string) {
 export function useInstanceContent(
   id: string,
   kind: ContentKind,
-  enabled = true,
+  { enabled = true }: QueryFlags = {},
 ) {
   return useQuery({ ...instanceQueries.content(id, kind), enabled });
 }

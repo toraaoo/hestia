@@ -8,6 +8,12 @@ import type { QueryKey, UseMutationOptions } from '@tanstack/react-query';
 import type { HestiaError } from '../api';
 import { invalidate } from './client';
 
+/** Caller-controlled query flags, merged into a hook's own query options. */
+export interface QueryFlags {
+  /** Gate the fetch; ANDed with the query's intrinsic enablement. Default true. */
+  enabled?: boolean;
+}
+
 export interface MutationSpec<TData, TVariables> {
   mutationKey: QueryKey;
   mutationFn: (variables: TVariables) => Promise<TData>;

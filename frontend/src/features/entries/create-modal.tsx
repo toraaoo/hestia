@@ -1,6 +1,5 @@
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
-import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -30,8 +29,18 @@ import {
 import { useAppForm } from '@/hooks/form';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import { instanceQueries, useCreateInstance } from '@/queries/instance';
-import { serverQueries, useCreateServer } from '@/queries/server';
+import {
+  useCreateInstance,
+  useInstanceFlavors,
+  useInstanceLoaders,
+  useInstanceVersions,
+} from '@/queries/instance';
+import {
+  useCreateServer,
+  useServerFlavors,
+  useServerLoaders,
+  useServerVersions,
+} from '@/queries/server';
 
 type Kind = 'server' | 'instance';
 type Step = 'flavor' | 'version' | 'details';
@@ -85,14 +94,8 @@ export function CreateEntryModal({
   const [search, setSearch] = useState('');
   const [showSnapshots, setShowSnapshots] = useState(false);
 
-  const serverFlavors = useQuery({
-    ...serverQueries.flavors(),
-    enabled: kind === 'server',
-  });
-  const instanceFlavors = useQuery({
-    ...instanceQueries.flavors(),
-    enabled: kind === 'instance',
-  });
+  const serverFlavors = useServerFlavors({ enabled: kind === 'server' });
+  const instanceFlavors = useInstanceFlavors({ enabled: kind === 'instance' });
   const flavorsQuery = kind === 'server' ? serverFlavors : instanceFlavors;
   const flavors: Flavor[] = useMemo(
     () => flavorsQuery.data ?? [],
@@ -319,24 +322,20 @@ function VersionStep({
 }) {
   const selected = form.state.values.version.version as string;
 
-  const serverVersions = useQuery({
-    ...serverQueries.versions(flavor),
+  const serverVersions = useServerVersions(flavor, {
     enabled: kind === 'server',
   });
-  const instanceVersions = useQuery({
-    ...instanceQueries.versions(flavor),
+  const instanceVersions = useInstanceVersions(flavor, {
     enabled: kind === 'instance',
   });
   const versionsQuery = kind === 'server' ? serverVersions : instanceVersions;
   const versions: GameVersion[] = versionsQuery.data ?? [];
 
-  const serverLoaders = useQuery({
-    ...serverQueries.loaders(flavor, selected),
-    enabled: kind === 'server' && flavor !== '' && selected !== '',
+  const serverLoaders = useServerLoaders(flavor, selected, {
+    enabled: kind === 'server',
   });
-  const instanceLoaders = useQuery({
-    ...instanceQueries.loaders(flavor, selected),
-    enabled: kind === 'instance' && flavor !== '' && selected !== '',
+  const instanceLoaders = useInstanceLoaders(flavor, selected, {
+    enabled: kind === 'instance',
   });
   const loadersQuery = kind === 'server' ? serverLoaders : instanceLoaders;
   const loaders = loadersQuery.data;

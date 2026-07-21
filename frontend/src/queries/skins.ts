@@ -9,7 +9,7 @@ import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
 import type { Skin, SkinList, SkinVariant } from '../api';
 import * as api from '../api/skins';
 import { queryClient } from './client';
-import { mutation } from './core';
+import { mutation, type QueryFlags } from './core';
 import { keys } from './keys';
 
 export const skinQueries = {
@@ -128,8 +128,8 @@ export const skinMutations = {
     }),
 };
 
-export function useSkins(account = '') {
-  return useQuery(skinQueries.list(account));
+export function useSkins(account = '', { enabled = true }: QueryFlags = {}) {
+  return useQuery({ ...skinQueries.list(account), enabled });
 }
 
 export function useAddSkin() {
