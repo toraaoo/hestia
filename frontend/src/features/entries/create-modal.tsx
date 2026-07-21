@@ -35,6 +35,7 @@ import {
   useInstanceLoaders,
   useInstanceVersions,
 } from '@/queries/instance';
+import { backgroundJob, foregroundJob } from '@/queries/jobs';
 import {
   useCreateServer,
   useServerFlavors,
@@ -106,6 +107,16 @@ export function CreateEntryModal({
   const createInstance = useCreateInstance();
   const creating = createServer.isPending || createInstance.isPending;
   const progress = createServer.progress;
+  const job = createServer.job;
+
+  useEffect(() => {
+    if (creating && job?.status === 'running') foregroundJob(job.id);
+  }, [creating, job?.id, job?.status]);
+
+  const close = () => {
+    if (job?.status === 'running') backgroundJob(job.id);
+    onOpenChange(false);
+  };
 
   const form = useAppForm({
     defaultValues: createWizardDefaults(''),
@@ -188,9 +199,7 @@ export function CreateEntryModal({
   return (
     <Dialog
       open={open}
-      onOpenChange={(o) => {
-        if (!creating) onOpenChange(o);
-      }}
+      onOpenChange={(o) => (o ? onOpenChange(true) : close())}
     >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>

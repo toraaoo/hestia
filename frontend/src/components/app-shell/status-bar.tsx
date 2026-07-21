@@ -39,7 +39,9 @@ export function StatusBar() {
     }
   }, [jobs]);
 
-  const running = jobs.filter((job) => job.status === 'running');
+  const running = jobs.filter(
+    (job) => job.status === 'running' && job.background,
+  );
   const nameOf = (job: Job): string => {
     if (job.entry?.kind === 'instance') {
       return (

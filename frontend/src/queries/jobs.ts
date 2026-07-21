@@ -43,6 +43,8 @@ export interface Job<TProgress = unknown> extends JobMeta {
   error: HestiaError | null;
   startedAt: number;
   settledAt: number | null;
+  /** Shown in the status bar; a modal foregrounds its job to hide it there. */
+  background: boolean;
 }
 
 const MAX_SETTLED = 50;
@@ -107,6 +109,7 @@ export function startJob<TData, TProgress>(
     error: null,
     startedAt: Date.now(),
     settledAt: null,
+    background: true,
   });
   pruneSettled();
   emit();
@@ -128,6 +131,18 @@ export function startJob<TData, TProgress>(
     },
   );
   return { id, result };
+}
+
+/** Hide a job from the status bar while a modal owns its display. */
+export function foregroundJob(id: string): void {
+  if (jobs.get(id)?.background === false) return;
+  patch(id, { background: false });
+}
+
+/** Reveal a job in the status bar after its modal is closed. */
+export function backgroundJob(id: string): void {
+  if (jobs.get(id)?.background === true) return;
+  patch(id, { background: true });
 }
 
 /** Drop one settled job from the store; a running job stays. */
