@@ -27,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ContentInstallModal,
   instanceTarget,
-} from '@/features/content/install-modal';
+} from '@/features/content/install';
 import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
 import { EntryIconMenu } from '@/features/entries/icon-menu';
 import {

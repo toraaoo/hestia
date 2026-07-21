@@ -9,7 +9,7 @@ import { Markdown } from '@/components/markdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ContentInstallModal } from '@/features/content/install-modal';
+import { ContentInstallModal } from '@/features/content/install';
 import { kindInfo } from '@/features/content/kinds';
 import { agoLabel, compact } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';

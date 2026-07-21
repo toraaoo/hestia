@@ -18,10 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  ContentInstallModal,
-  serverTarget,
-} from '@/features/content/install-modal';
+import { ContentInstallModal, serverTarget } from '@/features/content/install';
 import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
 import { EntryIconMenu } from '@/features/entries/icon-menu';
 import {

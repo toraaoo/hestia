@@ -6,7 +6,7 @@ import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ContentInstallModal } from '@/features/content/install-modal';
+import { ContentInstallModal } from '@/features/content/install';
 import { kindInfo } from '@/features/content/kinds';
 import { compact } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';

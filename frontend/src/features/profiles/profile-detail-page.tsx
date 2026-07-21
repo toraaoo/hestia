@@ -12,10 +12,7 @@ import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import {
-  ContentInstallModal,
-  profileTarget,
-} from '@/features/content/install-modal';
+import { ContentInstallModal, profileTarget } from '@/features/content/install';
 import { KindChips } from '@/features/content/kind-chips';
 import { kindInfo } from '@/features/content/kinds';
 import { profileFilterKinds } from '@/features/profiles/profiles-page';
