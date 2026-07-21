@@ -335,7 +335,7 @@ export function ContentInstallModal({
         </DialogHeader>
 
         {installing ? (
-          <div className="flex min-h-[18rem] flex-col justify-center px-1">
+          <div className="flex min-h-72 flex-col justify-center px-1">
             <Progress value={progress}>
               <ProgressLabel>
                 {phase || m['content.installing']()}
@@ -345,7 +345,7 @@ export function ContentInstallModal({
           </div>
         ) : (
           <>
-            <div className="flex max-h-[58vh] min-h-[16rem] flex-col overflow-hidden p-1">
+            <div className="flex max-h-[58vh] min-h-64 flex-col overflow-hidden p-1">
               {stepId === 'target' ? (
                 <TargetStep
                   kind={project?.kind ?? 'mod'}
@@ -766,7 +766,7 @@ function WorldsStep({
             <Checkbox
               id={id}
               checked={checked}
-              onCheckedChange={(c) => onToggle(w, c === true)}
+              onCheckedChange={(c) => onToggle(w, c)}
             />
             {w}
           </label>
