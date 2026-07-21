@@ -248,6 +248,10 @@ pub struct InstalledContent {
     pub filename: String,
     pub sha1: String,
     pub url: String,
+    /// The project's icon, carried for the desktop UI so an installed item
+    /// renders its artwork; empty for local-file imports (no project) and for
+    /// records written before this field.
+    pub icon_url: String,
     pub installed_unix: i64,
     /// For datapacks: the world directory (relative to the entry's `data/`)
     /// the file lives in — datapacks load from inside a world, not a flat dir.

@@ -656,6 +656,7 @@ impl Engine {
                     .map(|c| c.hex.clone())
                     .unwrap_or_default(),
                 url: file.artifact.url.clone(),
+                icon_url: project.icon_url.clone(),
                 installed_unix: registry::now_unix(),
                 world: world.to_string(),
                 origin: String::new(),

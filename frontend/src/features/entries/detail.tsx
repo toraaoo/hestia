@@ -427,14 +427,27 @@ function ContentRow({
   onToggle: () => void;
 }) {
   const [removing, setRemoving] = useState(false);
+  const [iconBroken, setIconBroken] = useState(false);
   const selecting = checked !== undefined;
   const Icon = contentIcon(item.kind);
   // A local-file import has no project page to open and no versions to move
   // between — its only action is enable/disable and removal.
   const platform = item.source !== 'file' && !!item.projectId;
+  const showImage = !!item.iconUrl && !iconBroken;
   const body = (
     <>
-      <Icon className="size-4 shrink-0 text-muted-foreground" />
+      {showImage ? (
+        <img
+          src={item.iconUrl}
+          alt=""
+          onError={() => setIconBroken(true)}
+          className="size-7 shrink-0 object-cover ring-1 ring-border"
+        />
+      ) : (
+        <span className="grid size-7 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
+          <Icon className="size-4" />
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm group-hover/item:underline group-hover/item:underline-offset-2">

@@ -1,5 +1,6 @@
 import type { Icon } from '@phosphor-icons/react';
 import { CheckIcon } from '@phosphor-icons/react';
+import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -13,6 +14,7 @@ import { cn } from '@/lib/utils';
  */
 export function PickRow({
   icon: RowIcon,
+  imageUrl,
   title,
   subtitle,
   badge,
@@ -21,6 +23,8 @@ export function PickRow({
   onSelect,
 }: {
   icon: Icon;
+  /** The content's artwork; falls back to `icon` when absent or on load error. */
+  imageUrl?: string;
   title: string;
   subtitle: string;
   badge?: string;
@@ -28,6 +32,8 @@ export function PickRow({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const [broken, setBroken] = useState(false);
+  const showImage = !!imageUrl && !broken;
   return (
     <button
       type="button"
@@ -41,7 +47,18 @@ export function PickRow({
           : 'border-border hover:border-foreground/20 hover:bg-muted/60',
       )}
     >
-      <RowIcon className="size-4.5 shrink-0 text-muted-foreground" />
+      {showImage ? (
+        <img
+          src={imageUrl}
+          alt=""
+          onError={() => setBroken(true)}
+          className="size-8 shrink-0 object-cover ring-1 ring-border"
+        />
+      ) : (
+        <span className="grid size-8 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
+          <RowIcon className="size-4.5" />
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="min-w-0 truncate text-sm font-medium">{title}</span>

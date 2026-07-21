@@ -686,6 +686,7 @@ function ContentStep({
               <PickRow
                 key={`${p.source}:${p.id}`}
                 icon={contentIcon(p.kind)}
+                imageUrl={p.iconUrl}
                 title={p.title}
                 subtitle={`${contentKindLabel[p.kind]()} · ${m['browse.by_author']({ name: p.author })}`}
                 badge={installed ? m['content.installed']() : undefined}

@@ -146,6 +146,8 @@ export interface InstalledContent {
   filename: string;
   sha1: string;
   url: string;
+  /** The project's icon for the desktop UI; empty for local-file imports. */
+  iconUrl: string;
   installedUnix: number;
   /** For datapacks: the world the file lives in; empty for other kinds. */
   world: string;
