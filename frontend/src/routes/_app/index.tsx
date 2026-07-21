@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import type { View } from '@/features/entries/collection';
-import { LibraryPage } from '@/features/library/library-page';
+import { LibraryPage } from '@/features/library/page';
 
 type LibrarySearch = { view?: View; servers?: string; instances?: string };
 

@@ -15,7 +15,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ContentInstallModal, profileTarget } from '@/features/content/install';
 import { KindChips } from '@/features/content/kind-chips';
 import { kindInfo } from '@/features/content/kinds';
-import { profileFilterKinds } from '@/features/profiles/profiles-page';
+import { profileFilterKinds } from '@/features/profiles/page';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
 import {

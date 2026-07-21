@@ -1,6 +1,6 @@
 import { CheckIcon, XIcon } from '@phosphor-icons/react';
 
-import { CapeFront } from '@/features/skins/skin-render';
+import { CapeFront } from '@/features/skins/render';
 import { cn } from '@/lib/utils';
 
 export function CapeGrid({ children }: { children: React.ReactNode }) {

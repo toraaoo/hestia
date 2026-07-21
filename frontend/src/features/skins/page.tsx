@@ -7,17 +7,17 @@ import { Page, Section } from '@/components/page';
 import { SignInGate } from '@/components/sign-in-gate';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { CapeCard, CapeGrid } from '@/features/skins/cape-card';
-import { collapseDefaults } from '@/features/skins/defaults';
-import type { SkinDraft } from '@/features/skins/edit-skin-modal';
-import { EditSkinModal } from '@/features/skins/edit-skin-modal';
-import { PreviewPanel } from '@/features/skins/preview-panel';
-import { SkinsPageSkeleton } from '@/features/skins/skeleton';
+import { CapeCard, CapeGrid } from '@/features/skins/cards/cape-card';
 import {
   SkinCard,
   SkinGrid,
   skinDisplayName,
-} from '@/features/skins/skin-card';
+} from '@/features/skins/cards/skin-card';
+import { collapseDefaults } from '@/features/skins/defaults';
+import type { SkinDraft } from '@/features/skins/edit-modal';
+import { EditSkinModal } from '@/features/skins/edit-modal';
+import { PreviewPanel } from '@/features/skins/preview-panel';
+import { SkinsPageSkeleton } from '@/features/skins/skeleton';
 import { readTextureFile } from '@/features/skins/texture';
 import { m } from '@/paraglide/messages.js';
 import {

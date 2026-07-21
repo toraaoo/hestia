@@ -36,7 +36,7 @@ import {
 import { useLaunchModal } from '@/features/instances/launch-modal';
 import { InstanceLogsTab } from '@/features/instances/tabs/logs';
 import { InstanceSettingsTab } from '@/features/instances/tabs/settings';
-import { ProfilesPanel } from '@/features/profiles/profiles-panel';
+import { ProfilesPanel } from '@/features/profiles/panel';
 import { agoLabel, bytes, memGb, uptime } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import {

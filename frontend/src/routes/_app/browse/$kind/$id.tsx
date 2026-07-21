@@ -4,7 +4,7 @@ import { kindBySlug } from '@/features/content/kinds';
 import {
   ProjectDetailPage,
   type ProjectTab,
-} from '@/features/content/project-detail-page';
+} from '@/features/content/project-detail';
 
 export const Route = createFileRoute('/_app/browse/$kind/$id')({
   validateSearch: (search: Record<string, unknown>): { tab?: ProjectTab } => ({

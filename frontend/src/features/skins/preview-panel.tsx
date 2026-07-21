@@ -4,8 +4,11 @@ import type { Cape, Skin, SkinVariant } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { skinDisplayName, skinVariantLabel } from '@/features/skins/skin-card';
-import { SkinModel } from '@/features/skins/skin-render';
+import {
+  skinDisplayName,
+  skinVariantLabel,
+} from '@/features/skins/cards/skin-card';
+import { SkinModel } from '@/features/skins/render';
 import { m } from '@/paraglide/messages.js';
 
 /** The sticky left panel: animated model plus the preview → apply flow. */
