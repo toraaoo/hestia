@@ -44,7 +44,7 @@ export function PickRow({
       <RowIcon className="size-4.5 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">{title}</span>
+          <span className="min-w-0 truncate text-sm font-medium">{title}</span>
           {badge && (
             <Badge variant="outline" className="shrink-0">
               {badge}
