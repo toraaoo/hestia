@@ -13,8 +13,6 @@ import {
 import type {
   BackupInfo,
   ConfigEntry,
-  ContentAddSpec,
-  ContentDone,
   ContentKind,
   ResolveParams,
   ServerCreateParams,
@@ -23,6 +21,7 @@ import type {
 } from '../api';
 import * as api from '../api/server';
 import { CATALOG_STALE_MS, mutation, type QueryFlags } from './core';
+import { entryContentFactories } from './entry-content';
 import { useEntryIconLookup } from './icons';
 import { jobMutation, useJobMutation } from './jobs';
 import { keys } from './keys';
@@ -238,65 +237,13 @@ export const serverMutations = {
         invalidates: () => [keys.servers.backups(id), keys.servers.info(id)],
       }),
   },
-  content: {
-    /** Servers take mods and datapacks; refused on a running or busy server. */
-    add: (id: string) =>
-      jobMutation<ContentDone, ContentAddSpec>({
-        mutationKey: [...keys.servers.content(id), 'add'],
-        meta: (spec) => ({
-          kind: 'content.add',
-          label: `add ${spec.kind}`,
-          entry: { kind: 'server', id },
-        }),
-        run: (spec, onProgress) => api.content.add(id, spec, onProgress),
-        invalidates: () => [keys.servers.content(id), keys.servers.info(id)],
-      }),
-    remove: (id: string) =>
-      mutation<void, { kind: ContentKind; item: string; worlds?: string[] }>({
-        mutationKey: [...keys.servers.content(id), 'remove'],
-        mutationFn: ({ kind, item, worlds }) =>
-          api.content.remove(id, kind, item, worlds),
-        invalidates: () => [keys.servers.content(id), keys.servers.info(id)],
-      }),
-    /** `item` empty updates every platform-sourced item of the kind. */
-    update: (id: string) =>
-      jobMutation<ContentDone, { kind: ContentKind; item?: string }>({
-        mutationKey: [...keys.servers.content(id), 'update'],
-        meta: ({ kind }) => ({
-          kind: 'content.update',
-          label: `update ${kind}s`,
-          entry: { kind: 'server', id },
-        }),
-        run: ({ kind, item }, onProgress) =>
-          api.content.update(id, kind, item, onProgress),
-        invalidates: () => [keys.servers.content(id), keys.servers.info(id)],
-      }),
-    enable: (id: string) =>
-      mutation<
-        void,
-        { kind: ContentKind; item: string; enabled: boolean; worlds?: string[] }
-      >({
-        mutationKey: [...keys.servers.content(id), 'enable'],
-        mutationFn: ({ kind, item, enabled, worlds }) =>
-          api.content.enable(id, kind, item, enabled, worlds),
-        invalidates: () => [keys.servers.content(id), keys.servers.info(id)],
-      }),
-    setVersion: (id: string) =>
-      jobMutation<
-        ContentDone,
-        { kind: ContentKind; item: string; version: string }
-      >({
-        mutationKey: [...keys.servers.content(id), 'set-version'],
-        meta: ({ kind }) => ({
-          kind: 'content.update',
-          label: `pin ${kind}`,
-          entry: { kind: 'server', id },
-        }),
-        run: ({ kind, item, version }, onProgress) =>
-          api.content.setVersion(id, kind, item, version, onProgress),
-        invalidates: () => [keys.servers.content(id), keys.servers.info(id)],
-      }),
-  },
+  /** Servers take mods and datapacks; refused on a running or busy server. */
+  content: entryContentFactories({
+    kind: 'server',
+    api: api.content,
+    contentKey: keys.servers.content,
+    infoKey: keys.servers.info,
+  }),
 };
 
 export function useServers() {

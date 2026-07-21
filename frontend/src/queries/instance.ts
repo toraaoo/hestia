@@ -8,7 +8,6 @@
 import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
 import type {
   ConfigEntry,
-  ContentAddSpec,
   ContentDone,
   ContentKind,
   ContentProfile,
@@ -20,6 +19,7 @@ import type {
 } from '../api';
 import * as api from '../api/instance';
 import { CATALOG_STALE_MS, mutation, type QueryFlags } from './core';
+import { entryContentFactories } from './entry-content';
 import { useEntryIconLookup } from './icons';
 import { jobMutation, useJobMutation } from './jobs';
 import { keys } from './keys';
@@ -259,86 +259,18 @@ export const instanceMutations = {
         ],
       }),
   },
-  content: {
-    /** Instances take mods, resourcepacks, shaders, and datapacks. */
-    add: (id: string) =>
-      jobMutation<ContentDone, ContentAddSpec>({
-        mutationKey: [...keys.instances.content(id), 'add'],
-        meta: (spec) => ({
-          kind: 'content.add',
-          label: `add ${spec.kind}`,
-          entry: { kind: 'instance', id },
-        }),
-        run: (spec, onProgress) => api.content.add(id, spec, onProgress),
-        invalidates: () => [
-          keys.instances.content(id),
-          keys.instances.info(id),
-        ],
-      }),
-    remove: (id: string) =>
-      mutation<void, { kind: ContentKind; item: string; worlds?: string[] }>({
-        mutationKey: [...keys.instances.content(id), 'remove'],
-        mutationFn: ({ kind, item, worlds }) =>
-          api.content.remove(id, kind, item, worlds),
-        // A removal also drops the filename from every profile.
-        invalidates: () => [
-          keys.instances.content(id),
-          keys.instances.profiles(id),
-          keys.instances.info(id),
-        ],
-      }),
-    /** `item` empty updates every platform-sourced item of the kind. */
-    update: (id: string) =>
-      jobMutation<ContentDone, { kind: ContentKind; item?: string }>({
-        mutationKey: [...keys.instances.content(id), 'update'],
-        meta: ({ kind }) => ({
-          kind: 'content.update',
-          label: `update ${kind}s`,
-          entry: { kind: 'instance', id },
-        }),
-        run: ({ kind, item }, onProgress) =>
-          api.content.update(id, kind, item, onProgress),
-        // An update can change a member's filename in every profile.
-        invalidates: () => [
-          keys.instances.content(id),
-          keys.instances.profiles(id),
-          keys.instances.info(id),
-        ],
-      }),
-    enable: (id: string) =>
-      mutation<
-        void,
-        { kind: ContentKind; item: string; enabled: boolean; worlds?: string[] }
-      >({
-        mutationKey: [...keys.instances.content(id), 'enable'],
-        mutationFn: ({ kind, item, enabled, worlds }) =>
-          api.content.enable(id, kind, item, enabled, worlds),
-        invalidates: () => [
-          keys.instances.content(id),
-          keys.instances.info(id),
-        ],
-      }),
-    setVersion: (id: string) =>
-      jobMutation<
-        ContentDone,
-        { kind: ContentKind; item: string; version: string }
-      >({
-        mutationKey: [...keys.instances.content(id), 'set-version'],
-        meta: ({ kind }) => ({
-          kind: 'content.update',
-          label: `pin ${kind}`,
-          entry: { kind: 'instance', id },
-        }),
-        run: ({ kind, item, version }, onProgress) =>
-          api.content.setVersion(id, kind, item, version, onProgress),
-        // A pin can change a member's filename in every profile.
-        invalidates: () => [
-          keys.instances.content(id),
-          keys.instances.profiles(id),
-          keys.instances.info(id),
-        ],
-      }),
-  },
+  /**
+   * Instances take mods, resourcepacks, shaders, and datapacks. A
+   * remove/update/pin can drop or remap a member's filename in every profile,
+   * so the instance also sweeps its `profiles(id)` key.
+   */
+  content: entryContentFactories({
+    kind: 'instance',
+    api: api.content,
+    contentKey: keys.instances.content,
+    infoKey: keys.instances.info,
+    extraInvalidate: (id) => [keys.instances.profiles(id)],
+  }),
 };
 
 export function useInstances() {

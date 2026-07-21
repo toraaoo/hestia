@@ -1,28 +1,16 @@
 import { ArrowsClockwiseIcon, TrashIcon } from '@phosphor-icons/react';
-import { useQueries } from '@tanstack/react-query';
+import { useMutation, useQueries } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import type { ContentVersion, InstalledContent } from '@/api';
 import { Empty } from '@/components/empty';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { KindChips } from '@/features/content/components/kind-chips';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
-import {
-  instanceQueries,
-  useEnableInstanceContent,
-  useRemoveInstanceContent,
-  useSetInstanceContentVersion,
-  useUpdateInstanceContent,
-} from '@/queries/instance';
-import {
-  serverQueries,
-  useEnableServerContent,
-  useRemoveServerContent,
-  useSetServerContentVersion,
-  useUpdateServerContent,
-} from '@/queries/server';
+import { instanceMutations, instanceQueries } from '@/queries/instance';
+import { useJobMutation } from '@/queries/jobs';
+import { serverMutations, serverQueries } from '@/queries/server';
 
 import {
   installedRef,
@@ -35,116 +23,68 @@ import {
 } from './content';
 import { ContentList } from './content-list';
 
-/** One mutation from each content op, shared by both entry kinds. */
-interface ContentMutations {
-  enable: {
-    mutate: (v: {
-      kind: InstalledContent['kind'];
-      item: string;
-      enabled: boolean;
-      worlds: string[];
-    }) => void;
-  };
-  remove: {
-    mutate: (v: {
-      kind: InstalledContent['kind'];
-      item: string;
-      worlds: string[];
-    }) => void;
-  };
-  update: {
-    mutate: (v: { kind: InstalledContent['kind']; item: string }) => void;
-  };
-  setVersion: {
-    mutate: (v: {
-      kind: InstalledContent['kind'];
-      item: string;
-      version: string;
-    }) => void;
-  };
-}
+/**
+ * The content tab body: kind filter chips + the filtered installed list, wired
+ * to the daemon. The two entry kinds now share one factory shape, so the
+ * queries and mutation handlers are selected by kind without splitting the
+ * component — hook order stays stable across a re-render either way.
+ */
+export function ContentSection({
+  entry,
+  kinds,
+  kind,
+  onKindChange,
+  action,
+}: SectionProps) {
+  const { id } = entry;
+  const isServer = entry.kind === 'server';
+  const queries = isServer ? serverQueries : instanceQueries;
+  const content = isServer
+    ? serverMutations.content
+    : instanceMutations.content;
 
-/** Map the entry's mutation hooks onto the row-level handler callbacks. */
-function buildHandlers(m: ContentMutations): RowHandlers {
-  return {
+  const lists = useQueries({
+    queries: kinds.map((k) => queries.content(id, k)),
+  });
+  const updates = useQueries({
+    queries: kinds.map((k) => queries.contentUpdates(id, k)),
+  });
+
+  const enable = useMutation(content.enable(id));
+  const remove = useMutation(content.remove(id));
+  const update = useJobMutation(content.update(id));
+  const setVersion = useJobMutation(content.setVersion(id));
+  const handlers: RowHandlers = {
     onEnable: (item, enabled) =>
-      m.enable.mutate({
+      enable.mutate({
         kind: item.kind,
         item: installedRef(item),
         enabled,
         worlds: itemWorlds(item),
       }),
     onRemove: (item) =>
-      m.remove.mutate({
+      remove.mutate({
         kind: item.kind,
         item: installedRef(item),
         worlds: itemWorlds(item),
       }),
     onUpdate: (item) =>
-      m.update.mutate({ kind: item.kind, item: installedRef(item) }),
-    onSetVersion: (item, version: ContentVersion) =>
-      m.setVersion.mutate({
+      update.mutate({ kind: item.kind, item: installedRef(item) }),
+    onSetVersion: (item, version) =>
+      setVersion.mutate({
         kind: item.kind,
         item: installedRef(item),
         version: version.id,
       }),
   };
-}
 
-/**
- * The content tab body: kind filter chips + the filtered installed list, wired
- * to the daemon. Dispatches to a server- or instance-bound section so the
- * mutation hooks stay unconditional.
- */
-export function ContentSection(props: SectionProps) {
-  return props.entry.kind === 'server' ? (
-    <ServerContentSection {...props} />
-  ) : (
-    <InstanceContentSection {...props} />
-  );
-}
-
-function ServerContentSection(props: SectionProps) {
-  const { id } = props.entry;
-  const lists = useQueries({
-    queries: props.kinds.map((k) => serverQueries.content(id, k)),
-  });
-  const updates = useQueries({
-    queries: props.kinds.map((k) => serverQueries.contentUpdates(id, k)),
-  });
-  const handlers = buildHandlers({
-    enable: useEnableServerContent(id),
-    remove: useRemoveServerContent(id),
-    update: useUpdateServerContent(id),
-    setVersion: useSetServerContentVersion(id),
-  });
   return (
     <ContentSectionView
-      {...props}
-      lists={lists}
-      updates={updates}
-      handlers={handlers}
-    />
-  );
-}
-
-function InstanceContentSection(props: SectionProps) {
-  const { id } = props.entry;
-  const lists = useQueries({
-    queries: props.kinds.map((k) => instanceQueries.content(id, k)),
-  });
-  const updates = useQueries({
-    queries: props.kinds.map((k) => instanceQueries.contentUpdates(id, k)),
-  });
-  const handlers = buildHandlers({
-    enable: useEnableInstanceContent(id),
-    remove: useRemoveInstanceContent(id),
-    update: useUpdateInstanceContent(id),
-    setVersion: useSetInstanceContentVersion(id),
-  });
-  return (
-    <ContentSectionView
-      {...props}
+      entry={entry}
+      kinds={kinds}
+      kind={kind}
+      onKindChange={onKindChange}
+      action={action}
       lists={lists}
       updates={updates}
       handlers={handlers}
