@@ -96,8 +96,9 @@ export function useContentProject(project: string, source = '') {
   return useQuery(contentQueries.project(project, source));
 }
 
-export function useContentVersions(query: VersionQuery) {
-  return useQuery(contentQueries.versions(query));
+export function useContentVersions(query: VersionQuery, enabled = true) {
+  const options = contentQueries.versions(query);
+  return useQuery({ ...options, enabled: enabled && options.enabled });
 }
 
 export function useResolvedModpack(versionId: string, source = '') {

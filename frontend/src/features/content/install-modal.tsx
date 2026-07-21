@@ -4,7 +4,6 @@ import {
   UploadSimpleIcon,
   XIcon,
 } from '@phosphor-icons/react';
-import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -55,10 +54,14 @@ import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { invalidate, keys } from '@/queries';
-import { contentQueries } from '@/queries/content';
-import { useInstances } from '@/queries/instance';
+import { useContentSearch, useContentVersions } from '@/queries/content';
+import {
+  useInstanceContent,
+  useInstances,
+  useInstanceWorlds,
+} from '@/queries/instance';
 import { useGlobalProfiles } from '@/queries/profile';
-import { useServers } from '@/queries/server';
+import { useServerContent, useServers } from '@/queries/server';
 
 /** An entry the content can be installed into, drawn from every store. */
 export interface Target {
@@ -206,6 +209,18 @@ export function ContentInstallModal({
     selectedKinds.includes('data_pack') && target?.type === 'instance';
   const isProfile = target?.type === 'profile';
 
+  const toggleProject = (p: ContentProject) => {
+    const ref = projectRef(p);
+    setPicked((prev) =>
+      prev.some((x) => projectRef(x) === ref)
+        ? prev.filter((x) => projectRef(x) !== ref)
+        : [...prev, p],
+    );
+    setVersionIds(({ [ref]: _, ...rest }) => rest);
+  };
+  const removeFile = (path: string) =>
+    setFiles((prev) => prev.filter((f) => f.path !== path));
+
   const pickStep = mode === 'browse' ? 'target' : 'content';
   const steps: string[] =
     needsWorlds && !isProfile
@@ -239,7 +254,7 @@ export function ContentInstallModal({
         ? selectedCount > 0
         : stepId === 'worlds'
           ? worlds.length > 0
-          : true;
+          : selectedCount > 0;
 
   async function install() {
     if (!target) return;
@@ -350,16 +365,7 @@ export function ContentInstallModal({
                     kind={kindFilter}
                     onKindChange={setKindFilter}
                     picked={picked}
-                    files={files}
-                    onToggle={(p) => {
-                      const ref = projectRef(p);
-                      setPicked((prev) =>
-                        prev.some((x) => projectRef(x) === ref)
-                          ? prev.filter((x) => projectRef(x) !== ref)
-                          : [...prev, p],
-                      );
-                      setVersionIds(({ [ref]: _, ...rest }) => rest);
-                    }}
+                    onToggle={toggleProject}
                     onAddFiles={(paths, k) =>
                       setFiles((prev) => [
                         ...prev,
@@ -367,9 +373,6 @@ export function ContentInstallModal({
                           .filter((p) => !prev.some((f) => f.path === p))
                           .map((path) => ({ path, kind: k })),
                       ])
-                    }
-                    onRemoveFile={(path) =>
-                      setFiles((prev) => prev.filter((f) => f.path !== path))
                     }
                   />
                 )
@@ -397,6 +400,8 @@ export function ContentInstallModal({
                         id ? { ...rest, [ref]: id } : rest,
                       )
                     }
+                    onRemoveProject={toggleProject}
+                    onRemoveFile={removeFile}
                     worlds={needsWorlds ? worlds : undefined}
                   />
                 </div>
@@ -477,7 +482,12 @@ function FilterBar({
   search: string;
   onSearch: (v: string) => void;
   placeholder: string;
-  chips?: { label: string; active: boolean; onClick: () => void }[];
+  chips?: {
+    label: string;
+    active: boolean;
+    disabled?: boolean;
+    onClick: () => void;
+  }[];
 }) {
   return (
     <div className="mb-3 flex flex-col gap-2.5">
@@ -492,7 +502,11 @@ function FilterBar({
             <button
               key={c.label}
               type="button"
-              className={chipClass(c.active)}
+              disabled={c.disabled}
+              className={cn(
+                chipClass(c.active),
+                c.disabled && 'cursor-not-allowed opacity-40',
+              )}
               onClick={c.onClick}
             >
               {c.label}
@@ -566,39 +580,63 @@ function TargetStep({
   );
 }
 
+/**
+ * The installed pool of a target, keyed `source:projectId` — the same match the
+ * CLI's browse session uses to flag an already-installed hit. Built on the
+ * server/instance content-list factories; a profile holds references, not an
+ * installable pool, so it reports nothing.
+ */
+function useInstalledRefs(target: Target, kind: ContentKind): Set<string> {
+  const server = useServerContent(target.id, kind, target.type === 'server');
+  const instance = useInstanceContent(
+    target.id,
+    kind,
+    target.type === 'instance',
+  );
+  const items = (target.type === 'server' ? server : instance).data?.items;
+  return useMemo(
+    () =>
+      new Set(
+        (items ?? [])
+          .filter((i) => i.projectId)
+          .map((i) => `${i.source}:${i.projectId}`),
+      ),
+    [items],
+  );
+}
+
 function ContentStep({
   target,
   kind,
   onKindChange,
   picked,
-  files,
   onToggle,
   onAddFiles,
-  onRemoveFile,
 }: {
   target: Target;
   kind: ContentKind | null;
   onKindChange: (kind: ContentKind | null) => void;
   picked: ContentProject[];
-  files: PickedFile[];
   onToggle: (p: ContentProject) => void;
   onAddFiles: (paths: string[], kind: ContentKind) => void;
-  onRemoveFile: (path: string) => void;
 }) {
   const [search, setSearch] = useState('');
   const kinds = ACCEPTS[target.type].filter((k) => targetTakesKind(target, k));
+  // Datapacks land inside a world; an instance with none can take none.
+  const worlds = useInstanceWorlds(target.id, target.type === 'instance');
+  const noWorlds = target.type === 'instance' && worlds.data?.length === 0;
+  const datapackBlocked = (k: ContentKind) => k === 'data_pack' && noWorlds;
   const activeKind = kind ?? kinds[0];
   const pickedRefs = new Set(picked.map(projectRef));
+  const installedRefs = useInstalledRefs(target, activeKind);
 
-  const results = useQuery(
-    contentQueries.search({
-      kind: activeKind,
-      query: search.trim(),
-      loader: activeKind === 'mod' ? target.flavor : undefined,
-      gameVersion: target.gameVersion || undefined,
-      limit: 30,
-    }),
-  );
+  const results = useContentSearch({
+    kind: activeKind,
+    query: search.trim(),
+    loader: activeKind === 'mod' ? target.flavor : undefined,
+    gameVersion: target.gameVersion || undefined,
+    limit: 30,
+  });
   const hits = results.data?.hits ?? [];
 
   return (
@@ -612,41 +650,25 @@ function ContentStep({
             chips={kinds.map((k) => ({
               label: kindInfo[k].label(),
               active: activeKind === k,
+              disabled: datapackBlocked(k),
               onClick: () => onKindChange(k),
             }))}
           />
 
           {/* A global profile stores project references, never files. */}
-          {target.type !== 'profile' && (
+          {target.type !== 'profile' && !datapackBlocked(activeKind) && (
             <FileImportButton
               onPickFiles={(paths) => onAddFiles(paths, activeKind)}
             />
           )}
-
-          {/* The selection survives searches and kind switches; chips keep
-              every picked item visible and removable from any view. */}
-          {picked.length + files.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {picked.map((p) => (
-                <SelectionChip
-                  key={projectRef(p)}
-                  label={p.title}
-                  onRemove={() => onToggle(p)}
-                />
-              ))}
-              {files.map((f) => (
-                <SelectionChip
-                  key={f.path}
-                  label={fileName(f.path)}
-                  onRemove={() => onRemoveFile(f.path)}
-                />
-              ))}
-            </div>
-          )}
         </>
       }
     >
-      {results.isPending ? (
+      {datapackBlocked(activeKind) ? (
+        <p className="px-1 py-8 text-center text-xs text-muted-foreground">
+          {m['content.no_worlds_datapack']()}
+        </p>
+      ) : results.isPending ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
           {m['content.installing']()}
         </p>
@@ -656,39 +678,24 @@ function ContentStep({
         </p>
       ) : (
         <div className="grid gap-2 p-0.5">
-          {hits.map((p) => (
-            <PickRow
-              key={`${p.source}:${p.id}`}
-              variant="add"
-              icon={contentIcon(p.kind)}
-              title={p.title}
-              subtitle={`${contentKindLabel[p.kind]()} · ${m['browse.by_author']({ name: p.author })}`}
-              selected={pickedRefs.has(projectRef(p))}
-              onSelect={() => onToggle(p)}
-            />
-          ))}
+          {hits.map((p) => {
+            const installed = installedRefs.has(`${p.source}:${p.id}`);
+            return (
+              <PickRow
+                key={`${p.source}:${p.id}`}
+                icon={contentIcon(p.kind)}
+                title={p.title}
+                subtitle={`${contentKindLabel[p.kind]()} · ${m['browse.by_author']({ name: p.author })}`}
+                badge={installed ? m['content.installed']() : undefined}
+                disabled={installed}
+                selected={pickedRefs.has(projectRef(p))}
+                onSelect={() => onToggle(p)}
+              />
+            );
+          })}
         </div>
       )}
     </PickerPanel>
-  );
-}
-
-function SelectionChip({
-  label,
-  onRemove,
-}: {
-  label: string;
-  onRemove: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onRemove}
-      className={cn(chipClass(true), 'flex items-center gap-1')}
-    >
-      <span className="max-w-40 truncate">{label}</span>
-      <XIcon weight="bold" className="size-3 shrink-0" />
-    </button>
   );
 }
 
@@ -728,11 +735,7 @@ function WorldsStep({
   selected: string[];
   onToggle: (world: string, on: boolean) => void;
 }) {
-  const query = useQuery({
-    queryKey: ['instance-worlds', instanceId],
-    queryFn: () => instanceApi.worlds(instanceId),
-    enabled: !!instanceId,
-  });
+  const query = useInstanceWorlds(instanceId);
   const list = query.data ?? [];
 
   if (!query.isPending && list.length === 0) {
@@ -777,6 +780,8 @@ function ReviewStep({
   files,
   versionIds,
   onVersion,
+  onRemoveProject,
+  onRemoveFile,
   worlds,
 }: {
   target: Target | null;
@@ -784,6 +789,8 @@ function ReviewStep({
   files: PickedFile[];
   versionIds: Record<string, string>;
   onVersion: (ref: string, id: string) => void;
+  onRemoveProject: (p: ContentProject) => void;
+  onRemoveFile: (path: string) => void;
   worlds?: string[];
 }) {
   const isProfile = target?.type === 'profile';
@@ -811,17 +818,38 @@ function ReviewStep({
             isProfile={isProfile}
             versionId={versionIds[projectRef(p)] ?? ''}
             onVersion={(id) => onVersion(projectRef(p), id)}
+            onRemove={() => onRemoveProject(p)}
           />
         ))}
         {files.map((f) => (
-          <ReviewRow
+          <div
             key={f.path}
-            label={fileName(f.path)}
-            value={m['content.local_file']()}
-          />
+            className="flex items-center justify-between gap-4 px-3 py-2 text-sm"
+          >
+            <div className="min-w-0">
+              <span className="block truncate">{fileName(f.path)}</span>
+              <span className="block truncate text-[11px] text-muted-foreground">
+                {m['content.local_file']()}
+              </span>
+            </div>
+            <RemoveButton onClick={() => onRemoveFile(f.path)} />
+          </div>
         ))}
       </div>
     </div>
+  );
+}
+
+function RemoveButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={m['action.remove']()}
+      className="flex size-6 shrink-0 items-center justify-center border border-border text-muted-foreground outline-none transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      <XIcon weight="bold" className="size-3.5" />
+    </button>
   );
 }
 
@@ -831,15 +859,17 @@ function ReviewItemRow({
   isProfile,
   versionId,
   onVersion,
+  onRemove,
 }: {
   target: Target | null;
   project: ContentProject;
   isProfile: boolean;
   versionId: string;
   onVersion: (id: string) => void;
+  onRemove: () => void;
 }) {
-  const versions = useQuery({
-    ...contentQueries.versions({
+  const versions = useContentVersions(
+    {
       source: project.source,
       project: projectRef(project),
       loader:
@@ -847,9 +877,9 @@ function ReviewItemRow({
           ? (target?.flavor ?? undefined)
           : undefined,
       gameVersion: !isProfile ? target?.gameVersion || undefined : undefined,
-    }),
-    enabled: !isProfile,
-  });
+    },
+    !isProfile,
+  );
   const list = versions.data ?? [];
   const resolved = list.find((v) => v.id === versionId) ?? list[0];
   const requiredDeps =
@@ -865,22 +895,27 @@ function ReviewItemRow({
             ` · ${m['content.dependencies']({ count: requiredDeps })}`}
         </span>
       </div>
-      {!isProfile && (
-        <div className="flex shrink-0 items-center gap-2">
-          {resolved && !versionId && (
-            <Badge variant="secondary" className="shrink-0">
-              {m['label.latest']()}
-            </Badge>
-          )}
-          {resolved && (
-            <VersionCombobox
-              versions={list}
-              value={resolved}
-              onChange={(v) => onVersion(v && v.id !== list[0]?.id ? v.id : '')}
-            />
-          )}
-        </div>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {!isProfile && (
+          <>
+            {resolved && !versionId && (
+              <Badge variant="secondary" className="shrink-0">
+                {m['label.latest']()}
+              </Badge>
+            )}
+            {resolved && (
+              <VersionCombobox
+                versions={list}
+                value={resolved}
+                onChange={(v) =>
+                  onVersion(v && v.id !== list[0]?.id ? v.id : '')
+                }
+              />
+            )}
+          </>
+        )}
+        <RemoveButton onClick={onRemove} />
+      </div>
     </div>
   );
 }

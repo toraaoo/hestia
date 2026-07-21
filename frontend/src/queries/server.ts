@@ -382,8 +382,12 @@ export function useServerBackups(id: string) {
   return useQuery(serverQueries.backups(id));
 }
 
-export function useServerContent(id: string, kind: ContentKind) {
-  return useQuery(serverQueries.content(id, kind));
+export function useServerContent(
+  id: string,
+  kind: ContentKind,
+  enabled = true,
+) {
+  return useQuery({ ...serverQueries.content(id, kind), enabled });
 }
 
 /** Update availability — disabled until `refetch()` is called (network per item). */

@@ -405,8 +405,8 @@ export function useInstanceProfile(params: ResolveParams) {
   return useQuery(instanceQueries.profile(params));
 }
 
-export function useInstanceWorlds(id: string) {
-  return useQuery(instanceQueries.worlds(id));
+export function useInstanceWorlds(id: string, enabled = true) {
+  return useQuery({ ...instanceQueries.worlds(id), enabled });
 }
 
 /** Follows the named session, or every session of the instance. */
@@ -442,8 +442,12 @@ export function useInstanceConfigValue(id: string, key: string) {
   return useQuery(instanceQueries.configValue(id, key));
 }
 
-export function useInstanceContent(id: string, kind: ContentKind) {
-  return useQuery(instanceQueries.content(id, kind));
+export function useInstanceContent(
+  id: string,
+  kind: ContentKind,
+  enabled = true,
+) {
+  return useQuery({ ...instanceQueries.content(id, kind), enabled });
 }
 
 /** Update availability — disabled until `refetch()` is called (network per item). */

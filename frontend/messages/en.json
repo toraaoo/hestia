@@ -308,6 +308,8 @@
     "hint_review": "Review and install.",
     "no_worlds_in_instance": "This instance has no worlds yet.",
     "stop_to_install": "Stop to install",
+    "installed": "Installed",
+    "no_worlds_datapack": "Create a world in-game before adding datapacks.",
     "no_target_for_kind": "No server or instance can take a {kind}.",
     "none_selected": "none selected",
     "dependencies": "Dependencies ({count})",

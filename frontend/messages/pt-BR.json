@@ -307,6 +307,8 @@
     "hint_review": "Revise e instale.",
     "no_worlds_in_instance": "Esta instância ainda não tem mundos.",
     "stop_to_install": "Pare para instalar",
+    "installed": "Instalado",
+    "no_worlds_datapack": "Crie um mundo no jogo antes de adicionar datapacks.",
     "no_target_for_kind": "Nenhum servidor ou instância pode receber um {kind}.",
     "none_selected": "nenhum selecionado",
     "dependencies": "Dependências ({count})",
