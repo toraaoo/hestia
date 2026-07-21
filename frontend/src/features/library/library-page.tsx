@@ -21,7 +21,7 @@ import {
   type View,
   ViewToggle,
 } from '@/features/entries/collection';
-import { CreateEntryModal } from '@/features/entries/create-modal';
+import { CreateEntryModal } from '@/features/entries/create';
 import type { EntryCardData } from '@/features/entries/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/skeleton';
 import { useLaunchModal } from '@/features/instances/launch-modal';

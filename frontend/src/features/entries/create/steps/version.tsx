@@ -1,0 +1,144 @@
+import { useEffect } from 'react';
+
+import type { GameVersion } from '@/api';
+import { SearchInput } from '@/components/search-input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { FieldError } from '@/components/ui/field';
+import { m } from '@/paraglide/messages.js';
+import { useInstanceLoaders, useInstanceVersions } from '@/queries/instance';
+import { useServerLoaders, useServerVersions } from '@/queries/server';
+
+import { type Kind, VersionRow, type WizardForm } from '../fields';
+
+/** The version list, snapshot toggle, and loader-build picker for a flavor. */
+export function VersionStep({
+  form,
+  kind,
+  flavor,
+  search,
+  onSearch,
+  showSnapshots,
+  onShowSnapshots,
+}: {
+  form: WizardForm;
+  kind: Kind;
+  flavor: string;
+  search: string;
+  onSearch: (value: string) => void;
+  showSnapshots: boolean;
+  onShowSnapshots: (value: boolean) => void;
+}) {
+  const selected = form.state.values.version.version as string;
+
+  const serverVersions = useServerVersions(flavor, {
+    enabled: kind === 'server',
+  });
+  const instanceVersions = useInstanceVersions(flavor, {
+    enabled: kind === 'instance',
+  });
+  const versionsQuery = kind === 'server' ? serverVersions : instanceVersions;
+  const versions: GameVersion[] = versionsQuery.data ?? [];
+
+  const serverLoaders = useServerLoaders(flavor, selected, {
+    enabled: kind === 'server',
+  });
+  const instanceLoaders = useInstanceLoaders(flavor, selected, {
+    enabled: kind === 'instance',
+  });
+  const loadersQuery = kind === 'server' ? serverLoaders : instanceLoaders;
+  const loaders = loadersQuery.data;
+
+  const q = search.trim().toLowerCase();
+  const list = versions.filter((v) => {
+    const isRelease = v.kind === 'release';
+    if (!showSnapshots && !isRelease) return false;
+    if (q && !v.id.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  useEffect(() => {
+    const current = form.state.values.version.loaderVersion as string;
+    if (loaders && loaders.length > 0) {
+      if (!current || !loaders.includes(current)) {
+        form.setFieldValue('version.loaderVersion', loaders[0]);
+      }
+    } else if (current) {
+      form.setFieldValue('version.loaderVersion', '');
+    }
+  }, [loaders, form]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <SearchInput
+        value={search}
+        onChange={onSearch}
+        placeholder={m['wizard.filter_versions']()}
+      />
+
+      <label
+        htmlFor="wizard-snapshots"
+        className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground"
+      >
+        <Checkbox
+          id="wizard-snapshots"
+          checked={showSnapshots}
+          onCheckedChange={(c) => onShowSnapshots(c === true)}
+        />
+        {m['wizard.show_snapshots']()}
+      </label>
+
+      <form.AppField name="version.version">
+        {(field: WizardForm) => {
+          const invalid =
+            field.state.meta.isTouched && field.state.meta.errors.length > 0;
+          return (
+            <div className="flex flex-col gap-1.5">
+              <div className="max-h-52 divide-y divide-border overflow-y-auto border border-border">
+                {list.length === 0 ? (
+                  <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                    {versionsQuery.isPending
+                      ? m['common.loading']()
+                      : m['wizard.no_versions_match']()}
+                  </p>
+                ) : (
+                  list.map((v) => (
+                    <VersionRow
+                      key={v.id}
+                      id={v.id}
+                      snapshot={v.kind !== 'release'}
+                      selected={field.state.value === v.id}
+                      onSelect={() => field.handleChange(v.id)}
+                    />
+                  ))
+                )}
+              </div>
+              {invalid && (
+                <FieldError
+                  errors={
+                    field.state.meta.errors as Array<{ message?: string }>
+                  }
+                />
+              )}
+            </div>
+          );
+        }}
+      </form.AppField>
+
+      {loaders && loaders.length > 0 && (
+        <form.AppField name="version.loaderVersion">
+          {(field: WizardForm) => (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {m['label.loader']()}
+              </span>
+              <field.SelectField
+                options={loaders.map((l: string) => ({ value: l, label: l }))}
+                triggerClassName="w-40"
+              />
+            </div>
+          )}
+        </form.AppField>
+      )}
+    </div>
+  );
+}
