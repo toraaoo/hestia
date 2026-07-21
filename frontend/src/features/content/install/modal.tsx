@@ -1,8 +1,7 @@
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
 
-import type { ContentKind, ContentProject } from '@/api';
+import type { ContentProject } from '@/api';
 import { contentIcon, entryIcon } from '@/components/icons';
 import { StepDots } from '@/components/step-dots';
 import { Button } from '@/components/ui/button';
@@ -30,12 +29,8 @@ import { ContentStep } from './steps/content';
 import { ReviewStep } from './steps/review';
 import { TargetStep } from './steps/target';
 import { WorldsStep } from './steps/worlds';
-import {
-  type PickedFile,
-  type Target,
-  targetTakesKind,
-  useTargets,
-} from './targets';
+import { type Target, targetTakesKind, useTargets } from './targets';
+import { useInstallWizard } from './use-wizard';
 
 /**
  * The content install modal over the daemon's `content.add` (and, for a global
@@ -59,37 +54,26 @@ export function ContentInstallModal({
   const mode: 'browse' | 'entry' = project ? 'browse' : 'entry';
   const targets = useTargets();
 
-  const [step, setStep] = useState(0);
-  const [targetId, setTargetId] = useState(entry?.id ?? '');
-  const [picked, setPicked] = useState<ContentProject[]>(
-    project ? [project] : [],
-  );
-  const [files, setFiles] = useState<PickedFile[]>([]);
-  const [kindFilter, setKindFilter] = useState<ContentKind | null>(null);
-  const [versionIds, setVersionIds] = useState<Record<string, string>>({});
-  const [worlds, setWorlds] = useState<string[]>([]);
-
-  const [installing, setInstalling] = useState(false);
-  const [error, setError] = useState('');
+  const [state, dispatch] = useInstallWizard({
+    open,
+    entryId: entry?.id ?? '',
+    project,
+  });
+  const {
+    step,
+    targetId,
+    picked,
+    files,
+    kindFilter,
+    versionIds,
+    worlds,
+    installing,
+    error,
+  } = state;
 
   const addServer = useJobMutation(serverMutations.content.add(targetId));
   const addInstance = useJobMutation(instanceMutations.content.add(targetId));
   const editProfile = useMutation(profileMutations.edit());
-
-  // Reset when (re)opened, keeping whichever side the caller fixed.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only on open.
-  useEffect(() => {
-    if (!open) return;
-    setStep(0);
-    setTargetId(entry?.id ?? '');
-    setPicked(project ? [project] : []);
-    setFiles([]);
-    setKindFilter(null);
-    setVersionIds({});
-    setWorlds([]);
-    setInstalling(false);
-    setError('');
-  }, [open]);
 
   const target = targets.find((t) => t.id === targetId) ?? entry ?? null;
   const selectedCount = picked.length + files.length;
@@ -100,17 +84,8 @@ export function ContentInstallModal({
     selectedKinds.includes('data_pack') && target?.type === 'instance';
   const isProfile = target?.type === 'profile';
 
-  const toggleProject = (p: ContentProject) => {
-    const ref = projectRef(p);
-    setPicked((prev) =>
-      prev.some((x) => projectRef(x) === ref)
-        ? prev.filter((x) => projectRef(x) !== ref)
-        : [...prev, p],
-    );
-    setVersionIds(({ [ref]: _, ...rest }) => rest);
-  };
-  const removeFile = (path: string) =>
-    setFiles((prev) => prev.filter((f) => f.path !== path));
+  const toggleProject = (p: ContentProject) =>
+    dispatch({ type: 'toggleProject', project: p });
 
   const pickStep = mode === 'browse' ? 'target' : 'content';
   const steps: string[] =
@@ -157,15 +132,23 @@ export function ContentInstallModal({
 
   async function install() {
     if (!target) return;
-    setInstalling(true);
-    setError('');
+    // A profile takes only projects; guard the no-op (e.g. only files staged)
+    // so it never closes as if it installed.
+    if (isProfile && picked.length === 0) {
+      dispatch({
+        type: 'installError',
+        message: m['content.profile_no_projects'](),
+      });
+      return;
+    }
+    dispatch({ type: 'installStart' });
     try {
-      if (isProfile && picked.length > 0) {
+      if (isProfile) {
         await editProfile.mutateAsync({
           name: target.name,
           add: picked.map(projectRef),
         });
-      } else if (target.type !== 'profile') {
+      } else {
         const add = target.type === 'server' ? addServer : addInstance;
         // The wire spec is per-kind, so a mixed selection installs as one
         // batch per kind; failures aggregate across batches.
@@ -185,20 +168,19 @@ export function ContentInstallModal({
             items,
             worlds: k === 'data_pack' && needsWorlds ? worlds : [],
           });
-          // A batch "succeeds" even when every item failed to resolve/install;
-          // surface those per-item failures instead of closing as if installed.
           failures.push(...done.failures.map((f) => f.message));
         }
         if (failures.length > 0) {
-          setError(failures.join('; '));
-          setInstalling(false);
+          dispatch({ type: 'installError', message: failures.join('; ') });
           return;
         }
       }
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setInstalling(false);
+      dispatch({
+        type: 'installError',
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
@@ -237,26 +219,20 @@ export function ContentInstallModal({
                     (t) => project && targetTakesKind(t, project.kind),
                   )}
                   selectedId={targetId}
-                  onSelect={(t) => {
-                    setTargetId(t.id);
-                    setWorlds([]);
-                  }}
+                  onSelect={(t) => dispatch({ type: 'target', id: t.id })}
                 />
               ) : stepId === 'content' ? (
                 target && (
                   <ContentStep
                     target={target}
                     kind={kindFilter}
-                    onKindChange={setKindFilter}
+                    onKindChange={(kind) =>
+                      dispatch({ type: 'kindFilter', kind })
+                    }
                     picked={picked}
                     onToggle={toggleProject}
-                    onAddFiles={(paths, k) =>
-                      setFiles((prev) => [
-                        ...prev,
-                        ...paths
-                          .filter((p) => !prev.some((f) => f.path === p))
-                          .map((path) => ({ path, kind: k })),
-                      ])
+                    onAddFiles={(paths, kind) =>
+                      dispatch({ type: 'addFiles', paths, kind })
                     }
                   />
                 )
@@ -265,10 +241,8 @@ export function ContentInstallModal({
                   <WorldsStep
                     instanceId={target?.id ?? ''}
                     selected={worlds}
-                    onToggle={(w, on) =>
-                      setWorlds((prev) =>
-                        on ? [...prev, w] : prev.filter((x) => x !== w),
-                      )
+                    onToggle={(world, on) =>
+                      dispatch({ type: 'toggleWorld', world, on })
                     }
                   />
                 </div>
@@ -280,12 +254,12 @@ export function ContentInstallModal({
                     files={files}
                     versionIds={versionIds}
                     onVersion={(ref, id) =>
-                      setVersionIds(({ [ref]: _, ...rest }) =>
-                        id ? { ...rest, [ref]: id } : rest,
-                      )
+                      dispatch({ type: 'version', ref, id })
                     }
                     onRemoveProject={toggleProject}
-                    onRemoveFile={removeFile}
+                    onRemoveFile={(path) =>
+                      dispatch({ type: 'removeFile', path })
+                    }
                     worlds={needsWorlds ? worlds : undefined}
                   />
                 </div>
@@ -322,7 +296,9 @@ export function ContentInstallModal({
                   type="button"
                   variant="outline"
                   data-icon="inline-start"
-                  onClick={() => setStep((s) => Math.max(0, s - 1))}
+                  onClick={() =>
+                    dispatch({ type: 'step', step: Math.max(0, step - 1) })
+                  }
                 >
                   <CaretLeftIcon />
                   {m['action.back']()}
@@ -343,7 +319,7 @@ export function ContentInstallModal({
                   data-icon="inline-end"
                   disabled={!canAdvance}
                   className="bg-ember text-ember-foreground hover:bg-ember/90"
-                  onClick={() => setStep((s) => s + 1)}
+                  onClick={() => dispatch({ type: 'step', step: step + 1 })}
                 >
                   {m['action.next']()}
                   <CaretRightIcon />

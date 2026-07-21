@@ -309,6 +309,7 @@
     "hint_content": "Escolha o conteúdo para instalar.",
     "hint_worlds": "Escolha os mundos que receberão este datapack.",
     "hint_review": "Revise e instale.",
+    "profile_no_projects": "Um perfil aceita projetos, não arquivos.",
     "no_worlds_in_instance": "Esta instância ainda não tem mundos.",
     "stop_to_install": "Pare para instalar",
     "installed": "Instalado",

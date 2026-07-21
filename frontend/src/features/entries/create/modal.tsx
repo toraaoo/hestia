@@ -23,6 +23,7 @@ import {
   detailsStepSchema,
   flavorStepSchema,
   versionStepSchema,
+  type WizardValues,
 } from '@/features/entries/lib/schema';
 import { useAppForm } from '@/hooks/form';
 import { m } from '@/paraglide/messages.js';
@@ -274,8 +275,7 @@ export function CreateEntryModal({
 }
 
 /** Build the server create params from the wizard's collected values. */
-// biome-ignore lint/suspicious/noExplicitAny: the wizard value is the form's internal shape.
-function serverParams(value: any) {
+function serverParams(value: WizardValues) {
   const d = value.details;
   const config: ConfigEntry[] = [
     { key: 'memory', value: `${d.memory}G` },
@@ -294,8 +294,7 @@ function serverParams(value: any) {
   };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: the wizard value is the form's internal shape.
-function instanceParams(value: any) {
+function instanceParams(value: WizardValues) {
   const d = value.details;
   return {
     name: d.name || undefined,

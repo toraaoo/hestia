@@ -310,6 +310,7 @@
     "hint_content": "Choose the content to install.",
     "hint_worlds": "Choose the worlds to add this datapack to.",
     "hint_review": "Review and install.",
+    "profile_no_projects": "A profile takes projects, not files.",
     "no_worlds_in_instance": "This instance has no worlds yet.",
     "stop_to_install": "Stop to install",
     "installed": "Installed",

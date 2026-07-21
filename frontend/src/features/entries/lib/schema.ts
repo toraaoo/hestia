@@ -54,6 +54,9 @@ export function createWizardSchema(kind: Kind) {
   });
 }
 
+/** The wizard's collected form value — the shape both `create` params read. */
+export type WizardValues = ReturnType<typeof createWizardDefaults>;
+
 export function createWizardDefaults(loaderVersion: string) {
   return {
     flavor: { flavor: 'vanilla' },
