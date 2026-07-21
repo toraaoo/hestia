@@ -1,9 +1,10 @@
 /**
- * `instance.*` — queries/mutations plus their 1:1 hooks, keyed by stable id
- * like the server hooks. There is no `instance.status` channel, so
- * `useInstance` selects the entry from the list query. `create`/`update` are
- * plain (long) calls, not jobs; `launch` is the job that materialises files
- * and spawns the game.
+ * `instance.*` — the `instanceQueries`/`instanceMutations` factories, consumed
+ * directly through useQuery/useMutation/useJobMutation, keyed by stable id like
+ * the server factories. Only the behavior-bearing hooks stay named (below):
+ * there is no `instance.status` channel, so `useInstance` selects the entry
+ * from the list query. `create`/`update` are plain (long) calls, not jobs;
+ * `launch` is the job that materialises files and spawns the game.
  */
 import { queryOptions, useQuery } from '@tanstack/react-query';
 import type {

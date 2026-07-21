@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import type { ContentVersion, InstalledContent } from '@/api';
@@ -15,7 +16,7 @@ import {
 import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import { useContentVersions } from '@/queries/content';
+import { contentQueries } from '@/queries/content';
 
 /**
  * Pick a specific published version of an installed item — real
@@ -39,12 +40,14 @@ export function ChangeVersionModal({
   const [search, setSearch] = useState('');
   const [pickedId, setPickedId] = useState<string | null>(null);
 
-  const versions = useContentVersions({
-    source: item?.source ?? '',
-    project: item?.projectId ?? '',
-    loader,
-    gameVersion,
-  });
+  const versions = useQuery(
+    contentQueries.versions({
+      source: item?.source ?? '',
+      project: item?.projectId ?? '',
+      loader,
+      gameVersion,
+    }),
+  );
   const list = item ? (versions.data ?? []) : [];
   const q = search.trim().toLowerCase();
   const shown = list.filter(

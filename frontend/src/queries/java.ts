@@ -1,9 +1,9 @@
-/** `java.*` — queries/mutations plus their 1:1 hooks. */
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
+/** `java.*` — query/mutation factories, consumed through useQuery/useMutation. */
+import { queryOptions } from '@tanstack/react-query';
 import type { JavaInstallDone, JavaInstallProgress } from '../api';
 import * as api from '../api/java';
 import { CATALOG_STALE_MS, mutation } from './core';
-import { jobMutation, useJobMutation } from './jobs';
+import { jobMutation } from './jobs';
 import { keys } from './keys';
 
 export const javaQueries = {
@@ -43,19 +43,3 @@ export const javaMutations = {
       invalidates: () => [keys.java.all],
     }),
 };
-
-export function useJavaReleases() {
-  return useQuery(javaQueries.releases());
-}
-
-export function useJavaRuntimes() {
-  return useQuery(javaQueries.runtimes());
-}
-
-export function useInstallJava() {
-  return useJobMutation(javaMutations.install());
-}
-
-export function useUninstallJava() {
-  return useMutation(javaMutations.uninstall());
-}

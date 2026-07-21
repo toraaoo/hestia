@@ -1,15 +1,16 @@
 /**
- * `skin.*` / `cape.*` — queries/mutations plus their 1:1 hooks. One query
+ * `skin.*` / `cape.*` — query/mutation factories, consumed through
+ * useQuery/useMutation. One query
  * serves the whole picker (skins and capes come from a single profile fetch);
  * every change invalidates it, since equipping, uploading, or resetting all
  * reshape which entry is equipped. `account` is a name or uuid; empty (the
  * default) targets the default account.
  */
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
+import { queryOptions } from '@tanstack/react-query';
 import type { Skin, SkinList, SkinVariant } from '../api';
 import * as api from '../api/skins';
 import { queryClient } from './client';
-import { mutation, type QueryFlags } from './core';
+import { mutation } from './core';
 import { keys } from './keys';
 
 export const skinQueries = {
@@ -127,35 +128,3 @@ export const skinMutations = {
         })),
     }),
 };
-
-export function useSkins(account = '', { enabled = true }: QueryFlags = {}) {
-  return useQuery({ ...skinQueries.list(account), enabled });
-}
-
-export function useAddSkin() {
-  return useMutation(skinMutations.add());
-}
-
-export function useUpdateSkin() {
-  return useMutation(skinMutations.update());
-}
-
-export function useEquipSkin() {
-  return useMutation(skinMutations.equip());
-}
-
-export function useResetSkin() {
-  return useMutation(skinMutations.reset());
-}
-
-export function useRemoveSkin() {
-  return useMutation(skinMutations.remove());
-}
-
-export function useEquipCape() {
-  return useMutation(skinMutations.equipCape());
-}
-
-export function useClearCape() {
-  return useMutation(skinMutations.clearCape());
-}

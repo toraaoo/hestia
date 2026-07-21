@@ -9,7 +9,7 @@ import { projectRef } from '@/features/content/components/content-card';
 import { PickRow } from '@/features/content/components/pick-row';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
-import { useContentSearch } from '@/queries/content';
+import { contentQueries } from '@/queries/content';
 import { instanceQueries } from '@/queries/instance';
 
 import { FilterBar } from '../filter-bar';
@@ -48,13 +48,15 @@ export function ContentStep({
   const pickedRefs = new Set(picked.map(projectRef));
   const installedRefs = useInstalledRefs(target, activeKind);
 
-  const results = useContentSearch({
-    kind: activeKind,
-    query: search.trim(),
-    loader: activeKind === 'mod' ? target.flavor : undefined,
-    gameVersion: target.gameVersion || undefined,
-    limit: 30,
-  });
+  const results = useQuery(
+    contentQueries.search({
+      kind: activeKind,
+      query: search.trim(),
+      loader: activeKind === 'mod' ? target.flavor : undefined,
+      gameVersion: target.gameVersion || undefined,
+      limit: 30,
+    }),
+  );
   const hits = results.data?.hits ?? [];
 
   return (

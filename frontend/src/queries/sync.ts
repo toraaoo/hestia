@@ -2,7 +2,7 @@
  * `sync.*` — the shared settings/config target set (instance-only): files
  * copied, folders linked into the shared store.
  */
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
+import { queryOptions } from '@tanstack/react-query';
 import type { SyncConfig, SyncTargets } from '../api';
 import * as api from '../api/sync';
 import { mutation } from './core';
@@ -38,19 +38,3 @@ export const syncMutations = {
       invalidates: () => [keys.sync.all, keys.instances.detail(id)],
     }),
 };
-
-export function useSyncConfig() {
-  return useQuery(syncQueries.config());
-}
-
-export function useSyncStatus() {
-  return useQuery(syncQueries.status());
-}
-
-export function useSetSyncTargets() {
-  return useMutation(syncMutations.set());
-}
-
-export function useAdoptInstanceSync(id: string) {
-  return useMutation(syncMutations.adopt(id));
-}

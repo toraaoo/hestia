@@ -8,7 +8,7 @@ import type {
 } from '@/api';
 import { m } from '@/paraglide/messages.js';
 import { instanceQueries, useInstances } from '@/queries/instance';
-import { useGlobalProfiles } from '@/queries/profile';
+import { profileQueries } from '@/queries/profile';
 import { serverQueries, useServers } from '@/queries/server';
 
 /** An entry the content can be installed into, drawn from every store. */
@@ -83,7 +83,7 @@ export const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 export function useTargets(): Target[] {
   const servers = useServers();
   const instances = useInstances();
-  const profiles = useGlobalProfiles();
+  const profiles = useQuery(profileQueries.list());
   return useMemo(
     () => [
       ...(servers.data ?? []).map(serverTarget),

@@ -1,4 +1,5 @@
 import { PlusIcon, XIcon } from '@phosphor-icons/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -19,12 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
-import {
-  useAdoptInstanceSync,
-  useSetSyncTargets,
-  useSyncConfig,
-  useSyncStatus,
-} from '@/queries/sync';
+import { syncMutations, syncQueries } from '@/queries/sync';
 
 const stateLabel: Record<LinkState, () => string> = {
   linked: () => m['sync.state_linked'](),
@@ -38,9 +34,9 @@ const stateLabel: Record<LinkState, () => string> = {
  * non-empty folder the guard refuses to link.
  */
 export function SyncSection() {
-  const config = useSyncConfig();
-  const status = useSyncStatus();
-  const setTargets = useSetSyncTargets();
+  const config = useQuery(syncQueries.config());
+  const status = useQuery(syncQueries.status());
+  const setTargets = useMutation(syncMutations.set());
 
   const targets = config.data?.targets ?? { files: [], folders: [] };
 
@@ -186,7 +182,7 @@ function TargetList({
 }
 
 function AdoptButton({ id, name }: { id: string; name: string }) {
-  const adopt = useAdoptInstanceSync(id);
+  const adopt = useMutation(syncMutations.adopt(id));
   return (
     <ConfirmDialog
       trigger={

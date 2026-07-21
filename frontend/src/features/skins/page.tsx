@@ -1,4 +1,5 @@
 import { PlusIcon } from '@phosphor-icons/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 
 import type { Skin } from '@/api';
@@ -20,29 +21,21 @@ import { EditSkinModal } from '@/features/skins/edit-modal';
 import { collapseDefaults } from '@/features/skins/lib/defaults';
 import { readTextureFile } from '@/features/skins/lib/texture';
 import { m } from '@/paraglide/messages.js';
-import {
-  useAccounts,
-  useAddSkin,
-  useClearCape,
-  useEquipCape,
-  useEquipSkin,
-  useRemoveSkin,
-  useSkins,
-  useUpdateSkin,
-} from '@/queries';
+import { useAccounts } from '@/queries';
+import { skinMutations, skinQueries } from '@/queries/skins';
 
 const BASE64_PREFIX = /^data:image\/png;base64,/;
 
 export function SkinsPage() {
   const { signedIn, isPending: accountsPending } = useAccounts();
-  const list = useSkins('', { enabled: signedIn });
+  const list = useQuery({ ...skinQueries.list(''), enabled: signedIn });
 
-  const add = useAddSkin();
-  const update = useUpdateSkin();
-  const equip = useEquipSkin();
-  const removeSkin = useRemoveSkin();
-  const equipCape = useEquipCape();
-  const clearCape = useClearCape();
+  const add = useMutation(skinMutations.add());
+  const update = useMutation(skinMutations.update());
+  const equip = useMutation(skinMutations.equip());
+  const removeSkin = useMutation(skinMutations.remove());
+  const equipCape = useMutation(skinMutations.equipCape());
+  const clearCape = useMutation(skinMutations.clearCape());
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [modal, setModal] = useState<{

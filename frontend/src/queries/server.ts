@@ -1,8 +1,9 @@
 /**
- * `server.*` — queries/mutations plus their 1:1 hooks. Per-entry factories
- * and hooks take the server's **stable id**; the wire resolves display names
- * too, but keying by id means a rename never strands a cache entry or a
- * mutation key.
+ * `server.*` — the `serverQueries`/`serverMutations` factories, consumed
+ * directly through useQuery/useMutation/useJobMutation. Only the hooks that
+ * add real behavior stay named (below). Per-entry factories take the server's
+ * **stable id**; the wire resolves display names too, but keying by id means a
+ * rename never strands a cache entry or a mutation key.
  */
 import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {

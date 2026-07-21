@@ -1,4 +1,5 @@
 import { BroomIcon, CoffeeIcon, TrashIcon } from '@phosphor-icons/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -25,15 +26,11 @@ import {
 import { SyncSection } from '@/features/settings/components/sync-section';
 import { bytes, memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
-import { useCacheInfo, useClearCache } from '@/queries/cache';
-import { useConfig, useSetConfig } from '@/queries/config';
+import { cacheMutations, cacheQueries } from '@/queries/cache';
+import { configMutations, configQueries } from '@/queries/config';
 import { useDaemon } from '@/queries/daemon';
-import {
-  useInstallJava,
-  useJavaReleases,
-  useJavaRuntimes,
-  useUninstallJava,
-} from '@/queries/java';
+import { javaMutations, javaQueries } from '@/queries/java';
+import { useJobMutation } from '@/queries/jobs';
 import { usePrefs } from '@/queries/prefs';
 
 /** The daemon config entries the settings page reads (`config.list`). */
@@ -45,15 +42,15 @@ interface ConfigEntries {
 
 export function SettingsPage() {
   const daemon = useDaemon();
-  const cache = useCacheInfo();
-  const clearCache = useClearCache();
-  const config = useConfig();
-  const setConfig = useSetConfig();
+  const cache = useQuery(cacheQueries.info());
+  const clearCache = useMutation(cacheMutations.clear());
+  const config = useQuery(configQueries.list());
+  const setConfig = useMutation(configMutations.set());
   const prefs = usePrefs();
-  const runtimesQuery = useJavaRuntimes();
-  const releasesQuery = useJavaReleases();
-  const install = useInstallJava();
-  const uninstall = useUninstallJava();
+  const runtimesQuery = useQuery(javaQueries.runtimes());
+  const releasesQuery = useQuery(javaQueries.releases());
+  const install = useJobMutation(javaMutations.install());
+  const uninstall = useMutation(javaMutations.uninstall());
 
   const entries = (config.data ?? {}) as ConfigEntries;
   const runtimes = runtimesQuery.data ?? [];

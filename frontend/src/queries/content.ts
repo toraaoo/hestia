@@ -7,12 +7,9 @@ import {
   infiniteQueryOptions,
   keepPreviousData,
   queryOptions,
-  useInfiniteQuery,
-  useQuery,
 } from '@tanstack/react-query';
 import type { ContentKind, SearchQuery, VersionQuery } from '../api';
 import * as api from '../api/content';
-import type { QueryFlags } from './core';
 import { keys } from './keys';
 
 const BROWSE_STALE_MS = 60_000;
@@ -80,31 +77,3 @@ export const contentQueries = {
       staleTime: BROWSE_STALE_MS,
     }),
 };
-
-export function useContentSources() {
-  return useQuery(contentQueries.sources());
-}
-
-export function useContentSearch(query: SearchQuery) {
-  return useQuery(contentQueries.search(query));
-}
-
-export function useContentSearchPaged(kinds: ContentKind[], query: string) {
-  return useInfiniteQuery(contentQueries.searchPaged(kinds, query));
-}
-
-export function useContentProject(project: string, source = '') {
-  return useQuery(contentQueries.project(project, source));
-}
-
-export function useContentVersions(
-  query: VersionQuery,
-  { enabled = true }: QueryFlags = {},
-) {
-  const options = contentQueries.versions(query);
-  return useQuery({ ...options, enabled: enabled && options.enabled });
-}
-
-export function useResolvedModpack(versionId: string, source = '') {
-  return useQuery(contentQueries.modpack(versionId, source));
-}

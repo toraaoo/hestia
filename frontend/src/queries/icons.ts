@@ -1,5 +1,5 @@
 /** Custom entry icons — the `icons_*` shell commands as queries/mutations. */
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import * as api from '../api/icons';
 import { mutation } from './core';
@@ -28,17 +28,13 @@ export const iconMutations = {
     }),
 };
 
-export function useEntryIcons() {
-  return useQuery(iconQueries.list());
-}
-
 /**
  * A stable resolver from entry id to its icon URL — the join the server and
  * instance query hooks use so list rows and detail views carry `iconUrl`
  * directly instead of each call site re-joining the icons map.
  */
 export function useEntryIconLookup(): (id: string) => string | undefined {
-  const map = useEntryIcons().data;
+  const map = useQuery(iconQueries.list()).data;
   return useCallback(
     (id) => {
       const entry = map?.[id];
@@ -46,12 +42,4 @@ export function useEntryIconLookup(): (id: string) => string | undefined {
     },
     [map],
   );
-}
-
-export function useSetEntryIcon() {
-  return useMutation(iconMutations.set());
-}
-
-export function useRemoveEntryIcon() {
-  return useMutation(iconMutations.remove());
 }

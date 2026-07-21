@@ -1,9 +1,9 @@
 /**
- * `process.*` — queries/mutations plus their 1:1 hooks, thin over the
- * daemon's supervisor. Servers and instances have their own richer hooks;
- * these are the raw per-process surface.
+ * `process.*` — query/mutation factories over the daemon's supervisor, plus
+ * the one composed hook `useProcessLogs` (follow matcher). Servers and
+ * instances have their own richer surfaces; these are the raw per-process one.
  */
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import type { ProcessSpec } from '../api';
 import * as api from '../api/process';
 import { mutation } from './core';
@@ -43,14 +43,6 @@ export const processMutations = {
     }),
 };
 
-export function useProcesses() {
-  return useQuery(processQueries.list());
-}
-
-export function useProcess(id: string) {
-  return useQuery(processQueries.status(id));
-}
-
 export function useProcessLogs(
   id: string,
   options: LogsOptions = {},
@@ -64,12 +56,4 @@ export function useProcessLogs(
     options.follow ? (processId) => processId === id : null,
     options.limit,
   );
-}
-
-export function useStartProcess() {
-  return useMutation(processMutations.start());
-}
-
-export function useStopProcess() {
-  return useMutation(processMutations.stop());
 }

@@ -1,9 +1,10 @@
 /**
- * `profile.*` — global content profiles: queries/mutations plus their 1:1
- * hooks. Applying a profile into an instance lives with the instance
- * mutations (`useApplyInstanceProfile`), where its invalidations belong.
+ * `profile.*` — global content profiles: query/mutation factories, consumed
+ * through useQuery/useMutation. Applying a profile into an instance lives with
+ * the instance mutations (`instanceMutations.profiles.apply`), where its
+ * invalidations belong.
  */
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
+import { queryOptions } from '@tanstack/react-query';
 import type { GlobalProfile } from '../api';
 import * as api from '../api/profile';
 import { mutation } from './core';
@@ -42,19 +43,3 @@ export const profileMutations = {
       invalidates: () => [keys.profiles.all],
     }),
 };
-
-export function useGlobalProfiles() {
-  return useQuery(profileQueries.list());
-}
-
-export function useCreateGlobalProfile() {
-  return useMutation(profileMutations.create());
-}
-
-export function useRemoveGlobalProfile() {
-  return useMutation(profileMutations.remove());
-}
-
-export function useEditGlobalProfile() {
-  return useMutation(profileMutations.edit());
-}

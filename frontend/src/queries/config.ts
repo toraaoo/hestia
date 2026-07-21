@@ -1,5 +1,5 @@
-/** `config.*` — queries/mutations plus their 1:1 hooks. */
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
+/** `config.*` — query/mutation factories, consumed through useQuery/useMutation. */
+import { queryOptions } from '@tanstack/react-query';
 import * as api from '../api/config';
 import { mutation } from './core';
 import { keys } from './keys';
@@ -25,15 +25,3 @@ export const configMutations = {
       invalidates: () => [keys.config.all],
     }),
 };
-
-export function useConfig() {
-  return useQuery(configQueries.list());
-}
-
-export function useConfigValue(key: string) {
-  return useQuery(configQueries.value(key));
-}
-
-export function useSetConfig() {
-  return useMutation(configMutations.set());
-}

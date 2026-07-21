@@ -1,3 +1,4 @@
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 
@@ -9,7 +10,7 @@ import { Bone, CardGridSkeleton } from '@/components/skeleton';
 import { ContentCard } from '@/features/content/components/content-card';
 import { contentKinds, kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
-import { useContentSearchPaged } from '@/queries/content';
+import { contentQueries } from '@/queries/content';
 
 /** Merge/sort key so the same project from one source is never listed twice. */
 const projectKey = (p: ContentProject) => `${p.source}:${p.id}`;
@@ -21,7 +22,7 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
   // A specific kind is one search; "All" fans out over every kind and merges,
   // since a source's search is scoped to a single project type.
   const kinds = kind ? [kind] : contentKinds;
-  const search = useContentSearchPaged(kinds, q);
+  const search = useInfiniteQuery(contentQueries.searchPaged(kinds, q));
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = search;
 
   const hits = (search.data?.pages ?? [])

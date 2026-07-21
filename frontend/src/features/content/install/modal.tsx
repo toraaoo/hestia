@@ -1,4 +1,5 @@
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
+import { useMutation } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import type { ContentKind, ContentProject } from '@/api';
@@ -22,7 +23,7 @@ import { projectRef } from '@/features/content/components/content-card';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations } from '@/queries/instance';
 import { useJobMutation } from '@/queries/jobs';
-import { useEditGlobalProfile } from '@/queries/profile';
+import { profileMutations } from '@/queries/profile';
 import { serverMutations } from '@/queries/server';
 
 import { ContentStep } from './steps/content';
@@ -73,7 +74,7 @@ export function ContentInstallModal({
 
   const addServer = useJobMutation(serverMutations.content.add(targetId));
   const addInstance = useJobMutation(instanceMutations.content.add(targetId));
-  const editProfile = useEditGlobalProfile();
+  const editProfile = useMutation(profileMutations.edit());
 
   // Reset when (re)opened, keeping whichever side the caller fixed.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset only on open.

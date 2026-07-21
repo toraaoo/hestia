@@ -51,22 +51,6 @@ export const daemonMutations = {
     }),
 };
 
-export function useDaemonStatus(enabled = true) {
-  return useQuery({ ...daemonQueries.status(), enabled });
-}
-
-export function useStopDaemon() {
-  return useMutation(daemonMutations.stop());
-}
-
-export function useStartDaemon() {
-  return useMutation(daemonMutations.start());
-}
-
-export function useRestartDaemon() {
-  return useMutation(daemonMutations.restart());
-}
-
 /**
  * The uptime as a live, optimistic label: it ticks up every second from the
  * fetched `uptimeSeconds` anchored to when that read resolved, so it counts
@@ -95,10 +79,10 @@ function useLiveUptime(
  */
 export function useDaemon() {
   const connected = useConnection() === 'connected';
-  const status = useDaemonStatus(connected);
+  const status = useQuery({ ...daemonQueries.status(), enabled: connected });
   const uptime = useLiveUptime(status.data, status.dataUpdatedAt);
-  const start = useStartDaemon();
-  const restart = useRestartDaemon();
+  const start = useMutation(daemonMutations.start());
+  const restart = useMutation(daemonMutations.restart());
   return {
     connected,
     status: status.data,

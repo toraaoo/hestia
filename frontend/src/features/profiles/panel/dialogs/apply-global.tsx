@@ -1,4 +1,5 @@
 import { StackIcon } from '@phosphor-icons/react';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Empty } from '@/components/empty';
@@ -20,7 +21,7 @@ import { PickRow } from '@/features/content/components/pick-row';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations } from '@/queries/instance';
 import { useJobMutation } from '@/queries/jobs';
-import { useGlobalProfiles } from '@/queries/profile';
+import { profileQueries } from '@/queries/profile';
 
 export function ApplyGlobalDialog({
   instanceId,
@@ -33,7 +34,7 @@ export function ApplyGlobalDialog({
   onOpenChange: (open: boolean) => void;
   version: string;
 }) {
-  const globals = useGlobalProfiles();
+  const globals = useQuery(profileQueries.list());
   const apply = useJobMutation(instanceMutations.profiles.apply(instanceId));
   const [picked, setPicked] = useState<string | null>(null);
 

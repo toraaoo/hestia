@@ -1,5 +1,5 @@
 import { PlusIcon, StackIcon, TrashIcon, XIcon } from '@phosphor-icons/react';
-import { useQueries } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -18,11 +18,7 @@ import { kindInfo } from '@/features/content/lib/kinds';
 import { profileFilterKinds } from '@/features/profiles/page';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
-import {
-  useEditGlobalProfile,
-  useGlobalProfiles,
-  useRemoveGlobalProfile,
-} from '@/queries/profile';
+import { profileMutations, profileQueries } from '@/queries/profile';
 
 /** A profile reference joined with its resolved project detail. */
 interface Reference {
@@ -51,9 +47,9 @@ export function ProfileDetailPage({
   onKindChange: (kind?: ContentKind) => void;
 }) {
   const navigate = useNavigate();
-  const list = useGlobalProfiles();
-  const remove = useRemoveGlobalProfile();
-  const edit = useEditGlobalProfile();
+  const list = useQuery(profileQueries.list());
+  const remove = useMutation(profileMutations.remove());
+  const edit = useMutation(profileMutations.edit());
   const [adding, setAdding] = useState(false);
 
   const profile = (list.data ?? []).find((p) => p.name === name);

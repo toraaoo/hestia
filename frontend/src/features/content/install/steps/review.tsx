@@ -1,4 +1,5 @@
 import { XIcon } from '@phosphor-icons/react';
+import { useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
 
 import type { ContentProject, ContentVersion } from '@/api';
@@ -15,7 +16,7 @@ import {
 import { projectRef } from '@/features/content/components/content-card';
 import { agoLabel } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
-import { useContentVersions } from '@/queries/content';
+import { contentQueries } from '@/queries/content';
 
 import { fileName, type PickedFile, type Target } from '../targets';
 
@@ -113,8 +114,8 @@ function ReviewItemRow({
   onVersion: (id: string) => void;
   onRemove: () => void;
 }) {
-  const versions = useContentVersions(
-    {
+  const versions = useQuery({
+    ...contentQueries.versions({
       source: project.source,
       project: projectRef(project),
       loader:
@@ -122,9 +123,9 @@ function ReviewItemRow({
           ? (target?.flavor ?? undefined)
           : undefined,
       gameVersion: !isProfile ? target?.gameVersion || undefined : undefined,
-    },
-    { enabled: !isProfile },
-  );
+    }),
+    enabled: !isProfile && projectRef(project).length > 0,
+  });
   const list = versions.data ?? [];
   const resolved = list.find((v) => v.id === versionId) ?? list[0];
   const requiredDeps =

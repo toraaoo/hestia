@@ -1,4 +1,5 @@
 import { ImageIcon, PencilSimpleIcon, TrashIcon } from '@phosphor-icons/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { dialog } from '@/api';
@@ -9,20 +10,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { m } from '@/paraglide/messages.js';
-import {
-  useEntryIcons,
-  useRemoveEntryIcon,
-  useSetEntryIcon,
-} from '@/queries/icons';
+import { iconMutations, iconQueries } from '@/queries/icons';
 
 /**
  * The hero-icon overlay menu: pick a custom image for the entry or reset it
  * to the kind glyph. Desktop-local (the shell's `icons_*` commands).
  */
 export function EntryIconMenu({ id }: { id: string }) {
-  const icons = useEntryIcons();
-  const set = useSetEntryIcon();
-  const remove = useRemoveEntryIcon();
+  const icons = useQuery(iconQueries.list());
+  const set = useMutation(iconMutations.set());
+  const remove = useMutation(iconMutations.remove());
   const hasIcon = !!icons.data?.[id];
 
   const change = async () => {

@@ -1,5 +1,5 @@
-/** `cache.*` — queries/mutations plus their 1:1 hooks. */
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
+/** `cache.*` — query/mutation factories, consumed through useQuery/useMutation. */
+import { queryOptions } from '@tanstack/react-query';
 import type { CacheUsage } from '../api';
 import * as api from '../api/cache';
 import { mutation } from './core';
@@ -27,15 +27,3 @@ export const cacheMutations = {
       invalidates: () => [keys.cache.all],
     }),
 };
-
-export function useCacheInfo() {
-  return useQuery(cacheQueries.info());
-}
-
-export function useCacheEntries() {
-  return useQuery(cacheQueries.list());
-}
-
-export function useClearCache() {
-  return useMutation(cacheMutations.clear());
-}

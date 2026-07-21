@@ -1,4 +1,5 @@
 import { CaretRightIcon, PlusIcon, StackIcon } from '@phosphor-icons/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -25,7 +26,7 @@ import {
   ViewToggle,
 } from '@/features/entries/components/collection';
 import { m } from '@/paraglide/messages.js';
-import { useCreateGlobalProfile, useGlobalProfiles } from '@/queries/profile';
+import { profileMutations, profileQueries } from '@/queries/profile';
 
 /** The kinds a global profile can reference — the selectable pool kinds. */
 export const profileFilterKinds: ContentKind[] = [
@@ -47,8 +48,8 @@ export function ProfilesPage({
 }) {
   const { query } = useSearch();
   const navigate = useNavigate();
-  const list = useGlobalProfiles();
-  const create = useCreateGlobalProfile();
+  const list = useQuery(profileQueries.list());
+  const create = useMutation(profileMutations.create());
   const [creating, setCreating] = useState(false);
 
   const profiles = list.data ?? [];

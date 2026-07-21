@@ -1,4 +1,5 @@
 import { DownloadSimpleIcon, HeartIcon, PlusIcon } from '@phosphor-icons/react';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import type { ContentKind } from '@/api';
@@ -13,7 +14,7 @@ import { ContentInstallModal } from '@/features/content/install';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { agoLabel, compact } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
-import { useContentProject, useContentVersions } from '@/queries/content';
+import { contentQueries } from '@/queries/content';
 
 export type ProjectTab = 'description' | 'versions';
 
@@ -28,8 +29,8 @@ export function ProjectDetailPage({
   tab: ProjectTab;
   onTabChange: (tab: ProjectTab) => void;
 }) {
-  const project = useContentProject(id);
-  const versions = useContentVersions({ project: id });
+  const project = useQuery(contentQueries.project(id));
+  const versions = useQuery(contentQueries.versions({ project: id }));
   const [installOpen, setInstallOpen] = useState(false);
 
   if (project.isPending) {
