@@ -42,7 +42,7 @@ export function WorldsStep({
             <Checkbox
               id={id}
               checked={checked}
-              onCheckedChange={(c) => onToggle(w, c === true)}
+              onCheckedChange={(c) => onToggle(w, c)}
             />
             {w}
           </label>
