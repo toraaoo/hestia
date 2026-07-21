@@ -1,4 +1,6 @@
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 
 import { system } from '@/api';
@@ -7,9 +9,11 @@ import { cn } from '@/lib/utils';
 /**
  * Renders untrusted Markdown (a content project's description body) with
  * `react-markdown` — remark/rehype under the hood, GFM tables/strikethrough via
- * `remark-gfm`. Raw HTML is escaped by default (no `dangerouslySetInnerHTML`),
- * so a hostile body cannot inject script. Links open in the system browser
- * rather than navigating the webview.
+ * `remark-gfm`. Modrinth bodies mix raw HTML into their Markdown, so `rehype-raw`
+ * parses it into real elements instead of leaving the tags as literal text;
+ * `rehype-sanitize` runs immediately after (never omit it) to strip scripts and
+ * event handlers, so a hostile body still cannot inject script. Links open in the
+ * system browser rather than navigating the webview.
  */
 const proseClass = cn(
   'text-sm leading-relaxed text-foreground/90',
@@ -44,6 +48,7 @@ export function Markdown({
     <div className={cn(proseClass, className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, rehypeSanitize]}
         components={{
           a({ href, children, node: _node, ...rest }) {
             return (
