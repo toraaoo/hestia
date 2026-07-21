@@ -38,11 +38,15 @@ export function useFollowedLogs(
   const [live, setLive] = useState<ProcessLogLine[]>([]);
   const matchesRef = useRef(matches);
   matchesRef.current = matches;
+  const following = matches !== null;
 
+  // Following, keep the buffer across refetches — a background tail refetch
+  // wiping it would drop lines newer than its window (a visible gap); the seam
+  // is de-duplicated below. Not following, reset so a refetch never duplicates.
   const [seenFetchAt, setSeenFetchAt] = useState(query.dataUpdatedAt);
   if (seenFetchAt !== query.dataUpdatedAt) {
     setSeenFetchAt(query.dataUpdatedAt);
-    setLive([]);
+    if (!following) setLive([]);
   }
 
   useDaemonEvent<ProcessOutputPayload>('process.output', (payload) => {
@@ -55,9 +59,31 @@ export function useFollowedLogs(
     });
   });
 
-  const lines = useMemo(
-    () => [...(query.data ?? []), ...live],
-    [query.data, live],
-  );
+  const lines = useMemo(() => {
+    const base = query.data ?? [];
+    const tail = following ? dropLeadingOverlap(base, live) : live;
+    return [...base, ...tail];
+  }, [query.data, live, following]);
   return { ...query, lines };
+}
+
+/** Drop the longest prefix of `live` that already ends `base` (same content). */
+function dropLeadingOverlap(
+  base: ProcessLogLine[],
+  live: ProcessLogLine[],
+): ProcessLogLine[] {
+  const max = Math.min(base.length, live.length);
+  for (let k = max; k > 0; k--) {
+    let match = true;
+    for (let i = 0; i < k; i++) {
+      const b = base[base.length - k + i];
+      const l = live[i];
+      if (b.line !== l.line || b.stream !== l.stream) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return live.slice(k);
+  }
+  return live;
 }

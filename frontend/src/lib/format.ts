@@ -9,7 +9,7 @@ export function agoLabel(unix: number): string {
   if (mins < 60) return m['ago.minutes']({ count: mins });
   const hours = Math.round(mins / 60);
   if (hours < 24) return m['ago.hours']({ count: hours });
-  const days = Math.round(hours / 24);
+  const days = Math.floor(hours / 24);
   if (days === 1) return m['ago.yesterday']();
   return m['ago.days']({ count: days });
 }

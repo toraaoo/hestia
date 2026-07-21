@@ -67,11 +67,11 @@ const TOPICS: Record<string, (payload: Record<string, unknown>) => QueryKey[]> =
         entryFromProcess(String(p.processId ?? ''), 'instance-'),
       ),
     'java.install.done': () => [keys.java.runtimes()],
-    // Backup jobs are server-only; content jobs carry only a job id, which
-    // another client's jobs mint themselves — the entry is unknowable, so
-    // sweep the kind's list (the footprint walk no longer rides under it).
-    'backup.done': () => [keys.servers.list()],
-    'content.done': () => [keys.servers.list(), keys.instances.list()],
+    // The topic carries only a job id, so the entry is unknowable cross-client;
+    // sweep the whole entry subtree (refreshes an open Content/Backups tab). The
+    // footprint walk lives outside `all` and is never triggered.
+    'backup.done': () => [keys.servers.all],
+    'content.done': () => [keys.servers.all, keys.instances.all],
   };
 
 /** The key prefixes a daemon topic outdates — exported for the regression test. */

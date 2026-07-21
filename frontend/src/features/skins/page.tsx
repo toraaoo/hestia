@@ -276,7 +276,7 @@ export function SkinsPage() {
         destructive
         confirmLabel={m['action.delete']()}
         onConfirm={() => {
-          if (pendingRemove) removeSkin.mutate(pendingRemove.key);
+          if (pendingRemove) removeSkin.mutate({ key: pendingRemove.key });
           setPendingRemove(null);
         }}
       />

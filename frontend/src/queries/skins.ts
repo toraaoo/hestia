@@ -22,11 +22,13 @@ export const skinQueries = {
 };
 
 // Exact transforms skip the settle refetch (a Mojang round trip); equip keeps
-// it, since the daemon may mint a preserved library row.
+// it, since the daemon may mint a preserved library row. Keyed by the target
+// account so a non-default picker never writes the wrong cache entry.
 function optimisticList(
+  account: string,
   update: (list: SkinList) => SkinList,
 ): (() => void) | undefined {
-  const key = keys.skins.list('');
+  const key = keys.skins.list(account);
   void queryClient.cancelQueries({ queryKey: key });
   const previous = queryClient.getQueryData<SkinList>(key);
   if (!previous) return undefined;
@@ -52,19 +54,21 @@ export const skinMutations = {
     >({
       mutationKey: [...keys.skins.all, 'add'],
       mutationFn: (params) => api.add(params),
-      onSuccess: (skin) =>
-        queryClient.setQueryData<SkinList>(keys.skins.list(''), (prev) =>
-          prev
-            ? {
-                ...prev,
-                skins: [
-                  skin,
-                  ...prev.skins
-                    .filter((s) => s.key !== skin.key)
-                    .map((s) => ({ ...s, equipped: false })),
-                ],
-              }
-            : prev,
+      onSuccess: (skin, { account }) =>
+        queryClient.setQueryData<SkinList>(
+          keys.skins.list(account ?? ''),
+          (prev) =>
+            prev
+              ? {
+                  ...prev,
+                  skins: [
+                    skin,
+                    ...prev.skins
+                      .filter((s) => s.key !== skin.key)
+                      .map((s) => ({ ...s, equipped: false })),
+                  ],
+                }
+              : prev,
         ),
       invalidates: () => [keys.skins.all],
     }),
@@ -75,8 +79,8 @@ export const skinMutations = {
     >({
       mutationKey: [...keys.skins.all, 'update'],
       mutationFn: (params) => api.update(params),
-      optimistic: ({ key, name, variant }) =>
-        optimisticList((list) => ({
+      optimistic: ({ key, name, variant, account }) =>
+        optimisticList(account ?? '', (list) => ({
           ...list,
           skins: list.skins.map((s) =>
             s.key === key ? { ...s, name, variant } : s,
@@ -87,8 +91,8 @@ export const skinMutations = {
     mutation<void, { key: string; account?: string }>({
       mutationKey: [...keys.skins.all, 'equip'],
       mutationFn: ({ key, account }) => api.equip(key, account),
-      optimistic: ({ key }) =>
-        optimisticList((list) => equipSkinInList(list, key)),
+      optimistic: ({ key, account }) =>
+        optimisticList(account ?? '', (list) => equipSkinInList(list, key)),
       invalidates: () => [keys.skins.all],
     }),
   reset: () =>
@@ -98,11 +102,11 @@ export const skinMutations = {
       invalidates: () => [keys.skins.all],
     }),
   remove: () =>
-    mutation<void, string>({
+    mutation<void, { key: string; account?: string }>({
       mutationKey: [...keys.skins.all, 'remove'],
-      mutationFn: (key) => api.remove(key),
-      optimistic: (key) =>
-        optimisticList((list) => ({
+      mutationFn: ({ key }) => api.remove(key),
+      optimistic: ({ key, account }) =>
+        optimisticList(account ?? '', (list) => ({
           ...list,
           skins: list.skins.filter((s) => s.key !== key),
         })),
@@ -111,8 +115,8 @@ export const skinMutations = {
     mutation<void, { cape: string; account?: string }>({
       mutationKey: [...keys.skins.all, 'cape', 'equip'],
       mutationFn: ({ cape, account }) => api.equipCape(cape, account),
-      optimistic: ({ cape }) =>
-        optimisticList((list) => ({
+      optimistic: ({ cape, account }) =>
+        optimisticList(account ?? '', (list) => ({
           ...list,
           capes: list.capes.map((c) => ({ ...c, equipped: c.id === cape })),
         })),
@@ -121,8 +125,8 @@ export const skinMutations = {
     mutation<void, { account?: string } | undefined>({
       mutationKey: [...keys.skins.all, 'cape', 'clear'],
       mutationFn: (params) => api.clearCape(params?.account),
-      optimistic: () =>
-        optimisticList((list) => ({
+      optimistic: (params) =>
+        optimisticList(params?.account ?? '', (list) => ({
           ...list,
           capes: list.capes.map((c) => ({ ...c, equipped: false })),
         })),

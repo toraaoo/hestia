@@ -214,6 +214,13 @@ function ChangeVersionDialog({
   const [version, setVersion] = useState('');
   const [downgrade, setDowngrade] = useState(false);
 
+  useEffect(() => {
+    if (open) {
+      setVersion('');
+      setDowngrade(false);
+    }
+  }, [open]);
+
   const options = useMemo(
     () => (versions.data ?? []).filter((v) => v.id !== instance.gameVersion),
     [versions.data, instance.gameVersion],

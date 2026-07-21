@@ -2,6 +2,7 @@ import { ArrowsClockwiseIcon, TrashIcon } from '@phosphor-icons/react';
 import { useMutation, useQueries } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import type { ContentKind } from '@/api';
 import { Empty } from '@/components/empty';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -120,12 +121,19 @@ function ContentSectionView({
   const [selected, setSelected] = useState<Set<string> | null>(null);
   const [confirming, setConfirming] = useState(false);
 
+  // Changing the kind filter hides rows a selection may still hold; clear it so
+  // a batch-remove can never delete a row the user can no longer see.
+  const changeKind = (next?: ContentKind) => {
+    setSelected(null);
+    onKindChange(next);
+  };
+
   return (
     <>
       <KindChips
         kinds={kinds}
         kind={kind}
-        onKindChange={onKindChange}
+        onKindChange={changeKind}
         count={(k) => items.filter((c) => c.kind === k).length}
         action={
           selected ? (

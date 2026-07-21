@@ -10,11 +10,17 @@ function Slider({
   max = 100,
   ...props
 }: SliderPrimitive.Root.Props) {
+  // Thumb count follows the value: a scalar (base-ui's own scalar mode) is one
+  // thumb, not [min, max] — otherwise a single-value slider renders two.
   const _values = Array.isArray(value)
     ? value
     : Array.isArray(defaultValue)
       ? defaultValue
-      : [min, max];
+      : typeof value === 'number'
+        ? [value]
+        : typeof defaultValue === 'number'
+          ? [defaultValue]
+          : [min, max];
 
   return (
     <SliderPrimitive.Root

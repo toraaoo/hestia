@@ -8,7 +8,12 @@ import {
   keepPreviousData,
   queryOptions,
 } from '@tanstack/react-query';
-import type { ContentKind, SearchQuery, VersionQuery } from '../api';
+import type {
+  ContentKind,
+  SearchQuery,
+  SearchResult,
+  VersionQuery,
+} from '../api';
 import * as api from '../api/content';
 import { keys } from './keys';
 
@@ -16,6 +21,9 @@ const BROWSE_STALE_MS = 60_000;
 
 /** Hits fetched per page when paging the browse grid. */
 export const SEARCH_PAGE = 20;
+
+/** Per-kind browse offset; `null` once that kind is exhausted. */
+type PagedOffsets = Partial<Record<ContentKind, number | null>>;
 
 export const contentQueries = {
   sources: () =>
@@ -33,25 +41,45 @@ export const contentQueries = {
       // screen while a new query loads (search-as-you-type never blanks).
       placeholderData: keepPreviousData,
     }),
-  // The browse grid pages by offset: pages accumulate under one stable key, so
-  // scrolling appends rather than refetching a growing window. "All" fans out
-  // over every kind for a page (a source search is scoped to one kind) and the
-  // grid merges them. `keepPreviousData` keeps the old results on screen while
-  // a new filter loads.
+  // "All" fans out over every kind, each with its own offset (`null` once
+  // exhausted) so a short kind stops being queried while a long one keeps
+  // paging; the grid merges the per-kind hits.
   searchPaged: (kinds: ContentKind[], query: string) =>
     infiniteQueryOptions({
       queryKey: keys.content.searchPaged(kinds, query),
       queryFn: ({ pageParam }) =>
         Promise.all(
-          kinds.map((kind) =>
-            api.search({ kind, query, limit: SEARCH_PAGE, offset: pageParam }),
-          ),
+          kinds.map((kind) => {
+            const offset = pageParam[kind];
+            if (offset == null)
+              return Promise.resolve<SearchResult>({
+                hits: [],
+                offset: 0,
+                limit: SEARCH_PAGE,
+                total: 0,
+              });
+            return api.search({ kind, query, limit: SEARCH_PAGE, offset });
+          }),
         ),
-      initialPageParam: 0,
-      getNextPageParam: (lastPage, _pages, lastParam) =>
-        lastPage.some((r) => r.offset + r.hits.length < r.total)
-          ? lastParam + SEARCH_PAGE
-          : undefined,
+      initialPageParam: Object.fromEntries(
+        kinds.map((kind) => [kind, 0]),
+      ) as PagedOffsets,
+      getNextPageParam: (lastPage, _pages, lastParam) => {
+        const next: PagedOffsets = {};
+        let more = false;
+        kinds.forEach((kind, index) => {
+          const prev = lastParam[kind];
+          if (prev == null) {
+            next[kind] = null;
+            return;
+          }
+          const result = lastPage[index];
+          const exhausted = result.offset + result.hits.length >= result.total;
+          next[kind] = exhausted ? null : prev + SEARCH_PAGE;
+          if (!exhausted) more = true;
+        });
+        return more ? next : undefined;
+      },
       staleTime: BROWSE_STALE_MS,
       placeholderData: keepPreviousData,
     }),

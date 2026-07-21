@@ -24,6 +24,7 @@ export function WindowControls() {
     if (!inApp) return;
     const win = getCurrentWindow();
     let unlisten: (() => void) | undefined;
+    let cancelled = false;
 
     win
       .isMaximized()
@@ -37,10 +38,15 @@ export function WindowControls() {
           .catch(() => {});
       })
       .then((fn) => {
-        unlisten = fn;
+        // Unmounted before the listener resolved: detach it now.
+        if (cancelled) fn();
+        else unlisten = fn;
       });
 
-    return () => unlisten?.();
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, [inApp]);
 
   const minimize = () => inApp && getCurrentWindow().minimize();
