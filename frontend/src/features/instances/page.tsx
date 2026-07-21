@@ -13,7 +13,7 @@ import {
   type View,
   ViewToggle,
 } from '@/features/entries/components/collection';
-import type { EntryCardData } from '@/features/entries/components/entry-card';
+import type { EntryCardModel } from '@/features/entries/components/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/components/skeleton';
 import { CreateEntryModal } from '@/features/entries/create';
 import { useLaunchModal } from '@/features/instances/launch-modal';
@@ -39,7 +39,7 @@ export function InstancesPage({
   const stop = useStopInstanceAny();
   const [creating, setCreating] = useState(false);
 
-  const cards: EntryCardData[] = useMemo(
+  const cards: EntryCardModel[] = useMemo(
     () =>
       (instances.data ?? []).map((instance) => ({
         ...instanceToCard(

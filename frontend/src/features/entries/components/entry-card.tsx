@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { usePinned } from '@/queries/pinned';
 
-export interface EntryCardData {
+export interface EntryCardModel {
   id: string;
   name: string;
   kind: 'instance' | 'server';
@@ -30,7 +30,7 @@ export interface EntryCardData {
   busy?: boolean;
 }
 
-function statusOf(entry: EntryCardData) {
+function statusOf(entry: EntryCardModel) {
   if (!entry.ready)
     return { tone: 'warn' as const, label: m['status.preparing']() };
   if (entry.running)
@@ -63,7 +63,7 @@ function StatusBadge({
 }
 
 /** Sidebar pin toggle: visible on hover, or always while pinned. */
-function PinToggle({ entry }: { entry: EntryCardData }) {
+function PinToggle({ entry }: { entry: EntryCardModel }) {
   const { ready, isPinned, toggle } = usePinned();
   const pin = { kind: entry.kind, id: entry.id };
   const pinned = isPinned(pin);
@@ -97,7 +97,7 @@ function ActionButton({
   entry,
   size = 'sm',
 }: {
-  entry: EntryCardData;
+  entry: EntryCardModel;
   size?: 'sm' | 'xs';
 }) {
   if (entry.running) {
@@ -148,7 +148,7 @@ function ActionButton({
 }
 
 /** Grid tile: art banner + name + loader/version chips + footer. */
-export function EntryCard({ entry }: { entry: EntryCardData }) {
+export function EntryCard({ entry }: { entry: EntryCardModel }) {
   const status = statusOf(entry);
   const Icon = entryIcon(entry.kind);
 
@@ -202,7 +202,7 @@ export function EntryCard({ entry }: { entry: EntryCardData }) {
 }
 
 /** List row: icon + name + chips inline + action. */
-export function EntryRow({ entry }: { entry: EntryCardData }) {
+export function EntryRow({ entry }: { entry: EntryCardModel }) {
   const status = statusOf(entry);
   const Icon = entryIcon(entry.kind);
 

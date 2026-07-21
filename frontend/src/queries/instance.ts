@@ -19,13 +19,11 @@ import type {
   ResolveParams,
 } from '../api';
 import * as api from '../api/instance';
-import { mutation, type QueryFlags } from './core';
+import { CATALOG_STALE_MS, mutation, type QueryFlags } from './core';
 import { useEntryIconLookup } from './icons';
 import { jobMutation, useJobMutation } from './jobs';
 import { keys } from './keys';
 import { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
-
-const CATALOG_STALE_MS = 5 * 60_000;
 
 export const instanceQueries = {
   list: () =>

@@ -2,11 +2,9 @@
 import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
 import type { JavaInstallDone, JavaInstallProgress } from '../api';
 import * as api from '../api/java';
-import { mutation } from './core';
+import { CATALOG_STALE_MS, mutation } from './core';
 import { jobMutation, useJobMutation } from './jobs';
 import { keys } from './keys';
-
-const CATALOG_STALE_MS = 5 * 60_000;
 
 export const javaQueries = {
   releases: () =>

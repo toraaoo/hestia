@@ -21,7 +21,7 @@ import {
   type View,
   ViewToggle,
 } from '@/features/entries/components/collection';
-import type { EntryCardData } from '@/features/entries/components/entry-card';
+import type { EntryCardModel } from '@/features/entries/components/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/components/skeleton';
 import { CreateEntryModal } from '@/features/entries/create';
 import { useLaunchModal } from '@/features/instances/launch-modal';
@@ -74,7 +74,7 @@ export function LibraryPage({
     startServer.isPending || stopServer.isPending
       ? ((startServer.variables ?? stopServer.variables) as string | undefined)
       : undefined;
-  const serverCards: EntryCardData[] = useMemo(
+  const serverCards: EntryCardModel[] = useMemo(
     () =>
       (servers.data ?? []).map((server) => ({
         ...serverToCard(server, {
@@ -87,7 +87,7 @@ export function LibraryPage({
     [servers.data, serverBusy, startServer, stopServer],
   );
 
-  const instanceCards: EntryCardData[] = useMemo(
+  const instanceCards: EntryCardModel[] = useMemo(
     () =>
       (instances.data ?? []).map((instance) => ({
         ...instanceToCard(

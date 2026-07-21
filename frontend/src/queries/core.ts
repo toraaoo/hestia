@@ -14,6 +14,9 @@ export interface QueryFlags {
   enabled?: boolean;
 }
 
+/** Staleness for the upstream catalogue reads (flavors/versions/loaders/profile). */
+export const CATALOG_STALE_MS = 5 * 60_000;
+
 export interface MutationSpec<TData, TVariables> {
   mutationKey: QueryKey;
   mutationFn: (variables: TVariables) => Promise<TData>;

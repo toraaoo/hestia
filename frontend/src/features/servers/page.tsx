@@ -12,7 +12,7 @@ import {
   type View,
   ViewToggle,
 } from '@/features/entries/components/collection';
-import type { EntryCardData } from '@/features/entries/components/entry-card';
+import type { EntryCardModel } from '@/features/entries/components/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/components/skeleton';
 import { CreateEntryModal } from '@/features/entries/create';
 import { m } from '@/paraglide/messages.js';
@@ -44,7 +44,7 @@ export function ServersPage({
       ? ((start.variables ?? stop.variables) as string | undefined)
       : undefined;
 
-  const cards: EntryCardData[] = useMemo(
+  const cards: EntryCardModel[] = useMemo(
     () =>
       (servers.data ?? []).map((server) => ({
         ...serverToCard(server, {

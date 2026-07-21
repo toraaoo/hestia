@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   EntryCard,
-  type EntryCardData,
+  type EntryCardModel,
   EntryRow,
 } from '@/features/entries/components/entry-card';
 import { agoLabel } from '@/lib/format';
@@ -43,7 +43,7 @@ function runningSessions(instance: InstanceInfo): number {
 export function serverToCard(
   server: ServerInfo,
   actions: CardActions,
-): EntryCardData {
+): EntryCardModel {
   const running = server.process?.state === 'running';
   const address = server.gamePort ? `:${server.gamePort}` : '';
   const state = running ? m['status.online']() : m['status.stopped']();
@@ -71,7 +71,7 @@ export function instanceToCard(
   instance: InstanceInfo,
   actions: CardActions,
   lastPlayedUnix?: number,
-): EntryCardData {
+): EntryCardModel {
   const running = runningSessions(instance);
   return {
     id: instance.id,
@@ -93,12 +93,12 @@ export function instanceToCard(
   };
 }
 
-export function flavorsOf(cards: EntryCardData[]): string[] {
+export function flavorsOf(cards: EntryCardModel[]): string[] {
   return [...new Set(cards.map((c) => c.flavor))];
 }
 
 export function filterCards(
-  cards: EntryCardData[],
+  cards: EntryCardModel[],
   query: string,
   flavor: string = 'all',
 ) {
@@ -202,7 +202,7 @@ export function EntryCollection({
   view,
   empty,
 }: {
-  cards: EntryCardData[];
+  cards: EntryCardModel[];
   view: View;
   empty: string;
 }) {
