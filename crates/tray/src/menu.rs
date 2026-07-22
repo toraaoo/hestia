@@ -4,6 +4,8 @@ use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuIt
 
 use crate::worker::{Action, DaemonState};
 
+const AUTOSTART_SUPPORTED: bool = !cfg!(debug_assertions);
+
 pub struct TrayMenu {
     menu: Menu,
     open: MenuItem,
@@ -56,7 +58,8 @@ impl TrayMenu {
             "Start daemon"
         });
         self.daemon.set_enabled(true);
-        self.autostart.set_enabled(state.running);
+        self.autostart
+            .set_enabled(state.running && AUTOSTART_SUPPORTED);
         self.autostart.set_checked(state.autostart);
     }
 

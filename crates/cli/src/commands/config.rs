@@ -27,6 +27,10 @@ pub async fn run(cmd: ConfigCmd) -> Result<()> {
         ConfigCmd::Set { key, value } => {
             // Parse as JSON, falling back to a bare string.
             let parsed = serde_json::from_str::<Value>(&value).unwrap_or(Value::String(value));
+            #[cfg(debug_assertions)]
+            if key == "autostart" && parsed == Value::Bool(true) {
+                bail!("start at login is unavailable in debug builds");
+            }
             client.config().set(&key, parsed).await?;
         }
         ConfigCmd::List => {

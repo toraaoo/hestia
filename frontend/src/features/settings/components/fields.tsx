@@ -53,17 +53,20 @@ export function CheckboxRow({
   label,
   checked,
   onChange,
+  disabled,
 }: {
   id: string;
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <Field orientation="horizontal">
       <Checkbox
         id={id}
         checked={checked}
+        disabled={disabled}
         onCheckedChange={(c) => onChange(c === true)}
       />
       <FieldLabel htmlFor={id} className="font-normal">

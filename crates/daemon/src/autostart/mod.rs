@@ -2,7 +2,9 @@
 //! key. Registers the running daemon's own executable so the registration
 //! survives the binary being moved.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
+
+pub const SUPPORTED: bool = !cfg!(debug_assertions);
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -20,10 +22,13 @@ mod unsupported;
 use unsupported as backend;
 
 pub fn is_enabled() -> bool {
-    backend::is_enabled()
+    SUPPORTED && backend::is_enabled()
 }
 
 pub fn set(enabled: bool) -> Result<()> {
+    if enabled && !SUPPORTED {
+        bail!("start at login is unavailable in debug builds");
+    }
     let result = if enabled {
         backend::enable().context("failed to enable autostart")
     } else {

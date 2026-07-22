@@ -119,6 +119,7 @@ export function SettingsPage() {
                 label={m['settings.start_at_login']()}
                 checked={entries.autostart ?? false}
                 onChange={(checked) => commitConfig('autostart', checked)}
+                disabled={import.meta.env.DEV}
               />
 
               <CheckboxRow
