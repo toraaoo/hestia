@@ -42,7 +42,12 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Run the daemon (default)
-    Serve,
+    Serve {
+        /// Release the inherited console (the Windows login task uses this so
+        /// no console window lingers). No effect on other platforms.
+        #[arg(long, hide = true)]
+        detach_console: bool,
+    },
     /// Check that a running daemon is reachable
     Ping,
     /// Stop a running daemon; supervised processes keep running
@@ -51,6 +56,12 @@ enum Command {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    let detach_console = matches!(
+        cli.command,
+        Some(Command::Serve {
+            detach_console: true
+        })
+    );
     let level = if cli.quiet {
         LogLevel::Warn
     } else {
@@ -74,6 +85,14 @@ fn main() -> ExitCode {
             rt.block_on(run_stop())
         }
         _ => {
+            #[cfg(windows)]
+            if detach_console {
+                // SAFETY: FreeConsole has no preconditions; it releases the console
+                // the login task attached so no window stays open.
+                unsafe { windows_sys::Win32::System::Console::FreeConsole() };
+            }
+            #[cfg(not(windows))]
+            let _ = detach_console;
             // The long-lived daemon also logs to a rotating, compressed file, since
             // clients detach its stderr.
             let file = common::FileLog::new(common::paths::log_dir(None), "hestiad", level);

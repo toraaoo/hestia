@@ -26,7 +26,7 @@
   <Actions Context="Author">
     <Exec>
       <Command>@COMMAND@</Command>
-      <Arguments>serve</Arguments>
+      <Arguments>serve --detach-console</Arguments>
       <WorkingDirectory>@WORKDIR@</WorkingDirectory>
     </Exec>
   </Actions>
