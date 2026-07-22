@@ -28,10 +28,11 @@ case "$target" in
     if [ -n "$profile" ]; then
       # A real release run needs the prod frontend (Tauri builds it) and the
       # staged sidecars; launch the built binary rather than the Vite dev server.
-      scripts/sidecars.sh
+      scripts/sidecars.sh --ensure
       (cd crates/desktop && cargo tauri build --no-bundle)
       exec ./target/release/hestia-desktop
     else
+      scripts/sidecars.sh --ensure --debug
       (cd crates/desktop && cargo tauri dev)
     fi
     ;;
