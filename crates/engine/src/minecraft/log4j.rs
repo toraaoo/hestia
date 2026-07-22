@@ -21,27 +21,8 @@ pub const NO_LOOKUPS_PROPERTY: &str = "-Dlog4j2.formatMsgNoLookups=true";
 
 /// Render a Log4j2 config that logs to the console and to `log_file`.
 pub fn session_config(log_file: &Path) -> String {
-    let file = xml_escape(&log_file.to_string_lossy());
-    format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="WARN">
-  <Appenders>
-    <Console name="SysOut" target="SYSTEM_OUT">
-      <PatternLayout pattern="[%d{{HH:mm:ss}}] [%t/%level]: %m{{nolookups}}%n"/>
-    </Console>
-    <File name="SessionFile" fileName="{file}">
-      <PatternLayout pattern="[%d{{HH:mm:ss}}] [%t/%level]: %m{{nolookups}}%n"/>
-    </File>
-  </Appenders>
-  <Loggers>
-    <Root level="info">
-      <AppenderRef ref="SysOut"/>
-      <AppenderRef ref="SessionFile"/>
-    </Root>
-  </Loggers>
-</Configuration>
-"#
-    )
+    include_str!("../../assets/session_log4j2.xml")
+        .replace("@LOG_FILE@", &xml_escape(&log_file.to_string_lossy()))
 }
 
 fn xml_escape(text: &str) -> String {
