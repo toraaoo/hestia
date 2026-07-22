@@ -19,7 +19,7 @@ use clap::{Parser, Subcommand};
 use common::LogLevel;
 
 #[derive(Parser)]
-#[command(name = "hestiad", version, about = "hestiad — the Hestia daemon")]
+#[command(name = "hestiad", version = common::app::VERSION_LABEL, about = "hestiad — the Hestia daemon")]
 struct Cli {
     #[arg(
         short,

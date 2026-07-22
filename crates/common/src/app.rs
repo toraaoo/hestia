@@ -16,3 +16,8 @@ pub const DESKTOP_QUIT_ARG: &str = "--quit";
 pub const VENDOR: &str = "toraaoo";
 pub const CHANNEL: &str = "dev";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg(debug_assertions)]
+pub const VERSION_LABEL: &str = concat!(env!("CARGO_PKG_VERSION"), "-debug");
+#[cfg(not(debug_assertions))]
+pub const VERSION_LABEL: &str = env!("CARGO_PKG_VERSION");

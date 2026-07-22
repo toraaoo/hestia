@@ -19,7 +19,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<AppInfo, _, _>(|_: Empty, _ctx| async move {
         Ok(AppInfoResult {
             name: common::app::NAME.into(),
-            version: common::app::VERSION.into(),
+            version: common::app::VERSION_LABEL.into(),
             id: common::app::ID.into(),
             vendor: common::app::VENDOR.into(),
             channel: common::app::CHANNEL.into(),
@@ -29,7 +29,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<DaemonStatus, _, _>(|_: Empty, ctx| async move {
         Ok(DaemonStatusResult {
             pid: std::process::id() as i64,
-            version: common::app::VERSION.into(),
+            version: common::app::VERSION_LABEL.into(),
             uptime_seconds: ctx.runtime.uptime_seconds(),
             home: ctx.runtime.engine().data_home(),
             log: ctx.runtime.log_path().clone(),
