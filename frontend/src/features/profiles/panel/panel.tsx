@@ -1,7 +1,6 @@
 import { DownloadSimpleIcon, PlusIcon } from '@phosphor-icons/react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { toast } from 'sonner';
 
 import type { ContentKind, InstanceInfo } from '@/api';
 import { Empty } from '@/components/empty';
@@ -18,10 +17,6 @@ import { ProfileRow } from './profile-row';
 
 /** The content kinds a profile selects over — never datapacks. */
 const selectableKinds: ContentKind[] = ['mod', 'resource_pack', 'shader'];
-
-const onToastError = {
-  onError: (error: Error) => toast.error(error.message),
-};
 
 /**
  * The instance's Profiles tab: named selections over the installed pool, the
@@ -113,16 +108,13 @@ export function ProfilesPanel({
               active={active === profile.name}
               running={running}
               onUse={() =>
-                use.mutate(
-                  active === profile.name ? '' : profile.name,
-                  onToastError,
-                )
+                use.mutate(active === profile.name ? '' : profile.name)
               }
               onEditMembers={() => setEditing(profile.name)}
               onRename={() => setRenaming(profile.name)}
-              onCapture={() => capture.mutate(profile.name, onToastError)}
-              onRelease={() => release.mutate(profile.name, onToastError)}
-              onRemove={() => removeProfile.mutate(profile.name, onToastError)}
+              onCapture={() => capture.mutate(profile.name)}
+              onRelease={() => release.mutate(profile.name)}
+              onRemove={() => removeProfile.mutate(profile.name)}
             />
           ))}
         </div>
@@ -136,10 +128,7 @@ export function ProfilesPanel({
         onCreate={(name, seedFromPool) =>
           create.mutate(
             { name, seedFromPool },
-            {
-              onSuccess: () => setCreating(false),
-              onError: (error) => toast.error(error.message),
-            },
+            { onSuccess: () => setCreating(false) },
           )
         }
       />
@@ -164,10 +153,7 @@ export function ProfilesPanel({
               add: members.filter((f) => !current.includes(f)),
               remove: current.filter((f) => !members.includes(f)),
             },
-            {
-              onSuccess: () => setEditing(null),
-              onError: (error) => toast.error(error.message),
-            },
+            { onSuccess: () => setEditing(null) },
           );
         }}
       />
@@ -180,10 +166,7 @@ export function ProfilesPanel({
         onRename={(name, newName) =>
           rename.mutate(
             { name, newName },
-            {
-              onSuccess: () => setRenaming(null),
-              onError: (error) => toast.error(error.message),
-            },
+            { onSuccess: () => setRenaming(null) },
           )
         }
       />

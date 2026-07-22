@@ -59,7 +59,6 @@ export function ApplyGlobalDialog({
         setPicked(null);
         onOpenChange(false);
       },
-      onError: (error) => toast.error(error.message),
     });
   };
 

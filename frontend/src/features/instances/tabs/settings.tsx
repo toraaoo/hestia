@@ -83,7 +83,6 @@ export function InstanceSettingsTab({
     rename.mutate(trimmed, {
       onSuccess: (updated) =>
         toast.success(m['toast.renamed']({ name: updated.name })),
-      onError: (error) => toast.error(error.message),
     });
   };
 
@@ -184,7 +183,6 @@ export function InstanceSettingsTab({
                   toast.success(m['toast.removed']({ name: instance.name }));
                   navigate({ to: '/instances' });
                 },
-                onError: (error) => toast.error(error.message),
               })
             }
           />

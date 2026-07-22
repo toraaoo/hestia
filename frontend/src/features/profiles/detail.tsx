@@ -2,7 +2,6 @@ import { PlusIcon, StackIcon, TrashIcon, XIcon } from '@phosphor-icons/react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { toast } from 'sonner';
 
 import type { ContentKind, ProfileEntry } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
@@ -89,10 +88,7 @@ export function ProfileDetailPage({
   const filtered = kind ? items.filter((i) => i.kind === kind) : items;
 
   const removeReference = (ref: string) =>
-    edit.mutate(
-      { name: profile.name, remove: [ref] },
-      { onError: (error) => toast.error(error.message) },
-    );
+    edit.mutate({ name: profile.name, remove: [ref] });
 
   return (
     <div className="flex min-h-full flex-col">
@@ -121,7 +117,6 @@ export function ProfileDetailPage({
             onConfirm={() =>
               remove.mutate(profile.name, {
                 onSuccess: () => navigate({ to: '/profiles' }),
-                onError: (error) => toast.error(error.message),
               })
             }
           />

@@ -61,7 +61,6 @@ export function ServerBackupsTab({
           onClick={() =>
             create.mutate(undefined, {
               onSuccess: () => toast.success(m['toast.saved']()),
-              onError: (error) => toast.error(error.message),
             })
           }
         >
@@ -110,7 +109,6 @@ export function ServerBackupsTab({
                 onConfirm={() =>
                   restore.mutate(backup.id, {
                     onSuccess: () => toast.success(m['toast.saved']()),
-                    onError: (error) => toast.error(error.message),
                   })
                 }
               />
@@ -130,11 +128,7 @@ export function ServerBackupsTab({
                 })}
                 destructive
                 confirmLabel={m['action.delete']()}
-                onConfirm={() =>
-                  remove.mutate(backup.id, {
-                    onError: (error) => toast.error(error.message),
-                  })
-                }
+                onConfirm={() => remove.mutate(backup.id)}
               />
             </div>
           ))}

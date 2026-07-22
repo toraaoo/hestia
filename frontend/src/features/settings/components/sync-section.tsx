@@ -40,10 +40,7 @@ export function SyncSection() {
 
   const targets = config.data?.targets ?? { files: [], folders: [] };
 
-  const commit = (next: SyncTargets) =>
-    setTargets.mutate(next, {
-      onError: (error) => toast.error(error.message),
-    });
+  const commit = (next: SyncTargets) => setTargets.mutate(next);
 
   return (
     <FieldSet>
@@ -197,7 +194,6 @@ function AdoptButton({ id, name }: { id: string; name: string }) {
         adopt.mutate(undefined, {
           onSuccess: (adopted) =>
             toast.success(m['sync.adopted']({ targets: adopted.join(', ') })),
-          onError: (error) => toast.error(error.message),
         })
       }
     />

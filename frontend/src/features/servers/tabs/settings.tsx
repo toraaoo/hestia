@@ -98,7 +98,6 @@ export function ServerSettingsTab({
     rename.mutate(trimmed, {
       onSuccess: (updated) =>
         toast.success(m['toast.renamed']({ name: updated.name })),
-      onError: (error) => toast.error(error.message),
     });
   };
 
@@ -236,7 +235,6 @@ export function ServerSettingsTab({
                   toast.success(m['toast.removed']({ name: server.name }));
                   navigate({ to: '/servers' });
                 },
-                onError: (error) => toast.error(error.message),
               })
             }
           />

@@ -2,7 +2,6 @@ import { CaretRightIcon, PlusIcon, StackIcon } from '@phosphor-icons/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { toast } from 'sonner';
 import type { ContentKind, GlobalProfile } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Empty } from '@/components/empty';
@@ -118,7 +117,6 @@ export function ProfilesPage({
                 params: { name: profile.name },
               });
             },
-            onError: (error) => toast.error(error.message),
           })
         }
       />

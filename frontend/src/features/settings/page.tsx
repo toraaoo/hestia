@@ -58,10 +58,7 @@ export function SettingsPage() {
   const installedMajors = new Set(runtimes.map((rt) => rt.major));
 
   const commitConfig = (key: string, value: unknown) =>
-    setConfig.mutate(
-      { key, value },
-      { onError: (error) => toast.error(error.message) },
-    );
+    setConfig.mutate({ key, value });
 
   const defaultMemory = entries.defaults?.memory ?? '';
   const [memoryDraft, setMemoryDraft] = useState<number | null>(null);
@@ -231,11 +228,7 @@ export function SettingsPage() {
                           })}
                           destructive
                           confirmLabel={m['action.uninstall']()}
-                          onConfirm={() =>
-                            uninstall.mutate(rt.major, {
-                              onError: (error) => toast.error(error.message),
-                            })
-                          }
+                          onConfirm={() => uninstall.mutate(rt.major)}
                         />
                       </div>
                     ))}
@@ -253,14 +246,7 @@ export function SettingsPage() {
                         variant="outline"
                         size="xs"
                         disabled={installed || install.isPending}
-                        onClick={() =>
-                          install.mutate(
-                            { major: r.major },
-                            {
-                              onError: (error) => toast.error(error.message),
-                            },
-                          )
-                        }
+                        onClick={() => install.mutate({ major: r.major })}
                       >
                         {r.major}
                         {r.lts ? ' LTS' : ''}

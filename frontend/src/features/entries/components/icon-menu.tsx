@@ -1,6 +1,5 @@
 import { ImageIcon, PencilSimpleIcon, TrashIcon } from '@phosphor-icons/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
 
 import { dialog } from '@/api';
 import {
@@ -25,10 +24,7 @@ export function EntryIconMenu({ id }: { id: string }) {
   const change = async () => {
     const path = await dialog.pickImage();
     if (!path) return;
-    set.mutate(
-      { entryId: id, sourcePath: path },
-      { onError: (error) => toast.error(error.message) },
-    );
+    set.mutate({ entryId: id, sourcePath: path });
   };
 
   return (
@@ -51,11 +47,7 @@ export function EntryIconMenu({ id }: { id: string }) {
         </DropdownMenuItem>
         <DropdownMenuItem
           disabled={!hasIcon || remove.isPending}
-          onClick={() =>
-            remove.mutate(id, {
-              onError: (error) => toast.error(error.message),
-            })
-          }
+          onClick={() => remove.mutate(id)}
         >
           <TrashIcon />
           {m['entry.reset_icon']()}
