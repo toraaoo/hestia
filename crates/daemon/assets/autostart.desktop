@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=@NAME@
+Comment=@NAME@ launcher daemon
+Exec="@EXEC@" serve
+Terminal=false
