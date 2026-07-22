@@ -5,7 +5,7 @@
 #   scripts/dev.sh                  build daemon, tray + CLI (debug), open a subshell
 #                                   with `hestia`/`hestiad` on PATH
 #   scripts/dev.sh <hestia-args>    build, then run `hestia <args>` once
-#   scripts/dev.sh --desktop [args] the Tauri desktop shell with frontend HMR
+#   scripts/dev.sh --release <hestia-args>  build release binaries, then run `hestia <args>` once
 #
 # The CLI auto-spawns the sibling daemon, so `hestia java list` just works.
 # Debug builds keep data under <repo>/.hestia, so this never touches ~/.hestia.
@@ -36,21 +36,18 @@ PATH="$(strip_installed_hestia)"
 # forwards here.
 export HESTIA_SOCK="${HESTIA_SOCK:-${XDG_RUNTIME_DIR:-/tmp}/hestiad-dev-$(id -u).sock}"
 
-# Desktop launcher with Vite HMR: Tauri drives the frontend dev server itself.
-# Stage debug sidecars so the daemon Tauri spawns keeps its debug_assertions —
-# and thus data under <repo>/.hestia, matching the plain dev path above.
-if [ "${1:-}" = "--desktop" ]; then
-    shift
-    log "Desktop shell with frontend HMR (cargo tauri dev)"
-    scripts/sidecars.sh --ensure --debug
-    cd crates/desktop
-    exec cargo tauri dev "$@"
+mode=debug
+flags=()
+
+if [ "${1:-}" = "--release" ]; then
+  mode=release
+  flags=(--release)
+  shift
 fi
 
-log "Building daemon + tray + CLI (debug)"
-cargo build -p daemon -p tray -p cli
-bindir="$PWD/target/debug"
-
+log "Building daemon + tray + CLI ($mode)"
+cargo build "${flags[@]}" -p daemon -p tray -p cli
+bindir="$PWD/target/$mode"
 # One-shot: `dev.sh java list` runs the CLI once and exits.
 if [ "$#" -gt 0 ]; then
     exec "$bindir/hestia" "$@"
