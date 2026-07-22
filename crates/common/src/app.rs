@@ -10,6 +10,9 @@ pub const ID: &str = "tech.lawrenceallen.hestia";
 /// remote instance that never shows, so the tray and desktop would block each
 /// other.
 pub const TRAY_ID: &str = "tech.lawrenceallen.hestia.tray";
+/// The flag the tray passes to re-launch the desktop shell just to close it:
+/// the running instance routes it through single-instance and exits.
+pub const DESKTOP_QUIT_ARG: &str = "--quit";
 pub const VENDOR: &str = "toraaoo";
 pub const CHANNEL: &str = "dev";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

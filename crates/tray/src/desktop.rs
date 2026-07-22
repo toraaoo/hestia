@@ -28,20 +28,33 @@ fn find_desktop() -> Option<PathBuf> {
 }
 
 pub fn launch() {
+    spawn(&[], "desktop launched", "cannot launch the desktop");
+}
+
+/// Signal a running desktop shell to close (a no-op if none is running).
+pub fn quit() {
+    spawn(
+        &[common::app::DESKTOP_QUIT_ARG],
+        "desktop quit signalled",
+        "cannot signal the desktop to quit",
+    );
+}
+
+fn spawn(args: &[&str], ok_msg: &str, err_msg: &str) {
     let Some(program) = find_desktop() else {
-        tracing::warn!("desktop binary not found beside the tray; cannot open");
+        tracing::warn!("desktop binary not found beside the tray");
         return;
     };
 
     let mut cmd = Command::new(&program);
-    cmd.stdin(Stdio::null())
+    cmd.args(args)
+        .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
 
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
-        // Detach into its own session — the desktop outlives the tray.
         // SAFETY: setsid is async-signal-safe and valid in the forked child.
         unsafe {
             cmd.pre_exec(|| {
@@ -58,7 +71,7 @@ pub fn launch() {
     }
 
     match cmd.spawn() {
-        Ok(child) => tracing::info!(pid = child.id(), "desktop launched"),
-        Err(e) => tracing::warn!("cannot launch the desktop: {e}"),
+        Ok(child) => tracing::info!(pid = child.id(), "{ok_msg}"),
+        Err(e) => tracing::warn!("{err_msg}: {e}"),
     }
 }

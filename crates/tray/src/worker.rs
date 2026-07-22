@@ -52,6 +52,7 @@ fn run(rx: Receiver<Action>, proxy: EventLoopProxy<UserEvent>) {
     loop {
         match rx.recv_timeout(POLL_INTERVAL) {
             Ok(Action::Quit) => {
+                crate::desktop::quit();
                 worker.stop_daemon();
                 let _ = proxy.send_event(UserEvent::Exit);
                 return;
