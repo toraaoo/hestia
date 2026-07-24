@@ -494,6 +494,9 @@ impl Servers {
                 "no server.properties to validate against; accepting the key"
             );
         }
+        if HARDCORE_KEYS.contains(&key) {
+            check_hardcore_invariant(&properties, key, value)?;
+        }
         merge_properties(&properties, &[(key, value.to_string())])
     }
 
@@ -532,6 +535,72 @@ fn read_property(path: &Path, key: &str) -> Option<String> {
         .into_iter()
         .find(|(k, _)| k == key)
         .map(|(_, v)| v)
+}
+
+/// The `server.properties` keys hardcore mode interlocks: enabling it forces
+/// `difficulty=hard` and `gamemode=survival`.
+const HARDCORE_KEYS: &[&str] = &["hardcore", "difficulty", "gamemode"];
+
+fn prop_is_true(value: &str) -> bool {
+    value.trim().eq_ignore_ascii_case("true")
+}
+
+// Modern versions serialize these as names; pre-1.13 used the numeric ids
+// (difficulty 3 = hard, gamemode 0 = survival), so accept both.
+fn prop_is_hard(value: &str) -> bool {
+    let value = value.trim();
+    value.eq_ignore_ascii_case("hard") || value == "3"
+}
+
+fn prop_is_survival(value: &str) -> bool {
+    let value = value.trim();
+    value.eq_ignore_ascii_case("survival") || value == "0"
+}
+
+/// Enforce Minecraft's rule that hardcore forces `difficulty=hard` and
+/// `gamemode=survival`: reject a `config set` to any of the three keys that
+/// would leave them contradicting, so the file can never drift into a state
+/// the game silently overrides at runtime. `key`/`value` is the pending edit.
+fn check_hardcore_invariant(properties: &Path, key: &str, value: &str) -> Result<()> {
+    let effective = |name: &str| -> Option<String> {
+        if name == key {
+            Some(value.to_string())
+        } else {
+            read_property(properties, name)
+        }
+    };
+    if !effective("hardcore").as_deref().is_some_and(prop_is_true) {
+        return Ok(());
+    }
+    let bad_difficulty = effective("difficulty").is_some_and(|v| !prop_is_hard(&v));
+    let bad_gamemode = effective("gamemode").is_some_and(|v| !prop_is_survival(&v));
+    if !bad_difficulty && !bad_gamemode {
+        return Ok(());
+    }
+    let detail = match key {
+        "difficulty" => {
+            "difficulty is locked to 'hard' while hardcore is enabled; disable hardcore first"
+                .into()
+        }
+        "gamemode" => {
+            "gamemode is locked to 'survival' while hardcore is enabled; disable hardcore first"
+                .into()
+        }
+        _ => {
+            let needed: Vec<&str> = [
+                bad_difficulty.then_some("difficulty=hard"),
+                bad_gamemode.then_some("gamemode=survival"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+            format!("hardcore requires {}; set them first", needed.join(" and "))
+        }
+    };
+    bail!(proto::error::ErrorInfo::ConfigRejected {
+        key: key.to_string(),
+        detail,
+    });
 }
 
 /// The server's world directory name (`level-name`, default `world`), read from

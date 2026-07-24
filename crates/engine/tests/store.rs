@@ -363,6 +363,55 @@ fn server_config_covers_jvm_and_properties() {
 }
 
 #[test]
+fn server_config_enforces_hardcore_invariant() {
+    let dir = temp_dir("server-hardcore");
+    let servers = Servers::new(dir.join("servers"));
+    let record = servers
+        .create("HC", ServerProfile::default(), None)
+        .unwrap();
+    let id = &record.id;
+
+    // Seed the file as a fresh server generates it: not hardcore, easy, survival.
+    let properties = servers.data_dir(&record).join("server.properties");
+    std::fs::create_dir_all(properties.parent().unwrap()).unwrap();
+    std::fs::write(
+        &properties,
+        "hardcore=false\ndifficulty=easy\ngamemode=survival\n",
+    )
+    .unwrap();
+
+    // Enabling hardcore while difficulty is not hard is refused.
+    let err = servers.config_set(id, "hardcore", "true").unwrap_err();
+    assert!(err.to_string().contains("difficulty=hard"));
+
+    // Aligning the linked keys first, then enabling hardcore, is accepted.
+    servers.config_set(id, "difficulty", "hard").unwrap();
+    servers.config_set(id, "hardcore", "true").unwrap();
+
+    // With hardcore on, difficulty is locked to hard and gamemode to survival.
+    assert!(servers
+        .config_set(id, "difficulty", "easy")
+        .unwrap_err()
+        .to_string()
+        .contains("locked to 'hard'"));
+    assert!(servers
+        .config_set(id, "gamemode", "creative")
+        .unwrap_err()
+        .to_string()
+        .contains("locked to 'survival'"));
+
+    // Setting them to the pinned values is a no-op that still passes.
+    servers.config_set(id, "gamemode", "survival").unwrap();
+
+    // Disabling hardcore frees the linked keys again.
+    servers.config_set(id, "hardcore", "false").unwrap();
+    servers.config_set(id, "difficulty", "easy").unwrap();
+    servers.config_set(id, "gamemode", "creative").unwrap();
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn instance_config_rejects_unknown_keys() {
     let dir = temp_dir("instance-config");
     let instances = Instances::new(dir.join("instances"));

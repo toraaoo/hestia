@@ -183,6 +183,7 @@ export function SelectField({
   placeholder,
   className,
   triggerClassName,
+  disabled,
 }: {
   label?: ReactNode;
   description?: ReactNode;
@@ -190,12 +191,14 @@ export function SelectField({
   placeholder?: string;
   className?: string;
   triggerClassName?: string;
+  disabled?: boolean;
 }) {
   const field = useFieldContext<string>();
   return (
     <Field className={className}>
       {label && <FieldLabel htmlFor={field.name}>{label}</FieldLabel>}
       <Select
+        disabled={disabled}
         value={field.state.value}
         onValueChange={(v) => {
           // Base UI can emit null on clear; never overwrite with it.
