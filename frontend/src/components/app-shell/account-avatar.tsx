@@ -12,18 +12,26 @@ export function AccountAvatar({
   uuid,
   name,
   size = 28,
+  bust,
   className,
 }: {
   uuid: string;
   name: string;
   /** Rendered edge length in pixels. */
   size?: number;
+  /**
+   * Cache-bust token appended to the head url. The mc-heads url is uuid-only,
+   * so a skin change reuses it and the browser serves the stale head; pass the
+   * equipped skin's key here to force a re-fetch when it changes.
+   */
+  bust?: string;
   className?: string;
 }) {
-  // Track the uuid whose head failed, so switching accounts re-tries the new
-  // head instead of staying on the fallback.
-  const [failedUuid, setFailedUuid] = useState<string | null>(null);
-  const failed = failedUuid === uuid;
+  // Track the identity whose head failed, so switching account — or equipping a
+  // new skin — re-tries the new head instead of staying on the fallback.
+  const id = bust ? `${uuid}:${bust}` : uuid;
+  const [failedId, setFailedId] = useState<string | null>(null);
+  const failed = failedId === id;
 
   const box = cn('shrink-0 overflow-hidden ring-1 ring-border', className);
   const style = { width: size, height: size };
@@ -44,12 +52,14 @@ export function AccountAvatar({
 
   return (
     <img
-      src={`https://mc-heads.net/avatar/${uuid}/${size * 2}`}
+      src={`https://mc-heads.net/avatar/${uuid}/${size * 2}${
+        bust ? `?v=${encodeURIComponent(bust)}` : ''
+      }`}
       alt=""
       width={size}
       height={size}
       style={style}
-      onError={() => setFailedUuid(uuid)}
+      onError={() => setFailedId(id)}
       className={cn(box, 'bg-muted [image-rendering:pixelated]')}
     />
   );

@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries/accounts';
+import { useEquippedSkinKey } from '@/queries/skins';
 
 export function AccountMenu() {
   const {
@@ -31,6 +32,7 @@ export function AccountMenu() {
     remove: removeAccount,
   } = useAccounts();
   const [signingOut, setSigningOut] = useState(false);
+  const equippedSkin = useEquippedSkinKey();
 
   const others = active
     ? accounts.filter((a) => a.uuid !== active.uuid)
@@ -88,6 +90,7 @@ export function AccountMenu() {
                 uuid={active.uuid}
                 name={active.name}
                 size={28}
+                bust={equippedSkin}
                 className="text-[11px]"
               />
               <span className="min-w-0 flex-1">

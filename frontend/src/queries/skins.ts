@@ -6,7 +6,7 @@
  * reshape which entry is equipped. `account` is a name or uuid; empty (the
  * default) targets the default account.
  */
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import type { Skin, SkinList, SkinVariant } from '../api';
 import * as api from '../api/skins';
 import { queryClient } from './client';
@@ -44,6 +44,22 @@ function equipSkinInList(list: SkinList, key: string): SkinList {
       .filter((s) => s.source !== 'external' || s.key === key)
       .map((s) => ({ ...s, equipped: s.key === key })),
   };
+}
+
+/**
+ * The equipped skin's texture hash for `account` (empty = default), read from
+ * the picker cache without fetching — so it's known only once the skin surface
+ * has loaded, and changes the moment an equip/reset settles there. Callers use
+ * it to cache-bust the mc-heads avatar, whose url is otherwise uuid-only and so
+ * pinned in the browser image cache across a skin change.
+ */
+export function useEquippedSkinKey(account = ''): string | undefined {
+  const { data } = useQuery({
+    ...skinQueries.list(account),
+    enabled: false,
+    notifyOnChangeProps: ['data'],
+  });
+  return data?.skins.find((s) => s.equipped)?.key;
 }
 
 export const skinMutations = {
