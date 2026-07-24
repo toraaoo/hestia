@@ -33,6 +33,7 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
+import { configQueries } from '@/queries/config';
 import { useJobMutation } from '@/queries/jobs';
 import { serverMutations, serverQueries } from '@/queries/server';
 
@@ -52,9 +53,20 @@ export function ServerSettingsTab({
   running: boolean;
 }) {
   const navigate = useNavigate();
+  const globalConfig = useQuery(configQueries.list());
   const rename = useMutation(serverMutations.rename(server.id));
   const setConfig = useMutation(serverMutations.setConfig(server.id));
   const remove = useMutation(serverMutations.remove(server.id));
+
+  const defaults =
+    (globalConfig.data as
+      | { defaults?: { memory?: string; 'jvm-args'?: string } }
+      | undefined) ?? {};
+  const defaultMemory = defaults.defaults?.memory ?? '';
+  const defaultMemoryGb = defaultMemory ? memGb(defaultMemory) : 4;
+  const defaultJvmArgs = defaults.defaults?.['jvm-args'] ?? '';
+  const memoryOverride = configValue(config, 'memory');
+  const inheritsMemory = memoryOverride === '' && defaultMemory !== '';
 
   const [name, setName] = useState(server.name);
   const [memory, setMemory] = useState(4);
@@ -69,15 +81,18 @@ export function ServerSettingsTab({
 
   useEffect(() => {
     if (!config) return;
-    setMemory(memGb(configValue(config, 'memory') || '4G'));
+    setMemory(memoryOverride ? memGb(memoryOverride) : defaultMemoryGb);
     setJvmArgs(configValue(config, 'jvm-args'));
     setInterval(configValue(config, 'backup-interval') || 'off');
     setRetention(configValue(config, 'backup-retention') || '10');
-  }, [config]);
+  }, [config, memoryOverride, defaultMemoryGb]);
 
   const saveConfig = async () => {
+    // Match the launcher default → clear the override so it keeps inheriting.
+    const memoryValue =
+      defaultMemory !== '' && memory === defaultMemoryGb ? '' : `${memory}G`;
     try {
-      await setConfig.mutateAsync({ key: 'memory', value: `${memory}G` });
+      await setConfig.mutateAsync({ key: 'memory', value: memoryValue });
       await setConfig.mutateAsync({ key: 'jvm-args', value: jvmArgs });
       await setConfig.mutateAsync({
         key: 'backup-interval',
@@ -131,6 +146,7 @@ export function ServerSettingsTab({
             {m['entry_settings.allocated_memory']()}
             <span className="ml-2 font-mono text-muted-foreground">
               {m['wizard.gb']({ value: memory })}
+              {inheritsMemory && ` (${m['entry_settings.inherits_default']()})`}
             </span>
           </FieldLabel>
           <Slider
@@ -151,7 +167,7 @@ export function ServerSettingsTab({
             id="jvm-args"
             value={jvmArgs}
             onChange={(e) => setJvmArgs(e.target.value)}
-            placeholder="-XX:+UseG1GC"
+            placeholder={defaultJvmArgs || '-XX:+UseG1GC'}
             className="font-mono"
           />
         </Field>

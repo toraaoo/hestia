@@ -19,7 +19,8 @@ pub(super) async fn run(client: &Client, server: &str, cmd: mc::ConfigCmd) -> Re
         }
         mc::ConfigCmd::List => {
             let entries = client.server().config_list(server).await?;
-            mc::show_config_entries(format!("{server} config"), entries)?;
+            let defaults = mc::jvm_defaults(client).await;
+            mc::show_config_entries(format!("{server} config"), entries, &defaults)?;
         }
     }
     Ok(())

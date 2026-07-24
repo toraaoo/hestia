@@ -1,7 +1,7 @@
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { ConfigEntry, Flavor } from '@/api';
@@ -26,7 +26,9 @@ import {
   type WizardValues,
 } from '@/features/entries/lib/schema';
 import { useAppForm } from '@/hooks/form';
+import { memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
+import { configQueries } from '@/queries/config';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
 import { backgroundJob, foregroundJob, useJobMutation } from '@/queries/jobs';
 import { serverMutations, serverQueries } from '@/queries/server';
@@ -76,6 +78,14 @@ export function CreateEntryModal({
     [flavorsQuery.data],
   );
 
+  const config = useQuery(configQueries.list());
+  const defaultMemory =
+    (config.data as { defaults?: { memory?: string } } | undefined)?.defaults
+      ?.memory ?? '';
+  const defaultMemoryGb = defaultMemory ? memGb(defaultMemory) : 4;
+  const defaultMemoryRef = useRef(defaultMemoryGb);
+  defaultMemoryRef.current = defaultMemoryGb;
+
   const createServer = useJobMutation(serverMutations.create());
   const createInstance = useMutation(instanceMutations.create());
   const creating = createServer.isPending || createInstance.isPending;
@@ -92,17 +102,26 @@ export function CreateEntryModal({
   };
 
   const form = useAppForm({
-    defaultValues: createWizardDefaults(''),
+    defaultValues: createWizardDefaults('', defaultMemoryGb),
     validationLogic: revalidateLogic(),
     validators: { onDynamic: createWizardSchema(kind) },
     onSubmit: async ({ value }) => {
+      // Inherit the launcher default when the slider is left on it: store no
+      // per-entry override, so a later change to the global default cascades.
+      const memoryEntries: ConfigEntry[] =
+        defaultMemory !== '' &&
+        value.details.memory === defaultMemoryRef.current
+          ? []
+          : [{ key: 'memory', value: `${value.details.memory}G` }];
       try {
         if (kind === 'server') {
-          const server = await createServer.mutateAsync(serverParams(value));
+          const server = await createServer.mutateAsync(
+            serverParams(value, memoryEntries),
+          );
           toast.success(m['toast.created']({ name: server.name }));
         } else {
           const instance = await createInstance.mutateAsync(
-            instanceParams(value),
+            instanceParams(value, memoryEntries),
           );
           toast.success(m['toast.created']({ name: instance.name }));
         }
@@ -119,7 +138,7 @@ export function CreateEntryModal({
     setStep('flavor');
     setSearch('');
     setShowSnapshots(false);
-    form.reset();
+    form.reset(createWizardDefaults('', defaultMemoryRef.current));
   }, [open, form]);
 
   const Icon = entryIcon(kind);
@@ -275,10 +294,10 @@ export function CreateEntryModal({
 }
 
 /** Build the server create params from the wizard's collected values. */
-function serverParams(value: WizardValues) {
+function serverParams(value: WizardValues, memoryEntries: ConfigEntry[]) {
   const d = value.details;
   const config: ConfigEntry[] = [
-    { key: 'memory', value: `${d.memory}G` },
+    ...memoryEntries,
     { key: 'motd', value: d.motd },
     { key: 'gamemode', value: d.gamemode },
     { key: 'difficulty', value: d.difficulty },
@@ -287,20 +306,20 @@ function serverParams(value: WizardValues) {
     { key: 'online-mode', value: String(d.onlineMode) },
   ];
   return {
-    ...instanceParams(value),
+    ...instanceParams(value, memoryEntries),
     eula: true,
     port: d.port ? Number(d.port) : undefined,
     config,
   };
 }
 
-function instanceParams(value: WizardValues) {
+function instanceParams(value: WizardValues, memoryEntries: ConfigEntry[]) {
   const d = value.details;
   return {
     name: d.name || undefined,
     flavor: value.flavor.flavor,
     version: value.version.version,
     loaderVersion: value.version.loaderVersion || undefined,
-    config: [{ key: 'memory', value: `${d.memory}G` }],
+    config: memoryEntries,
   };
 }
