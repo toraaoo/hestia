@@ -142,7 +142,11 @@ export const serverMutations = {
     mutation<ServerInfo, string>({
       mutationKey: [...keys.servers.detail(id), 'rename'],
       mutationFn: (name) => api.rename(id, name),
-      invalidates: () => [keys.servers.list(), keys.servers.detail(id)],
+      invalidates: () => [
+        keys.servers.list(),
+        keys.servers.detail(id),
+        keys.servers.info(id),
+      ],
     }),
   remove: (id: string) =>
     mutation({
