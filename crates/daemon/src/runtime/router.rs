@@ -7,40 +7,30 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use ipc::errors;
 use ipc::protocol::{Request, Response};
+use proto::error::ErrorInfo;
 use proto::Contract;
 use serde_json::Value;
 use tracing::Instrument;
 
 use super::HandlerContext;
 
-/// A handler's typed failure, carrying the protocol error code to answer with.
-#[derive(Debug)]
-pub struct ServiceError {
-    pub code: String,
-    pub message: String,
-}
+/// A handler's typed failure is the canonical `ErrorInfo` — the same value the
+/// socket carries and a front-end localizes.
+pub type ServiceResult<T> = Result<T, ErrorInfo>;
 
-impl ServiceError {
-    pub fn new(code: &str, message: impl Into<String>) -> Self {
-        ServiceError {
-            code: code.to_string(),
-            message: message.into(),
-        }
-    }
-    pub fn not_found(message: impl Into<String>) -> Self {
-        Self::new(errors::NOT_FOUND, message)
-    }
-    pub fn bad_request(message: impl Into<String>) -> Self {
-        Self::new(errors::BAD_REQUEST, message)
-    }
-    pub fn handler_error(message: impl Into<String>) -> Self {
-        Self::new(errors::HANDLER_ERROR, message)
+/// A generic engine failure with no more-specific `ErrorInfo`; the un-localized
+/// English chain rides along in `detail`.
+pub fn internal(e: anyhow::Error) -> ErrorInfo {
+    ErrorInfo::Internal {
+        detail: format!("{e:#}"),
     }
 }
 
-pub type ServiceResult<T> = Result<T, ServiceError>;
+/// Serialize an `ErrorInfo` into an error `Response`.
+pub fn error_response(info: ErrorInfo) -> Response {
+    Response::failure(serde_json::to_value(&info).unwrap_or(Value::Null))
+}
 
 /// Channels locked until a Minecraft account is signed in: you cannot use
 /// Minecraft you don't own.
@@ -74,32 +64,23 @@ impl Router {
                         && !ctx.runtime.engine().accounts().has_account()
                     {
                         tracing::warn!("rejected: no signed-in account");
-                        return Response::failure(
-                            errors::UNAUTHORIZED,
-                            "sign in with a Microsoft account to use instances",
-                        );
+                        return error_response(ErrorInfo::SignInRequired);
                     }
                     tracing::debug!("dispatch");
                     let started = std::time::Instant::now();
                     let response = handler(request, ctx).await;
                     let elapsed_ms = started.elapsed().as_millis() as u64;
                     match &response.error {
-                        Some(err) => tracing::warn!(
-                            code = %err.code,
-                            message = %err.message,
-                            elapsed_ms,
-                            "request failed"
-                        ),
+                        Some(err) => tracing::warn!(error = %err, elapsed_ms, "request failed"),
                         None => tracing::debug!(elapsed_ms, "request ok"),
                     }
                     response
                 }
                 None => {
                     tracing::warn!("no handler for channel");
-                    Response::failure(
-                        errors::UNKNOWN_CHANNEL,
-                        format!("unknown channel: {}", request.channel),
-                    )
+                    error_response(ErrorInfo::UnknownChannel {
+                        channel: request.channel.clone(),
+                    })
                 }
             }
         }
@@ -136,14 +117,18 @@ impl<'r> Channels<'r> {
                 Box::pin(async move {
                     let params: C::Params = match serde_json::from_value(req.payload) {
                         Ok(p) => p,
-                        Err(e) => return Response::failure(errors::BAD_REQUEST, e.to_string()),
+                        Err(e) => {
+                            return error_response(ErrorInfo::MalformedRequest {
+                                detail: e.to_string(),
+                            })
+                        }
                     };
                     match f(params, ctx).await {
                         Ok(result) => {
                             let payload = serde_json::to_value(result).unwrap_or(Value::Null);
                             Response::success(payload)
                         }
-                        Err(err) => Response::failure(err.code, err.message),
+                        Err(info) => error_response(info),
                     }
                 })
             }),

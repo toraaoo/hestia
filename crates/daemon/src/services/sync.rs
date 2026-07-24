@@ -3,6 +3,7 @@
 //! instance launch flow; these channels read and edit the target set, report
 //! each instance's per-target link state, and run the adopt migration.
 
+use proto::error::{EntryKind, ErrorInfo};
 use proto::sync::{
     SyncAdopt, SyncAdoptResult, SyncConfig, SyncGet, SyncSet, SyncSetParams, SyncStatus,
     SyncStatusResult,
@@ -10,7 +11,7 @@ use proto::sync::{
 use proto::Empty;
 
 use super::guards::{ensure_no_content, find_instance};
-use crate::runtime::{instance_process_id, Channels, ServiceError};
+use crate::runtime::{instance_process_id, Channels};
 
 fn config(sync: &engine::Sync) -> SyncConfig {
     SyncConfig {
@@ -28,7 +29,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         let sync = ctx.runtime.engine().sync();
         let targets = sync
             .set_targets(p.targets)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(
             files = targets.files.len(),
             folders = targets.folders.len(),
@@ -46,17 +47,17 @@ pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<SyncAdopt, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
         if ctx.runtime.instance_running(&record.id) {
-            return Err(ServiceError::bad_request(format!(
-                "instance '{}' is running; stop it first",
-                record.name
-            )));
+            return Err(ErrorInfo::EntryRunning {
+                entry: EntryKind::Instance,
+                name: record.name.clone(),
+            });
         }
         ensure_no_content(&ctx, &instance_process_id(&record.id), &record.name)?;
         let adopted = ctx
             .runtime
             .engine()
             .adopt_instance_sync(&record.id, &p.targets)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(
             instance = %record.id,
             targets = adopted.len(),

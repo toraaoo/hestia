@@ -8,7 +8,9 @@ use proto::skins::{
 };
 use proto::Empty;
 
-use crate::runtime::{Channels, ServiceError};
+use proto::error::ErrorInfo;
+
+use crate::runtime::Channels;
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<SkinList, _, _>(|p, ctx| async move {
@@ -17,7 +19,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .list_skins(&p.account)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(SkinListResult { skins, capes })
     });
 
@@ -28,7 +30,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .add_skin(&p.account, &p.name, p.variant, &p.data)
             .await
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(SkinAddResult { skin })
     });
 
@@ -37,7 +39,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .equip_skin(&p.account, &p.key)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(Empty {})
     });
 
@@ -46,34 +48,28 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .reset_skin(&p.account)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(Empty {})
     });
 
     on.handle::<SkinUpdate, _, _>(|p, ctx| async move {
         if ctx.runtime.engine().skins().entry(&p.key).is_none() {
-            return Err(ServiceError::not_found(format!(
-                "no library skin matches '{}'",
-                p.key
-            )));
+            return Err(ErrorInfo::SkinNotFound { key: p.key.clone() });
         }
         let skin = ctx
             .runtime
             .engine()
             .update_skin(&p.account, &p.key, &p.name, p.variant)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(SkinUpdateResult { skin })
     });
 
     on.handle::<SkinRemove, _, _>(|p, ctx| async move {
         match ctx.runtime.engine().skins().remove(&p.key) {
             Ok(true) => Ok(Empty {}),
-            Ok(false) => Err(ServiceError::not_found(format!(
-                "no library skin matches '{}'",
-                p.key
-            ))),
-            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+            Ok(false) => Err(ErrorInfo::SkinNotFound { key: p.key.clone() }),
+            Err(e) => Err(crate::runtime::internal(e)),
         }
     });
 
@@ -82,7 +78,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .equip_cape(&p.account, &p.cape)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(Empty {})
     });
 
@@ -91,7 +87,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .clear_cape(&p.account)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(Empty {})
     });
 }

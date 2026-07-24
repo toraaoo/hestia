@@ -1,6 +1,6 @@
 //! Every channel the daemon serves, wired onto the router. One `handle::<C>` per
 //! channel, grouped into a registrar per domain; handlers reach the daemon's
-//! collaborators through `HandlerContext` and return `ServiceError` for a typed
+//! collaborators through `HandlerContext` and return `ErrorInfo` for a typed
 //! failure.
 
 mod accounts;

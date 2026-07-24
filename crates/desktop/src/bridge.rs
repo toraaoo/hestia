@@ -51,6 +51,9 @@ enum ConnectionState {
 pub struct CallError {
     code: String,
     message: String,
+    /// The serialized `proto::error::ErrorInfo` the webview localizes from;
+    /// `null` for transport failures with no daemon error.
+    info: Value,
 }
 
 impl CallError {
@@ -59,21 +62,23 @@ impl CallError {
         CallError {
             code: "error".into(),
             message: message.into(),
+            info: Value::Null,
         }
     }
 }
 
 impl From<IpcError> for CallError {
     fn from(error: IpcError) -> Self {
-        let code = match &error {
-            IpcError::Daemon { code, .. } => code.clone(),
-            IpcError::Timeout(_) => "timeout".into(),
-            IpcError::ConnectionLost => "connection_lost".into(),
-            _ => "transport".into(),
+        let (code, info) = match &error {
+            IpcError::Daemon { code, info, .. } => (code.clone(), info.clone()),
+            IpcError::Timeout(_) => ("timeout".into(), Value::Null),
+            IpcError::ConnectionLost => ("connection_lost".into(), Value::Null),
+            _ => ("transport".into(), Value::Null),
         };
         CallError {
             code,
             message: error.to_string(),
+            info,
         }
     }
 }
@@ -91,17 +96,16 @@ pub async fn ipc_call(
     match client.session().call_raw(&channel, payload, timeout).await {
         Ok(response) if response.ok => Ok(response.payload),
         Ok(response) => {
-            let error = response.error.map_or_else(
-                || CallError {
-                    code: "error".into(),
-                    message: "daemon error".into(),
-                },
-                |e| CallError {
-                    code: e.code,
-                    message: e.message,
-                },
-            );
-            Err(error)
+            let raw = response.error.unwrap_or(Value::Null);
+            let info = serde_json::from_value::<client::proto::error::ErrorInfo>(raw.clone())
+                .unwrap_or(client::proto::error::ErrorInfo::Internal {
+                    detail: "daemon error".into(),
+                });
+            Err(CallError {
+                code: info.code().into(),
+                message: info.to_string(),
+                info: raw,
+            })
         }
         Err(error) => {
             if client.session().is_closed() {

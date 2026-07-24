@@ -10,6 +10,7 @@ pub mod content;
 pub mod contract;
 pub mod daemon;
 pub mod download;
+pub mod error;
 pub mod events;
 pub mod health;
 pub mod instance;

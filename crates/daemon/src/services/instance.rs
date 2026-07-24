@@ -2,6 +2,7 @@
 //! launch over the supervisor, and the per-instance JVM settings. Backups live
 //! in `backup`, content installs in `content`.
 
+use proto::error::{EntryKind, ErrorInfo, Field, ProfileScope};
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList, InstanceConfigListResult,
     InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceInfoQuery,
@@ -17,7 +18,7 @@ use proto::process::ProcessLogsResult;
 use proto::Empty;
 
 use super::guards::{ensure_no_content, ensure_stopped, find_instance};
-use crate::runtime::{instance_process_id, Channels, ServiceError};
+use crate::runtime::{instance_process_id, Channels};
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<InstanceFlavors, _, _>(|_: Empty, ctx| async move {
@@ -33,7 +34,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .minecraft()
             .instance_versions(&p.flavor)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(VersionsResult { versions })
     });
 
@@ -43,7 +44,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .minecraft()
             .resolve_instance(&p.flavor, &p.version, p.loader_version)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+            .map_err(crate::runtime::internal)
     });
 
     on.handle::<InstanceLoaders, _, _>(|p, ctx| async move {
@@ -53,20 +54,22 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .minecraft()
             .instance_loader_versions(&p.flavor, &p.version)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(LoadersResult { loaders })
     });
 
     on.handle::<InstanceCreate, _, _>(|p, ctx| async move {
         if p.flavor.is_empty() || p.version.is_empty() {
-            return Err(ServiceError::bad_request("flavor and version are required"));
+            return Err(ErrorInfo::FieldsRequired {
+                fields: vec![Field::Flavor, Field::Version],
+            });
         }
         let record = ctx
             .runtime
             .engine()
             .create_instance(&p.name, &p.flavor, &p.version, p.loader_version, &p.config)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(
             instance = %record.id,
             name = %record.name,
@@ -81,21 +84,23 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<InstanceUpdate, _, _>(|p, ctx| async move {
         if p.version.is_empty() {
-            return Err(ServiceError::bad_request("version is required"));
+            return Err(ErrorInfo::FieldRequired {
+                field: Field::Version,
+            });
         }
         let record = find_instance(&ctx, &p.instance)?;
         if ctx.runtime.instance_running(&record.id) {
-            return Err(ServiceError::bad_request(format!(
-                "instance '{}' is running; stop it first",
-                record.name
-            )));
+            return Err(ErrorInfo::EntryRunning {
+                entry: EntryKind::Instance,
+                name: record.name.clone(),
+            });
         }
         let record = ctx
             .runtime
             .engine()
             .update_instance(&record.id, &p.version, p.loader_version, p.allow_downgrade)
             .await
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(
             instance = %record.id,
             version = %record.profile.game_version,
@@ -123,7 +128,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         ctx.runtime
             .engine()
             .instance_detail(&record.id)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+            .map_err(crate::runtime::internal)
     });
 
     on.handle::<InstanceWorlds, _, _>(|p, ctx| async move {
@@ -131,23 +136,26 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .instance_worlds(&p.instance)
-            .map_err(|e| ServiceError::not_found(format!("{e:#}")))?;
+            .map_err(|_| ErrorInfo::EntryNotFound {
+                entry: EntryKind::Instance,
+                reference: p.instance.clone(),
+            })?;
         Ok(InstanceWorldsResult { worlds })
     });
 
     on.handle::<InstanceRemove, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
         if ctx.runtime.instance_running(&record.id) {
-            return Err(ServiceError::bad_request(format!(
-                "instance '{}' is running; stop it first",
-                record.name
-            )));
+            return Err(ErrorInfo::EntryRunning {
+                entry: EntryKind::Instance,
+                name: record.name.clone(),
+            });
         }
         ctx.runtime
             .engine()
             .instances()
             .remove(&record.id)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         ctx.runtime.discard_instance_sessions(&record.id);
         tracing::info!(instance = %record.id, name = %record.name, "instance removed");
         Ok(Empty {})
@@ -155,15 +163,15 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<InstanceRename, _, _>(|p, ctx| async move {
         if p.name.trim().is_empty() {
-            return Err(ServiceError::bad_request("a new name is required"));
+            return Err(ErrorInfo::FieldRequired { field: Field::Name });
         }
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
         if ctx.runtime.instance_running(&record.id) {
-            return Err(ServiceError::bad_request(format!(
-                "instance '{}' is running; stop it first",
-                record.name
-            )));
+            return Err(ErrorInfo::EntryRunning {
+                entry: EntryKind::Instance,
+                name: record.name.clone(),
+            });
         }
         ensure_no_content(&ctx, &process_id, &record.name)?;
         let renamed = ctx
@@ -171,7 +179,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .instances()
             .rename(&record.id, &p.name)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(id = %renamed.id, name = %renamed.name, "instance renamed");
         Ok(ctx.runtime.instance_view(renamed))
     });
@@ -181,19 +189,18 @@ pub(super) fn register(on: &mut Channels<'_>) {
         // The account's tokens can no longer be refreshed: block up front so a
         // dead sign-in prompts re-login instead of failing mid-launch.
         if ctx.runtime.engine().accounts().needs_reauth(&p.account) {
-            return Err(ServiceError::new(
-                ipc::errors::UNAUTHORIZED,
-                "your Microsoft sign-in has expired; sign in again to play",
-            ));
+            return Err(ErrorInfo::SessionExpired {
+                reference: p.account.clone(),
+            });
         }
         // Concurrent sessions are opt-in: by default a running instance is
         // refused, and `new_session` unlocks a second (or third) launch.
         let running = ctx.runtime.instance_running(&record.id);
         if !p.new_session && running {
-            return Err(ServiceError::bad_request(format!(
-                "instance '{}' is already running; pass --new-session to run another",
-                record.name
-            )));
+            return Err(ErrorInfo::EntryRunning {
+                entry: EntryKind::Instance,
+                name: record.name.clone(),
+            });
         }
         // A concurrent session runs against the mirror the live sessions use
         // (the reconcile is skipped), so a profile override that differs from
@@ -203,17 +210,13 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 .runtime
                 .engine()
                 .instance_profiles(&record.id)
-                .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+                .map_err(crate::runtime::internal)?;
             let requested = if p.profile == "none" { "" } else { &p.profile };
             if !requested.eq_ignore_ascii_case(&active) {
-                return Err(ServiceError::bad_request(format!(
-                    "instance '{}' is running{}; stop it before switching profiles",
-                    record.name,
-                    match active.is_empty() {
-                        true => " with no profile".to_string(),
-                        false => format!(" under profile '{active}'"),
-                    }
-                )));
+                return Err(ErrorInfo::EntryRunning {
+                    entry: EntryKind::Instance,
+                    name: record.name.clone(),
+                });
             }
         }
         match ctx
@@ -222,9 +225,9 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .start(record.id, p.account, p.profile, !running, p.id)
         {
             Some(id) => Ok(InstanceLaunchResult { id }),
-            None => Err(ServiceError::bad_request(
-                "that instance could not be launched",
-            )),
+            None => Err(ErrorInfo::Internal {
+                detail: "that instance could not be launched".into(),
+            }),
         }
     });
 
@@ -235,20 +238,19 @@ pub(super) fn register(on: &mut Channels<'_>) {
             // Stop one named session, refusing an id that is not this instance's.
             Some(session) => {
                 if !sessions.iter().any(|s| s.id == session) {
-                    return Err(ServiceError::not_found(format!(
-                        "instance '{}' has no session '{session}'",
-                        record.name
-                    )));
+                    return Err(ErrorInfo::ProcessNotFound {
+                        id: session.clone(),
+                    });
                 }
                 ctx.runtime.processes().stop(&session);
             }
             None => {
                 let stopped = ctx.runtime.stop_instance_sessions(&record.id);
                 if stopped == 0 {
-                    return Err(ServiceError::bad_request(format!(
-                        "instance '{}' is not running",
-                        record.name
-                    )));
+                    return Err(ErrorInfo::NotRunning {
+                        entry: EntryKind::Instance,
+                        name: record.name.clone(),
+                    });
                 }
             }
         }
@@ -285,8 +287,8 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .config_get(&record.id, &p.key)
         {
             Ok(Some(value)) => Ok(InstanceConfigGetResult { value }),
-            Ok(None) => Err(ServiceError::not_found(format!("'{}' is not set", p.key))),
-            Err(e) => Err(ServiceError::bad_request(format!("{e:#}"))),
+            Ok(None) => Err(ErrorInfo::ConfigKeyUnset { key: p.key.clone() }),
+            Err(e) => Err(crate::runtime::internal(e)),
         }
     });
 
@@ -296,7 +298,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .instances()
             .config_set(&record.id, &p.key, &p.value)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(instance = %record.id, key = %p.key, "instance config updated");
         Ok(Empty {})
     });
@@ -308,7 +310,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .instances()
             .config_list(&record.id)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?
+            .map_err(crate::runtime::internal)?
             .into_iter()
             .map(|(key, value)| ConfigEntry { key, value })
             .collect();
@@ -324,7 +326,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .instance_profiles(&record.id)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(InstanceProfileListResult { active, profiles })
     });
 
@@ -337,7 +339,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .create_instance_profile(&record.id, &p.name, p.seed_from_pool)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(instance = %record.id, profile = %profile.name, "profile created");
         Ok(profile)
     });
@@ -347,7 +349,10 @@ pub(super) fn register(on: &mut Channels<'_>) {
         ctx.runtime
             .engine()
             .remove_instance_profile(&record.id, &p.name)
-            .map_err(|e| ServiceError::not_found(format!("{e:#}")))?;
+            .map_err(|_| ErrorInfo::ProfileNotFound {
+                scope: ProfileScope::Instance,
+                name: p.name.clone(),
+            })?;
         tracing::info!(instance = %record.id, profile = %p.name, "profile removed");
         Ok(Empty {})
     });
@@ -357,7 +362,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         ctx.runtime
             .engine()
             .rename_instance_profile(&record.id, &p.name, &p.new_name)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))
+            .map_err(crate::runtime::internal)
     });
 
     on.handle::<InstanceProfileUse, _, _>(|p, ctx| async move {
@@ -365,7 +370,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         ctx.runtime
             .engine()
             .use_instance_profile(&record.id, &p.name)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(instance = %record.id, profile = %p.name, "active profile changed");
         Ok(Empty {})
     });
@@ -375,7 +380,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         ctx.runtime
             .engine()
             .edit_instance_profile(&record.id, &p.name, &p.add, &p.remove)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))
+            .map_err(crate::runtime::internal)
     });
 
     // Capture/release move real settings trees (and a released store may be
@@ -392,7 +397,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         ctx.runtime
             .engine()
             .capture_instance_profile(&record.id, &p.name)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(instance = %record.id, profile = %p.name, "profile settings captured");
         Ok(Empty {})
     });
@@ -408,7 +413,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         ctx.runtime
             .engine()
             .release_instance_profile(&record.id, &p.name)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(instance = %record.id, profile = %p.name, "profile settings released");
         Ok(Empty {})
     });
