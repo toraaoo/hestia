@@ -128,7 +128,11 @@ export const instanceMutations = {
     mutation<InstanceInfo, string>({
       mutationKey: [...keys.instances.detail(id), 'rename'],
       mutationFn: (name) => api.rename(id, name),
-      invalidates: () => [keys.instances.list(), keys.instances.detail(id)],
+      invalidates: () => [
+        keys.instances.list(),
+        keys.instances.detail(id),
+        keys.instances.info(id),
+      ],
     }),
   remove: (id: string) =>
     mutation({
