@@ -5,6 +5,8 @@ export type LoginMethod = 'device_code' | 'sisu';
 export interface Account {
   uuid: string;
   name: string;
+  /** Stored, but its refresh token was rejected: cannot launch until re-login. */
+  needsReauth: boolean;
 }
 
 /**

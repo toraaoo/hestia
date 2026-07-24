@@ -58,9 +58,11 @@ export async function runJob<
       resolveOutcome(event.payload as TDone);
     } else if (event.topic === topics.error) {
       settled = true;
-      rejectOutcome(
-        new HestiaError(HANDLER_ERROR, String(event.payload.message ?? '')),
-      );
+      const code =
+        typeof event.payload.code === 'string' && event.payload.code
+          ? event.payload.code
+          : HANDLER_ERROR;
+      rejectOutcome(new HestiaError(code, String(event.payload.message ?? '')));
     } else if (
       onProgress &&
       (!topics.progress || event.topic === topics.progress)

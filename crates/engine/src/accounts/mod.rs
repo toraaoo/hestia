@@ -20,11 +20,27 @@ use sha2::{Digest, Sha256};
 use microsoft::{
     launcher_login, minecraft_profile, poll_device_code, redeem_code, refresh_oauth,
     request_device_code, request_device_token, sisu_authenticate, sisu_authorize, xsts_authorize,
-    OAuthTokens,
+    OAuthRejected, OAuthTokens,
 };
 use signing::{base64url_nopad, format_uuid_v4, hex, random_bytes, ProofKey};
 
 const REFRESH_MARGIN_SECONDS: i64 = 300;
+
+/// The account's refresh token was rejected; recover only by re-login. Mapped to
+/// the `unauthorized` code so front-ends prompt sign-in instead of failing opaquely.
+#[derive(Debug, thiserror::Error)]
+#[error("your Microsoft sign-in for '{reference}' has expired; run `hestia account login` to sign in again")]
+pub struct ReauthRequired {
+    pub reference: String,
+}
+
+impl ReauthRequired {
+    fn new(reference: &str) -> Self {
+        ReauthRequired {
+            reference: reference.to_string(),
+        }
+    }
+}
 
 /// What the user must act on to finish a sign-in.
 pub struct LoginChallenge {
@@ -58,6 +74,9 @@ struct StoredAccount {
     access_token: String,
     #[serde(default)]
     expires_at: i64,
+    /// Set when the refresh token is rejected; cleared by a fresh sign-in.
+    #[serde(default)]
+    needs_reauth: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -105,12 +124,31 @@ impl Accounts {
             .map(|a| Account {
                 uuid: a.uuid,
                 name: a.name,
+                needs_reauth: a.needs_reauth,
             })
             .collect()
     }
 
     pub fn has_account(&self) -> bool {
         !load(&self.path()).accounts.is_empty()
+    }
+
+    /// Whether the resolved account (or the default, for an empty reference)
+    /// needs a fresh sign-in. A missing account returns false — callers handle
+    /// "no account" separately.
+    pub fn needs_reauth(&self, reference: &str) -> bool {
+        let file = load(&self.path());
+        let account = if reference.is_empty() {
+            file.accounts
+                .iter()
+                .find(|a| a.uuid == file.default_uuid)
+                .or_else(|| file.accounts.first())
+        } else {
+            file.accounts
+                .iter()
+                .find(|a| a.uuid == reference || a.name == reference)
+        };
+        account.is_some_and(|a| a.needs_reauth || a.refresh_token.is_empty())
     }
 
     /// The account launches use when none is named: the switched-to one, else
@@ -125,6 +163,7 @@ impl Accounts {
         Some(Account {
             uuid: stored.uuid.clone(),
             name: stored.name.clone(),
+            needs_reauth: stored.needs_reauth,
         })
     }
 
@@ -140,6 +179,7 @@ impl Accounts {
             .map(|a| Account {
                 uuid: a.uuid.clone(),
                 name: a.name.clone(),
+                needs_reauth: a.needs_reauth,
             })
         else {
             return Ok(None);
@@ -262,15 +302,16 @@ impl Accounts {
             (oauth, xsts)
         };
 
-        let minecraft_token = launcher_login(&xsts).await?;
-        let profile = minecraft_profile(&minecraft_token).await?;
+        let minecraft = launcher_login(&xsts).await?;
+        let profile = minecraft_profile(&minecraft.access_token).await?;
 
         let record = StoredAccount {
             uuid: profile.uuid.clone(),
             name: profile.name.clone(),
             refresh_token: oauth.refresh_token,
-            access_token: minecraft_token,
-            expires_at: now_seconds() + oauth.expires_in,
+            access_token: minecraft.access_token,
+            expires_at: now_seconds() + minecraft.expires_in,
+            needs_reauth: false,
         };
 
         {
@@ -284,6 +325,7 @@ impl Accounts {
         Ok(Account {
             uuid: profile.uuid,
             name: profile.name,
+            needs_reauth: false,
         })
     }
 
@@ -300,11 +342,21 @@ impl Accounts {
                 .ok_or_else(|| anyhow!("no account matches '{reference}'"))?
         };
 
+        if account.needs_reauth || account.refresh_token.is_empty() {
+            return Err(ReauthRequired::new(reference).into());
+        }
         if account.expires_at - now_seconds() > REFRESH_MARGIN_SECONDS {
             return Ok(account.access_token);
         }
 
-        rotate_tokens(&mut account).await?;
+        if let Err(e) = rotate_tokens(&mut account).await {
+            // A rejected refresh token is fatal; a transient failure is not.
+            if e.downcast_ref::<OAuthRejected>().is_some() {
+                self.flag_reauth(&account.uuid)?;
+                return Err(ReauthRequired::new(reference).into());
+            }
+            return Err(e);
+        }
         let mut file = load(&path);
         if let Some(existing) = file.accounts.iter_mut().find(|a| a.uuid == account.uuid) {
             *existing = account.clone();
@@ -313,6 +365,17 @@ impl Accounts {
         }
         save(&path, &file)?;
         Ok(account.access_token)
+    }
+
+    fn flag_reauth(&self, uuid: &str) -> Result<()> {
+        let path = self.path();
+        let mut file = load(&path);
+        if let Some(account) = file.accounts.iter_mut().find(|a| a.uuid == uuid) {
+            account.needs_reauth = true;
+            save(&path, &file)?;
+            tracing::warn!(uuid, "account refresh rejected; sign-in required");
+        }
+        Ok(())
     }
 
     pub fn remove(&self, reference: &str) -> Result<bool> {
@@ -362,11 +425,13 @@ async fn rotate_tokens(account: &mut StoredAccount) -> Result<()> {
     .await?;
     let xsts = xsts_authorize(&authorization, &device.token, &key, device.clock_offset).await?;
 
-    account.access_token = launcher_login(&xsts).await?;
+    let minecraft = launcher_login(&xsts).await?;
+    account.access_token = minecraft.access_token;
     if !oauth.refresh_token.is_empty() {
         account.refresh_token = oauth.refresh_token;
     }
-    account.expires_at = now_seconds() + oauth.expires_in;
+    account.expires_at = now_seconds() + minecraft.expires_in;
+    account.needs_reauth = false;
     Ok(())
 }
 

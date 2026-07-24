@@ -477,6 +477,9 @@ impl Topic for InstanceLaunchDoneEvent {
 pub struct InstanceLaunchErrorEvent {
     pub id: String,
     pub message: String,
+    /// The `ipc::errors` code the failure maps to (empty = generic handler error).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub code: String,
 }
 impl Topic for InstanceLaunchErrorEvent {
     const TOPIC: &'static str = "instance.launch.error";

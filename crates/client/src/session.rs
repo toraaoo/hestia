@@ -160,7 +160,7 @@ impl Session {
         Fut: std::future::Future<Output = Result<(), IpcError>>,
     {
         struct Outcome {
-            state: Mutex<Option<Result<Value, String>>>,
+            state: Mutex<Option<Result<Value, (String, String)>>>,
             notify: Notify,
         }
         let outcome = Arc::new(Outcome {
@@ -185,7 +185,13 @@ impl Session {
                     .get("message")
                     .and_then(Value::as_str)
                     .unwrap_or_default();
-                *cb_outcome.state.lock().unwrap() = Some(Err(msg.to_string()));
+                let code = event
+                    .payload
+                    .get("code")
+                    .and_then(Value::as_str)
+                    .filter(|c| !c.is_empty())
+                    .unwrap_or(ipc::errors::HANDLER_ERROR);
+                *cb_outcome.state.lock().unwrap() = Some(Err((code.to_string(), msg.to_string())));
                 cb_outcome.notify.notify_waiters();
             } else {
                 on_event(event);
@@ -203,7 +209,7 @@ impl Session {
         &self,
         id: &str,
         start: F,
-        state: &Mutex<Option<Result<Value, String>>>,
+        state: &Mutex<Option<Result<Value, (String, String)>>>,
         notify: &Notify,
     ) -> Result<Value, IpcError>
     where
@@ -217,10 +223,7 @@ impl Session {
 
         loop {
             if let Some(result) = state.lock().unwrap().take() {
-                return result.map_err(|m| IpcError::Daemon {
-                    code: ipc::errors::HANDLER_ERROR.into(),
-                    message: m,
-                });
+                return result.map_err(|(code, message)| IpcError::Daemon { code, message });
             }
             if self.is_closed() {
                 return Err(IpcError::ConnectionLost);

@@ -47,8 +47,13 @@ pub struct DeviceCodeChallenge {
 pub struct OAuthTokens {
     pub access_token: String,
     pub refresh_token: String,
-    pub expires_in: i64,
 }
+
+/// The refresh token is dead (`invalid_grant`) — as opposed to a transient
+/// error; callers treat only this as re-auth-required.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct OAuthRejected(pub String);
 
 pub struct SisuAuthorization {
     pub user_token: String,
@@ -285,6 +290,12 @@ async fn exchange_oauth(form: &[(&str, &str)], what: &str, rejection: &str) -> R
             .get("error_description")
             .and_then(Value::as_str)
             .unwrap_or(error);
+        // Only `invalid_grant` means the refresh token itself is dead. Other
+        // OAuth errors (server_error, temporarily_unavailable, …) are transient
+        // and must not force a re-login.
+        if error == "invalid_grant" {
+            return Err(OAuthRejected(format!("{rejection}: {description}")).into());
+        }
         bail!("{rejection}: {description}");
     }
     Ok(OAuthTokens {
@@ -295,11 +306,6 @@ async fn exchange_oauth(form: &[(&str, &str)], what: &str, rejection: &str) -> R
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string(),
-        expires_in: parsed
-            .body
-            .get("expires_in")
-            .and_then(Value::as_i64)
-            .unwrap_or(0),
     })
 }
 
@@ -374,11 +380,6 @@ pub async fn poll_device_code(device_code: &str) -> Result<Option<OAuthTokens>> 
                 .and_then(Value::as_str)
                 .unwrap_or_default()
                 .to_string(),
-            expires_in: parsed
-                .body
-                .get("expires_in")
-                .and_then(Value::as_i64)
-                .unwrap_or(0),
         }));
     }
     match error {
@@ -514,7 +515,12 @@ pub async fn xsts_authorize(
     })
 }
 
-pub async fn launcher_login(xsts: &XstsToken) -> Result<String> {
+pub struct MinecraftToken {
+    pub access_token: String,
+    pub expires_in: i64,
+}
+
+pub async fn launcher_login(xsts: &XstsToken) -> Result<MinecraftToken> {
     let body = json!({
         "platform": "PC_LAUNCHER",
         "xtoken": format!("XBL3.0 x={};{}", xsts.user_hash, xsts.token),
@@ -535,7 +541,14 @@ pub async fn launcher_login(xsts: &XstsToken) -> Result<String> {
         );
     }
     let parsed = read(response, "Minecraft services").await?;
-    require_string(&parsed.body, "access_token", "Minecraft services")
+    Ok(MinecraftToken {
+        access_token: require_string(&parsed.body, "access_token", "Minecraft services")?,
+        expires_in: parsed
+            .body
+            .get("expires_in")
+            .and_then(Value::as_i64)
+            .unwrap_or(86_400),
+    })
 }
 
 pub async fn minecraft_profile(minecraft_access_token: &str) -> Result<MinecraftProfile> {

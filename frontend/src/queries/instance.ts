@@ -165,6 +165,7 @@ export const instanceMutations = {
         keys.instances.list(),
         keys.instances.detail(id),
         keys.processes.list(),
+        keys.accounts.all,
       ],
     }),
   stopAny: () =>

@@ -1,4 +1,9 @@
-import { CaretUpDownIcon, PlusIcon, SignOutIcon } from '@phosphor-icons/react';
+import {
+  ArrowClockwiseIcon,
+  CaretUpDownIcon,
+  PlusIcon,
+  SignOutIcon,
+} from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import { AccountAvatar } from '@/components/app-shell/account-avatar';
@@ -87,10 +92,14 @@ export function AccountMenu() {
               />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm">{active.name}</span>
-                <span className="block truncate text-[11px] text-muted-foreground">
+                <span
+                  className={`block truncate text-[11px] ${active.needsReauth ? 'text-destructive' : 'text-muted-foreground'}`}
+                >
                   {login.isPending
                     ? m['account.signing_in']()
-                    : m['account.microsoft']()}
+                    : active.needsReauth
+                      ? m['account.reauth_required']()
+                      : m['account.microsoft']()}
                 </span>
               </span>
               <CaretUpDownIcon className="size-4 shrink-0 text-muted-foreground" />
@@ -102,10 +111,22 @@ export function AccountMenu() {
             <DropdownMenuLabel>
               {m['account.signed_in_as']({ name: active.name })}
             </DropdownMenuLabel>
+            {active.needsReauth && (
+              <DropdownMenuItem
+                disabled={login.isPending}
+                onClick={() => login.mutate()}
+                className="text-destructive focus:text-destructive"
+              >
+                <ArrowClockwiseIcon />
+                {m['account.reauth']()}
+              </DropdownMenuItem>
+            )}
             {others.map((a) => (
               <DropdownMenuItem
                 key={a.uuid}
-                onClick={() => switchAccount.mutate(a.uuid)}
+                onClick={() =>
+                  a.needsReauth ? login.mutate() : switchAccount.mutate(a.uuid)
+                }
               >
                 <AccountAvatar
                   uuid={a.uuid}
@@ -113,7 +134,14 @@ export function AccountMenu() {
                   size={20}
                   className="text-[9px]"
                 />
-                {m['account.switch_to']({ name: a.name })}
+                <span className="min-w-0 flex-1 truncate">
+                  {m['account.switch_to']({ name: a.name })}
+                </span>
+                {a.needsReauth && (
+                  <span className="text-[10px] text-destructive">
+                    {m['account.expired']()}
+                  </span>
+                )}
               </DropdownMenuItem>
             ))}
           </DropdownMenuGroup>

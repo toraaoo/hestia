@@ -9,7 +9,7 @@ pub use facades::{
     Accounts, App, Cache, Config, Content, Daemon, Instance, Java, Process, ProcessEvent, Profiles,
     Server, Skins, Sync,
 };
-pub use ipc::errors::IpcError;
+pub use ipc::errors::{self, IpcError};
 pub use session::{job_id, Session};
 
 /// Re-export `proto` so front-ends need only depend on `client`.

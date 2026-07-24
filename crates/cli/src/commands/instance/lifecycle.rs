@@ -23,16 +23,7 @@ pub async fn launch(
     new_session: bool,
     detach: bool,
 ) -> Result<()> {
-    let reporter = Arc::new(ProvisionReporter::new());
-    let progress = reporter.clone();
-    let result = client
-        .instance()
-        .launch(reference, account, new_session, "", move |p| {
-            progress.update(p)
-        })
-        .await;
-    reporter.finish();
-    let (process_id, pid) = result?;
+    let (process_id, pid) = launch_once(client, reference, account, new_session).await?;
     if detach || !ui::interactive_output() {
         return ui::show(View::line(format!(
             "instance '{reference}' launched (pid {pid})"
@@ -48,6 +39,48 @@ pub async fn launch(
         .collect();
     crate::commands::lifecycle::log_session(client, reference, &process_id, backfill, "instance")
         .await
+}
+
+/// Launch; on an `unauthorized` (expired sign-in) offer to re-auth and retry once.
+async fn launch_once(
+    client: &Client,
+    reference: &str,
+    account: &str,
+    new_session: bool,
+) -> Result<(String, u32)> {
+    let mut retried = false;
+    loop {
+        let reporter = Arc::new(ProvisionReporter::new());
+        let progress = reporter.clone();
+        let result = client
+            .instance()
+            .launch(reference, account, new_session, "", move |p| {
+                progress.update(p)
+            })
+            .await;
+        reporter.finish();
+        match result {
+            Ok(launched) => return Ok(launched),
+            Err(e) if is_unauthorized(&e) => {
+                if retried || !ui::interactive_output() {
+                    bail!(
+                        "your Microsoft sign-in has expired; run `hestia account login`, then try again"
+                    );
+                }
+                ui::show(View::note("your Microsoft sign-in has expired"))?;
+                if !ui::confirm("Sign in again now?", "sign in", "cancel")? {
+                    bail!("sign-in required to play");
+                }
+                crate::commands::account::reauth(client).await?;
+                retried = true;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+}
+
+fn is_unauthorized(err: &client::IpcError) -> bool {
+    matches!(err, client::IpcError::Daemon { code, .. } if code == client::errors::UNAUTHORIZED)
 }
 
 pub(crate) async fn stop(client: &Client, instance: &str, session: Option<String>) -> Result<()> {

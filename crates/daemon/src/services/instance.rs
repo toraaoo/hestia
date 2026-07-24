@@ -178,6 +178,14 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<InstanceLaunch, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
+        // The account's tokens can no longer be refreshed: block up front so a
+        // dead sign-in prompts re-login instead of failing mid-launch.
+        if ctx.runtime.engine().accounts().needs_reauth(&p.account) {
+            return Err(ServiceError::new(
+                ipc::errors::UNAUTHORIZED,
+                "your Microsoft sign-in has expired; sign in again to play",
+            ));
+        }
         // Concurrent sessions are opt-in: by default a running instance is
         // refused, and `new_session` unlocks a second (or third) launch.
         let running = ctx.runtime.instance_running(&record.id);

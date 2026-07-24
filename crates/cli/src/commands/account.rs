@@ -87,6 +87,12 @@ pub async fn run(cmd: AccountCmd) -> Result<()> {
     Ok(())
 }
 
+/// Interactive sign-in for a launch whose account's tokens expired, reusing the
+/// device-code flow. Returns the re-signed account.
+pub(crate) async fn reauth(client: &Client) -> Result<Account> {
+    device_code_login(client).await
+}
+
 /// Interactive account picker for a `switch` without an argument.
 async fn pick_account(client: &Client) -> Result<String> {
     let listing = client.accounts().list().await?;

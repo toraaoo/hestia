@@ -111,7 +111,10 @@
     "sign_in": "Entrar",
     "signing_in": "Entrando…",
     "not_signed_in": "Não conectado",
-    "sign_in_failed": "Falha ao entrar"
+    "sign_in_failed": "Falha ao entrar",
+    "reauth_required": "Sessão expirada",
+    "reauth": "Entrar novamente",
+    "expired": "Expirada"
   },
   "daemon": {
     "connected": "hestiad conectado",

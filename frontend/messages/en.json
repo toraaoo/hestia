@@ -112,7 +112,10 @@
     "sign_in": "Sign in",
     "signing_in": "Signing in…",
     "not_signed_in": "Not signed in",
-    "sign_in_failed": "Sign-in failed"
+    "sign_in_failed": "Sign-in failed",
+    "reauth_required": "Sign-in expired",
+    "reauth": "Sign in again",
+    "expired": "Expired"
   },
   "daemon": {
     "connected": "hestiad connected",

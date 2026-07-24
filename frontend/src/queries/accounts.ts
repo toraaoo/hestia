@@ -71,7 +71,7 @@ export function useAccounts() {
   return {
     accounts,
     active,
-    signedIn: accounts.length > 0,
+    signedIn: active ? !active.needsReauth : false,
     isPending: query.isPending,
     ready: !query.isPending,
     login,
@@ -86,5 +86,5 @@ export async function ensureSignedIn(
   queryClient: QueryClient,
 ): Promise<boolean> {
   const list = await queryClient.ensureQueryData(accountQueries.list());
-  return list.accounts.length > 0;
+  return list.accounts.some((a) => !a.needsReauth);
 }

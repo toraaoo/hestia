@@ -90,11 +90,12 @@ impl InstanceLaunchManager {
                         pid,
                     }));
                 }
-                Err(message) => {
+                Err((message, code)) => {
                     tracing::error!(job = %job_id, instance = %instance_id, error = %message, "instance launch failed");
                     hub.publish(&topic_event(&InstanceLaunchErrorEvent {
                         id: job_id.clone(),
                         message,
+                        code,
                     }));
                 }
             }
@@ -139,11 +140,17 @@ async fn launch(
     profile: &str,
     reconcile: bool,
     on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
-) -> Result<(String, u32), String> {
+) -> Result<(String, u32), (String, String)> {
     let (_record, plan, log_file) = engine
         .prepare_instance(instance_id, account, seq, profile, reconcile, on_progress)
         .await
-        .map_err(|e| format!("{e:#}"))?;
+        .map_err(|e| {
+            let code = match e.downcast_ref::<engine::ReauthRequired>() {
+                Some(_) => ipc::errors::UNAUTHORIZED,
+                None => ipc::errors::HANDLER_ERROR,
+            };
+            (format!("{e:#}"), code.to_string())
+        })?;
 
     let spec = ProcessSpec {
         id: session_id.to_string(),
@@ -161,9 +168,13 @@ async fn launch(
             }
             Ok((info.id, info.pid))
         }
-        Err(StartError::EmptyProgram | StartError::InvalidId) => {
-            Err("invalid launch plan".to_string())
-        }
-        Err(StartError::Spawn(e)) => Err(format!("cannot spawn the game: {e}")),
+        Err(StartError::EmptyProgram | StartError::InvalidId) => Err((
+            "invalid launch plan".to_string(),
+            ipc::errors::HANDLER_ERROR.to_string(),
+        )),
+        Err(StartError::Spawn(e)) => Err((
+            format!("cannot spawn the game: {e}"),
+            ipc::errors::HANDLER_ERROR.to_string(),
+        )),
     }
 }

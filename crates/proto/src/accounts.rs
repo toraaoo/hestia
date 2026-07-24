@@ -18,6 +18,8 @@ pub enum LoginMethod {
 pub struct Account {
     pub uuid: String,
     pub name: String,
+    /// Stored, but its refresh token was rejected: cannot launch until re-login.
+    pub needs_reauth: bool,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]

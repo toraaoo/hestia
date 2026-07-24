@@ -21,7 +21,7 @@ mod skins;
 mod sync;
 mod usage;
 
-pub use accounts::{Accounts, LoginChallenge};
+pub use accounts::{Accounts, LoginChallenge, ReauthRequired};
 pub use backup::BackupSettings;
 pub use cache::{Cache, CacheEntry, CacheUsage};
 pub use config::{Config, ConfigError, Settings};
