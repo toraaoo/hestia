@@ -37,7 +37,9 @@ pub(crate) fn kind_dir(kind: ContentKind) -> Result<&'static str> {
         ContentKind::ResourcePack => Ok("resourcepacks"),
         ContentKind::Shader => Ok("shaderpacks"),
         ContentKind::DataPack => Ok("datapacks"),
-        ContentKind::Modpack => bail!("modpack content cannot be installed as a single file"),
+        ContentKind::Modpack => bail!(proto::error::ErrorInfo::UnsupportedOperation {
+            reason: proto::error::Unsupported::ModpackNotSingleFile
+        }),
     }
 }
 

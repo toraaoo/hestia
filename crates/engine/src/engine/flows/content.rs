@@ -32,7 +32,9 @@ impl Engine {
         on_progress: OnProgress<'_>,
     ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
         if !matches!(spec.kind, ContentKind::Mod | ContentKind::DataPack) {
-            bail!("a server takes mods and datapacks only");
+            bail!(proto::error::ErrorInfo::UnsupportedOperation {
+                reason: proto::error::Unsupported::ServerContentKinds
+            });
         }
         let (_, ctx) = self.server_content_ctx(reference)?;
         self.add_content(&ctx, spec, on_progress).await
@@ -152,7 +154,9 @@ impl Engine {
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
         if item.is_empty() || version.is_empty() {
-            bail!("an item and a version are required");
+            bail!(proto::error::ErrorInfo::FieldsRequired {
+                fields: vec![proto::error::Field::Item, proto::error::Field::Version]
+            });
         }
         let (_, ctx) = self.server_content_ctx(reference)?;
         self.update_content(&ctx, kind, item, version, on_progress)
@@ -168,7 +172,9 @@ impl Engine {
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
         if item.is_empty() || version.is_empty() {
-            bail!("an item and a version are required");
+            bail!(proto::error::ErrorInfo::FieldsRequired {
+                fields: vec![proto::error::Field::Item, proto::error::Field::Version]
+            });
         }
         self.change_instance_version(reference, kind, item, version, on_progress)
             .await
@@ -304,7 +310,9 @@ impl Engine {
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
         if !record.ready {
-            bail!("server '{}' is still provisioning", record.name);
+            bail!(proto::error::ErrorInfo::Provisioning {
+                name: record.name.clone()
+            });
         }
         let ctx = EntryContent {
             entry_dir: self.servers.server_dir(&record),
@@ -339,10 +347,14 @@ impl Engine {
     ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
         install::kind_dir(spec.kind)?;
         if spec.kind == ContentKind::Mod && ctx.flavor == "vanilla" {
-            bail!("a vanilla {} cannot load mods", ctx.side.noun());
+            bail!(proto::error::ErrorInfo::UnsupportedOperation {
+                reason: proto::error::Unsupported::VanillaNoMods
+            });
         }
         if spec.items.is_empty() {
-            bail!("nothing to install");
+            bail!(proto::error::ErrorInfo::NothingToDo {
+                what: proto::error::Task::Install
+            });
         }
         let worlds = datapack_worlds(ctx, spec)?;
 
@@ -685,7 +697,9 @@ impl Engine {
         if targets.is_empty() {
             match reference.is_empty() {
                 true => bail!("nothing is installed"),
-                false => bail!("no installed item matches '{reference}'"),
+                false => bail!(proto::error::ErrorInfo::ContentNotFound {
+                    reference: reference.to_string()
+                }),
             }
         }
         let loader = content_loader(kind, &ctx.flavor);
@@ -903,7 +917,9 @@ fn datapack_worlds(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<Vec<Stri
                     continue;
                 }
                 if !ctx.data_dir.join("saves").join(requested).is_dir() {
-                    bail!("no save world '{requested}' in this instance");
+                    bail!(proto::error::ErrorInfo::WorldNotFound {
+                        world: requested.to_string()
+                    });
                 }
                 let resolved = format!("saves/{requested}");
                 if !worlds.contains(&resolved) {
@@ -911,7 +927,9 @@ fn datapack_worlds(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<Vec<Stri
                 }
             }
             if worlds.is_empty() {
-                bail!("name a save world for the datapack (the instance's --world)");
+                bail!(proto::error::ErrorInfo::FieldRequired {
+                    field: proto::error::Field::World
+                });
             }
             Ok(worlds)
         }
@@ -1004,7 +1022,9 @@ fn remove_content(
     worlds: &[String],
 ) -> Result<Vec<InstalledContent>> {
     if !worlds.is_empty() && kind != ContentKind::DataPack {
-        bail!("only datapacks are installed per world");
+        bail!(proto::error::ErrorInfo::UnsupportedOperation {
+            reason: proto::error::Unsupported::DatapacksPerWorld
+        });
     }
     let (removed, kept): (Vec<_>, Vec<_>) =
         install::load(&ctx.entry_dir).into_iter().partition(|i| {
@@ -1042,7 +1062,9 @@ fn set_enabled(
     worlds: &[String],
 ) -> Result<usize> {
     if !worlds.is_empty() && kind != ContentKind::DataPack {
-        bail!("only datapacks are installed per world");
+        bail!(proto::error::ErrorInfo::UnsupportedOperation {
+            reason: proto::error::Unsupported::DatapacksPerWorld
+        });
     }
     let mut index = install::load(&ctx.entry_dir);
     let mut matched = 0usize;

@@ -140,7 +140,9 @@ impl ContentProvider for Modrinth {
             .and_then(Value::as_str)
             .unwrap_or_default();
         if !filename.ends_with(".mrpack") {
-            bail!("version {version_id} is not a Modrinth modpack (expected a .mrpack file)");
+            bail!(proto::error::ErrorInfo::NotAModpack {
+                reference: version_id.to_string()
+            });
         }
         let url = file
             .get("url")
@@ -184,7 +186,9 @@ fn parse_index(index: &Value) -> Result<ResolvedModpack> {
         .and_then(Value::as_u64)
         .unwrap_or(0);
     if format != 1 {
-        bail!("unsupported modpack format version: {format} (expected 1)");
+        bail!(proto::error::ErrorInfo::ModpackInvalid {
+            detail: format!("unsupported format version: {format} (expected 1)")
+        });
     }
 
     let mut files = Vec::new();
