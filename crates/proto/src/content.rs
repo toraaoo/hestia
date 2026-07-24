@@ -650,3 +650,28 @@ impl Contract for ModpackResolve {
     type Params = ModpackParams;
     type Result = ResolvedModpack;
 }
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ContentInspectParams {
+    pub path: String,
+}
+
+/// A local file's import classification: `valid` when installable as
+/// single-file content, `kind` the detected kind (absent for a valid archive of
+/// an unrecognised shape — the caller then chooses), and `reason` set when not.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ContentInspectResult {
+    pub valid: bool,
+    pub kind: Option<ContentKind>,
+    pub filename: String,
+    pub reason: String,
+}
+
+pub struct ContentInspect;
+impl Contract for ContentInspect {
+    const CHANNEL: &'static str = "content.inspect";
+    type Params = ContentInspectParams;
+    type Result = ContentInspectResult;
+}

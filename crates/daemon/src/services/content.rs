@@ -2,8 +2,8 @@
 //! resolution) and the per-entry install surface for servers and instances.
 
 use proto::content::{
-    ContentJobResult, ContentKind, ContentListResult, ContentProjectGet, ContentSearch,
-    ContentSources, ContentUpdatesResult, ContentVersions, InstanceContentAdd,
+    ContentInspect, ContentJobResult, ContentKind, ContentListResult, ContentProjectGet,
+    ContentSearch, ContentSources, ContentUpdatesResult, ContentVersions, InstanceContentAdd,
     InstanceContentCheckUpdates, InstanceContentEnable, InstanceContentList, InstanceContentRemove,
     InstanceContentSetVersion, InstanceContentUpdate, ModpackResolve, ServerContentAdd,
     ServerContentCheckUpdates, ServerContentEnable, ServerContentList, ServerContentRemove,
@@ -93,6 +93,13 @@ fn register_sources(on: &mut Channels<'_>) {
             .resolve_modpack(&p.source, &p.version_id)
             .await
             .map_err(crate::runtime::engine_error)
+    });
+
+    on.handle::<ContentInspect, _, _>(|p, ctx| async move {
+        if p.path.is_empty() {
+            return Err(ErrorInfo::FieldRequired { field: Field::Path });
+        }
+        Ok(ctx.runtime.engine().content().inspect(&p.path))
     });
 }
 

@@ -5,6 +5,7 @@
  */
 import { call } from './core/ipc';
 import type {
+  ContentInspectResult,
   ContentProject,
   ContentSource,
   ContentVersion,
@@ -48,4 +49,9 @@ export function resolveModpack(
     { source, versionId },
     { timeoutMs: 120_000 },
   );
+}
+
+/** Classify a daemon-local file for import (detected kind + validity). */
+export function inspect(path: string): Promise<ContentInspectResult> {
+  return call('content.inspect', { path });
 }

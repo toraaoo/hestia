@@ -71,10 +71,19 @@ export const entryTypeLabel = (type: Target['type']): string =>
       ? m['entry.type_profile']()
       : m['entry.type_instance']();
 
-/** A local file staged for import, tagged with the kind it installs as. */
+/**
+ * A local file staged for import, carrying the daemon's inspection. `kind` is
+ * the effective kind (detected, then user-overridable); null means an
+ * unrecognised-but-valid archive whose kind must be chosen. `valid` false marks
+ * an un-installable file (modpack/corrupt) shown with `reason`.
+ */
 export interface PickedFile {
   path: string;
-  kind: ContentKind;
+  filename: string;
+  kind: ContentKind | null;
+  detected: ContentKind | null;
+  valid: boolean;
+  reason: string;
 }
 
 export const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;

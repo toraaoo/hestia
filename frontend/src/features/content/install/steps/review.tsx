@@ -2,7 +2,7 @@ import { XIcon } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
 
-import type { ContentProject, ContentVersion } from '@/api';
+import type { ContentKind, ContentProject, ContentVersion } from '@/api';
 import { contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -14,11 +14,18 @@ import {
   ComboboxList,
 } from '@/components/ui/combobox';
 import { projectRef } from '@/features/content/components/content-card';
+import { kindInfo } from '@/features/content/lib/kinds';
 import { agoLabel } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
 
-import { fileName, type PickedFile, type Target } from '../targets';
+import {
+  ACCEPTS,
+  type PickedFile,
+  type Target,
+  targetTakesKind,
+} from '../targets';
 
 export function ReviewStep({
   target,
@@ -28,6 +35,7 @@ export function ReviewStep({
   onVersion,
   onRemoveProject,
   onRemoveFile,
+  onSetFileKind,
   worlds,
 }: {
   target: Target | null;
@@ -37,6 +45,7 @@ export function ReviewStep({
   onVersion: (ref: string, id: string) => void;
   onRemoveProject: (p: ContentProject) => void;
   onRemoveFile: (path: string) => void;
+  onSetFileKind: (path: string, kind: ContentKind) => void;
   worlds?: string[];
 }) {
   const isProfile = target?.type === 'profile';
@@ -68,20 +77,98 @@ export function ReviewStep({
           />
         ))}
         {files.map((f) => (
-          <div
+          <FileReviewRow
             key={f.path}
-            className="flex items-center justify-between gap-4 px-3 py-2 text-sm"
-          >
-            <div className="min-w-0">
-              <span className="block truncate">{fileName(f.path)}</span>
-              <span className="block truncate text-[11px] text-muted-foreground">
-                {m['content.local_file']()}
-              </span>
-            </div>
-            <RemoveButton onClick={() => onRemoveFile(f.path)} />
-          </div>
+            file={f}
+            target={target}
+            onSetKind={(kind) => onSetFileKind(f.path, kind)}
+            onRemove={() => onRemoveFile(f.path)}
+          />
         ))}
       </div>
+    </div>
+  );
+}
+
+function installDir(kind: ContentKind): string {
+  return kind === 'data_pack'
+    ? m['content.world_datapacks']()
+    : `${kindInfo[kind].slug}/`;
+}
+
+function FileReviewRow({
+  file,
+  target,
+  onSetKind,
+  onRemove,
+}: {
+  file: PickedFile;
+  target: Target | null;
+  onSetKind: (kind: ContentKind) => void;
+  onRemove: () => void;
+}) {
+  const kinds = target
+    ? ACCEPTS[target.type].filter((k) => targetTakesKind(target, k))
+    : [];
+
+  if (!file.valid) {
+    return (
+      <div className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
+        <div className="min-w-0">
+          <span className="block truncate">{file.filename}</span>
+          <span className="block text-[11px] text-destructive">
+            {file.reason}
+          </span>
+        </div>
+        <RemoveButton onClick={onRemove} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
+      <div className="min-w-0">
+        <span className="block truncate">{file.filename}</span>
+        <span className="block truncate text-[11px] text-muted-foreground">
+          {file.kind
+            ? m['content.install_to']({ dir: installDir(file.kind) })
+            : m['content.choose_type']()}
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <KindPicker kinds={kinds} value={file.kind} onChange={onSetKind} />
+        <RemoveButton onClick={onRemove} />
+      </div>
+    </div>
+  );
+}
+
+function KindPicker({
+  kinds,
+  value,
+  onChange,
+}: {
+  kinds: ContentKind[];
+  value: ContentKind | null;
+  onChange: (kind: ContentKind) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {kinds.map((k) => (
+        <button
+          key={k}
+          type="button"
+          onClick={() => onChange(k)}
+          className={cn(
+            'border px-2 py-0.5 text-[11px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
+            value === k
+              ? 'border-ember bg-ember/10 text-foreground'
+              : 'border-border text-muted-foreground hover:bg-muted/60',
+          )}
+        >
+          {contentKindLabel[k]()}
+        </button>
+      ))}
     </div>
   );
 }
