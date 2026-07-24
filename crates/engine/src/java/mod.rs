@@ -93,7 +93,10 @@ impl Java {
         on_progress: impl Fn(&JavaInstallProgress) + Send + Sync,
     ) -> Result<JavaInstallOutcome> {
         if major <= 0 {
-            bail!("invalid java major version: {major}");
+            bail!(proto::error::ErrorInfo::InvalidValue {
+                field: proto::error::Field::JavaVersion,
+                reason: proto::error::Reason::JavaMajor
+            });
         }
         tracing::info!(major, force, "java install requested");
         if !force {
