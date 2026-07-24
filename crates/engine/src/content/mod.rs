@@ -3,15 +3,18 @@
 //! modpack entry points over it. Stateless — every result is fetched upstream —
 //! so it needs no data directory, exactly like the `minecraft` aggregate.
 
+pub(crate) mod inspect;
 pub(crate) mod install;
 mod modrinth;
 pub(crate) mod profiles;
 mod provider;
 
+use std::path::Path;
+
 use anyhow::{Context, Result};
 use proto::content::{
-    ContentProject, ContentSource, ContentVersion, ResolvedModpack, SearchQuery, SearchResult,
-    VersionQuery,
+    ContentInspectResult, ContentProject, ContentSource, ContentVersion, ResolvedModpack,
+    SearchQuery, SearchResult, VersionQuery,
 };
 
 use provider::ContentProvider;
@@ -32,6 +35,44 @@ impl Default for Content {
 impl Content {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Classify a local file for import (the daemon is the only side that can
+    /// read a client-picked path).
+    pub fn inspect(&self, path: &str) -> ContentInspectResult {
+        let p = Path::new(path);
+        let filename = p
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if !p.is_file() {
+            return ContentInspectResult {
+                valid: false,
+                kind: None,
+                filename,
+                reason: format!("no file at {}", p.display()),
+            };
+        }
+        match inspect::classify(p) {
+            Ok(inspect::Detected::Kind(kind)) => ContentInspectResult {
+                valid: true,
+                kind: Some(kind),
+                filename,
+                reason: String::new(),
+            },
+            Ok(inspect::Detected::Unknown) => ContentInspectResult {
+                valid: true,
+                kind: None,
+                filename,
+                reason: String::new(),
+            },
+            Err(e) => ContentInspectResult {
+                valid: false,
+                kind: None,
+                filename,
+                reason: format!("{e:#}"),
+            },
+        }
     }
 
     pub fn sources(&self) -> Vec<ContentSource> {

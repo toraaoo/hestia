@@ -211,3 +211,12 @@ export interface ContentDone {
   items: InstalledContent[];
   failures: ContentFailure[];
 }
+
+/** A local file's import classification. `kind` is null for a valid archive of
+ * an unrecognised shape (the caller then chooses); `reason` is set when invalid. */
+export interface ContentInspectResult {
+  valid: boolean;
+  kind: ContentKind | null;
+  filename: string;
+  reason: string;
+}

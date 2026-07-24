@@ -2,7 +2,12 @@ import { UploadSimpleIcon } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { type ContentKind, type ContentProject, dialog } from '@/api';
+import {
+  type ContentKind,
+  type ContentProject,
+  content as contentApi,
+  dialog,
+} from '@/api';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { PickerPanel } from '@/components/picker-panel';
 import { projectRef } from '@/features/content/components/content-card';
@@ -15,6 +20,8 @@ import { instanceQueries } from '@/queries/instance';
 import { FilterBar } from '../filter-bar';
 import {
   ACCEPTS,
+  fileName,
+  type PickedFile,
   type Target,
   targetTakesKind,
   useInstalledRefs,
@@ -33,7 +40,7 @@ export function ContentStep({
   onKindChange: (kind: ContentKind | null) => void;
   picked: ContentProject[];
   onToggle: (p: ContentProject) => void;
-  onAddFiles: (paths: string[], kind: ContentKind) => void;
+  onAddFiles: (files: PickedFile[]) => void;
 }) {
   const [search, setSearch] = useState('');
   const kinds = ACCEPTS[target.type].filter((k) => targetTakesKind(target, k));
@@ -76,10 +83,8 @@ export function ContentStep({
           />
 
           {/* A global profile stores project references, never files. */}
-          {target.type !== 'profile' && !datapackBlocked(activeKind) && (
-            <FileImportButton
-              onPickFiles={(paths) => onAddFiles(paths, activeKind)}
-            />
+          {target.type !== 'profile' && (
+            <FileImportButton onFiles={onAddFiles} />
           )}
         </>
       }
@@ -121,16 +126,30 @@ export function ContentStep({
 }
 
 function FileImportButton({
-  onPickFiles,
+  onFiles,
 }: {
-  onPickFiles: (paths: string[]) => void;
+  onFiles: (files: PickedFile[]) => void;
 }) {
   return (
     <button
       type="button"
       onClick={async () => {
         const paths = await dialog.pickContentFiles();
-        if (paths.length > 0) onPickFiles(paths);
+        if (paths.length === 0) return;
+        const files = await Promise.all(
+          paths.map(async (path): Promise<PickedFile> => {
+            const r = await contentApi.inspect(path);
+            return {
+              path,
+              filename: r.filename || fileName(path),
+              kind: r.kind,
+              detected: r.kind,
+              valid: r.valid,
+              reason: r.reason,
+            };
+          }),
+        );
+        onFiles(files);
       }}
       className="mb-2 flex w-full items-center gap-3 border border-dashed border-border p-3 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring"
     >

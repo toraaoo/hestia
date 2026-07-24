@@ -27,7 +27,8 @@ export type WizardAction =
   | { type: 'step'; step: number }
   | { type: 'target'; id: string }
   | { type: 'toggleProject'; project: ContentProject }
-  | { type: 'addFiles'; paths: string[]; kind: ContentKind }
+  | { type: 'addFiles'; files: PickedFile[] }
+  | { type: 'setFileKind'; path: string; kind: ContentKind }
   | { type: 'removeFile'; path: string }
   | { type: 'kindFilter'; kind: ContentKind | null }
   | { type: 'version'; ref: string; id: string }
@@ -74,10 +75,17 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
         ...state,
         files: [
           ...state.files,
-          ...action.paths
-            .filter((path) => !state.files.some((f) => f.path === path))
-            .map((path) => ({ path, kind: action.kind })),
+          ...action.files.filter(
+            (f) => !state.files.some((existing) => existing.path === f.path),
+          ),
         ],
+      };
+    case 'setFileKind':
+      return {
+        ...state,
+        files: state.files.map((f) =>
+          f.path === action.path ? { ...f, kind: action.kind } : f,
+        ),
       };
     case 'removeFile':
       return {

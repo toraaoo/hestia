@@ -1,7 +1,7 @@
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
 import { useMutation } from '@tanstack/react-query';
 
-import type { ContentProject } from '@/api';
+import type { ContentKind, ContentProject } from '@/api';
 import { contentIcon, entryIcon } from '@/components/icons';
 import { StepDots } from '@/components/step-dots';
 import { Button } from '@/components/ui/button';
@@ -77,9 +77,14 @@ export function ContentInstallModal({
 
   const target = targets.find((t) => t.id === targetId) ?? entry ?? null;
   const selectedCount = picked.length + files.length;
+  const fileKinds = files
+    .map((f) => f.kind)
+    .filter((k): k is ContentKind => k !== null);
   const selectedKinds = [
-    ...new Set([...picked.map((p) => p.kind), ...files.map((f) => f.kind)]),
+    ...new Set([...picked.map((p) => p.kind), ...fileKinds]),
   ];
+  // A staged file blocks install until it is installable and has a kind.
+  const filesReady = files.every((f) => f.valid && f.kind !== null);
   const needsWorlds =
     selectedKinds.includes('data_pack') && target?.type === 'instance';
   const isProfile = target?.type === 'profile';
@@ -120,7 +125,7 @@ export function ContentInstallModal({
         ? selectedCount > 0
         : stepId === 'worlds'
           ? worlds.length > 0
-          : selectedCount > 0;
+          : selectedCount > 0 && filesReady;
 
   const liveProgress =
     (target?.type === 'server' ? addServer : addInstance).progress ?? null;
@@ -231,8 +236,8 @@ export function ContentInstallModal({
                     }
                     picked={picked}
                     onToggle={toggleProject}
-                    onAddFiles={(paths, kind) =>
-                      dispatch({ type: 'addFiles', paths, kind })
+                    onAddFiles={(files) =>
+                      dispatch({ type: 'addFiles', files })
                     }
                   />
                 )
@@ -259,6 +264,9 @@ export function ContentInstallModal({
                     onRemoveProject={toggleProject}
                     onRemoveFile={(path) =>
                       dispatch({ type: 'removeFile', path })
+                    }
+                    onSetFileKind={(path, kind) =>
+                      dispatch({ type: 'setFileKind', path, kind })
                     }
                     worlds={needsWorlds ? worlds : undefined}
                   />

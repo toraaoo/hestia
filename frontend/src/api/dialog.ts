@@ -6,8 +6,8 @@
  */
 import { open } from '@tauri-apps/plugin-dialog';
 
-/** File extensions a content import accepts, by nothing more than convention. */
-const CONTENT_EXTENSIONS = ['jar', 'zip', 'mrpack'];
+/** Single-file content is a jar or zip; a `.mrpack` is a modpack, not offered here. */
+const CONTENT_EXTENSIONS = ['jar', 'zip'];
 
 /**
  * Pick content files and return their absolute paths (empty if the dialog was

@@ -13,7 +13,7 @@ use proto::content::{
 use proto::minecraft::{ProvisionPhase, ProvisionProgress};
 
 use super::phase_progress;
-use crate::content::{install, profiles};
+use crate::content::{inspect, install, profiles};
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
 use crate::minecraft::materialize::{self, OnProgress};
@@ -979,6 +979,17 @@ fn add_file_content(
         item.filename.clone()
     };
     materialize::validate_filename(&filename)?;
+    // Reject an unreadable archive or a modpack; the detected kind is advisory
+    // (the requested `kind` wins, so an override installs where asked).
+    match inspect::classify(source)? {
+        inspect::Detected::Kind(detected) if detected != kind => tracing::warn!(
+            file = %filename,
+            ?detected,
+            requested = ?kind,
+            "importing a local file under a kind that differs from its detected type"
+        ),
+        _ => {}
+    }
     let mut installed = Vec::new();
     for world in worlds {
         let (managed, data) = content_targets(ctx, kind, world, &filename)?;

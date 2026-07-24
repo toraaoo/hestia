@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use ipc::errors::IpcError;
 use proto::content::{
-    ContentProject, ContentProjectGet, ContentSearch, ContentSource, ContentSources,
-    ContentVersion, ContentVersions, ModpackParams, ModpackResolve, ProjectParams, ResolvedModpack,
-    SearchQuery, SearchResult, VersionQuery,
+    ContentInspect, ContentInspectParams, ContentInspectResult, ContentProject, ContentProjectGet,
+    ContentSearch, ContentSource, ContentSources, ContentVersion, ContentVersions, ModpackParams,
+    ModpackResolve, ProjectParams, ResolvedModpack, SearchQuery, SearchResult, VersionQuery,
 };
 
 use crate::session::Session;
@@ -54,5 +54,13 @@ impl Content<'_> {
         self.session
             .call_with_timeout::<ModpackResolve>(&params, Duration::from_secs(120))
             .await
+    }
+
+    /// Classify a daemon-local file for import (detected kind + validity).
+    pub async fn inspect(&self, path: &str) -> Result<ContentInspectResult, IpcError> {
+        let params = ContentInspectParams {
+            path: path.to_string(),
+        };
+        self.session.call::<ContentInspect>(&params).await
     }
 }
