@@ -32,19 +32,14 @@ impl Request {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Error {
-    pub code: String,
-    pub message: String,
-}
-
-/// A response: success carries a payload; failure carries an error. The id echoes
-/// the request's id when present.
+/// A response: success carries a payload; failure carries the daemon's
+/// structured error (a serialized `proto::error::ErrorInfo`) as opaque JSON —
+/// `ipc` stays domain-free and never interprets it.
 #[derive(Debug, Clone)]
 pub struct Response {
     pub ok: bool,
     pub payload: Value,
-    pub error: Option<Error>,
+    pub error: Option<Value>,
     pub id: Option<i64>,
     pub version: i64,
 }
@@ -60,14 +55,11 @@ impl Response {
         }
     }
 
-    pub fn failure(code: impl Into<String>, message: impl Into<String>) -> Self {
+    pub fn failure(error: Value) -> Self {
         Response {
             ok: false,
             payload: Value::Null,
-            error: Some(Error {
-                code: code.into(),
-                message: message.into(),
-            }),
+            error: Some(error),
             id: None,
             version: PROTOCOL_VERSION,
         }
@@ -98,12 +90,7 @@ pub fn encode_response(res: &Response) -> String {
     if res.ok {
         j["payload"] = res.payload.clone();
     } else {
-        let (code, message) = res
-            .error
-            .as_ref()
-            .map(|e| (e.code.as_str(), e.message.as_str()))
-            .unwrap_or(("error", ""));
-        j["error"] = json!({ "code": code, "message": message });
+        j["error"] = res.error.clone().unwrap_or_else(|| json!({}));
     }
     if let Some(id) = res.id {
         j["id"] = json!(id);
@@ -160,22 +147,10 @@ pub fn decode_response(frame: &Value) -> Response {
             version,
         }
     } else {
-        let e = frame.get("error").cloned().unwrap_or(json!({}));
         Response {
             ok: false,
             payload: Value::Null,
-            error: Some(Error {
-                code: e
-                    .get("code")
-                    .and_then(Value::as_str)
-                    .unwrap_or("error")
-                    .to_string(),
-                message: e
-                    .get("message")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-                    .to_string(),
-            }),
+            error: Some(frame.get("error").cloned().unwrap_or_else(|| json!({}))),
             id,
             version,
         }

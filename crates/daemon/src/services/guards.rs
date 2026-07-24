@@ -2,30 +2,45 @@
 //! reference, and refusing an operation that would race a running process or an
 //! in-flight job.
 
+use proto::error::{EntryKind, ErrorInfo};
 use proto::process::ProcessState;
 
-use crate::runtime::{HandlerContext, ServiceError};
+use crate::runtime::HandlerContext;
+
+fn entry_kind(noun: &str) -> EntryKind {
+    if noun == "instance" {
+        EntryKind::Instance
+    } else {
+        EntryKind::Server
+    }
+}
 
 pub(super) fn find_server(
     ctx: &HandlerContext,
     reference: &str,
-) -> Result<engine::ServerRecord, ServiceError> {
+) -> Result<engine::ServerRecord, ErrorInfo> {
     ctx.runtime
         .engine()
         .servers()
         .get(reference)
-        .ok_or_else(|| ServiceError::not_found(format!("no server matches '{reference}'")))
+        .ok_or_else(|| ErrorInfo::EntryNotFound {
+            entry: EntryKind::Server,
+            reference: reference.to_string(),
+        })
 }
 
 pub(super) fn find_instance(
     ctx: &HandlerContext,
     reference: &str,
-) -> Result<engine::InstanceRecord, ServiceError> {
+) -> Result<engine::InstanceRecord, ErrorInfo> {
     ctx.runtime
         .engine()
         .instances()
         .get(reference)
-        .ok_or_else(|| ServiceError::not_found(format!("no instance matches '{reference}'")))
+        .ok_or_else(|| ErrorInfo::EntryNotFound {
+            entry: EntryKind::Instance,
+            reference: reference.to_string(),
+        })
 }
 
 pub(super) fn is_running(ctx: &HandlerContext, process_id: &str) -> bool {
@@ -42,11 +57,12 @@ pub(super) fn ensure_stopped(
     process_id: &str,
     noun: &str,
     name: &str,
-) -> Result<(), ServiceError> {
+) -> Result<(), ErrorInfo> {
     if is_running(ctx, process_id) {
-        return Err(ServiceError::bad_request(format!(
-            "{noun} '{name}' is running; stop it first"
-        )));
+        return Err(ErrorInfo::EntryRunning {
+            entry: entry_kind(noun),
+            name: name.to_string(),
+        });
     }
     Ok(())
 }
@@ -55,11 +71,11 @@ pub(super) fn ensure_no_update(
     ctx: &HandlerContext,
     server_id: &str,
     name: &str,
-) -> Result<(), ServiceError> {
+) -> Result<(), ErrorInfo> {
     if ctx.runtime.server_updates().in_flight(server_id) {
-        return Err(ServiceError::bad_request(format!(
-            "server '{name}' is being updated"
-        )));
+        return Err(ErrorInfo::UpdateInProgress {
+            name: name.to_string(),
+        });
     }
     Ok(())
 }
@@ -70,11 +86,11 @@ pub(super) fn ensure_no_content(
     ctx: &HandlerContext,
     key: &str,
     name: &str,
-) -> Result<(), ServiceError> {
+) -> Result<(), ErrorInfo> {
     if ctx.runtime.content_jobs().in_flight(key) {
-        return Err(ServiceError::bad_request(format!(
-            "'{name}' has a content change in progress; wait for it to finish"
-        )));
+        return Err(ErrorInfo::ContentInProgress {
+            name: name.to_string(),
+        });
     }
     Ok(())
 }
@@ -86,20 +102,22 @@ pub(super) fn ensure_no_backup(
     ctx: &HandlerContext,
     key: &str,
     name: &str,
-) -> Result<(), ServiceError> {
+) -> Result<(), ErrorInfo> {
     if ctx.runtime.backups().in_flight(key) {
-        return Err(ServiceError::bad_request(format!(
-            "'{name}' has a backup or restore in progress; wait for it to finish"
-        )));
+        return Err(ErrorInfo::BackupInProgress {
+            name: name.to_string(),
+        });
     }
     Ok(())
 }
 
 pub(super) fn require_content_items(
     spec: &proto::content::ContentAddSpec,
-) -> Result<(), ServiceError> {
+) -> Result<(), ErrorInfo> {
     if spec.items.is_empty() {
-        return Err(ServiceError::bad_request("nothing to install"));
+        return Err(ErrorInfo::NothingToDo {
+            what: proto::error::Task::Install,
+        });
     }
     for item in &spec.items {
         let picked = [&item.project, &item.url, &item.path]
@@ -107,13 +125,15 @@ pub(super) fn require_content_items(
             .filter(|s| !s.is_empty())
             .count();
         if picked != 1 {
-            return Err(ServiceError::bad_request(
-                "each item must name exactly one of a project, a url, or a file",
-            ));
+            return Err(ErrorInfo::MutuallyExclusive {
+                options: vec!["a project".into(), "a url".into(), "a file".into()],
+            });
         }
     }
     if !spec.worlds.is_empty() && spec.kind != proto::content::ContentKind::DataPack {
-        return Err(ServiceError::bad_request("worlds apply to datapacks only"));
+        return Err(ErrorInfo::UnsupportedOperation {
+            reason: proto::error::Unsupported::WorldsForDatapacksOnly,
+        });
     }
     Ok(())
 }
@@ -121,14 +141,14 @@ pub(super) fn require_content_items(
 pub(super) fn require_backup(
     backups: anyhow::Result<Vec<proto::backup::BackupInfo>>,
     reference: &str,
-) -> Result<(), ServiceError> {
-    let backups = backups.map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+) -> Result<(), ErrorInfo> {
+    let backups = backups.map_err(crate::runtime::internal)?;
     if backups.iter().any(|b| b.id == reference) {
         Ok(())
     } else {
-        Err(ServiceError::not_found(format!(
-            "no backup matches '{reference}'"
-        )))
+        Err(ErrorInfo::BackupNotFound {
+            reference: reference.to_string(),
+        })
     }
 }
 

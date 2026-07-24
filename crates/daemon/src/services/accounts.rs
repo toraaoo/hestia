@@ -5,9 +5,10 @@ use proto::accounts::{
     AccountLoginComplete, AccountLoginCompleteResult, AccountRemove, AccountSwitch,
     AccountSwitchResult,
 };
+use proto::error::ErrorInfo;
 use proto::Empty;
 
-use crate::runtime::{Channels, ServiceError};
+use crate::runtime::Channels;
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<AccountLoginBegin, _, _>(|p, ctx| async move {
@@ -18,7 +19,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .accounts()
             .begin_login(p.method)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(AccountLoginBeginResult {
             id: challenge.id,
             method: challenge.method,
@@ -35,7 +36,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .accounts()
             .complete_login(&p.id, &p.code)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(account = %account.name, "account signed in");
         Ok(AccountLoginCompleteResult { account })
     });
@@ -57,11 +58,10 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 tracing::info!(account = %account.name, "default account switched");
                 Ok(AccountSwitchResult { account })
             }
-            Ok(None) => Err(ServiceError::not_found(format!(
-                "no account matches '{}'",
-                p.account
-            ))),
-            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+            Ok(None) => Err(ErrorInfo::AccountNotFound {
+                reference: p.account.clone(),
+            }),
+            Err(e) => Err(crate::runtime::internal(e)),
         }
     });
 
@@ -71,11 +71,10 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 tracing::info!(account = %p.account, "account removed");
                 Ok(Empty {})
             }
-            Ok(false) => Err(ServiceError::not_found(format!(
-                "no account matches '{}'",
-                p.account
-            ))),
-            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+            Ok(false) => Err(ErrorInfo::AccountNotFound {
+                reference: p.account.clone(),
+            }),
+            Err(e) => Err(crate::runtime::internal(e)),
         }
     });
 }

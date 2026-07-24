@@ -27,7 +27,7 @@ pub use managers::{
 };
 pub use metrics::spawn_metrics_sampler;
 pub use process::{ExitObserver, ProcessSupervisor, StartError};
-pub use router::{Channels, Router, ServiceError};
+pub use router::{error_response, internal, Channels, Router};
 pub use scheduler::spawn_backup_scheduler;
 
 /// The supervisor id a managed server runs under — deterministic, so every

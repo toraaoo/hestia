@@ -2,6 +2,7 @@
 //! the rcon console, and the per-server settings. Backups live in `backup`,
 //! content installs in `content`.
 
+use proto::error::{EntryKind, ErrorInfo, Field};
 use proto::minecraft::{ConfigEntry, FlavorsResult, LoadersResult, VersionsResult};
 use proto::process::{LogSource, ProcessLogsResult, ProcessSpec, RestartPolicy};
 use proto::server::{
@@ -16,7 +17,7 @@ use proto::Empty;
 use super::guards::{
     ensure_no_backup, ensure_no_content, ensure_no_update, find_server, is_running,
 };
-use crate::runtime::{server_process_id, Channels, ServiceError, StartError};
+use crate::runtime::{server_process_id, Channels, StartError};
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<ServerFlavors, _, _>(|_: Empty, ctx| async move {
@@ -32,7 +33,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .minecraft()
             .server_versions(&p.flavor)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(VersionsResult { versions })
     });
 
@@ -42,7 +43,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .minecraft()
             .resolve_server(&p.flavor, &p.version, p.loader_version)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+            .map_err(crate::runtime::internal)
     });
 
     on.handle::<ServerLoaders, _, _>(|p, ctx| async move {
@@ -52,50 +53,51 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .minecraft()
             .server_loader_versions(&p.flavor, &p.version)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(LoadersResult { loaders })
     });
 
     on.handle::<ServerCreate, _, _>(|p, ctx| async move {
         if p.flavor.is_empty() || p.version.is_empty() {
-            return Err(ServiceError::bad_request("flavor and version are required"));
+            return Err(ErrorInfo::FieldsRequired {
+                fields: vec![Field::Flavor, Field::Version],
+            });
         }
         if !p.eula {
-            return Err(ServiceError::bad_request(
-                "creating a server requires accepting the Minecraft EULA",
-            ));
+            return Err(ErrorInfo::EulaRequired);
         }
         match ctx.runtime.server_creates().start(p) {
             Some(id) => Ok(ServerCreateResult { id }),
-            None => Err(ServiceError::bad_request(
-                "that server is already being created",
-            )),
+            None => Err(ErrorInfo::Busy {
+                detail: "that server is already being created".into(),
+            }),
         }
     });
 
     on.handle::<ServerUpdate, _, _>(|p, ctx| async move {
         if p.version.is_empty() {
-            return Err(ServiceError::bad_request("version is required"));
+            return Err(ErrorInfo::FieldRequired {
+                field: Field::Version,
+            });
         }
         let record = find_server(&ctx, &p.server)?;
         if is_running(&ctx, &server_process_id(&record.id)) {
-            return Err(ServiceError::bad_request(format!(
-                "server '{}' is running; stop it first",
-                record.name
-            )));
+            return Err(ErrorInfo::EntryRunning {
+                entry: EntryKind::Server,
+                name: record.name.clone(),
+            });
         }
         if ctx.runtime.server_creates().in_flight(&record.name) {
-            return Err(ServiceError::bad_request(format!(
-                "server '{}' is still being created",
-                record.name
-            )));
+            return Err(ErrorInfo::Provisioning {
+                name: record.name.clone(),
+            });
         }
         ensure_no_backup(&ctx, &server_process_id(&record.id), &record.name)?;
         match ctx.runtime.server_updates().start(record.id, p) {
             Some(id) => Ok(ServerUpdateResult { id }),
-            None => Err(ServiceError::bad_request(
-                "that server is already being updated",
-            )),
+            None => Err(ErrorInfo::UpdateInProgress {
+                name: record.name.clone(),
+            }),
         }
     });
 
@@ -121,7 +123,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         ctx.runtime
             .engine()
             .server_detail(&record.id)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+            .map_err(crate::runtime::internal)
     });
 
     on.handle::<ServerPing, _, _>(|p, ctx| async move {
@@ -130,23 +132,23 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .server_ping(&record.id)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+            .map_err(crate::runtime::internal)
     });
 
     on.handle::<ServerRemove, _, _>(|p, ctx| async move {
         let record = find_server(&ctx, &p.server)?;
         if is_running(&ctx, &server_process_id(&record.id)) {
-            return Err(ServiceError::bad_request(format!(
-                "server '{}' is running; stop it first",
-                record.name
-            )));
+            return Err(ErrorInfo::EntryRunning {
+                entry: EntryKind::Server,
+                name: record.name.clone(),
+            });
         }
         ensure_no_backup(&ctx, &server_process_id(&record.id), &record.name)?;
         ctx.runtime
             .engine()
             .servers()
             .remove(&record.id)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         ctx.runtime
             .processes()
             .discard(&server_process_id(&record.id));
@@ -156,21 +158,20 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<ServerRename, _, _>(|p, ctx| async move {
         if p.name.trim().is_empty() {
-            return Err(ServiceError::bad_request("a new name is required"));
+            return Err(ErrorInfo::FieldRequired { field: Field::Name });
         }
         let record = find_server(&ctx, &p.server)?;
         let process_id = server_process_id(&record.id);
         if is_running(&ctx, &process_id) {
-            return Err(ServiceError::bad_request(format!(
-                "server '{}' is running; stop it first",
-                record.name
-            )));
+            return Err(ErrorInfo::EntryRunning {
+                entry: EntryKind::Server,
+                name: record.name.clone(),
+            });
         }
         if ctx.runtime.server_creates().in_flight(&record.name) {
-            return Err(ServiceError::bad_request(format!(
-                "server '{}' is still being created",
-                record.name
-            )));
+            return Err(ErrorInfo::Provisioning {
+                name: record.name.clone(),
+            });
         }
         ensure_no_update(&ctx, &record.id, &record.name)?;
         ensure_no_backup(&ctx, &process_id, &record.name)?;
@@ -180,7 +181,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .servers()
             .rename(&record.id, &p.name)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(id = %renamed.id, name = %renamed.name, "server renamed");
         Ok(ctx.runtime.server_view(renamed))
     });
@@ -189,10 +190,10 @@ pub(super) fn register(on: &mut Channels<'_>) {
         let record = find_server(&ctx, &p.server)?;
         let process_id = server_process_id(&record.id);
         if is_running(&ctx, &process_id) {
-            return Err(ServiceError::bad_request(format!(
-                "server '{}' is already running",
-                record.name
-            )));
+            return Err(ErrorInfo::EntryRunning {
+                entry: EntryKind::Server,
+                name: record.name.clone(),
+            });
         }
         ensure_no_backup(&ctx, &process_id, &record.name)?;
         tracing::info!(server = %record.id, name = %record.name, "starting server");
@@ -200,7 +201,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .server_launch_plan(&record.id)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         let spec = ProcessSpec {
             id: process_id,
             program: plan.program.to_string_lossy().into_owned(),
@@ -215,12 +216,12 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 process_id: info.id,
                 pid: info.pid,
             }),
-            Err(StartError::EmptyProgram | StartError::InvalidId) => {
-                Err(ServiceError::bad_request("invalid launch plan"))
-            }
-            Err(StartError::Spawn(e)) => Err(ServiceError::handler_error(format!(
-                "cannot spawn the server: {e}"
-            ))),
+            Err(StartError::EmptyProgram | StartError::InvalidId) => Err(ErrorInfo::Internal {
+                detail: "invalid launch plan".into(),
+            }),
+            Err(StartError::Spawn(e)) => Err(ErrorInfo::Internal {
+                detail: format!("cannot spawn the server: {e}"),
+            }),
         }
     });
 
@@ -228,10 +229,10 @@ pub(super) fn register(on: &mut Channels<'_>) {
         let record = find_server(&ctx, &p.server)?;
         let process_id = server_process_id(&record.id);
         if !is_running(&ctx, &process_id) {
-            return Err(ServiceError::bad_request(format!(
-                "server '{}' is not running",
-                record.name
-            )));
+            return Err(ErrorInfo::NotRunning {
+                entry: EntryKind::Server,
+                name: record.name.clone(),
+            });
         }
         ctx.runtime.processes().stop(&process_id);
         Ok(Empty {})
@@ -239,21 +240,23 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<ServerCommand, _, _>(|p, ctx| async move {
         if p.command.trim().is_empty() {
-            return Err(ServiceError::bad_request("command is empty"));
+            return Err(ErrorInfo::FieldRequired {
+                field: Field::Command,
+            });
         }
         let record = find_server(&ctx, &p.server)?;
         if !is_running(&ctx, &server_process_id(&record.id)) {
-            return Err(ServiceError::bad_request(format!(
-                "server '{}' is not running",
-                record.name
-            )));
+            return Err(ErrorInfo::NotRunning {
+                entry: EntryKind::Server,
+                name: record.name.clone(),
+            });
         }
         let response = ctx
             .runtime
             .engine()
             .server_command(&record.id, &p.command)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(ServerCommandResult { response })
     });
 
@@ -276,8 +279,8 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .config_get(&record.id, &p.key)
         {
             Ok(Some(value)) => Ok(ServerConfigGetResult { value }),
-            Ok(None) => Err(ServiceError::not_found(format!("'{}' is not set", p.key))),
-            Err(e) => Err(ServiceError::bad_request(format!("{e:#}"))),
+            Ok(None) => Err(ErrorInfo::ConfigKeyUnset { key: p.key.clone() }),
+            Err(e) => Err(crate::runtime::internal(e)),
         }
     });
 
@@ -287,7 +290,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .servers()
             .config_set(&record.id, &p.key, &p.value)
-            .map_err(|e| ServiceError::bad_request(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         tracing::info!(server = %record.id, key = %p.key, "server config updated");
         Ok(Empty {})
     });
@@ -299,7 +302,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .servers()
             .config_list(&record.id)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?
+            .map_err(crate::runtime::internal)?
             .into_iter()
             .map(|(key, value)| ConfigEntry { key, value })
             .collect();

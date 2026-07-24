@@ -1,12 +1,13 @@
 //! Java runtime management: the provider catalogue plus install/uninstall.
 
+use proto::error::{ErrorInfo, Field, Reason};
 use proto::java::{
     JavaInstall, JavaInstallResult, JavaList, JavaListResult, JavaReleases, JavaReleasesResult,
     JavaUninstall,
 };
 use proto::Empty;
 
-use crate::runtime::{Channels, ServiceError};
+use crate::runtime::Channels;
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<JavaReleases, _, _>(|_: Empty, ctx| async move {
@@ -16,7 +17,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .java()
             .releases()
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         // The launcher only ever launches Minecraft, so offering every
         // vendor-supported major is noise.
         let releases = releases
@@ -55,33 +56,33 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<JavaInstall, _, _>(|p, ctx| async move {
         if p.major <= 0 {
-            return Err(ServiceError::bad_request(
-                "major must be a positive integer",
-            ));
+            return Err(ErrorInfo::InvalidValue {
+                field: Field::JavaVersion,
+                reason: Reason::JavaMajor,
+            });
         }
         match ctx.runtime.java_installs().start(p.major, p.id, p.force) {
             Some(id) => Ok(JavaInstallResult { id }),
-            None => Err(ServiceError::bad_request(format!(
-                "java {} is already being installed",
-                p.major
-            ))),
+            None => Err(ErrorInfo::Busy {
+                detail: format!("java {} is already being installed", p.major),
+            }),
         }
     });
 
     on.handle::<JavaUninstall, _, _>(|p, ctx| async move {
         if p.major <= 0 {
-            return Err(ServiceError::bad_request(
-                "major must be a positive integer",
-            ));
+            return Err(ErrorInfo::InvalidValue {
+                field: Field::JavaVersion,
+                reason: Reason::JavaMajor,
+            });
         }
         if ctx.runtime.engine().java().uninstall(p.major) {
             tracing::info!(major = p.major, "java runtime uninstalled");
             Ok(Empty {})
         } else {
-            Err(ServiceError::not_found(format!(
-                "no installed java runtime for major {}",
-                p.major
-            )))
+            Err(ErrorInfo::VersionNotFound {
+                reference: format!("java {}", p.major),
+            })
         }
     });
 }

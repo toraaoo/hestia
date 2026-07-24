@@ -5,11 +5,30 @@ use engine::ConfigError;
 use proto::config::{
     ConfigGet, ConfigGetResult, ConfigList, ConfigListResult, ConfigSet, AUTOSTART_KEY, HOME_KEY,
 };
+use proto::error::ErrorInfo;
 use proto::Empty;
 use serde_json::{json, Value};
 
 use crate::autostart;
-use crate::runtime::{Channels, ServiceError};
+use crate::runtime::Channels;
+
+fn config_err(e: ConfigError) -> ErrorInfo {
+    match e {
+        ConfigError::UnknownKey(key) => ErrorInfo::ConfigKeyUnknown { key },
+        ConfigError::TypeMismatch(detail) => ErrorInfo::ConfigTypeMismatch { detail },
+        ConfigError::InvalidValue { key, source } => ErrorInfo::ConfigRejected {
+            key,
+            detail: source.to_string(),
+        },
+        ConfigError::Rejected { key, message } => ErrorInfo::ConfigRejected {
+            key,
+            detail: message,
+        },
+        ConfigError::Io(e) => ErrorInfo::Internal {
+            detail: e.to_string(),
+        },
+    }
+}
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<ConfigGet, _, _>(|p, ctx| async move {
@@ -23,39 +42,46 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 value: json!(autostart::is_enabled()),
             });
         }
-        match ctx.runtime.engine().config().get(&p.key) {
-            Ok(value) => Ok(ConfigGetResult { value }),
-            Err(ConfigError::UnknownKey(m)) => {
-                Err(ServiceError::not_found(format!("unknown config key: {m}")))
-            }
-            Err(e) => Err(ServiceError::handler_error(e.to_string())),
-        }
+        ctx.runtime
+            .engine()
+            .config()
+            .get(&p.key)
+            .map(|value| ConfigGetResult { value })
+            .map_err(config_err)
     });
 
     on.handle::<ConfigSet, _, _>(|p, ctx| async move {
         if p.key == HOME_KEY {
             let Value::String(dir) = p.value else {
-                return Err(ServiceError::bad_request("home expects a string"));
+                return Err(ErrorInfo::ConfigRejected {
+                    key: HOME_KEY.into(),
+                    detail: "expects a string".into(),
+                });
             };
             ctx.runtime
                 .engine()
                 .set_data_home(&dir)
-                .map_err(|e| ServiceError::handler_error(e.to_string()))?;
+                .map_err(|e| ErrorInfo::Internal {
+                    detail: e.to_string(),
+                })?;
             tracing::info!(home = %dir, "data home changed");
             return Ok(Empty {});
         }
         if p.key == AUTOSTART_KEY {
             let Value::Bool(enabled) = p.value else {
-                return Err(ServiceError::bad_request("autostart expects a boolean"));
+                return Err(ErrorInfo::ConfigRejected {
+                    key: AUTOSTART_KEY.into(),
+                    detail: "expects a boolean".into(),
+                });
             };
-            autostart::set(enabled).map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            autostart::set(enabled).map_err(crate::runtime::internal)?;
             return Ok(Empty {});
         }
         ctx.runtime
             .engine()
             .config()
             .set(&p.key, p.value)
-            .map_err(|e| ServiceError::bad_request(e.to_string()))?;
+            .map_err(config_err)?;
         tracing::info!(key = %p.key, "config updated");
         Ok(Empty {})
     });

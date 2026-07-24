@@ -23,6 +23,13 @@ pub enum IpcError {
     ConnectionLost,
     #[error("timed out waiting for daemon response on '{0}'")]
     Timeout(String),
-    #[error("{code}: {message}")]
-    Daemon { code: String, message: String },
+    #[error("{message}")]
+    Daemon {
+        code: String,
+        message: String,
+        /// The raw serialized `proto::error::ErrorInfo` for structured consumers
+        /// (the desktop forwards it to the webview to localize); `code` and
+        /// `message` are the client's local projection of it.
+        info: serde_json::Value,
+    },
 }

@@ -10,20 +10,21 @@ use proto::content::{
     ServerContentSetVersion, ServerContentUpdate, SourcesResult,
     VersionsResult as ContentVersionsResult,
 };
+use proto::error::{ErrorInfo, Field, Unsupported};
 use proto::Empty;
 
 use super::guards::{
     ensure_no_backup, ensure_no_content, ensure_no_update, ensure_stopped, find_instance,
     find_server, require_content_items,
 };
-use crate::runtime::{instance_process_id, server_process_id, Channels, ContentJob, ServiceError};
+use crate::runtime::{instance_process_id, server_process_id, Channels, ContentJob};
 
 /// A datapack toggle may narrow by world; any other kind rejects `worlds`.
-fn check_worlds(kind: ContentKind, worlds: &[String]) -> Result<(), ServiceError> {
+fn check_worlds(kind: ContentKind, worlds: &[String]) -> Result<(), ErrorInfo> {
     if !worlds.is_empty() && kind != ContentKind::DataPack {
-        return Err(ServiceError::bad_request(
-            "only datapacks are installed per world",
-        ));
+        return Err(ErrorInfo::UnsupportedOperation {
+            reason: Unsupported::DatapacksPerWorld,
+        });
     }
     Ok(())
 }
@@ -47,24 +48,28 @@ fn register_sources(on: &mut Channels<'_>) {
             .content()
             .search(&q)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+            .map_err(crate::runtime::internal)
     });
 
     on.handle::<ContentProjectGet, _, _>(|p, ctx| async move {
         if p.project.is_empty() {
-            return Err(ServiceError::bad_request("project is required"));
+            return Err(ErrorInfo::FieldRequired {
+                field: Field::Project,
+            });
         }
         ctx.runtime
             .engine()
             .content()
             .project(&p.source, &p.project)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+            .map_err(crate::runtime::internal)
     });
 
     on.handle::<ContentVersions, _, _>(|q, ctx| async move {
         if q.project.is_empty() {
-            return Err(ServiceError::bad_request("project is required"));
+            return Err(ErrorInfo::FieldRequired {
+                field: Field::Project,
+            });
         }
         let versions = ctx
             .runtime
@@ -72,20 +77,22 @@ fn register_sources(on: &mut Channels<'_>) {
             .content()
             .versions(&q)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(ContentVersionsResult { versions })
     });
 
     on.handle::<ModpackResolve, _, _>(|p, ctx| async move {
         if p.version_id.is_empty() {
-            return Err(ServiceError::bad_request("version_id is required"));
+            return Err(ErrorInfo::FieldRequired {
+                field: Field::Version,
+            });
         }
         ctx.runtime
             .engine()
             .content()
             .resolve_modpack(&p.source, &p.version_id)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+            .map_err(crate::runtime::internal)
     });
 }
 
@@ -105,9 +112,9 @@ fn register_server(on: &mut Channels<'_>) {
             p.id,
         ) {
             Some(id) => Ok(ContentJobResult { id }),
-            None => Err(ServiceError::bad_request(
-                "a content change is already running for that server",
-            )),
+            None => Err(ErrorInfo::ContentInProgress {
+                name: record.name.clone(),
+            }),
         }
     });
 
@@ -117,18 +124,18 @@ fn register_server(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .server_content(&record.id, p.kind)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(ContentListResult { items, untracked })
     });
 
     on.handle::<ServerContentRemove, _, _>(|p, ctx| async move {
         if p.item.is_empty() {
-            return Err(ServiceError::bad_request("item is required"));
+            return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
         if !p.worlds.is_empty() && p.kind != ContentKind::DataPack {
-            return Err(ServiceError::bad_request(
-                "only datapacks are installed per world",
-            ));
+            return Err(ErrorInfo::UnsupportedOperation {
+                reason: Unsupported::DatapacksPerWorld,
+            });
         }
         let record = find_server(&ctx, &p.server)?;
         let process_id = server_process_id(&record.id);
@@ -141,11 +148,10 @@ fn register_server(on: &mut Channels<'_>) {
             .remove_server_content(&record.id, p.kind, &p.item, &p.worlds)
         {
             Ok(true) => Ok(Empty {}),
-            Ok(false) => Err(ServiceError::not_found(format!(
-                "nothing installed matches '{}'",
-                p.item
-            ))),
-            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+            Ok(false) => Err(ErrorInfo::ContentNotFound {
+                reference: p.item.clone(),
+            }),
+            Err(e) => Err(crate::runtime::internal(e)),
         }
     });
 
@@ -164,15 +170,15 @@ fn register_server(on: &mut Channels<'_>) {
             p.id,
         ) {
             Some(id) => Ok(ContentJobResult { id }),
-            None => Err(ServiceError::bad_request(
-                "a content change is already running for that server",
-            )),
+            None => Err(ErrorInfo::ContentInProgress {
+                name: record.name.clone(),
+            }),
         }
     });
 
     on.handle::<ServerContentEnable, _, _>(|p, ctx| async move {
         if p.item.is_empty() {
-            return Err(ServiceError::bad_request("item is required"));
+            return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
         check_worlds(p.kind, &p.worlds)?;
         let record = find_server(&ctx, &p.server)?;
@@ -186,12 +192,11 @@ fn register_server(on: &mut Channels<'_>) {
             .engine()
             .enable_server_content(&record.id, p.kind, &p.item, p.enabled, &p.worlds)
         {
-            Ok(0) => Err(ServiceError::not_found(format!(
-                "nothing installed matches '{}'",
-                p.item
-            ))),
+            Ok(0) => Err(ErrorInfo::ContentNotFound {
+                reference: p.item.clone(),
+            }),
             Ok(_) => Ok(Empty {}),
-            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+            Err(e) => Err(crate::runtime::internal(e)),
         }
     });
 
@@ -202,13 +207,15 @@ fn register_server(on: &mut Channels<'_>) {
             .engine()
             .check_server_updates(&record.id, p.kind)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(ContentUpdatesResult { updates })
     });
 
     on.handle::<ServerContentSetVersion, _, _>(|p, ctx| async move {
         if p.item.is_empty() || p.version.is_empty() {
-            return Err(ServiceError::bad_request("item and version are required"));
+            return Err(ErrorInfo::FieldsRequired {
+                fields: vec![Field::Item, Field::Version],
+            });
         }
         let record = find_server(&ctx, &p.server)?;
         let process_id = server_process_id(&record.id);
@@ -225,9 +232,9 @@ fn register_server(on: &mut Channels<'_>) {
             p.id,
         ) {
             Some(id) => Ok(ContentJobResult { id }),
-            None => Err(ServiceError::bad_request(
-                "a content change is already running for that server",
-            )),
+            None => Err(ErrorInfo::ContentInProgress {
+                name: record.name.clone(),
+            }),
         }
     });
 }
@@ -246,9 +253,9 @@ fn register_instance(on: &mut Channels<'_>) {
             p.id,
         ) {
             Some(id) => Ok(ContentJobResult { id }),
-            None => Err(ServiceError::bad_request(
-                "a content change is already running for that instance",
-            )),
+            None => Err(ErrorInfo::ContentInProgress {
+                name: record.name.clone(),
+            }),
         }
     });
 
@@ -258,18 +265,18 @@ fn register_instance(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .instance_content(&record.id, p.kind)
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(ContentListResult { items, untracked })
     });
 
     on.handle::<InstanceContentRemove, _, _>(|p, ctx| async move {
         if p.item.is_empty() {
-            return Err(ServiceError::bad_request("item is required"));
+            return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
         if !p.worlds.is_empty() && p.kind != ContentKind::DataPack {
-            return Err(ServiceError::bad_request(
-                "only datapacks are installed per world",
-            ));
+            return Err(ErrorInfo::UnsupportedOperation {
+                reason: Unsupported::DatapacksPerWorld,
+            });
         }
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
@@ -281,11 +288,10 @@ fn register_instance(on: &mut Channels<'_>) {
             .remove_instance_content(&record.id, p.kind, &p.item, &p.worlds)
         {
             Ok(true) => Ok(Empty {}),
-            Ok(false) => Err(ServiceError::not_found(format!(
-                "nothing installed matches '{}'",
-                p.item
-            ))),
-            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+            Ok(false) => Err(ErrorInfo::ContentNotFound {
+                reference: p.item.clone(),
+            }),
+            Err(e) => Err(crate::runtime::internal(e)),
         }
     });
 
@@ -302,15 +308,15 @@ fn register_instance(on: &mut Channels<'_>) {
             p.id,
         ) {
             Some(id) => Ok(ContentJobResult { id }),
-            None => Err(ServiceError::bad_request(
-                "a content change is already running for that instance",
-            )),
+            None => Err(ErrorInfo::ContentInProgress {
+                name: record.name.clone(),
+            }),
         }
     });
 
     on.handle::<InstanceContentEnable, _, _>(|p, ctx| async move {
         if p.item.is_empty() {
-            return Err(ServiceError::bad_request("item is required"));
+            return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
         check_worlds(p.kind, &p.worlds)?;
         let record = find_instance(&ctx, &p.instance)?;
@@ -322,12 +328,11 @@ fn register_instance(on: &mut Channels<'_>) {
             .engine()
             .enable_instance_content(&record.id, p.kind, &p.item, p.enabled, &p.worlds)
         {
-            Ok(0) => Err(ServiceError::not_found(format!(
-                "nothing installed matches '{}'",
-                p.item
-            ))),
+            Ok(0) => Err(ErrorInfo::ContentNotFound {
+                reference: p.item.clone(),
+            }),
             Ok(_) => Ok(Empty {}),
-            Err(e) => Err(ServiceError::handler_error(format!("{e:#}"))),
+            Err(e) => Err(crate::runtime::internal(e)),
         }
     });
 
@@ -338,13 +343,15 @@ fn register_instance(on: &mut Channels<'_>) {
             .engine()
             .check_instance_updates(&record.id, p.kind)
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))?;
+            .map_err(crate::runtime::internal)?;
         Ok(ContentUpdatesResult { updates })
     });
 
     on.handle::<InstanceContentSetVersion, _, _>(|p, ctx| async move {
         if p.item.is_empty() || p.version.is_empty() {
-            return Err(ServiceError::bad_request("item and version are required"));
+            return Err(ErrorInfo::FieldsRequired {
+                fields: vec![Field::Item, Field::Version],
+            });
         }
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
@@ -359,9 +366,9 @@ fn register_instance(on: &mut Channels<'_>) {
             p.id,
         ) {
             Some(id) => Ok(ContentJobResult { id }),
-            None => Err(ServiceError::bad_request(
-                "a content change is already running for that instance",
-            )),
+            None => Err(ErrorInfo::ContentInProgress {
+                name: record.name.clone(),
+            }),
         }
     });
 }

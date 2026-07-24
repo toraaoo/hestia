@@ -11,6 +11,7 @@ use std::time::Duration;
 use ipc::errors::IpcError;
 use ipc::protocol::{self, Event, Request, Response};
 use ipc::{Connection, FrameWriter};
+use proto::error::ErrorInfo;
 use proto::Contract;
 use serde_json::Value;
 use tokio::sync::{oneshot, Notify};
@@ -127,14 +128,12 @@ impl Session {
         let payload =
             serde_json::to_value(params).map_err(|e| IpcError::Malformed(e.to_string()))?;
         let res = self.call_raw(C::CHANNEL, payload, CALL_TIMEOUT).await?;
-        if !res.ok {
-            if let Some(err) = &res.error {
-                if err.code == ipc::errors::NOT_FOUND {
-                    return Ok(None);
-                }
+        let res = match must(res) {
+            Err(IpcError::Daemon { code, .. }) if code == ipc::errors::NOT_FOUND => {
+                return Ok(None)
             }
-        }
-        let res = must(res)?;
+            other => other?,
+        };
         serde_json::from_value(res.payload)
             .map(Some)
             .map_err(|e| IpcError::Malformed(e.to_string()))
@@ -223,7 +222,11 @@ impl Session {
 
         loop {
             if let Some(result) = state.lock().unwrap().take() {
-                return result.map_err(|(code, message)| IpcError::Daemon { code, message });
+                return result.map_err(|(code, message)| IpcError::Daemon {
+                    code,
+                    message,
+                    info: Value::Null,
+                });
             }
             if self.is_closed() {
                 return Err(IpcError::ConnectionLost);
@@ -270,18 +273,18 @@ impl Drop for Session {
 /// Turn a daemon-side error `Response` into an `IpcError`; otherwise hand it back.
 pub fn must(res: Response) -> Result<Response, IpcError> {
     if res.ok {
-        Ok(res)
-    } else if let Some(err) = res.error {
-        Err(IpcError::Daemon {
-            code: err.code,
-            message: err.message,
-        })
-    } else {
-        Err(IpcError::Daemon {
-            code: "error".into(),
-            message: "daemon error".into(),
-        })
+        return Ok(res);
     }
+    let raw = res.error.unwrap_or(Value::Null);
+    let info =
+        serde_json::from_value::<ErrorInfo>(raw.clone()).unwrap_or_else(|_| ErrorInfo::Internal {
+            detail: "daemon error".into(),
+        });
+    Err(IpcError::Daemon {
+        code: info.code().into(),
+        message: info.to_string(),
+        info: raw,
+    })
 }
 
 /// A client-generated job id lets callers subscribe before starting a job, so
