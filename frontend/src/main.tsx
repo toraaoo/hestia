@@ -10,6 +10,12 @@ import { startSessionTracking } from './queries/sessions';
 import { getRouter } from './router';
 import './styles.css';
 
+// Browser dev only: fake the Tauri bridge before anything calls `invoke()`.
+// Stripped from the desktop release, and skipped when the real shell is present.
+if (import.meta.env.DEV && !('__TAURI_INTERNALS__' in window)) {
+  await (await import('./mock')).installBrowserMock();
+}
+
 initDesktopShell();
 startInvalidation();
 startSessionTracking();
