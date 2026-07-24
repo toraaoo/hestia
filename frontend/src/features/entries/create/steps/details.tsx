@@ -56,26 +56,37 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
             )}
           </form.AppField>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <form.AppField name="details.gamemode">
-              {(field: WizardForm) => (
-                <field.SelectField
-                  label={m['wizard.gamemode']()}
-                  options={options(GAMEMODES)}
-                  triggerClassName="w-full"
-                />
-              )}
-            </form.AppField>
-            <form.AppField name="details.difficulty">
-              {(field: WizardForm) => (
-                <field.SelectField
-                  label={m['wizard.difficulty']()}
-                  options={options(DIFFICULTIES)}
-                  triggerClassName="w-full"
-                />
-              )}
-            </form.AppField>
-          </div>
+          {/* Hardcore forces difficulty=hard and gamemode=survival, so both
+              selects are pinned and disabled while it is on — matching the
+              daemon's invariant and Minecraft's own create-world screen. */}
+          <form.Subscribe
+            selector={(s: WizardForm) => s.values.details.hardcore as boolean}
+          >
+            {(hardcore: boolean) => (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <form.AppField name="details.gamemode">
+                  {(field: WizardForm) => (
+                    <field.SelectField
+                      label={m['wizard.gamemode']()}
+                      options={options(GAMEMODES)}
+                      triggerClassName="w-full"
+                      disabled={hardcore}
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="details.difficulty">
+                  {(field: WizardForm) => (
+                    <field.SelectField
+                      label={m['wizard.difficulty']()}
+                      options={options(DIFFICULTIES)}
+                      triggerClassName="w-full"
+                      disabled={hardcore}
+                    />
+                  )}
+                </form.AppField>
+              </div>
+            )}
+          </form.Subscribe>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <form.AppField name="details.maxPlayers">
@@ -105,7 +116,13 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
                   id="prop-hardcore"
                   label={m['wizard.hardcore']()}
                   checked={field.state.value}
-                  onChange={field.handleChange}
+                  onChange={(checked) => {
+                    field.handleChange(checked);
+                    if (checked) {
+                      form.setFieldValue('details.gamemode', 'survival');
+                      form.setFieldValue('details.difficulty', 'hard');
+                    }
+                  }}
                 />
               )}
             </form.AppField>
