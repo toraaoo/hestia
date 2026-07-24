@@ -209,10 +209,16 @@ impl Skins {
 /// Reject anything that is not a skin-shaped PNG: 64×64, or the legacy 64×32.
 pub(crate) fn validate_skin_png(png: &[u8]) -> Result<()> {
     let Some((width, height)) = png_dimensions(png) else {
-        bail!("the skin texture is not a PNG file");
+        bail!(proto::error::ErrorInfo::InvalidTexture {
+            detail: "the skin texture is not a PNG file".to_string()
+        });
     };
     if width != 64 || !(height == 64 || height == 32) {
-        bail!("a skin texture must be 64×64 (or the legacy 64×32), got {width}×{height}");
+        bail!(proto::error::ErrorInfo::InvalidTexture {
+            detail: format!(
+                "a skin texture must be 64×64 (or the legacy 64×32), got {width}×{height}"
+            )
+        });
     }
     Ok(())
 }

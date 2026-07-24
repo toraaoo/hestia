@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use proto::minecraft::{InstanceProfile, ServerProfile};
 use serde::{Deserialize, Serialize};
 
@@ -113,13 +113,19 @@ pub(crate) fn normalize_memory(value: &str) -> Result<String> {
         .chars()
         .last()
         .filter(|c| "kmgKMG".contains(*c))
-        .context("memory must look like 4G or 2048M")?;
+        .ok_or(proto::error::ErrorInfo::InvalidValue {
+            field: proto::error::Field::Memory,
+            reason: proto::error::Reason::MemoryFormat,
+        })?;
     let digits = &trimmed[..trimmed.len() - unit.len_utf8()];
     let valid = !digits.is_empty()
         && digits.bytes().all(|b| b.is_ascii_digit())
         && digits.bytes().any(|b| b != b'0');
     if !valid {
-        bail!("memory must look like 4G or 2048M");
+        bail!(proto::error::ErrorInfo::InvalidValue {
+            field: proto::error::Field::Memory,
+            reason: proto::error::Reason::MemoryFormat
+        });
     }
     Ok(format!("{digits}{}", unit.to_ascii_uppercase()))
 }
@@ -129,7 +135,10 @@ pub(crate) fn parse_jvm_args(value: &str) -> Result<Vec<String>> {
     let mut args = Vec::new();
     for token in value.split_whitespace() {
         if !token.starts_with('-') {
-            bail!("jvm arguments must start with '-' (got '{token}')");
+            bail!(proto::error::ErrorInfo::InvalidValue {
+                field: proto::error::Field::JvmArgs,
+                reason: proto::error::Reason::JvmArgsPrefix
+            });
         }
         args.push(token.to_string());
     }

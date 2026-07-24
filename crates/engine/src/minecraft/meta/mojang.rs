@@ -58,7 +58,9 @@ pub async fn version_json(id: &str) -> Result<Value> {
         .await?
         .into_iter()
         .find(|e| e.id == id)
-        .with_context(|| format!("unknown Minecraft version: {id}"))?;
+        .ok_or_else(|| proto::error::ErrorInfo::VersionNotFound {
+            reference: id.to_string(),
+        })?;
     fetch_json(&entry.url).await
 }
 
