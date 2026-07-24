@@ -10,13 +10,20 @@ import {
   type QueryKey,
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { errorMessage, type HestiaError, UNAUTHORIZED } from '../api';
+import {
+  CONNECTION_LOST,
+  errorMessage,
+  type HestiaError,
+  TIMEOUT,
+  TRANSPORT,
+  UNAUTHORIZED,
+} from '../api';
 
-// The instance surface is gated on a signed-in account (the router answers
-// `unauthorized` before an account exists). Every gated feature is already
-// hidden behind the sign-in UI, so these are expected on first launch — never
-// a toast.
-const silent = (error: HestiaError) => error.code === UNAUTHORIZED;
+// Never a toast: `unauthorized` is expected behind the sign-in gate, and
+// connectivity failures are the status bar's concern, not a per-call error.
+const TRANSPORT_CODES = new Set([TRANSPORT, CONNECTION_LOST, TIMEOUT]);
+const silent = (error: HestiaError) =>
+  error.code === UNAUTHORIZED || TRANSPORT_CODES.has(error.code);
 
 declare module '@tanstack/react-query' {
   interface Register {
