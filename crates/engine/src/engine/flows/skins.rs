@@ -167,14 +167,17 @@ impl Engine {
         name: &str,
         variant: SkinVariant,
     ) -> Result<Skin> {
-        let previous = self
-            .skins()
-            .entry(key)
-            .with_context(|| format!("no library skin matches '{key}'"))?;
-        let entry = self
-            .skins()
-            .update(key, name, variant)?
-            .with_context(|| format!("no library skin matches '{key}'"))?;
+        let previous =
+            self.skins()
+                .entry(key)
+                .ok_or_else(|| proto::error::ErrorInfo::SkinNotFound {
+                    key: key.to_string(),
+                })?;
+        let entry = self.skins().update(key, name, variant)?.ok_or_else(|| {
+            proto::error::ErrorInfo::SkinNotFound {
+                key: key.to_string(),
+            }
+        })?;
 
         let mut equipped = false;
         if previous.variant != variant {
@@ -229,7 +232,9 @@ impl Engine {
                 None => self.skins().invalidate_profile(&reference),
             }
         } else {
-            bail!("no skin matches '{key}'");
+            bail!(proto::error::ErrorInfo::SkinNotFound {
+                key: key.to_string()
+            });
         }
         tracing::info!(key, "skin equipped");
         Ok(())

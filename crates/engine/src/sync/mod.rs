@@ -87,7 +87,10 @@ impl Sync {
         for path in &targets.files {
             validate_target(path)?;
             if first_component(path).as_deref() == Some("saves") {
-                bail!("'{path}' cannot be a copied target (share `saves` as a folder instead)");
+                bail!(proto::error::ErrorInfo::SyncTargetInvalid {
+                    path: path.to_string(),
+                    reason: proto::error::SyncReason::CopiedTarget
+                });
             }
         }
         for path in &targets.folders {
@@ -215,7 +218,10 @@ impl Sync {
         } else {
             for name in requested {
                 if !targets.folders.contains(name) {
-                    bail!("'{name}' is not a folder sync target");
+                    bail!(proto::error::ErrorInfo::SyncTargetInvalid {
+                        path: name.to_string(),
+                        reason: proto::error::SyncReason::NotFolderTarget
+                    });
                 }
             }
             requested.to_vec()
@@ -435,7 +441,10 @@ fn validate_target(path: &str) -> Result<()> {
     let first =
         first_component(path).with_context(|| format!("'{path}' is not a safe relative path"))?;
     if RESERVED_ROOTS.contains(&first.as_str()) {
-        bail!("'{path}' is a launcher-managed directory and cannot be a sync target");
+        bail!(proto::error::ErrorInfo::SyncTargetInvalid {
+            path: path.to_string(),
+            reason: proto::error::SyncReason::ManagedDir
+        });
     }
     Ok(())
 }

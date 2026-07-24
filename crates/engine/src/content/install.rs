@@ -230,7 +230,11 @@ pub(crate) fn pick_version<'a>(
         return versions
             .iter()
             .find(|v| v.id == pin || v.version_number == pin)
-            .with_context(|| format!("no version matches '{pin}'"));
+            .ok_or_else(|| {
+                anyhow::Error::from(proto::error::ErrorInfo::VersionNotFound {
+                    reference: pin.to_string(),
+                })
+            });
     }
     let compatible = |v: &&ContentVersion| {
         v.game_versions.iter().any(|g| g == game_version)
