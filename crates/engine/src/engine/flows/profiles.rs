@@ -95,7 +95,9 @@ impl Engine {
                         "'{reference}' is not selectable content (datapacks live in their world)"
                     );
                 }
-                bail!("no installed content matches '{reference}'");
+                bail!(proto::error::ErrorInfo::ContentNotFound {
+                    reference: reference.to_string()
+                });
             }
             Ok(matched)
         };
@@ -116,7 +118,9 @@ impl Engine {
     pub fn capture_instance_profile(&self, reference: &str, name: &str) -> Result<Profile> {
         let (dir, profile) = self.find_profile(reference, name)?;
         if profile.captured {
-            bail!("profile '{}' is already captured", profile.name);
+            bail!(proto::error::ErrorInfo::ProfileAlreadyCaptured {
+                name: profile.name.clone()
+            });
         }
         self.sync()
             .capture(&profiles::store_dir(&dir, &profile.name))?;
@@ -132,7 +136,9 @@ impl Engine {
     pub fn release_instance_profile(&self, reference: &str, name: &str) -> Result<Profile> {
         let (dir, profile) = self.find_profile(reference, name)?;
         if !profile.captured {
-            bail!("profile '{}' has no captured settings", profile.name);
+            bail!(proto::error::ErrorInfo::ProfileNotCaptured {
+                name: profile.name.clone()
+            });
         }
         self.sync()
             .release(&profiles::store_dir(&dir, &profile.name))?;

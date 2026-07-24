@@ -63,7 +63,10 @@ impl Profiles {
         let dir = self.dir();
         let path = dir.join(format!("{name}.json"));
         if path.exists() {
-            bail!("a global profile named '{name}' already exists");
+            bail!(proto::error::ErrorInfo::AlreadyExists {
+                entry: proto::error::Nameable::GlobalProfile,
+                name: name.to_string()
+            });
         }
         std::fs::create_dir_all(&dir)
             .with_context(|| format!("cannot create {}", dir.display()))?;
@@ -79,7 +82,10 @@ impl Profiles {
         let name = canonical_name(name)?;
         let path = self.dir().join(format!("{name}.json"));
         if !path.is_file() {
-            bail!("no global profile named '{name}'");
+            bail!(proto::error::ErrorInfo::ProfileNotFound {
+                scope: proto::error::ProfileScope::Global,
+                name: name.to_string()
+            });
         }
         std::fs::remove_file(&path).with_context(|| format!("cannot remove {}", path.display()))?;
         tracing::info!(profile = %name, "global profile removed");
@@ -90,7 +96,10 @@ impl Profiles {
         let name = canonical_name(name)?;
         let path = self.dir().join(format!("{name}.json"));
         if !path.is_file() {
-            bail!("no global profile named '{name}'");
+            bail!(proto::error::ErrorInfo::ProfileNotFound {
+                scope: proto::error::ProfileScope::Global,
+                name: name.to_string()
+            });
         }
         write_entries(&path, entries)?;
         Ok(GlobalProfile {

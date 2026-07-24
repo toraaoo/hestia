@@ -77,10 +77,14 @@ pub(crate) fn list(entry_dir: &Path) -> (String, Vec<Profile>) {
 fn validate_name(name: &str) -> Result<&str> {
     let name = name.trim();
     if name.is_empty() {
-        bail!("a profile name is required");
+        bail!(proto::error::ErrorInfo::FieldRequired {
+            field: proto::error::Field::Name
+        });
     }
     if name.eq_ignore_ascii_case(RESERVED) {
-        bail!("'{RESERVED}' is reserved (it launches with no profile)");
+        bail!(proto::error::ErrorInfo::ReservedName {
+            name: RESERVED.to_string()
+        });
     }
     Ok(name)
 }
@@ -97,7 +101,10 @@ pub(crate) fn create(entry_dir: &Path, name: &str, members: Vec<String>) -> Resu
     let name = validate_name(name)?;
     let mut stored = load_stored(entry_dir);
     if find(&stored, name).is_some() {
-        bail!("a profile named '{name}' already exists");
+        bail!(proto::error::ErrorInfo::AlreadyExists {
+            entry: proto::error::Nameable::Profile,
+            name: name.to_string()
+        });
     }
     let entry = Members { members };
     let created = profile(entry_dir, name, &entry);
@@ -110,7 +117,10 @@ pub(crate) fn create(entry_dir: &Path, name: &str, members: Vec<String>) -> Resu
 pub(crate) fn remove(entry_dir: &Path, name: &str) -> Result<()> {
     let mut stored = load_stored(entry_dir);
     let Some((key, _)) = find(&stored, name) else {
-        bail!("no profile named '{name}'");
+        bail!(proto::error::ErrorInfo::ProfileNotFound {
+            scope: proto::error::ProfileScope::Instance,
+            name: name.to_string()
+        });
     };
     let key = key.to_string();
     stored.profiles.remove(&key);
@@ -129,12 +139,18 @@ pub(crate) fn rename(entry_dir: &Path, name: &str, new_name: &str) -> Result<Pro
     let new_name = validate_name(new_name)?;
     let mut stored = load_stored(entry_dir);
     let Some((key, _)) = find(&stored, name) else {
-        bail!("no profile named '{name}'");
+        bail!(proto::error::ErrorInfo::ProfileNotFound {
+            scope: proto::error::ProfileScope::Instance,
+            name: name.to_string()
+        });
     };
     let key = key.to_string();
     if let Some((other, _)) = find(&stored, new_name) {
         if other != key {
-            bail!("a profile named '{new_name}' already exists");
+            bail!(proto::error::ErrorInfo::AlreadyExists {
+                entry: proto::error::Nameable::Profile,
+                name: new_name.to_string()
+            });
         }
     }
     let members = stored.profiles.remove(&key).expect("found above");
@@ -160,7 +176,10 @@ pub(crate) fn set_active(entry_dir: &Path, name: &str) -> Result<()> {
         return save_stored(entry_dir, &stored);
     }
     let Some((key, _)) = find(&stored, name) else {
-        bail!("no profile named '{name}'");
+        bail!(proto::error::ErrorInfo::ProfileNotFound {
+            scope: proto::error::ProfileScope::Instance,
+            name: name.to_string()
+        });
     };
     stored.active = key.to_string();
     save_stored(entry_dir, &stored)
@@ -176,7 +195,10 @@ pub(crate) fn edit(
 ) -> Result<Profile> {
     let mut stored = load_stored(entry_dir);
     let Some((key, _)) = find(&stored, name) else {
-        bail!("no profile named '{name}'");
+        bail!(proto::error::ErrorInfo::ProfileNotFound {
+            scope: proto::error::ProfileScope::Instance,
+            name: name.to_string()
+        });
     };
     let key = key.to_string();
     let members = stored.profiles.get_mut(&key).expect("found above");
@@ -205,7 +227,10 @@ pub(crate) fn resolve(entry_dir: &Path, requested: &str) -> Result<Option<Profil
         other => other.to_string(),
     };
     let Some((key, members)) = find(&stored, &name) else {
-        bail!("no profile named '{name}'");
+        bail!(proto::error::ErrorInfo::ProfileNotFound {
+            scope: proto::error::ProfileScope::Instance,
+            name: name.to_string()
+        });
     };
     Ok(Some(profile(entry_dir, key, members)))
 }
