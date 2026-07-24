@@ -85,7 +85,10 @@ impl Instances {
 
     pub fn create(&self, name: &str, profile: InstanceProfile) -> Result<InstanceRecord> {
         if registry::name_taken(name, self.list().iter().map(|r| r.name.as_str())) {
-            bail!("an instance named '{name}' already exists");
+            bail!(proto::error::ErrorInfo::AlreadyExists {
+                entry: proto::error::Nameable::Instance,
+                name: name.to_string()
+            });
         }
         registry::slugify(name)?;
         let id = registry::allocate_id(|id| self.get(id).is_some())?;
@@ -165,7 +168,9 @@ impl Instances {
             .get(id)
             .with_context(|| format!("unknown instance: {id}"))?;
         if !record.jvm.set(key, value)? {
-            bail!("unknown key '{key}' (valid keys: {MEMORY_KEY}, {JVM_ARGS_KEY})");
+            bail!(proto::error::ErrorInfo::ConfigKeyUnknown {
+                key: key.to_string()
+            });
         }
         registry::write_record(&self.instance_dir(&record), RECORD, &record)
     }
@@ -192,7 +197,10 @@ impl Instances {
                 .filter(|r| r.id != record.id)
                 .map(|r| r.name.as_str()),
         ) {
-            bail!("an instance named '{new_name}' already exists");
+            bail!(proto::error::ErrorInfo::AlreadyExists {
+                entry: proto::error::Nameable::Instance,
+                name: new_name.to_string()
+            });
         }
         registry::slugify(new_name)?;
         let old_dir = self.instance_dir(&record);

@@ -142,7 +142,7 @@ pub(super) fn require_backup(
     backups: anyhow::Result<Vec<proto::backup::BackupInfo>>,
     reference: &str,
 ) -> Result<(), ErrorInfo> {
-    let backups = backups.map_err(crate::runtime::internal)?;
+    let backups = backups.map_err(crate::runtime::engine_error)?;
     if backups.iter().any(|b| b.id == reference) {
         Ok(())
     } else {

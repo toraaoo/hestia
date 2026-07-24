@@ -339,7 +339,11 @@ impl Accounts {
             file.accounts
                 .into_iter()
                 .find(|a| a.uuid == reference || a.name == reference)
-                .ok_or_else(|| anyhow!("no account matches '{reference}'"))?
+                .ok_or_else(|| {
+                    anyhow::Error::from(proto::error::ErrorInfo::AccountNotFound {
+                        reference: reference.to_string(),
+                    })
+                })?
         };
 
         if account.needs_reauth || account.refresh_token.is_empty() {
@@ -404,12 +408,14 @@ async fn await_device_tokens(session: &LoginSession) -> Result<OAuthTokens> {
         }
         tokio::time::sleep(interval).await;
     }
-    bail!("the sign-in request expired before it was approved; run 'hestia account login' again")
+    bail!(proto::error::ErrorInfo::LoginTimedOut)
 }
 
 async fn rotate_tokens(account: &mut StoredAccount) -> Result<()> {
     if account.refresh_token.is_empty() {
-        bail!("this account has no refresh token; sign in again");
+        bail!(proto::error::ErrorInfo::SessionExpired {
+            reference: account.name.clone(),
+        });
     }
     tracing::debug!(uuid = %account.uuid, "refreshing minecraft token");
     let oauth = refresh_oauth(&account.refresh_token).await?;

@@ -27,7 +27,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .profiles()
             .create(&p.name)
-            .map_err(crate::runtime::internal)
+            .map_err(crate::runtime::engine_error)
     });
 
     on.handle::<ProfileRemove, _, _>(|p, ctx| async move {
@@ -50,7 +50,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .edit_global_profile(&p.name, &p.source, &p.add, &p.remove)
             .await
-            .map_err(crate::runtime::internal)
+            .map_err(crate::runtime::engine_error)
     });
 
     on.handle::<InstanceProfileApply, _, _>(|p, ctx| async move {

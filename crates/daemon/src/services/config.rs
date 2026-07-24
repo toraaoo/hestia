@@ -74,7 +74,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
                     detail: "expects a boolean".into(),
                 });
             };
-            autostart::set(enabled).map_err(crate::runtime::internal)?;
+            autostart::set(enabled).map_err(crate::runtime::engine_error)?;
             return Ok(Empty {});
         }
         ctx.runtime

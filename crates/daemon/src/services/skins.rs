@@ -19,7 +19,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .list_skins(&p.account)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(SkinListResult { skins, capes })
     });
 
@@ -30,7 +30,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .add_skin(&p.account, &p.name, p.variant, &p.data)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(SkinAddResult { skin })
     });
 
@@ -39,7 +39,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .equip_skin(&p.account, &p.key)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(Empty {})
     });
 
@@ -48,7 +48,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .reset_skin(&p.account)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(Empty {})
     });
 
@@ -61,7 +61,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .update_skin(&p.account, &p.key, &p.name, p.variant)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(SkinUpdateResult { skin })
     });
 
@@ -69,7 +69,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         match ctx.runtime.engine().skins().remove(&p.key) {
             Ok(true) => Ok(Empty {}),
             Ok(false) => Err(ErrorInfo::SkinNotFound { key: p.key.clone() }),
-            Err(e) => Err(crate::runtime::internal(e)),
+            Err(e) => Err(crate::runtime::engine_error(e)),
         }
     });
 
@@ -78,7 +78,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .equip_cape(&p.account, &p.cape)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(Empty {})
     });
 
@@ -87,7 +87,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .clear_cape(&p.account)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(Empty {})
     });
 }

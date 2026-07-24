@@ -17,7 +17,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .java()
             .releases()
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         // The launcher only ever launches Minecraft, so offering every
         // vendor-supported major is noise.
         let releases = releases

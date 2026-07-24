@@ -19,7 +19,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .accounts()
             .begin_login(p.method)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(AccountLoginBeginResult {
             id: challenge.id,
             method: challenge.method,
@@ -36,7 +36,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .accounts()
             .complete_login(&p.id, &p.code)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         tracing::info!(account = %account.name, "account signed in");
         Ok(AccountLoginCompleteResult { account })
     });
@@ -61,7 +61,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             Ok(None) => Err(ErrorInfo::AccountNotFound {
                 reference: p.account.clone(),
             }),
-            Err(e) => Err(crate::runtime::internal(e)),
+            Err(e) => Err(crate::runtime::engine_error(e)),
         }
     });
 
@@ -74,7 +74,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             Ok(false) => Err(ErrorInfo::AccountNotFound {
                 reference: p.account.clone(),
             }),
-            Err(e) => Err(crate::runtime::internal(e)),
+            Err(e) => Err(crate::runtime::engine_error(e)),
         }
     });
 }
