@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { ConfigEntry, InstanceInfo } from '@/api';
+import { errorMessage } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -73,7 +74,7 @@ export function InstanceSettingsTab({
       await setConfig.mutateAsync({ key: 'jvm-args', value: jvmArgs });
       toast.success(m['toast.saved']());
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(errorMessage(error));
     }
   };
 
@@ -233,7 +234,7 @@ function ChangeVersionDialog({
       toast.success(m['toast.updated']({ name: instance.name }));
       onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(errorMessage(error));
     }
   };
 

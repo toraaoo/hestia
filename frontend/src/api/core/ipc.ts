@@ -9,6 +9,7 @@
  * value therefore also passes through untouched.)
  */
 import { invoke } from '@tauri-apps/api/core';
+import type { ErrorInfo } from '../types/error';
 
 /** Default per-call timeout, matching the client SDK's `CALL_TIMEOUT`. */
 export const CALL_TIMEOUT_MS = 10_000;
@@ -26,11 +27,14 @@ export const TRANSPORT = 'transport';
 
 export class HestiaError extends Error {
   readonly code: string;
+  /** The structured daemon error (`proto::error::ErrorInfo`) to localize from. */
+  readonly info: ErrorInfo | null;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, info: ErrorInfo | null = null) {
     super(message);
     this.name = 'HestiaError';
     this.code = code;
+    this.info = info;
   }
 }
 
@@ -44,8 +48,12 @@ export interface CallOptions {
 
 function toHestiaError(raw: unknown): HestiaError {
   if (raw && typeof raw === 'object' && 'code' in raw && 'message' in raw) {
-    const { code, message } = raw as { code: string; message: string };
-    return new HestiaError(code, message);
+    const { code, message, info } = raw as {
+      code: string;
+      message: string;
+      info?: ErrorInfo | null;
+    };
+    return new HestiaError(code, message, info ?? null);
   }
   return new HestiaError(TRANSPORT, String(raw));
 }

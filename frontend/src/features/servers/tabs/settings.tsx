@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { ConfigEntry, ServerInfo } from '@/api';
+import { errorMessage } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -88,7 +89,7 @@ export function ServerSettingsTab({
       });
       toast.success(m['toast.saved']());
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(errorMessage(error));
     }
   };
 
@@ -288,7 +289,7 @@ function ChangeVersionDialog({
       toast.success(m['toast.updated']({ name: server.name }));
       onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(errorMessage(error));
     }
   };
 

@@ -11,7 +11,7 @@ import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type { ContentKind } from '@/api';
-import { type InstanceInfo, system } from '@/api';
+import { errorMessage, type InstanceInfo, system } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { entryIcon } from '@/components/icons';
@@ -140,7 +140,7 @@ export function InstanceDetailPage({
   const openFolder = () => {
     if (info.data)
       system.openPath(info.data.entryDir).catch((error: Error) => {
-        toast.error(error.message);
+        toast.error(errorMessage(error));
       });
   };
 

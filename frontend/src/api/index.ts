@@ -8,6 +8,7 @@ export * as app from './app';
 export * as cache from './cache';
 export * as config from './config';
 export * as content from './content';
+export { errorMessage } from './core/errors';
 export {
   type ConnectionState,
   type DaemonEvent,
