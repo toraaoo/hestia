@@ -1,8 +1,8 @@
 /** The `daemon.*` channels. */
-import { call } from './core/ipc';
+import { call, invokeCommand } from './core/ipc';
 import type { DaemonStatus } from './types/daemon';
 
-/** The old daemon must release the endpoint before the bridge respawns. */
+/** The old daemon must release the endpoint before a restart respawns. */
 const RESTART_GRACE_MS = 600;
 
 export function status(): Promise<DaemonStatus> {
@@ -17,33 +17,20 @@ export async function stop(stopProcesses = false): Promise<boolean> {
   return result.stopping;
 }
 
-/**
- * Start the daemon if it is not running. The shell bridge auto-spawns
- * `hestiad` on any explicit call, so a status read doubles as the trigger.
- */
-export function start(): Promise<DaemonStatus> {
+/** Start the daemon via the shell's `start_daemon` command; `ipc_call` never spawns. */
+export async function start(): Promise<DaemonStatus> {
+  await invokeCommand('start_daemon');
   return status();
 }
 
 /**
- * Stop then respawn — picks up a freshly built `hestiad`. Supervised
- * processes keep running and are re-adopted.
+ * Stop then start again — picks up a freshly built `hestiad`; supervised
+ * processes are re-adopted. The grace lets the old daemon release the endpoint.
  */
 export async function restart(): Promise<DaemonStatus> {
   await stop(false);
   await delay(RESTART_GRACE_MS);
-  return retryStatus();
-}
-
-async function retryStatus(attempts = 5): Promise<DaemonStatus> {
-  for (let i = 0; ; i++) {
-    try {
-      return await status();
-    } catch (error) {
-      if (i >= attempts) throw error;
-      await delay(400);
-    }
-  }
+  return start();
 }
 
 function delay(ms: number): Promise<void> {

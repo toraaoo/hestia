@@ -105,7 +105,7 @@ fn main() -> ExitCode {
 }
 
 async fn run_stop() -> i32 {
-    match client::Client::connect(false).await {
+    match client::Client::connect().await {
         Ok(client) => match client.daemon().stop(false).await {
             Ok(_) => {
                 println!("hestiad stopping");
@@ -127,7 +127,7 @@ async fn run_stop() -> i32 {
 }
 
 async fn run_ping() -> i32 {
-    match client::Client::connect(false).await {
+    match client::Client::connect().await {
         Ok(client) => match client.app().info().await {
             Ok(info) => {
                 println!("{} {} — alive", info.name, info.version);

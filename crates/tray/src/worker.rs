@@ -123,7 +123,7 @@ impl Worker {
     }
 
     fn connect_spawning(&mut self) {
-        match self.rt.block_on(Client::connect(true)) {
+        match self.rt.block_on(Client::start()) {
             Ok(c) => {
                 self.autostart = fetch_autostart(&self.rt, &c);
                 self.client = Some(c);
@@ -134,7 +134,7 @@ impl Worker {
 
     fn connect_if_needed(&mut self) -> bool {
         if self.client.is_none() {
-            if let Ok(c) = self.rt.block_on(Client::connect(false)) {
+            if let Ok(c) = self.rt.block_on(Client::connect()) {
                 self.autostart = fetch_autostart(&self.rt, &c);
                 self.client = Some(c);
             }

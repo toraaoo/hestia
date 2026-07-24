@@ -43,7 +43,7 @@ pub async fn run(cmd: DaemonCmd) -> Result<()> {
             Err(_) => ui::show(View::line("stopped"))?,
         },
         DaemonCmd::Start => {
-            let client = super::connect().await?;
+            let client = super::start().await?;
             let info = client.app().info().await?;
             ui::show(View::line(format!(
                 "hestiad running ({} {})",
@@ -72,7 +72,7 @@ pub async fn run(cmd: DaemonCmd) -> Result<()> {
                 // Give the old daemon a moment to release the endpoint.
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
-            let client = super::connect().await?;
+            let client = super::start().await?;
             let info = client.app().info().await?;
             ui::show(View::line(format!(
                 "hestiad restarted ({} {})",

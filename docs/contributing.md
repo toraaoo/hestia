@@ -286,8 +286,9 @@ async fn list() -> Result<()> {
 }
 ```
 
-Use `connect()` to auto-spawn the daemon, or `connect_running()` when the command
-must not start it. Build `View::line` / `note` / `detail` / `table`; call
+Use `connect()` for a command that needs a running daemon (it never spawns one),
+or `start()` for the deliberate `daemon start` path that spawns `hestiad`. Build
+`View::line` / `note` / `detail` / `table`; call
 `ui::select` for an interactive pick (it errors when stdin is not a terminal, so
 offer an argument as the fallback), and `ui::human_bytes` for sizes.
 
@@ -406,9 +407,10 @@ cargo test --workspace
 
 Iterate interactively with `scripts/dev.sh` — it opens a subshell with `hestia`
 and `hestiad` on `PATH` (debug builds keep data in `<repo>/.hestia`), or
-`scripts/dev.sh java list` for a one-shot. The daemon auto-spawns on first client
-connect, so most CLI commands "just work" without starting it by hand;
-`hestia daemon status|start|stop|restart` manages it explicitly.
+`scripts/dev.sh java list` for a one-shot. The daemon is never auto-spawned —
+start it with `hestia daemon start` (or login autostart); commands error
+pointing there when it is down. `hestia daemon status|start|stop|restart`
+manages it explicitly.
 
 The desktop app needs the system webview (WebKitGTK on Linux, WebView2 on Windows)
 and the Bun-built frontend:

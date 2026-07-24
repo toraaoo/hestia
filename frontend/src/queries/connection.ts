@@ -1,8 +1,8 @@
 /**
- * Daemon connection state as a React subscription. Optimistically
- * `connected` until the shell's watcher reports a transition — the bridge
- * auto-spawns the daemon on the first call, so pessimism would just flash a
- * disconnected banner at startup.
+ * Daemon connection state as a React subscription. Optimistically `connected`
+ * until the shell reports a transition (the bridge emits `disconnected` when it
+ * cannot reach the daemon); the daemon is commonly up via autostart, so
+ * pessimism would just flash a disconnected banner at startup.
  */
 import { useSyncExternalStore } from 'react';
 import { type ConnectionState, onConnectionChange } from '../api';

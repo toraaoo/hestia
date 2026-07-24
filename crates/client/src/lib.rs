@@ -23,32 +23,32 @@ pub struct Client {
 }
 
 impl Client {
-    /// Connect to the daemon at the default endpoint, auto-spawning it if it is
-    /// not already running and `auto_spawn` is set.
-    pub async fn connect(auto_spawn: bool) -> Result<Client, IpcError> {
+    /// Connect to a running daemon. Never spawns — use [`Client::start`] for that.
+    pub async fn connect() -> Result<Client, IpcError> {
         let endpoint = ipc::endpoint::default_endpoint();
-        match ipc::connect(&endpoint).await {
-            Ok(conn) => {
-                tracing::debug!(endpoint = %endpoint.display(), "connected to the daemon");
-                Ok(Client {
-                    session: Session::new(conn),
-                })
-            }
-            Err(e) if auto_spawn => {
-                tracing::debug!(
-                    endpoint = %endpoint.display(),
-                    error = %e,
-                    "daemon not reachable; auto-spawning"
-                );
-                spawn::spawn_daemon()?;
-                match spawn::connect_with_retry(&endpoint).await {
-                    Some(conn) => Ok(Client {
-                        session: Session::new(conn),
-                    }),
-                    None => Err(IpcError::ConnectionLost),
-                }
-            }
-            Err(e) => Err(e),
+        let conn = ipc::connect(&endpoint).await?;
+        tracing::debug!(endpoint = %endpoint.display(), "connected to the daemon");
+        Ok(Client {
+            session: Session::new(conn),
+        })
+    }
+
+    /// Start the daemon if not already running, then connect. The one path
+    /// that spawns `hestiad` — every explicit start action routes through here.
+    pub async fn start() -> Result<Client, IpcError> {
+        let endpoint = ipc::endpoint::default_endpoint();
+        if let Ok(conn) = ipc::connect(&endpoint).await {
+            return Ok(Client {
+                session: Session::new(conn),
+            });
+        }
+        tracing::debug!(endpoint = %endpoint.display(), "daemon not running; starting it");
+        spawn::spawn_daemon()?;
+        match spawn::connect_with_retry(&endpoint).await {
+            Some(conn) => Ok(Client {
+                session: Session::new(conn),
+            }),
+            None => Err(IpcError::ConnectionLost),
         }
     }
 

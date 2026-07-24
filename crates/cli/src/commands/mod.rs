@@ -19,17 +19,22 @@ use client::Client;
 
 use crate::ui::Spinner;
 
-/// Connect to the daemon, auto-spawning it if it is not already running.
+/// Connect to a running daemon; never spawns it.
 pub async fn connect() -> Result<Client> {
     let _spinner = Spinner::start("connecting to the daemon");
-    Client::connect(true)
+    Client::connect()
         .await
-        .context("cannot reach the daemon")
+        .context("the daemon is not running — start it with `hestia daemon start`")
 }
 
-/// Connect only if the daemon is already running (no auto-spawn).
+/// Probe for a running daemon; callers that treat "not running" as normal
+/// (status, stop) use this.
 pub async fn connect_running() -> Result<Client> {
-    Client::connect(false)
-        .await
-        .context("the daemon is not running")
+    Client::connect().await.context("the daemon is not running")
+}
+
+/// Explicitly start the daemon and connect.
+pub async fn start() -> Result<Client> {
+    let _spinner = Spinner::start("starting the daemon");
+    Client::start().await.context("cannot start the daemon")
 }

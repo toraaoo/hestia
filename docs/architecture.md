@@ -161,9 +161,11 @@ UI-free, domain-free code linked by the daemon and every client:
 
 ## `client` — the typed SDK
 
-The one way a front-end drives the daemon. `Client::connect(auto_spawn)` opens a
-connection (auto-spawning `hestiad` if it is not running and `auto_spawn` is set);
-`connect_to(endpoint)` targets an explicit socket without spawning.
+The one way a front-end drives the daemon. `Client::connect()` opens a connection
+to a running daemon — it never spawns; `Client::start()` is the sole path that
+spawns `hestiad` (if not already running), backing the deliberate start actions
+(CLI `daemon start`, the tray, the desktop start button). `connect_to(endpoint)`
+targets an explicit socket.
 
 - **`Session`** (`session.rs`) — the connection core, private to the crate: one
   persistent, multiplexed connection whose background reader task fulfils pending
@@ -992,10 +994,10 @@ plus the server's `backup` and `console`) over a shared `entry` module, and
 `content/` splits along
 its own seam — `browse` (search a source) versus `manage` (install into an
 entry). Global flags (`--verbose`/`--quiet`/`--home`) sit on the root; `--home`
-is exported as `$HESTIA_HOME` and only takes effect when this invocation
-auto-spawns the daemon (a running daemon keeps its own directory).
-`commands/connect()` auto-spawns via the client SDK; `connect_running()`
-requires an existing daemon.
+is exported as `$HESTIA_HOME` and only takes effect when `hestia daemon start`
+spawns the daemon (a running daemon keeps its own directory). No command
+auto-spawns: `commands/connect()` and `connect_running()` require a running
+daemon, and `commands/start()` (behind `daemon start`) is the one that spawns it.
 
 The command grammar is noun-first and **entry-first**: catalogue verbs read
 `hestia server create|list|versions|flavors`, but everything that acts on a
@@ -1086,16 +1088,18 @@ A Tauri v2 shell hosting the React frontend in the root `frontend/`, wired to
 the daemon through the same one-way boundary as the CLI: the shell reaches
 launcher logic only through `client` (never by linking `engine`). The wiring
 is one seam, `src/bridge.rs`: a shared `Client` held as Tauri managed state
-(lazily connected, auto-spawning `hestiad` on the first call — the sidecar
-binary sits beside the exe, exactly where `client::spawn` looks), a single
-generic `ipc_call(channel, payload, timeout_ms)` command forwarding through
-the session's public `call_raw`, and event forwarding: on connect the bridge
+(lazily connected to a running daemon — never auto-spawned; the dedicated
+`start_daemon` command is the one path that spawns the sidecar, which sits
+beside the exe where `client::spawn` looks), a single generic
+`ipc_call(channel, payload, timeout_ms)` command forwarding through the
+session's public `call_raw`, and event forwarding: on connect the bridge
 claims the session's one event-callback slot, subscribes to *every* daemon
 event (`events.subscribe` with an empty id), and re-emits each as a
 `hestia:event` webview event. A watcher task notices a lost daemon between
-calls, emits `hestia:connection` transitions, and passively reconnects (no
-auto-spawn — a deliberately stopped daemon stays stopped; an explicit
-frontend call spawns it again).
+calls, emits `hestia:connection` transitions (`ipc_call` also emits
+`disconnected` when it cannot reach the daemon), and passively reconnects to a
+daemon that comes back — but never spawns one, so a deliberately stopped daemon
+stays stopped until the user starts it.
 
 The typed surface lives in the frontend, `frontend/src/api/`: `core/` (the
 `ipc_call` wrapper with the SDK's timeout defaults, the event bus, and a

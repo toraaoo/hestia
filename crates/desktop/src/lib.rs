@@ -41,6 +41,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             bridge::ipc_call,
+            bridge::start_daemon,
             commands::auth::account_login_sisu,
             commands::prefs::prefs_list,
             commands::prefs::prefs_set,

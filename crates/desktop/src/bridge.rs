@@ -132,7 +132,7 @@ pub fn watch(app: AppHandle) {
                 }
                 Some(_) => {}
                 None => {
-                    if let Ok(client) = connect(&app, false).await {
+                    if let Ok(client) = connect(&app).await {
                         *guard = Some(client);
                     }
                 }
@@ -150,9 +150,28 @@ pub(crate) async fn acquire(app: &AppHandle, bridge: &Bridge) -> Result<Arc<Clie
         *guard = None;
         let _ = app.emit(CONNECTION_CHANNEL, ConnectionState::Disconnected);
     }
-    let client = connect(app, true).await?;
+    let client = match connect(app).await {
+        Ok(client) => client,
+        Err(error) => {
+            let _ = app.emit(CONNECTION_CHANNEL, ConnectionState::Disconnected);
+            return Err(error);
+        }
+    };
     *guard = Some(client.clone());
     Ok(client)
+}
+
+/// Start the daemon and adopt the connection — the start button's trigger.
+/// `ipc_call` never spawns; this is the one command that does.
+#[tauri::command]
+pub async fn start_daemon(app: AppHandle, bridge: State<'_, Bridge>) -> Result<(), CallError> {
+    let mut guard = bridge.client.lock().await;
+    if guard.as_ref().is_some_and(|c| !c.session().is_closed()) {
+        return Ok(());
+    }
+    let client = attach(&app, Client::start().await?).await?;
+    *guard = Some(client);
+    Ok(())
 }
 
 async fn release(app: &AppHandle, bridge: &Bridge, lost: &Arc<Client>) {
@@ -163,12 +182,16 @@ async fn release(app: &AppHandle, bridge: &Bridge, lost: &Arc<Client>) {
     }
 }
 
-/// Connect, forward every daemon event into the webview, and subscribe to all
-/// of them. One connection carries every frontend call, so the session's
-/// single event-callback slot is claimed exactly once, here — the frontend
-/// multiplexes by topic and job id on its side.
-async fn connect(app: &AppHandle, auto_spawn: bool) -> Result<Arc<Client>, CallError> {
-    let client = Arc::new(Client::connect(auto_spawn).await?);
+/// Connect to a running daemon and wire event forwarding; never spawns.
+async fn connect(app: &AppHandle) -> Result<Arc<Client>, CallError> {
+    attach(app, Client::connect().await?).await
+}
+
+/// Forward every daemon event into the webview and subscribe to all of them.
+/// One connection carries every call, so the session's single event-callback
+/// slot is claimed exactly once, here.
+async fn attach(app: &AppHandle, client: Client) -> Result<Arc<Client>, CallError> {
+    let client = Arc::new(client);
     let emitter = app.clone();
     client
         .session()

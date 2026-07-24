@@ -205,12 +205,12 @@ fn main() -> ExitCode {
     let _guard = common::init_logging(console_level, Some(file));
     tracing::debug!(version = common::app::VERSION, "hestia cli starting");
 
-    // In the daemon model the data directory is daemon-global, so --home is
-    // exported as $HESTIA_HOME and only takes effect when this invocation
-    // auto-spawns the daemon; a daemon already running keeps its own directory.
+    // The data directory is daemon-global, so --home is exported as
+    // $HESTIA_HOME and only takes effect when `daemon start` spawns the daemon;
+    // a daemon already running keeps its own directory.
     if let Some(home) = &cli.home {
         if !home.is_empty() {
-            tracing::debug!(home, "exporting HESTIA_HOME for an auto-spawned daemon");
+            tracing::debug!(home, "exporting HESTIA_HOME for a spawned daemon");
             std::env::set_var("HESTIA_HOME", home);
         }
     }

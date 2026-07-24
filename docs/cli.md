@@ -23,7 +23,7 @@ across both servers and instances so you need not recall which kind it is.
 Conventions: anything a `create` needs but wasn't given is prompted for on a
 terminal (piped invocations must pass the flag); `ls`/`rm` alias every
 list/remove; `-v`/`-vv` raise log verbosity, `-q` quiets to errors; `--home`
-overrides the data directory for an auto-spawned daemon.
+overrides the data directory when `hestia daemon start` spawns the daemon.
 
 ## Accounts
 
