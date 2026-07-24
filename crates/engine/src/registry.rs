@@ -17,26 +17,25 @@ pub(crate) fn now_unix() -> i64 {
         .unwrap_or(0)
 }
 
-/// Allocate a stable entry id: the name's slug tagged with a short random
-/// suffix (`smp-3f9a2c7d`), retried against `taken` on the astronomically rare
-/// clash. The slug keeps the id legible on disk and in logs; the suffix is what
-/// makes the id unique and *stable*, so a rename is a metadata write — it never
-/// has to move the directory or re-key the process. The id stays `[a-z0-9-]`,
-/// never `_`, which the session-key scheme (`instance-<id>_<seq>`) reserves.
-pub(crate) fn allocate_id(name: &str, taken: impl Fn(&str) -> bool) -> Result<String> {
+/// A stable, opaque entry id (UUIDv7 hex): the entry's internal key — process
+/// key, port/in-flight claims, process records — never a path component, so a
+/// rename never touches it. Stays `[0-9a-f]`, never `_` (the `<id>_<seq>`
+/// session-key scheme reserves it).
+pub(crate) fn allocate_id(taken: impl Fn(&str) -> bool) -> Result<String> {
     for _ in 0..8 {
-        let id = format!("{}-{}", slugify(name)?, short_tag());
+        let id = Uuid::now_v7().simple().to_string();
         if !taken(&id) {
             return Ok(id);
         }
     }
-    bail!("could not allocate a unique id for '{name}'");
+    bail!("could not allocate a unique entry id");
 }
 
-/// Eight hex chars from the random tail of a UUIDv7 (not its time prefix, so
-/// ids minted in the same millisecond do not share a tag).
-fn short_tag() -> String {
-    Uuid::now_v7().simple().to_string()[24..32].to_string()
+/// An entry's directory name: its display name slugged (unique via
+/// [`name_taken`]), so a rename moves the directory. Falls back to the id for a
+/// name with no sluggable characters, which create forbids.
+pub(crate) fn dir_name(id: &str, name: &str) -> String {
+    proto::naming::slugify(name).unwrap_or_else(|| id.to_string())
 }
 
 /// True when `name` collides with an existing entry's display name once both
@@ -52,8 +51,7 @@ pub(crate) fn name_taken<'a>(name: &str, existing: impl IntoIterator<Item = &'a 
 }
 
 /// Reduce a display name to a filesystem-safe slug (the shared rule lives in
-/// `proto::naming`). The slug prefixes an id but is no longer an id on its own —
-/// [`allocate_id`] tags it with a stable suffix.
+/// `proto::naming`); it names the entry's directory ([`dir_name`]).
 pub(crate) fn slugify(name: &str) -> Result<String> {
     match proto::naming::slugify(name) {
         Some(slug) => Ok(slug),

@@ -23,7 +23,7 @@ impl Engine {
             .instances
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
-        let saves = self.instances.data_dir(&record.id).join("saves");
+        let saves = self.instances.data_dir(&record).join("saves");
         let mut worlds: Vec<String> = std::fs::read_dir(&saves)
             .into_iter()
             .flatten()
@@ -41,7 +41,7 @@ impl Engine {
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
         Ok(crate::usage::dir_size(
-            &self.instances.instance_dir(&record.id),
+            &self.instances.instance_dir(&record),
         ))
     }
 
@@ -52,8 +52,8 @@ impl Engine {
             .instances
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
-        let entry_dir = self.instances.instance_dir(&record.id);
-        let data_dir = self.instances.data_dir(&record.id);
+        let entry_dir = self.instances.instance_dir(&record);
+        let data_dir = self.instances.data_dir(&record);
         Ok(InstanceDetails {
             id: record.id,
             name: record.name,
@@ -154,7 +154,7 @@ impl Engine {
             .instances
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
-        let entry_dir = self.instances.instance_dir(&record.id);
+        let entry_dir = self.instances.instance_dir(&record);
         let launch_profile = if reconcile {
             profiles::resolve(&entry_dir, profile)?
         } else {
@@ -199,7 +199,7 @@ impl Engine {
         )
         .await?;
 
-        let game_dir = self.instances.data_dir(&record.id);
+        let game_dir = self.instances.data_dir(&record);
         std::fs::create_dir_all(&game_dir)
             .with_context(|| format!("cannot create {}", game_dir.display()))?;
         if reconcile {
@@ -221,7 +221,7 @@ impl Engine {
         // Per-session logging lives under the instance root (not data/, so it is
         // outside backups): each concurrent session gets its own file the
         // supervisor can tail independently.
-        let session_dir = self.instances.instance_dir(&record.id).join("logs");
+        let session_dir = self.instances.instance_dir(&record).join("logs");
         std::fs::create_dir_all(&session_dir)
             .with_context(|| format!("cannot create {}", session_dir.display()))?;
         let log_file = session_dir.join(format!("session-{session_seq}.log"));

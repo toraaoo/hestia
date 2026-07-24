@@ -42,8 +42,8 @@ impl Engine {
             None
         };
         let result = run_backup(
-            self.servers.server_dir(&record.id),
-            self.servers.data_dir(&record.id),
+            self.servers.server_dir(&record),
+            self.servers.data_dir(&record),
             kind,
             server_backup_excludes(&record),
             on_progress,
@@ -85,8 +85,8 @@ impl Engine {
         }
         let _claim = self.claim_backup(format!("server-{}", record.id))?;
         run_restore(
-            self.servers.server_dir(&record.id),
-            self.servers.data_dir(&record.id),
+            self.servers.server_dir(&record),
+            self.servers.data_dir(&record),
             backup.to_string(),
             server_backup_excludes(&record),
             on_progress,
@@ -100,7 +100,7 @@ impl Engine {
             .servers
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
-        Ok(backup::list(&self.servers.server_dir(&record.id)))
+        Ok(backup::list(&self.servers.server_dir(&record)))
     }
 
     /// Delete one server backup. Returns false when no backup matches.
@@ -109,7 +109,7 @@ impl Engine {
             .servers
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
-        backup::remove(&self.servers.server_dir(&record.id), backup)
+        backup::remove(&self.servers.server_dir(&record), backup)
     }
 
     /// Prune a server's *scheduled* backups beyond its retention (manual and
@@ -121,7 +121,7 @@ impl Engine {
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
         backup::prune(
-            &self.servers.server_dir(&record.id),
+            &self.servers.server_dir(&record),
             BackupKind::Scheduled,
             record.backup.retention(),
         )

@@ -92,15 +92,21 @@ fn servers_store_round_trips_records() {
     };
     let record = servers.create("My Server!", profile.clone(), None).unwrap();
     assert!(
-        record.id.starts_with("my-server-"),
-        "id is the slug tagged with a stable suffix: {}",
+        record.id.len() == 32 && record.id.chars().all(|c| c.is_ascii_hexdigit()),
+        "id is an opaque uuid, not the slug: {}",
         record.id
     );
     assert!(!record.ready);
     assert!(record.game_port.is_some());
-    assert!(servers.server_dir(&record.id).is_dir());
+    let entry_dir = servers.server_dir(&record);
+    assert!(entry_dir.is_dir());
     assert!(
-        !servers.data_dir(&record.id).exists(),
+        entry_dir.ends_with("my-server"),
+        "the directory is named for the slug, not the id: {}",
+        entry_dir.display()
+    );
+    assert!(
+        !servers.data_dir(&record).exists(),
         "data/ appears on demand, not at create"
     );
     assert!(servers.create("My Server!", profile.clone(), None).is_err());
@@ -130,7 +136,7 @@ fn servers_store_round_trips_records() {
 }
 
 #[test]
-fn server_rename_keeps_the_id_and_directory() {
+fn server_rename_keeps_the_id_moves_the_directory() {
     let dir = temp_dir("server-rename");
     let servers = Servers::new(dir.join("servers"));
     let profile = ServerProfile {
@@ -141,6 +147,7 @@ fn server_rename_keeps_the_id_and_directory() {
     let created = servers.create("Old Name", profile.clone(), None).unwrap();
     let id = created.id.clone();
     let port = created.game_port;
+    let old_dir = servers.server_dir(&created);
     servers.create("Keeper", profile, None).unwrap();
 
     // Renaming onto another entry's name is refused.
@@ -150,7 +157,9 @@ fn server_rename_keeps_the_id_and_directory() {
     assert_eq!(renamed.id, id, "the id is stable across a rename");
     assert_eq!(renamed.name, "New Name");
     assert_eq!(renamed.game_port, port, "the claimed port is untouched");
-    assert!(servers.server_dir(&id).is_dir());
+    let new_dir = servers.server_dir(&renamed);
+    assert!(new_dir.is_dir() && new_dir.ends_with("new-name"));
+    assert!(!old_dir.exists(), "the birth-name directory is gone");
     assert_eq!(servers.get("New Name").unwrap().id, id);
     assert!(servers.get("Old Name").is_none());
 
@@ -173,8 +182,8 @@ fn instances_store_round_trips_records() {
     };
     let record = instances.create("Modded", profile).unwrap();
     assert!(
-        record.id.starts_with("modded-"),
-        "id is the slug tagged with a stable suffix: {}",
+        record.id.len() == 32 && record.id.chars().all(|c| c.is_ascii_hexdigit()),
+        "id is an opaque uuid, not the slug: {}",
         record.id
     );
     assert!(
@@ -188,13 +197,11 @@ fn instances_store_round_trips_records() {
         instances.get("Modded").unwrap().profile.loader_version,
         Some("0.16.5".into())
     );
-    assert!(instances.instance_dir(&record.id).is_dir());
-    assert_eq!(
-        instances.data_dir(&record.id),
-        instances.instance_dir(&record.id).join("data")
-    );
+    let entry_dir = instances.instance_dir(&record);
+    assert!(entry_dir.is_dir() && entry_dir.ends_with("modded"));
+    assert_eq!(instances.data_dir(&record), entry_dir.join("data"));
     assert!(
-        !instances.data_dir(&record.id).exists(),
+        !instances.data_dir(&record).exists(),
         "data/ appears on demand, not at create"
     );
 
@@ -204,7 +211,7 @@ fn instances_store_round_trips_records() {
 }
 
 #[test]
-fn instance_rename_keeps_the_id_and_directory() {
+fn instance_rename_keeps_the_id_moves_the_directory() {
     let dir = temp_dir("instance-rename");
     let instances = Instances::new(dir.join("instances"));
     let record = instances
@@ -218,6 +225,7 @@ fn instance_rename_keeps_the_id_and_directory() {
         )
         .unwrap();
     let id = record.id.clone();
+    let old_dir = instances.instance_dir(&record);
     instances.config_set(&id, "memory", "4G").unwrap();
     instances
         .create("Keeper", InstanceProfile::default())
@@ -228,7 +236,9 @@ fn instance_rename_keeps_the_id_and_directory() {
     let renamed = instances.rename(&id, "New Pack").unwrap();
     assert_eq!(renamed.id, id, "the id is stable across a rename");
     assert_eq!(renamed.name, "New Pack");
-    assert!(instances.instance_dir(&id).is_dir());
+    let new_dir = instances.instance_dir(&renamed);
+    assert!(new_dir.is_dir() && new_dir.ends_with("new-pack"));
+    assert!(!old_dir.exists(), "the birth-name directory is gone");
     assert_eq!(instances.get("New Pack").unwrap().id, id);
     assert!(instances.get("Old Pack").is_none());
     assert_eq!(
@@ -321,7 +331,7 @@ fn server_config_covers_jvm_and_properties() {
 
     // Seed the file as the generation run would: every key the server's
     // version knows, with its default.
-    let properties = servers.data_dir(id).join("server.properties");
+    let properties = servers.data_dir(&record).join("server.properties");
     std::fs::create_dir_all(properties.parent().unwrap()).unwrap();
     std::fs::write(&properties, "motd=A Minecraft Server\nview-distance=10\n").unwrap();
 

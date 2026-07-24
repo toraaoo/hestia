@@ -24,10 +24,10 @@ pub fn slugify(name: &str) -> Option<String> {
 }
 
 /// Does `reference` identify the entry with this `id`/`name`? Matches the exact
-/// id (`smp-3f9a2c7d`), or any spelling of the display name that slugs the same
-/// — so `My Server`, `my-server`, and `MY  SERVER` all resolve to the one
-/// server named "My Server". Unambiguous because entry names are slug-unique;
-/// an exact id wins over a slugged name.
+/// (opaque) id, or any spelling of the display name that slugs the same — so
+/// `My Server`, `my-server`, and `MY  SERVER` all resolve to the one server
+/// named "My Server". Unambiguous because entry names are slug-unique; an exact
+/// id wins over a slugged name.
 pub fn reference_matches(reference: &str, id: &str, name: &str) -> bool {
     if id == reference {
         return true;
@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn reference_matches_id_exact_and_slugged_name() {
-        let (id, name) = ("my-server-3f9a2c7d", "My Server");
+        let (id, name) = ("0192f3a45b6c7d8e9f00112233445566", "My Server");
         assert!(reference_matches(id, id, name), "exact id");
         assert!(reference_matches("My Server", id, name), "exact name");
         assert!(reference_matches("my-server", id, name), "slugged name");

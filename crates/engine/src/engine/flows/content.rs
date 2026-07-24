@@ -307,8 +307,8 @@ impl Engine {
             bail!("server '{}' is still provisioning", record.name);
         }
         let ctx = EntryContent {
-            entry_dir: self.servers.server_dir(&record.id),
-            data_dir: self.servers.data_dir(&record.id),
+            entry_dir: self.servers.server_dir(&record),
+            data_dir: self.servers.data_dir(&record),
             game_version: record.profile.game_version.clone(),
             flavor: record.profile.flavor.clone(),
             side: EntrySide::Server,
@@ -322,8 +322,8 @@ impl Engine {
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
         let ctx = EntryContent {
-            entry_dir: self.instances.instance_dir(&record.id),
-            data_dir: self.instances.data_dir(&record.id),
+            entry_dir: self.instances.instance_dir(&record),
+            data_dir: self.instances.data_dir(&record),
             game_version: record.profile.game_version.clone(),
             flavor: record.profile.flavor.clone(),
             side: EntrySide::Client,

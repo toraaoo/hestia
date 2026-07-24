@@ -1,5 +1,6 @@
-//! Persistent Minecraft server store: each server lives at `<dir>/<id>/` —
-//! the `server.json` record beside `data/`, the working directory the game
+//! Persistent Minecraft server store: each server lives at `<dir>/<slug>/` (the
+//! name slugged; the id is opaque) — the `server.json` record beside `data/`,
+//! the working directory the game
 //! itself runs in (jar, `eula.txt`, `server.properties`, the world). The root
 //! is reserved for managed content directories (`mods/`, `plugins/`,
 //! `configs/`, `backups/`); every directory appears on demand. Listing scans
@@ -89,14 +90,17 @@ impl Servers {
         self.dir.lock().unwrap().clone()
     }
 
-    pub fn server_dir(&self, id: &str) -> PathBuf {
-        self.dir().join(id)
+    /// The server's directory, named for its current display name, so a rename
+    /// moves it; the id stays the entry's stable internal key.
+    pub fn server_dir(&self, record: &ServerRecord) -> PathBuf {
+        self.dir()
+            .join(registry::dir_name(&record.id, &record.name))
     }
 
     /// The server's working directory — everything the game itself reads and
     /// writes (jar, libraries, `eula.txt`, `server.properties`, the world).
-    pub fn data_dir(&self, id: &str) -> PathBuf {
-        self.server_dir(id).join(DATA)
+    pub fn data_dir(&self, record: &ServerRecord) -> PathBuf {
+        self.server_dir(record).join(DATA)
     }
 
     pub fn list(&self) -> Vec<ServerRecord> {
@@ -123,11 +127,12 @@ impl Servers {
         if registry::name_taken(name, self.list().iter().map(|r| r.name.as_str())) {
             bail!("a server named '{name}' already exists");
         }
-        let id = registry::allocate_id(name, |id| self.get(id).is_some())?;
+        registry::slugify(name)?;
+        let id = registry::allocate_id(|id| self.get(id).is_some())?;
         let _claims = self.claims.lock().unwrap();
         let game_port = self.claim_game_port(port)?;
         let record = ServerRecord {
-            id: id.clone(),
+            id,
             name: name.to_string(),
             created_unix: registry::now_unix(),
             ready: false,
@@ -137,11 +142,11 @@ impl Servers {
             backup: BackupSettings::default(),
             profile,
         };
-        let dir = self.server_dir(&id);
+        let dir = self.server_dir(&record);
         std::fs::create_dir_all(&dir)
             .with_context(|| format!("cannot create {}", dir.display()))?;
         registry::write_record(&dir, RECORD, &record)?;
-        tracing::info!(id, name, game_port, "server registered");
+        tracing::info!(id = %record.id, name, game_port, "server registered");
         Ok(record)
     }
 
@@ -203,7 +208,7 @@ impl Servers {
         };
 
         merge_properties(
-            &self.data_dir(&record.id).join(PROPERTIES),
+            &self.data_dir(&record).join(PROPERTIES),
             &[
                 ("server-port", game_port.to_string()),
                 ("enable-rcon", "true".to_string()),
@@ -213,7 +218,7 @@ impl Servers {
         )?;
         record.game_port = Some(game_port);
         record.rcon = Some(rcon);
-        registry::write_record(&self.server_dir(&record.id), RECORD, &record)?;
+        registry::write_record(&self.server_dir(&record), RECORD, &record)?;
         Ok(record)
     }
 
@@ -227,7 +232,7 @@ impl Servers {
         java: &Path,
         on_progress: OnProgress<'_>,
     ) -> Result<()> {
-        let data = self.data_dir(&record.id);
+        let data = self.data_dir(record);
         std::fs::create_dir_all(&data)
             .with_context(|| format!("cannot create {}", data.display()))?;
         materialize::validate_filename(&record.profile.primary.filename)?;
@@ -313,9 +318,9 @@ impl Servers {
         let previous_primary = record.profile.primary.filename.clone();
         record.profile = profile;
         record.ready = false;
-        let data = self.data_dir(&record.id);
+        let data = self.data_dir(&record);
         materialize::validate_filename(&record.profile.primary.filename)?;
-        registry::write_record(&self.server_dir(&record.id), RECORD, &record)?;
+        registry::write_record(&self.server_dir(&record), RECORD, &record)?;
 
         if !record.profile.libraries.is_empty() {
             materialize::ensure_libraries(
@@ -364,7 +369,7 @@ impl Servers {
     /// know are dropped. The acceptance recorded at create is rewritten even
     /// when the run fails.
     async fn regenerate_properties(&self, record: &ServerRecord, java: &Path) -> Result<()> {
-        let eula = self.data_dir(&record.id).join("eula.txt");
+        let eula = self.data_dir(record).join("eula.txt");
         if eula.exists() {
             std::fs::remove_file(&eula).context("cannot suspend eula.txt for the schema run")?;
         }
@@ -378,14 +383,13 @@ impl Servers {
             .get(id)
             .with_context(|| format!("unknown server: {id}"))?;
         record.ready = true;
-        registry::write_record(&self.server_dir(id), RECORD, &record)?;
+        registry::write_record(&self.server_dir(&record), RECORD, &record)?;
         Ok(record)
     }
 
-    /// Rename a server: rewrite the record's display name. The id is stable, so
-    /// the directory, ports, rcon, and JVM/backup settings stay put — only the
-    /// name field changes. The caller guarantees the server is stopped and not
-    /// busy.
+    /// Rename a server: rewrite the display name and move its directory to the
+    /// new slug. The id is stable, so ports, rcon, the process, and JVM/backup
+    /// settings are untouched. The caller guarantees it is stopped and not busy.
     pub fn rename(&self, reference: &str, new_name: &str) -> Result<ServerRecord> {
         let _claims = self.claims.lock().unwrap();
         let mut record = self
@@ -400,8 +404,16 @@ impl Servers {
         ) {
             bail!("a server named '{new_name}' already exists");
         }
+        registry::slugify(new_name)?;
+        let old_dir = self.server_dir(&record);
         record.name = new_name.to_string();
-        registry::write_record(&self.server_dir(&record.id), RECORD, &record)?;
+        let new_dir = self.server_dir(&record);
+        if new_dir != old_dir && old_dir.exists() {
+            std::fs::rename(&old_dir, &new_dir).with_context(|| {
+                format!("cannot move {} to {}", old_dir.display(), new_dir.display())
+            })?;
+        }
+        registry::write_record(&new_dir, RECORD, &record)?;
         tracing::info!(id = %record.id, name = %new_name, "server renamed");
         Ok(record)
     }
@@ -412,7 +424,7 @@ impl Servers {
         let Some(record) = self.get(reference) else {
             return Ok(false);
         };
-        let dir = self.server_dir(&record.id);
+        let dir = self.server_dir(&record);
         std::fs::remove_dir_all(&dir)
             .with_context(|| format!("cannot remove {}", dir.display()))?;
         tracing::info!(id = %record.id, "server removed");
@@ -425,7 +437,7 @@ impl Servers {
         java: &Path,
         jvm: &JavaSettings,
     ) -> LaunchPlan {
-        launch::server_plan(&record.profile, java, &self.data_dir(&record.id), jvm)
+        launch::server_plan(&record.profile, java, &self.data_dir(record), jvm)
     }
 
     /// Read one setting: a reserved JVM or backup key from the record, or any
@@ -437,10 +449,7 @@ impl Servers {
         if let Some(value) = record.jvm.get(key).or_else(|| record.backup.get(key)) {
             return Ok(value);
         }
-        Ok(read_property(
-            &self.data_dir(&record.id).join(PROPERTIES),
-            key,
-        ))
+        Ok(read_property(&self.data_dir(&record).join(PROPERTIES), key))
     }
 
     /// Write one setting: a reserved JVM or backup key onto the record, or a
@@ -456,7 +465,7 @@ impl Servers {
             .get(id)
             .with_context(|| format!("unknown server: {id}"))?;
         if record.jvm.set(key, value)? || record.backup.set(key, value)? {
-            registry::write_record(&self.server_dir(&record.id), RECORD, &record)?;
+            registry::write_record(&self.server_dir(&record), RECORD, &record)?;
             return Ok(());
         }
         if MANAGED_PROPERTIES.contains(&key) {
@@ -465,7 +474,7 @@ impl Servers {
                  rcon is configured automatically)"
             );
         }
-        let properties = self.data_dir(&record.id).join(PROPERTIES);
+        let properties = self.data_dir(&record).join(PROPERTIES);
         if properties.exists() {
             if read_property(&properties, key).is_none() {
                 bail!("'{key}' is not a server.properties key this server's version knows");
@@ -488,7 +497,7 @@ impl Servers {
             .with_context(|| format!("unknown server: {id}"))?;
         let mut entries = record.jvm.entries();
         entries.extend(record.backup.entries());
-        entries.extend(read_properties(&self.data_dir(&record.id).join(PROPERTIES)));
+        entries.extend(read_properties(&self.data_dir(&record).join(PROPERTIES)));
         Ok(entries)
     }
 }

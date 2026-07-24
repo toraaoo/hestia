@@ -86,7 +86,7 @@ impl Engine {
             .minecraft
             .resolve_server(&record.profile.flavor, &spec.version, spec.loader_version)
             .await?;
-        if self.servers.data_dir(&record.id).is_dir() {
+        if self.servers.data_dir(&record).is_dir() {
             on_progress(&phase_progress(ProvisionPhase::Backup));
             self.backup_server(&record.id, BackupKind::Update, false, on_progress)
                 .await
@@ -110,8 +110,8 @@ impl Engine {
         }
         let record = self.servers.ensure_start_config(&record.id)?;
         install::sync(
-            &self.servers.server_dir(&record.id),
-            &self.servers.data_dir(&record.id),
+            &self.servers.server_dir(&record),
+            &self.servers.data_dir(&record),
             None,
         )?;
         let java = self.installed_java(record.profile.java_major)?;
@@ -152,7 +152,7 @@ impl Engine {
             .servers
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
-        Ok(usage::dir_size(&self.servers.server_dir(&record.id)))
+        Ok(usage::dir_size(&self.servers.server_dir(&record)))
     }
 
     /// The server's static, informational view: descriptor, locations, and the
@@ -162,8 +162,8 @@ impl Engine {
             .servers
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
-        let entry_dir = self.servers.server_dir(&record.id);
-        let data_dir = self.servers.data_dir(&record.id);
+        let entry_dir = self.servers.server_dir(&record);
+        let data_dir = self.servers.data_dir(&record);
         Ok(ServerDetails {
             id: record.id,
             name: record.name,

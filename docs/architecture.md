@@ -609,35 +609,32 @@ The subsystems behind the aggregate:
 > `data/` must treat a link as a boundary, never a directory to descend
 > into — `remove_dir_all`'s link-preserving behavior is pinned by a test.
 
-> **The id is a stable, slug-tagged token; rename is a metadata write.** The
-> `id` is the directory name (`servers/<id>/`), the supervisor's process key
-> (`server-<id>`), the port-claim and content in-flight key, and how the
-> on-disk process records are keyed — so it must never change once an entry
-> exists, or a running process and every record pointing at it are orphaned.
-> It is minted once at create as `<slug>-<suffix>`: `slugify(name)` for
-> legibility (the id still reads like the entry on disk and in logs), tagged
-> with eight hex chars from the random tail of a UUIDv7 for a stable, unique
-> discriminator. The suffix is what lets two different names that slug alike
-> coexist — and it is drawn from the uuid's *random* section, not its
-> millisecond prefix, so ids minted back-to-back don't share a tag. `rename`
-> then rewrites the record's `name` field and nothing else: the directory,
-> ports, rcon, JVM/backup settings, and game data are already keyed by the
-> stable id, so none of them move. A front-end targets an entry by its **name**,
-> never the opaque id: a reference resolves by exact id *or* any spelling that
-> slugs to the display name (`My Server`, `my-server`, `MY  SERVER` all hit the
-> one server named "My Server"), so the CLI need not echo the suffix back at the
-> user. That rule — `proto::naming::reference_matches` — lives in `proto`, the
-> same no-drift seam the wire payloads use, so the daemon (`get`) and every
-> front-end resolve a reference identically. It is unambiguous only because two
-> entries may not reduce to the same slug (`Modded` and `modded` are the same
-> entry — `name_taken` rejects the second). The rejected
-> alternative was the old scheme — id *equals* the slug, so a rename re-slugs,
-> moves the directory, re-keys the process records, and `discard`s the old
-> process id. That made a rename a tree-moving operation guarded like `remove`;
-> a stable id makes it a label edit. The one cost — the slug half of the id
-> reflects the *birth* name, so `servers/smp-3f9a2c7d/` lingers after the entry
-> is renamed `cozy` — is cosmetic: the record and every listing carry the live
-> name, and the id was never a name to begin with.
+> **The id is an opaque uuid; the directory is the slug — decoupled.** Two
+> facts about an entry pull in opposite directions: its *internal key* must
+> never change (the supervisor's process key `server-<id>`, the port-claim and
+> content in-flight key, and how the on-disk `processes/<id>/` records are keyed
+> — a change orphans a running process and every record pointing at it), while
+> its *on-disk directory* should read like the entry and track its name. Binding
+> both to one `<slug>-<suffix>` token forced a choice; splitting them removes it.
+> The `id` is now a bare UUIDv7 hex string minted once at create — opaque,
+> stable, never a path component (`registry::allocate_id`). The directory is
+> named `slugify(name)` (`registry::dir_name`), unique because `name_taken`
+> forbids two entries slugging alike. So `rename` rewrites the `name` **and
+> moves the directory** to the new slug, while the id — and everything keyed by
+> it — stays put; it is guarded stopped-and-not-busy, since no live process may
+> hold the folder mid-move. A front-end still targets an entry by its **name**,
+> never the id: a reference resolves by exact id *or* any spelling that slugs to
+> the display name (`My Server`, `my-server`, `MY  SERVER` all hit the one
+> server named "My Server"). That rule — `proto::naming::reference_matches` —
+> lives in `proto`, the same no-drift seam the wire payloads use, so the daemon
+> (`get`) and every front-end resolve a reference identically; it is unambiguous
+> only because `name_taken` keeps slugs unique. This is possible cheaply because
+> the id was never *derived* from the directory name — `registry::scan`
+> deserializes it from the record JSON — so the folder is just a container the
+> resolvers (`server_dir`/`data_dir`) name from the record's current name.
+> The rejected alternative was the old scheme — id *equals* the slug, so it
+> could not move on rename; the directory then lied about the entry's name
+> forever (`servers/smp-3f9a2c7d/` lingering after a rename to `cozy`).
 
 > **Backups follow docker-mc-backup, minus what the launcher already owns.**
 > The reference behaviour (itzg/docker-mc-backup) is: pause world writes over
@@ -809,9 +806,9 @@ supervises launched processes, and manages autostart. The only crate that links
   requires the caller to assert EULA acceptance; update refuses a running or
   still-creating server and, without `allow_downgrade`, a downgrade — a
   front-end updates a running server by explicitly stopping and restarting it
-  around the job, the CLI's confirmed stop-update-start; rename re-slugs the id
-  and moves the directory, refused while running or busy — see the decision
-  note below;
+  around the job, the CLI's confirmed stop-update-start; rename rewrites the name
+  and moves the directory to the new slug (the id is untouched), refused while
+  running or busy — see the decision note below;
   start/stop/status/logs are thin over
   the supervisor, merging the stored record with live process state; `info` is
   the static, informational view — descriptor, on-disk locations, and the disk
@@ -931,8 +928,8 @@ supervises launched processes, and manages autostart. The only crate that links
 > the safety rail is the default. Under the hood `instance-<id>` is no longer a
 > single supervisor key — it splits into an *entry key* (`instance-<id>`, still
 > the unit for the backup/update/content/rename guards and their in-flight sets) and
-> a per-launch *session key* (`instance-<id>_<seq>`). Ids are `[a-z0-9-]` (a
-> slug plus a hex tag), never `_`, so a session prefix `instance-<id>_` can't collide across
+> a per-launch *session key* (`instance-<id>_<seq>`). Ids are `[0-9a-f]` (a
+> uuid hex string), never `_`, so a session prefix `instance-<id>_` can't collide across
 > instances; every former singular lookup (status, stop, logs, running-check)
 > becomes a prefix query over the supervisor's flat table, so the supervisor and
 > its on-disk records need no change — each session just gets a distinct id.

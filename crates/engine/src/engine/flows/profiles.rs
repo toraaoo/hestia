@@ -158,7 +158,7 @@ impl Engine {
             .instances()
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
-        Ok(self.instances().instance_dir(&record.id))
+        Ok(self.instances().instance_dir(&record))
     }
 
     /// Edit a global profile's references: adds are project slugs/ids resolved
@@ -222,7 +222,7 @@ impl Engine {
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
         let profile = self.profiles().get(profile_name)?;
-        let entry_dir = self.instances().instance_dir(&record.id);
+        let entry_dir = self.instances().instance_dir(&record);
         let pool: HashSet<String> = install::load(&entry_dir)
             .into_iter()
             .map(|i| i.project_id)

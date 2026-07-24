@@ -13,7 +13,7 @@ impl Engine {
             .list()
             .into_iter()
             .map(|record| InstanceSyncStatus {
-                targets: self.sync.status(&self.instances.data_dir(&record.id)),
+                targets: self.sync.status(&self.instances.data_dir(&record)),
                 id: record.id,
                 name: record.name,
             })
@@ -28,7 +28,6 @@ impl Engine {
             .instances
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
-        self.sync
-            .adopt(&self.instances.data_dir(&record.id), targets)
+        self.sync.adopt(&self.instances.data_dir(&record), targets)
     }
 }

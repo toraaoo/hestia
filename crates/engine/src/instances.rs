@@ -1,5 +1,6 @@
 //! Persistent Minecraft instance (client) store: each instance lives at
-//! `<dir>/<id>/` — the `instance.json` record beside `data/`, the game
+//! `<dir>/<slug>/` (the name slugged; the id is opaque) — the `instance.json`
+//! record beside `data/`, the game
 //! directory the client writes into (saves, options). The root is reserved
 //! for managed content directories (`mods/`, `resourcepacks/`, `configs/`);
 //! every directory appears on demand. Files shared across
@@ -56,14 +57,17 @@ impl Instances {
         self.dir.lock().unwrap().clone()
     }
 
-    pub fn instance_dir(&self, id: &str) -> PathBuf {
-        self.dir().join(id)
+    /// The instance's directory, named for its current display name, so a
+    /// rename moves it; the id stays the entry's stable internal key.
+    pub fn instance_dir(&self, record: &InstanceRecord) -> PathBuf {
+        self.dir()
+            .join(registry::dir_name(&record.id, &record.name))
     }
 
     /// The instance's game directory — everything the client itself reads and
     /// writes (saves, options, logs).
-    pub fn data_dir(&self, id: &str) -> PathBuf {
-        self.instance_dir(id).join(DATA)
+    pub fn data_dir(&self, record: &InstanceRecord) -> PathBuf {
+        self.instance_dir(record).join(DATA)
     }
 
     pub fn list(&self) -> Vec<InstanceRecord> {
@@ -83,9 +87,10 @@ impl Instances {
         if registry::name_taken(name, self.list().iter().map(|r| r.name.as_str())) {
             bail!("an instance named '{name}' already exists");
         }
-        let id = registry::allocate_id(name, |id| self.get(id).is_some())?;
+        registry::slugify(name)?;
+        let id = registry::allocate_id(|id| self.get(id).is_some())?;
         let record = InstanceRecord {
-            id: id.clone(),
+            id,
             name: name.to_string(),
             created_unix: registry::now_unix(),
             last_played_unix: None,
@@ -93,11 +98,11 @@ impl Instances {
             jvm: JavaSettings::default(),
             profile,
         };
-        let dir = self.instance_dir(&id);
+        let dir = self.instance_dir(&record);
         std::fs::create_dir_all(&dir)
             .with_context(|| format!("cannot create {}", dir.display()))?;
         registry::write_record(&dir, RECORD, &record)?;
-        tracing::info!(id, name, "instance registered");
+        tracing::info!(id = %record.id, name, "instance registered");
         Ok(record)
     }
 
@@ -109,7 +114,7 @@ impl Instances {
             .get(id)
             .with_context(|| format!("unknown instance: {id}"))?;
         record.profile = profile;
-        registry::write_record(&self.instance_dir(&record.id), RECORD, &record)?;
+        registry::write_record(&self.instance_dir(&record), RECORD, &record)?;
         tracing::info!(
             id = %record.id,
             version = %record.profile.game_version,
@@ -126,7 +131,7 @@ impl Instances {
             .get(id)
             .with_context(|| format!("unknown instance: {id}"))?;
         record.last_played_unix = Some(registry::now_unix());
-        registry::write_record(&self.instance_dir(&record.id), RECORD, &record)
+        registry::write_record(&self.instance_dir(&record), RECORD, &record)
     }
 
     /// Add an exited session's duration to the cumulative playtime. A
@@ -139,7 +144,7 @@ impl Instances {
             .get(id)
             .with_context(|| format!("unknown instance: {id}"))?;
         record.playtime_seconds += seconds;
-        registry::write_record(&self.instance_dir(&record.id), RECORD, &record)
+        registry::write_record(&self.instance_dir(&record), RECORD, &record)
     }
 
     /// Read one JVM setting (`memory` / `jvm-args`); `Ok(None)` means unset. An
@@ -162,7 +167,7 @@ impl Instances {
         if !record.jvm.set(key, value)? {
             bail!("unknown key '{key}' (valid keys: {MEMORY_KEY}, {JVM_ARGS_KEY})");
         }
-        registry::write_record(&self.instance_dir(&record.id), RECORD, &record)
+        registry::write_record(&self.instance_dir(&record), RECORD, &record)
     }
 
     /// Both JVM settings with their current values (empty when unset).
@@ -173,10 +178,9 @@ impl Instances {
         Ok(record.jvm.entries())
     }
 
-    /// Rename an instance: rewrite the record's display name. The id is stable,
-    /// so the directory, JVM settings, and game data stay put — only the name
-    /// field changes. The caller guarantees the instance is stopped and not
-    /// busy.
+    /// Rename an instance: rewrite the display name and move its directory to
+    /// the new slug. The id is stable, so JVM settings and game data are
+    /// untouched. The caller guarantees the instance is stopped and not busy.
     pub fn rename(&self, reference: &str, new_name: &str) -> Result<InstanceRecord> {
         let mut record = self
             .get(reference)
@@ -190,8 +194,16 @@ impl Instances {
         ) {
             bail!("an instance named '{new_name}' already exists");
         }
+        registry::slugify(new_name)?;
+        let old_dir = self.instance_dir(&record);
         record.name = new_name.to_string();
-        registry::write_record(&self.instance_dir(&record.id), RECORD, &record)?;
+        let new_dir = self.instance_dir(&record);
+        if new_dir != old_dir && old_dir.exists() {
+            std::fs::rename(&old_dir, &new_dir).with_context(|| {
+                format!("cannot move {} to {}", old_dir.display(), new_dir.display())
+            })?;
+        }
+        registry::write_record(&new_dir, RECORD, &record)?;
         tracing::info!(id = %record.id, name = %new_name, "instance renamed");
         Ok(record)
     }
@@ -202,7 +214,7 @@ impl Instances {
         let Some(record) = self.get(reference) else {
             return Ok(false);
         };
-        let dir = self.instance_dir(&record.id);
+        let dir = self.instance_dir(&record);
         std::fs::remove_dir_all(&dir)
             .with_context(|| format!("cannot remove {}", dir.display()))?;
         tracing::info!(id = %record.id, "instance removed");
