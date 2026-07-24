@@ -11,15 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AppSkinsIndexRouteImport } from './routes/_app/skins/index'
-import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
-import { Route as AppServersIndexRouteImport } from './routes/_app/servers/index'
-import { Route as AppProfilesIndexRouteImport } from './routes/_app/profiles/index'
-import { Route as AppInstancesIndexRouteImport } from './routes/_app/instances/index'
 import { Route as AppBrowseIndexRouteImport } from './routes/_app/browse/index'
-import { Route as AppServersIdRouteImport } from './routes/_app/servers/$id'
-import { Route as AppProfilesNameRouteImport } from './routes/_app/profiles/$name'
+import { Route as AppInstancesIndexRouteImport } from './routes/_app/instances/index'
 import { Route as AppInstancesIdRouteImport } from './routes/_app/instances/$id'
+import { Route as AppProfilesIndexRouteImport } from './routes/_app/profiles/index'
+import { Route as AppProfilesNameRouteImport } from './routes/_app/profiles/$name'
+import { Route as AppServersIndexRouteImport } from './routes/_app/servers/index'
+import { Route as AppServersIdRouteImport } from './routes/_app/servers/$id'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSkinsIndexRouteImport } from './routes/_app/skins/index'
 import { Route as AppBrowseKindIndexRouteImport } from './routes/_app/browse/$kind/index'
 import { Route as AppBrowseKindIdRouteImport } from './routes/_app/browse/$kind/$id'
 
@@ -32,24 +32,9 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppSkinsIndexRoute = AppSkinsIndexRouteImport.update({
-  id: '/skins/',
-  path: '/skins/',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
-  id: '/settings/',
-  path: '/settings/',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppServersIndexRoute = AppServersIndexRouteImport.update({
-  id: '/servers/',
-  path: '/servers/',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppProfilesIndexRoute = AppProfilesIndexRouteImport.update({
-  id: '/profiles/',
-  path: '/profiles/',
+const AppBrowseIndexRoute = AppBrowseIndexRouteImport.update({
+  id: '/browse/',
+  path: '/browse/',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppInstancesIndexRoute = AppInstancesIndexRouteImport.update({
@@ -57,14 +42,14 @@ const AppInstancesIndexRoute = AppInstancesIndexRouteImport.update({
   path: '/instances/',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppBrowseIndexRoute = AppBrowseIndexRouteImport.update({
-  id: '/browse/',
-  path: '/browse/',
+const AppInstancesIdRoute = AppInstancesIdRouteImport.update({
+  id: '/instances/$id',
+  path: '/instances/$id',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppServersIdRoute = AppServersIdRouteImport.update({
-  id: '/servers/$id',
-  path: '/servers/$id',
+const AppProfilesIndexRoute = AppProfilesIndexRouteImport.update({
+  id: '/profiles/',
+  path: '/profiles/',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppProfilesNameRoute = AppProfilesNameRouteImport.update({
@@ -72,9 +57,24 @@ const AppProfilesNameRoute = AppProfilesNameRouteImport.update({
   path: '/profiles/$name',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppInstancesIdRoute = AppInstancesIdRouteImport.update({
-  id: '/instances/$id',
-  path: '/instances/$id',
+const AppServersIndexRoute = AppServersIndexRouteImport.update({
+  id: '/servers/',
+  path: '/servers/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppServersIdRoute = AppServersIdRouteImport.update({
+  id: '/servers/$id',
+  path: '/servers/$id',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSkinsIndexRoute = AppSkinsIndexRouteImport.update({
+  id: '/skins/',
+  path: '/skins/',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppBrowseKindIndexRoute = AppBrowseKindIndexRouteImport.update({
@@ -198,32 +198,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/skins/': {
-      id: '/_app/skins/'
-      path: '/skins'
-      fullPath: '/skins/'
-      preLoaderRoute: typeof AppSkinsIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/settings/': {
-      id: '/_app/settings/'
-      path: '/settings'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof AppSettingsIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/servers/': {
-      id: '/_app/servers/'
-      path: '/servers'
-      fullPath: '/servers/'
-      preLoaderRoute: typeof AppServersIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/profiles/': {
-      id: '/_app/profiles/'
-      path: '/profiles'
-      fullPath: '/profiles/'
-      preLoaderRoute: typeof AppProfilesIndexRouteImport
+    '/_app/browse/': {
+      id: '/_app/browse/'
+      path: '/browse'
+      fullPath: '/browse/'
+      preLoaderRoute: typeof AppBrowseIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/instances/': {
@@ -233,18 +212,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInstancesIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/browse/': {
-      id: '/_app/browse/'
-      path: '/browse'
-      fullPath: '/browse/'
-      preLoaderRoute: typeof AppBrowseIndexRouteImport
+    '/_app/instances/$id': {
+      id: '/_app/instances/$id'
+      path: '/instances/$id'
+      fullPath: '/instances/$id'
+      preLoaderRoute: typeof AppInstancesIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/servers/$id': {
-      id: '/_app/servers/$id'
-      path: '/servers/$id'
-      fullPath: '/servers/$id'
-      preLoaderRoute: typeof AppServersIdRouteImport
+    '/_app/profiles/': {
+      id: '/_app/profiles/'
+      path: '/profiles'
+      fullPath: '/profiles/'
+      preLoaderRoute: typeof AppProfilesIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/profiles/$name': {
@@ -254,11 +233,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProfilesNameRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/instances/$id': {
-      id: '/_app/instances/$id'
-      path: '/instances/$id'
-      fullPath: '/instances/$id'
-      preLoaderRoute: typeof AppInstancesIdRouteImport
+    '/_app/servers/': {
+      id: '/_app/servers/'
+      path: '/servers'
+      fullPath: '/servers/'
+      preLoaderRoute: typeof AppServersIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/servers/$id': {
+      id: '/_app/servers/$id'
+      path: '/servers/$id'
+      fullPath: '/servers/$id'
+      preLoaderRoute: typeof AppServersIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/skins/': {
+      id: '/_app/skins/'
+      path: '/skins'
+      fullPath: '/skins/'
+      preLoaderRoute: typeof AppSkinsIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/browse/$kind/': {

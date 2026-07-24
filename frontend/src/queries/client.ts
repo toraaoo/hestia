@@ -10,7 +10,7 @@ import {
   type QueryKey,
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { type HestiaError, UNAUTHORIZED } from '../api';
+import { errorMessage, type HestiaError, UNAUTHORIZED } from '../api';
 
 // The instance surface is gated on a signed-in account (the router answers
 // `unauthorized` before an account exists). Every gated feature is already
@@ -32,13 +32,13 @@ export const queryClient = new QueryClient({
       // A query may opt out of the toast (e.g. a ping a stopped server can't
       // answer) via meta.silent.
       if (query.meta?.silent || silent(error)) return;
-      toast.error(error.message, { id: query.queryHash });
+      toast.error(errorMessage(error), { id: query.queryHash });
     },
   }),
   mutationCache: new MutationCache({
     onError: (error) => {
       if (silent(error)) return;
-      toast.error(error.message);
+      toast.error(errorMessage(error));
     },
   }),
   defaultOptions: {
