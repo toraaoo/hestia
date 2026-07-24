@@ -345,7 +345,7 @@ fn server_config_covers_jvm_and_properties() {
     // A key the schema does not carry is rejected — a typo cannot drift the
     // file.
     let unknown = servers.config_set(id, "this-is-a-typo", "x").unwrap_err();
-    assert!(unknown.to_string().contains("this server's version"));
+    assert!(unknown.to_string().contains("unknown config key"));
 
     // Managed keys stay rejected even though the file now exists.
     assert!(servers.config_set(id, "rcon.port", "25580").is_err());

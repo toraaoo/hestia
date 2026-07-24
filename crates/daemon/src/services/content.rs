@@ -48,7 +48,7 @@ fn register_sources(on: &mut Channels<'_>) {
             .content()
             .search(&q)
             .await
-            .map_err(crate::runtime::internal)
+            .map_err(crate::runtime::engine_error)
     });
 
     on.handle::<ContentProjectGet, _, _>(|p, ctx| async move {
@@ -62,7 +62,7 @@ fn register_sources(on: &mut Channels<'_>) {
             .content()
             .project(&p.source, &p.project)
             .await
-            .map_err(crate::runtime::internal)
+            .map_err(crate::runtime::engine_error)
     });
 
     on.handle::<ContentVersions, _, _>(|q, ctx| async move {
@@ -77,7 +77,7 @@ fn register_sources(on: &mut Channels<'_>) {
             .content()
             .versions(&q)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(ContentVersionsResult { versions })
     });
 
@@ -92,7 +92,7 @@ fn register_sources(on: &mut Channels<'_>) {
             .content()
             .resolve_modpack(&p.source, &p.version_id)
             .await
-            .map_err(crate::runtime::internal)
+            .map_err(crate::runtime::engine_error)
     });
 }
 
@@ -124,7 +124,7 @@ fn register_server(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .server_content(&record.id, p.kind)
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(ContentListResult { items, untracked })
     });
 
@@ -151,7 +151,7 @@ fn register_server(on: &mut Channels<'_>) {
             Ok(false) => Err(ErrorInfo::ContentNotFound {
                 reference: p.item.clone(),
             }),
-            Err(e) => Err(crate::runtime::internal(e)),
+            Err(e) => Err(crate::runtime::engine_error(e)),
         }
     });
 
@@ -196,7 +196,7 @@ fn register_server(on: &mut Channels<'_>) {
                 reference: p.item.clone(),
             }),
             Ok(_) => Ok(Empty {}),
-            Err(e) => Err(crate::runtime::internal(e)),
+            Err(e) => Err(crate::runtime::engine_error(e)),
         }
     });
 
@@ -207,7 +207,7 @@ fn register_server(on: &mut Channels<'_>) {
             .engine()
             .check_server_updates(&record.id, p.kind)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(ContentUpdatesResult { updates })
     });
 
@@ -265,7 +265,7 @@ fn register_instance(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .instance_content(&record.id, p.kind)
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(ContentListResult { items, untracked })
     });
 
@@ -291,7 +291,7 @@ fn register_instance(on: &mut Channels<'_>) {
             Ok(false) => Err(ErrorInfo::ContentNotFound {
                 reference: p.item.clone(),
             }),
-            Err(e) => Err(crate::runtime::internal(e)),
+            Err(e) => Err(crate::runtime::engine_error(e)),
         }
     });
 
@@ -332,7 +332,7 @@ fn register_instance(on: &mut Channels<'_>) {
                 reference: p.item.clone(),
             }),
             Ok(_) => Ok(Empty {}),
-            Err(e) => Err(crate::runtime::internal(e)),
+            Err(e) => Err(crate::runtime::engine_error(e)),
         }
     });
 
@@ -343,7 +343,7 @@ fn register_instance(on: &mut Channels<'_>) {
             .engine()
             .check_instance_updates(&record.id, p.kind)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(ContentUpdatesResult { updates })
     });
 

@@ -46,7 +46,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .server_backups(&record.id)
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(BackupListResult { backups })
     });
 
@@ -95,7 +95,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             Ok(false) => Err(ErrorInfo::BackupNotFound {
                 reference: p.backup.clone(),
             }),
-            Err(e) => Err(crate::runtime::internal(e)),
+            Err(e) => Err(crate::runtime::engine_error(e)),
         }
     });
 }

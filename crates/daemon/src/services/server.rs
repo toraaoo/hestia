@@ -33,7 +33,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .minecraft()
             .server_versions(&p.flavor)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(VersionsResult { versions })
     });
 
@@ -43,7 +43,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .minecraft()
             .resolve_server(&p.flavor, &p.version, p.loader_version)
             .await
-            .map_err(crate::runtime::internal)
+            .map_err(crate::runtime::engine_error)
     });
 
     on.handle::<ServerLoaders, _, _>(|p, ctx| async move {
@@ -53,7 +53,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .minecraft()
             .server_loader_versions(&p.flavor, &p.version)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(LoadersResult { loaders })
     });
 
@@ -123,7 +123,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         ctx.runtime
             .engine()
             .server_detail(&record.id)
-            .map_err(crate::runtime::internal)
+            .map_err(crate::runtime::engine_error)
     });
 
     on.handle::<ServerPing, _, _>(|p, ctx| async move {
@@ -132,7 +132,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .server_ping(&record.id)
             .await
-            .map_err(crate::runtime::internal)
+            .map_err(crate::runtime::engine_error)
     });
 
     on.handle::<ServerRemove, _, _>(|p, ctx| async move {
@@ -148,7 +148,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .servers()
             .remove(&record.id)
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         ctx.runtime
             .processes()
             .discard(&server_process_id(&record.id));
@@ -181,7 +181,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .servers()
             .rename(&record.id, &p.name)
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         tracing::info!(id = %renamed.id, name = %renamed.name, "server renamed");
         Ok(ctx.runtime.server_view(renamed))
     });
@@ -201,7 +201,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .server_launch_plan(&record.id)
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         let spec = ProcessSpec {
             id: process_id,
             program: plan.program.to_string_lossy().into_owned(),
@@ -256,7 +256,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .server_command(&record.id, &p.command)
             .await
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         Ok(ServerCommandResult { response })
     });
 
@@ -280,7 +280,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         {
             Ok(Some(value)) => Ok(ServerConfigGetResult { value }),
             Ok(None) => Err(ErrorInfo::ConfigKeyUnset { key: p.key.clone() }),
-            Err(e) => Err(crate::runtime::internal(e)),
+            Err(e) => Err(crate::runtime::engine_error(e)),
         }
     });
 
@@ -290,7 +290,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .servers()
             .config_set(&record.id, &p.key, &p.value)
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         tracing::info!(server = %record.id, key = %p.key, "server config updated");
         Ok(Empty {})
     });
@@ -302,7 +302,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .servers()
             .config_list(&record.id)
-            .map_err(crate::runtime::internal)?
+            .map_err(crate::runtime::engine_error)?
             .into_iter()
             .map(|(key, value)| ConfigEntry { key, value })
             .collect();

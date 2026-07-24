@@ -29,7 +29,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         let sync = ctx.runtime.engine().sync();
         let targets = sync
             .set_targets(p.targets)
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         tracing::info!(
             files = targets.files.len(),
             folders = targets.folders.len(),
@@ -57,7 +57,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .adopt_instance_sync(&record.id, &p.targets)
-            .map_err(crate::runtime::internal)?;
+            .map_err(crate::runtime::engine_error)?;
         tracing::info!(
             instance = %record.id,
             targets = adopted.len(),

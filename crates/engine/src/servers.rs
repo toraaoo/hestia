@@ -125,7 +125,10 @@ impl Servers {
         port: Option<u16>,
     ) -> Result<ServerRecord> {
         if registry::name_taken(name, self.list().iter().map(|r| r.name.as_str())) {
-            bail!("a server named '{name}' already exists");
+            bail!(proto::error::ErrorInfo::AlreadyExists {
+                entry: proto::error::Nameable::Server,
+                name: name.to_string()
+            });
         }
         registry::slugify(name)?;
         let id = registry::allocate_id(|id| self.get(id).is_some())?;
@@ -155,10 +158,10 @@ impl Servers {
         match requested {
             Some(port) => {
                 if claimed.contains(&port) {
-                    bail!("port {port} is already claimed by another server");
+                    bail!(proto::error::ErrorInfo::PortUnavailable { port });
                 }
                 if !can_bind(port) {
-                    bail!("port {port} is already in use");
+                    bail!(proto::error::ErrorInfo::PortUnavailable { port });
                 }
                 Ok(port)
             }
@@ -196,7 +199,7 @@ impl Servers {
             None => allocate_port(GAME_PORT_BASE, &claimed)?,
         };
         if claimed.contains(&game_port) || !can_bind(game_port) {
-            bail!("game port {game_port} is in use by another process");
+            bail!(proto::error::ErrorInfo::PortUnavailable { port: game_port });
         }
 
         let rcon = match record.rcon.take() {
@@ -402,7 +405,10 @@ impl Servers {
                 .filter(|r| r.id != record.id)
                 .map(|r| r.name.as_str()),
         ) {
-            bail!("a server named '{new_name}' already exists");
+            bail!(proto::error::ErrorInfo::AlreadyExists {
+                entry: proto::error::Nameable::Server,
+                name: new_name.to_string()
+            });
         }
         registry::slugify(new_name)?;
         let old_dir = self.server_dir(&record);
@@ -477,7 +483,9 @@ impl Servers {
         let properties = self.data_dir(&record).join(PROPERTIES);
         if properties.exists() {
             if read_property(&properties, key).is_none() {
-                bail!("'{key}' is not a server.properties key this server's version knows");
+                bail!(proto::error::ErrorInfo::ConfigKeyUnknown {
+                    key: key.to_string()
+                });
             }
         } else {
             tracing::debug!(
