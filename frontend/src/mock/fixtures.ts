@@ -73,7 +73,7 @@ export const channels: Record<string, Handler> = {
     dataDir: `/mock/.hestia/instances/${instance.id}/data`,
     diskBytes: 512 * 1024 * 1024,
   }),
-  'instance.content.list': () => ({ content: [] }),
+  'instance.content.list': () => ({ items: [], untracked: [] }),
   'instance.profile.list': () => ({ profiles: [], active: null }),
   'instance.worlds': () => ({ worlds: [] }),
   'instance.flavors': () => ({ flavors }),
@@ -87,7 +87,7 @@ export const channels: Record<string, Handler> = {
     dataDir: `/mock/.hestia/servers/${server.id}/data`,
     diskBytes: 1_024 * 1024 * 1024,
   }),
-  'server.content.list': () => ({ content: [] }),
+  'server.content.list': () => ({ items: [], untracked: [] }),
   'server.backup.list': () => ({ backups: [] }),
   'server.flavors': () => ({ flavors }),
   'server.loaders': () => ({ loaders: [] }),
@@ -101,8 +101,13 @@ export const channels: Record<string, Handler> = {
     sources: [{ id: 'modrinth', name: 'Modrinth' }],
   }),
   'profile.list': () => ({ profiles: [] }),
-  'config.list': () => ({ entries: [] }),
+  'config.list': () => ({ entries: {} }),
   'config.get': () => ({ value: null }),
+  'instance.config.list': () => ({ entries: [] }),
+  'server.config.list': () => ({ entries: [] }),
+
+  'content.search': () => ({ hits: [], offset: 0, limit: 20, total: 0 }),
+  'content.versions': () => ({ versions: [] }),
 };
 
 /** Bespoke shell commands (not the generic `ipc_call` bridge). */
