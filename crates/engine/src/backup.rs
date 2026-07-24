@@ -76,12 +76,12 @@ impl BackupSettings {
                 self.retention = if value.trim().is_empty() {
                     None
                 } else {
-                    let n: u32 = value
-                        .trim()
-                        .parse()
-                        .ok()
-                        .filter(|n| *n > 0)
-                        .context("backup-retention must be a positive integer")?;
+                    let n: u32 = value.trim().parse().ok().filter(|n| *n > 0).ok_or(
+                        proto::error::ErrorInfo::InvalidValue {
+                            field: proto::error::Field::BackupRetention,
+                            reason: proto::error::Reason::RetentionPositive,
+                        },
+                    )?;
                     Some(n)
                 };
                 Ok(true)
@@ -128,17 +128,27 @@ pub fn parse_interval(value: &str) -> Result<Duration> {
         Some('m') => 60,
         Some('h') => 3600,
         Some('d') => 86400,
-        _ => bail!("backup-interval must look like 30m, 6h, or 1d"),
+        _ => bail!(proto::error::ErrorInfo::InvalidValue {
+            field: proto::error::Field::BackupInterval,
+            reason: proto::error::Reason::IntervalFormat
+        }),
     };
     let digits = &trimmed[..trimmed.len() - 1];
-    let count: u64 = digits
-        .parse()
-        .ok()
-        .filter(|n| *n > 0)
-        .context("backup-interval must look like 30m, 6h, or 1d")?;
+    let count: u64 =
+        digits
+            .parse()
+            .ok()
+            .filter(|n| *n > 0)
+            .ok_or(proto::error::ErrorInfo::InvalidValue {
+                field: proto::error::Field::BackupInterval,
+                reason: proto::error::Reason::IntervalFormat,
+            })?;
     let interval = Duration::from_secs(count.saturating_mul(unit_seconds));
     if interval < MIN_INTERVAL {
-        bail!("backup-interval must be at least 5m");
+        bail!(proto::error::ErrorInfo::InvalidValue {
+            field: proto::error::Field::BackupInterval,
+            reason: proto::error::Reason::IntervalTooShort
+        });
     }
     Ok(interval)
 }
@@ -158,7 +168,9 @@ pub fn create(
     on_progress: OnProgress<'_>,
 ) -> Result<BackupInfo> {
     if !data_dir.is_dir() {
-        bail!("nothing to back up yet (no data directory)");
+        bail!(proto::error::ErrorInfo::NothingToDo {
+            what: proto::error::Task::BackUp
+        });
     }
     let dir = backups_dir(entry_dir);
     std::fs::create_dir_all(&dir).with_context(|| format!("cannot create {}", dir.display()))?;

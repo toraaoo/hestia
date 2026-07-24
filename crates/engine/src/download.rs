@@ -49,7 +49,9 @@ impl<'a> Downloader<'a> {
         on_progress: &ProgressFn<'_>,
     ) -> Result<()> {
         if url.is_empty() {
-            bail!("download url is empty");
+            bail!(proto::error::ErrorInfo::FieldRequired {
+                field: proto::error::Field::Url
+            });
         }
         if let Some(c) = checksum {
             if !c.is_valid() {
@@ -139,7 +141,11 @@ impl<'a> Downloader<'a> {
             let actual = hasher.hex_digest();
             let expected = checksum.hex.to_lowercase();
             if actual != expected {
-                bail!("checksum mismatch for {url}: expected {expected}, got {actual}");
+                bail!(proto::error::ErrorInfo::DownloadFailed {
+                    detail: format!(
+                        "checksum mismatch for {url}: expected {expected}, got {actual}"
+                    )
+                });
             }
         }
         Ok(())
