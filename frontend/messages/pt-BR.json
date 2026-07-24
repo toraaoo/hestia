@@ -514,6 +514,7 @@
     "minecraft_version": "Versão do Minecraft",
     "mod_loader": "Loader de mods",
     "allocated_memory": "Memória alocada",
+    "inherits_default": "padrão",
     "java_arguments": "Argumentos Java",
     "backup_schedule": "Agendamento de backup",
     "every_interval": "A cada {interval}",

@@ -33,6 +33,7 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
+import { configQueries } from '@/queries/config';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
 
 function configValue(config: ConfigEntry[] | undefined, key: string): string {
@@ -49,9 +50,20 @@ export function InstanceSettingsTab({
   running: boolean;
 }) {
   const navigate = useNavigate();
+  const globalConfig = useQuery(configQueries.list());
   const rename = useMutation(instanceMutations.rename(instance.id));
   const setConfig = useMutation(instanceMutations.setConfig(instance.id));
   const remove = useMutation(instanceMutations.remove(instance.id));
+
+  const defaults =
+    (globalConfig.data as
+      | { defaults?: { memory?: string; 'jvm-args'?: string } }
+      | undefined) ?? {};
+  const defaultMemory = defaults.defaults?.memory ?? '';
+  const defaultMemoryGb = defaultMemory ? memGb(defaultMemory) : 4;
+  const defaultJvmArgs = defaults.defaults?.['jvm-args'] ?? '';
+  const memoryOverride = configValue(config, 'memory');
+  const inheritsMemory = memoryOverride === '' && defaultMemory !== '';
 
   const [name, setName] = useState(instance.name);
   const [memory, setMemory] = useState(4);
@@ -64,13 +76,16 @@ export function InstanceSettingsTab({
 
   useEffect(() => {
     if (!config) return;
-    setMemory(memGb(configValue(config, 'memory') || '4G'));
+    setMemory(memoryOverride ? memGb(memoryOverride) : defaultMemoryGb);
     setJvmArgs(configValue(config, 'jvm-args'));
-  }, [config]);
+  }, [config, memoryOverride, defaultMemoryGb]);
 
   const saveConfig = async () => {
+    // Match the launcher default → clear the override so it keeps inheriting.
+    const memoryValue =
+      defaultMemory !== '' && memory === defaultMemoryGb ? '' : `${memory}G`;
     try {
-      await setConfig.mutateAsync({ key: 'memory', value: `${memory}G` });
+      await setConfig.mutateAsync({ key: 'memory', value: memoryValue });
       await setConfig.mutateAsync({ key: 'jvm-args', value: jvmArgs });
       toast.success(m['toast.saved']());
     } catch (error) {
@@ -116,6 +131,7 @@ export function InstanceSettingsTab({
             {m['entry_settings.allocated_memory']()}
             <span className="ml-2 font-mono text-muted-foreground">
               {m['wizard.gb']({ value: memory })}
+              {inheritsMemory && ` (${m['entry_settings.inherits_default']()})`}
             </span>
           </FieldLabel>
           <Slider
@@ -136,7 +152,7 @@ export function InstanceSettingsTab({
             id="jvm-args"
             value={jvmArgs}
             onChange={(e) => setJvmArgs(e.target.value)}
-            placeholder="-XX:+UseG1GC"
+            placeholder={defaultJvmArgs || '-XX:+UseG1GC'}
             className="font-mono"
           />
         </Field>

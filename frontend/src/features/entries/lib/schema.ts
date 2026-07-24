@@ -57,13 +57,16 @@ export function createWizardSchema(kind: Kind) {
 /** The wizard's collected form value — the shape both `create` params read. */
 export type WizardValues = ReturnType<typeof createWizardDefaults>;
 
-export function createWizardDefaults(loaderVersion: string) {
+export function createWizardDefaults(
+  loaderVersion: string,
+  defaultMemoryGb = 4,
+) {
   return {
     flavor: { flavor: 'vanilla' },
     version: { version: '', loaderVersion },
     details: {
       name: '',
-      memory: 4,
+      memory: defaultMemoryGb,
       motd: 'A Minecraft Server',
       gamemode: 'survival',
       difficulty: 'normal',

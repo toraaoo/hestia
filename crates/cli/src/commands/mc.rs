@@ -10,6 +10,7 @@ use client::proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, ProvisionPhase, ProvisionProgress, VersionKind,
 };
 use client::proto::process::{ProcessInfo, ProcessState};
+use client::Client;
 
 use crate::ui::{self, View};
 
@@ -35,11 +36,59 @@ pub enum ConfigCmd {
     List,
 }
 
-/// Render `config list` entries as a KEY/VALUE table.
-pub fn show_config_entries(title: impl Into<String>, entries: Vec<ConfigEntry>) -> Result<()> {
+/// The launcher-wide JVM defaults (`defaults.memory` / `defaults.jvm-args`), an
+/// empty string when unset. An entry that leaves `memory`/`jvm-args` unset
+/// inherits these at launch, so `config list` surfaces them.
+#[derive(Default)]
+pub struct JvmDefaults {
+    pub memory: String,
+    pub jvm_args: String,
+}
+
+/// Fetch the launcher-wide JVM defaults; a failed read yields empty values.
+pub async fn jvm_defaults(client: &Client) -> JvmDefaults {
+    async fn read(client: &Client, key: &str) -> String {
+        client
+            .config()
+            .get(key)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|v| v.as_str().map(str::to_string))
+            .unwrap_or_default()
+    }
+    JvmDefaults {
+        memory: read(client, "defaults.memory").await,
+        jvm_args: read(client, "defaults.jvm-args").await,
+    }
+}
+
+/// Render `config list` entries as a KEY/VALUE table. A `memory`/`jvm-args`
+/// entry left unset shows the inherited launcher default (annotated), so the
+/// effective launch value is visible.
+pub fn show_config_entries(
+    title: impl Into<String>,
+    entries: Vec<ConfigEntry>,
+    defaults: &JvmDefaults,
+) -> Result<()> {
     let rows = entries
         .into_iter()
-        .map(|e| vec![e.key, e.value])
+        .map(|e| {
+            let value = if !e.value.is_empty() {
+                e.value
+            } else {
+                match e.key.as_str() {
+                    "memory" if !defaults.memory.is_empty() => {
+                        format!("{} (default)", defaults.memory)
+                    }
+                    "jvm-args" if !defaults.jvm_args.is_empty() => {
+                        format!("{} (default)", defaults.jvm_args)
+                    }
+                    _ => e.value,
+                }
+            };
+            vec![e.key, value]
+        })
         .collect::<Vec<_>>();
     ui::show(View::table(title, ["KEY", "VALUE"], rows))
 }

@@ -523,6 +523,7 @@
     "minecraft_version": "Minecraft version",
     "mod_loader": "Mod loader",
     "allocated_memory": "Allocated memory",
+    "inherits_default": "default",
     "java_arguments": "Java arguments",
     "backup_schedule": "Backup schedule",
     "every_interval": "Every {interval}",
