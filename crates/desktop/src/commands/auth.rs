@@ -35,6 +35,7 @@ pub async fn account_login_sisu(
     bridge: State<'_, Bridge>,
 ) -> Result<Option<Account>, CallError> {
     let client = acquire(&app, &bridge).await?;
+    tracing::info!("sisu sign-in started");
     let begin = client.accounts().begin_login(LoginMethod::Sisu).await?;
     if begin.url.is_empty() {
         return Err(other("daemon returned no sign-in URL"));
@@ -61,11 +62,13 @@ pub async fn account_login_sisu(
     let started = Instant::now();
     loop {
         if started.elapsed() >= FLOW_TIMEOUT {
+            tracing::warn!("sisu sign-in timed out");
             let _ = window.close();
             return Err(other("sign-in timed out"));
         }
         // A closed window's title read errors — the user cancelled the flow.
         if window.title().is_err() {
+            tracing::info!("sisu sign-in cancelled");
             return Ok(None);
         }
         if let Ok(current) = window.url() {
@@ -77,6 +80,7 @@ pub async fn account_login_sisu(
                 {
                     let _ = window.close();
                     let account = client.accounts().complete_login(&begin.id, &code).await?;
+                    tracing::info!(name = %account.name, "sisu sign-in complete");
                     return Ok(Some(account));
                 }
             }

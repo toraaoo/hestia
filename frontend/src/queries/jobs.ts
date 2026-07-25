@@ -14,9 +14,12 @@ import {
   useMutation,
 } from '@tanstack/react-query';
 import { useMemo, useState, useSyncExternalStore } from 'react';
+import { logger } from '@/lib/log';
 import type { ProvisionProgress } from '../api';
 import { HestiaError, TRANSPORT } from '../api';
 import { invalidate } from './client';
+
+const log = logger('jobs');
 
 export type JobEntryKind = 'server' | 'instance';
 
@@ -101,6 +104,7 @@ export function startJob<TData, TProgress>(
 ): JobHandle<TData> {
   seq += 1;
   const id = `job-${seq}`;
+  log.debug({ id, op: meta.kind, entry: meta.entry?.id }, 'job started');
   jobs.set(id, {
     ...meta,
     id,
@@ -118,6 +122,7 @@ export function startJob<TData, TProgress>(
     if (jobs.get(id)?.status === 'running') patch(id, { progress });
   }).then(
     (data) => {
+      log.debug({ id, op: meta.kind }, 'job done');
       patch(id, { status: 'done', settledAt: Date.now() });
       return data;
     },

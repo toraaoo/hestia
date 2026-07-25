@@ -113,6 +113,7 @@ pub fn icon_set(
     remove_stored(&dir, &entry_id);
     let target = dir.join(format!("{entry_id}.{ext}"));
     std::fs::copy(&source, &target).map_err(|e| CallError::other(e.to_string()))?;
+    tracing::info!(entry_id, ext, size, "icon set");
     allow_assets(&app, &dir);
     entry_for(&target).ok_or_else(|| CallError::other("cannot read the stored icon"))
 }
@@ -122,6 +123,7 @@ pub fn icon_remove(entry_id: String) -> Result<(), CallError> {
     if !valid_id(&entry_id) {
         return Err(CallError::other("invalid entry id"));
     }
+    tracing::info!(entry_id, "icon removed");
     remove_stored(&icons_dir(), &entry_id);
     Ok(())
 }

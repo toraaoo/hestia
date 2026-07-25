@@ -46,6 +46,7 @@ pub fn prefs_list() -> Result<Value, CallError> {
 
 #[tauri::command]
 pub fn prefs_set(key: String, value: Value) -> Result<(), CallError> {
+    tracing::debug!(key, "pref set");
     let _guard = LOCK.lock().unwrap();
     let path = path();
     let mut values = load(&path);
@@ -55,6 +56,7 @@ pub fn prefs_set(key: String, value: Value) -> Result<(), CallError> {
 
 #[tauri::command]
 pub fn prefs_remove(key: String) -> Result<(), CallError> {
+    tracing::debug!(key, "pref removed");
     let _guard = LOCK.lock().unwrap();
     let path = path();
     let mut values = load(&path);

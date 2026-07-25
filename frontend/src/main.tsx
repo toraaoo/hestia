@@ -7,6 +7,7 @@ import { ErrorBoundary } from './components/error-boundary';
 import { LocaleProvider } from './hooks/locale';
 import { installCrashHandlers } from './lib/crash';
 import { initDesktopShell } from './lib/desktop';
+import { log } from './lib/log';
 import { queryClient, startInvalidation } from './queries';
 import { startSessionTracking } from './queries/sessions';
 import { getRouter } from './router';
@@ -19,6 +20,7 @@ if (import.meta.env.DEV && !('__TAURI_INTERNALS__' in window)) {
 }
 
 installCrashHandlers();
+log.info({ mode: import.meta.env.MODE }, 'ui starting');
 initDesktopShell();
 startInvalidation();
 startSessionTracking();

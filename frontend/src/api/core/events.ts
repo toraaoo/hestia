@@ -7,6 +7,10 @@
  */
 import { listen } from '@tauri-apps/api/event';
 
+import { logger } from '@/lib/log';
+
+const log = logger('events');
+
 export const EVENT_CHANNEL = 'hestia:event';
 export const CONNECTION_CHANNEL = 'hestia:connection';
 
@@ -27,6 +31,7 @@ let connectionListener: Promise<unknown> | null = null;
 
 async function ensureEventListener(): Promise<void> {
   eventListener ??= listen<DaemonEvent>(EVENT_CHANNEL, (event) => {
+    log.trace({ topic: event.payload.topic }, 'daemon event');
     // The wire is camelCase (proto's `rename_all`), so the payload already
     // matches the type mirrors — forwarded through with no conversion.
     for (const handler of [...eventHandlers]) handler(event.payload);
