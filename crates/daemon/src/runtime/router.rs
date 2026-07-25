@@ -32,6 +32,7 @@ pub fn engine_error(e: anyhow::Error) -> ErrorInfo {
             reference: reauth.reference.clone(),
         };
     }
+    tracing::error!(error = ?e, "unhandled engine failure");
     ErrorInfo::Internal {
         detail: format!("{e:#}"),
     }
@@ -48,6 +49,13 @@ fn requires_account(channel: &str) -> bool {
     channel.starts_with("instance.") || channel.starts_with("sync.")
 }
 
+fn is_polled(channel: &str) -> bool {
+    matches!(
+        channel,
+        "daemon.status" | "health.ping" | "process.list" | "process.status"
+    )
+}
+
 type BoxFuture = Pin<Box<dyn Future<Output = Response> + Send>>;
 type Handler = Arc<dyn Fn(Request, HandlerContext) -> BoxFuture + Send + Sync>;
 
@@ -62,6 +70,7 @@ impl Router {
     }
 
     pub async fn route(&self, request: Request, ctx: HandlerContext) -> Response {
+        let polled = is_polled(&request.channel);
         let span = tracing::info_span!(
             "req",
             channel = %request.channel,
@@ -76,13 +85,15 @@ impl Router {
                         tracing::warn!("rejected: no signed-in account");
                         return error_response(ErrorInfo::SignInRequired);
                     }
-                    tracing::debug!("dispatch");
                     let started = std::time::Instant::now();
                     let response = handler(request, ctx).await;
                     let elapsed_ms = started.elapsed().as_millis() as u64;
-                    match &response.error {
-                        Some(err) => tracing::warn!(error = %err, elapsed_ms, "request failed"),
-                        None => tracing::debug!(elapsed_ms, "request ok"),
+                    match (&response.error, polled) {
+                        (Some(err), _) => {
+                            tracing::warn!(error = %err, elapsed_ms, "request failed")
+                        }
+                        (None, true) => tracing::trace!(elapsed_ms, "request ok"),
+                        (None, false) => tracing::debug!(elapsed_ms, "request ok"),
                     }
                     response
                 }
