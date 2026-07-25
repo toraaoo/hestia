@@ -111,7 +111,7 @@ pub fn set_persisted_home(dir: &Path) -> std::io::Result<()> {
 
 /// The config file within the resolved data directory.
 pub fn config_path(override_dir: Option<&Path>) -> PathBuf {
-    data_home(override_dir).join("config")
+    data_home(override_dir).join("config.json")
 }
 
 /// The directory holding Hestia's own logs, within the resolved data directory.
