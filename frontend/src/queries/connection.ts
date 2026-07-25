@@ -5,7 +5,11 @@
  * pessimism would just flash a disconnected banner at startup.
  */
 import { useSyncExternalStore } from 'react';
+
+import { logger } from '@/lib/log';
 import { type ConnectionState, onConnectionChange } from '../api';
+
+const log = logger('connection');
 
 let state: ConnectionState = 'connected';
 const listeners = new Set<() => void>();
@@ -15,6 +19,8 @@ function ensureWatcher(): void {
   if (watching) return;
   watching = true;
   onConnectionChange((next) => {
+    if (next !== state)
+      log.warn({ from: state, to: next }, 'daemon connection');
     state = next;
     for (const listener of listeners) listener();
   }).catch(() => {

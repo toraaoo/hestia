@@ -8,9 +8,12 @@
  * subscription would only duplicate delivery (and leak a daemon-side sub that
  * is pruned only on disconnect).
  */
+import { logger } from '@/lib/log';
 import type { ProvisionProgress } from '../types/minecraft';
 import { onDaemonEvent } from './events';
 import { HANDLER_ERROR, HestiaError } from './ipc';
+
+const log = logger('job');
 
 let counter = 0;
 
@@ -62,7 +65,9 @@ export async function runJob<
         typeof event.payload.code === 'string' && event.payload.code
           ? event.payload.code
           : HANDLER_ERROR;
-      rejectOutcome(new HestiaError(code, String(event.payload.message ?? '')));
+      const message = String(event.payload.message ?? '');
+      log.warn({ id, code }, `job failed: ${message}`);
+      rejectOutcome(new HestiaError(code, message));
     } else if (
       onProgress &&
       (!topics.progress || event.topic === topics.progress)
@@ -72,6 +77,7 @@ export async function runJob<
   });
 
   try {
+    log.debug({ id, done: topics.done }, 'job started');
     await options.start();
     return await outcome;
   } finally {

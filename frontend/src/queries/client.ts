@@ -10,6 +10,8 @@ import {
   type QueryKey,
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+import { logger } from '@/lib/log';
 import {
   CONNECTION_LOST,
   errorMessage,
@@ -18,6 +20,8 @@ import {
   TRANSPORT,
   UNAUTHORIZED,
 } from '../api';
+
+const log = logger('query');
 
 // Never a toast: `unauthorized` is expected behind the sign-in gate, and
 // connectivity failures are the status bar's concern, not a per-call error.
@@ -36,6 +40,10 @@ export const queryClient = new QueryClient({
   // a retriggering refetch replacing its own toast rather than stacking.
   queryCache: new QueryCache({
     onError: (error, query) => {
+      log.warn(
+        { key: query.queryHash, code: error.code },
+        `query failed: ${error.message}`,
+      );
       // A query may opt out of the toast (e.g. a ping a stopped server can't
       // answer) via meta.silent.
       if (query.meta?.silent || silent(error)) return;
@@ -43,7 +51,11 @@ export const queryClient = new QueryClient({
     },
   }),
   mutationCache: new MutationCache({
-    onError: (error) => {
+    onError: (error, _vars, _ctx, mutation) => {
+      log.warn(
+        { key: mutation.options.mutationKey?.join('.'), code: error.code },
+        `mutation failed: ${error.message}`,
+      );
       if (silent(error)) return;
       toast.error(errorMessage(error));
     },

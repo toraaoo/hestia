@@ -108,6 +108,7 @@ pub async fn ipc_call(
             })
         }
         Err(error) => {
+            tracing::warn!(channel, %error, "call failed");
             if client.session().is_closed() {
                 release(&app, &bridge, &client).await;
             }
@@ -127,6 +128,7 @@ pub fn watch(app: AppHandle) {
             let mut guard = bridge.client.lock().await;
             match guard.as_ref() {
                 Some(client) if client.session().is_closed() => {
+                    tracing::info!("daemon connection lost");
                     *guard = None;
                     let _ = app.emit(CONNECTION_CHANNEL, ConnectionState::Disconnected);
                 }
@@ -169,6 +171,7 @@ pub async fn start_daemon(app: AppHandle, bridge: State<'_, Bridge>) -> Result<(
     if guard.as_ref().is_some_and(|c| !c.session().is_closed()) {
         return Ok(());
     }
+    tracing::info!("starting the daemon");
     let client = attach(&app, Client::start().await?).await?;
     *guard = Some(client);
     Ok(())
@@ -177,6 +180,7 @@ pub async fn start_daemon(app: AppHandle, bridge: State<'_, Bridge>) -> Result<(
 async fn release(app: &AppHandle, bridge: &Bridge, lost: &Arc<Client>) {
     let mut guard = bridge.client.lock().await;
     if guard.as_ref().is_some_and(|held| Arc::ptr_eq(held, lost)) {
+        tracing::info!("daemon connection released");
         *guard = None;
         let _ = app.emit(CONNECTION_CHANNEL, ConnectionState::Disconnected);
     }

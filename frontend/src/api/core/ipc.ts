@@ -9,7 +9,10 @@
  * value therefore also passes through untouched.)
  */
 import { invoke } from '@tauri-apps/api/core';
+import { logger } from '@/lib/log';
 import type { ErrorInfo } from '../types/error';
+
+const log = logger('ipc');
 
 /** Default per-call timeout, matching the client SDK's `CALL_TIMEOUT`. */
 export const CALL_TIMEOUT_MS = 10_000;
@@ -63,16 +66,27 @@ export async function call<T>(
   params: unknown = {},
   options: CallOptions = {},
 ): Promise<T> {
+  const started = performance.now();
   try {
     const result = await invoke<unknown>('ipc_call', {
       channel,
       payload: params ?? {},
       timeoutMs: options.timeoutMs,
     });
+    log.debug({ channel, ms: elapsed(started) }, 'call ok');
     return result as T;
   } catch (raw) {
-    throw toHestiaError(raw);
+    const error = toHestiaError(raw);
+    log.warn(
+      { channel, code: error.code, ms: elapsed(started) },
+      `call failed: ${error.message}`,
+    );
+    throw error;
   }
+}
+
+function elapsed(started: number): number {
+  return Math.round(performance.now() - started);
 }
 
 /**
@@ -88,7 +102,9 @@ export async function invokeCommand<T>(
   try {
     return await invoke<T>(command, args);
   } catch (raw) {
-    throw toHestiaError(raw);
+    const error = toHestiaError(raw);
+    log.warn({ command, code: error.code }, `command failed: ${error.message}`);
+    throw error;
   }
 }
 

@@ -3,7 +3,9 @@ import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { ErrorBoundary } from './components/error-boundary';
 import { LocaleProvider } from './hooks/locale';
+import { installCrashHandlers } from './lib/crash';
 import { initDesktopShell } from './lib/desktop';
 import { queryClient, startInvalidation } from './queries';
 import { startSessionTracking } from './queries/sessions';
@@ -16,6 +18,7 @@ if (import.meta.env.DEV && !('__TAURI_INTERNALS__' in window)) {
   await (await import('./mock')).installBrowserMock();
 }
 
+installCrashHandlers();
 initDesktopShell();
 startInvalidation();
 startSessionTracking();
@@ -25,11 +28,13 @@ const rootElement = document.getElementById('app');
 if (rootElement && !rootElement.innerHTML) {
   createRoot(rootElement).render(
     <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <LocaleProvider>
-          <RouterProvider router={router} />
-        </LocaleProvider>
-      </QueryClientProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <LocaleProvider>
+            <RouterProvider router={router} />
+          </LocaleProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
     </StrictMode>,
   );
 }

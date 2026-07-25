@@ -16,9 +16,11 @@ pub fn run() {
         // and we surface the existing window instead of opening another.
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if is_quit_signal(&argv) {
+                tracing::info!("quit requested by a second instance");
                 app.exit(0);
                 return;
             }
+            tracing::info!(?argv, "second instance; focusing the open window");
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
@@ -36,6 +38,7 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
             }
+            tracing::info!(version = common::app::VERSION_LABEL, "desktop shell ready");
             bridge::watch(app.handle().clone());
             Ok(())
         })
@@ -48,7 +51,12 @@ pub fn run() {
             commands::prefs::prefs_remove,
             commands::icons::icons_list,
             commands::icons::icon_set,
-            commands::icons::icon_remove
+            commands::icons::icon_remove,
+            commands::diagnostics::log_write,
+            commands::diagnostics::crash_report,
+            commands::diagnostics::crash_list,
+            commands::diagnostics::crash_read,
+            commands::diagnostics::crash_clear
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
