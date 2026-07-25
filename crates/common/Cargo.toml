@@ -9,8 +9,8 @@ publish.workspace = true
 [dependencies]
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-tracing-appender = { workspace = true }
-flate2 = { workspace = true }
+flexi_logger = { workspace = true }
+chrono = { workspace = true }
 
 # husky-rs installs the repo's git hooks (.husky/) via its build script on
 # `cargo test`. The virtual workspace has no root package to host it, so it lives

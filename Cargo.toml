@@ -25,7 +25,8 @@ tokio = { version = "1.52.3", features = ["rt-multi-thread", "net", "io-util", "
 futures-util = "0.3.32"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-tracing-appender = "0.2.5"
+flexi_logger = { version = "0.31.9", default-features = false, features = ["compress"] }
+chrono = { version = "0.4.42", default-features = false, features = ["clock"] }
 clap = { version = "4.6.1", features = ["derive"] }
 ratatui = { version = "0.30.2", features = ["unstable-rendered-line-info"] }
 tui-markdown = { version = "0.3.8", default-features = false }

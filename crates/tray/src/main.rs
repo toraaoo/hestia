@@ -30,7 +30,7 @@ pub enum UserEvent {
 
 fn main() -> ExitCode {
     let level = common::LogLevel::default();
-    let file = common::FileLog::appending(common::paths::log_dir(None), "tray", level);
+    let file = common::FileLog::for_binary("tray", None, level);
     let _guard = common::init_logging(level, Some(file));
 
     let Some(_lock) = lock::acquire() else {

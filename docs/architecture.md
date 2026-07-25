@@ -148,16 +148,58 @@ UI-free, domain-free code linked by the daemon and every client:
   `CHANNEL`, `VERSION` from `CARGO_PKG_VERSION`): one source of truth every binary
   reads.
 - **`logging`** — `init_logging(console LogLevel, Option<FileLog>)` configures the
-  process `tracing` subscriber once and returns a `LogGuard`. Each sink has its
-  own level: the console (stderr), plus an optional rotated, compressed file —
-  fresh-per-run (`logs/latest.log`, the long-lived daemon's) or appended across
-  runs and rotated by size (`logs/hestia.log`, shared by the short-lived CLI
-  invocations, whose console stays at warnings/errors unless `-v`/`-vv` raise it).
+  process `tracing` subscriber once, installs the crash hook, and returns a
+  `LogGuard`. Each binary owns a directory under `<data_home>/logs/<binary>/` and
+  writes up to three independently filtered sinks: the console (stderr, gated
+  while a fullscreen CLI surface owns the terminal), `latest.log` (Hestia's own
+  crates at the file's level, dependencies at warnings), and — for the resident
+  binaries, `hestiad` and `desktop` — the `debug/latest.log` firehose (every
+  target at trace, dependencies included). `HESTIA_LOG` overrides every computed
+  directive. Rotation is `flexi_logger`'s: `latest.log` rolls on the day or 20 MB
+  into dated `YYYY-MM-DD.log.gz` archives (2 kept plain, 30 gzipped), the
+  firehose on 200 MB (5 gzipped) — Minecraft's own `logs/` layout and Forge's
+  split.
+- **`crash`** — the panic hook every binary gets from `init_logging`: a panic is
+  recorded through `tracing` *and* written to `<data_home>/logs/crashes/` as a
+  standalone report (message, location, backtrace, platform, and the tail of the
+  live log). `record()` is the same path for a crash that never touched the Rust
+  stack — the desktop's webview errors. `list`/`read`/`clear` back the shell's
+  crash notice; `read` only opens paths the module itself wrote.
+- **`time`** — local-time stamps for log lines and report names, via `chrono`.
 - **`paths`** — data-directory resolution: `--home` → `$HESTIA_HOME` → a persisted
   pointer (`config set home`) → the platform default (`~/.hestia`, `%APPDATA%\Hestia`
   on Windows). **Debug builds** anchor the default at `<workspace>/.hestia` so
   development never touches the real per-user directory. Also `config_path`,
   `log_dir`, and `set_persisted_home`.
+
+> **Two log files, because one file cannot be both readable and complete.** A
+> single sink forced a choice every debug session lost: at trace it filled with
+> dependency chatter (`latest.log` was 90% `mio::poll` plus a `daemon.status`
+> poll every two seconds), and below trace it dropped the detail a bug needed.
+> The split is Forge's — a filtered `latest.log` for reading and a `debug.log`
+> firehose for reconstructing — and it is only possible per *target*, so the
+> sinks carry their own `EnvFilter` as per-layer filters rather than sharing one
+> global one. The firehose is deliberately unfiltered, inheriting the global
+> filter instead: it must take everything, dependencies included. Rotation moved
+> to `flexi_logger` rather than staying hand-rolled, which retired four bugs in
+> the old `rolling.rs` — a failed rotation re-gzipped the whole file on every
+> subsequent write, a failed archive then truncated the log it had failed to
+> save, archives were written non-atomically, and pruning sorted by mtime so an
+> unreadable archive was deleted first. Only the writer is borrowed: the
+> subscriber, formatting and spans stay `tracing`'s, because `flexi_logger`'s own
+> `trc::setup_tracing` installs a single-writer subscriber that cannot express
+> three differently-filtered sinks.
+
+> **A crash must survive the process that had no console.** The daemon's stderr
+> is detached, a release desktop build has `windows_subsystem = "windows"`, and a
+> panic inside a spawned task printed where nobody looks — so a crash left
+> nothing but a missing process. `init_logging` now installs the hook for every
+> binary (rather than each `main` remembering to), and reports from all four
+> share one directory so the desktop can surface a *daemon* crash it never saw.
+> The webview reaches the same reports through `crash_report`, since a React
+> render error or an unhandled rejection kills the UI without touching the Rust
+> stack. Note that `panic = "abort"` with `strip = true` in the release profile
+> leaves release backtraces as bare addresses.
 
 ## `client` — the typed SDK
 

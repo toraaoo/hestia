@@ -201,9 +201,8 @@ fn main() -> ExitCode {
         }
     };
     let home = cli.home.as_deref().filter(|h| !h.is_empty()).map(Path::new);
-    let file = common::FileLog::appending(common::paths::log_dir(home), "hestia", file_level);
+    let file = common::FileLog::for_binary("hestia", home, file_level);
     let _guard = common::init_logging(console_level, Some(file));
-    tracing::debug!(version = common::app::VERSION, "hestia cli starting");
 
     // The data directory is daemon-global, so --home is exported as
     // $HESTIA_HOME and only takes effect when `daemon start` spawns the daemon;
