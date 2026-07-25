@@ -25,14 +25,22 @@ stop_hestia() {
 }
 stop_hestia
 
+# The staged sidecars must match the requested profile: a debug build bundles
+# debug sidecars (dev data under <repo>/.hestia), a --release one the release
+# set. sidecars.sh defaults to release, so forward the profile explicitly.
+sidecar_profile="--debug"
+for arg in "$@"; do
+  [ "$arg" = "--release" ] && sidecar_profile="--release"
+done
+
 # Compiling the desktop crate requires the Tauri externalBin sidecars to be
 # staged, or its build script fails on the missing resource paths.
 case "$target" in
   cli)     cargo build -p cli "$@" ;;
   daemon)  cargo build -p daemon -p tray "$@" ;;
-  desktop) scripts/sidecars.sh --ensure
+  desktop) scripts/sidecars.sh --ensure "$sidecar_profile"
            (cd crates/desktop && cargo tauri build "$@") ;;
-  all)     scripts/sidecars.sh --ensure
+  all)     scripts/sidecars.sh --ensure "$sidecar_profile"
            cargo build --workspace "$@" ;;
   *) echo "usage: $0 [cli|daemon|desktop|all] [cargo flags]" >&2; exit 1 ;;
 esac
