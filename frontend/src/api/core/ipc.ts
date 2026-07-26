@@ -77,12 +77,16 @@ export async function call<T>(
     return result as T;
   } catch (raw) {
     const error = toHestiaError(raw);
-    log.warn(
+    log[offline(error) ? 'debug' : 'warn'](
       { channel, code: error.code, ms: elapsed(started) },
       `call failed: ${error.message}`,
     );
     throw error;
   }
+}
+
+function offline(error: HestiaError): boolean {
+  return error.code === CONNECTION_LOST || error.code === TRANSPORT;
 }
 
 function elapsed(started: number): number {

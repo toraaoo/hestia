@@ -252,7 +252,11 @@ if (error && isNotFound(error)) return <NotFound />;   // from '#/api'
 `tryCall`-backed reads (`useConfigValue`, `useServerConfigValue`, …) already
 surface a missing value as `null` data rather than an error. Queries and
 mutations don't retry (the daemon is a local socket — failures aren't
-transient network blips), so an error is real the first time you see it.
+transient network blips), so an error is real the first time you see it. Nor
+does an errored query refetch when a component remounts (`retryOnMount:
+false`): it clears when something invalidates it — a mutation, a daemon topic,
+or the reconnect sweep. A daemon that goes away is not a per-query concern at
+all; the shell's `OfflineOverlay` reports it once, from `useConnection()`.
 
 ## Hook inventory
 

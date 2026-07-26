@@ -39,6 +39,7 @@ pub fn run() {
                 let _ = window.show();
             }
             tracing::info!(version = common::app::VERSION_LABEL, "desktop shell ready");
+            bridge::start(app.handle().clone());
             bridge::watch(app.handle().clone());
             Ok(())
         })

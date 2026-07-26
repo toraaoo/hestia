@@ -128,7 +128,10 @@
   "restarting": "Restarting…",
   "restart": "Restart daemon",
   "restart_title": "Restart the daemon?",
-  "restart_description": "The launcher briefly disconnects while it restarts. Running servers and instances keep running."
+  "restart_description": "The launcher briefly disconnects while it restarts. Running servers and instances keep running.",
+  "offline_title": "Hestia isn't running",
+  "offline_body": "The launcher's background service stopped. Servers and instances it started keep running; start it again to manage them.",
+  "reconnecting": "Reconnecting…"
  },
  "playbar": {
   "quick_play": "Quick play",

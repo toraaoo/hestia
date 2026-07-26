@@ -1151,18 +1151,21 @@ A Tauri v2 shell hosting the React frontend in the root `frontend/`, wired to
 the daemon through the same one-way boundary as the CLI: the shell reaches
 launcher logic only through `client` (never by linking `engine`). The wiring
 is one seam, `src/bridge.rs`: a shared `Client` held as Tauri managed state
-(lazily connected to a running daemon — never auto-spawned; the dedicated
-`start_daemon` command is the one path that spawns the sidecar, which sits
-beside the exe where `client::spawn` looks), a single generic
+(started at shell launch — `bridge::start` runs the `Client::start()` spawn
+path once, so opening the app brings its daemon up; the sidecar sits beside the
+exe where `client::spawn` looks, and the `start_daemon` command is the same
+path behind the UI's start button), a single generic
 `ipc_call(channel, payload, timeout_ms)` command forwarding through the
 session's public `call_raw`, and event forwarding: on connect the bridge
 claims the session's one event-callback slot, subscribes to *every* daemon
 event (`events.subscribe` with an empty id), and re-emits each as a
 `hestia:event` webview event. A watcher task notices a lost daemon between
-calls, emits `hestia:connection` transitions (`ipc_call` also emits
-`disconnected` when it cannot reach the daemon), and passively reconnects to a
-daemon that comes back — but never spawns one, so a deliberately stopped daemon
-stays stopped until the user starts it.
+calls, emits `hestia:connection` transitions, and passively reconnects to a
+daemon that comes back — but *reconnection* never spawns, so a daemon stopped
+during the session stays stopped until the user starts it. `ipc_call` itself
+never spawns either, and while the connection is down it answers
+`connection_lost` from the held state rather than attempting the socket: one
+connect attempt per watch interval, whatever the webview asks for.
 
 The typed surface lives in the frontend, `frontend/src/api/`: `core/` (the
 `ipc_call` wrapper with the SDK's timeout defaults, the event bus, and a
@@ -1251,6 +1254,28 @@ flow: `account.login.begin` returns the Microsoft URL for the shell to open,
 > indirection when a direct write to the data home is simpler. The store is
 > schema-less: the front-end owns its own keys, consumed through the frontend's
 > `usePrefs` hook.
+
+> **Offline is one state, not a failure per read — and the shell brings its own
+> daemon up.** With no daemon running, every query failed, and three defaults
+> turned that into a hot loop: `retry: false` leaves a query in `error`,
+> TanStack's `retryOnMount` refetches it whenever a new observer mounts, and a
+> refetch with no data reads as `pending` — which flips a page's `loading`,
+> swaps its body for the skeleton, unmounts those observers, and remounts them
+> to start again. Measured at ~150 IPC calls a second and ~600 renders a second
+> on the library page, which is what the "flickering" was. Three changes settle
+> it, one per layer: `retryOnMount: false` (recovery is the reconnect sweep in
+> `queries/invalidation.ts`, not a mount); the bridge answers `connection_lost`
+> from its held state while the daemon is down, so a burst of reads costs one
+> socket attempt per watch interval instead of one each, and emits
+> `hestia:connection` only on transitions; and the failures log at `debug`
+> rather than `warn` on both sides, since an offline daemon is a state the
+> status bar reports, not an error per call. The UI then says it once: an
+> `OfflineOverlay` in the app shell with the daemon's own start action. The
+> shell also **starts the daemon at launch** (`bridge::start`) — opening the
+> desktop is as deliberate a launch of Hestia as `hestia daemon start`, and the
+> alternative was an app that opens into an overlay telling the user to press a
+> button. Reconnection still never spawns: a daemon stopped *during* a session
+> was stopped on purpose.
 
 ### Tray (`tray`)
 

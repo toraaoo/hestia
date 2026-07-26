@@ -9,7 +9,7 @@
 //! surface lives once, in the frontend's `src/api/`.
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use client::proto::events::{EventsSubscribe, EventsSubscribeParams};
 use client::{Client, IpcError};
@@ -28,7 +28,23 @@ const WATCH_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Default)]
 pub struct Bridge {
-    client: Mutex<Option<Arc<Client>>>,
+    state: Mutex<Connection>,
+}
+
+#[derive(Default)]
+struct Connection {
+    client: Option<Arc<Client>>,
+    failed_at: Option<Instant>,
+    announced: Option<ConnectionState>,
+}
+
+impl Connection {
+    /// A down daemon costs one socket attempt per `WATCH_INTERVAL`, not one
+    /// per call: the webview keeps issuing reads while it is offline.
+    fn backing_off(&self) -> bool {
+        self.failed_at
+            .is_some_and(|at| at.elapsed() < WATCH_INTERVAL)
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -62,6 +78,15 @@ impl CallError {
         CallError {
             code: "error".into(),
             message: message.into(),
+            info: Value::Null,
+        }
+    }
+
+    /// Answered without touching the socket while the daemon is known down.
+    fn offline() -> Self {
+        CallError {
+            code: "connection_lost".into(),
+            message: "the daemon is not running".into(),
             info: Value::Null,
         }
     }
@@ -119,71 +144,121 @@ pub async fn ipc_call(
 }
 
 /// Watch the shared connection: notice a lost daemon between calls and
-/// passively reconnect (no auto-spawn — a deliberately stopped daemon must
-/// stay stopped) so event forwarding resumes when it comes back.
+/// reconnect to one that comes back (never spawning — a deliberately stopped
+/// daemon must stay stopped) so event forwarding resumes with it.
 pub fn watch(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(WATCH_INTERVAL).await;
             let bridge = app.state::<Bridge>();
-            let mut guard = bridge.client.lock().await;
-            match guard.as_ref() {
+            let mut state = bridge.state.lock().await;
+            match state.client.as_ref() {
                 Some(client) if client.session().is_closed() => {
                     tracing::info!("daemon connection lost");
-                    *guard = None;
-                    let _ = app.emit(CONNECTION_CHANNEL, ConnectionState::Disconnected);
+                    state.client = None;
+                    announce(&app, &mut state, ConnectionState::Disconnected);
                 }
                 Some(_) => {}
                 None => {
-                    if let Ok(client) = connect(&app).await {
-                        *guard = Some(client);
-                    }
+                    let _ = adopt(&app, &mut state, connect(&app).await);
                 }
             }
         }
     });
 }
 
+/// Bring the daemon up at shell start: opening the desktop is a deliberate
+/// launch, so it spawns `hestiad` when none is running. `ipc_call` still never
+/// spawns.
+pub fn start(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let bridge = app.state::<Bridge>();
+        let mut state = bridge.state.lock().await;
+        if let Err(error) = ensure_started(&app, &mut state).await {
+            tracing::warn!(?error, "could not start the daemon at shell start");
+        }
+    });
+}
+
 pub(crate) async fn acquire(app: &AppHandle, bridge: &Bridge) -> Result<Arc<Client>, CallError> {
-    let mut guard = bridge.client.lock().await;
-    if let Some(client) = guard.as_ref() {
+    let mut state = bridge.state.lock().await;
+    if let Some(client) = state.client.as_ref() {
         if !client.session().is_closed() {
             return Ok(client.clone());
         }
-        *guard = None;
-        let _ = app.emit(CONNECTION_CHANNEL, ConnectionState::Disconnected);
+        state.client = None;
+        announce(app, &mut state, ConnectionState::Disconnected);
     }
-    let client = match connect(app).await {
-        Ok(client) => client,
-        Err(error) => {
-            let _ = app.emit(CONNECTION_CHANNEL, ConnectionState::Disconnected);
-            return Err(error);
-        }
-    };
-    *guard = Some(client.clone());
-    Ok(client)
+    if state.backing_off() {
+        return Err(CallError::offline());
+    }
+    let connected = connect(app).await;
+    adopt(app, &mut state, connected)
 }
 
 /// Start the daemon and adopt the connection — the start button's trigger.
-/// `ipc_call` never spawns; this is the one command that does.
 #[tauri::command]
 pub async fn start_daemon(app: AppHandle, bridge: State<'_, Bridge>) -> Result<(), CallError> {
-    let mut guard = bridge.client.lock().await;
-    if guard.as_ref().is_some_and(|c| !c.session().is_closed()) {
+    let mut state = bridge.state.lock().await;
+    ensure_started(&app, &mut state).await
+}
+
+async fn ensure_started(app: &AppHandle, state: &mut Connection) -> Result<(), CallError> {
+    if state
+        .client
+        .as_ref()
+        .is_some_and(|c| !c.session().is_closed())
+    {
         return Ok(());
     }
     tracing::info!("starting the daemon");
-    let client = attach(&app, Client::start().await?).await?;
-    *guard = Some(client);
-    Ok(())
+    let started = match Client::start().await {
+        Ok(client) => attach(app, client).await,
+        Err(error) => Err(error.into()),
+    };
+    adopt(app, state, started).map(|_| ())
+}
+
+/// Record a connect attempt's outcome and announce the resulting state.
+fn adopt(
+    app: &AppHandle,
+    state: &mut Connection,
+    connected: Result<Arc<Client>, CallError>,
+) -> Result<Arc<Client>, CallError> {
+    match connected {
+        Ok(client) => {
+            state.client = Some(client.clone());
+            state.failed_at = None;
+            announce(app, state, ConnectionState::Connected);
+            Ok(client)
+        }
+        Err(error) => {
+            state.failed_at = Some(Instant::now());
+            announce(app, state, ConnectionState::Disconnected);
+            Err(error)
+        }
+    }
+}
+
+/// Only transitions reach the webview; a repeat is noise it would react to.
+fn announce(app: &AppHandle, state: &mut Connection, next: ConnectionState) {
+    if state.announced == Some(next) {
+        return;
+    }
+    state.announced = Some(next);
+    let _ = app.emit(CONNECTION_CHANNEL, next);
 }
 
 async fn release(app: &AppHandle, bridge: &Bridge, lost: &Arc<Client>) {
-    let mut guard = bridge.client.lock().await;
-    if guard.as_ref().is_some_and(|held| Arc::ptr_eq(held, lost)) {
+    let mut state = bridge.state.lock().await;
+    if state
+        .client
+        .as_ref()
+        .is_some_and(|held| Arc::ptr_eq(held, lost))
+    {
         tracing::info!("daemon connection released");
-        *guard = None;
-        let _ = app.emit(CONNECTION_CHANNEL, ConnectionState::Disconnected);
+        state.client = None;
+        announce(app, &mut state, ConnectionState::Disconnected);
     }
 }
 
@@ -214,6 +289,5 @@ async fn attach(app: &AppHandle, client: Client) -> Result<Arc<Client>, CallErro
         .call::<EventsSubscribe>(&EventsSubscribeParams::default())
         .await?;
     tracing::info!("connected to the daemon");
-    let _ = app.emit(CONNECTION_CHANNEL, ConnectionState::Connected);
     Ok(client)
 }

@@ -40,7 +40,7 @@ export const queryClient = new QueryClient({
   // a retriggering refetch replacing its own toast rather than stacking.
   queryCache: new QueryCache({
     onError: (error, query) => {
-      log.warn(
+      log[silent(error) ? 'debug' : 'warn'](
         { key: query.queryHash, code: error.code },
         `query failed: ${error.message}`,
       );
@@ -67,6 +67,10 @@ export const queryClient = new QueryClient({
       // blips worth retrying.
       networkMode: 'always',
       retry: false,
+      // Refetching an errored query on mount loops: a data-less fetch reads as
+      // `pending`, pages swap to skeletons, the observers remount, repeat.
+      // Recovery is the reconnect sweep in ./invalidation.
+      retryOnMount: false,
       // Daemon events invalidate what changes, so polling-style refetches
       // only need to catch what the topic map misses.
       staleTime: 30_000,

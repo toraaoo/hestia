@@ -1,17 +1,19 @@
 import { Logo } from '@/components/app-shell/logo';
 import { Button } from '@/components/ui/button';
 import { m } from '@/paraglide/messages.js';
-import { useAccounts, usePrefs } from '@/queries';
+import { useAccounts, useConnection, usePrefs } from '@/queries';
 
 const DISMISS_KEY = 'welcome-dismissed';
 
 export function FirstRunOverlay() {
   const { signedIn, ready: accountsReady, login } = useAccounts();
   const { get, set, ready: prefsReady } = usePrefs();
+  const connected = useConnection() === 'connected';
 
-  if (!accountsReady || !prefsReady || signedIn || get(DISMISS_KEY, false)) {
-    return null;
-  }
+  // Offline, "not signed in" is unknown rather than true, and the offline
+  // overlay owns the screen.
+  if (!connected || !accountsReady || !prefsReady || signedIn) return null;
+  if (get(DISMISS_KEY, false)) return null;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-xs">
