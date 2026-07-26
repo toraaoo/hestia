@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use ipc::errors::IpcError;
-use ipc::protocol::{self, Event, Request, Response};
+use ipc::protocol::{self, DecodeError, Event, Request, Response};
 use ipc::{Connection, FrameWriter};
 use proto::error::ErrorInfo;
 use proto::Contract;
@@ -248,10 +248,22 @@ impl Shared {
             }
             return;
         }
-        let res = protocol::decode_response(&value);
-        let id = res.id.unwrap_or(0);
-        if let Some(tx) = self.pending.lock().unwrap().remove(&id) {
-            let _ = tx.send(res);
+        match protocol::decode_response(&value) {
+            Ok(res) => {
+                let id = res.id.unwrap_or(0);
+                if let Some(tx) = self.pending.lock().unwrap().remove(&id) {
+                    let _ = tx.send(res);
+                }
+            }
+            // A foreign-major daemon is refused, not silently consumed: tear the
+            // connection down so every waiter fails fast rather than timing out.
+            Err(DecodeError::IncompatibleVersion { .. }) => {
+                tracing::warn!("closing connection: incompatible daemon protocol version");
+                self.close();
+            }
+            // A junk frame is ignored, as before — one bad frame is not a reason
+            // to drop an otherwise-compatible connection.
+            Err(DecodeError::Malformed(_)) => {}
         }
     }
 

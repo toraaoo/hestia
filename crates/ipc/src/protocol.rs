@@ -2,6 +2,7 @@
 //! encode/decode through here, so the wire format lives in exactly one place.
 
 use serde_json::{json, Value};
+use thiserror::Error;
 
 /// The protocol major version carried by every envelope. Bump on a breaking wire
 /// change; additive fields do not need a bump.
@@ -10,6 +11,35 @@ pub const PROTOCOL_VERSION: i64 = 1;
 /// Whether a peer advertising major `version` can talk to us. Same major only.
 pub fn compatible(version: i64) -> bool {
     version == PROTOCOL_VERSION
+}
+
+/// Why an inbound envelope could not be turned into a request or response. The
+/// seam fails **closed**: a missing or foreign-major `v` refuses to decode
+/// rather than defaulting to the current version, so no caller can silently
+/// consume a frame it does not understand. The type carries the invariant —
+/// `compatible()` is not an opt-in check a decode site can forget.
+#[derive(Debug, Error)]
+pub enum DecodeError {
+    #[error("malformed envelope: {0}")]
+    Malformed(String),
+    #[error("incompatible protocol version: got {got}, expected {want}")]
+    IncompatibleVersion { got: i64, want: i64 },
+}
+
+/// Extract and validate an envelope's major version. A missing `v` is malformed
+/// (never an implicit "current"), and a foreign major is refused.
+fn decode_version(frame: &Value) -> Result<i64, DecodeError> {
+    let version = frame
+        .get("v")
+        .and_then(Value::as_i64)
+        .ok_or_else(|| DecodeError::Malformed("missing protocol version".into()))?;
+    if !compatible(version) {
+        return Err(DecodeError::IncompatibleVersion {
+            got: version,
+            want: PROTOCOL_VERSION,
+        });
+    }
+    Ok(version)
 }
 
 /// A request: a channel name, a JSON payload, and an optional correlation id.
@@ -102,8 +132,10 @@ pub fn encode_event(event: &Event) -> String {
     json!({ "event": event.topic, "payload": event.payload }).to_string()
 }
 
-pub fn decode_request(frame: &str) -> Result<Request, serde_json::Error> {
-    let j: Value = serde_json::from_str(frame)?;
+pub fn decode_request(frame: &str) -> Result<Request, DecodeError> {
+    let j: Value =
+        serde_json::from_str(frame).map_err(|e| DecodeError::Malformed(e.to_string()))?;
+    let version = decode_version(&j)?;
     let channel = j
         .get("channel")
         .and_then(Value::as_str)
@@ -114,10 +146,6 @@ pub fn decode_request(frame: &str) -> Result<Request, serde_json::Error> {
         _ => json!({}),
     };
     let id = j.get("id").and_then(Value::as_i64);
-    let version = j
-        .get("v")
-        .and_then(Value::as_i64)
-        .unwrap_or(PROTOCOL_VERSION);
     Ok(Request {
         channel,
         payload,
@@ -131,29 +159,26 @@ pub fn is_event(frame: &Value) -> bool {
     frame.get("event").map(Value::is_string).unwrap_or(false)
 }
 
-pub fn decode_response(frame: &Value) -> Response {
+pub fn decode_response(frame: &Value) -> Result<Response, DecodeError> {
+    let version = decode_version(frame)?;
     let ok = frame.get("ok").and_then(Value::as_bool).unwrap_or(false);
-    let version = frame
-        .get("v")
-        .and_then(Value::as_i64)
-        .unwrap_or(PROTOCOL_VERSION);
     let id = frame.get("id").and_then(Value::as_i64);
     if ok {
-        Response {
+        Ok(Response {
             ok: true,
             payload: frame.get("payload").cloned().unwrap_or(json!({})),
             error: None,
             id,
             version,
-        }
+        })
     } else {
-        Response {
+        Ok(Response {
             ok: false,
             payload: Value::Null,
             error: Some(frame.get("error").cloned().unwrap_or_else(|| json!({}))),
             id,
             version,
-        }
+        })
     }
 }
 
@@ -168,5 +193,59 @@ pub fn decode_event(frame: &Value) -> Event {
             Some(p) if !p.is_null() => p.clone(),
             _ => json!({}),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn request_round_trips_at_current_version() {
+        let frame = encode_request(&Request::new("health.ping", json!({}), Some(7)));
+        let req = decode_request(&frame).expect("current-major request decodes");
+        assert_eq!(req.channel, "health.ping");
+        assert_eq!(req.id, Some(7));
+        assert_eq!(req.version, PROTOCOL_VERSION);
+    }
+
+    #[test]
+    fn request_with_foreign_major_is_refused() {
+        for v in [0, 99, PROTOCOL_VERSION + 1] {
+            let frame = json!({ "v": v, "channel": "health.ping", "payload": {} }).to_string();
+            match decode_request(&frame) {
+                Err(DecodeError::IncompatibleVersion { got, want }) => {
+                    assert_eq!(got, v);
+                    assert_eq!(want, PROTOCOL_VERSION);
+                }
+                other => panic!("expected version rejection for v={v}, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn request_without_version_is_malformed() {
+        let frame = json!({ "channel": "health.ping", "payload": {} }).to_string();
+        assert!(matches!(
+            decode_request(&frame),
+            Err(DecodeError::Malformed(_))
+        ));
+    }
+
+    #[test]
+    fn response_round_trips_at_current_version() {
+        let encoded = encode_response(&Response::success(json!({ "pong": true })));
+        let value: Value = serde_json::from_str(&encoded).unwrap();
+        let res = decode_response(&value).expect("current-major response decodes");
+        assert!(res.ok);
+    }
+
+    #[test]
+    fn response_with_foreign_major_is_refused() {
+        let frame = json!({ "v": 99, "ok": true, "payload": {} });
+        assert!(matches!(
+            decode_response(&frame),
+            Err(DecodeError::IncompatibleVersion { got: 99, .. })
+        ));
     }
 }

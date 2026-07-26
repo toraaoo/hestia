@@ -7,5 +7,5 @@ pub mod protocol;
 pub mod transport;
 
 pub use errors::IpcError;
-pub use protocol::{Event, Request, Response, PROTOCOL_VERSION};
+pub use protocol::{DecodeError, Event, Request, Response, PROTOCOL_VERSION};
 pub use transport::{bind, connect, Connection, FrameReader, FrameWriter, Listener, Peer};

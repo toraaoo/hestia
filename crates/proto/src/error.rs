@@ -339,6 +339,7 @@ pub enum ErrorInfo {
     // --- protocol ---
     UnknownChannel { channel: String },
     MalformedRequest { detail: String },
+    IncompatibleVersion { got: i64, want: i64 },
 
     // --- operational (unbounded English `detail`) ---
     Io { operation: IoOp, detail: String },
@@ -368,6 +369,7 @@ impl ErrorInfo {
                 "unauthorized"
             }
             UnknownChannel { .. } => "unknown_channel",
+            IncompatibleVersion { .. } => "version_mismatch",
             Io { .. }
             | Upstream { .. }
             | DownloadFailed { .. }
@@ -448,6 +450,12 @@ impl fmt::Display for ErrorInfo {
             }
             UnknownChannel { channel } => write!(f, "unknown channel: {channel}"),
             MalformedRequest { detail } => write!(f, "malformed request: {detail}"),
+            IncompatibleVersion { got, want } => {
+                write!(
+                    f,
+                    "unsupported protocol version {got}; this daemon speaks version {want}"
+                )
+            }
             Io { operation, detail } => write!(f, "could not {operation}: {detail}"),
             Upstream { service, detail } => write!(f, "{service} request failed: {detail}"),
             DownloadFailed { detail } => write!(f, "download failed: {detail}"),

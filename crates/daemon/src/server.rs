@@ -6,7 +6,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use ipc::protocol::{decode_request, encode_response};
+use ipc::protocol::{decode_request, encode_response, DecodeError};
 use ipc::{Connection, Peer};
 use tracing::Instrument;
 
@@ -109,9 +109,14 @@ async fn serve_connection(
         let req = match decode_request(&frame) {
             Ok(r) => r,
             Err(e) => {
-                tracing::warn!("dropping malformed frame: {e}");
-                let info = proto::error::ErrorInfo::MalformedRequest {
-                    detail: e.to_string(),
+                tracing::warn!("rejecting frame: {e}");
+                let info = match e {
+                    DecodeError::IncompatibleVersion { got, want } => {
+                        proto::error::ErrorInfo::IncompatibleVersion { got, want }
+                    }
+                    DecodeError::Malformed(detail) => {
+                        proto::error::ErrorInfo::MalformedRequest { detail }
+                    }
                 };
                 let _ = out_tx.send(encode_response(&crate::runtime::error_response(info)));
                 continue;
