@@ -13,8 +13,8 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use proto::content::{
-    ContentInspectResult, ContentProject, ContentSource, ContentVersion, ResolvedModpack,
-    SearchQuery, SearchResult, VersionQuery,
+    ContentInspectResult, ContentKind, ContentProject, ContentSource, ContentVersion,
+    ResolvedModpack, ResolvedUrl, SearchQuery, SearchResult, VersionQuery,
 };
 
 use provider::ContentProvider;
@@ -98,10 +98,37 @@ impl Content {
         provider.search(query).await
     }
 
-    pub async fn project(&self, source: &str, project: &str) -> Result<ContentProject> {
+    pub async fn project(
+        &self,
+        source: &str,
+        project: &str,
+        kind: Option<ContentKind>,
+    ) -> Result<ContentProject> {
         let provider = self.provider(source)?;
-        tracing::info!(source = provider.id(), project, "content project lookup");
-        provider.project(project).await
+        tracing::info!(
+            source = provider.id(),
+            project,
+            ?kind,
+            "content project lookup"
+        );
+        provider.project(project, kind).await
+    }
+
+    /// Resolve a source page URL to the project it names (and the version it
+    /// pins, for a version page).
+    pub async fn resolve_url(&self, url: &str) -> Result<ResolvedUrl> {
+        let (source, reference) = self.parse_url(url).ok_or_else(|| {
+            anyhow::Error::from(proto::error::ErrorInfo::UnsupportedContentUrl {
+                url: url.to_string(),
+            })
+        })?;
+        let project = self
+            .project(&source, &reference.project, reference.kind)
+            .await?;
+        Ok(ResolvedUrl {
+            project,
+            version_id: reference.version.unwrap_or_default(),
+        })
     }
 
     pub async fn versions(&self, query: &VersionQuery) -> Result<Vec<ContentVersion>> {

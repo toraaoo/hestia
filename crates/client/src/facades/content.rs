@@ -2,9 +2,10 @@ use std::time::Duration;
 
 use ipc::errors::IpcError;
 use proto::content::{
-    ContentInspect, ContentInspectParams, ContentInspectResult, ContentProject, ContentProjectGet,
-    ContentSearch, ContentSource, ContentSources, ContentVersion, ContentVersions, ModpackParams,
-    ModpackResolve, ProjectParams, ResolvedModpack, SearchQuery, SearchResult, VersionQuery,
+    ContentInspect, ContentInspectParams, ContentInspectResult, ContentKind, ContentProject,
+    ContentProjectGet, ContentResolveUrl, ContentSearch, ContentSource, ContentSources,
+    ContentVersion, ContentVersions, ModpackParams, ModpackResolve, ProjectParams,
+    ResolveUrlParams, ResolvedModpack, ResolvedUrl, SearchQuery, SearchResult, VersionQuery,
 };
 
 use crate::session::Session;
@@ -28,12 +29,28 @@ impl Content<'_> {
         self.session.call::<ContentSearch>(query).await
     }
 
-    pub async fn project(&self, source: &str, project: &str) -> Result<ContentProject, IpcError> {
+    /// A project's detail. `kind` is the browse context, stamped onto the
+    /// answer when the project publishes it.
+    pub async fn project(
+        &self,
+        source: &str,
+        project: &str,
+        kind: Option<ContentKind>,
+    ) -> Result<ContentProject, IpcError> {
         let params = ProjectParams {
             source: source.to_string(),
             project: project.to_string(),
+            kind,
         };
         self.session.call::<ContentProjectGet>(&params).await
+    }
+
+    /// Resolve a source page URL to the project (and pinned version) it names.
+    pub async fn resolve_url(&self, url: &str) -> Result<ResolvedUrl, IpcError> {
+        let params = ResolveUrlParams {
+            url: url.to_string(),
+        };
+        self.session.call::<ContentResolveUrl>(&params).await
     }
 
     pub async fn versions(&self, query: &VersionQuery) -> Result<Vec<ContentVersion>, IpcError> {

@@ -13,8 +13,8 @@ use proto::app::AppInfoResult;
 use proto::backup::BackupInfo;
 use proto::cache::{CacheEntry, CacheInfoResult};
 use proto::content::{
-    ContentAddSpec, ContentDoneEvent, ContentErrorEvent, ContentProgressEvent, ContentVersion,
-    InstalledContent, SearchQuery, ServerContentAddParams,
+    ContentAddSpec, ContentDoneEvent, ContentErrorEvent, ContentProgressEvent, ContentProject,
+    ContentVersion, InstalledContent, SearchQuery, ServerContentAddParams,
 };
 use proto::daemon::{DaemonStatusResult, DaemonStopParams};
 use proto::download::DownloadSpec;
@@ -145,6 +145,7 @@ golden!(
 golden!(search_query, SearchQuery, "search_query.json");
 golden!(global_profile, GlobalProfile, "global_profile.json");
 golden!(content_version, ContentVersion, "content_version.json");
+golden!(content_project, ContentProject, "content_project.json");
 golden!(skin, Skin, "skin.json");
 golden!(cape, Cape, "cape.json");
 golden!(

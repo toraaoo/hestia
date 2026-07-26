@@ -3,11 +3,12 @@
 
 use proto::content::{
     ContentInspect, ContentJobResult, ContentKind, ContentListResult, ContentProjectGet,
-    ContentSearch, ContentSources, ContentUpdatesResult, ContentVersions, ContentVersionsResult,
-    InstanceContentAdd, InstanceContentCheckUpdates, InstanceContentEnable, InstanceContentList,
-    InstanceContentRemove, InstanceContentSetVersion, InstanceContentUpdate, ModpackResolve,
-    ServerContentAdd, ServerContentCheckUpdates, ServerContentEnable, ServerContentList,
-    ServerContentRemove, ServerContentSetVersion, ServerContentUpdate, SourcesResult,
+    ContentResolveUrl, ContentSearch, ContentSources, ContentUpdatesResult, ContentVersions,
+    ContentVersionsResult, InstanceContentAdd, InstanceContentCheckUpdates, InstanceContentEnable,
+    InstanceContentList, InstanceContentRemove, InstanceContentSetVersion, InstanceContentUpdate,
+    ModpackResolve, ServerContentAdd, ServerContentCheckUpdates, ServerContentEnable,
+    ServerContentList, ServerContentRemove, ServerContentSetVersion, ServerContentUpdate,
+    SourcesResult,
 };
 use proto::error::{ErrorInfo, Field, Unsupported};
 use proto::Empty;
@@ -59,7 +60,19 @@ fn register_sources(on: &mut Channels<'_>) {
         ctx.runtime
             .engine()
             .content()
-            .project(&p.source, &p.project)
+            .project(&p.source, &p.project, p.kind)
+            .await
+            .map_err(crate::runtime::engine_error)
+    });
+
+    on.handle::<ContentResolveUrl, _, _>(|p, ctx| async move {
+        if p.url.is_empty() {
+            return Err(ErrorInfo::FieldRequired { field: Field::Url });
+        }
+        ctx.runtime
+            .engine()
+            .content()
+            .resolve_url(&p.url)
             .await
             .map_err(crate::runtime::engine_error)
     });

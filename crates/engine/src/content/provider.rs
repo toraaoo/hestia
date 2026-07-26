@@ -5,14 +5,17 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use proto::content::{ContentProject, ContentVersion, ResolvedModpack, SearchQuery, VersionQuery};
+use proto::content::{
+    ContentKind, ContentProject, ContentVersion, ResolvedModpack, SearchQuery, VersionQuery,
+};
 
 /// A project reference recognised in a platform's own site URL, optionally
-/// pinned to one version.
+/// pinned to one version. `kind` is what the URL's own path says the project is.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UrlRef {
     pub project: String,
     pub version: Option<String>,
+    pub kind: Option<ContentKind>,
 }
 
 #[async_trait]
@@ -22,7 +25,8 @@ pub trait ContentProvider: Send + Sync {
     /// Recognise a project/version page URL on this platform's site.
     fn parse_url(&self, url: &str) -> Option<UrlRef>;
     async fn search(&self, query: &SearchQuery) -> Result<proto::content::SearchResult>;
-    async fn project(&self, project: &str) -> Result<ContentProject>;
+    /// A project's detail, stamped with the caller's `kind` when it publishes it.
+    async fn project(&self, project: &str, kind: Option<ContentKind>) -> Result<ContentProject>;
     async fn versions(&self, query: &VersionQuery) -> Result<Vec<ContentVersion>>;
     async fn resolve_modpack(&self, version_id: &str) -> Result<ResolvedModpack>;
 }

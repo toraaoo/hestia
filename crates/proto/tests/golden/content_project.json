@@ -1,0 +1,30 @@
+{
+  "source": "modrinth",
+  "id": "8oi3bsk5",
+  "slug": "terralith",
+  "kind": "data_pack",
+  "kinds": [
+    "data_pack",
+    "mod"
+  ],
+  "title": "Terralith",
+  "description": "Terrain generation overhaul",
+  "body": "",
+  "author": "Starmute",
+  "categories": [
+    "worldgen"
+  ],
+  "downloads": 4200000,
+  "follows": 12345,
+  "iconUrl": "https://cdn.modrinth.com/data/8oi3bsk5/icon.png",
+  "gallery": [
+    {
+      "url": "https://cdn.modrinth.com/data/8oi3bsk5/images/shot.png",
+      "featured": true,
+      "title": "",
+      "description": ""
+    }
+  ],
+  "clientSide": "optional",
+  "serverSide": "required"
+}

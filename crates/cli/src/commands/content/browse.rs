@@ -94,7 +94,7 @@ pub async fn run_browse(kind: ContentKind, cmd: BrowseCmd) -> Result<()> {
                 let _spinner = Spinner::start("fetching project");
                 client
                     .content()
-                    .project(&source.unwrap_or_default(), &project)
+                    .project(&source.unwrap_or_default(), &project, Some(kind))
                     .await?
             };
             show_project(&detail)

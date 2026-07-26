@@ -487,7 +487,11 @@ impl Engine {
         let mut queued = HashSet::new();
         let mut queue = Vec::new();
         for root in roots {
-            let project = match self.content.project(&root.source, &root.project).await {
+            let project = match self
+                .content
+                .project(&root.source, &root.project, Some(kind))
+                .await
+            {
                 Ok(project) => project,
                 Err(e) => {
                     failures.push(failure(&root.given, "", crate::error_info(e)));
@@ -577,14 +581,17 @@ impl Engine {
                     if !visited.insert(dep.project_id.clone()) {
                         continue;
                     }
-                    let dep_project =
-                        match self.content.project(&node.source, &dep.project_id).await {
-                            Ok(project) => project,
-                            Err(e) => {
-                                failures.push(failure(&dep.project_id, "", crate::error_info(e)));
-                                continue;
-                            }
-                        };
+                    let dep_project = match self
+                        .content
+                        .project(&node.source, &dep.project_id, Some(kind))
+                        .await
+                    {
+                        Ok(project) => project,
+                        Err(e) => {
+                            failures.push(failure(&dep.project_id, "", crate::error_info(e)));
+                            continue;
+                        }
+                    };
                     if side_gate(kind, &dep_project, ctx.side).is_err() {
                         tracing::warn!(
                             dependency = %dep_project.title,

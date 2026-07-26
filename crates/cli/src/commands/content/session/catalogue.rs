@@ -98,10 +98,14 @@ impl Catalogue {
 
     /// Ask for the highlighted project's long description once.
     pub(super) fn want_detail(&mut self) {
-        let Some((id, source, slug)) = self
-            .highlighted()
-            .map(|hit| (hit.id.clone(), hit.source.clone(), hit.slug.clone()))
-        else {
+        let Some((id, source, slug, kind)) = self.highlighted().map(|hit| {
+            (
+                hit.id.clone(),
+                hit.source.clone(),
+                hit.slug.clone(),
+                hit.kind,
+            )
+        }) else {
             return;
         };
         if self.details.contains_key(&id) || !self.detail_requested.insert(id) {
@@ -110,6 +114,7 @@ impl Catalogue {
         let _ = self.requests.send(Request::Detail {
             source,
             project: slug,
+            kind,
         });
     }
 

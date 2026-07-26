@@ -5,8 +5,8 @@
 //! event-callback slot.
 
 use client::proto::content::{
-    ContentAddSpec, ContentFailure, ContentProject, ContentVersion, InstalledContent, SearchQuery,
-    SearchResult, VersionQuery,
+    ContentAddSpec, ContentFailure, ContentKind, ContentProject, ContentVersion, InstalledContent,
+    SearchQuery, SearchResult, VersionQuery,
 };
 use client::proto::minecraft::ProvisionProgress;
 use client::Client;
@@ -16,9 +16,18 @@ use crate::commands::content::entry::ContentEntry;
 use crate::commands::content::EntryKind;
 
 pub(super) enum Request {
-    Search { seq: u64, query: SearchQuery },
-    Detail { source: String, project: String },
-    Versions { query: VersionQuery },
+    Search {
+        seq: u64,
+        query: SearchQuery,
+    },
+    Detail {
+        source: String,
+        project: String,
+        kind: ContentKind,
+    },
+    Versions {
+        query: VersionQuery,
+    },
     Install(InstallJob),
 }
 
@@ -81,8 +90,16 @@ pub(super) async fn drive(
                     message: e.to_string(),
                 },
             },
-            Request::Detail { source, project } => {
-                match client.content().project(&source, &project).await {
+            Request::Detail {
+                source,
+                project,
+                kind,
+            } => {
+                match client
+                    .content()
+                    .project(&source, &project, Some(kind))
+                    .await
+                {
                     Ok(detail) => AppEvent::Detail(Box::new(detail)),
                     Err(_) => continue,
                 }

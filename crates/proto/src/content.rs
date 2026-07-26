@@ -92,7 +92,11 @@ pub struct ContentProject {
     pub source: String,
     pub id: String,
     pub slug: String,
+    /// What to install this as — the requested kind whenever `kinds` has it,
+    /// since Modrinth types a datapack project as a mod.
     pub kind: ContentKind,
+    /// Every kind the project publishes, derived from its loaders.
+    pub kinds: Vec<ContentKind>,
     pub title: String,
     pub description: String,
     pub body: String,
@@ -244,12 +248,31 @@ pub struct SourcesResult {
     pub sources: Vec<ContentSource>,
 }
 
+/// `kind` is the browse context, stamped onto the answer when supported.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProjectParams {
     pub source: String,
     pub project: String,
+    pub kind: Option<ContentKind>,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct ResolveUrlParams {
+    pub url: String,
+}
+
+/// A source page URL resolved to what it names: the project, and the version it
+/// pins when the URL is a version page (empty for a project page).
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct ResolvedUrl {
+    pub project: ContentProject,
+    pub version_id: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -704,6 +727,13 @@ impl Contract for ContentVersions {
     const CHANNEL: &'static str = "content.versions";
     type Params = VersionQuery;
     type Result = ContentVersionsResult;
+}
+
+pub struct ContentResolveUrl;
+impl Contract for ContentResolveUrl {
+    const CHANNEL: &'static str = "content.resolve_url";
+    type Params = ResolveUrlParams;
+    type Result = ResolvedUrl;
 }
 
 pub struct ModpackResolve;

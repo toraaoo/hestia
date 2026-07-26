@@ -25,14 +25,29 @@ const SITE: &str = "modrinth.com";
 /// loader name is the key with any `-loader` suffix stripped.
 const LOADER_KEYS: [&str; 4] = ["fabric-loader", "quilt-loader", "neoforge", "forge"];
 
-/// The site's project-type path segments (`modrinth.com/<type>/<slug>`).
-const SITE_TYPES: [&str; 6] = [
-    "mod",
-    "modpack",
-    "resourcepack",
-    "shader",
-    "datapack",
-    "plugin",
+/// The site's project-type path segments (`modrinth.com/<type>/<slug>`) and the
+/// kind each names.
+const SITE_TYPES: [(&str, Option<ContentKind>); 6] = [
+    ("mod", Some(ContentKind::Mod)),
+    ("modpack", Some(ContentKind::Modpack)),
+    ("resourcepack", Some(ContentKind::ResourcePack)),
+    ("shader", Some(ContentKind::Shader)),
+    ("datapack", Some(ContentKind::DataPack)),
+    ("plugin", None),
+];
+
+/// Which kind each loader implies. Modrinth types a datapack project as `mod`,
+/// so the loaders are the only signal of what a project actually publishes.
+const LOADER_KINDS: [(&str, ContentKind); 9] = [
+    ("fabric", ContentKind::Mod),
+    ("forge", ContentKind::Mod),
+    ("neoforge", ContentKind::Mod),
+    ("quilt", ContentKind::Mod),
+    ("datapack", ContentKind::DataPack),
+    ("iris", ContentKind::Shader),
+    ("optifine", ContentKind::Shader),
+    ("vanilla", ContentKind::ResourcePack),
+    ("minecraft", ContentKind::ResourcePack),
 ];
 
 pub struct Modrinth;
@@ -60,16 +75,18 @@ impl ContentProvider for Modrinth {
             .next()?
             .split('/')
             .filter(|s| !s.is_empty());
-        let kind = segments.next()?;
-        if !SITE_TYPES.contains(&kind) {
-            return None;
-        }
+        let segment = segments.next()?;
+        let (_, kind) = SITE_TYPES.iter().find(|(name, _)| *name == segment)?;
         let project = segments.next()?.to_string();
         let version = match (segments.next(), segments.next()) {
             (Some("version"), Some(v)) => Some(v.to_string()),
             _ => None,
         };
-        Some(UrlRef { project, version })
+        Some(UrlRef {
+            project,
+            version,
+            kind: *kind,
+        })
     }
 
     async fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
@@ -88,10 +105,15 @@ impl ContentProvider for Modrinth {
             params.push(("query", query.query.clone()));
         }
         let root = get_json(&format!("{API}/search"), &params).await?;
+        // The facet fixed the result set; a datapack hit still types as `mod`.
         let hits = root
             .get("hits")
             .and_then(Value::as_array)
-            .map(|a| a.iter().map(|h| parse_hit(self.id(), h)).collect())
+            .map(|a| {
+                a.iter()
+                    .map(|h| parse_hit(self.id(), h, query.kind))
+                    .collect()
+            })
             .unwrap_or_default();
         Ok(SearchResult {
             hits,
@@ -104,9 +126,9 @@ impl ContentProvider for Modrinth {
         })
     }
 
-    async fn project(&self, project: &str) -> Result<ContentProject> {
+    async fn project(&self, project: &str, kind: Option<ContentKind>) -> Result<ContentProject> {
         let body = get_json(&format!("{API}/project/{project}"), &[]).await?;
-        Ok(parse_project(self.id(), &body))
+        Ok(parse_project(self.id(), &body, kind))
     }
 
     async fn versions(&self, query: &VersionQuery) -> Result<Vec<ContentVersion>> {
@@ -268,19 +290,23 @@ fn parse_index(index: &Value) -> Result<ResolvedModpack> {
     })
 }
 
-fn parse_hit(source: &str, hit: &Value) -> ContentProject {
+fn parse_hit(source: &str, hit: &Value, requested: ContentKind) -> ContentProject {
     ContentProject {
         source: source.to_string(),
         id: str_field(hit, "project_id"),
         slug: str_field(hit, "slug"),
-        kind: parse_kind(&str_field(hit, "project_type")),
+        kind: requested,
+        kinds: kinds_from_loaders(
+            &str_array(hit, "categories"),
+            parse_kind(&str_field(hit, "project_type")),
+        ),
         title: str_field(hit, "title"),
         description: str_field(hit, "description"),
         body: String::new(),
         author: str_field(hit, "author"),
-        categories: categories(hit),
         downloads: u64_field(hit, "downloads"),
         follows: u64_field(hit, "follows"),
+        categories: categories(hit),
         icon_url: str_field(hit, "icon_url"),
         gallery: hit
             .get("gallery")
@@ -300,12 +326,15 @@ fn parse_hit(source: &str, hit: &Value) -> ContentProject {
     }
 }
 
-fn parse_project(source: &str, body: &Value) -> ContentProject {
+fn parse_project(source: &str, body: &Value, requested: Option<ContentKind>) -> ContentProject {
+    let parsed = parse_kind(&str_field(body, "project_type"));
+    let kinds = kinds_from_loaders(&str_array(body, "loaders"), parsed);
     ContentProject {
         source: source.to_string(),
         id: str_field(body, "id"),
         slug: str_field(body, "slug"),
-        kind: parse_kind(&str_field(body, "project_type")),
+        kind: requested.filter(|k| kinds.contains(k)).unwrap_or(parsed),
+        kinds,
         title: str_field(body, "title"),
         description: str_field(body, "description"),
         body: str_field(body, "body"),
@@ -427,6 +456,25 @@ fn parse_kind(s: &str) -> ContentKind {
         "datapack" => ContentKind::DataPack,
         _ => ContentKind::Mod,
     }
+}
+
+/// Every kind a project's loaders imply, `fallback` when they imply none.
+fn kinds_from_loaders(loaders: &[String], fallback: ContentKind) -> Vec<ContentKind> {
+    let mut kinds: Vec<ContentKind> = Vec::new();
+    for loader in loaders {
+        if let Some((_, kind)) = LOADER_KINDS
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(loader))
+        {
+            if !kinds.contains(kind) {
+                kinds.push(*kind);
+            }
+        }
+    }
+    if kinds.is_empty() {
+        kinds.push(fallback);
+    }
+    kinds
 }
 
 fn sort_index(sort: SearchSort) -> &'static str {
@@ -708,6 +756,88 @@ mod tests {
             .is_none());
         assert!(m.parse_url("modrinth.com/mod/sodium").is_none());
         assert!(m.parse_url("https://modrinth.com/mod").is_none());
+    }
+
+    #[test]
+    fn site_url_carries_the_kind_its_path_names() {
+        let m = Modrinth;
+        assert_eq!(
+            m.parse_url("https://modrinth.com/datapack/terralith")
+                .unwrap()
+                .kind,
+            Some(ContentKind::DataPack)
+        );
+        assert_eq!(
+            m.parse_url("https://modrinth.com/shader/complementary")
+                .unwrap()
+                .kind,
+            Some(ContentKind::Shader)
+        );
+        assert_eq!(
+            m.parse_url("https://modrinth.com/plugin/luckperms")
+                .unwrap()
+                .kind,
+            None
+        );
+    }
+
+    #[test]
+    fn loaders_map_to_every_kind_a_project_publishes() {
+        let of = |loaders: &[&str]| {
+            kinds_from_loaders(
+                &loaders.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+                ContentKind::Mod,
+            )
+        };
+        assert_eq!(of(&["datapack"]), vec![ContentKind::DataPack]);
+        assert_eq!(
+            of(&["datapack", "fabric", "neoforge"]),
+            vec![ContentKind::DataPack, ContentKind::Mod]
+        );
+        assert_eq!(of(&["iris", "optifine"]), vec![ContentKind::Shader]);
+        assert_eq!(of(&["minecraft"]), vec![ContentKind::ResourcePack]);
+        assert_eq!(of(&["bukkit"]), vec![ContentKind::Mod], "falls back");
+    }
+
+    #[test]
+    fn a_datapack_hit_is_typed_by_the_query_not_modrinths_project_type() {
+        // Modrinth answers `project_type: "mod"` for every datapack project.
+        let hit = json!({
+            "project_id": "8oi3bsk5",
+            "slug": "terralith",
+            "project_type": "mod",
+            "title": "Terralith",
+            "categories": ["datapack", "fabric", "worldgen"],
+        });
+        let parsed = parse_hit("modrinth", &hit, ContentKind::DataPack);
+        assert_eq!(parsed.kind, ContentKind::DataPack);
+        assert!(parsed.kinds.contains(&ContentKind::Mod));
+
+        let as_mod = parse_hit("modrinth", &hit, ContentKind::Mod);
+        assert_eq!(as_mod.kind, ContentKind::Mod);
+    }
+
+    #[test]
+    fn project_detail_takes_the_requested_kind_only_when_published() {
+        let body = json!({
+            "id": "8oi3bsk5",
+            "slug": "terralith",
+            "project_type": "mod",
+            "title": "Terralith",
+            "loaders": ["datapack", "fabric"],
+        });
+        assert_eq!(
+            parse_project("modrinth", &body, Some(ContentKind::DataPack)).kind,
+            ContentKind::DataPack
+        );
+        assert_eq!(
+            parse_project("modrinth", &body, Some(ContentKind::Shader)).kind,
+            ContentKind::Mod
+        );
+        assert_eq!(
+            parse_project("modrinth", &body, None).kind,
+            ContentKind::Mod
+        );
     }
 
     #[test]

@@ -182,7 +182,7 @@ impl Engine {
         for reference in add {
             let project = self
                 .content()
-                .project(source, reference)
+                .project(source, reference, None)
                 .await
                 .with_context(|| format!("cannot resolve '{reference}'"))?;
             if !profiles::selectable(project.kind) {
@@ -248,7 +248,7 @@ impl Engine {
             }
             let project = match self
                 .content()
-                .project(&entry.source, &entry.project_id)
+                .project(&entry.source, &entry.project_id, None)
                 .await
             {
                 Ok(project) => project,
