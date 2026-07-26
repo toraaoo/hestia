@@ -21,6 +21,10 @@ pub enum IpcError {
     Malformed(String),
     #[error("daemon connection lost")]
     ConnectionLost,
+    #[error(
+        "incompatible protocol version: the daemon speaks version {got}, this build speaks {want}"
+    )]
+    IncompatibleVersion { got: i64, want: i64 },
     #[error("timed out waiting for daemon response on '{0}'")]
     Timeout(String),
     #[error("{message}")]

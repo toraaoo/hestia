@@ -25,6 +25,9 @@ struct Shared {
     pending: Mutex<HashMap<i64, oneshot::Sender<Response>>>,
     event_cb: Mutex<Option<EventCallback>>,
     closed: AtomicBool,
+    /// Set when the connection was torn down for a protocol-version mismatch, so
+    /// a woken waiter reports why rather than a bare `ConnectionLost`.
+    mismatch: Mutex<Option<(i64, i64)>>,
 }
 
 pub struct Session {
@@ -41,6 +44,7 @@ impl Session {
             pending: Mutex::new(HashMap::new()),
             event_cb: Mutex::new(None),
             closed: AtomicBool::new(false),
+            mismatch: Mutex::new(None),
         });
         let reader_shared = shared.clone();
         let handle = tokio::spawn(async move {
@@ -70,7 +74,7 @@ impl Session {
         timeout: Duration,
     ) -> Result<Response, IpcError> {
         if self.is_closed() {
-            return Err(IpcError::ConnectionLost);
+            return Err(self.shared.close_error());
         }
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = oneshot::channel();
@@ -94,7 +98,7 @@ impl Session {
                 tracing::debug!(channel, id, ok = res.ok, "call complete");
                 Ok(res)
             }
-            Ok(Err(_)) => Err(IpcError::ConnectionLost),
+            Ok(Err(_)) => Err(self.shared.close_error()),
             Err(_) => {
                 self.shared.pending.lock().unwrap().remove(&id);
                 Err(IpcError::Timeout(channel.to_string()))
@@ -229,7 +233,7 @@ impl Session {
                 });
             }
             if self.is_closed() {
-                return Err(IpcError::ConnectionLost);
+                return Err(self.shared.close_error());
             }
             let _ = tokio::time::timeout(Duration::from_millis(500), notify.notified()).await;
         }
@@ -256,9 +260,15 @@ impl Shared {
                 }
             }
             // A foreign-major daemon is refused, not silently consumed: tear the
-            // connection down so every waiter fails fast rather than timing out.
-            Err(DecodeError::IncompatibleVersion { .. }) => {
-                tracing::warn!("closing connection: incompatible daemon protocol version");
+            // connection down so every waiter fails fast rather than timing out,
+            // recording the mismatch so they report why.
+            Err(DecodeError::IncompatibleVersion { got, want }) => {
+                tracing::warn!(
+                    got,
+                    want,
+                    "closing connection: incompatible daemon protocol version"
+                );
+                *self.mismatch.lock().unwrap() = Some((got, want));
                 self.close();
             }
             // A junk frame is ignored, as before — one bad frame is not a reason
@@ -271,6 +281,15 @@ impl Shared {
         self.closed.store(true, Ordering::SeqCst);
         // Wake every waiter so they fail instead of blocking forever.
         self.pending.lock().unwrap().clear();
+    }
+
+    /// The error a waiter woken by a torn-down connection should report: a
+    /// version mismatch names itself, everything else is a bare disconnect.
+    fn close_error(&self) -> IpcError {
+        match *self.mismatch.lock().unwrap() {
+            Some((got, want)) => IpcError::IncompatibleVersion { got, want },
+            None => IpcError::ConnectionLost,
+        }
     }
 }
 

@@ -73,6 +73,7 @@ impl From<IpcError> for CallError {
             IpcError::Daemon { code, info, .. } => (code.clone(), info.clone()),
             IpcError::Timeout(_) => ("timeout".into(), Value::Null),
             IpcError::ConnectionLost => ("connection_lost".into(), Value::Null),
+            IpcError::IncompatibleVersion { .. } => ("version_mismatch".into(), Value::Null),
             _ => ("transport".into(), Value::Null),
         };
         CallError {
