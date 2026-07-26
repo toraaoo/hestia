@@ -7,4 +7,13 @@ import type { SideSupport } from "./SideSupport";
  * A project, as a search hit or a detail. `body` (the long description) is only
  * filled by the detail call; `icon_url`/`gallery` carry images for the desktop UI.
  */
-export type ContentProject = { source: string, id: string, slug: string, kind: ContentKind, title: string, description: string, body: string, author: string, categories: Array<string>, downloads: number, follows: number, iconUrl: string, gallery: Array<GalleryImage>, clientSide: SideSupport, serverSide: SideSupport, };
+export type ContentProject = { source: string, id: string, slug: string, 
+/**
+ * What to install this as — the requested kind whenever `kinds` has it,
+ * since Modrinth types a datapack project as a mod.
+ */
+kind: ContentKind, 
+/**
+ * Every kind the project publishes, derived from its loaders.
+ */
+kinds: Array<ContentKind>, title: string, description: string, body: string, author: string, categories: Array<string>, downloads: number, follows: number, iconUrl: string, gallery: Array<GalleryImage>, clientSide: SideSupport, serverSide: SideSupport, };
