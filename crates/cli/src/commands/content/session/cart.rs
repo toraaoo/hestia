@@ -12,9 +12,8 @@ pub(super) struct Chosen {
     pub version_label: String,
 }
 
-/// An installed project staged for removal. `worlds` narrows an instance
-/// datapack to some of the save worlds holding it (bare folder names); empty
-/// clears every copy.
+/// An installed project staged for removal. `worlds` narrows a datapack to the
+/// save worlds it stops loading in (bare folder names); empty uninstalls it.
 pub(super) struct StagedRemoval {
     pub project_id: String,
     pub worlds: Vec<String>,
@@ -66,10 +65,7 @@ impl Cart {
         });
     }
 
-    pub(super) fn unstage_removal(&mut self, project_id: &str) {
-        self.removals.retain(|r| r.project_id != project_id);
-    }
-
+    /// Keep the item, dropping only the named worlds from its selection.
     pub(super) fn narrow_removal(&mut self, project_id: &str, worlds: Vec<String>) {
         if let Some(staged) = self
             .removals
@@ -78,6 +74,10 @@ impl Cart {
         {
             staged.worlds = worlds;
         }
+    }
+
+    pub(super) fn unstage_removal(&mut self, project_id: &str) {
+        self.removals.retain(|r| r.project_id != project_id);
     }
 
     /// Pin a version, whatever state the row was in — a removal-staged row flips

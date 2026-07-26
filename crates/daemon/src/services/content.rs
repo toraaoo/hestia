@@ -2,15 +2,14 @@
 //! resolution) and the per-entry install surface for servers and instances.
 
 use proto::content::{
-    ContentInspect, ContentJobResult, ContentKind, ContentListResult, ContentProjectGet,
-    ContentResolveUrl, ContentSearch, ContentSources, ContentUpdatesResult, ContentVersions,
-    ContentVersionsResult, InstanceContentAdd, InstanceContentCheckUpdates, InstanceContentEnable,
-    InstanceContentList, InstanceContentRemove, InstanceContentSetVersion, InstanceContentUpdate,
-    ModpackResolve, ServerContentAdd, ServerContentCheckUpdates, ServerContentEnable,
-    ServerContentList, ServerContentRemove, ServerContentSetVersion, ServerContentUpdate,
-    SourcesResult,
+    ContentInspect, ContentJobResult, ContentListResult, ContentProjectGet, ContentResolveUrl,
+    ContentSearch, ContentSources, ContentUpdatesResult, ContentVersions, ContentVersionsResult,
+    InstanceContentAdd, InstanceContentCheckUpdates, InstanceContentEnable, InstanceContentList,
+    InstanceContentRemove, InstanceContentSetVersion, InstanceContentUpdate, ModpackResolve,
+    ServerContentAdd, ServerContentCheckUpdates, ServerContentEnable, ServerContentList,
+    ServerContentRemove, ServerContentSetVersion, ServerContentUpdate, SourcesResult,
 };
-use proto::error::{ErrorInfo, Field, Unsupported};
+use proto::error::{ErrorInfo, Field};
 use proto::Empty;
 
 use super::guards::{
@@ -18,16 +17,6 @@ use super::guards::{
     find_server, require_content_items,
 };
 use crate::runtime::{instance_process_id, server_process_id, Channels, ContentJob};
-
-/// A datapack toggle may narrow by world; any other kind rejects `worlds`.
-fn check_worlds(kind: ContentKind, worlds: &[String]) -> Result<(), ErrorInfo> {
-    if !worlds.is_empty() && kind != ContentKind::DataPack {
-        return Err(ErrorInfo::UnsupportedOperation {
-            reason: Unsupported::DatapacksPerWorld,
-        });
-    }
-    Ok(())
-}
 
 pub(super) fn register(on: &mut Channels<'_>) {
     register_sources(on);
@@ -151,11 +140,6 @@ fn register_server(on: &mut Channels<'_>) {
         if p.item.is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
-        if !p.worlds.is_empty() && p.kind != ContentKind::DataPack {
-            return Err(ErrorInfo::UnsupportedOperation {
-                reason: Unsupported::DatapacksPerWorld,
-            });
-        }
         let record = find_server(&ctx, &p.server)?;
         let process_id = server_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "server", &record.name)?;
@@ -199,7 +183,6 @@ fn register_server(on: &mut Channels<'_>) {
         if p.item.is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
-        check_worlds(p.kind, &p.worlds)?;
         let record = find_server(&ctx, &p.server)?;
         let process_id = server_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "server", &record.name)?;
@@ -292,11 +275,6 @@ fn register_instance(on: &mut Channels<'_>) {
         if p.item.is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
-        if !p.worlds.is_empty() && p.kind != ContentKind::DataPack {
-            return Err(ErrorInfo::UnsupportedOperation {
-                reason: Unsupported::DatapacksPerWorld,
-            });
-        }
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
@@ -337,7 +315,6 @@ fn register_instance(on: &mut Channels<'_>) {
         if p.item.is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
-        check_worlds(p.kind, &p.worlds)?;
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;

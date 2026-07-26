@@ -13,7 +13,7 @@ use client::Client;
 use client::proto::content::SearchQuery;
 
 use super::entry::ContentEntry;
-use super::format::{kind_plural, source_label, world_name};
+use super::format::{kind_plural, source_label, world_label};
 use super::{session, EntryKind, PAGE};
 use crate::ui::{self, ProvisionReporter, View};
 
@@ -39,7 +39,7 @@ pub enum ContentCmd {
         filename: Option<String>,
         #[arg(
             long,
-            help = "For a datapack on an instance: a save world to install into (repeatable; prompts to pick when omitted)"
+            help = "For a datapack on an instance: a save world to load it in (repeatable; every world when omitted)"
         )]
         world: Vec<String>,
     },
@@ -53,7 +53,7 @@ pub enum ContentCmd {
         item: Option<String>,
         #[arg(
             long,
-            help = "For a datapack: only remove from this save world (repeatable; every copy when omitted)"
+            help = "For a datapack: stop loading it in this save world only (repeatable)"
         )]
         world: Vec<String>,
     },
@@ -236,6 +236,15 @@ async fn add_session(
     }
 }
 
+/// Which worlds an installed datapack loads in, as a trailing clause; empty for
+/// every other kind.
+fn worlds_suffix(item: &InstalledContent) -> String {
+    match item.kind == ContentKind::DataPack {
+        true => format!(" ({})", world_label(item)),
+        false => String::new(),
+    }
+}
+
 /// Print what a batch installed, removed, and failed; errors (a non-zero
 /// exit) when nothing landed at all.
 pub(super) fn show_install_report(
@@ -245,22 +254,16 @@ pub(super) fn show_install_report(
     failures: &[ContentFailure],
 ) -> Result<()> {
     for content in installed {
-        let where_ = match world_name(&content.world) {
-            Some(world) => format!("'{name}' ({world})"),
-            None => format!("'{name}'"),
-        };
         ui::show(View::line(format!(
-            "installed {} ({}) into {where_}",
-            content.title, content.filename
+            "installed {} ({}) into '{name}'{}",
+            content.title,
+            content.filename,
+            worlds_suffix(content)
         )))?;
     }
     for content in removed {
-        let where_ = match world_name(&content.world) {
-            Some(world) => format!("'{name}' ({world})"),
-            None => format!("'{name}'"),
-        };
         ui::show(View::line(format!(
-            "removed {} ({}) from {where_}",
+            "removed {} ({}) from '{name}'",
             content.title, content.filename
         )))?;
     }
@@ -311,7 +314,7 @@ async fn list(client: &Client, entry: EntryKind, kind: ContentKind, reference: &
                     vec![
                         i.title.clone(),
                         i.version_number.clone(),
-                        world_name(&i.world).unwrap_or("-").to_string(),
+                        world_label(i),
                         source_label(i),
                     ]
                 })
@@ -362,10 +365,9 @@ async fn remove(
         }
     };
     handle.remove(kind, &item, &worlds).await?;
-    let where_ = if worlds.is_empty() {
-        format!("'{name}'")
-    } else {
-        format!("'{name}' ({})", worlds.join(", "))
+    let where_ = match worlds.is_empty() {
+        true => format!("'{name}'"),
+        false => format!("'{name}' ({})", worlds.join(", ")),
     };
     ui::show(View::line(format!("removed '{item}' from {where_}")))
 }
@@ -455,7 +457,11 @@ async fn set_enabled(
     };
     handle.enable(kind, &item, enabled, &worlds).await?;
     let verb = if enabled { "enabled" } else { "disabled" };
-    ui::show(View::line(format!("{verb} '{item}' in '{name}'")))
+    let where_ = match worlds.is_empty() {
+        true => format!("'{name}'"),
+        false => format!("'{name}' ({})", worlds.join(", ")),
+    };
+    ui::show(View::line(format!("{verb} '{item}' in {where_}")))
 }
 
 async fn set_version(

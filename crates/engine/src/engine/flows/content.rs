@@ -74,9 +74,10 @@ impl Engine {
         Ok(list_content(&ctx, kind))
     }
 
-    /// Uninstall one item (matched by project id, slug, filename, or title).
-    /// A non-empty `worlds` narrows a datapack removal to those save worlds;
-    /// empty clears every copy. Returns false when nothing matches.
+    /// Uninstall one item (matched by project id, slug, filename, or title) —
+    /// its managed copy and every mirror of it. A non-empty `worlds` instead
+    /// narrows a datapack to the worlds it keeps loading in. False when nothing
+    /// matches.
     pub fn remove_server_content(
         &self,
         reference: &str,
@@ -198,11 +199,9 @@ impl Engine {
             .update_content(&ctx, kind, item, pin, on_progress)
             .await?;
         for new_item in &updated {
-            let old = before.iter().find(|i| {
-                i.kind == new_item.kind
-                    && i.project_id == new_item.project_id
-                    && i.world == new_item.world
-            });
+            let old = before
+                .iter()
+                .find(|i| i.kind == new_item.kind && i.project_id == new_item.project_id);
             if let Some(old) = old {
                 profiles::remap(&ctx.entry_dir, &old.filename, &new_item.filename)?;
             }
@@ -210,9 +209,10 @@ impl Engine {
         Ok(updated)
     }
 
-    /// Enable or disable installed items matching `item` (a datapack narrows by
-    /// `worlds`). Returns the number of matched entries — zero means nothing
-    /// matched. The entry must be stopped (enforced at the service boundary).
+    /// Enable or disable installed items matching `item`; a non-empty `worlds`
+    /// scopes a datapack toggle to those save worlds. Returns the number of
+    /// matched entries — zero means nothing matched. The entry must be stopped
+    /// (enforced at the service boundary).
     pub fn enable_server_content(
         &self,
         reference: &str,
@@ -294,7 +294,6 @@ impl Engine {
             out.push(proto::content::ContentUpdate {
                 filename: item.filename,
                 project_id: item.project_id,
-                world: item.world,
                 current_version_id: item.version_id.clone(),
                 current_version_number: item.version_number.clone(),
                 latest_version_id: latest.id.clone(),
@@ -408,7 +407,7 @@ impl Engine {
         let mut items = Vec::new();
         for item in files {
             match add_file_content(ctx, spec.kind, item, &worlds) {
-                Ok(mut installed) => items.append(&mut installed),
+                Ok(installed) => items.push(installed),
                 Err(e) => failures.push(failure(&item.path, "", crate::error_info(e))),
             }
         }
@@ -418,18 +417,18 @@ impl Engine {
         items.append(&mut platform_items);
         failures.append(&mut platform_failures);
 
+        let entry_worlds = ctx.worlds();
         let mut index = install::load(&ctx.entry_dir);
         for item in &items {
             let replaced = index.iter().position(|i| {
                 i.kind == item.kind
-                    && (i.kind != ContentKind::DataPack || i.world == item.world)
                     && ((!item.project_id.is_empty() && i.project_id == item.project_id)
                         || i.filename == item.filename)
             });
             if let Some(pos) = replaced {
                 let old = index.remove(pos);
                 if old.filename != item.filename {
-                    install::remove_files(&ctx.entry_dir, &ctx.data_dir, &old);
+                    install::remove_files(&ctx.entry_dir, &ctx.data_dir, &old, &entry_worlds);
                 }
             }
             index.push(item.clone());
@@ -627,7 +626,7 @@ impl Engine {
                 .install_version_file(ctx, kind, &node.project, &version, worlds, &labeled)
                 .await
             {
-                Ok(mut installed) => items.append(&mut installed),
+                Ok(installed) => items.push(installed),
                 Err(e) => failures.push(failure(
                     &node.given,
                     &node.project.title,
@@ -639,10 +638,10 @@ impl Engine {
         (items, failures)
     }
 
-    /// Download a version's primary file into every target world (one entry
-    /// per world; non-datapack kinds pass the single empty world). `kind` is
-    /// the *requested* kind, not the project's: Modrinth types datapacks as
-    /// mod projects, so `project.kind` would route a datapack into `mods/`.
+    /// Download a version's primary file into the managed directory and mirror
+    /// it into the game's load dirs. `kind` is the *requested* kind, not the
+    /// project's: Modrinth types datapacks as mod projects, so `project.kind`
+    /// would route a datapack into `mods/`.
     async fn install_version_file(
         &self,
         ctx: &EntryContent,
@@ -651,47 +650,43 @@ impl Engine {
         version: &proto::content::ContentVersion,
         worlds: &[String],
         on_progress: OnProgress<'_>,
-    ) -> Result<Vec<InstalledContent>> {
+    ) -> Result<InstalledContent> {
         let file = install::primary_file(version)?;
         materialize::validate_filename(&file.artifact.filename)?;
-        let mut installed = Vec::new();
-        for world in worlds {
-            let (managed, data) = content_targets(ctx, kind, world, &file.artifact.filename)?;
-            materialize::ensure_artifact(
-                Some(&self.cache),
-                &file.artifact,
-                &managed,
-                ProvisionPhase::Content,
-                on_progress,
-            )
-            .await?;
-            if managed != data {
-                install::mirror(&managed, &data)?;
-            }
-            installed.push(InstalledContent {
-                kind,
-                source: version.source.clone(),
-                project_id: project.id.clone(),
-                slug: project.slug.clone(),
-                title: project.title.clone(),
-                version_id: version.id.clone(),
-                version_number: version.version_number.clone(),
-                filename: file.artifact.filename.clone(),
-                sha1: file
-                    .artifact
-                    .checksum
-                    .as_ref()
-                    .map(|c| c.hex.clone())
-                    .unwrap_or_default(),
-                url: file.artifact.url.clone(),
-                icon_url: project.icon_url.clone(),
-                installed_unix: registry::now_unix(),
-                world: world.to_string(),
-                origin: String::new(),
-                enabled: true,
-            });
-        }
-        Ok(installed)
+        let managed = content_target(ctx, kind, &file.artifact.filename)?;
+        materialize::ensure_artifact(
+            Some(&self.cache),
+            &file.artifact,
+            &managed,
+            ProvisionPhase::Content,
+            on_progress,
+        )
+        .await?;
+        let item = InstalledContent {
+            kind,
+            source: version.source.clone(),
+            project_id: project.id.clone(),
+            slug: project.slug.clone(),
+            title: project.title.clone(),
+            version_id: version.id.clone(),
+            version_number: version.version_number.clone(),
+            filename: file.artifact.filename.clone(),
+            sha1: file
+                .artifact
+                .checksum
+                .as_ref()
+                .map(|c| c.hex.clone())
+                .unwrap_or_default(),
+            url: file.artifact.url.clone(),
+            icon_url: project.icon_url.clone(),
+            installed_unix: registry::now_unix(),
+            worlds: worlds.to_vec(),
+            origin: String::new(),
+            enabled: true,
+            disabled_worlds: Vec::new(),
+        };
+        install::apply_files(&ctx.entry_dir, &ctx.data_dir, &item, &ctx.worlds())?;
+        Ok(item)
     }
 
     /// Move matched platform items to a newer version — the newest compatible
@@ -762,15 +757,12 @@ impl Engine {
                     item.kind,
                     &project,
                     &version,
-                    std::slice::from_ref(&item.world),
+                    &item.worlds,
                     on_progress,
                 )
-                .await?
-                .into_iter()
-                .next()
-                .context("install produced no item")?;
+                .await?;
             if new_item.filename != item.filename {
-                install::remove_files(&ctx.entry_dir, &ctx.data_dir, &item);
+                install::remove_files(&ctx.entry_dir, &ctx.data_dir, &item, &ctx.worlds());
             }
             tracing::info!(
                 title = %item.title,
@@ -784,11 +776,10 @@ impl Engine {
         if !updated.is_empty() {
             let mut index = install::load(&ctx.entry_dir);
             for new_item in &updated {
-                match index.iter_mut().find(|i| {
-                    i.kind == new_item.kind
-                        && i.project_id == new_item.project_id
-                        && (i.kind != ContentKind::DataPack || i.world == new_item.world)
-                }) {
+                match index
+                    .iter_mut()
+                    .find(|i| i.kind == new_item.kind && i.project_id == new_item.project_id)
+                {
                     Some(entry) => {
                         // An update moves the version, not the ownership or the
                         // enabled state: a profile-tagged, disabled item keeps
@@ -887,6 +878,17 @@ impl EntrySide {
     }
 }
 
+impl EntryContent {
+    /// The entry's worlds, data-relative: a server's single `level-name`, an
+    /// instance's save folders.
+    fn worlds(&self) -> Vec<String> {
+        match self.side {
+            EntrySide::Server => vec![crate::servers::level_name(&self.data_dir)],
+            EntrySide::Client => crate::instances::save_worlds(&self.data_dir),
+        }
+    }
+}
+
 /// Reject content the platform marks unsupported for the entry's side
 /// (`Unknown` passes — the platform did not say). Datapacks are exempt: they
 /// run on the server side of any world, including a client's integrated server,
@@ -911,73 +913,47 @@ fn side_gate(requested: ContentKind, project: &ContentProject, side: EntrySide) 
     Ok(())
 }
 
-/// Resolve the data-relative world directories a datapack batch installs into
-/// — a server's single `level-name` world, or an instance's chosen (and
-/// validated) saves. The single empty world for every non-datapack kind,
-/// which installs into a flat dir.
+/// The save worlds a datapack batch targets, data-relative: an instance's
+/// chosen (and validated) saves, empty meaning every world it has now or grows
+/// later. A server has one world, so its selection is always empty; so is every
+/// non-datapack kind, which mirrors into a flat dir.
 fn datapack_worlds(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<Vec<String>> {
-    if spec.kind != ContentKind::DataPack {
-        return Ok(vec![String::new()]);
+    if spec.kind != ContentKind::DataPack || ctx.side == EntrySide::Server {
+        return Ok(Vec::new());
     }
-    match ctx.side {
-        EntrySide::Server => Ok(vec![crate::servers::level_name(&ctx.data_dir)]),
-        EntrySide::Client => {
-            let mut worlds = Vec::new();
-            for world in &spec.worlds {
-                let requested = world.trim();
-                if requested.is_empty() {
-                    continue;
-                }
-                if !ctx.data_dir.join("saves").join(requested).is_dir() {
-                    bail!(proto::error::ErrorInfo::WorldNotFound {
-                        world: requested.to_string()
-                    });
-                }
-                let resolved = format!("saves/{requested}");
-                if !worlds.contains(&resolved) {
-                    worlds.push(resolved);
-                }
-            }
-            if worlds.is_empty() {
-                bail!(proto::error::ErrorInfo::FieldRequired {
-                    field: proto::error::Field::World
-                });
-            }
-            Ok(worlds)
+    let mut worlds = Vec::new();
+    for world in &spec.worlds {
+        let requested = world.trim();
+        if requested.is_empty() {
+            continue;
+        }
+        if !ctx.data_dir.join("saves").join(requested).is_dir() {
+            bail!(proto::error::ErrorInfo::WorldNotFound {
+                world: requested.to_string()
+            });
+        }
+        let resolved = format!("saves/{requested}");
+        if !worlds.contains(&resolved) {
+            worlds.push(resolved);
         }
     }
+    Ok(worlds)
 }
 
-/// The `(managed, data)` paths a kind's file occupies. Mods/resourcepacks/
-/// shaders keep a managed copy in the entry root that is mirrored into `data/`;
-/// a datapack has one file, inside its world under `data/` (managed == data),
-/// so the caller skips the mirror.
-fn content_targets(
-    ctx: &EntryContent,
-    kind: ContentKind,
-    world: &str,
-    filename: &str,
-) -> Result<(PathBuf, PathBuf)> {
-    if kind == ContentKind::DataPack {
-        let path = ctx.data_dir.join(world).join("datapacks").join(filename);
-        return Ok((path.clone(), path));
-    }
-    let dir = install::kind_dir(kind)?;
-    Ok((
-        ctx.entry_dir.join(dir).join(filename),
-        ctx.data_dir.join(dir).join(filename),
-    ))
+/// The managed path a kind's file occupies under the entry root — the source of
+/// truth every mirror is placed from.
+fn content_target(ctx: &EntryContent, kind: ContentKind, filename: &str) -> Result<PathBuf> {
+    Ok(ctx.entry_dir.join(install::kind_dir(kind)?).join(filename))
 }
 
-/// Import a local file: copy it into the managed directory (or, for a
-/// datapack, straight into each target world) and mirror it into the game
-/// directory. No provenance beyond the hash, so it can never update.
+/// Import a local file: copy it into the managed directory and mirror it into
+/// the game's load dirs. No provenance beyond the hash, so it can never update.
 fn add_file_content(
     ctx: &EntryContent,
     kind: ContentKind,
     item: &ContentAddItem,
     worlds: &[String],
-) -> Result<Vec<InstalledContent>> {
+) -> Result<InstalledContent> {
     let source = Path::new(&item.path);
     if !source.is_file() {
         bail!("no file at {}", source.display());
@@ -1002,30 +978,25 @@ fn add_file_content(
         ),
         _ => {}
     }
-    let mut installed = Vec::new();
-    for world in worlds {
-        let (managed, data) = content_targets(ctx, kind, world, &filename)?;
-        if let Some(parent) = managed.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("cannot create {}", parent.display()))?;
-        }
-        std::fs::copy(source, &managed)
-            .with_context(|| format!("cannot import {}", source.display()))?;
-        if managed != data {
-            install::mirror(&managed, &data)?;
-        }
-        installed.push(InstalledContent {
-            kind,
-            source: "file".to_string(),
-            title: filename.clone(),
-            sha1: install::sha1_file(&managed)?,
-            filename: filename.clone(),
-            installed_unix: registry::now_unix(),
-            world: world.to_string(),
-            enabled: true,
-            ..InstalledContent::default()
-        });
+    let managed = content_target(ctx, kind, &filename)?;
+    if let Some(parent) = managed.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
     }
+    std::fs::copy(source, &managed)
+        .with_context(|| format!("cannot import {}", source.display()))?;
+    let installed = InstalledContent {
+        kind,
+        source: "file".to_string(),
+        title: filename.clone(),
+        sha1: install::sha1_file(&managed)?,
+        filename,
+        installed_unix: registry::now_unix(),
+        worlds: worlds.to_vec(),
+        enabled: true,
+        ..InstalledContent::default()
+    };
+    install::apply_files(&ctx.entry_dir, &ctx.data_dir, &installed, &ctx.worlds())?;
     Ok(installed)
 }
 
@@ -1034,10 +1005,13 @@ fn list_content(ctx: &EntryContent, kind: ContentKind) -> (Vec<InstalledContent>
         .into_iter()
         .filter(|i| i.kind == kind)
         .collect();
-    let untracked = install::untracked(&ctx.data_dir, kind, &items);
+    let untracked = install::untracked(&ctx.data_dir, kind, &items, &ctx.worlds());
     (items, untracked)
 }
 
+/// Uninstall matching items: the managed copy and every mirror of it. A
+/// non-empty `worlds` (datapacks only) instead drops those worlds from the
+/// item's selection, uninstalling it only when none is left.
 fn remove_content(
     ctx: &EntryContent,
     kind: ContentKind,
@@ -1049,67 +1023,95 @@ fn remove_content(
             reason: proto::error::Unsupported::DatapacksPerWorld
         });
     }
-    let (removed, kept): (Vec<_>, Vec<_>) =
-        install::load(&ctx.entry_dir).into_iter().partition(|i| {
-            i.kind == kind
-                && install::matches(i, reference)
-                && (worlds.is_empty() || worlds.iter().any(|w| world_matches(&i.world, w)))
-        });
-    if removed.is_empty() {
-        return Ok(removed);
+    let entry_worlds = ctx.worlds();
+    let (matched, mut kept): (Vec<_>, Vec<_>) = install::load(&ctx.entry_dir)
+        .into_iter()
+        .partition(|i| i.kind == kind && install::matches(i, reference));
+    if matched.is_empty() {
+        return Ok(matched);
     }
-    for item in &removed {
-        install::remove_files(&ctx.entry_dir, &ctx.data_dir, item);
+    let mut removed = Vec::new();
+    for mut item in matched {
+        let remaining = keep_worlds(&item, worlds, &entry_worlds);
+        if !remaining.is_empty() {
+            item.worlds = remaining;
+            install::apply_files(&ctx.entry_dir, &ctx.data_dir, &item, &entry_worlds)?;
+            tracing::info!(
+                entry = %ctx.entry_dir.display(),
+                title = %item.title,
+                worlds = ?item.worlds,
+                "datapack narrowed to fewer worlds"
+            );
+            kept.push(item);
+            continue;
+        }
+        install::remove_files(&ctx.entry_dir, &ctx.data_dir, &item, &entry_worlds);
         tracing::info!(
             entry = %ctx.entry_dir.display(),
             kind = ?item.kind,
             title = %item.title,
             filename = %item.filename,
-            world = %item.world,
             "content removed"
         );
+        removed.push(item);
     }
     install::save(&ctx.entry_dir, kept)?;
     Ok(removed)
 }
 
-/// Flip the enabled flag on every index entry matching `reference` (a datapack
-/// narrows by `worlds`), applying the filesystem side immediately. Returns how
-/// many entries matched (regardless of whether the flag actually moved), so the
+/// The worlds an item still loads in once `drop` are taken from it; empty means
+/// nothing is left, so the item goes. An "every world" selection materialises to
+/// the entry's current worlds first.
+fn keep_worlds(item: &InstalledContent, drop: &[String], entry_worlds: &[String]) -> Vec<String> {
+    if drop.is_empty() {
+        return Vec::new();
+    }
+    let current = match item.worlds.is_empty() {
+        true => entry_worlds,
+        false => &item.worlds,
+    };
+    current
+        .iter()
+        .filter(|world| !drop.iter().any(|named| install::world_name(world) == named))
+        .cloned()
+        .collect()
+}
+
+/// Toggle every index entry matching `reference`, applying the filesystem side
+/// immediately. With no `worlds` the item itself flips; with worlds (datapacks
+/// only) just those are scoped in or out, leaving the rest as they are. Returns
+/// how many entries matched (regardless of whether anything moved), so the
 /// caller can distinguish "nothing matched" from "already in that state".
 fn set_enabled(
     ctx: &EntryContent,
     kind: ContentKind,
     reference: &str,
     enabled: bool,
-    worlds: &[String],
+    scope: &[String],
 ) -> Result<usize> {
-    if !worlds.is_empty() && kind != ContentKind::DataPack {
+    if !scope.is_empty() && kind != ContentKind::DataPack {
         bail!(proto::error::ErrorInfo::UnsupportedOperation {
             reason: proto::error::Unsupported::DatapacksPerWorld
         });
     }
+    let entry_worlds = ctx.worlds();
     let mut index = install::load(&ctx.entry_dir);
     let mut matched = 0usize;
     for item in index.iter_mut() {
-        let hit = item.kind == kind
-            && install::matches(item, reference)
-            && (worlds.is_empty() || worlds.iter().any(|w| world_matches(&item.world, w)));
-        if !hit {
+        if item.kind != kind || !install::matches(item, reference) {
             continue;
         }
         matched += 1;
-        if item.enabled != enabled {
-            item.enabled = enabled;
-            install::set_enabled_files(&ctx.entry_dir, &ctx.data_dir, item)?;
-            tracing::info!(
-                entry = %ctx.entry_dir.display(),
-                title = %item.title,
-                filename = %item.filename,
-                enabled,
-                "content enabled state changed"
-            );
-        }
+        scope_enabled(item, enabled, scope, &entry_worlds);
+        install::apply_files(&ctx.entry_dir, &ctx.data_dir, item, &entry_worlds)?;
+        tracing::info!(
+            entry = %ctx.entry_dir.display(),
+            title = %item.title,
+            filename = %item.filename,
+            enabled,
+            worlds = ?scope,
+            "content enabled state changed"
+        );
     }
     if matched > 0 {
         install::save(&ctx.entry_dir, index)?;
@@ -1117,10 +1119,42 @@ fn set_enabled(
     Ok(matched)
 }
 
-/// Whether an index entry's world path (`saves/<name>`, or a server's level
-/// dir) is the named world — callers name a world by its folder name.
-fn world_matches(world: &str, name: &str) -> bool {
-    world.rsplit('/').next().unwrap_or(world) == name
+/// Apply a toggle to one item: item-wide with no `scope`, else only to the
+/// named worlds. Enabling a world also turns the item itself back on, since a
+/// wholly disabled pack loads nowhere.
+fn scope_enabled(
+    item: &mut InstalledContent,
+    enabled: bool,
+    scope: &[String],
+    entry_worlds: &[String],
+) {
+    if scope.is_empty() {
+        item.enabled = enabled;
+        if enabled {
+            item.disabled_worlds.clear();
+        }
+        return;
+    }
+    let targets: Vec<String> = install::target_worlds(item, entry_worlds)
+        .iter()
+        .filter(|world| {
+            scope
+                .iter()
+                .any(|named| install::world_name(world) == named)
+        })
+        .cloned()
+        .collect();
+    if enabled {
+        item.enabled = true;
+        item.disabled_worlds
+            .retain(|world| !targets.contains(world));
+    } else {
+        for world in targets {
+            if !item.disabled_worlds.contains(&world) {
+                item.disabled_worlds.push(world);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1139,18 +1173,57 @@ mod tests {
 
     #[test]
     fn targets_route_by_requested_kind_not_project_kind() {
-        let (managed, data) =
-            content_targets(&ctx(), ContentKind::DataPack, "saves/world", "pack.zip").unwrap();
         assert_eq!(
-            managed,
-            Path::new("/entry/data/saves/world/datapacks/pack.zip")
+            content_target(&ctx(), ContentKind::DataPack, "pack.zip").unwrap(),
+            Path::new("/entry/datapacks/pack.zip")
         );
-        assert_eq!(managed, data);
+        assert_eq!(
+            content_target(&ctx(), ContentKind::Shader, "shader.zip").unwrap(),
+            Path::new("/entry/shaderpacks/shader.zip")
+        );
+    }
 
-        let (managed, data) =
-            content_targets(&ctx(), ContentKind::Shader, "", "shader.zip").unwrap();
-        assert_eq!(managed, Path::new("/entry/shaderpacks/shader.zip"));
-        assert_eq!(data, Path::new("/entry/data/shaderpacks/shader.zip"));
+    #[test]
+    fn scoping_a_world_off_leaves_the_rest_loaded() {
+        let entry_worlds = vec!["saves/one".to_string(), "saves/two".to_string()];
+        let mut item = InstalledContent {
+            kind: ContentKind::DataPack,
+            enabled: true,
+            ..InstalledContent::default()
+        };
+
+        scope_enabled(&mut item, false, &["two".to_string()], &entry_worlds);
+        assert_eq!(item.disabled_worlds, vec!["saves/two".to_string()]);
+        assert!(item.enabled, "the item itself stays on");
+
+        scope_enabled(&mut item, true, &["two".to_string()], &entry_worlds);
+        assert!(item.disabled_worlds.is_empty());
+    }
+
+    #[test]
+    fn removing_named_worlds_keeps_the_rest() {
+        let entry_worlds = vec!["saves/one".to_string(), "saves/two".to_string()];
+        let item = InstalledContent {
+            kind: ContentKind::DataPack,
+            ..InstalledContent::default()
+        };
+        assert_eq!(
+            keep_worlds(&item, &["two".to_string()], &entry_worlds),
+            vec!["saves/one".to_string()]
+        );
+        assert!(
+            keep_worlds(
+                &item,
+                &["one".to_string(), "two".to_string()],
+                &entry_worlds
+            )
+            .is_empty(),
+            "no world left means the item goes"
+        );
+        assert!(
+            keep_worlds(&item, &[], &entry_worlds).is_empty(),
+            "an unscoped removal takes the item"
+        );
     }
 
     #[test]

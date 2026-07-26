@@ -72,6 +72,23 @@ pub(super) fn world_name(world: &str) -> Option<&str> {
     (!name.is_empty()).then_some(name)
 }
 
+/// How an item's world targeting reads in a listing: the folder names it
+/// mirrors into, or `all` for a datapack that follows every world.
+pub(super) fn world_label(item: &InstalledContent) -> String {
+    if item.kind != ContentKind::DataPack {
+        return "-".to_string();
+    }
+    match item.worlds.is_empty() {
+        true => "all".to_string(),
+        false => item
+            .worlds
+            .iter()
+            .filter_map(|w| world_name(w))
+            .collect::<Vec<_>>()
+            .join(", "),
+    }
+}
+
 /// Build a searchable version picker over a project's versions, paired with the
 /// versions themselves so the selected index maps back to one.
 pub(super) fn version_picker(versions: &[ContentVersion]) -> (Picker, Vec<ContentVersion>) {

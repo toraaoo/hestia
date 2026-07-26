@@ -109,10 +109,12 @@ impl Engine {
             anyhow::bail!("server '{}' is still provisioning", record.name);
         }
         let record = self.servers.ensure_start_config(&record.id)?;
+        let data_dir = self.servers.data_dir(&record);
         install::sync(
             &self.servers.server_dir(&record),
-            &self.servers.data_dir(&record),
+            &data_dir,
             None,
+            &[crate::servers::level_name(&data_dir)],
         )?;
         let java = self.installed_java(record.profile.java_major)?;
         let jvm = record

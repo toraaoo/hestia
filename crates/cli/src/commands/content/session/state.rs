@@ -10,88 +10,44 @@ use client::proto::content::{
 use super::cart::StagedRemoval;
 use super::driver::{InstallJob, Removal, Request};
 use super::{ContentSession, Mode, Overlay, Target};
-use crate::commands::content::format::{version_picker, world_name};
+use crate::commands::content::format::{
+    version_picker, world_label, world_name as install_world_name,
+};
 use crate::commands::content::EntryKind;
 use crate::ui::components::SelectList;
 
 impl ContentSession {
-    /// The target's index entries for a project — several for a datapack
-    /// installed into more than one world, at most one otherwise. Local imports
+    /// The target's index entry for a project, if it is installed. Local imports
     /// carry no project id and cannot be matched to a hit.
-    pub(super) fn installed_entries(&self, project: &ContentProject) -> Vec<&InstalledContent> {
-        let Some(target) = self.target.as_ref() else {
-            return Vec::new();
-        };
-        target
-            .installed
-            .iter()
-            .filter(|i| {
-                !i.project_id.is_empty() && i.project_id == project.id && i.source == project.source
-            })
-            .collect()
+    pub(super) fn installed_entry(&self, project: &ContentProject) -> Option<&InstalledContent> {
+        self.target.as_ref()?.installed.iter().find(|i| {
+            !i.project_id.is_empty() && i.project_id == project.id && i.source == project.source
+        })
     }
 
-    /// The index entries a staged removal clears — every copy, narrowed to the
-    /// staged worlds when the removal was scoped.
-    pub(super) fn staged_records(&self, staged: &StagedRemoval) -> Vec<&InstalledContent> {
-        let Some(target) = self.target.as_ref() else {
-            return Vec::new();
-        };
-        target
+    /// The index entry a staged removal clears.
+    pub(super) fn staged_record(&self, staged: &StagedRemoval) -> Option<&InstalledContent> {
+        self.target
+            .as_ref()?
             .installed
             .iter()
-            .filter(|i| {
-                i.project_id == staged.project_id
-                    && (staged.worlds.is_empty()
-                        || staged
-                            .worlds
-                            .iter()
-                            .any(|w| world_name(&i.world) == Some(w.as_str())))
-            })
-            .collect()
+            .find(|i| i.project_id == staged.project_id)
     }
 
-    /// The browse-time "already installed" marker: the installed version — or,
-    /// for an instance's datapacks (installed per world), the worlds the pack is
-    /// in, which is what "installed" precisely means for that kind.
+    /// The browse-time "already installed" marker: the installed version, or —
+    /// for an instance's datapacks — the worlds it loads in.
     pub(super) fn installed_label(&self, project: &ContentProject) -> Option<String> {
-        let entries = self.installed_entries(project);
-        let first = entries.first()?;
+        let entry = self.installed_entry(project)?;
         if self.instance_datapacks() {
-            let worlds: Vec<&str> = entries
-                .iter()
-                .filter_map(|i| world_name(&i.world))
-                .collect();
-            return Some(format!("in {}", worlds.join(", ")));
+            return Some(format!("in {}", world_label(entry)));
         }
-        Some(first.version_number.clone())
+        Some(entry.version_number.clone())
     }
 
-    /// The review-time marker: what this install overwrites. For an instance's
-    /// datapacks that is the overlap between the picked target worlds and the
-    /// worlds already holding the pack — empty overlap means the install only
-    /// adds fresh copies, so there is nothing to flag.
+    /// The review-time marker: what this install overwrites.
     pub(super) fn review_marker(&self, project: &ContentProject) -> Option<String> {
-        let entries = self.installed_entries(project);
-        let first = entries.first()?;
-        if self.instance_datapacks() {
-            let overlap: Vec<&str> = self
-                .cart
-                .worlds
-                .iter()
-                .filter_map(|picked| {
-                    entries
-                        .iter()
-                        .find(|i| world_name(&i.world) == Some(picked.as_str()))
-                        .and_then(|i| world_name(&i.world))
-                })
-                .collect();
-            if overlap.is_empty() {
-                return None;
-            }
-            return Some(format!("replaces the copy in {}", overlap.join(", ")));
-        }
-        Some(format!("replaces {}", first.version_number))
+        let entry = self.installed_entry(project)?;
+        Some(format!("replaces {}", entry.version_number))
     }
 
     pub(super) fn instance_datapacks(&self) -> bool {
@@ -105,19 +61,13 @@ impl ContentSession {
             )
     }
 
-    pub(super) fn needs_worlds(&self) -> bool {
-        self.instance_datapacks() && !self.cart.chosen.is_empty() && self.cart.worlds.is_empty()
-    }
-
     /// Space on a row. A plain row toggles in and out of the batch; an installed
-    /// row cycles keep → reinstall → remove → keep. Staging the removal of a
-    /// datapack held by several worlds opens the world list, pre-checked, to
-    /// narrow which copies go.
+    /// row cycles keep → reinstall → remove → keep.
     pub(super) fn toggle_chosen(&mut self) {
         let Some(hit) = self.catalogue.highlighted().cloned() else {
             return;
         };
-        let installed = !self.installed_entries(&hit).is_empty();
+        let installed = self.installed_entry(&hit).is_some();
         let chosen_pos = self.cart.chosen_pos(&hit.id);
         if installed {
             if let Some(pos) = chosen_pos {
@@ -135,22 +85,40 @@ impl ContentSession {
         }
     }
 
+    /// Stage a removal; a datapack loading in several worlds first asks which
+    /// of them it should stop loading in.
     fn stage_removal(&mut self, hit: &ContentProject) {
-        let worlds: Vec<String> = self
-            .installed_entries(hit)
-            .iter()
-            .filter_map(|i| world_name(&i.world))
-            .map(str::to_string)
-            .collect();
         self.cart.stage_removal(hit.id.clone());
-        if self.instance_datapacks() && worlds.len() > 1 {
-            let count = worlds.len();
+        let Some(worlds) = self
+            .installed_entry(hit)
+            .filter(|_| self.instance_datapacks())
+            .map(|entry| self.entry_worlds(entry))
+        else {
+            return;
+        };
+        if worlds.len() > 1 {
             self.overlay = Some(Overlay::RemoveWorlds {
                 project: hit.id.clone(),
-                list: SelectList::new(worlds.clone()).with_checked(0..count),
+                list: SelectList::new(worlds.clone()).with_checkboxes(),
                 names: worlds,
             });
         }
+    }
+
+    /// The save worlds an installed datapack loads in, by folder name.
+    fn entry_worlds(&self, entry: &InstalledContent) -> Vec<String> {
+        if !entry.worlds.is_empty() {
+            return entry
+                .worlds
+                .iter()
+                .filter_map(|w| install_world_name(w))
+                .map(str::to_string)
+                .collect();
+        }
+        self.target
+            .as_ref()
+            .map(|t| t.worlds.clone())
+            .unwrap_or_default()
     }
 
     pub(super) fn open_versions(&mut self, project: ContentProject) {
@@ -188,7 +156,7 @@ impl ContentSession {
             .map(|staged| Removal {
                 key: staged.project_id.clone(),
                 worlds: staged.worlds.clone(),
-                records: self.staged_records(staged).into_iter().cloned().collect(),
+                record: self.staged_record(staged).cloned(),
             })
             .collect();
         let spec = ContentAddSpec {

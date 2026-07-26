@@ -40,7 +40,7 @@ impl ContentSession {
                         let plain = self
                             .catalogue
                             .highlighted()
-                            .map(|hit| self.installed_entries(hit).is_empty())
+                            .map(|hit| self.installed_entry(hit).is_none())
                             .unwrap_or(false);
                         if !self.cart.has_changes() && plain {
                             self.toggle_chosen();
@@ -111,13 +111,7 @@ impl ContentSession {
                     };
                 }
             }
-            KeyCode::Enter => {
-                if self.needs_worlds() {
-                    self.open_worlds();
-                } else {
-                    self.install();
-                }
-            }
+            KeyCode::Enter => self.install(),
             _ => {}
         }
         Flow::Continue
@@ -162,16 +156,6 @@ impl ContentSession {
                     self.overlay = Some(Overlay::Versions { project, picker });
                 }
             },
-            Overlay::Worlds(mut list, names) => match key.code {
-                KeyCode::Esc => {}
-                KeyCode::Enter => {
-                    self.cart.worlds = list.chosen().iter().map(|&i| names[i].clone()).collect();
-                }
-                _ => {
-                    list.on_key(&key);
-                    self.overlay = Some(Overlay::Worlds(list, names));
-                }
-            },
             Overlay::RemoveWorlds {
                 project,
                 mut list,
@@ -180,10 +164,8 @@ impl ContentSession {
                 KeyCode::Esc => {}
                 KeyCode::Enter => {
                     let picked: Vec<String> =
-                        list.checked().iter().map(|&i| names[i].clone()).collect();
-                    if picked.is_empty() {
-                        self.cart.unstage_removal(&project);
-                    } else if picked.len() < names.len() {
+                        list.chosen().iter().map(|&i| names[i].clone()).collect();
+                    if picked.len() < names.len() {
                         self.cart.narrow_removal(&project, picked);
                     }
                 }
@@ -194,6 +176,16 @@ impl ContentSession {
                         list,
                         names,
                     });
+                }
+            },
+            Overlay::Worlds(mut list, names) => match key.code {
+                KeyCode::Esc => {}
+                KeyCode::Enter => {
+                    self.cart.worlds = list.chosen().iter().map(|&i| names[i].clone()).collect();
+                }
+                _ => {
+                    list.on_key(&key);
+                    self.overlay = Some(Overlay::Worlds(list, names));
                 }
             },
         }

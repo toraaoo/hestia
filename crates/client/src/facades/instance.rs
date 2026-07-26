@@ -422,8 +422,8 @@ impl Instance<'_> {
         Ok((result.items, result.untracked))
     }
 
-    /// Uninstall one item. A non-empty `worlds` narrows a datapack removal
-    /// to those save worlds; empty clears every copy.
+    /// Uninstall one item and every mirror of it. A non-empty `worlds` instead
+    /// narrows a datapack to the save worlds it keeps loading in.
     pub async fn content_remove(
         &self,
         instance: &str,
@@ -468,7 +468,7 @@ impl Instance<'_> {
         .map(|(items, _)| items)
     }
 
-    /// Enable or disable one installed item. A non-empty `worlds` narrows a
+    /// Enable or disable one installed item; a non-empty `worlds` scopes a
     /// datapack toggle to those save worlds.
     pub async fn content_enable(
         &self,

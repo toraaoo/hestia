@@ -70,9 +70,8 @@ enum Overlay {
         picker: Option<(Picker, Vec<ContentVersion>)>,
     },
     Worlds(SelectList, Vec<String>),
-    /// Narrow a staged datapack removal to some of the worlds holding it —
-    /// opened pre-checked with all of them; unchecking every world cancels the
-    /// removal.
+    /// Drop a staged datapack removal to some of the worlds it loads in — opened
+    /// with all of them checked; unchecking every world uninstalls it outright.
     RemoveWorlds {
         project: String,
         list: SelectList,

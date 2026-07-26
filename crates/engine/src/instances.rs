@@ -7,7 +7,7 @@
 //! instances (client jars, libraries, assets) live in the engine-wide stores
 //! and are materialised at launch.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use anyhow::{bail, Context, Result};
@@ -228,4 +228,18 @@ impl Instances {
         tracing::info!(id = %record.id, "instance removed");
         Ok(true)
     }
+}
+
+/// The instance's save worlds as data-relative `saves/<name>` paths — where a
+/// datapack is mirrored to.
+pub(crate) fn save_worlds(data_dir: &Path) -> Vec<String> {
+    let mut worlds: Vec<String> = std::fs::read_dir(data_dir.join("saves"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| format!("saves/{}", entry.file_name().to_string_lossy()))
+        .collect();
+    worlds.sort();
+    worlds
 }

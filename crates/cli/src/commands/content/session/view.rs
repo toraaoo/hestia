@@ -10,7 +10,7 @@ use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragra
 use ratatui::Frame;
 
 use super::{ContentSession, Focus, Overlay};
-use crate::commands::content::format::{compact, kind_plural, side_label, world_name};
+use crate::commands::content::format::{compact, kind_plural, side_label};
 use crate::ui::components::modal;
 use crate::ui::markdown;
 
@@ -102,7 +102,7 @@ impl ContentSession {
             .map(|hit| {
                 let mut spans = Vec::new();
                 if with_boxes {
-                    let installed = !self.installed_entries(hit).is_empty();
+                    let installed = self.installed_entry(hit).is_some();
                     let mark = if installed && self.cart.is_removing(&hit.id) {
                         Span::styled("[-] ", Style::default().fg(Color::Red))
                     } else if installed && !self.cart.is_chosen(&hit.id) {
@@ -230,23 +230,13 @@ impl ContentSession {
             })
             .collect();
         for staged in &self.cart.removals {
-            let records = self.staged_records(staged);
-            let title = records
-                .first()
+            let record = self.staged_record(staged);
+            let title = record
                 .map(|r| r.title.clone())
                 .unwrap_or_else(|| staged.project_id.clone());
-            let what = if self.instance_datapacks() {
-                let worlds: Vec<&str> = records
-                    .iter()
-                    .filter_map(|r| world_name(&r.world))
-                    .collect();
-                format!("remove (in {})", worlds.join(", "))
-            } else {
-                let version = records
-                    .first()
-                    .map(|r| r.version_number.clone())
-                    .unwrap_or_default();
-                format!("remove {version}")
+            let what = match record {
+                Some(record) => format!("remove {}", record.version_number),
+                None => "remove".to_string(),
             };
             rows.push(ListItem::new(Line::from(vec![
                 Span::styled("- ", Style::default().fg(Color::Red)),
@@ -255,11 +245,10 @@ impl ContentSession {
             ])));
         }
         if self.base.kind == ContentKind::DataPack && !self.cart.chosen.is_empty() {
-            let worlds = if self.cart.worlds.is_empty() {
-                match self.needs_worlds() {
-                    true => "worlds: (none picked — w to pick)".to_string(),
-                    false => "world: the server's own".to_string(),
-                }
+            let worlds = if !self.instance_datapacks() {
+                "world: the server's own".to_string()
+            } else if self.cart.worlds.is_empty() {
+                "worlds: all (w to pick)".to_string()
             } else {
                 format!("worlds: {}", self.cart.worlds.join(", "))
             };
@@ -318,13 +307,13 @@ impl ContentSession {
                 );
             }
             Some(Overlay::RemoveWorlds { list, .. }) => {
-                let inner = modal::bordered(frame, area, "remove from world(s)");
+                let inner = modal::bordered(frame, area, "keep loading in world(s)");
                 let [list_area, hint] =
                     Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(inner);
                 list.render(frame, list_area);
                 frame.render_widget(
                     Paragraph::new(Line::from(
-                        "space toggle · enter confirm · none = keep · esc every copy",
+                        "space toggle · enter confirm · none = uninstall · esc uninstall",
                     ))
                     .style(dim()),
                     hint,

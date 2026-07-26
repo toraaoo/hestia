@@ -307,28 +307,23 @@ pub struct InstalledContent {
     pub filename: String,
     pub sha1: String,
     pub url: String,
-    /// The project's icon, carried for the desktop UI so an installed item
-    /// renders its artwork; empty for local-file imports (no project) and for
-    /// records written before this field.
+    /// The project's icon, carried for the desktop UI; empty for a local-file
+    /// import, which has no project.
     pub icon_url: String,
     pub installed_unix: i64,
-    /// For datapacks: the world directory (relative to the entry's `data/`)
-    /// the file lives in — datapacks load from inside a world, not a flat dir.
-    /// Empty for every other kind.
-    pub world: String,
+    /// For datapacks: the save worlds (relative to the entry's `data/`) the
+    /// managed file is mirrored into, empty meaning every world the entry has.
+    /// Always empty for the other kinds, which mirror into one flat dir.
+    pub worlds: Vec<String>,
     /// Who put the item in the pool: empty = user-installed; a global profile
     /// apply tags its installs `profile:<name>`.
     pub origin: String,
-    /// Whether the launch-time mirror installs this item into `data/`. A
-    /// disabled item keeps its managed copy and provenance but is not loaded by
-    /// the game (for a datapack, its in-world file is renamed `.disabled`).
-    /// Defaults to `true` so records written before this field decode enabled.
-    #[serde(default = "default_true")]
+    /// Whether the launch-time mirror places this item in the game's load dirs.
+    /// A disabled item keeps its managed copy and provenance, and is not loaded.
     pub enabled: bool,
-}
-
-fn default_true() -> bool {
-    true
+    /// For datapacks: worlds it targets but is not loaded in — the per-world
+    /// twin of `enabled`. Empty for the other kinds.
+    pub disabled_worlds: Vec<String>,
 }
 
 /// The installed items of one kind, plus filenames found in the entry's game
@@ -365,9 +360,9 @@ pub struct ContentAddSpec {
     pub kind: ContentKind,
     pub source: String,
     pub items: Vec<ContentAddItem>,
-    /// For datapacks on an instance: the save worlds each item installs into
-    /// (the game loads datapacks from inside a world). Ignored for other
-    /// kinds; a server uses its single `level-name` world.
+    /// For datapacks on an instance: the save worlds to mirror into, empty
+    /// meaning every world. Ignored for other kinds; a server always uses its
+    /// single `level-name` world.
     pub worlds: Vec<String>,
 }
 
@@ -420,8 +415,9 @@ pub struct InstanceContentListParams {
     pub kind: ContentKind,
 }
 
-/// `worlds` narrows a datapack removal to those save worlds (empty removes
-/// every copy); it is rejected for the other kinds, which have no worlds.
+/// `worlds` narrows a datapack removal to those save worlds — the pack stops
+/// loading in them and its copies there go; it is uninstalled outright when no
+/// world is left targeting it. Rejected for the kinds that have no worlds.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
@@ -471,9 +467,9 @@ pub struct ContentJobResult {
 }
 
 /// Enable or disable one installed item (matched by project id, slug, filename,
-/// or title). Disabling drops it from the game's load dir while keeping the
-/// managed copy and provenance; enabling restores the mirror. `worlds` narrows
-/// a datapack toggle to those save worlds (empty toggles every copy).
+/// or title). Disabling drops it from the game's load dirs while keeping the
+/// managed copy and provenance; enabling restores the mirror. `worlds` scopes a
+/// datapack toggle to those save worlds, leaving the others as they are.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
@@ -523,9 +519,6 @@ pub struct InstanceContentCheckUpdatesParams {
 pub struct ContentUpdate {
     pub filename: String,
     pub project_id: String,
-    /// For a datapack: the world the copy lives in (disambiguates one project
-    /// installed into several worlds). Empty for the other kinds.
-    pub world: String,
     pub current_version_id: String,
     pub current_version_number: String,
     pub latest_version_id: String,

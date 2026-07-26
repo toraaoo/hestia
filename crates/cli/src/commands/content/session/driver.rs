@@ -46,7 +46,7 @@ pub(super) struct InstallJob {
 pub(super) struct Removal {
     pub key: String,
     pub worlds: Vec<String>,
-    pub records: Vec<InstalledContent>,
+    pub record: Option<InstalledContent>,
 }
 
 pub(super) enum AppEvent {
@@ -139,14 +139,10 @@ async fn run_install(
     let mut failures = Vec::new();
     for removal in removals {
         match handle.remove(kind, &removal.key, &removal.worlds).await {
-            Ok(()) => removed.extend(removal.records),
+            Ok(()) => removed.extend(removal.record),
             Err(e) => failures.push(ContentFailure {
                 item: removal.key,
-                title: removal
-                    .records
-                    .first()
-                    .map(|r| r.title.clone())
-                    .unwrap_or_default(),
+                title: removal.record.map(|r| r.title).unwrap_or_default(),
                 error: client::error_info(&e),
             }),
         }

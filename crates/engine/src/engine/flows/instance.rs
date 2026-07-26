@@ -212,7 +212,8 @@ impl Engine {
             self.sync.apply(&game_dir, store.as_deref())?;
             let selection: Option<std::collections::HashSet<String>> =
                 launch_profile.map(|p| p.members.into_iter().collect());
-            install::sync(&entry_dir, &game_dir, selection.as_ref())?;
+            let worlds = crate::instances::save_worlds(&game_dir);
+            install::sync(&entry_dir, &game_dir, selection.as_ref(), &worlds)?;
         }
         let natives_dir = meta.join("natives").join(&record.profile.game_version);
         std::fs::create_dir_all(&natives_dir)
