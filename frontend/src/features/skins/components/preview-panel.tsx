@@ -15,14 +15,12 @@ import { m } from '@/paraglide/messages.js';
 export function PreviewPanel({
   skin,
   cape,
-  nametag,
   previewing,
   onApply,
   onVariantChange,
 }: {
   skin: Skin;
   cape?: Cape;
-  nametag?: string;
   previewing: boolean;
   onApply: () => void;
   onVariantChange?: (variant: SkinVariant) => void;
@@ -42,7 +40,6 @@ export function PreviewPanel({
           texture={skin.texture}
           capeTexture={cape?.texture}
           variant={skin.variant}
-          nametag={nametag}
           width={254}
           height={330}
         />

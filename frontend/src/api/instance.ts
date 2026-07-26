@@ -66,7 +66,7 @@ export async function loaders(
 
 export async function list(): Promise<InstanceInfo[]> {
   const result = await call<{ instances: InstanceInfo[] }>('instance.list');
-  return result.instances;
+  return result?.instances ?? [];
 }
 
 /** The instance's static, informational view (locations + disk footprint). */

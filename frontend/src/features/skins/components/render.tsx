@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { IdleAnimation, SkinViewer } from 'skinview3d';
 
 import type { SkinVariant } from '@/api';
 import {
@@ -8,64 +7,21 @@ import {
   drawCapeFront,
   loadTexture,
 } from '@/features/skins/lib/texture';
+import { SkinPreview } from '@/features/skins/lib/webgl/preview';
+import { thumbnail } from '@/features/skins/lib/webgl/thumbnails';
 import { cn } from '@/lib/utils';
-
-const POSE_WIDTH = 160;
-const POSE_HEIGHT = 256;
-
-let poseViewer: SkinViewer | null = null;
-let poseQueue: Promise<unknown> = Promise.resolve();
-const poseSnapshots = new Map<string, Promise<string>>();
-
-function posedViewer(): SkinViewer {
-  if (!poseViewer) {
-    poseViewer = new SkinViewer({
-      canvas: document.createElement('canvas'),
-      width: POSE_WIDTH,
-      height: POSE_HEIGHT,
-      zoom: 0.9,
-      renderPaused: true,
-    });
-    poseViewer.playerObject.rotation.y = Math.PI / 8;
-    const parts = poseViewer.playerObject.skin;
-    parts.rightArm.rotation.x = 0.12;
-    parts.leftArm.rotation.x = -0.12;
-    parts.rightLeg.rotation.x = -0.08;
-    parts.leftLeg.rotation.x = 0.08;
-  }
-  return poseViewer;
-}
-
-// One shared paused viewer: a card grid must never hold WebGL contexts apiece.
-function poseSnapshot(texture: string, variant: SkinVariant): Promise<string> {
-  const key = `${variant}|${texture}`;
-  let pending = poseSnapshots.get(key);
-  if (!pending) {
-    const run = poseQueue.then(async () => {
-      const viewer = posedViewer();
-      await viewer.loadSkin(texture, {
-        model: variant === 'slim' ? 'slim' : 'default',
-      });
-      viewer.render();
-      // Same-task readback: the unpreserved buffer is gone after compositing.
-      return viewer.canvas.toDataURL();
-    });
-    poseQueue = run.catch(() => undefined);
-    poseSnapshots.set(key, run);
-    run.catch(() => poseSnapshots.delete(key));
-    pending = run;
-  }
-  return pending;
-}
+import { m } from '@/paraglide/messages.js';
 
 /** A static posed render of a full skin — the card-grid view. */
 export function SkinPose({
   texture,
   variant,
+  capeTexture,
   className,
 }: {
   texture: string;
   variant: SkinVariant;
+  capeTexture?: string;
   className?: string;
 }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -73,7 +29,7 @@ export function SkinPose({
   useEffect(() => {
     let live = true;
     setSrc(null);
-    poseSnapshot(texture, variant)
+    thumbnail(variant, texture, capeTexture)
       .then((url) => {
         if (live) setSrc(url);
       })
@@ -81,10 +37,16 @@ export function SkinPose({
     return () => {
       live = false;
     };
-  }, [texture, variant]);
+  }, [texture, variant, capeTexture]);
 
   if (!src) return <div aria-hidden className={className} />;
-  return <img src={src} alt="" className={cn('object-contain', className)} />;
+  return (
+    <img
+      src={src}
+      alt=""
+      className={cn('object-cover object-top', className)}
+    />
+  );
 }
 
 /** Flat front face of a cape texture, for the cape picker. */
@@ -121,8 +83,8 @@ export function CapeFront({
 }
 
 /**
- * The animated 3D player model (skinview3d). One instance per surface — the
- * main preview panel and the edit modal — never per card.
+ * The animated 3D player model. One instance per surface — the main preview
+ * panel and the edit modal — never per card; each holds a WebGL context.
  */
 export function SkinModel({
   texture,
@@ -130,7 +92,6 @@ export function SkinModel({
   variant,
   width,
   height,
-  nametag,
   className,
 }: {
   texture: string;
@@ -138,53 +99,60 @@ export function SkinModel({
   variant: SkinVariant;
   width: number;
   height: number;
-  nametag?: string;
   className?: string;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const viewerRef = useRef<SkinViewer | null>(null);
+  const previewRef = useRef<SkinPreview | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mounts once, reloaded in place below — a rebuild would drop the WebGL context
   useEffect(() => {
-    if (!canvasRef.current) return;
-    const viewer = new SkinViewer({
+    if (!containerRef.current || !canvasRef.current) return;
+    const preview = new SkinPreview({
       canvas: canvasRef.current,
-      zoom: 0.85,
+      container: containerRef.current,
+      variant,
+      texture,
+      cape: capeTexture,
     });
-    viewer.controls.enableZoom = false;
-    viewer.controls.enablePan = false;
-    viewer.animation = new IdleAnimation();
-    viewer.playerObject.rotation.y = Math.PI / 9;
-    viewerRef.current = viewer;
+    previewRef.current = preview;
     return () => {
-      viewerRef.current = null;
-      viewer.dispose();
+      previewRef.current = null;
+      preview.dispose();
     };
-    // The viewer mounts once; size and textures are applied by the effects
-    // below (which also run on mount) without rebuilding the WebGL context.
   }, []);
 
   useEffect(() => {
-    viewerRef.current?.setSize(width, height);
-  }, [width, height]);
+    void previewRef.current?.load(variant, texture, capeTexture);
+  }, [variant, texture, capeTexture]);
 
-  useEffect(() => {
-    viewerRef.current
-      ?.loadSkin(texture, {
-        model: variant === 'slim' ? 'slim' : 'default',
-      })
-      .catch(() => {});
-  }, [texture, variant]);
-
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-    if (capeTexture) viewer.loadCape(capeTexture).catch(() => {});
-    else viewer.resetCape();
-  }, [capeTexture]);
-
-  useEffect(() => {
-    if (viewerRef.current) viewerRef.current.nameTag = nametag || null;
-  }, [nametag]);
-
-  return <canvas ref={canvasRef} className={className} />;
+  return (
+    <div
+      ref={containerRef}
+      style={{ width, height }}
+      className={cn('relative select-none', className)}
+    >
+      <canvas
+        ref={canvasRef}
+        className="size-full cursor-grab touch-none active:cursor-grabbing"
+        onPointerDown={(e) =>
+          previewRef.current?.pointerDown(e.nativeEvent, e.currentTarget)
+        }
+        onPointerMove={(e) => previewRef.current?.pointerMove(e.nativeEvent)}
+        onPointerUp={(e) =>
+          previewRef.current?.pointerUp(e.nativeEvent, e.currentTarget)
+        }
+        onPointerLeave={(e) =>
+          previewRef.current?.pointerUp(e.nativeEvent, e.currentTarget)
+        }
+        onPointerCancel={(e) =>
+          previewRef.current?.pointerUp(e.nativeEvent, e.currentTarget)
+        }
+        onClick={() => previewRef.current?.click()}
+      />
+      <span className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[11px] text-muted-foreground">
+        {m['skins.drag_to_rotate']()}
+      </span>
+    </div>
+  );
 }

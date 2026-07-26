@@ -75,6 +75,8 @@ tray    → bin tray            (tray-icon + tao)                   → client, 
   (built with [Bun](https://bun.sh/)) — desktop; its
   [tray-icon](https://github.com/tauri-apps/tray-icon) +
   [tao](https://github.com/tauri-apps/tao) crates — the system tray.
+- [three.js](https://threejs.org/) — the desktop's skin preview and its card
+  thumbnails (see the skin-preview decision note).
 
 ## The socket boundary
 
@@ -1270,12 +1272,13 @@ flow: `account.login.begin` returns the Microsoft URL for the shell to open,
 > `hestia:connection` only on transitions; and the failures log at `debug`
 > rather than `warn` on both sides, since an offline daemon is a state the
 > status bar reports, not an error per call. The UI then says it once: an
-> `OfflineOverlay` in the app shell with the daemon's own start action. The
-> shell also **starts the daemon at launch** (`bridge::start`) — opening the
-> desktop is as deliberate a launch of Hestia as `hestia daemon start`, and the
-> alternative was an app that opens into an overlay telling the user to press a
-> button. Reconnection still never spawns: a daemon stopped *during* a session
-> was stopped on purpose.
+> `OfflineOverlay` in the app shell carrying the daemon's own start action —
+> the whole app is backed by the daemon, so there is nothing useful to do
+> behind it. The shell also **starts the daemon at launch**
+> (`bridge::start`) — opening the desktop is as deliberate a launch of Hestia
+> as `hestia daemon start`, so the overlay is the exception, not the greeting.
+> Reconnection still never spawns: a daemon stopped *during* a session was
+> stopped on purpose.
 
 ### Tray (`tray`)
 

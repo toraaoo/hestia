@@ -174,4 +174,8 @@ pointer (`config set home`) → the platform default (`~/.hestia`, or
 
 ## License
 
-[MIT](LICENSE) © 2026 toraaoo
+[GPL-3.0-only](LICENSE) © 2026 toraaoo
+
+The desktop skin preview and its thumbnail renderer are ported from
+[Modrinth's launcher](https://github.com/modrinth/code) (GPL-3.0-only,
+© Rinth, Inc.) — the reason Hestia is GPL rather than MIT.

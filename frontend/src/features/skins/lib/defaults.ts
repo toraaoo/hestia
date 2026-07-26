@@ -1,5 +1,5 @@
-// One card per character (Modrinth's rule): the canonical model, Steve and
-// Alex first, except an equipped non-canonical variant wins its card.
+// One card per character: the canonical model, Steve and Alex first, except an
+// equipped non-canonical variant wins its card.
 import type { Skin, SkinVariant } from '@/api';
 
 const CANONICAL_MODEL: Record<string, SkinVariant> = {

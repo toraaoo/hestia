@@ -52,10 +52,9 @@ pub(super) fn register(on: &mut Channels<'_>) {
         Ok(Empty {})
     });
 
+    // No library pre-check: the flow adopts an equipped skin the library does
+    // not yet record, which is how the current skin becomes editable.
     on.handle::<SkinUpdate, _, _>(|p, ctx| async move {
-        if ctx.runtime.engine().skins().entry(&p.key).is_none() {
-            return Err(ErrorInfo::SkinNotFound { key: p.key.clone() });
-        }
         let skin = ctx
             .runtime
             .engine()

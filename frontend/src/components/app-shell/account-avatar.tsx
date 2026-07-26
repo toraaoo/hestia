@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils';
  * known locally it is blitted head-on, so a skin change reflects instantly —
  * the uuid-keyed mc-heads head is cached by the browser (and the service)
  * across an equip and lags behind. Without a texture it falls back to mc-heads
- * by uuid (the same source Modrinth's launcher uses), and to the name's
- * initials when neither renders (offline, unknown profile).
+ * by uuid, and to the name's initials when neither renders (offline, unknown
+ * profile).
  */
 export function AccountAvatar({
   uuid,

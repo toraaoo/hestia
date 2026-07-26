@@ -65,7 +65,7 @@ export async function loaders(
 
 export async function list(): Promise<ServerInfo[]> {
   const result = await call<{ servers: ServerInfo[] }>('server.list');
-  return result.servers;
+  return result?.servers ?? [];
 }
 
 /** The server's record merged with its live process state. */

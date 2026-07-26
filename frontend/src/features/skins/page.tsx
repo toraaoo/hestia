@@ -27,7 +27,7 @@ import { skinMutations, skinQueries } from '@/queries/skins';
 const BASE64_PREFIX = /^data:image\/png;base64,/;
 
 export function SkinsPage() {
-  const { active, signedIn, isPending: accountsPending } = useAccounts();
+  const { signedIn, isPending: accountsPending } = useAccounts();
   const list = useQuery({ ...skinQueries.list(''), enabled: signedIn });
 
   const add = useMutation(skinMutations.add());
@@ -136,7 +136,6 @@ export function SkinsPage() {
         <PreviewPanel
           skin={selected}
           cape={equippedCape}
-          nametag={active?.name}
           previewing={previewing}
           onApply={() => equip.mutate({ key: selected.key })}
           onVariantChange={

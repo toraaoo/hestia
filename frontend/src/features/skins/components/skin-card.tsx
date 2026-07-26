@@ -70,11 +70,11 @@ export function SkinCard({
         aria-pressed={selected}
         className="block w-full outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
       >
-        <div className="flex h-28 items-center justify-center bg-muted/40 pt-2">
+        <div className="relative aspect-[31/34] bg-muted/40">
           <SkinPose
             texture={skin.texture}
             variant={skin.variant}
-            className="h-24 w-full"
+            className="absolute inset-0 size-full"
           />
         </div>
         <div className="border-t border-border p-2 text-left">
