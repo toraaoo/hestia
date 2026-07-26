@@ -270,7 +270,7 @@ pub(super) fn show_install_report(
         } else {
             failure.title.clone()
         };
-        ui::show(View::note(format!("failed {label}: {}", failure.message)))?;
+        ui::show(View::note(format!("failed {label}: {}", failure.error)))?;
     }
     if installed.is_empty() && removed.is_empty() {
         match failures.is_empty() {

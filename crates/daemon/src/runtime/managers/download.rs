@@ -57,7 +57,7 @@ impl DownloadManager {
                     tracing::error!(job = %job_id, url = %spec.url, error = format!("{e:#}"), "download failed");
                     hub.publish(&topic_event(&DownloadErrorEvent {
                         id: job_id.clone(),
-                        message: e.to_string(),
+                        error: crate::runtime::engine_error(e),
                     }));
                 }
             }

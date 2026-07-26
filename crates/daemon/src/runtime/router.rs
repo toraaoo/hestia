@@ -19,25 +19,6 @@ use super::HandlerContext;
 /// socket carries and a front-end localizes.
 pub type ServiceResult<T> = Result<T, ErrorInfo>;
 
-/// Map an engine `anyhow` failure to an `ErrorInfo`: if the engine raised a
-/// typed `ErrorInfo` (a user-facing failure a front-end can localize), surface
-/// it; otherwise fall back to `Internal`, carrying the un-localized English
-/// chain in `detail`.
-pub fn engine_error(e: anyhow::Error) -> ErrorInfo {
-    if let Some(info) = e.downcast_ref::<ErrorInfo>() {
-        return info.clone();
-    }
-    if let Some(reauth) = e.downcast_ref::<engine::ReauthRequired>() {
-        return ErrorInfo::SessionExpired {
-            reference: reauth.reference.clone(),
-        };
-    }
-    tracing::error!(error = ?e, "unhandled engine failure");
-    ErrorInfo::Internal {
-        detail: format!("{e:#}"),
-    }
-}
-
 /// Serialize an `ErrorInfo` into an error `Response`.
 pub fn error_response(info: ErrorInfo) -> Response {
     Response::failure(serde_json::to_value(&info).unwrap_or(Value::Null))

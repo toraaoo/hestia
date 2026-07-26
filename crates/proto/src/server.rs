@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty, Topic};
+use crate::error::ErrorInfo;
 use crate::minecraft::{
     ConfigEntry, FlavorsResult, LoadersParams, LoadersResult, ProvisionProgress, ResolveParams,
     ServerProfile, VersionsParams, VersionsResult,
@@ -360,7 +361,8 @@ impl Topic for ServerCreateDoneEvent {
 #[serde(rename_all = "camelCase")]
 pub struct ServerCreateErrorEvent {
     pub id: String,
-    pub message: String,
+    /// The structured cause a front-end localizes from.
+    pub error: ErrorInfo,
 }
 impl Topic for ServerCreateErrorEvent {
     const TOPIC: &'static str = "server.create.error";
@@ -391,7 +393,8 @@ impl Topic for ServerUpdateDoneEvent {
 #[serde(rename_all = "camelCase")]
 pub struct ServerUpdateErrorEvent {
     pub id: String,
-    pub message: String,
+    /// The structured cause a front-end localizes from.
+    pub error: ErrorInfo,
 }
 impl Topic for ServerUpdateErrorEvent {
     const TOPIC: &'static str = "server.update.error";

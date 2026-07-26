@@ -10,6 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty, Topic};
+use crate::error::ErrorInfo;
 use crate::minecraft::ProvisionProgress;
 use crate::server::ServerRef;
 
@@ -149,7 +150,8 @@ impl Topic for BackupDoneEvent {
 #[serde(rename_all = "camelCase")]
 pub struct BackupErrorEvent {
     pub id: String,
-    pub message: String,
+    /// The structured cause a front-end localizes from.
+    pub error: ErrorInfo,
 }
 impl Topic for BackupErrorEvent {
     const TOPIC: &'static str = "backup.error";

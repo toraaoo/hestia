@@ -93,7 +93,7 @@ impl ServerCreateManager {
                     tracing::error!(job = %job_id, error = format!("{e:#}"), "server create failed");
                     hub.publish(&topic_event(&ServerCreateErrorEvent {
                         id: job_id.clone(),
-                        message: format!("{e:#}"),
+                        error: crate::runtime::engine_error(e),
                     }));
                 }
             }
@@ -178,7 +178,7 @@ impl ServerUpdateManager {
                     tracing::error!(job = %job_id, server = %server_id, error = format!("{e:#}"), "server update failed");
                     hub.publish(&topic_event(&ServerUpdateErrorEvent {
                         id: job_id.clone(),
-                        message: format!("{e:#}"),
+                        error: crate::runtime::engine_error(e),
                     }));
                 }
             }

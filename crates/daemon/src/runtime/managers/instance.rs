@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use engine::Engine;
+use proto::error::ErrorInfo;
 use proto::instance::{
     InstanceLaunchDoneEvent, InstanceLaunchErrorEvent, InstanceLaunchProgressEvent,
 };
@@ -90,12 +91,11 @@ impl InstanceLaunchManager {
                         pid,
                     }));
                 }
-                Err((message, code)) => {
-                    tracing::error!(job = %job_id, instance = %instance_id, error = %message, "instance launch failed");
+                Err(error) => {
+                    tracing::error!(job = %job_id, instance = %instance_id, %error, "instance launch failed");
                     hub.publish(&topic_event(&InstanceLaunchErrorEvent {
                         id: job_id.clone(),
-                        message,
-                        code,
+                        error,
                     }));
                 }
             }
@@ -140,17 +140,11 @@ async fn launch(
     profile: &str,
     reconcile: bool,
     on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
-) -> Result<(String, u32), (String, String)> {
+) -> Result<(String, u32), ErrorInfo> {
     let (_record, plan, log_file) = engine
         .prepare_instance(instance_id, account, seq, profile, reconcile, on_progress)
         .await
-        .map_err(|e| {
-            let code = match e.downcast_ref::<engine::ReauthRequired>() {
-                Some(_) => ipc::errors::UNAUTHORIZED,
-                None => ipc::errors::HANDLER_ERROR,
-            };
-            (format!("{e:#}"), code.to_string())
-        })?;
+        .map_err(crate::runtime::engine_error)?;
 
     let spec = ProcessSpec {
         id: session_id.to_string(),
@@ -168,13 +162,11 @@ async fn launch(
             }
             Ok((info.id, info.pid))
         }
-        Err(StartError::EmptyProgram | StartError::InvalidId) => Err((
-            "invalid launch plan".to_string(),
-            ipc::errors::HANDLER_ERROR.to_string(),
-        )),
-        Err(StartError::Spawn(e)) => Err((
-            format!("cannot spawn the game: {e}"),
-            ipc::errors::HANDLER_ERROR.to_string(),
-        )),
+        Err(StartError::EmptyProgram | StartError::InvalidId) => Err(ErrorInfo::Internal {
+            detail: "invalid launch plan".to_string(),
+        }),
+        Err(StartError::Spawn(e)) => Err(ErrorInfo::Internal {
+            detail: format!("cannot spawn the game: {e}"),
+        }),
     }
 }

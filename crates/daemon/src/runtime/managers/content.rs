@@ -206,7 +206,7 @@ impl ContentManager {
                     tracing::error!(job = %job_id, error = format!("{e:#}"), "content job failed");
                     hub.publish(&topic_event(&ContentErrorEvent {
                         id: job_id.clone(),
-                        message: format!("{e:#}"),
+                        error: crate::runtime::engine_error(e),
                     }));
                 }
             }

@@ -10,6 +10,7 @@ use proto::content::{
     ContentAddItem, ContentAddSpec, ContentFailure, ContentKind, ContentProject, DependencyKind,
     InstalledContent, SideSupport, VersionQuery,
 };
+use proto::error::ErrorInfo;
 use proto::minecraft::{ProvisionPhase, ProvisionProgress};
 
 use super::phase_progress;
@@ -370,7 +371,9 @@ impl Engine {
                 failures.push(failure(
                     item_label(item),
                     "",
-                    "specify exactly one of a project, a url, or a file",
+                    ErrorInfo::MutuallyExclusive {
+                        options: vec!["a project".into(), "a url".into(), "a file".into()],
+                    },
                 ));
                 continue;
             }
@@ -385,10 +388,9 @@ impl Engine {
                     None => failures.push(failure(
                         &item.url,
                         "",
-                        format!(
-                            "'{}' is not a project URL on a supported content source",
-                            item.url
-                        ),
+                        ErrorInfo::UnsupportedContentUrl {
+                            url: item.url.clone(),
+                        },
                     )),
                 }
             } else if !item.project.is_empty() {
@@ -407,7 +409,7 @@ impl Engine {
         for item in files {
             match add_file_content(ctx, spec.kind, item, &worlds) {
                 Ok(mut installed) => items.append(&mut installed),
-                Err(e) => failures.push(failure(&item.path, "", format!("{e:#}"))),
+                Err(e) => failures.push(failure(&item.path, "", crate::error_info(e))),
             }
         }
         let (mut platform_items, mut platform_failures) = self
@@ -447,7 +449,7 @@ impl Engine {
             tracing::warn!(
                 entry = %ctx.entry_dir.display(),
                 item = %fail.item,
-                message = %fail.message,
+                error = %fail.error,
                 "content install failed"
             );
         }
@@ -488,7 +490,7 @@ impl Engine {
             let project = match self.content.project(&root.source, &root.project).await {
                 Ok(project) => project,
                 Err(e) => {
-                    failures.push(failure(&root.given, "", format!("{e:#}")));
+                    failures.push(failure(&root.given, "", crate::error_info(e)));
                     continue;
                 }
             };
@@ -496,15 +498,16 @@ impl Engine {
                 failures.push(failure(
                     &root.given,
                     &project.title,
-                    format!(
-                        "'{}' is {:?} content, not {:?}",
-                        project.title, project.kind, kind
-                    ),
+                    ErrorInfo::ContentKindMismatch {
+                        title: project.title.clone(),
+                        actual: project.kind,
+                        expected: kind,
+                    },
                 ));
                 continue;
             }
             if let Err(e) = side_gate(kind, &project, ctx.side) {
-                failures.push(failure(&root.given, &project.title, format!("{e:#}")));
+                failures.push(failure(&root.given, &project.title, crate::error_info(e)));
                 continue;
             }
             if !queued.insert(project.id.clone()) {
@@ -533,7 +536,11 @@ impl Engine {
             {
                 Ok(versions) => versions,
                 Err(e) => {
-                    failures.push(failure(&node.given, &node.project.title, format!("{e:#}")));
+                    failures.push(failure(
+                        &node.given,
+                        &node.project.title,
+                        crate::error_info(e),
+                    ));
                     continue;
                 }
             };
@@ -548,7 +555,7 @@ impl Engine {
                     failures.push(failure(
                         &node.given,
                         &node.project.title,
-                        format!("cannot install '{}': {e:#}", node.project.title),
+                        crate::error_info(e),
                     ));
                     continue;
                 }
@@ -574,7 +581,7 @@ impl Engine {
                         match self.content.project(&node.source, &dep.project_id).await {
                             Ok(project) => project,
                             Err(e) => {
-                                failures.push(failure(&dep.project_id, "", format!("{e:#}")));
+                                failures.push(failure(&dep.project_id, "", crate::error_info(e)));
                                 continue;
                             }
                         };
@@ -614,9 +621,11 @@ impl Engine {
                 .await
             {
                 Ok(mut installed) => items.append(&mut installed),
-                Err(e) => {
-                    failures.push(failure(&node.given, &node.project.title, format!("{e:#}")))
-                }
+                Err(e) => failures.push(failure(
+                    &node.given,
+                    &node.project.title,
+                    crate::error_info(e),
+                )),
             }
             finished += 1;
         }
@@ -829,15 +838,11 @@ fn kind_matches(requested: ContentKind, project: ContentKind) -> bool {
     requested == project || (requested == ContentKind::DataPack && project == ContentKind::Mod)
 }
 
-fn failure(
-    item: impl Into<String>,
-    title: impl Into<String>,
-    message: impl Into<String>,
-) -> ContentFailure {
+fn failure(item: impl Into<String>, title: impl Into<String>, error: ErrorInfo) -> ContentFailure {
     ContentFailure {
         item: item.into(),
         title: title.into(),
-        message: message.into(),
+        error,
     }
 }
 

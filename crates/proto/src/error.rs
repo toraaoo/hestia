@@ -12,6 +12,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::content::ContentKind;
+
 /// A launcher entry that resolves by reference.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -280,73 +282,196 @@ impl fmt::Display for SyncReason {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ErrorInfo {
     // --- validation ---
-    FieldRequired { field: Field },
-    FieldsRequired { fields: Vec<Field> },
-    InvalidValue { field: Field, reason: Reason },
-    MutuallyExclusive { options: Vec<String> },
-    NothingToDo { what: Task },
+    FieldRequired {
+        field: Field,
+    },
+    FieldsRequired {
+        fields: Vec<Field>,
+    },
+    InvalidValue {
+        field: Field,
+        reason: Reason,
+    },
+    MutuallyExclusive {
+        options: Vec<String>,
+    },
+    NothingToDo {
+        what: Task,
+    },
     EulaRequired,
-    Busy { detail: String },
-    ReservedName { name: String },
-    UnsupportedOperation { reason: Unsupported },
-    InvalidTexture { detail: String },
+    Busy {
+        detail: String,
+    },
+    ReservedName {
+        name: String,
+    },
+    UnsupportedOperation {
+        reason: Unsupported,
+    },
+    InvalidTexture {
+        detail: String,
+    },
 
     // --- not found ---
-    EntryNotFound { entry: EntryKind, reference: String },
-    ProcessNotFound { id: String },
-    BackupNotFound { reference: String },
-    ContentNotFound { reference: String },
-    ProfileNotFound { scope: ProfileScope, name: String },
-    SkinNotFound { key: String },
-    WorldNotFound { world: String },
-    AccountNotFound { reference: String },
-    VersionNotFound { reference: String },
-    ConfigKeyUnknown { key: String },
-    ConfigKeyUnset { key: String },
-    ConfigTypeMismatch { detail: String },
-    ConfigRejected { key: String, detail: String },
+    EntryNotFound {
+        entry: EntryKind,
+        reference: String,
+    },
+    ProcessNotFound {
+        id: String,
+    },
+    BackupNotFound {
+        reference: String,
+    },
+    ContentNotFound {
+        reference: String,
+    },
+    ProfileNotFound {
+        scope: ProfileScope,
+        name: String,
+    },
+    SkinNotFound {
+        key: String,
+    },
+    WorldNotFound {
+        world: String,
+    },
+    AccountNotFound {
+        reference: String,
+    },
+    VersionNotFound {
+        reference: String,
+    },
+    ConfigKeyUnknown {
+        key: String,
+    },
+    ConfigKeyUnset {
+        key: String,
+    },
+    ConfigTypeMismatch {
+        detail: String,
+    },
+    ConfigRejected {
+        key: String,
+        detail: String,
+    },
 
     // --- conflict ---
-    AlreadyExists { entry: Nameable, name: String },
-    PortUnavailable { port: u16 },
+    AlreadyExists {
+        entry: Nameable,
+        name: String,
+    },
+    PortUnavailable {
+        port: u16,
+    },
 
     // --- state ---
-    EntryRunning { entry: EntryKind, name: String },
-    NotRunning { entry: EntryKind, name: String },
-    Provisioning { name: String },
-    UpdateInProgress { name: String },
-    ContentInProgress { name: String },
-    BackupInProgress { name: String },
-    NoConsole { name: String },
-    NoGamePort { name: String },
-    ProfileAlreadyCaptured { name: String },
-    ProfileNotCaptured { name: String },
+    EntryRunning {
+        entry: EntryKind,
+        name: String,
+    },
+    NotRunning {
+        entry: EntryKind,
+        name: String,
+    },
+    Provisioning {
+        name: String,
+    },
+    UpdateInProgress {
+        name: String,
+    },
+    ContentInProgress {
+        name: String,
+    },
+    BackupInProgress {
+        name: String,
+    },
+    NoConsole {
+        name: String,
+    },
+    NoGamePort {
+        name: String,
+    },
+    ProfileAlreadyCaptured {
+        name: String,
+    },
+    ProfileNotCaptured {
+        name: String,
+    },
 
     // --- auth ---
     SignInRequired,
-    SessionExpired { reference: String },
+    SessionExpired {
+        reference: String,
+    },
     LoginDeclined,
     LoginTimedOut,
 
     // --- content / modpack ---
-    NotAModpack { reference: String },
-    ModpackInvalid { detail: String },
+    NotAModpack {
+        reference: String,
+    },
+    ModpackInvalid {
+        detail: String,
+    },
+    UnsupportedContentUrl {
+        url: String,
+    },
+    ContentKindMismatch {
+        title: String,
+        actual: ContentKind,
+        expected: ContentKind,
+    },
 
     // --- sync ---
-    SyncTargetInvalid { path: String, reason: SyncReason },
-    SyncLinkConflict { path: String },
+    SyncTargetInvalid {
+        path: String,
+        reason: SyncReason,
+    },
+    SyncLinkConflict {
+        path: String,
+    },
 
     // --- protocol ---
-    UnknownChannel { channel: String },
-    MalformedRequest { detail: String },
-    IncompatibleVersion { got: i64, want: i64 },
+    UnknownChannel {
+        channel: String,
+    },
+    MalformedRequest {
+        detail: String,
+    },
+    IncompatibleVersion {
+        got: i64,
+        want: i64,
+    },
 
     // --- operational (unbounded English `detail`) ---
-    Io { operation: IoOp, detail: String },
-    Upstream { service: Service, detail: String },
-    DownloadFailed { detail: String },
-    RconFailed { detail: String },
-    Internal { detail: String },
+    Io {
+        operation: IoOp,
+        detail: String,
+    },
+    Upstream {
+        service: Service,
+        detail: String,
+    },
+    DownloadFailed {
+        detail: String,
+    },
+    RconFailed {
+        detail: String,
+    },
+    Internal {
+        detail: String,
+    },
+}
+
+/// A neutral fallback so structs embedding an `ErrorInfo` can keep the file's
+/// defensive `#[serde(default)]` — never authored deliberately.
+impl Default for ErrorInfo {
+    fn default() -> Self {
+        ErrorInfo::Internal {
+            detail: String::new(),
+        }
+    }
 }
 
 impl ErrorInfo {
@@ -442,6 +567,17 @@ impl fmt::Display for ErrorInfo {
             LoginTimedOut => write!(f, "the sign-in timed out — try again"),
             NotAModpack { reference } => write!(f, "'{reference}' is not a modpack"),
             ModpackInvalid { detail } => write!(f, "this modpack could not be read: {detail}"),
+            UnsupportedContentUrl { url } => {
+                write!(
+                    f,
+                    "'{url}' is not a project URL on a supported content source"
+                )
+            }
+            ContentKindMismatch {
+                title,
+                actual,
+                expected,
+            } => write!(f, "'{title}' is {actual} content, not {expected}"),
             SyncTargetInvalid { path, reason } => {
                 write!(f, "'{path}' cannot be a sync target: {reason}")
             }

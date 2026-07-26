@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty, Topic};
+use crate::error::ErrorInfo;
 use crate::minecraft::{
     ConfigEntry, FlavorsResult, InstanceProfile, LoadersParams, LoadersResult, ProvisionProgress,
     ResolveParams, VersionsParams, VersionsResult,
@@ -476,10 +477,8 @@ impl Topic for InstanceLaunchDoneEvent {
 #[serde(rename_all = "camelCase")]
 pub struct InstanceLaunchErrorEvent {
     pub id: String,
-    pub message: String,
-    /// The `ipc::errors` code the failure maps to (empty = generic handler error).
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub code: String,
+    /// The structured cause a front-end localizes from.
+    pub error: ErrorInfo,
 }
 impl Topic for InstanceLaunchErrorEvent {
     const TOPIC: &'static str = "instance.launch.error";

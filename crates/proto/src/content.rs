@@ -5,9 +5,12 @@
 //! types are normalized so a front-end never sees a platform's raw shape, and all
 //! carry `#[serde(default)]` so an older/newer peer decodes additive fields.
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty, Topic};
+use crate::error::ErrorInfo;
 use crate::minecraft::{Artifact, ProvisionProgress};
 
 /// What a project is — the second selector level after the source.
@@ -20,6 +23,18 @@ pub enum ContentKind {
     ResourcePack,
     Shader,
     DataPack,
+}
+
+impl fmt::Display for ContentKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            ContentKind::Mod => "mod",
+            ContentKind::Modpack => "modpack",
+            ContentKind::ResourcePack => "resource pack",
+            ContentKind::Shader => "shader",
+            ContentKind::DataPack => "datapack",
+        })
+    }
 }
 
 /// Whether a project (or a modpack file) is meant for the client, the server,
@@ -317,7 +332,8 @@ pub struct ContentFailure {
     pub item: String,
     /// The resolved project title, when resolution got that far.
     pub title: String,
-    pub message: String,
+    /// The structured cause a front-end localizes from.
+    pub error: ErrorInfo,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -610,7 +626,8 @@ impl Topic for ContentDoneEvent {
 #[serde(rename_all = "camelCase")]
 pub struct ContentErrorEvent {
     pub id: String,
-    pub message: String,
+    /// The structured cause a front-end localizes from.
+    pub error: ErrorInfo,
 }
 impl Topic for ContentErrorEvent {
     const TOPIC: &'static str = "content.error";

@@ -130,7 +130,7 @@ async fn run_install(
                     .first()
                     .map(|r| r.title.clone())
                     .unwrap_or_default(),
-                message: e.to_string(),
+                error: client::error_info(&e),
             }),
         }
     }

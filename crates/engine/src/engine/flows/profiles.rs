@@ -256,7 +256,7 @@ impl Engine {
                     failures.push(ContentFailure {
                         item: entry.slug.clone(),
                         title: String::new(),
-                        message: format!("{e:#}"),
+                        error: crate::error_info(e),
                     });
                     continue;
                 }

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty, Topic};
+use crate::error::ErrorInfo;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default, rename_all = "camelCase")]
@@ -141,7 +142,8 @@ impl Topic for JavaInstallDoneEvent {
 #[serde(rename_all = "camelCase")]
 pub struct JavaInstallErrorEvent {
     pub id: String,
-    pub message: String,
+    /// The structured cause a front-end localizes from.
+    pub error: ErrorInfo,
 }
 impl Topic for JavaInstallErrorEvent {
     const TOPIC: &'static str = "java.install.error";

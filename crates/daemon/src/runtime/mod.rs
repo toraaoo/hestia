@@ -20,6 +20,7 @@ use proto::server::ServerInfo;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Notify;
 
+pub use engine::error_info as engine_error;
 pub use event_hub::EventHub;
 pub use managers::{
     BackupJob, BackupManager, ContentJob, ContentManager, DownloadManager, InstanceLaunchManager,
@@ -27,7 +28,7 @@ pub use managers::{
 };
 pub use metrics::spawn_metrics_sampler;
 pub use process::{ExitObserver, ProcessSupervisor, StartError};
-pub use router::{engine_error, error_response, Channels, Router};
+pub use router::{error_response, Channels, Router};
 pub use scheduler::spawn_backup_scheduler;
 
 /// The supervisor id a managed server runs under — deterministic, so every

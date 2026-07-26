@@ -23,7 +23,10 @@
     {
       "item": "sodiumm",
       "title": "",
-      "message": "no project matches 'sodiumm'"
+      "error": {
+        "kind": "content_not_found",
+        "reference": "sodiumm"
+      }
     }
   ]
 }

@@ -15,6 +15,21 @@ pub use session::{job_id, Session};
 /// Re-export `proto` so front-ends need only depend on `client`.
 pub use proto;
 
+/// Recover the structured `ErrorInfo` a client error carries: the daemon's
+/// serialized error when there was one, else a generic `Internal` from the
+/// transport-level message. The inverse of how a handler's `ErrorInfo` crosses
+/// the socket — so a caller can rebuild a typed failure to render or re-report.
+pub fn error_info(error: &IpcError) -> proto::error::ErrorInfo {
+    if let IpcError::Daemon { info, .. } = error {
+        if let Ok(parsed) = serde_json::from_value::<proto::error::ErrorInfo>(info.clone()) {
+            return parsed;
+        }
+    }
+    proto::error::ErrorInfo::Internal {
+        detail: error.to_string(),
+    }
+}
+
 use std::path::Path;
 
 /// A connection to the daemon plus the typed facades over it.

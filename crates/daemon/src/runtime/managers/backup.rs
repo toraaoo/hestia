@@ -113,7 +113,7 @@ impl BackupManager {
                     tracing::error!(job = %job_id, error = format!("{e:#}"), "backup job failed");
                     hub.publish(&topic_event(&BackupErrorEvent {
                         id: job_id.clone(),
-                        message: format!("{e:#}"),
+                        error: crate::runtime::engine_error(e),
                     }));
                 }
             }

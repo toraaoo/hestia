@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Topic};
+use crate::error::ErrorInfo;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -103,7 +104,8 @@ impl Topic for DownloadDoneEvent {
 #[serde(rename_all = "camelCase")]
 pub struct DownloadErrorEvent {
     pub id: String,
-    pub message: String,
+    /// The structured cause a front-end localizes from.
+    pub error: ErrorInfo,
 }
 impl Topic for DownloadErrorEvent {
     const TOPIC: &'static str = "download.error";

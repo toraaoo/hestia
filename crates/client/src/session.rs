@@ -163,7 +163,7 @@ impl Session {
         Fut: std::future::Future<Output = Result<(), IpcError>>,
     {
         struct Outcome {
-            state: Mutex<Option<Result<Value, (String, String)>>>,
+            state: Mutex<Option<Result<Value, ErrorInfo>>>,
             notify: Notify,
         }
         let outcome = Arc::new(Outcome {
@@ -183,18 +183,14 @@ impl Session {
                 *cb_outcome.state.lock().unwrap() = Some(Ok(event.payload.clone()));
                 cb_outcome.notify.notify_waiters();
             } else if event.topic == error {
-                let msg = event
+                let info = event
                     .payload
-                    .get("message")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default();
-                let code = event
-                    .payload
-                    .get("code")
-                    .and_then(Value::as_str)
-                    .filter(|c| !c.is_empty())
-                    .unwrap_or(ipc::errors::HANDLER_ERROR);
-                *cb_outcome.state.lock().unwrap() = Some(Err((code.to_string(), msg.to_string())));
+                    .get("error")
+                    .and_then(|e| serde_json::from_value::<ErrorInfo>(e.clone()).ok())
+                    .unwrap_or_else(|| ErrorInfo::Internal {
+                        detail: "the job failed".into(),
+                    });
+                *cb_outcome.state.lock().unwrap() = Some(Err(info));
                 cb_outcome.notify.notify_waiters();
             } else {
                 on_event(event);
@@ -212,7 +208,7 @@ impl Session {
         &self,
         id: &str,
         start: F,
-        state: &Mutex<Option<Result<Value, (String, String)>>>,
+        state: &Mutex<Option<Result<Value, ErrorInfo>>>,
         notify: &Notify,
     ) -> Result<Value, IpcError>
     where
@@ -226,10 +222,10 @@ impl Session {
 
         loop {
             if let Some(result) = state.lock().unwrap().take() {
-                return result.map_err(|(code, message)| IpcError::Daemon {
-                    code,
-                    message,
-                    info: Value::Null,
+                return result.map_err(|info| IpcError::Daemon {
+                    code: info.code().to_string(),
+                    message: info.to_string(),
+                    info: serde_json::to_value(&info).unwrap_or(Value::Null),
                 });
             }
             if self.is_closed() {

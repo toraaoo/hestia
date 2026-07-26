@@ -1,4 +1,8 @@
 {
   "id": "server-content-add-1",
-  "message": "no server matches 'smp'"
+  "error": {
+    "kind": "entry_not_found",
+    "entry": "server",
+    "reference": "smp"
+  }
 }

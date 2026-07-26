@@ -69,7 +69,7 @@ impl JavaInstallManager {
                     tracing::error!(job = %job_id, major, error = format!("{e:#}"), "java install failed");
                     hub.publish(&topic_event(&JavaInstallErrorEvent {
                         id: job_id.clone(),
-                        message: format!("{e:#}"),
+                        error: crate::runtime::engine_error(e),
                     }));
                 }
             }
