@@ -1,7 +1,13 @@
 /**
- * Localizes a daemon error: renders the structured `ErrorInfo` through the
- * `error.kind.*` messages (resolving token fields to their own labels), falling
- * back to a generic message keyed by the coarse `code`, then the raw message.
+ * Localizes a daemon error. The structured `ErrorInfo` is rendered
+ * **generically**: `error.kind.<kind>` is the message template and the variant's
+ * fields are its interpolation params, with token-enum fields (server, memory,
+ * adoptium, …) resolved through the shared `error.token.*` table. A coarse
+ * `error.code.*` message is the fallback, then the raw message.
+ *
+ * There is deliberately no per-variant `switch`: adding an `ErrorInfo` variant
+ * needs only message keys, never a change here. The only per-field knowledge is
+ * `TOKEN_FIELDS` — the fields whose value is itself an enum to be labelled.
  */
 import { m } from '@/paraglide/messages.js';
 import type { ErrorInfo } from '../types/error';
@@ -14,81 +20,41 @@ const msg = m as unknown as Record<
   (params?: Record<string, unknown>) => string
 >;
 
-function label(category: string, value: string): string {
-  return msg[`error.${category}.${value}`]?.() ?? value;
+// Fields whose value is a token enum resolved through `error.token.*`; every
+// other field interpolates raw. A value with no token entry falls back to
+// itself, so listing a free-text field here would be harmless.
+const TOKEN_FIELDS = new Set([
+  'field',
+  'reason',
+  'entry',
+  'scope',
+  'service',
+  'operation',
+  'what',
+  'actual',
+  'expected',
+]);
+
+function token(value: unknown): string {
+  return typeof value === 'string'
+    ? (msg[`error.token.${value}`]?.() ?? value)
+    : String(value);
 }
 
-function kind(name: string, params: Record<string, unknown> = {}): string {
-  return msg[`error.kind.${name}`]?.(params) ?? '';
+/** The localized message for a structured daemon error. */
+export function errorMessageFromInfo(info: ErrorInfo): string {
+  const params: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(info)) {
+    if (key === 'kind') continue;
+    if (Array.isArray(value)) params[key] = value.map(token).join(', ');
+    else if (TOKEN_FIELDS.has(key)) params[key] = token(value);
+    else params[key] = value;
+  }
+  return msg[`error.kind.${info.kind}`]?.(params) ?? '';
 }
 
 function codeFallback(code: string): string {
   return msg[`error.code.${code}`]?.() ?? '';
-}
-
-function fromInfo(info: ErrorInfo): string {
-  switch (info.kind) {
-    case 'field_required':
-      return kind(info.kind, { field: label('field', info.field) });
-    case 'fields_required':
-      return kind(info.kind, {
-        fields: info.fields.map((f) => label('field', f)).join(', '),
-      });
-    case 'invalid_value':
-      return kind(info.kind, {
-        field: label('field', info.field),
-        reason: label('reason', info.reason),
-      });
-    case 'mutually_exclusive':
-      return kind(info.kind, { options: info.options.join(', ') });
-    case 'nothing_to_do':
-      return kind(info.kind, { what: label('task', info.what) });
-    case 'unsupported_operation':
-      return kind(info.kind, { reason: label('unsupported', info.reason) });
-    case 'entry_not_found':
-      return kind(info.kind, {
-        entry: label('entry', info.entry),
-        reference: info.reference,
-      });
-    case 'entry_running':
-    case 'not_running':
-      return kind(info.kind, {
-        entry: label('entry', info.entry),
-        name: info.name,
-      });
-    case 'already_exists':
-      return kind(info.kind, {
-        entry: label('nameable', info.entry),
-        name: info.name,
-      });
-    case 'profile_not_found':
-      return kind(info.kind, {
-        scope: label('scope', info.scope),
-        name: info.name,
-      });
-    case 'sync_target_invalid':
-      return kind(info.kind, {
-        path: info.path,
-        reason: label('sync_reason', info.reason),
-      });
-    case 'upstream':
-      return kind(info.kind, {
-        service: label('service', info.service),
-        detail: info.detail,
-      });
-    case 'io':
-      return kind(info.kind, {
-        operation: label('io_op', info.operation),
-        detail: info.detail,
-      });
-    case 'eula_required':
-    case 'sign_in_required':
-    case 'login_declined':
-    case 'login_timed_out':
-      return kind(info.kind);
-    default:
-      return kind(info.kind, info as unknown as Record<string, unknown>);
-  }
 }
 
 /** The localized, user-facing string for any daemon or transport error. */
@@ -97,7 +63,7 @@ export function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
   }
   if (error.info) {
-    const rendered = fromInfo(error.info);
+    const rendered = errorMessageFromInfo(error.info);
     if (rendered) return rendered;
   }
   return codeFallback(error.code) || error.message;

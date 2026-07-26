@@ -2,7 +2,7 @@ import { CaretUpIcon } from '@phosphor-icons/react';
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
-import type { ProvisionProgress } from '@/api';
+import { errorMessage, type ProvisionProgress } from '@/api';
 import {
   Popover,
   PopoverContent,
@@ -34,7 +34,7 @@ export function StatusBar() {
     for (const job of jobs) {
       if (job.status === 'error' && !toasted.current.has(job.id)) {
         toasted.current.add(job.id);
-        toast.error(job.error?.message ?? m['jobs.failed']());
+        toast.error(job.error ? errorMessage(job.error) : m['jobs.failed']());
       }
     }
   }, [jobs]);

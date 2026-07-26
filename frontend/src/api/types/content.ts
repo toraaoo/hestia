@@ -1,4 +1,5 @@
 /** Mirrors `crates/proto/src/content.rs`. */
+import type { ErrorInfo } from './error';
 import type { Artifact } from './minecraft';
 
 export type ContentKind =
@@ -203,7 +204,8 @@ export interface ContentAddSpec {
 export interface ContentFailure {
   item: string;
   title: string;
-  message: string;
+  /** The structured cause a front-end localizes from. */
+  error: ErrorInfo;
 }
 
 export interface ContentDone {

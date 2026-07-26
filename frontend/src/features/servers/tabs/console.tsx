@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { errorMessage } from '@/api';
 import { Empty } from '@/components/empty';
 import { type LogRow, LogView } from '@/components/log-view';
 import { Input } from '@/components/ui/input';
@@ -56,7 +57,7 @@ export function ServerConsoleTab({
         const trimmed = reply.trim();
         if (trimmed) push({ kind: 'reply', text: trimmed });
       },
-      onError: (error) => push({ kind: 'error', text: error.message }),
+      onError: (error) => push({ kind: 'error', text: errorMessage(error) }),
     });
   };
 

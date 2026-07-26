@@ -16,6 +16,11 @@ use crate::minecraft::{Artifact, ProvisionProgress};
 /// What a project is — the second selector level after the source.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(
+    feature = "ts",
+    derive(ts_rs::TS),
+    ts(export, export_to = "../../../frontend/src/api/types/generated/")
+)]
 pub enum ContentKind {
     #[default]
     Mod,

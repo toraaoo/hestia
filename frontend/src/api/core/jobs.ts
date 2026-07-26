@@ -9,6 +9,7 @@
  * is pruned only on disconnect).
  */
 import { logger } from '@/lib/log';
+import type { ErrorInfo } from '../types/error';
 import type { ProvisionProgress } from '../types/minecraft';
 import { onDaemonEvent } from './events';
 import { HANDLER_ERROR, HestiaError } from './ipc';
@@ -61,13 +62,14 @@ export async function runJob<
       resolveOutcome(event.payload as TDone);
     } else if (event.topic === topics.error) {
       settled = true;
-      const code =
-        typeof event.payload.code === 'string' && event.payload.code
-          ? event.payload.code
-          : HANDLER_ERROR;
-      const message = String(event.payload.message ?? '');
-      log.warn({ id, code }, `job failed: ${message}`);
-      rejectOutcome(new HestiaError(code, message));
+      // Job error events carry the structured `ErrorInfo`; the display site
+      // localizes it. `kind` is a stable fallback message, shown only if that
+      // localization ever misses.
+      const info = (event.payload.error ?? null) as ErrorInfo | null;
+      log.warn({ id, kind: info?.kind }, 'job failed');
+      rejectOutcome(
+        new HestiaError(HANDLER_ERROR, info?.kind ?? 'job failed', info),
+      );
     } else if (
       onProgress &&
       (!topics.progress || event.topic === topics.progress)

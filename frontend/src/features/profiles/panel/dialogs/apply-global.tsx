@@ -2,6 +2,7 @@ import { StackIcon } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { errorMessageFromInfo } from '@/api';
 import { Empty } from '@/components/empty';
 import { Button } from '@/components/ui/button';
 import {
@@ -55,7 +56,8 @@ export function ApplyGlobalDialog({
     if (!picked) return;
     apply.mutate(picked, {
       onSuccess: (done) => {
-        for (const failure of done.failures) toast.error(failure.message);
+        for (const failure of done.failures)
+          toast.error(errorMessageFromInfo(failure.error));
         setPicked(null);
         onOpenChange(false);
       },

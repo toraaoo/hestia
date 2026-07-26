@@ -1,7 +1,11 @@
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
 import { useMutation } from '@tanstack/react-query';
 
-import type { ContentKind, ContentProject } from '@/api';
+import {
+  type ContentKind,
+  type ContentProject,
+  errorMessageFromInfo,
+} from '@/api';
 import { contentIcon, entryIcon } from '@/components/icons';
 import { StepDots } from '@/components/step-dots';
 import { Button } from '@/components/ui/button';
@@ -173,7 +177,9 @@ export function ContentInstallModal({
             items,
             worlds: k === 'data_pack' && needsWorlds ? worlds : [],
           });
-          failures.push(...done.failures.map((f) => f.message));
+          failures.push(
+            ...done.failures.map((f) => errorMessageFromInfo(f.error)),
+          );
         }
         if (failures.length > 0) {
           dispatch({ type: 'installError', message: failures.join('; ') });
