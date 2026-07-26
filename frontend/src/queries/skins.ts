@@ -106,6 +106,19 @@ export const skinMutations = {
             s.key === key ? { ...s, name, variant } : s,
           ),
         })),
+      onSuccess: (skin, { account }) =>
+        queryClient.setQueryData<SkinList>(
+          keys.skins.list(account ?? ''),
+          (prev) =>
+            prev
+              ? {
+                  ...prev,
+                  skins: prev.skins.map((s) =>
+                    s.key === skin.key ? { ...s, ...skin } : s,
+                  ),
+                }
+              : prev,
+        ),
     }),
   equip: () =>
     mutation<void, { key: string; account?: string }>({

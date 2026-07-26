@@ -10,20 +10,22 @@ use base64::Engine as _;
 use proto::skins::{Cape, Skin, SkinSource, SkinVariant};
 
 use super::Engine;
-use crate::skins::{defaults, mojang, validate_skin_png};
+use crate::skins::{defaults, mojang, validate_skin_png, LibraryEntry};
 
 impl Engine {
-    /// The resolved account reference and a live token for it (name or uuid;
-    /// empty = the default account). The reference keys the profile cache.
-    async fn skin_session(&self, account: &str) -> Result<(String, String)> {
-        let reference = if account.trim().is_empty() {
+    fn skin_reference(&self, account: &str) -> Result<String> {
+        if account.trim().is_empty() {
             self.accounts()
                 .default_account()
                 .map(|a| a.uuid)
-                .context("no account is signed in")?
+                .context("no account is signed in")
         } else {
-            account.trim().to_string()
-        };
+            Ok(account.trim().to_string())
+        }
+    }
+
+    async fn skin_session(&self, account: &str) -> Result<(String, String)> {
+        let reference = self.skin_reference(account)?;
         let token = self.accounts().access_token(&reference).await?;
         Ok((reference, token))
     }
@@ -156,10 +158,10 @@ impl Engine {
         })
     }
 
-    /// Rewrite a library entry's label and variant. When the edited skin is
-    /// the one equipped and its variant changed, the texture is re-uploaded
-    /// under the new variant — otherwise `list_skins` would sync the local
-    /// variant back from the profile and silently undo the edit.
+    /// Rewrite a library entry's label and variant. An equipped skin not yet in
+    /// the library is adopted into it first. The variant re-upload is required:
+    /// otherwise `list_skins` syncs the local variant back from the profile and
+    /// silently undoes the edit.
     pub async fn update_skin(
         &self,
         account: &str,
@@ -167,24 +169,20 @@ impl Engine {
         name: &str,
         variant: SkinVariant,
     ) -> Result<Skin> {
-        let previous =
-            self.skins()
-                .entry(key)
-                .ok_or_else(|| proto::error::ErrorInfo::SkinNotFound {
-                    key: key.to_string(),
-                })?;
+        let previous = match self.skins().entry(key) {
+            Some(entry) => entry,
+            None => self.adopt_equipped_skin(account, key).await?,
+        };
         let entry = self.skins().update(key, name, variant)?.ok_or_else(|| {
             proto::error::ErrorInfo::SkinNotFound {
                 key: key.to_string(),
             }
         })?;
 
-        let mut equipped = false;
         if previous.variant != variant {
             let (reference, token) = self.skin_session(account).await?;
             let profile = mojang::fetch_profile(&token).await?;
             if profile.active_skin().is_some_and(|a| a.key == key) {
-                equipped = true;
                 let png = self.skins().texture(key)?;
                 match mojang::upload_skin(&token, png, variant).await? {
                     Some(profile) => self.skins().store_profile(&reference, profile),
@@ -198,6 +196,7 @@ impl Engine {
             }
         }
 
+        let equipped = self.skin_equipped(account, key);
         let texture = data_url(&self.skins().texture(key)?);
         Ok(Skin {
             key: entry.key,
@@ -207,6 +206,38 @@ impl Engine {
             source: SkinSource::Library,
             equipped,
         })
+    }
+
+    async fn adopt_equipped_skin(&self, account: &str, key: &str) -> Result<LibraryEntry> {
+        let (reference, token) = self.skin_session(account).await?;
+        let profile = match self.skins().cached_profile(&reference) {
+            Some(profile) => profile,
+            None => {
+                let profile = mojang::fetch_profile(&token).await?;
+                self.skins().store_profile(&reference, profile.clone());
+                profile
+            }
+        };
+        let active = profile
+            .active_skin()
+            .filter(|a| a.key == key)
+            .ok_or_else(|| proto::error::ErrorInfo::SkinNotFound {
+                key: key.to_string(),
+            })?;
+        let png = mojang::fetch_texture(&active.url).await?;
+        let entry = self.skins().add_keyed(key, &png, active.variant, "")?;
+        tracing::info!(key, "adopted the equipped skin into the library");
+        Ok(entry)
+    }
+
+    fn skin_equipped(&self, account: &str, key: &str) -> bool {
+        let Ok(reference) = self.skin_reference(account) else {
+            return false;
+        };
+        self.skins()
+            .cached_profile(&reference)
+            .and_then(|profile| profile.active_skin().map(|a| a.key == key))
+            .unwrap_or(false)
     }
 
     /// Equip a library or default skin by its key from `skin.list`.
@@ -268,8 +299,8 @@ impl Engine {
     }
 
     /// Save the equipped texture into the library when neither the library nor
-    /// the defaults already record it. Best-effort: a failure must not block
-    /// the change the user asked for.
+    /// the defaults already record it, under an auto-generated "Skin N" name.
+    /// Best-effort: a failure must not block the change the user asked for.
     async fn preserve_current_skin(&self, profile: &mojang::Profile) {
         let Some(active) = profile.active_skin() else {
             return;
@@ -277,10 +308,11 @@ impl Engine {
         if defaults::find(&active.key).is_some() || self.skins().entry(&active.key).is_some() {
             return;
         }
+        let name = self.next_library_skin_name();
         let saved = match mojang::fetch_texture(&active.url).await {
             Ok(png) => self
                 .skins()
-                .add_keyed(&active.key, &png, active.variant, ""),
+                .add_keyed(&active.key, &png, active.variant, &name),
             Err(e) => Err(e),
         };
         match saved {
@@ -291,6 +323,23 @@ impl Engine {
                 tracing::warn!(key = %active.key, error = %e, "could not preserve the replaced skin")
             }
         }
+    }
+}
+
+impl Engine {
+    fn next_library_skin_name(&self) -> String {
+        let highest = self
+            .skins()
+            .list()
+            .iter()
+            .filter_map(|e| {
+                e.name
+                    .strip_prefix("Skin ")
+                    .and_then(|n| n.trim().parse::<u32>().ok())
+            })
+            .max()
+            .unwrap_or(0);
+        format!("Skin {}", highest + 1)
     }
 }
 

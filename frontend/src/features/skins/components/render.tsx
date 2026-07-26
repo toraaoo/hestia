@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { SkinViewer, WalkingAnimation } from 'skinview3d';
+import { IdleAnimation, SkinViewer } from 'skinview3d';
 
 import type { SkinVariant } from '@/api';
 import {
@@ -26,12 +26,12 @@ function posedViewer(): SkinViewer {
       zoom: 0.9,
       renderPaused: true,
     });
-    poseViewer.playerObject.rotation.y = Math.PI / 9;
+    poseViewer.playerObject.rotation.y = Math.PI / 8;
     const parts = poseViewer.playerObject.skin;
-    parts.rightArm.rotation.x = 0.25;
-    parts.leftArm.rotation.x = -0.25;
-    parts.rightLeg.rotation.x = -0.2;
-    parts.leftLeg.rotation.x = 0.2;
+    parts.rightArm.rotation.x = 0.12;
+    parts.leftArm.rotation.x = -0.12;
+    parts.rightLeg.rotation.x = -0.08;
+    parts.leftLeg.rotation.x = 0.08;
   }
   return poseViewer;
 }
@@ -130,6 +130,7 @@ export function SkinModel({
   variant,
   width,
   height,
+  nametag,
   className,
 }: {
   texture: string;
@@ -137,6 +138,7 @@ export function SkinModel({
   variant: SkinVariant;
   width: number;
   height: number;
+  nametag?: string;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -150,8 +152,7 @@ export function SkinModel({
     });
     viewer.controls.enableZoom = false;
     viewer.controls.enablePan = false;
-    viewer.animation = new WalkingAnimation();
-    viewer.animation.speed = 0.55;
+    viewer.animation = new IdleAnimation();
     viewer.playerObject.rotation.y = Math.PI / 9;
     viewerRef.current = viewer;
     return () => {
@@ -180,6 +181,10 @@ export function SkinModel({
     if (capeTexture) viewer.loadCape(capeTexture).catch(() => {});
     else viewer.resetCape();
   }, [capeTexture]);
+
+  useEffect(() => {
+    if (viewerRef.current) viewerRef.current.nameTag = nametag || null;
+  }, [nametag]);
 
   return <canvas ref={canvasRef} className={className} />;
 }

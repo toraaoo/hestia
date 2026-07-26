@@ -18,9 +18,10 @@ import { SkinPose } from '@/features/skins/components/render';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
-/** An external (Mojang-set, never saved) skin arrives unnamed. */
 export function skinDisplayName(skin: Skin): string {
-  return skin.name || m['skins.unnamed']();
+  if (skin.name) return skin.name;
+  if (skin.source === 'external') return m['skins.current']();
+  return m['skins.unnamed']();
 }
 
 export function skinVariantLabel(skin: Skin): string {
