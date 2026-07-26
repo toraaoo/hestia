@@ -22,9 +22,10 @@ fn a_panic_writes_a_report_carrying_the_log_tail() {
     assert_eq!(reports.len(), 1, "expected exactly one report: {reports:?}");
 
     let report = common::crash::read(&reports[0]).expect("report is readable");
+    let paths = report.replace('\\', "/");
     assert!(report.contains("deliberate test panic"), "{report}");
     assert!(report.contains("kind:     panic"), "{report}");
-    assert!(report.contains("crates/common/tests/crash.rs"), "{report}");
+    assert!(paths.contains("crates/common/tests/crash.rs"), "{report}");
     assert!(
         report.contains("a line the report should carry"),
         "{report}"
