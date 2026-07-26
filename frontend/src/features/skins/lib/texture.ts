@@ -20,6 +20,18 @@ export function loadTexture(src: string): Promise<HTMLImageElement> {
   return pending;
 }
 
+/** The head is an 8x8 face at (8,8) with the hat/helm overlay at (40,8). */
+export const HEAD = 8;
+
+export function drawHead(canvas: HTMLCanvasElement, img: HTMLImageElement) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, HEAD, HEAD);
+  ctx.drawImage(img, 8, 8, HEAD, HEAD, 0, 0, HEAD, HEAD);
+  ctx.drawImage(img, 40, 8, HEAD, HEAD, 0, 0, HEAD, HEAD);
+}
+
 /** The cape's front face is the 10x16 region at (1,1) of a 64x32 texture. */
 export const CAPE_W = 10;
 export const CAPE_H = 16;

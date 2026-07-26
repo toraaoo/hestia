@@ -28,7 +28,7 @@ export const accountMutations = {
     mutation<Account | null, void>({
       mutationKey: [...keys.accounts.all, 'login', 'sisu'],
       mutationFn: () => api.loginSisu(),
-      invalidates: () => [keys.accounts.all],
+      invalidates: () => [keys.accounts.all, keys.skins.all],
     }),
   beginLogin: () =>
     mutation<LoginBegin, LoginMethod>({
@@ -39,20 +39,20 @@ export const accountMutations = {
     mutation<Account, { id: string; code?: string }>({
       mutationKey: [...keys.accounts.all, 'login', 'complete'],
       mutationFn: ({ id, code }) => api.completeLogin(id, code),
-      invalidates: () => [keys.accounts.all],
+      invalidates: () => [keys.accounts.all, keys.skins.all],
     }),
   /** Pick the default account launches use; `account` is a name or uuid. */
   switch: () =>
     mutation<Account, string>({
       mutationKey: [...keys.accounts.all, 'switch'],
       mutationFn: (account) => api.switchAccount(account),
-      invalidates: () => [keys.accounts.all],
+      invalidates: () => [keys.accounts.all, keys.skins.all],
     }),
   remove: () =>
     mutation<void, string>({
       mutationKey: [...keys.accounts.all, 'remove'],
       mutationFn: (account) => api.remove(account),
-      invalidates: () => [keys.accounts.all],
+      invalidates: () => [keys.accounts.all, keys.skins.all],
     }),
 };
 

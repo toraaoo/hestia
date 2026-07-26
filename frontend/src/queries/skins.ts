@@ -47,19 +47,23 @@ function equipSkinInList(list: SkinList, key: string): SkinList {
 }
 
 /**
- * The equipped skin's texture hash for `account` (empty = default), read from
- * the picker cache without fetching — so it's known only once the skin surface
- * has loaded, and changes the moment an equip/reset settles there. Callers use
- * it to cache-bust the mc-heads avatar, whose url is otherwise uuid-only and so
- * pinned in the browser image cache across a skin change.
+ * The equipped skin for `account` (empty = default). Its `texture` lets the
+ * avatar render the head locally (reflecting a change at once); its `key`
+ * cache-busts the mc-heads fallback, whose url is otherwise uuid-only and so
+ * pinned in the browser image cache across a skin change. Pass `enabled` to
+ * fetch it eagerly (the avatar wants the equipped skin before the picker is
+ * ever opened); left off, it only reads what the picker has already loaded.
  */
-export function useEquippedSkinKey(account = ''): string | undefined {
+export function useEquippedSkin(
+  account = '',
+  { enabled = false }: { enabled?: boolean } = {},
+): Skin | undefined {
   const { data } = useQuery({
     ...skinQueries.list(account),
-    enabled: false,
+    enabled,
     notifyOnChangeProps: ['data'],
   });
-  return data?.skins.find((s) => s.equipped)?.key;
+  return data?.skins.find((s) => s.equipped);
 }
 
 export const skinMutations = {
