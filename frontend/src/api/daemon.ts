@@ -1,11 +1,11 @@
 /** The `daemon.*` channels. */
 import { call, invokeCommand } from './core/ipc';
-import type { DaemonStatus } from './types/daemon';
+import type { DaemonStatusResult } from './types/daemon';
 
 /** The old daemon must release the endpoint before a restart respawns. */
 const RESTART_GRACE_MS = 600;
 
-export function status(): Promise<DaemonStatus> {
+export function status(): Promise<DaemonStatusResult> {
   return call('daemon.status');
 }
 
@@ -18,7 +18,7 @@ export async function stop(stopProcesses = false): Promise<boolean> {
 }
 
 /** Start the daemon via the shell's `start_daemon` command; `ipc_call` never spawns. */
-export async function start(): Promise<DaemonStatus> {
+export async function start(): Promise<DaemonStatusResult> {
   await invokeCommand('start_daemon');
   return status();
 }
@@ -27,7 +27,7 @@ export async function start(): Promise<DaemonStatus> {
  * Stop then start again — picks up a freshly built `hestiad`; supervised
  * processes are re-adopted. The grace lets the old daemon release the endpoint.
  */
-export async function restart(): Promise<DaemonStatus> {
+export async function restart(): Promise<DaemonStatusResult> {
   await stop(false);
   await delay(RESTART_GRACE_MS);
   return start();

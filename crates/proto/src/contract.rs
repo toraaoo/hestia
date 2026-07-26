@@ -23,4 +23,5 @@ pub trait Topic {
 /// An empty payload: serializes to `{}` and decodes from it, matching the C++
 /// `proto::Empty`.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 pub struct Empty {}

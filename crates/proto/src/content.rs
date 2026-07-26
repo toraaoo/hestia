@@ -15,12 +15,8 @@ use crate::minecraft::{Artifact, ProvisionProgress};
 
 /// What a project is — the second selector level after the source.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum ContentKind {
     #[default]
     Mod,
@@ -45,6 +41,7 @@ impl fmt::Display for ContentKind {
 /// Whether a project (or a modpack file) is meant for the client, the server,
 /// both, or neither. `Unknown` when the source does not say.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum SideSupport {
     Required,
@@ -56,6 +53,7 @@ pub enum SideSupport {
 
 /// A version's release stability.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum ReleaseChannel {
     #[default]
@@ -66,6 +64,7 @@ pub enum ReleaseChannel {
 
 /// A source platform (modrinth, curseforge) — the first selector level.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentSource {
     pub id: String,
@@ -75,6 +74,7 @@ pub struct ContentSource {
 /// A gallery image on a project. Search hits carry only `url`; the detail call
 /// fills the caption fields.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct GalleryImage {
     pub url: String,
@@ -86,6 +86,7 @@ pub struct GalleryImage {
 /// A project, as a search hit or a detail. `body` (the long description) is only
 /// filled by the detail call; `icon_url`/`gallery` carry images for the desktop UI.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentProject {
     pub source: String,
@@ -107,6 +108,7 @@ pub struct ContentProject {
 
 /// One downloadable file of a version; `primary` marks the main artifact.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentFile {
     pub artifact: Artifact,
@@ -115,6 +117,7 @@ pub struct ContentFile {
 
 /// How a dependency relates to the version that declares it.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum DependencyKind {
     #[default]
@@ -127,6 +130,7 @@ pub enum DependencyKind {
 /// A dependency on another project (and optionally a specific version of it).
 /// Either id may be empty when the source pins only the other.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentDependency {
     pub project_id: String,
@@ -136,6 +140,7 @@ pub struct ContentDependency {
 
 /// A downloadable version of a project.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentVersion {
     pub source: String,
@@ -155,6 +160,7 @@ pub struct ContentVersion {
 
 /// How search results are ordered.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum SearchSort {
     #[default]
@@ -168,6 +174,7 @@ pub enum SearchSort {
 /// A paginated search over a source. `source` empty selects the default source;
 /// `limit` is clamped to `1..=100` by the provider.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SearchQuery {
     pub source: String,
@@ -183,6 +190,7 @@ pub struct SearchQuery {
 
 /// A page of search hits. `total` is the full match count for paging.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SearchResult {
     pub hits: Vec<ContentProject>,
@@ -193,6 +201,7 @@ pub struct SearchResult {
 
 /// The versions of a project, optionally filtered by loader and game version.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct VersionQuery {
     pub source: String,
@@ -203,6 +212,7 @@ pub struct VersionQuery {
 
 /// One file a modpack pulls in, at its path relative to the game directory.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ModpackFile {
     pub path: String,
@@ -214,6 +224,7 @@ pub struct ModpackFile {
 /// A resolved modpack: the loader/game version it targets and the files to
 /// place. `overrides/` handling is a materialize-time concern, deferred.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ResolvedModpack {
     pub source: String,
@@ -227,12 +238,14 @@ pub struct ResolvedModpack {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SourcesResult {
     pub sources: Vec<ContentSource>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProjectParams {
     pub source: String,
@@ -240,12 +253,14 @@ pub struct ProjectParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
-pub struct VersionsResult {
+pub struct ContentVersionsResult {
     pub versions: Vec<ContentVersion>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ModpackParams {
     pub source: String,
@@ -256,6 +271,7 @@ pub struct ModpackParams {
 /// platform id (`modrinth`) or the literal `file` for a local import — imports
 /// carry empty project/version ids and cannot be updated.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstalledContent {
     pub kind: ContentKind,
@@ -295,6 +311,7 @@ fn default_true() -> bool {
 /// The installed items of one kind, plus filenames found in the entry's game
 /// directory that no index entry accounts for.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentListResult {
     pub items: Vec<InstalledContent>,
@@ -305,6 +322,7 @@ pub struct ContentListResult {
 /// optionally pinned by `version`), `url` (a project/version page URL on a
 /// supported source), or `path` (a daemon-local file to import).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentAddItem {
     pub project: String,
@@ -318,6 +336,7 @@ pub struct ContentAddItem {
 /// installed in a single job. Items that fail are reported per item on the
 /// done event; the rest of the batch proceeds.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentAddSpec {
     pub kind: ContentKind,
@@ -331,6 +350,7 @@ pub struct ContentAddSpec {
 
 /// One item of a batch that could not be installed.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentFailure {
     /// The selector as given (project slug/id, URL, or path).
@@ -342,6 +362,7 @@ pub struct ContentFailure {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerContentAddParams {
     pub server: String,
@@ -351,6 +372,7 @@ pub struct ServerContentAddParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceContentAddParams {
     pub instance: String,
@@ -360,6 +382,7 @@ pub struct InstanceContentAddParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerContentListParams {
     pub server: String,
@@ -367,6 +390,7 @@ pub struct ServerContentListParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceContentListParams {
     pub instance: String,
@@ -376,6 +400,7 @@ pub struct InstanceContentListParams {
 /// `worlds` narrows a datapack removal to those save worlds (empty removes
 /// every copy); it is rejected for the other kinds, which have no worlds.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerContentRemoveParams {
     pub server: String,
@@ -385,6 +410,7 @@ pub struct ServerContentRemoveParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceContentRemoveParams {
     pub instance: String,
@@ -395,6 +421,7 @@ pub struct InstanceContentRemoveParams {
 
 /// `item` empty updates every platform-sourced item of the kind.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerContentUpdateParams {
     pub server: String,
@@ -404,6 +431,7 @@ pub struct ServerContentUpdateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceContentUpdateParams {
     pub instance: String,
@@ -413,6 +441,7 @@ pub struct InstanceContentUpdateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentJobResult {
     pub id: String,
@@ -423,6 +452,7 @@ pub struct ContentJobResult {
 /// managed copy and provenance; enabling restores the mirror. `worlds` narrows
 /// a datapack toggle to those save worlds (empty toggles every copy).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerContentEnableParams {
     pub server: String,
@@ -433,6 +463,7 @@ pub struct ServerContentEnableParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceContentEnableParams {
     pub instance: String,
@@ -446,6 +477,7 @@ pub struct InstanceContentEnableParams {
 /// version. Resolves upstream, so it is a plain (network-bound) call rather
 /// than an install job.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerContentCheckUpdatesParams {
     pub server: String,
@@ -453,6 +485,7 @@ pub struct ServerContentCheckUpdatesParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceContentCheckUpdatesParams {
     pub instance: String,
@@ -462,6 +495,7 @@ pub struct InstanceContentCheckUpdatesParams {
 /// One installed item's update status: its current pin against the newest
 /// compatible version resolved upstream.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentUpdate {
     pub filename: String,
@@ -478,6 +512,7 @@ pub struct ContentUpdate {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentUpdatesResult {
     pub updates: Vec<ContentUpdate>,
@@ -487,6 +522,7 @@ pub struct ContentUpdatesResult {
 /// The swap re-installs that version like an update, applying at the next
 /// start/launch; runs as a content job.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerContentSetVersionParams {
     pub server: String,
@@ -497,6 +533,7 @@ pub struct ServerContentSetVersionParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceContentSetVersionParams {
     pub instance: String,
@@ -605,6 +642,7 @@ impl Contract for InstanceContentSetVersion {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ContentProgressEvent {
     pub id: String,
@@ -616,6 +654,7 @@ impl Topic for ContentProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ContentDoneEvent {
     pub id: String,
@@ -628,6 +667,7 @@ impl Topic for ContentDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ContentErrorEvent {
     pub id: String,
@@ -663,7 +703,7 @@ pub struct ContentVersions;
 impl Contract for ContentVersions {
     const CHANNEL: &'static str = "content.versions";
     type Params = VersionQuery;
-    type Result = VersionsResult;
+    type Result = ContentVersionsResult;
 }
 
 pub struct ModpackResolve;
@@ -674,6 +714,7 @@ impl Contract for ModpackResolve {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentInspectParams {
     pub path: String,
@@ -683,6 +724,7 @@ pub struct ContentInspectParams {
 /// single-file content, `kind` the detected kind (absent for a valid archive of
 /// an unrecognised shape — the caller then chooses), and `reason` set when not.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentInspectResult {
     pub valid: bool,

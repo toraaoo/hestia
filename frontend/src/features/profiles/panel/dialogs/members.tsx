@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { ContentProfile, InstalledContent } from '@/api';
+import type { InstalledContent, Profile } from '@/api';
 import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ export function MembersDialog({
   onOpenChange,
   onSave,
 }: {
-  profile: ContentProfile | null;
+  profile: Profile | null;
   pool: InstalledContent[];
   pending: boolean;
   onOpenChange: (open: boolean) => void;

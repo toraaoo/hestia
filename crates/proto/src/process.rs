@@ -7,6 +7,7 @@ use crate::contract::{Contract, Empty, Topic};
 
 /// What the supervisor does when a launched process exits.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum RestartPolicy {
     /// Leave the process dead once it exits (the default).
@@ -18,6 +19,7 @@ pub enum RestartPolicy {
 
 /// Where a supervised process's output ends up.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum LogSource {
     /// The supervisor captures stdout+stderr into a file it owns.
@@ -29,6 +31,7 @@ pub enum LogSource {
 
 /// A request to launch a process under the daemon's supervisor.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProcessSpec {
     /// Client-supplied id; empty asks the daemon to allocate one.
@@ -44,6 +47,7 @@ pub struct ProcessSpec {
 
 /// Where a supervised process is in its lifecycle.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "lowercase")]
 pub enum ProcessState {
     #[default]
@@ -56,6 +60,7 @@ pub enum ProcessState {
 
 /// A snapshot of one tracked process.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProcessInfo {
     pub id: String,
@@ -70,6 +75,7 @@ pub struct ProcessInfo {
 
 /// Which stream a captured log line came from.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "lowercase")]
 pub enum LogStream {
     #[default]
@@ -78,6 +84,7 @@ pub enum LogStream {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProcessLogLine {
     pub stream: LogStream,
@@ -85,6 +92,7 @@ pub struct ProcessLogLine {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProcessStartResult {
     pub id: String,
@@ -100,6 +108,7 @@ impl Contract for ProcessStart {
 
 /// Names a single tracked process by id (stop / status / logs share it).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProcessRef {
     pub id: String,
@@ -113,6 +122,7 @@ impl Contract for ProcessStop {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProcessListResult {
     pub processes: Vec<ProcessInfo>,
@@ -133,6 +143,7 @@ impl Contract for ProcessStatus {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProcessLogsParams {
     pub id: String,
@@ -142,6 +153,7 @@ pub struct ProcessLogsParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProcessLogsResult {
     pub lines: Vec<ProcessLogLine>,
@@ -155,6 +167,7 @@ impl Contract for ProcessLogs {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessStartedEvent {
     pub id: String,
@@ -168,6 +181,7 @@ impl Topic for ProcessStartedEvent {
 /// process (a game's startup log) can't flood subscribers with an event per
 /// line.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProcessOutputEvent {
     pub id: String,
@@ -179,6 +193,7 @@ impl Topic for ProcessOutputEvent {
 
 /// One running process's resource sample; `cpu_pct` is 100 per full core.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProcessMetrics {
     pub id: String,
@@ -187,6 +202,7 @@ pub struct ProcessMetrics {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessMetricsEvent {
     pub samples: Vec<ProcessMetrics>,
@@ -196,6 +212,7 @@ impl Topic for ProcessMetricsEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessExitEvent {
     pub id: String,

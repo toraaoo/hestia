@@ -1,8 +1,9 @@
 /** The `app.*` / `health.*` channels. */
 import { call } from './core/ipc';
-import type { AppInfo, PingResult } from './types/app';
+import type { AppInfoResult } from './types/app';
+import type { PingResult } from './types/health';
 
-export function info(): Promise<AppInfo> {
+export function info(): Promise<AppInfoResult> {
   return call('app.info');
 }
 

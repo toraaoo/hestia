@@ -22,7 +22,7 @@ import {
   type SectionProps,
   type UpdatesResult,
 } from './content';
-import { ContentList } from './content-list';
+import { ContentListResult } from './content-list';
 
 /**
  * The content tab body: kind filter chips + the filtered installed list, wired
@@ -195,7 +195,7 @@ function ContentSectionView({
           })}
         </Empty>
       ) : (
-        <ContentList
+        <ContentListResult
           entry={entry}
           items={filtered}
           updatable={updatable}

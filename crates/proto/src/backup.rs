@@ -17,6 +17,7 @@ use crate::server::ServerRef;
 /// Why a backup was taken. Encoded into the archive's id, so the disk stays
 /// the registry.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum BackupKind {
     #[default]
@@ -47,6 +48,7 @@ impl BackupKind {
 
 /// One stored backup archive.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct BackupInfo {
     pub id: String,
@@ -56,6 +58,7 @@ pub struct BackupInfo {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct BackupListResult {
     pub backups: Vec<BackupInfo>,
@@ -64,12 +67,14 @@ pub struct BackupListResult {
 /// The immediate answer of a backup create/restore call: the job whose
 /// events carry the outcome.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct BackupJobResult {
     pub id: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerBackupCreateParams {
     /// Server name or id.
@@ -79,6 +84,7 @@ pub struct ServerBackupCreateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerBackupRestoreParams {
     /// Server name or id.
@@ -91,6 +97,7 @@ pub struct ServerBackupRestoreParams {
 
 /// Names one backup of one server (remove).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerBackupRef {
     pub server: String,
@@ -126,6 +133,7 @@ impl Contract for ServerBackupRemove {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BackupProgressEvent {
     pub id: String,
@@ -137,6 +145,7 @@ impl Topic for BackupProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BackupDoneEvent {
     pub id: String,
@@ -147,6 +156,7 @@ impl Topic for BackupDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BackupErrorEvent {
     pub id: String,

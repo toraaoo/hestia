@@ -6,6 +6,7 @@ use crate::contract::{Contract, Empty, Topic};
 use crate::error::ErrorInfo;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct JavaRelease {
     pub major: i32,
@@ -13,6 +14,7 @@ pub struct JavaRelease {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct JavaRuntime {
     pub vendor: String,
@@ -25,6 +27,7 @@ pub struct JavaRuntime {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "lowercase")]
 pub enum JavaInstallPhase {
     Resolving,
@@ -33,6 +36,7 @@ pub enum JavaInstallPhase {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct JavaInstallProgress {
     pub phase: JavaInstallPhase,
@@ -56,6 +60,7 @@ impl JavaInstallProgress {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct JavaReleasesResult {
     pub releases: Vec<JavaRelease>,
@@ -69,6 +74,7 @@ impl Contract for JavaReleases {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct JavaListResult {
     pub runtimes: Vec<JavaRuntime>,
@@ -82,6 +88,7 @@ impl Contract for JavaList {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct JavaInstallParams {
     pub major: i32,
@@ -90,6 +97,7 @@ pub struct JavaInstallParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct JavaInstallResult {
     pub id: String,
@@ -103,6 +111,7 @@ impl Contract for JavaInstall {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct JavaUninstallParams {
     pub major: i32,
@@ -116,6 +125,7 @@ impl Contract for JavaUninstall {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct JavaInstallProgressEvent {
     pub id: String,
@@ -127,6 +137,7 @@ impl Topic for JavaInstallProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct JavaInstallDoneEvent {
     pub id: String,
@@ -139,6 +150,7 @@ impl Topic for JavaInstallDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct JavaInstallErrorEvent {
     pub id: String,

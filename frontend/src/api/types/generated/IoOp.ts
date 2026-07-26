@@ -3,14 +3,4 @@
 /**
  * The filesystem action an `Io` failure was performing.
  */
-export type IoOp =
-  | 'create'
-  | 'read'
-  | 'write'
-  | 'remove'
-  | 'move'
-  | 'copy'
-  | 'open'
-  | 'link'
-  | 'unlink'
-  | 'extract';
+export type IoOp = "create" | "read" | "write" | "remove" | "move" | "copy" | "open" | "link" | "unlink" | "extract";

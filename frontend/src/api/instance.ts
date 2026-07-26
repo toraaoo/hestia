@@ -5,24 +5,24 @@
  * `stop` and `logs` take an optional session id.
  */
 
+import type { ContentAddInput } from './content';
 import { call, tryCall } from './core/ipc';
 import { jobId, runJob } from './core/jobs';
 import type {
-  ContentAddSpec,
-  ContentDone,
+  ContentDoneEvent,
   ContentKind,
-  ContentList,
+  ContentListResult,
   ContentUpdate,
 } from './types/content';
 import type {
-  ContentProfile,
   InstanceCreateParams,
   InstanceDetails,
   InstanceInfo,
-  InstanceLaunchDone,
+  InstanceLaunchDoneEvent,
   InstanceLaunchParams,
-  InstanceProfiles,
+  InstanceProfileListResult,
   InstanceUpdateParams,
+  Profile,
 } from './types/instance';
 import type {
   ConfigEntry,
@@ -75,7 +75,7 @@ export function info(instance: string): Promise<InstanceDetails> {
 }
 
 export async function create(
-  params: InstanceCreateParams,
+  params: Partial<InstanceCreateParams>,
 ): Promise<InstanceInfo> {
   const result = await call<{ instance: InstanceInfo }>(
     'instance.create',
@@ -87,7 +87,7 @@ export async function create(
 
 /** The instance pays for the new version at its next launch. */
 export async function update(
-  params: InstanceUpdateParams,
+  params: Omit<InstanceUpdateParams, 'id'>,
 ): Promise<InstanceInfo> {
   const result = await call<{ instance: InstanceInfo }>(
     'instance.update',
@@ -118,11 +118,11 @@ export async function worlds(instance: string): Promise<string[]> {
  * account. Resolves once the session is running.
  */
 export function launch(
-  params: InstanceLaunchParams,
+  params: Partial<InstanceLaunchParams>,
   onProgress?: OnProgress,
-): Promise<InstanceLaunchDone> {
+): Promise<InstanceLaunchDoneEvent> {
   const id = jobId('instance-launch');
-  return runJob<InstanceLaunchDone>({
+  return runJob<InstanceLaunchDoneEvent>({
     id,
     topics: {
       progress: 'instance.launch.progress',
@@ -181,7 +181,7 @@ export const config = {
  * launch, so it is safe while the instance runs.
  */
 export const profiles = {
-  list(instance: string): Promise<InstanceProfiles> {
+  list(instance: string): Promise<InstanceProfileListResult> {
     return call('instance.profile.list', { instance });
   },
 
@@ -190,7 +190,7 @@ export const profiles = {
     instance: string,
     name: string,
     seedFromPool = true,
-  ): Promise<ContentProfile> {
+  ): Promise<Profile> {
     return call('instance.profile.create', {
       instance,
       name,
@@ -203,11 +203,7 @@ export const profiles = {
     await call('instance.profile.remove', { instance, name });
   },
 
-  rename(
-    instance: string,
-    name: string,
-    newName: string,
-  ): Promise<ContentProfile> {
+  rename(instance: string, name: string, newName: string): Promise<Profile> {
     return call('instance.profile.rename', {
       instance,
       name,
@@ -229,7 +225,7 @@ export const profiles = {
     name: string,
     add: string[] = [],
     remove: string[] = [],
-  ): Promise<ContentProfile> {
+  ): Promise<Profile> {
     return call('instance.profile.edit', { instance, name, add, remove });
   },
 
@@ -261,9 +257,9 @@ export const profiles = {
     instance: string,
     profile: string,
     onProgress?: OnProgress,
-  ): Promise<ContentDone> {
+  ): Promise<ContentDoneEvent> {
     const id = jobId('profile-apply');
-    return runJob<ContentDone>({
+    return runJob<ContentDoneEvent>({
       id,
       topics: { done: 'content.done', error: 'content.error' },
       onProgress,
@@ -276,11 +272,11 @@ export const content = {
   /** Instances take mods, resourcepacks, shaders, and datapacks. */
   add(
     instance: string,
-    spec: ContentAddSpec,
+    spec: ContentAddInput,
     onProgress?: OnProgress,
-  ): Promise<ContentDone> {
+  ): Promise<ContentDoneEvent> {
     const id = jobId('instance-content');
-    return runJob<ContentDone>({
+    return runJob<ContentDoneEvent>({
       id,
       topics: {
         progress: 'content.progress',
@@ -292,7 +288,7 @@ export const content = {
     });
   },
 
-  list(instance: string, kind: ContentKind): Promise<ContentList> {
+  list(instance: string, kind: ContentKind): Promise<ContentListResult> {
     return call('instance.content.list', { instance, kind });
   },
 
@@ -311,9 +307,9 @@ export const content = {
     kind: ContentKind,
     item = '',
     onProgress?: OnProgress,
-  ): Promise<ContentDone> {
+  ): Promise<ContentDoneEvent> {
     const id = jobId('instance-content-update');
-    return runJob<ContentDone>({
+    return runJob<ContentDoneEvent>({
       id,
       topics: {
         progress: 'content.progress',
@@ -363,9 +359,9 @@ export const content = {
     item: string,
     version: string,
     onProgress?: OnProgress,
-  ): Promise<ContentDone> {
+  ): Promise<ContentDoneEvent> {
     const id = jobId('instance-content-set-version');
-    return runJob<ContentDone>({
+    return runJob<ContentDoneEvent>({
       id,
       topics: {
         progress: 'content.progress',

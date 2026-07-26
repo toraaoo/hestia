@@ -7,6 +7,7 @@ export * as accounts from './accounts';
 export * as app from './app';
 export * as cache from './cache';
 export * as config from './config';
+export type { ContentAddInput } from './content';
 export * as content from './content';
 export { errorMessage, errorMessageFromInfo } from './core/errors';
 export {
@@ -45,4 +46,4 @@ export * as skins from './skins';
 export * as sync from './sync';
 export * as system from './system';
 export type * from './types';
-export { downgradeBetween } from './types/minecraft';
+export { downgradeBetween } from './version';

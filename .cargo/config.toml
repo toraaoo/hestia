@@ -1,0 +1,6 @@
+# ts-rs TypeScript codegen (active only under `proto`'s `ts` feature). The
+# bindings land beside the front-end's typed API layer; large ints map to
+# `number` because the wire serializes them as JSON numbers. See scripts/gen-types.sh.
+[env]
+TS_RS_EXPORT_DIR = { value = "frontend/src/api/types/generated", relative = true }
+TS_RS_LARGE_INT = "number"

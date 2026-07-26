@@ -6,14 +6,14 @@
  * the `backup.*` / `content.*` topics, disambiguated by job id.
  */
 
+import type { ContentAddInput } from './content';
 import { call, tryCall } from './core/ipc';
 import { jobId, runJob } from './core/jobs';
 import type { BackupInfo } from './types/backup';
 import type {
-  ContentAddSpec,
-  ContentDone,
+  ContentDoneEvent,
   ContentKind,
-  ContentList,
+  ContentListResult,
   ContentUpdate,
 } from './types/content';
 import type {
@@ -84,7 +84,7 @@ export function ping(server: string): Promise<ServerPingResult> {
 }
 
 export async function create(
-  params: ServerCreateParams,
+  params: Partial<ServerCreateParams>,
   onProgress?: OnProgress,
 ): Promise<ServerInfo> {
   const id = jobId('server-create');
@@ -102,7 +102,7 @@ export async function create(
 }
 
 export async function update(
-  params: ServerUpdateParams,
+  params: Omit<ServerUpdateParams, 'id'>,
   onProgress?: OnProgress,
 ): Promise<ServerInfo> {
   const id = jobId('server-update');
@@ -232,11 +232,11 @@ export const content = {
   /** Servers take mods and datapacks; refused on a running or busy server. */
   add(
     server: string,
-    spec: ContentAddSpec,
+    spec: ContentAddInput,
     onProgress?: OnProgress,
-  ): Promise<ContentDone> {
+  ): Promise<ContentDoneEvent> {
     const id = jobId('server-content');
-    return runJob<ContentDone>({
+    return runJob<ContentDoneEvent>({
       id,
       topics: {
         progress: 'content.progress',
@@ -248,7 +248,7 @@ export const content = {
     });
   },
 
-  list(server: string, kind: ContentKind): Promise<ContentList> {
+  list(server: string, kind: ContentKind): Promise<ContentListResult> {
     return call('server.content.list', { server, kind });
   },
 
@@ -267,9 +267,9 @@ export const content = {
     kind: ContentKind,
     item = '',
     onProgress?: OnProgress,
-  ): Promise<ContentDone> {
+  ): Promise<ContentDoneEvent> {
     const id = jobId('server-content-update');
-    return runJob<ContentDone>({
+    return runJob<ContentDoneEvent>({
       id,
       topics: {
         progress: 'content.progress',
@@ -318,9 +318,9 @@ export const content = {
     item: string,
     version: string,
     onProgress?: OnProgress,
-  ): Promise<ContentDone> {
+  ): Promise<ContentDoneEvent> {
     const id = jobId('server-content-set-version');
-    return runJob<ContentDone>({
+    return runJob<ContentDoneEvent>({
       id,
       topics: {
         progress: 'content.progress',

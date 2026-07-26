@@ -6,6 +6,7 @@ use crate::contract::{Contract, Topic};
 use crate::error::ErrorInfo;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "lowercase")]
 pub enum HashAlgorithm {
     Sha1,
@@ -30,6 +31,7 @@ impl HashAlgorithm {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct Checksum {
     pub algorithm: HashAlgorithm,
@@ -47,6 +49,7 @@ impl Checksum {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadSpec {
     #[serde(default)]
@@ -60,6 +63,7 @@ pub struct DownloadSpec {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct DownloadProgress {
     pub downloaded: u64,
@@ -67,6 +71,7 @@ pub struct DownloadProgress {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct DownloadStartResult {
     pub id: String,
@@ -80,6 +85,7 @@ impl Contract for DownloadStart {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadProgressEvent {
     pub id: String,
@@ -91,6 +97,7 @@ impl Topic for DownloadProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadDoneEvent {
     pub id: String,
@@ -101,6 +108,7 @@ impl Topic for DownloadDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadErrorEvent {
     pub id: String,

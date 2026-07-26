@@ -9,7 +9,7 @@ import {
 } from '@phosphor-icons/react';
 import { useState } from 'react';
 
-import type { ContentProfile } from '@/api';
+import type { Profile } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -34,7 +34,7 @@ export function ProfileRow({
   onRelease,
   onRemove,
 }: {
-  profile: ContentProfile;
+  profile: Profile;
   poolSize: number;
   active: boolean;
   running: boolean;

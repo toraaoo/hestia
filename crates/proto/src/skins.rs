@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::contract::{Contract, Empty};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum SkinVariant {
     #[default]
@@ -18,6 +19,7 @@ pub enum SkinVariant {
 /// How the daemon knows about a skin: a vanilla default, a library entry, or
 /// the account's currently equipped texture that neither covers.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum SkinSource {
     #[default]
@@ -27,6 +29,7 @@ pub enum SkinSource {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct Skin {
     /// The texture hash — the stable identity a library row and an equip name.
@@ -41,6 +44,7 @@ pub struct Skin {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct Cape {
     pub id: String,
@@ -51,6 +55,7 @@ pub struct Cape {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SkinListParams {
     /// Name or uuid; empty uses the default account.
@@ -58,6 +63,7 @@ pub struct SkinListParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SkinListResult {
     /// Library entries, then the vanilla defaults, then — only when neither
@@ -76,6 +82,7 @@ impl Contract for SkinList {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SkinAddParams {
     /// Name or uuid; empty uses the default account.
@@ -88,6 +95,7 @@ pub struct SkinAddParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SkinAddResult {
     pub skin: Skin,
@@ -101,6 +109,7 @@ impl Contract for SkinAdd {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SkinEquipParams {
     /// Name or uuid; empty uses the default account.
@@ -117,6 +126,7 @@ impl Contract for SkinEquip {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SkinResetParams {
     /// Name or uuid; empty uses the default account.
@@ -131,6 +141,7 @@ impl Contract for SkinReset {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SkinUpdateParams {
     /// Name or uuid; empty uses the default account.
@@ -143,6 +154,7 @@ pub struct SkinUpdateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SkinUpdateResult {
     /// The updated library entry. A label-only update never touches Mojang,
@@ -158,6 +170,7 @@ impl Contract for SkinUpdate {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SkinRemoveParams {
     /// The library entry to remove. The equipped Mojang skin is untouched.
@@ -172,6 +185,7 @@ impl Contract for SkinRemove {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct CapeEquipParams {
     /// Name or uuid; empty uses the default account.
@@ -188,6 +202,7 @@ impl Contract for CapeEquip {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct CapeClearParams {
     /// Name or uuid; empty uses the default account.

@@ -80,8 +80,8 @@ export const entryTypeLabel = (type: Target['type']): string =>
 export interface PickedFile {
   path: string;
   filename: string;
-  kind: ContentKind | null;
-  detected: ContentKind | null;
+  kind?: ContentKind;
+  detected?: ContentKind;
   valid: boolean;
   reason: string;
 }

@@ -6,6 +6,7 @@ use crate::contract::{Contract, Empty};
 use crate::download::Checksum;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct CacheEntry {
     #[serde(flatten)]
@@ -15,6 +16,7 @@ pub struct CacheEntry {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct CacheUsage {
     pub entries: u64,
@@ -22,6 +24,7 @@ pub struct CacheUsage {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct CacheInfoResult {
     pub path: PathBuf,
@@ -37,6 +40,7 @@ impl Contract for CacheInfo {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct CacheListResult {
     pub entries: Vec<CacheEntry>,

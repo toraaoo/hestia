@@ -32,7 +32,7 @@ export const contentQueries = {
       queryFn: () => api.sources(),
       staleTime: Number.POSITIVE_INFINITY,
     }),
-  search: (query: SearchQuery) =>
+  search: (query: Partial<SearchQuery>) =>
     queryOptions({
       queryKey: keys.content.search(query),
       queryFn: () => api.search(query),
@@ -90,11 +90,11 @@ export const contentQueries = {
       enabled: project.length > 0,
       staleTime: BROWSE_STALE_MS,
     }),
-  versions: (query: VersionQuery) =>
+  versions: (query: Partial<VersionQuery>) =>
     queryOptions({
       queryKey: keys.content.versions(query),
       queryFn: () => api.versions(query),
-      enabled: query.project.length > 0,
+      enabled: (query.project ?? '').length > 0,
       staleTime: BROWSE_STALE_MS,
     }),
   /** Downloads and reads the `.mrpack` index — mount deliberately. */

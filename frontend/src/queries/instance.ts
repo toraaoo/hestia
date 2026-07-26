@@ -9,13 +9,13 @@
 import { queryOptions, useQuery } from '@tanstack/react-query';
 import type {
   ConfigEntry,
-  ContentDone,
+  ContentDoneEvent,
   ContentKind,
-  ContentProfile,
   InstanceCreateParams,
   InstanceInfo,
-  InstanceLaunchDone,
+  InstanceLaunchDoneEvent,
   InstanceUpdateParams,
+  Profile,
   ResolveParams,
 } from '../api';
 import * as api from '../api/instance';
@@ -108,14 +108,14 @@ export const instanceQueries = {
 
 export const instanceMutations = {
   create: () =>
-    mutation<InstanceInfo, InstanceCreateParams>({
+    mutation<InstanceInfo, Partial<InstanceCreateParams>>({
       mutationKey: [...keys.instances.all, 'create'],
       mutationFn: (params) => api.create(params),
       invalidates: () => [keys.instances.list()],
     }),
   /** The instance pays for the new version at its next launch. */
   update: (id: string) =>
-    mutation<InstanceInfo, Omit<InstanceUpdateParams, 'instance'>>({
+    mutation<InstanceInfo, Omit<InstanceUpdateParams, 'instance' | 'id'>>({
       mutationKey: [...keys.instances.detail(id), 'update'],
       mutationFn: (params) => api.update({ ...params, instance: id }),
       invalidates: () => [
@@ -157,7 +157,7 @@ export const instanceMutations = {
    * job store like the per-id `launch` above.
    */
   launchAny: () =>
-    jobMutation<InstanceLaunchDone, string>({
+    jobMutation<InstanceLaunchDoneEvent, string>({
       mutationKey: [...keys.instances.all, 'launch'],
       meta: (id) => ({
         kind: 'instance.launch',
@@ -192,7 +192,7 @@ export const instanceMutations = {
   profiles: {
     /** Seeded with every selectable pool item unless `seedFromPool` is false. */
     create: (id: string) =>
-      mutation<ContentProfile, { name: string; seedFromPool?: boolean }>({
+      mutation<Profile, { name: string; seedFromPool?: boolean }>({
         mutationKey: [...keys.instances.profiles(id), 'create'],
         mutationFn: ({ name, seedFromPool }) =>
           api.profiles.create(id, name, seedFromPool),
@@ -206,7 +206,7 @@ export const instanceMutations = {
         invalidates: () => [keys.instances.profiles(id)],
       }),
     rename: (id: string) =>
-      mutation<ContentProfile, { name: string; newName: string }>({
+      mutation<Profile, { name: string; newName: string }>({
         mutationKey: [...keys.instances.profiles(id), 'rename'],
         mutationFn: ({ name, newName }) =>
           api.profiles.rename(id, name, newName),
@@ -221,10 +221,7 @@ export const instanceMutations = {
       }),
     /** Add/remove members by pool reference. */
     edit: (id: string) =>
-      mutation<
-        ContentProfile,
-        { name: string; add?: string[]; remove?: string[] }
-      >({
+      mutation<Profile, { name: string; add?: string[]; remove?: string[] }>({
         mutationKey: [...keys.instances.profiles(id), 'edit'],
         mutationFn: ({ name, add, remove }) =>
           api.profiles.edit(id, name, add, remove),
@@ -249,7 +246,7 @@ export const instanceMutations = {
      * tagged with the profile and never removed by a later apply.
      */
     apply: (id: string) =>
-      jobMutation<ContentDone, string>({
+      jobMutation<ContentDoneEvent, string>({
         mutationKey: [...keys.instances.content(id), 'profile-apply'],
         meta: (profile) => ({
           kind: 'profile.apply',

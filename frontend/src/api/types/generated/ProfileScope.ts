@@ -3,4 +3,4 @@
 /**
  * Which profile namespace a lookup missed.
  */
-export type ProfileScope = 'instance' | 'global';
+export type ProfileScope = "instance" | "global";

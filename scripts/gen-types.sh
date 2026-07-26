@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
-# Regenerate the TypeScript bindings for the wire error surface from the Rust
-# `proto` types (ts-rs). The generated files land in
-# `frontend/src/api/types/generated/` and are committed — run this whenever a
-# `proto::error::ErrorInfo` variant (or a token enum it references) changes.
+# Regenerate the TypeScript bindings for the proto wire types (ts-rs). The flat
+# per-type files land in frontend/src/api/types/generated/, wrapped by one
+# per-module barrel each; both are committed. Run this after changing any
+# `#[derive(ts_rs::TS)]` type in `crates/proto`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo "generating TypeScript error bindings from proto…"
+gen_dir="$PWD/frontend/src/api/types/generated"
+
+# The export dir and the i64/u64 → number mapping live in .cargo/config.toml so
+# the annotations stay a bare `#[ts(export)]`.
+echo "generating TypeScript bindings from proto…"
+rm -rf "$gen_dir"
 cargo test -p proto --features ts >/dev/null
-echo "wrote frontend/src/api/types/generated/"
+
+python3 scripts/gen-barrels.py
+
+echo "wrote $gen_dir and per-module barrels"

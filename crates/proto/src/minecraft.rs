@@ -12,6 +12,7 @@ use crate::download::Checksum;
 /// A distribution offered by a domain: the first level of the `available`
 /// selector (`vanilla`, `fabric`, …).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct Flavor {
     pub id: String,
@@ -21,6 +22,7 @@ pub struct Flavor {
 /// One key/value setting, shared by the server and instance `config` channels
 /// and their create-time settings list.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ConfigEntry {
     pub key: String,
@@ -28,6 +30,7 @@ pub struct ConfigEntry {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum VersionKind {
     #[default]
@@ -39,6 +42,7 @@ pub enum VersionKind {
 
 /// A game version a flavor can target.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct GameVersion {
     pub id: String,
@@ -48,6 +52,7 @@ pub struct GameVersion {
 
 /// A single downloadable file, the shared shape for every artifact in a profile.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct Artifact {
     pub url: String,
@@ -60,6 +65,7 @@ pub struct Artifact {
 /// A classpath dependency, resolved to its download and its path under the
 /// libraries root (Maven layout).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct Library {
     pub name: String,
@@ -69,6 +75,7 @@ pub struct Library {
 
 /// The asset index a client version pins (`assetIndex` in a vanilla profile).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct AssetIndex {
     pub id: String,
@@ -78,6 +85,7 @@ pub struct AssetIndex {
 
 /// The resolved launch profile for a Minecraft *server*.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerProfile {
     pub flavor: String,
@@ -92,6 +100,7 @@ pub struct ServerProfile {
 
 /// The resolved launch profile for a Minecraft *client* (instance).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfile {
     pub flavor: String,
@@ -117,24 +126,28 @@ pub fn downgrade_between(versions: &[GameVersion], from: &str, to: &str) -> Opti
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct FlavorsResult {
     pub flavors: Vec<Flavor>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct VersionsParams {
     pub flavor: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct VersionsResult {
     pub versions: Vec<GameVersion>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct LoadersParams {
     pub flavor: String,
@@ -144,12 +157,14 @@ pub struct LoadersParams {
 /// Loader builds newest-first; empty for a flavor with no pickable loader
 /// version (vanilla, and loaders that pin one build per game version).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct LoadersResult {
     pub loaders: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ResolveParams {
     pub flavor: String,
@@ -160,6 +175,7 @@ pub struct ResolveParams {
 
 /// Where a provisioning job (server create, instance launch preparation) is.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum ProvisionPhase {
     #[default]
@@ -181,6 +197,7 @@ pub enum ProvisionPhase {
 /// the job runs, as dependency resolution discovers more work. Both are zero
 /// for a single-unit phase.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProvisionProgress {
     pub phase: ProvisionPhase,

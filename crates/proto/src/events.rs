@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::contract::Contract;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct EventsSubscribeParams {
     /// Empty subscribes to every event.
@@ -11,6 +12,7 @@ pub struct EventsSubscribeParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct EventsSubscribeResult {
     pub subscribed: bool,

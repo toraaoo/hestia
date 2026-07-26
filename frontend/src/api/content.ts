@@ -5,6 +5,8 @@
  */
 import { call } from './core/ipc';
 import type {
+  ContentAddItem,
+  ContentAddSpec,
   ContentInspectResult,
   ContentProject,
   ContentSource,
@@ -15,12 +17,16 @@ import type {
   VersionQuery,
 } from './types/content';
 
+export type ContentAddInput = Partial<Omit<ContentAddSpec, 'items'>> & {
+  items: Partial<ContentAddItem>[];
+};
+
 export async function sources(): Promise<ContentSource[]> {
   const result = await call<{ sources: ContentSource[] }>('content.sources');
   return result.sources;
 }
 
-export function search(query: SearchQuery): Promise<SearchResult> {
+export function search(query: Partial<SearchQuery>): Promise<SearchResult> {
   return call('content.search', query);
 }
 
@@ -31,7 +37,9 @@ export function project(
   return call('content.project', { source, project: projectId });
 }
 
-export async function versions(query: VersionQuery): Promise<ContentVersion[]> {
+export async function versions(
+  query: Partial<VersionQuery>,
+): Promise<ContentVersion[]> {
   const result = await call<{ versions: ContentVersion[] }>(
     'content.versions',
     query,

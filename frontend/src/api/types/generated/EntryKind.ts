@@ -3,4 +3,4 @@
 /**
  * A launcher entry that resolves by reference.
  */
-export type EntryKind = 'server' | 'instance';
+export type EntryKind = "server" | "instance";

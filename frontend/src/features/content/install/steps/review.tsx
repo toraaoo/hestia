@@ -149,7 +149,7 @@ function KindPicker({
   onChange,
 }: {
   kinds: ContentKind[];
-  value: ContentKind | null;
+  value: ContentKind | undefined;
   onChange: (kind: ContentKind) => void;
 }) {
   return (

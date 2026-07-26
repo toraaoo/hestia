@@ -127,13 +127,13 @@ export const keys = {
   content: {
     all: ['content'] as const,
     sources: () => [...keys.content.all, 'sources'] as const,
-    search: (query: SearchQuery) =>
+    search: (query: Partial<SearchQuery>) =>
       [...keys.content.all, 'search', query] as const,
     searchPaged: (kinds: ContentKind[], query: string) =>
       [...keys.content.all, 'search', 'paged', kinds, query] as const,
     project: (source: string, project: string) =>
       [...keys.content.all, 'project', source, project] as const,
-    versions: (query: VersionQuery) =>
+    versions: (query: Partial<VersionQuery>) =>
       [...keys.content.all, 'versions', query] as const,
     modpack: (source: string, versionId: string) =>
       [...keys.content.all, 'modpack', source, versionId] as const,

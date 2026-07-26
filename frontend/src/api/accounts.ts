@@ -9,8 +9,8 @@
 import { call, invokeCommand } from './core/ipc';
 import type {
   Account,
-  AccountList,
-  LoginBegin,
+  AccountListResult,
+  AccountLoginBeginResult,
   LoginMethod,
 } from './types/accounts';
 
@@ -25,7 +25,9 @@ export function loginSisu(): Promise<Account | null> {
   return invokeCommand<Account | null>('account_login_sisu');
 }
 
-export function beginLogin(method: LoginMethod = 'sisu'): Promise<LoginBegin> {
+export function beginLogin(
+  method: LoginMethod = 'sisu',
+): Promise<AccountLoginBeginResult> {
   return call('account.login.begin', { method }, { timeoutMs: 60_000 });
 }
 
@@ -38,7 +40,7 @@ export async function completeLogin(id: string, code = ''): Promise<Account> {
   return result.account;
 }
 
-export function list(): Promise<AccountList> {
+export function list(): Promise<AccountListResult> {
   return call('account.list');
 }
 

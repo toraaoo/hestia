@@ -3,4 +3,4 @@
 /**
  * What there was nothing to do.
  */
-export type Task = 'install' | 'modify' | 'back_up';
+export type Task = "install" | "modify" | "back_up";

@@ -45,6 +45,7 @@ impl Contract for InstanceLoaders {
 /// An instance can run more than once concurrently (each launch is a session),
 /// so this is a list, not a single process.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceInfo {
     pub id: String,
@@ -66,6 +67,7 @@ pub struct InstanceInfo {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceCreateParams {
     /// Display name; defaults to `<flavor>-<version>` when empty.
@@ -81,6 +83,7 @@ pub struct InstanceCreateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceCreateResult {
     pub instance: InstanceInfo,
@@ -94,6 +97,7 @@ impl Contract for InstanceCreate {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceUpdateParams {
     /// Instance name or id.
@@ -109,6 +113,7 @@ pub struct InstanceUpdateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceUpdateResult {
     pub instance: InstanceInfo,
@@ -122,6 +127,7 @@ impl Contract for InstanceUpdate {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceListResult {
     pub instances: Vec<InstanceInfo>,
@@ -136,6 +142,7 @@ impl Contract for InstanceList {
 
 /// Names one managed instance by id or name (remove / stop).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceRef {
     pub instance: String,
@@ -145,6 +152,7 @@ pub struct InstanceRef {
 /// locations, and footprint — everything independent of the live sessions.
 /// The disk figure is a directory walk, so this is fetched on demand.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceDetails {
     pub id: String,
@@ -176,6 +184,7 @@ impl Contract for InstanceInfoQuery {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceWorldsResult {
     /// Save-world folder names under the instance's `data/saves/`, sorted.
@@ -197,6 +206,7 @@ impl Contract for InstanceRemove {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceRenameParams {
     /// The instance to rename, by its current name or id.
@@ -213,6 +223,7 @@ impl Contract for InstanceRename {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceStopParams {
     pub instance: String,
@@ -229,6 +240,7 @@ impl Contract for InstanceStop {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceLogsParams {
     pub instance: String,
@@ -248,6 +260,7 @@ impl Contract for InstanceLogs {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceConfigGetParams {
     pub instance: String,
@@ -255,6 +268,7 @@ pub struct InstanceConfigGetParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceConfigGetResult {
     pub value: String,
@@ -268,6 +282,7 @@ impl Contract for InstanceConfigGet {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceConfigSetParams {
     pub instance: String,
@@ -283,6 +298,7 @@ impl Contract for InstanceConfigSet {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceConfigListResult {
     pub entries: Vec<ConfigEntry>,
@@ -300,6 +316,7 @@ impl Contract for InstanceConfigList {
 /// one index field always present and unique. No profile active = every pool
 /// item is mirrored.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct Profile {
     pub name: String,
@@ -311,6 +328,7 @@ pub struct Profile {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileListResult {
     /// The active profile's name; empty when none is active.
@@ -326,6 +344,7 @@ impl Contract for InstanceProfileList {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileCreateParams {
     pub instance: String,
@@ -343,6 +362,7 @@ impl Contract for InstanceProfileCreate {
 
 /// Names one profile of one instance (remove / use).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileRef {
     pub instance: String,
@@ -358,6 +378,7 @@ impl Contract for InstanceProfileRemove {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileRenameParams {
     pub instance: String,
@@ -403,6 +424,7 @@ impl Contract for InstanceProfileRelease {
 /// resolved server-side; one that matches nothing — or only a datapack — is a
 /// `bad_request`.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceProfileEditParams {
     pub instance: String,
@@ -419,6 +441,7 @@ impl Contract for InstanceProfileEdit {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceLaunchParams {
     pub instance: String,
@@ -439,6 +462,7 @@ pub struct InstanceLaunchParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceLaunchResult {
     pub id: String,
@@ -452,6 +476,7 @@ impl Contract for InstanceLaunch {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct InstanceLaunchProgressEvent {
     pub id: String,
@@ -463,6 +488,7 @@ impl Topic for InstanceLaunchProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct InstanceLaunchDoneEvent {
     pub id: String,
@@ -474,6 +500,7 @@ impl Topic for InstanceLaunchDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct InstanceLaunchErrorEvent {
     pub id: String,

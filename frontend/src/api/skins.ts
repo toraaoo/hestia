@@ -6,11 +6,11 @@
  * token is rotated through Microsoft inline, which multiplies the round trips.
  */
 import { call } from './core/ipc';
-import type { Skin, SkinList, SkinVariant } from './types/skins';
+import type { Skin, SkinListResult, SkinVariant } from './types/skins';
 
 const MOJANG_TIMEOUT = { timeoutMs: 30_000 };
 
-export function list(account = ''): Promise<SkinList> {
+export function list(account = ''): Promise<SkinListResult> {
   return call('skin.list', { account }, MOJANG_TIMEOUT);
 }
 

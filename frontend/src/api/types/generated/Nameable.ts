@@ -3,4 +3,4 @@
 /**
  * A uniquely-named thing that can already exist.
  */
-export type Nameable = 'server' | 'instance' | 'profile' | 'global_profile';
+export type Nameable = "server" | "instance" | "profile" | "global_profile";

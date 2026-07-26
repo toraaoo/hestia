@@ -7,7 +7,7 @@
  * default) targets the default account.
  */
 import { queryOptions, useQuery } from '@tanstack/react-query';
-import type { Skin, SkinList, SkinVariant } from '../api';
+import type { Skin, SkinListResult, SkinVariant } from '../api';
 import * as api from '../api/skins';
 import { queryClient } from './client';
 import { mutation } from './core';
@@ -26,18 +26,18 @@ export const skinQueries = {
 // account so a non-default picker never writes the wrong cache entry.
 function optimisticList(
   account: string,
-  update: (list: SkinList) => SkinList,
+  update: (list: SkinListResult) => SkinListResult,
 ): (() => void) | undefined {
   const key = keys.skins.list(account);
   void queryClient.cancelQueries({ queryKey: key });
-  const previous = queryClient.getQueryData<SkinList>(key);
+  const previous = queryClient.getQueryData<SkinListResult>(key);
   if (!previous) return undefined;
-  queryClient.setQueryData<SkinList>(key, update(previous));
+  queryClient.setQueryData<SkinListResult>(key, update(previous));
   return () => queryClient.setQueryData(key, previous);
 }
 
 // An external row exists only while equipped; equipping another drops it.
-function equipSkinInList(list: SkinList, key: string): SkinList {
+function equipSkinInList(list: SkinListResult, key: string): SkinListResult {
   return {
     ...list,
     skins: list.skins
@@ -75,7 +75,7 @@ export const skinMutations = {
       mutationKey: [...keys.skins.all, 'add'],
       mutationFn: (params) => api.add(params),
       onSuccess: (skin, { account }) =>
-        queryClient.setQueryData<SkinList>(
+        queryClient.setQueryData<SkinListResult>(
           keys.skins.list(account ?? ''),
           (prev) =>
             prev
@@ -107,7 +107,7 @@ export const skinMutations = {
           ),
         })),
       onSuccess: (skin, { account }) =>
-        queryClient.setQueryData<SkinList>(
+        queryClient.setQueryData<SkinListResult>(
           keys.skins.list(account ?? ''),
           (prev) =>
             prev

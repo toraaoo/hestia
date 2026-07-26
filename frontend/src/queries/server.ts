@@ -113,7 +113,7 @@ export const serverQueries = {
 
 export const serverMutations = {
   create: () =>
-    jobMutation<ServerInfo, ServerCreateParams>({
+    jobMutation<ServerInfo, Partial<ServerCreateParams>>({
       mutationKey: [...keys.servers.all, 'create'],
       meta: (params) => ({
         kind: 'server.create',
@@ -123,7 +123,7 @@ export const serverMutations = {
       invalidates: () => [keys.servers.list()],
     }),
   update: (id: string) =>
-    jobMutation<ServerInfo, Omit<ServerUpdateParams, 'server'>>({
+    jobMutation<ServerInfo, Omit<ServerUpdateParams, 'server' | 'id'>>({
       mutationKey: [...keys.servers.detail(id), 'update'],
       meta: (params) => ({
         kind: 'server.update',

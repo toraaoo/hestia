@@ -7,8 +7,8 @@
  */
 import type { QueryKey } from '@tanstack/react-query';
 import type {
-  ContentAddSpec,
-  ContentDone,
+  ContentAddInput,
+  ContentDoneEvent,
   ContentKind,
   ProvisionProgress,
 } from '../api';
@@ -21,9 +21,9 @@ type OnProgress = (progress: ProvisionProgress) => void;
 export interface EntryContentApi {
   add(
     id: string,
-    spec: ContentAddSpec,
+    spec: ContentAddInput,
     onProgress?: OnProgress,
-  ): Promise<ContentDone>;
+  ): Promise<ContentDoneEvent>;
   remove(
     id: string,
     kind: ContentKind,
@@ -35,7 +35,7 @@ export interface EntryContentApi {
     kind: ContentKind,
     item?: string,
     onProgress?: OnProgress,
-  ): Promise<ContentDone>;
+  ): Promise<ContentDoneEvent>;
   enable(
     id: string,
     kind: ContentKind,
@@ -49,7 +49,7 @@ export interface EntryContentApi {
     item: string,
     version: string,
     onProgress?: OnProgress,
-  ): Promise<ContentDone>;
+  ): Promise<ContentDoneEvent>;
 }
 
 export interface EntryContentConfig {
@@ -74,7 +74,7 @@ export function entryContentFactories(cfg: EntryContentConfig) {
   return {
     /** Refused on a running or busy entry. */
     add: (id: string) =>
-      jobMutation<ContentDone, ContentAddSpec>({
+      jobMutation<ContentDoneEvent, ContentAddInput>({
         mutationKey: [...cfg.contentKey(id), 'add'],
         meta: (spec) => ({
           kind: 'content.add',
@@ -93,7 +93,7 @@ export function entryContentFactories(cfg: EntryContentConfig) {
       }),
     /** `item` empty updates every platform-sourced item of the kind. */
     update: (id: string) =>
-      jobMutation<ContentDone, { kind: ContentKind; item?: string }>({
+      jobMutation<ContentDoneEvent, { kind: ContentKind; item?: string }>({
         mutationKey: [...cfg.contentKey(id), 'update'],
         meta: ({ kind }) => ({
           kind: 'content.update',
@@ -116,7 +116,7 @@ export function entryContentFactories(cfg: EntryContentConfig) {
       }),
     setVersion: (id: string) =>
       jobMutation<
-        ContentDone,
+        ContentDoneEvent,
         { kind: ContentKind; item: string; version: string }
       >({
         mutationKey: [...cfg.contentKey(id), 'set-version'],

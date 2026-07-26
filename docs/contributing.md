@@ -330,9 +330,13 @@ client facade method. See the decision note in
 [hooks.md](hooks.md) is the usage guide for *consuming* the queries layer
 (patterns, the job store, the full hook inventory).
 
-**1. The typed function**, in the domain's module (`frontend/src/api/<domain>.ts`),
-with any payload types mirrored from `proto` in `frontend/src/api/types/<domain>.ts`
-(wire-faithful snake_case):
+**1. The typed function**, in the domain's module (`frontend/src/api/<domain>.ts`).
+Payload types are **generated** from `proto` by ts-rs into
+`frontend/src/api/types/` (a flat `generated/` dir plus one per-module barrel);
+run `scripts/gen-types.sh` after changing a wire type. They carry the proto
+names verbatim (camelCase fields), so a request whose fields are all
+serde-default is sent as a `Partial<T>` from the API function and the daemon
+fills the rest:
 
 ```ts
 // frontend/src/api/instance.ts

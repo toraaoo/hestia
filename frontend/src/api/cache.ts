@@ -1,8 +1,8 @@
 /** The `cache.*` channels. */
 import { call } from './core/ipc';
-import type { CacheEntry, CacheInfo, CacheUsage } from './types/cache';
+import type { CacheEntry, CacheInfoResult, CacheUsage } from './types/cache';
 
-export function info(): Promise<CacheInfo> {
+export function info(): Promise<CacheInfoResult> {
   return call('cache.info');
 }
 

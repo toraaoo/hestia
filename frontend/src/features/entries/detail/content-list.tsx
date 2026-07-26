@@ -34,7 +34,7 @@ import {
   rowKey,
 } from './content';
 
-export function ContentList({
+export function ContentListResult({
   entry,
   items,
   updatable,

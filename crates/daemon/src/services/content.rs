@@ -3,12 +3,11 @@
 
 use proto::content::{
     ContentInspect, ContentJobResult, ContentKind, ContentListResult, ContentProjectGet,
-    ContentSearch, ContentSources, ContentUpdatesResult, ContentVersions, InstanceContentAdd,
-    InstanceContentCheckUpdates, InstanceContentEnable, InstanceContentList, InstanceContentRemove,
-    InstanceContentSetVersion, InstanceContentUpdate, ModpackResolve, ServerContentAdd,
-    ServerContentCheckUpdates, ServerContentEnable, ServerContentList, ServerContentRemove,
-    ServerContentSetVersion, ServerContentUpdate, SourcesResult,
-    VersionsResult as ContentVersionsResult,
+    ContentSearch, ContentSources, ContentUpdatesResult, ContentVersions, ContentVersionsResult,
+    InstanceContentAdd, InstanceContentCheckUpdates, InstanceContentEnable, InstanceContentList,
+    InstanceContentRemove, InstanceContentSetVersion, InstanceContentUpdate, ModpackResolve,
+    ServerContentAdd, ServerContentCheckUpdates, ServerContentEnable, ServerContentList,
+    ServerContentRemove, ServerContentSetVersion, ServerContentUpdate, SourcesResult,
 };
 use proto::error::{ErrorInfo, Field, Unsupported};
 use proto::Empty;

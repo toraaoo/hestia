@@ -1167,8 +1167,10 @@ stays stopped until the user starts it.
 The typed surface lives in the frontend, `frontend/src/api/`: `core/` (the
 `ipc_call` wrapper with the SDK's timeout defaults, the event bus, and a
 `runJob` driver mirroring `Session::run_job` — client-generated job id,
-subscribe-before-start), `types/` (hand-mirrored `proto` types, one file per
-proto module, wire-faithful snake_case), and one module per domain mirroring
+subscribe-before-start), `types/` (`proto` wire types **generated** by ts-rs —
+a flat `generated/` dir plus one per-module barrel, regenerated with
+`scripts/gen-types.sh`; the feature-gated `#[ts]` derives never enter a
+production build), and one module per domain mirroring
 the client facades. Over it sits `frontend/src/queries/` — the TanStack Query
 layer, one module per domain mirroring the API namespaces **1:1** so the UI
 only renders. Each domain exports its **factories** —

@@ -16,12 +16,8 @@ use crate::content::ContentKind;
 
 /// A launcher entry that resolves by reference.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum EntryKind {
     Server,
     Instance,
@@ -38,12 +34,8 @@ impl fmt::Display for EntryKind {
 
 /// A uniquely-named thing that can already exist.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum Nameable {
     Server,
     Instance,
@@ -64,12 +56,8 @@ impl fmt::Display for Nameable {
 
 /// Which profile namespace a lookup missed.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum ProfileScope {
     Instance,
     Global,
@@ -86,12 +74,8 @@ impl fmt::Display for ProfileScope {
 
 /// A required-or-invalid input, named so a front-end can label it.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum Field {
     Name,
     Project,
@@ -140,12 +124,8 @@ impl fmt::Display for Field {
 
 /// A closed reason an otherwise-present value was rejected.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum Reason {
     MemoryFormat,
     JvmArgsPrefix,
@@ -180,12 +160,8 @@ impl fmt::Display for Reason {
 
 /// A domain rule that forbids an otherwise well-formed operation.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum Unsupported {
     ServerContentKinds,
     VanillaNoMods,
@@ -210,12 +186,8 @@ impl fmt::Display for Unsupported {
 
 /// An upstream service the daemon depends on.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum Service {
     Adoptium,
     Mojang,
@@ -240,12 +212,8 @@ impl fmt::Display for Service {
 
 /// The filesystem action an `Io` failure was performing.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum IoOp {
     Create,
     Read,
@@ -278,12 +246,8 @@ impl fmt::Display for IoOp {
 
 /// What there was nothing to do.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum Task {
     Install,
     Modify,
@@ -302,12 +266,8 @@ impl fmt::Display for Task {
 
 /// Why a path was rejected as a sync target.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum SyncReason {
     CopiedTarget,
     NotFolderTarget,
@@ -329,12 +289,8 @@ impl fmt::Display for SyncReason {
 /// The one daemon error type — every failure the socket surfaces. The `kind`
 /// tag is the wire discriminant; front-ends switch on it exhaustively.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "ts",
-    derive(ts_rs::TS),
-    ts(export, export_to = "../../../frontend/src/api/types/generated/")
-)]
 pub enum ErrorInfo {
     // --- validation ---
     FieldRequired {
@@ -495,11 +451,7 @@ pub enum ErrorInfo {
         detail: String,
     },
     IncompatibleVersion {
-        // JSON numbers, not JS BigInt: version majors are tiny and cross the
-        // wire as plain numbers, so pin the TS type rather than ts-rs's i64→bigint.
-        #[cfg_attr(feature = "ts", ts(type = "number"))]
         got: i64,
-        #[cfg_attr(feature = "ts", ts(type = "number"))]
         want: i64,
     },
 

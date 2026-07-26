@@ -6,7 +6,7 @@
  */
 import type { QueryClient } from '@tanstack/react-query';
 import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
-import type { Account, LoginBegin, LoginMethod } from '../api';
+import type { Account, AccountLoginBeginResult, LoginMethod } from '../api';
 import * as api from '../api/accounts';
 import { mutation } from './core';
 import { keys } from './keys';
@@ -31,7 +31,7 @@ export const accountMutations = {
       invalidates: () => [keys.accounts.all, keys.skins.all],
     }),
   beginLogin: () =>
-    mutation<LoginBegin, LoginMethod>({
+    mutation<AccountLoginBeginResult, LoginMethod>({
       mutationKey: [...keys.accounts.all, 'login', 'begin'],
       mutationFn: (method) => api.beginLogin(method),
     }),

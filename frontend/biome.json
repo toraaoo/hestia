@@ -14,6 +14,7 @@
       "**/vite.config.ts",
       "!**/dist",
       "!**/src/paraglide",
+      "!**/src/api/types",
       "!**/src/routeTree.gen.ts",
       "!**/src/styles.css"
     ]

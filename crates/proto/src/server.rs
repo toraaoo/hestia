@@ -45,6 +45,7 @@ impl Contract for ServerLoaders {
 /// A managed server: the stored record plus, when it has been started, the
 /// supervised process snapshot.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerInfo {
     pub id: String,
@@ -72,6 +73,7 @@ pub struct ServerInfo {
 /// disk figure is a directory walk, so this is fetched on demand, never in a
 /// list.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerDetails {
     pub id: String,
@@ -100,6 +102,7 @@ impl Contract for ServerDetail {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerCreateParams {
     /// Display name; defaults to `<flavor>-<version>` when empty.
@@ -122,6 +125,7 @@ pub struct ServerCreateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerCreateResult {
     pub id: String,
@@ -135,6 +139,7 @@ impl Contract for ServerCreate {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerUpdateParams {
     /// Server name or id.
@@ -152,6 +157,7 @@ pub struct ServerUpdateParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerUpdateResult {
     pub id: String,
@@ -165,6 +171,7 @@ impl Contract for ServerUpdate {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerListResult {
     pub servers: Vec<ServerInfo>,
@@ -179,6 +186,7 @@ impl Contract for ServerList {
 
 /// Names one managed server by id or name (remove / start / stop / status).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerRef {
     pub server: String,
@@ -192,6 +200,7 @@ impl Contract for ServerRemove {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerRenameParams {
     /// The server to rename, by its current name or id.
@@ -208,6 +217,7 @@ impl Contract for ServerRename {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerStartResult {
     pub process_id: String,
@@ -237,6 +247,7 @@ impl Contract for ServerStatus {
 
 /// Server List Ping snapshot over the game port; only a running server answers.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerPingResult {
     pub players_online: u32,
@@ -253,6 +264,7 @@ impl Contract for ServerPing {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerLogsParams {
     pub server: String,
@@ -269,6 +281,7 @@ impl Contract for ServerLogs {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerCommandParams {
     pub server: String,
@@ -276,6 +289,7 @@ pub struct ServerCommandParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerCommandResult {
     pub response: String,
@@ -289,6 +303,7 @@ impl Contract for ServerCommand {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerConfigGetParams {
     pub server: String,
@@ -296,6 +311,7 @@ pub struct ServerConfigGetParams {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerConfigGetResult {
     pub value: String,
@@ -309,6 +325,7 @@ impl Contract for ServerConfigGet {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerConfigSetParams {
     pub server: String,
@@ -324,6 +341,7 @@ impl Contract for ServerConfigSet {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerConfigListResult {
     pub entries: Vec<ConfigEntry>,
@@ -337,6 +355,7 @@ impl Contract for ServerConfigList {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ServerCreateProgressEvent {
     pub id: String,
@@ -348,6 +367,7 @@ impl Topic for ServerCreateProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ServerCreateDoneEvent {
     pub id: String,
@@ -358,6 +378,7 @@ impl Topic for ServerCreateDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ServerCreateErrorEvent {
     pub id: String,
@@ -369,6 +390,7 @@ impl Topic for ServerCreateErrorEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ServerUpdateProgressEvent {
     pub id: String,
@@ -380,6 +402,7 @@ impl Topic for ServerUpdateProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ServerUpdateDoneEvent {
     pub id: String,
@@ -390,6 +413,7 @@ impl Topic for ServerUpdateDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ServerUpdateErrorEvent {
     pub id: String,

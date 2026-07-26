@@ -83,12 +83,12 @@ export function ContentInstallModal({
   const selectedCount = picked.length + files.length;
   const fileKinds = files
     .map((f) => f.kind)
-    .filter((k): k is ContentKind => k !== null);
+    .filter((k): k is ContentKind => k !== undefined);
   const selectedKinds = [
     ...new Set([...picked.map((p) => p.kind), ...fileKinds]),
   ];
   // A staged file blocks install until it is installable and has a kind.
-  const filesReady = files.every((f) => f.valid && f.kind !== null);
+  const filesReady = files.every((f) => f.valid && f.kind !== undefined);
   const needsWorlds =
     selectedKinds.includes('data_pack') && target?.type === 'instance';
   const isProfile = target?.type === 'profile';

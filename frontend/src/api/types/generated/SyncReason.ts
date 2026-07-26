@@ -3,8 +3,4 @@
 /**
  * Why a path was rejected as a sync target.
  */
-export type SyncReason =
-  | 'copied_target'
-  | 'not_folder_target'
-  | 'managed_dir'
-  | 'unsafe_path';
+export type SyncReason = "copied_target" | "not_folder_target" | "managed_dir" | "unsafe_path";

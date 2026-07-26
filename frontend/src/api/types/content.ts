@@ -1,224 +1,48 @@
-/** Mirrors `crates/proto/src/content.rs`. */
-import type { ErrorInfo } from './error';
-import type { Artifact } from './minecraft';
-
-export type ContentKind =
-  | 'mod'
-  | 'modpack'
-  | 'resource_pack'
-  | 'shader'
-  | 'data_pack';
-
-export type SideSupport = 'required' | 'optional' | 'unsupported' | 'unknown';
-
-export type ReleaseChannel = 'release' | 'beta' | 'alpha';
-
-export interface ContentSource {
-  id: string;
-  name: string;
-}
-
-export interface GalleryImage {
-  url: string;
-  featured: boolean;
-  title: string;
-  description: string;
-}
-
-/**
- * A project, as a search hit or a detail. `body` (the long description) is
- * only filled by the detail call.
- */
-export interface ContentProject {
-  source: string;
-  id: string;
-  slug: string;
-  kind: ContentKind;
-  title: string;
-  description: string;
-  body: string;
-  author: string;
-  categories: string[];
-  downloads: number;
-  follows: number;
-  iconUrl: string;
-  gallery: GalleryImage[];
-  clientSide: SideSupport;
-  serverSide: SideSupport;
-}
-
-export interface ContentFile {
-  artifact: Artifact;
-  primary: boolean;
-}
-
-export type DependencyKind =
-  | 'required'
-  | 'optional'
-  | 'incompatible'
-  | 'embedded';
-
-export interface ContentDependency {
-  projectId: string;
-  versionId: string;
-  kind: DependencyKind;
-}
-
-export interface ContentVersion {
-  source: string;
-  id: string;
-  projectId: string;
-  name: string;
-  versionNumber: string;
-  channel: ReleaseChannel;
-  gameVersions: string[];
-  loaders: string[];
-  featured: boolean;
-  datePublished: string;
-  downloads: number;
-  files: ContentFile[];
-  dependencies: ContentDependency[];
-}
-
-export type SearchSort =
-  | 'relevance'
-  | 'downloads'
-  | 'follows'
-  | 'newest'
-  | 'updated';
-
-/** A paginated search; `source` empty selects the default source. */
-export interface SearchQuery {
-  source?: string;
-  kind?: ContentKind;
-  query?: string;
-  loader?: string;
-  gameVersion?: string;
-  categories?: string[];
-  sort?: SearchSort;
-  limit?: number;
-  offset?: number;
-}
-
-export interface SearchResult {
-  hits: ContentProject[];
-  offset: number;
-  limit: number;
-  total: number;
-}
-
-export interface VersionQuery {
-  source?: string;
-  project: string;
-  loader?: string;
-  gameVersion?: string;
-}
-
-export interface ModpackFile {
-  path: string;
-  artifact: Artifact;
-  client: SideSupport;
-  server: SideSupport;
-}
-
-export interface ResolvedModpack {
-  source: string;
-  projectId: string;
-  versionId: string;
-  name: string;
-  gameVersion: string;
-  loader?: string;
-  loaderVersion?: string;
-  files: ModpackFile[];
-}
-
-/**
- * One installed content item. `source` is a platform id (`modrinth`) or the
- * literal `file` for a local import — imports cannot be updated.
- */
-export interface InstalledContent {
-  kind: ContentKind;
-  source: string;
-  projectId: string;
-  slug: string;
-  title: string;
-  versionId: string;
-  versionNumber: string;
-  filename: string;
-  sha1: string;
-  url: string;
-  /** The project's icon for the desktop UI; empty for local-file imports. */
-  iconUrl: string;
-  installedUnix: number;
-  /** For datapacks: the world the file lives in; empty for other kinds. */
-  world: string;
-  /**
-   * Who put the item in the pool: empty = user-installed; a global profile
-   * apply tags its installs `profile:<name>`.
-   */
-  origin: string;
-  /** Whether the game loads this item; a disabled item keeps its managed copy. */
-  enabled: boolean;
-}
-
-/** One installed item's update status, from `content.check_updates`. */
-export interface ContentUpdate {
-  filename: string;
-  projectId: string;
-  /** For a datapack: the world the copy lives in; empty for other kinds. */
-  world: string;
-  currentVersionId: string;
-  currentVersionNumber: string;
-  latestVersionId: string;
-  latestVersionNumber: string;
-  /** True when the newest compatible version differs from the current pin. */
-  updatable: boolean;
-}
-
-export interface ContentList {
-  items: InstalledContent[];
-  /** Filenames in the game dir that no index entry accounts for. */
-  untracked: string[];
-}
-
-/**
- * One thing to install: exactly one of `project` (optionally pinned by
- * `version`), `url` (a source page URL), or `path` (a daemon-local file).
- */
-export interface ContentAddItem {
-  project?: string;
-  version?: string;
-  url?: string;
-  path?: string;
-  filename?: string;
-}
-
-export interface ContentAddSpec {
-  kind: ContentKind;
-  source?: string;
-  items: ContentAddItem[];
-  /** For datapacks on an instance: the save worlds each item installs into. */
-  worlds?: string[];
-}
-
-export interface ContentFailure {
-  item: string;
-  title: string;
-  /** The structured cause a front-end localizes from. */
-  error: ErrorInfo;
-}
-
-export interface ContentDone {
-  id: string;
-  items: InstalledContent[];
-  failures: ContentFailure[];
-}
-
-/** A local file's import classification. `kind` is null for a valid archive of
- * an unrecognised shape (the caller then chooses); `reason` is set when invalid. */
-export interface ContentInspectResult {
-  valid: boolean;
-  kind: ContentKind | null;
-  filename: string;
-  reason: string;
-}
+// Generated by scripts/gen-types.sh — proto::content wire types. Do not edit.
+export type { ContentAddItem } from "./generated/ContentAddItem";
+export type { ContentAddSpec } from "./generated/ContentAddSpec";
+export type { ContentDependency } from "./generated/ContentDependency";
+export type { ContentDoneEvent } from "./generated/ContentDoneEvent";
+export type { ContentErrorEvent } from "./generated/ContentErrorEvent";
+export type { ContentFailure } from "./generated/ContentFailure";
+export type { ContentFile } from "./generated/ContentFile";
+export type { ContentInspectParams } from "./generated/ContentInspectParams";
+export type { ContentInspectResult } from "./generated/ContentInspectResult";
+export type { ContentJobResult } from "./generated/ContentJobResult";
+export type { ContentKind } from "./generated/ContentKind";
+export type { ContentListResult } from "./generated/ContentListResult";
+export type { ContentProgressEvent } from "./generated/ContentProgressEvent";
+export type { ContentProject } from "./generated/ContentProject";
+export type { ContentSource } from "./generated/ContentSource";
+export type { ContentUpdate } from "./generated/ContentUpdate";
+export type { ContentUpdatesResult } from "./generated/ContentUpdatesResult";
+export type { ContentVersion } from "./generated/ContentVersion";
+export type { ContentVersionsResult } from "./generated/ContentVersionsResult";
+export type { DependencyKind } from "./generated/DependencyKind";
+export type { GalleryImage } from "./generated/GalleryImage";
+export type { InstalledContent } from "./generated/InstalledContent";
+export type { InstanceContentAddParams } from "./generated/InstanceContentAddParams";
+export type { InstanceContentCheckUpdatesParams } from "./generated/InstanceContentCheckUpdatesParams";
+export type { InstanceContentEnableParams } from "./generated/InstanceContentEnableParams";
+export type { InstanceContentListParams } from "./generated/InstanceContentListParams";
+export type { InstanceContentRemoveParams } from "./generated/InstanceContentRemoveParams";
+export type { InstanceContentSetVersionParams } from "./generated/InstanceContentSetVersionParams";
+export type { InstanceContentUpdateParams } from "./generated/InstanceContentUpdateParams";
+export type { ModpackFile } from "./generated/ModpackFile";
+export type { ModpackParams } from "./generated/ModpackParams";
+export type { ProjectParams } from "./generated/ProjectParams";
+export type { ReleaseChannel } from "./generated/ReleaseChannel";
+export type { ResolvedModpack } from "./generated/ResolvedModpack";
+export type { SearchQuery } from "./generated/SearchQuery";
+export type { SearchResult } from "./generated/SearchResult";
+export type { SearchSort } from "./generated/SearchSort";
+export type { ServerContentAddParams } from "./generated/ServerContentAddParams";
+export type { ServerContentCheckUpdatesParams } from "./generated/ServerContentCheckUpdatesParams";
+export type { ServerContentEnableParams } from "./generated/ServerContentEnableParams";
+export type { ServerContentListParams } from "./generated/ServerContentListParams";
+export type { ServerContentRemoveParams } from "./generated/ServerContentRemoveParams";
+export type { ServerContentSetVersionParams } from "./generated/ServerContentSetVersionParams";
+export type { ServerContentUpdateParams } from "./generated/ServerContentUpdateParams";
+export type { SideSupport } from "./generated/SideSupport";
+export type { SourcesResult } from "./generated/SourcesResult";
+export type { VersionQuery } from "./generated/VersionQuery";
