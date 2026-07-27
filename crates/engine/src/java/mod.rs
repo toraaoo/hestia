@@ -17,6 +17,11 @@ use crate::cache::Cache;
 use crate::download::Downloader;
 
 const RUNTIME_RECORD: &str = "runtime.json";
+/// An install extracts here and is renamed into place, so a runtime is only ever
+/// registered whole.
+const STAGING_SUFFIX: &str = ".staging";
+/// Where the downloaded archive lands before extraction.
+const SCRATCH: &str = "tmp";
 
 pub struct JavaInstallOutcome {
     pub runtime: JavaRuntime,
@@ -40,6 +45,17 @@ impl Java {
 
     pub fn reload(&self, dir: PathBuf) {
         *self.dir.lock().unwrap() = dir;
+    }
+
+    /// Drop the `.staging` trees and downloaded archives an interrupted install
+    /// left behind. A runtime is only registered by the rename out of staging,
+    /// so anything still staged belongs to a job that is gone — see
+    /// `crate::reclaim`.
+    pub fn reclaim(&self) -> crate::reclaim::Reclaimed {
+        let base = self.dir();
+        let mut freed = crate::reclaim::suffixed(&base, STAGING_SUFFIX);
+        freed += crate::reclaim::contents(&base.join(SCRATCH));
+        freed
     }
 
     pub async fn releases(&self) -> Result<Vec<JavaRelease>> {
@@ -126,8 +142,8 @@ impl Java {
 
         let base = self.dir();
         let install_dir = base.join(format!("{}-{}", package.vendor, package.major));
-        let archive = base.join("tmp").join(&package.archive_name);
-        let staging = with_suffix(&install_dir, ".staging");
+        let archive = base.join(SCRATCH).join(&package.archive_name);
+        let staging = with_suffix(&install_dir, STAGING_SUFFIX);
 
         let _ = std::fs::remove_dir_all(&staging);
         let result = self

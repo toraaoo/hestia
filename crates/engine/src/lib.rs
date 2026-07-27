@@ -16,6 +16,7 @@ mod instances;
 mod java;
 mod minecraft;
 mod profiles;
+mod reclaim;
 mod registry;
 mod servers;
 mod skins;

@@ -99,6 +99,25 @@ impl Engine {
         self.data_home.lock().unwrap().clone()
     }
 
+    /// Reclaim every abandoned temp artifact in the data home. A `.part` or
+    /// `.staging` artifact is only valid while its job holds the matching
+    /// in-flight claim, and no claim survives a restart — so at startup each of
+    /// these belongs to a job that will never finish. Call once the data home is
+    /// settled, before serving.
+    pub fn reclaim_temp(&self) {
+        let mut freed = self.java.reclaim();
+        for record in self.servers.list() {
+            freed += crate::backup::reclaim(&self.servers.server_dir(&record));
+        }
+        if !freed.is_empty() {
+            tracing::info!(
+                entries = freed.entries,
+                bytes = freed.bytes,
+                "reclaimed abandoned temp artifacts"
+            );
+        }
+    }
+
     /// Persist `dir` (empty reverts to the default), re-resolve, and repoint every
     /// subsystem on the running daemon.
     pub fn set_data_home(&self, dir: &str) -> std::io::Result<PathBuf> {
@@ -116,6 +135,9 @@ impl Engine {
         self.profiles.reload(resolved.join("profiles"));
         *self.data_home.lock().unwrap() = resolved.clone();
         tracing::info!(home = %resolved.display(), "engine data home changed");
+        // The new home may carry artifacts from whichever daemon last used it;
+        // no job of ours holds a claim on them either.
+        self.reclaim_temp();
         Ok(resolved)
     }
 

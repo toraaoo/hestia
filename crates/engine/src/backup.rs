@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 
 const BACKUPS: &str = "backups";
 const EXTENSION: &str = ".tar.gz";
+/// The in-progress archive: renamed onto the real name only once written whole.
+const PART_SUFFIX: &str = ".part";
 const SESSION_LOCK: &str = "session.lock";
 
 /// Progress for an archive/restore pass: `(files done, files total)`; total
@@ -157,6 +159,13 @@ pub fn backups_dir(entry_dir: &Path) -> PathBuf {
     entry_dir.join(BACKUPS)
 }
 
+/// Drop any `.part` archive left behind by an interrupted create. A partial
+/// archive is never promoted (the rename is the commit), so one on disk means
+/// the job that was writing it died — see `crate::reclaim`.
+pub fn reclaim(entry_dir: &Path) -> crate::reclaim::Reclaimed {
+    crate::reclaim::suffixed(&backups_dir(entry_dir), PART_SUFFIX)
+}
+
 /// Archive `data_dir` into a new backup under the entry root, skipping the
 /// top-level `exclude` names and Minecraft's transient `session.lock` files.
 /// The archive lands whole or not at all (written through a `.part` temp file).
@@ -174,9 +183,19 @@ pub fn create(
     }
     let dir = backups_dir(entry_dir);
     std::fs::create_dir_all(&dir).with_context(|| format!("cannot create {}", dir.display()))?;
+    // A crash during an earlier archive leaves its `.part` behind; drop it here
+    // too, so the store is clean whether or not the daemon restarted since.
+    let freed = reclaim(entry_dir);
+    if !freed.is_empty() {
+        tracing::info!(
+            entries = freed.entries,
+            bytes = freed.bytes,
+            "reclaimed abandoned backup archives"
+        );
+    }
     let id = allocate_id(entry_dir, kind);
     let path = dir.join(format!("{id}{EXTENSION}"));
-    let part = dir.join(format!("{id}{EXTENSION}.part"));
+    let part = dir.join(format!("{id}{EXTENSION}{PART_SUFFIX}"));
 
     let written = write_archive(&part, data_dir, exclude, on_progress);
     if let Err(e) = written {
@@ -609,6 +628,32 @@ mod tests {
         assert!(!paths
             .iter()
             .any(|path| path.file_name().is_some_and(|name| name == SESSION_LOCK)));
+        std::fs::remove_dir_all(&entry).ok();
+    }
+
+    #[test]
+    fn an_interrupted_archive_leaves_no_part_behind() {
+        let entry = temp_entry("reclaim");
+        let data = entry.join("data");
+        write(&data.join("world/level.dat"), "x");
+
+        // What a daemon killed mid-archive leaves: a `.part` that was never
+        // renamed, so it is in no listing but still occupies the store.
+        let orphan = backups_dir(&entry).join("20260725-093946-manual.tar.gz.part");
+        write(&orphan, "half an archive");
+        assert!(list(&entry).is_empty(), "a .part is not a backup");
+
+        let freed = reclaim(&entry);
+        assert_eq!(freed.entries, 1);
+        assert!(freed.bytes > 0);
+        assert!(!orphan.exists(), "an abandoned .part is reclaimed");
+
+        // And a fresh archive cleans up before writing, so the store is tidy
+        // whether or not the daemon restarted in between.
+        write(&orphan, "half an archive");
+        create(&entry, &data, BackupKind::Manual, &[], &|_, _| {}).unwrap();
+        assert!(!orphan.exists());
+        assert_eq!(list(&entry).len(), 1);
         std::fs::remove_dir_all(&entry).ok();
     }
 
