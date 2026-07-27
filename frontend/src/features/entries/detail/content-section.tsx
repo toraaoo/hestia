@@ -1,5 +1,5 @@
 import { ArrowsClockwiseIcon, TrashIcon } from '@phosphor-icons/react';
-import { useMutation, useQueries } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import type { ContentKind } from '@/api';
@@ -49,24 +49,32 @@ export function ContentSection({
   const updates = useQueries({
     queries: kinds.map((k) => queries.contentUpdates(id, k)),
   });
+  // A datapack that names no world targets every world the instance has, so the
+  // per-world rows need the entry's current list. A server has exactly one.
+  const worlds = useQuery({
+    ...instanceQueries.worlds(id),
+    enabled: !isServer && kinds.includes('data_pack'),
+  });
 
   const enable = useMutation(content.enable(id));
   const remove = useMutation(content.remove(id));
   const update = useJobMutation(content.update(id));
   const setVersion = useJobMutation(content.setVersion(id));
   const handlers: RowHandlers = {
-    // A row is the whole installed item, so a toggle or removal covers every
-    // world it targets — the wire reads an empty `worlds` as all of them.
-    onEnable: (item, enabled) =>
+    // An omitted `worlds` covers every world the item targets — how the wire
+    // reads an empty scope.
+    onEnable: (item, enabled, worlds) =>
       enable.mutate({
         kind: item.kind,
         item: installedRef(item),
         enabled,
+        worlds,
       }),
-    onRemove: (item) =>
+    onRemove: (item, worlds) =>
       remove.mutate({
         kind: item.kind,
         item: installedRef(item),
+        worlds,
       }),
     onUpdate: (item) =>
       update.mutate({ kind: item.kind, item: installedRef(item) }),
@@ -88,6 +96,7 @@ export function ContentSection({
       lists={lists}
       updates={updates}
       handlers={handlers}
+      entryWorlds={worlds.data ?? []}
     />
   );
 }
@@ -101,10 +110,12 @@ function ContentSectionView({
   lists,
   updates,
   handlers,
+  entryWorlds,
 }: SectionProps & {
   lists: ListResult[];
   updates: UpdatesResult[];
   handlers: RowHandlers;
+  entryWorlds: string[];
 }) {
   const items = lists.flatMap((q) => q.data?.items ?? []);
   const untracked = lists.flatMap((q) => q.data?.untracked ?? []);
@@ -199,6 +210,7 @@ function ContentSectionView({
           items={filtered}
           updatable={updatable}
           handlers={handlers}
+          entryWorlds={entryWorlds}
           selected={selected}
           onToggleSelect={(key) =>
             setSelected((prev) => {

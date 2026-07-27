@@ -15,6 +15,26 @@ export const installedRef = (i: InstalledContent) => i.projectId || i.filename;
 /** A stable identity for one installed row; the index keys an item by filename. */
 export const rowKey = (i: InstalledContent) => `${i.kind}:${i.filename}`;
 
+/**
+ * The index stores a world data-relative (`saves/My World`) while the wire's
+ * `worlds` scope names it bare — one conversion, here.
+ */
+export const worldName = (world: string) => world.split('/').pop() ?? world;
+
+/**
+ * The worlds a datapack loads in: its own selection, or — when it has none —
+ * every world the entry has, now or later. Mirrors `install::target_worlds`.
+ */
+export const packWorlds = (
+  item: InstalledContent,
+  entryWorlds: string[],
+): string[] =>
+  item.worlds.length > 0 ? item.worlds.map(worldName) : entryWorlds;
+
+/** Whether a pack is loaded in one world: the per-world twin of `enabled`. */
+export const worldEnabled = (item: InstalledContent, world: string): boolean =>
+  item.enabled && !item.disabledWorlds.map(worldName).includes(world);
+
 /** The loader filter a kind's version lookup needs, given the entry's flavor. */
 export const kindLoader = (
   kind: ContentKind,
@@ -23,8 +43,13 @@ export const kindLoader = (
   kind === 'mod' ? flavor : kind === 'data_pack' ? 'datapack' : undefined;
 
 export interface RowHandlers {
-  onEnable: (item: InstalledContent, enabled: boolean) => void;
-  onRemove: (item: InstalledContent) => void;
+  /** `worlds` narrows a datapack to those saves; omitted covers every one. */
+  onEnable: (
+    item: InstalledContent,
+    enabled: boolean,
+    worlds?: string[],
+  ) => void;
+  onRemove: (item: InstalledContent, worlds?: string[]) => void;
   onUpdate: (item: InstalledContent) => void;
   onSetVersion: (item: InstalledContent, version: ContentVersion) => void;
 }

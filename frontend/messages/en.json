@@ -490,7 +490,12 @@
   "select": "Select",
   "remove_count": "Remove ({count})",
   "remove_selected_title": "Remove selected content?",
-  "remove_selected_description": "{count} item(s) will be removed. Their files are deleted; the change applies at the next start."
+  "remove_selected_description": "{count} item(s) will be removed. Their files are deleted; the change applies at the next start.",
+  "worlds": "Worlds",
+  "loaded_in_worlds": "{loaded}/{total} worlds",
+  "remove_from_world_title": "Remove from this world?",
+  "remove_from_world_description": "{name} will be removed from {world}. Other worlds keep it; the change applies at the next launch.",
+  "loaded_in_world": "Loaded in {world}"
  },
  "backup": {
   "create": "Create backup",

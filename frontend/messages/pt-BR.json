@@ -481,7 +481,12 @@
   "select": "Selecionar",
   "remove_count": "Remover ({count})",
   "remove_selected_title": "Remover o conteúdo selecionado?",
-  "remove_selected_description": "{count} item(ns) serão removidos. Seus arquivos são excluídos; a mudança se aplica na próxima inicialização."
+  "remove_selected_description": "{count} item(ns) serão removidos. Seus arquivos são excluídos; a mudança se aplica na próxima inicialização.",
+  "worlds": "Mundos",
+  "loaded_in_worlds": "{loaded}/{total} mundos",
+  "remove_from_world_title": "Remover deste mundo?",
+  "remove_from_world_description": "{name} será removido de {world}. Os outros mundos o mantêm; a mudança vale no próximo início.",
+  "loaded_in_world": "Carregado em {world}"
  },
  "backup": {
   "create": "Criar backup",
