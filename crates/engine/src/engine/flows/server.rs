@@ -29,12 +29,15 @@ impl Engine {
         spec: ServerCreateSpec,
         on_progress: OnProgress<'_>,
     ) -> Result<(ServerRecord, Vec<WarningInfo>)> {
-        on_progress(&phase_progress(ProvisionPhase::Resolving));
+        on_progress.report(&phase_progress(ProvisionPhase::Resolving));
         let profile = self
             .minecraft
             .resolve_server(&spec.flavor, &spec.version, spec.loader_version)
             .await?;
         let name = effective_name(&spec.name, &spec.flavor, &spec.version);
+        // Before the record exists: a cancel up to here leaves nothing at all,
+        // not even a port claim.
+        on_progress.check()?;
         let record = self.servers.create(&name, profile, spec.port)?;
 
         // Config entries apply after provisioning so property keys validate
@@ -43,6 +46,7 @@ impl Engine {
             let java = self
                 .ensure_java(record.profile.java_major, on_progress)
                 .await?;
+            on_progress.check()?;
             self.servers
                 .provision(&record, Some(&self.cache), &java, on_progress)
                 .await?;
@@ -97,18 +101,21 @@ impl Engine {
             &versions,
             spec.allow_downgrade,
         )?;
-        on_progress(&phase_progress(ProvisionPhase::Resolving));
+        on_progress.report(&phase_progress(ProvisionPhase::Resolving));
         let profile = self
             .minecraft
             .resolve_server(&record.profile.flavor, &spec.version, spec.loader_version)
             .await?;
         if self.servers.data_dir(&record).is_dir() {
-            on_progress(&phase_progress(ProvisionPhase::Backup));
+            on_progress.report(&phase_progress(ProvisionPhase::Backup));
             self.backup_server(&record.id, BackupKind::Update, false, on_progress)
                 .await
                 .context("pre-update backup failed")?;
         }
         let java = self.ensure_java(profile.java_major, on_progress).await?;
+        // The pre-update backup is on disk by now, so a cancel here costs
+        // nothing: the server is still on its old version.
+        on_progress.check()?;
         let record = self
             .servers
             .update(&record.id, profile, Some(&self.cache), &java, on_progress)

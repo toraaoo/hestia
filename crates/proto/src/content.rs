@@ -694,6 +694,17 @@ impl Topic for ContentErrorEvent {
     const TOPIC: &'static str = "content.error";
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
+/// A content install or update stopped at the caller's request. Items already installed stay installed — the batch is per-item, and each one that completed is real.
+pub struct ContentCancelledEvent {
+    pub id: String,
+}
+impl Topic for ContentCancelledEvent {
+    const TOPIC: &'static str = "content.cancelled";
+}
+
 pub struct ContentSources;
 impl Contract for ContentSources {
     const CHANNEL: &'static str = "content.sources";

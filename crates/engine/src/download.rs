@@ -14,7 +14,7 @@ use tokio::io::AsyncWriteExt;
 use crate::cache::Cache;
 use crate::checksum::Hasher;
 
-pub type ProgressFn<'a> = dyn Fn(&DownloadProgress) + Send + Sync + 'a;
+pub type ProgressFn<'a> = dyn Fn(&DownloadProgress) -> Result<()> + Send + Sync + 'a;
 
 /// The engine-wide HTTP client. One pooled client keeps connections alive
 /// across requests — a fresh client per request (what `reqwest::get` does)
@@ -132,7 +132,7 @@ impl<'a> Downloader<'a> {
                 h.update(&chunk);
             }
             downloaded += chunk.len() as u64;
-            on_progress(&DownloadProgress { downloaded, total });
+            on_progress(&DownloadProgress { downloaded, total })?;
         }
         file.flush().await?;
         drop(file);
@@ -190,7 +190,7 @@ async fn serve_from_cache(
         on_progress(&DownloadProgress {
             downloaded: copied,
             total,
-        });
+        })?;
     }
     output.flush().await?;
     drop(output);

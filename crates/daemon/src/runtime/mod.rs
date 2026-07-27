@@ -23,8 +23,8 @@ use tokio::sync::Notify;
 pub use engine::error_info as engine_error;
 pub use event_hub::EventHub;
 pub use managers::{
-    BackupJob, BackupManager, ContentJob, ContentManager, DownloadManager, InstanceLaunchManager,
-    JavaInstallManager, ServerCreateManager, ServerUpdateManager,
+    BackupJob, BackupManager, Cancellations, ContentJob, ContentManager, DownloadManager,
+    InstanceLaunchManager, JavaInstallManager, ServerCreateManager, ServerUpdateManager,
 };
 pub use metrics::spawn_metrics_sampler;
 pub use process::{ExitObserver, ProcessSupervisor, StartError};
@@ -97,6 +97,7 @@ pub struct Runtime {
     content_jobs: ContentManager,
     processes: Arc<ProcessSupervisor>,
     log_path: PathBuf,
+    cancellations: Cancellations,
     started: Instant,
     stop: Notify,
     stop_processes: AtomicBool,
@@ -106,8 +107,12 @@ impl Runtime {
     pub fn new(log_path: PathBuf, override_home: Option<&std::path::Path>) -> Self {
         let engine = Arc::new(Engine::new(override_home));
         let hub = Arc::new(EventHub::default());
-        let java_installs = JavaInstallManager::new(engine.clone(), hub.clone());
-        let downloads = DownloadManager::new(engine.clone(), hub.clone());
+        // One registry for every cancellable job, keyed by job id — what
+        // `job.cancel` looks a running job up in, whichever manager owns it.
+        let cancellations = Cancellations::new();
+        let java_installs =
+            JavaInstallManager::new(engine.clone(), hub.clone(), cancellations.clone());
+        let downloads = DownloadManager::new(engine.clone(), hub.clone(), cancellations.clone());
         let playtime_engine = engine.clone();
         let on_exit: ExitObserver = Arc::new(move |info: &proto::process::ProcessInfo| {
             let Some(instance_id) = instance_id_of_session(&info.id) else {
@@ -126,12 +131,18 @@ impl Runtime {
             engine.data_home().join("processes"),
             Some(on_exit),
         ));
-        let server_creates = ServerCreateManager::new(engine.clone(), hub.clone());
-        let server_updates = ServerUpdateManager::new(engine.clone(), hub.clone());
-        let instance_launches =
-            InstanceLaunchManager::new(engine.clone(), hub.clone(), processes.clone());
-        let backups = BackupManager::new(engine.clone(), hub.clone());
-        let content_jobs = ContentManager::new(engine.clone(), hub.clone());
+        let server_creates =
+            ServerCreateManager::new(engine.clone(), hub.clone(), cancellations.clone());
+        let server_updates =
+            ServerUpdateManager::new(engine.clone(), hub.clone(), cancellations.clone());
+        let instance_launches = InstanceLaunchManager::new(
+            engine.clone(),
+            hub.clone(),
+            processes.clone(),
+            cancellations.clone(),
+        );
+        let backups = BackupManager::new(engine.clone(), hub.clone(), cancellations.clone());
+        let content_jobs = ContentManager::new(engine.clone(), hub.clone(), cancellations.clone());
         Runtime {
             engine,
             hub,
@@ -142,6 +153,7 @@ impl Runtime {
             instance_launches,
             backups,
             content_jobs,
+            cancellations,
             processes,
             log_path,
             started: Instant::now(),
@@ -202,6 +214,11 @@ impl Runtime {
 
     pub fn hub(&self) -> &EventHub {
         &self.hub
+    }
+
+    /// Every cancellable job in flight, whichever manager owns it.
+    pub fn cancellations(&self) -> &Cancellations {
+        &self.cancellations
     }
 
     pub fn java_installs(&self) -> &JavaInstallManager {

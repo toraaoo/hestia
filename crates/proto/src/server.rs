@@ -401,6 +401,17 @@ impl Topic for ServerCreateErrorEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(rename_all = "camelCase")]
+/// A create stopped at the caller's request. The half-provisioned record is discarded, exactly as a failed create discards it — nothing un-startable is left behind.
+pub struct ServerCreateCancelledEvent {
+    pub id: String,
+}
+impl Topic for ServerCreateCancelledEvent {
+    const TOPIC: &'static str = "server.create.cancelled";
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
 pub struct ServerUpdateProgressEvent {
     pub id: String,
     #[serde(flatten)]
@@ -434,4 +445,15 @@ pub struct ServerUpdateErrorEvent {
 }
 impl Topic for ServerUpdateErrorEvent {
     const TOPIC: &'static str = "server.update.error";
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
+/// A version update stopped at the caller's request. The server stays on the phase the update left it in and is recovered by updating again; its pre-update backup is already on disk.
+pub struct ServerUpdateCancelledEvent {
+    pub id: String,
+}
+impl Topic for ServerUpdateCancelledEvent {
+    const TOPIC: &'static str = "server.update.cancelled";
 }

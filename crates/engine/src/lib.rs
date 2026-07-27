@@ -6,6 +6,7 @@
 mod accounts;
 mod backup;
 mod cache;
+mod cancel;
 mod checksum;
 mod config;
 mod content;
@@ -26,6 +27,7 @@ mod usage;
 pub use accounts::{Accounts, LoginChallenge, ReauthRequired};
 pub use backup::BackupSettings;
 pub use cache::{Cache, CacheEntry, CacheUsage};
+pub use cancel::{is_cancelled, Cancel, Job};
 pub use config::{Config, ConfigError, Settings};
 pub use content::Content;
 pub use download::Downloader;

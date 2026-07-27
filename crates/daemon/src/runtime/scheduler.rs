@@ -53,7 +53,13 @@ async fn run_due_backups(runtime: &Runtime) {
 
         tracing::info!(server = %record.id, "scheduled backup starting");
         match engine
-            .backup_server(&record.id, BackupKind::Scheduled, true, &|_| {})
+            .backup_server(
+                &record.id,
+                BackupKind::Scheduled,
+                true,
+                // A scheduled backup has no caller to cancel it.
+                &engine::Job::new(&|_| {}, &engine::Cancel::new()),
+            )
             .await
         {
             Ok(backup) => {

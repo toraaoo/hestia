@@ -15,4 +15,5 @@ pub use content::{ContentJob, ContentManager};
 pub use download::DownloadManager;
 pub use instance::InstanceLaunchManager;
 pub use java::JavaInstallManager;
+pub use job::Cancellations;
 pub use server::{ServerCreateManager, ServerUpdateManager};

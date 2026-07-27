@@ -19,7 +19,10 @@ use crate::download::Downloader;
 const ASSET_HOST: &str = "https://resources.download.minecraft.net";
 const CONCURRENT_FETCHES: usize = 16;
 
-pub type OnProgress<'a> = &'a (dyn Fn(&ProvisionProgress) + Send + Sync);
+/// What a long-running step reports through — and is cancelled by. The two
+/// travel together deliberately: a step that reports progress is exactly one
+/// that can be stopped between reports (`crate::cancel`).
+pub type OnProgress<'a> = &'a crate::cancel::Job<'a>;
 
 pub fn validate_filename(name: &str) -> Result<()> {
     if name.is_empty() || name.starts_with('.') || name.contains(['/', '\\']) {
@@ -59,19 +62,24 @@ pub async fn ensure_artifact(
     if present(destination, artifact.size) {
         return Ok(());
     }
+    on_progress.check()?;
     Downloader::new(cache)
         .fetch(
             &artifact.url,
             destination,
             artifact.checksum.as_ref(),
             &|dp| {
-                on_progress(&ProvisionProgress {
+                // Per chunk: a large artifact stops promptly, and its `.part`
+                // is discarded by the failure path rather than promoted.
+                on_progress.check()?;
+                on_progress.report(&ProvisionProgress {
                     phase,
                     current: dp.downloaded,
                     total: dp.total,
                     detail: artifact.filename.clone(),
                     ..ProvisionProgress::default()
                 });
+                Ok(())
             },
         )
         .await
@@ -102,6 +110,7 @@ pub async fn ensure_libraries(
     let fetches = targets.into_iter().map(|library| {
         let done = &done;
         async move {
+            on_progress.check()?;
             let destination = safe_join(root, &library.path)?;
             if !present(&destination, library.artifact.size) {
                 Downloader::new(cache)
@@ -109,7 +118,7 @@ pub async fn ensure_libraries(
                         &library.artifact.url,
                         &destination,
                         library.artifact.checksum.as_ref(),
-                        &|_| {},
+                        &|_| Ok(()),
                     )
                     .await
                     .with_context(|| format!("library {}", library.name))?;
@@ -146,7 +155,7 @@ pub async fn ensure_assets(
                 &index.artifact.url,
                 &index_path,
                 index.artifact.checksum.as_ref(),
-                &|_| {},
+                &|_| Ok(()),
             )
             .await
             .context("asset index")?;
@@ -192,6 +201,7 @@ pub async fn ensure_assets(
         let objects_root = &objects_root;
         let index_id = &index.id;
         async move {
+            on_progress.check()?;
             let prefix = hash[..2].to_string();
             let destination = objects_root.join(&prefix).join(&hash);
             if !present(&destination, size) {
@@ -206,7 +216,7 @@ pub async fn ensure_assets(
                         &format!("{ASSET_HOST}/{prefix}/{hash}"),
                         &destination,
                         Some(&checksum),
-                        &|_| {},
+                        &|_| Ok(()),
                     )
                     .await
                     .with_context(|| format!("asset object {hash}"))?;
@@ -232,7 +242,7 @@ fn report_count(
     total: u64,
     detail: &str,
 ) {
-    on_progress(&ProvisionProgress {
+    on_progress.report(&ProvisionProgress {
         phase,
         current,
         total,

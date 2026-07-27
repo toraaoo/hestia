@@ -472,7 +472,7 @@ impl Engine {
         if roots.is_empty() {
             return (items, failures);
         }
-        on_progress(&phase_progress(ProvisionPhase::Resolving));
+        on_progress.report(&phase_progress(ProvisionPhase::Resolving));
 
         let mut visited: HashSet<String> = install::load(&ctx.entry_dir)
             .into_iter()
@@ -614,14 +614,17 @@ impl Engine {
             let title = node.project.title.clone();
             let item = finished + 1;
             let known = item + queue.len() as u64;
-            let labeled = move |p: &ProvisionProgress| {
+            let relabel = move |p: &ProvisionProgress| {
                 let mut progress = p.clone();
                 progress.detail = title.clone();
                 progress.item = item;
                 progress.items = known;
-                on_progress(&progress);
+                on_progress.report(&progress);
             };
-            labeled(&phase_progress(ProvisionPhase::Content));
+            // The relabelled view keeps the same cancel token: per-item install
+            // is the longest part of a batch, and must stay interruptible.
+            let labeled = crate::cancel::Job::new(&relabel, on_progress.cancel());
+            labeled.report(&phase_progress(ProvisionPhase::Content));
             match self
                 .install_version_file(ctx, kind, &node.project, &version, worlds, &labeled)
                 .await
@@ -727,7 +730,7 @@ impl Engine {
                 }
                 continue;
             }
-            on_progress(&phase_progress(ProvisionPhase::Resolving));
+            on_progress.report(&phase_progress(ProvisionPhase::Resolving));
             let versions = self
                 .content
                 .versions(&VersionQuery {

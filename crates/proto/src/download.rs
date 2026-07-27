@@ -118,3 +118,14 @@ pub struct DownloadErrorEvent {
 impl Topic for DownloadErrorEvent {
     const TOPIC: &'static str = "download.error";
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
+/// A download stopped at the caller's request; its `.part` file is reclaimed.
+pub struct DownloadCancelledEvent {
+    pub id: String,
+}
+impl Topic for DownloadCancelledEvent {
+    const TOPIC: &'static str = "download.cancelled";
+}

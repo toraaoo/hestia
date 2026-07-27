@@ -91,6 +91,20 @@ impl Client {
         }
     }
 
+    /// Ask the daemon to cancel a running job by the id its events carry.
+    /// `false` means it was already over — a normal race, not an error.
+    ///
+    /// Cancelling is always explicit: a disconnecting client never cancels
+    /// anything, because a job outlives the client that started it.
+    pub async fn cancel_job(&self, id: &str) -> Result<bool, IpcError> {
+        let params = proto::job::JobCancelParams { id: id.to_string() };
+        Ok(self
+            .session
+            .call::<proto::job::JobCancel>(&params)
+            .await?
+            .cancelled)
+    }
+
     pub fn config(&self) -> Config<'_> {
         Config {
             session: &self.session,

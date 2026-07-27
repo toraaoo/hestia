@@ -27,6 +27,10 @@ pub enum IpcError {
     IncompatibleVersion { got: i64, want: i64 },
     #[error("timed out waiting for daemon response on '{0}'")]
     Timeout(String),
+    /// The job was cancelled at someone's request. Not a failure — nothing went
+    /// wrong — so a front-end reports it as such rather than as an error.
+    #[error("cancelled")]
+    Cancelled,
     #[error("{message}")]
     Daemon {
         code: String,

@@ -190,6 +190,7 @@ async fn run_backup(
     on_progress: OnProgress<'_>,
 ) -> Result<BackupInfo> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let cancel = on_progress.cancel().clone();
     let task = tokio::task::spawn_blocking(move || {
         backup::create(
             &entry_dir,
@@ -197,12 +198,18 @@ async fn run_backup(
             kind,
             &exclude,
             &move |current, total| {
+                // Per file: the archive stops between entries, and its `.part`
+                // is discarded rather than promoted.
+                if cancel.is_cancelled() {
+                    return Err(crate::cancel::Cancelled.into());
+                }
                 let _ = tx.send((current, total));
+                Ok(())
             },
         )
     });
     while let Some((current, total)) = rx.recv().await {
-        on_progress(&backup_progress(current, total));
+        on_progress.report(&backup_progress(current, total));
     }
     task.await.context("the backup task panicked")?
 }
@@ -215,6 +222,7 @@ async fn run_restore(
     on_progress: OnProgress<'_>,
 ) -> Result<BackupInfo> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let cancel = on_progress.cancel().clone();
     let task = tokio::task::spawn_blocking(move || {
         backup::restore(
             &entry_dir,
@@ -222,12 +230,18 @@ async fn run_restore(
             &backup,
             &preserve,
             &move |current, total| {
+                // A restore extracts into staging and swaps at the end, so
+                // stopping mid-extract leaves the live data untouched.
+                if cancel.is_cancelled() {
+                    return Err(crate::cancel::Cancelled.into());
+                }
                 let _ = tx.send((current, total));
+                Ok(())
             },
         )
     });
     while let Some((current, total)) = rx.recv().await {
-        on_progress(&backup_progress(current, total));
+        on_progress.report(&backup_progress(current, total));
     }
     task.await.context("the restore task panicked")?
 }

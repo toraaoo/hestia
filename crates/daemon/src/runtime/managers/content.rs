@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use engine::Engine;
 use proto::content::{
-    ContentAddSpec, ContentDoneEvent, ContentErrorEvent, ContentFailure, ContentKind,
-    ContentProgressEvent, InstalledContent,
+    ContentAddSpec, ContentCancelledEvent, ContentDoneEvent, ContentErrorEvent, ContentFailure,
+    ContentKind, ContentProgressEvent, InstalledContent,
 };
 use proto::minecraft::ProvisionProgress;
 
-use super::job::{coalesce_progress, job_id, topic_event, InFlight};
+use super::job::{coalesce_progress, job_id, topic_event, Cancellations, InFlight};
 use crate::runtime::{instance_process_id, server_process_id, EventHub};
 
 /// One content install or update for one entry — what `ContentManager::start`
@@ -81,7 +81,7 @@ impl ContentJob {
     async fn run(
         self,
         engine: &Engine,
-        on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
+        on_progress: &engine::Job<'_>,
     ) -> anyhow::Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
         match self {
             ContentJob::ServerAdd { server_id, spec } => {
@@ -144,14 +144,16 @@ pub struct ContentManager {
     engine: Arc<Engine>,
     hub: Arc<EventHub>,
     active: InFlight<String>,
+    cancellations: Cancellations,
 }
 
 impl ContentManager {
-    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>) -> Self {
+    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, cancellations: Cancellations) -> Self {
         ContentManager {
             engine,
             hub,
             active: InFlight::new(),
+            cancellations,
         }
     }
 
@@ -173,6 +175,7 @@ impl ContentManager {
 
         let engine = self.engine.clone();
         let hub = self.hub.clone();
+        let cancellations = self.cancellations.clone();
         let job_id = id.clone();
         tracing::info!(job = %id, entry = %key, kind = job.id_prefix(), "content job started");
 
@@ -188,7 +191,9 @@ impl ContentManager {
                     }));
                 }));
 
-            match job.run(&engine, on_progress.as_ref()).await {
+            let (cancel, _registered) = cancellations.register(&job_id);
+            let running = engine::Job::new(on_progress.as_ref(), &cancel);
+            match job.run(&engine, &running).await {
                 Ok((items, failures)) => {
                     tracing::info!(
                         job = %job_id,
@@ -201,6 +206,10 @@ impl ContentManager {
                         items,
                         failures,
                     }));
+                }
+                Err(e) if engine::is_cancelled(&e) => {
+                    tracing::info!(job = %job_id, "content job cancelled");
+                    hub.publish(&topic_event(&ContentCancelledEvent { id: job_id.clone() }));
                 }
                 Err(e) => {
                     tracing::error!(job = %job_id, error = format!("{e:#}"), "content job failed");

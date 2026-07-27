@@ -39,3 +39,30 @@ pub async fn start() -> Result<Client> {
     let _spinner = Spinner::start("starting the daemon");
     Client::start().await.context("cannot start the daemon")
 }
+
+/// Run a daemon job, turning Ctrl-C into an explicit cancellation of it.
+///
+/// Ctrl-C used to kill only this process while the daemon ran the job to
+/// completion — a JDK arriving minutes after the user stopped waiting for it.
+/// The daemon deliberately never cancels a job because its client vanished (a
+/// job outlives the client that started it, like every supervised workload), so
+/// the client has to *ask*, and this is where a terminal interrupt is turned
+/// into that request.
+///
+/// The job's own future is still awaited afterwards, so the command exits on
+/// the daemon's `cancelled` event rather than guessing that the cancel took.
+pub async fn cancellable<T>(
+    client: &Client,
+    id: &str,
+    job: impl std::future::Future<Output = Result<T, client::IpcError>>,
+) -> Result<T, client::IpcError> {
+    tokio::pin!(job);
+    loop {
+        tokio::select! {
+            outcome = &mut job => return outcome,
+            _ = tokio::signal::ctrl_c() => {
+                let _ = client.cancel_job(id).await;
+            }
+        }
+    }
+}

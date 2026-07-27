@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use engine::Engine;
 use proto::backup::{
-    BackupDoneEvent, BackupErrorEvent, BackupInfo, BackupKind, BackupProgressEvent,
+    BackupCancelledEvent, BackupDoneEvent, BackupErrorEvent, BackupInfo, BackupKind,
+    BackupProgressEvent,
 };
 use proto::minecraft::ProvisionProgress;
 
-use super::job::{job_id, topic_event, InFlight};
+use super::job::{job_id, topic_event, Cancellations, InFlight};
 use crate::runtime::{server_process_id, EventHub};
 
 /// One backup or restore job for one server — what `BackupManager::start`
@@ -37,7 +38,7 @@ impl BackupJob {
     async fn run(
         self,
         engine: &Engine,
-        on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
+        on_progress: &engine::Job<'_>,
     ) -> anyhow::Result<BackupInfo> {
         match self {
             BackupJob::ServerBackup { server_id, live } => {
@@ -58,14 +59,16 @@ pub struct BackupManager {
     engine: Arc<Engine>,
     hub: Arc<EventHub>,
     active: InFlight<String>,
+    cancellations: Cancellations,
 }
 
 impl BackupManager {
-    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>) -> Self {
+    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, cancellations: Cancellations) -> Self {
         BackupManager {
             engine,
             hub,
             active: InFlight::new(),
+            cancellations,
         }
     }
 
@@ -87,6 +90,7 @@ impl BackupManager {
 
         let engine = self.engine.clone();
         let hub = self.hub.clone();
+        let cancellations = self.cancellations.clone();
         let job_id = id.clone();
         tracing::info!(job = %id, entry = %key, kind = job.id_prefix(), "backup job started");
 
@@ -101,13 +105,19 @@ impl BackupManager {
                 }));
             });
 
-            match job.run(&engine, on_progress.as_ref()).await {
+            let (cancel, _registered) = cancellations.register(&job_id);
+            let running = engine::Job::new(on_progress.as_ref(), &cancel);
+            match job.run(&engine, &running).await {
                 Ok(backup) => {
                     tracing::info!(job = %job_id, backup = %backup.id, size = backup.size, "backup job done");
                     hub.publish(&topic_event(&BackupDoneEvent {
                         id: job_id.clone(),
                         backup,
                     }));
+                }
+                Err(e) if engine::is_cancelled(&e) => {
+                    tracing::info!(job = %job_id, "backup job cancelled");
+                    hub.publish(&topic_event(&BackupCancelledEvent { id: job_id.clone() }));
                 }
                 Err(e) => {
                     tracing::error!(job = %job_id, error = format!("{e:#}"), "backup job failed");

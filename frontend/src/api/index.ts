@@ -32,13 +32,21 @@ export {
   UNAUTHORIZED,
   UNKNOWN_CHANNEL,
 } from './core/ipc';
-export { type JobOptions, type JobTopics, jobId, runJob } from './core/jobs';
+export {
+  JobCancelled,
+  type JobOptions,
+  type JobTopics,
+  jobId,
+  runJob,
+  watchNextJob,
+} from './core/jobs';
 export { warningHint, warningMessage } from './core/warnings';
 export * as daemon from './daemon';
 export * as dialog from './dialog';
 export * as download from './download';
 export * as instance from './instance';
 export * as java from './java';
+export * as job from './job';
 export * as prefs from './prefs';
 export * as process from './process';
 export * as profile from './profile';

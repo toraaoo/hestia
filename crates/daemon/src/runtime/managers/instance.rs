@@ -5,13 +5,14 @@ use std::sync::{Arc, Mutex};
 use engine::Engine;
 use proto::error::ErrorInfo;
 use proto::instance::{
-    InstanceLaunchDoneEvent, InstanceLaunchErrorEvent, InstanceLaunchProgressEvent,
+    InstanceLaunchCancelledEvent, InstanceLaunchDoneEvent, InstanceLaunchErrorEvent,
+    InstanceLaunchProgressEvent,
 };
 use proto::minecraft::ProvisionProgress;
 use proto::process::{LogSource, ProcessSpec, RestartPolicy};
 use proto::warning::WarningInfo;
 
-use super::job::{coalesce_progress, job_id, topic_event};
+use super::job::{coalesce_progress, job_id, topic_event, Cancellations};
 use crate::runtime::{
     instance_session_id, instance_session_prefix, EventHub, ProcessSupervisor, StartError,
 };
@@ -20,17 +21,24 @@ pub struct InstanceLaunchManager {
     engine: Arc<Engine>,
     hub: Arc<EventHub>,
     processes: Arc<ProcessSupervisor>,
+    cancellations: Cancellations,
     /// Session ids reserved between seq allocation and the supervisor accepting
     /// them, so two concurrent launches of one instance can't collide on a seq.
     reserved: Arc<Mutex<HashSet<String>>>,
 }
 
 impl InstanceLaunchManager {
-    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, processes: Arc<ProcessSupervisor>) -> Self {
+    pub fn new(
+        engine: Arc<Engine>,
+        hub: Arc<EventHub>,
+        processes: Arc<ProcessSupervisor>,
+        cancellations: Cancellations,
+    ) -> Self {
         InstanceLaunchManager {
             engine,
             hub,
             processes,
+            cancellations,
             reserved: Arc::new(Mutex::new(HashSet::new())),
         }
     }
@@ -55,6 +63,7 @@ impl InstanceLaunchManager {
         let hub = self.hub.clone();
         let processes = self.processes.clone();
         let reserved = self.reserved.clone();
+        let cancellations = self.cancellations.clone();
         let job_id = id.clone();
         tracing::info!(job = %id, instance = %instance_id, session = %session_id, account = %account, "instance launch started");
 
@@ -69,6 +78,8 @@ impl InstanceLaunchManager {
                     }));
                 }));
 
+            let (cancel, _registered) = cancellations.register(&job_id);
+            let running = engine::Job::new(on_progress.as_ref(), &cancel);
             let outcome = launch(
                 &engine,
                 &processes,
@@ -78,7 +89,7 @@ impl InstanceLaunchManager {
                 &account,
                 &profile,
                 reconcile,
-                on_progress.as_ref(),
+                &running,
             )
             .await;
             // The supervisor now owns the id (or the launch failed) — release it.
@@ -99,7 +110,13 @@ impl InstanceLaunchManager {
                         warnings: launched.warnings,
                     }));
                 }
-                Err(error) => {
+                Err(LaunchFailure::Cancelled) => {
+                    tracing::info!(job = %job_id, instance = %instance_id, "instance launch cancelled");
+                    hub.publish(&topic_event(&InstanceLaunchCancelledEvent {
+                        id: job_id.clone(),
+                    }));
+                }
+                Err(LaunchFailure::Failed(error)) => {
                     tracing::error!(job = %job_id, instance = %instance_id, %error, "instance launch failed");
                     hub.publish(&topic_event(&InstanceLaunchErrorEvent {
                         id: job_id.clone(),
@@ -147,12 +164,12 @@ async fn launch(
     account: &str,
     profile: &str,
     reconcile: bool,
-    on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
-) -> Result<Launched, ErrorInfo> {
+    on_progress: &engine::Job<'_>,
+) -> Result<Launched, LaunchFailure> {
     let prepared = engine
         .prepare_instance(instance_id, account, seq, profile, reconcile, on_progress)
         .await
-        .map_err(crate::runtime::engine_error)?;
+        .map_err(LaunchFailure::from)?;
 
     let spec = ProcessSpec {
         id: session_id.to_string(),
@@ -174,12 +191,31 @@ async fn launch(
                 warnings: prepared.warnings,
             })
         }
-        Err(StartError::EmptyProgram | StartError::InvalidId) => Err(ErrorInfo::Internal {
-            detail: "invalid launch plan".to_string(),
-        }),
-        Err(StartError::Spawn(e)) => Err(ErrorInfo::Internal {
+        Err(StartError::EmptyProgram | StartError::InvalidId) => {
+            Err(LaunchFailure::Failed(ErrorInfo::Internal {
+                detail: "invalid launch plan".to_string(),
+            }))
+        }
+        Err(StartError::Spawn(e)) => Err(LaunchFailure::Failed(ErrorInfo::Internal {
             detail: format!("cannot spawn the game: {e}"),
-        }),
+        })),
+    }
+}
+
+/// Why a launch did not produce a session. Cancellation is kept apart from
+/// failure all the way out: nothing went wrong, so the job must not report an
+/// error to a front-end that would show it as one.
+enum LaunchFailure {
+    Cancelled,
+    Failed(ErrorInfo),
+}
+
+impl From<anyhow::Error> for LaunchFailure {
+    fn from(error: anyhow::Error) -> Self {
+        match engine::is_cancelled(&error) {
+            true => LaunchFailure::Cancelled,
+            false => LaunchFailure::Failed(crate::runtime::engine_error(error)),
+        }
     }
 }
 

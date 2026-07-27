@@ -106,6 +106,7 @@ impl Java {
         major: i32,
         force: bool,
         cache: Option<&Cache>,
+        cancel: &crate::cancel::Cancel,
         on_progress: impl Fn(&JavaInstallProgress) + Send + Sync,
     ) -> Result<JavaInstallOutcome> {
         if major <= 0 {
@@ -140,31 +141,26 @@ impl Java {
             "resolved java package"
         );
 
-        let base = self.dir();
-        let install_dir = base.join(format!("{}-{}", package.vendor, package.major));
-        let archive = base.join(SCRATCH).join(&package.archive_name);
-        let staging = with_suffix(&install_dir, STAGING_SUFFIX);
+        let paths = InstallPaths::for_package(&self.dir(), &package);
 
-        let _ = std::fs::remove_dir_all(&staging);
+        let _ = std::fs::remove_dir_all(&paths.staging);
         let result = self
-            .run_install(
-                &package,
-                &archive,
-                &staging,
-                &install_dir,
-                cache,
-                &on_progress,
-            )
+            .run_install(&package, &paths, cache, cancel, &on_progress)
             .await;
         if let Err(e) = &result {
-            tracing::error!(major, "java install failed: {e:#}");
-            let _ = std::fs::remove_dir_all(&staging);
-            let _ = std::fs::remove_file(&archive);
+            // A cancellation is not a failure: it is logged as what it is, and
+            // cleaned up the same way, because the staging discipline does not
+            // care why the install stopped.
+            match crate::cancel::is_cancelled(e) {
+                true => tracing::info!(major, "java install cancelled"),
+                false => tracing::error!(major, "java install failed: {e:#}"),
+            }
+            paths.discard();
         }
         result?;
-        let _ = std::fs::remove_file(&archive);
+        let _ = std::fs::remove_file(&paths.archive);
 
-        let outcome = read_runtime(&install_dir)
+        let outcome = read_runtime(&paths.install_dir)
             .map(|runtime| JavaInstallOutcome {
                 runtime,
                 already_installed: false,
@@ -186,48 +182,91 @@ impl Java {
     async fn run_install(
         &self,
         package: &adoptium::JavaPackage,
-        archive: &Path,
-        staging: &Path,
-        install_dir: &Path,
+        paths: &InstallPaths,
         cache: Option<&Cache>,
+        cancel: &crate::cancel::Cancel,
         on_progress: &(impl Fn(&JavaInstallProgress) + Send + Sync),
     ) -> Result<()> {
         Downloader::new(cache)
-            .fetch(&package.url, archive, Some(&package.checksum), &|dp| {
-                on_progress(&JavaInstallProgress {
-                    phase: JavaInstallPhase::Downloading,
-                    current: dp.downloaded,
-                    total: dp.total,
-                });
-            })
+            .fetch(
+                &package.url,
+                &paths.archive,
+                Some(&package.checksum),
+                &|dp| {
+                    // A JDK is a couple of hundred megabytes: the chunk loop is
+                    // where a cancel has to be noticed, not after it lands.
+                    cancel.check()?;
+                    on_progress(&JavaInstallProgress {
+                        phase: JavaInstallPhase::Downloading,
+                        current: dp.downloaded,
+                        total: dp.total,
+                    });
+                    Ok(())
+                },
+            )
             .await?;
 
+        cancel.check()?;
         on_progress(&JavaInstallProgress {
             phase: JavaInstallPhase::Extracting,
             current: 0,
             total: 0,
         });
-        tracing::debug!(archive = %archive.display(), "extracting java archive");
-        let archive_owned = archive.to_path_buf();
-        let staging_owned = staging.to_path_buf();
+        tracing::debug!(archive = %paths.archive.display(), "extracting java archive");
+        let archive_owned = paths.archive.clone();
+        let staging_owned = paths.staging.clone();
         tokio::task::spawn_blocking(move || {
             extract::extract_archive(&archive_owned, &staging_owned, |_, _| {})
         })
         .await
         .context("extraction task panicked")??;
 
-        let executable = platform::find_java_executable(staging).with_context(|| {
+        let executable = platform::find_java_executable(&paths.staging).with_context(|| {
             format!(
                 "archive {} contained no java executable",
                 package.archive_name
             )
         })?;
-        let relative = executable.strip_prefix(staging).unwrap_or(&executable);
-        write_runtime_record(staging, package, relative)?;
+        let relative = executable
+            .strip_prefix(&paths.staging)
+            .unwrap_or(&executable);
+        write_runtime_record(&paths.staging, package, relative)?;
 
-        let _ = std::fs::remove_dir_all(install_dir);
-        std::fs::rename(staging, install_dir).context("moving staged install into place")?;
+        let _ = std::fs::remove_dir_all(&paths.install_dir);
+        std::fs::rename(&paths.staging, &paths.install_dir)
+            .context("moving staged install into place")?;
         Ok(())
+    }
+}
+
+/// Where one install's pieces live. The three travel together because they are
+/// one story — the archive is extracted into staging, and only the rename onto
+/// `install_dir` makes the runtime real — so passing them as three parameters
+/// only made every signature that touches an install longer.
+struct InstallPaths {
+    /// The downloaded archive, under the scratch dir.
+    archive: PathBuf,
+    /// Where it extracts; a runtime here is not yet registered.
+    staging: PathBuf,
+    /// What the rename commits to — the disk is the registry.
+    install_dir: PathBuf,
+}
+
+impl InstallPaths {
+    fn for_package(base: &Path, package: &adoptium::JavaPackage) -> Self {
+        let install_dir = base.join(format!("{}-{}", package.vendor, package.major));
+        InstallPaths {
+            archive: base.join(SCRATCH).join(&package.archive_name),
+            staging: with_suffix(&install_dir, STAGING_SUFFIX),
+            install_dir,
+        }
+    }
+
+    /// Drop everything a failed or cancelled install staged. What it does not
+    /// touch is `install_dir`: an earlier, working runtime must survive.
+    fn discard(&self) {
+        let _ = std::fs::remove_dir_all(&self.staging);
+        let _ = std::fs::remove_file(&self.archive);
     }
 }
 

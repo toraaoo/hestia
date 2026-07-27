@@ -4,6 +4,7 @@ use proto::app::{AppInfo, AppInfoResult};
 use proto::daemon::{DaemonStatus, DaemonStatusResult, DaemonStop, DaemonStopResult};
 use proto::events::{EventsSubscribe, EventsSubscribeResult};
 use proto::health::{Ping, PingResult};
+use proto::job::{JobCancel, JobCancelResult};
 use proto::Empty;
 
 use crate::runtime::Channels;
@@ -33,6 +34,14 @@ pub(super) fn register(on: &mut Channels<'_>) {
             uptime_seconds: ctx.runtime.uptime_seconds(),
             home: ctx.runtime.engine().data_home(),
             log: ctx.runtime.log_path().clone(),
+        })
+    });
+
+    // One channel for every manager: a job is identified by the id its own
+    // events carry, so cancelling needs nothing domain-specific.
+    on.handle::<JobCancel, _, _>(|p, ctx| async move {
+        Ok(JobCancelResult {
+            cancelled: ctx.runtime.cancellations().cancel(&p.id),
         })
     });
 

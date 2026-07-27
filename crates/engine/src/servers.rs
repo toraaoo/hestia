@@ -300,7 +300,7 @@ impl Servers {
         )
         .await?;
 
-        on_progress(&ProvisionProgress {
+        on_progress.report(&ProvisionProgress {
             phase: ProvisionPhase::Server,
             current: 0,
             total: 0,
@@ -443,7 +443,7 @@ impl Servers {
         )
         .await?;
 
-        on_progress(&ProvisionProgress {
+        on_progress.report(&ProvisionProgress {
             phase: ProvisionPhase::Server,
             current: 0,
             total: 0,

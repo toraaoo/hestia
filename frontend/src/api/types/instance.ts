@@ -9,6 +9,7 @@ export type { InstanceCreateParams } from "./generated/InstanceCreateParams";
 export type { InstanceCreateResult } from "./generated/InstanceCreateResult";
 export type { InstanceDetails } from "./generated/InstanceDetails";
 export type { InstanceInfo } from "./generated/InstanceInfo";
+export type { InstanceLaunchCancelledEvent } from "./generated/InstanceLaunchCancelledEvent";
 export type { InstanceLaunchDoneEvent } from "./generated/InstanceLaunchDoneEvent";
 export type { InstanceLaunchErrorEvent } from "./generated/InstanceLaunchErrorEvent";
 export type { InstanceLaunchParams } from "./generated/InstanceLaunchParams";

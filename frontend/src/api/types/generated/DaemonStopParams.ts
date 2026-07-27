@@ -2,6 +2,15 @@
 
 export type DaemonStopParams = { 
 /**
- * When false (the default), supervised processes keep running.
+ * When false (the default), supervised processes keep running — the daemon
+ * is restartable under live workloads, and stopping one is always a
+ * deliberate act.
+ *
+ * This is a two-valued instruction because by the time a caller reaches the
+ * channel it has decided. Deciding is the *front-end's* job: with workloads
+ * running there is a third meaning — "ask me" — which the CLI resolves by
+ * prompting (or refusing, when piped) before calling. A front-end that
+ * sends `false` while a server is running is asserting that the user meant
+ * to leave it running.
  */
 stopProcesses: boolean, };

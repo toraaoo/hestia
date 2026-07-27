@@ -69,11 +69,17 @@ pub async fn run(cmd: JavaCmd) -> Result<()> {
         JavaCmd::Install { major, force } => {
             let reporter = Arc::new(InstallReporter::new());
             let progress = reporter.clone();
-            let (runtime, already) = client
-                .java()
-                .install(major, force, move |p| progress.update(p))
-                .await?;
+            // Our own job id, so Ctrl-C can cancel this install rather than
+            // just walking away from it.
+            let id = format!("java-install-{major}-{}", std::process::id());
+            let java = client.java();
+            let install = java.install(major, force, &id, move |p| progress.update(p));
+            let result = super::cancellable(&client, &id, install).await;
             reporter.finish();
+            if matches!(result, Err(client::IpcError::Cancelled)) {
+                return ui::show(View::note(format!("java {major} install cancelled")));
+            }
+            let (runtime, already) = result?;
             let verb = if already {
                 "already installed"
             } else {

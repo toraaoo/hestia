@@ -1,8 +1,9 @@
-import { CaretUpIcon } from '@phosphor-icons/react';
+import { CaretUpIcon, XIcon } from '@phosphor-icons/react';
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
 import { errorMessage, type ProvisionProgress } from '@/api';
+import { Button } from '@/components/ui/button';
 import {
   Popover,
   PopoverContent,
@@ -18,7 +19,7 @@ import {
 import { m } from '@/paraglide/messages.js';
 import { useDaemon } from '@/queries/daemon';
 import { useInstances } from '@/queries/instance';
-import { type Job, useJobs } from '@/queries/jobs';
+import { cancelJob, type Job, useJobs } from '@/queries/jobs';
 import { useServers } from '@/queries/server';
 
 export function StatusBar() {
@@ -116,9 +117,21 @@ function JobActivity({
         <div className="max-h-72 divide-y divide-border overflow-y-auto p-1">
           {jobs.map((job) => (
             <div key={job.id} className="flex flex-col gap-1.5 p-2">
-              <span className="truncate text-xs font-medium text-foreground">
-                {nameOf(job)}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
+                  {nameOf(job)}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={m['action.cancel']()}
+                  onClick={() => {
+                    cancelJob(job.id).catch(() => {});
+                  }}
+                >
+                  <XIcon />
+                </Button>
+              </div>
               <ProvisionProgressView
                 progress={job.progress as ProvisionProgress | null}
               />

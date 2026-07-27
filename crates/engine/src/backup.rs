@@ -23,7 +23,10 @@ const SESSION_LOCK: &str = "session.lock";
 
 /// Progress for an archive/restore pass: `(files done, files total)`; total
 /// is 0 when unknown (restoring streams the archive once).
-pub type OnProgress<'a> = &'a (dyn Fn(u64, u64) + Send + Sync);
+/// Per-file archive progress. Returns `Err` to stop: a cancelled archive
+/// unwinds through the same path a write failure does, and the `.part` it was
+/// building is discarded rather than promoted.
+pub type OnProgress<'a> = &'a (dyn Fn(u64, u64) -> Result<()> + Send + Sync);
 
 /// The reserved per-server scheduled-backup setting keys.
 pub const INTERVAL_KEY: &str = "backup-interval";
@@ -306,7 +309,7 @@ fn append_tree(
             .append_path_with_name(&path, rel)
             .with_context(|| format!("archiving {}", rel.display()))?;
         *done += 1;
-        on_progress(*done, total);
+        on_progress(*done, total)?;
         return Ok(());
     }
     builder
@@ -462,7 +465,7 @@ fn extract_archive(archive: &Path, dest: &Path, on_progress: OnProgress<'_>) -> 
             .unpack_in(dest)
             .context("extracting an archive entry")?;
         done += 1;
-        on_progress(done, 0);
+        on_progress(done, 0)?;
     }
     Ok(())
 }
@@ -580,7 +583,7 @@ mod tests {
         write(&data.join("server.jar"), "current-jar");
         write(&data.join("logs/latest.log"), "log");
 
-        let backup = create(&entry, &data, BackupKind::Manual, &exclude, &|_, _| {}).unwrap();
+        let backup = create(&entry, &data, BackupKind::Manual, &exclude, &|_, _| Ok(())).unwrap();
         assert_eq!(list(&entry).len(), 1);
         assert_eq!(list(&entry)[0].id, backup.id);
         assert_eq!(list(&entry)[0].kind, BackupKind::Manual);
@@ -589,7 +592,7 @@ mod tests {
         write(&data.join("server.jar"), "newer-jar");
         std::fs::remove_file(data.join("server.properties")).unwrap();
 
-        let restored = restore(&entry, &data, &backup.id, &exclude, &|_, _| {}).unwrap();
+        let restored = restore(&entry, &data, &backup.id, &exclude, &|_, _| Ok(())).unwrap();
         assert_eq!(restored.id, backup.id);
         let content = |p: &str| std::fs::read_to_string(data.join(p)).unwrap();
         assert_eq!(content("world/level.dat"), "one");
@@ -611,7 +614,7 @@ mod tests {
         write(&data.join("world/session.lock"), "world lock");
         write(&data.join("world/region/r.0.0.mca"), "world data");
 
-        let backup = create(&entry, &data, BackupKind::Manual, &[], &|_, _| {}).unwrap();
+        let backup = create(&entry, &data, BackupKind::Manual, &[], &|_, _| Ok(())).unwrap();
         let archive = backups_dir(&entry).join(format!("{}{EXTENSION}", backup.id));
         let file = File::open(archive).unwrap();
         let decoder = flate2::read::GzDecoder::new(file);
@@ -651,7 +654,7 @@ mod tests {
         // And a fresh archive cleans up before writing, so the store is tidy
         // whether or not the daemon restarted in between.
         write(&orphan, "half an archive");
-        create(&entry, &data, BackupKind::Manual, &[], &|_, _| {}).unwrap();
+        create(&entry, &data, BackupKind::Manual, &[], &|_, _| Ok(())).unwrap();
         assert!(!orphan.exists());
         assert_eq!(list(&entry).len(), 1);
         std::fs::remove_dir_all(&entry).ok();
@@ -663,10 +666,10 @@ mod tests {
         let data = entry.join("data");
         write(&data.join("world/level.dat"), "x");
 
-        let old = create(&entry, &data, BackupKind::Scheduled, &[], &|_, _| {}).unwrap();
-        let mid = create(&entry, &data, BackupKind::Scheduled, &[], &|_, _| {}).unwrap();
-        let new = create(&entry, &data, BackupKind::Scheduled, &[], &|_, _| {}).unwrap();
-        let manual = create(&entry, &data, BackupKind::Manual, &[], &|_, _| {}).unwrap();
+        let old = create(&entry, &data, BackupKind::Scheduled, &[], &|_, _| Ok(())).unwrap();
+        let mid = create(&entry, &data, BackupKind::Scheduled, &[], &|_, _| Ok(())).unwrap();
+        let new = create(&entry, &data, BackupKind::Scheduled, &[], &|_, _| Ok(())).unwrap();
+        let manual = create(&entry, &data, BackupKind::Manual, &[], &|_, _| Ok(())).unwrap();
 
         let removed = prune(&entry, BackupKind::Scheduled, 1).unwrap();
         let removed_ids: Vec<&str> = removed.iter().map(|b| b.id.as_str()).collect();
@@ -683,8 +686,8 @@ mod tests {
     fn missing_data_and_unknown_backups_are_errors() {
         let entry = temp_entry("errors");
         let missing = entry.join("nope");
-        assert!(create(&entry, &missing, BackupKind::Manual, &[], &|_, _| {}).is_err());
-        assert!(restore(&entry, &entry.join("data"), "ghost", &[], &|_, _| {}).is_err());
+        assert!(create(&entry, &missing, BackupKind::Manual, &[], &|_, _| Ok(())).is_err());
+        assert!(restore(&entry, &entry.join("data"), "ghost", &[], &|_, _| Ok(())).is_err());
         assert!(!remove(&entry, "ghost").unwrap());
         std::fs::remove_dir_all(&entry).ok();
     }

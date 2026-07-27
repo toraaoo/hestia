@@ -160,3 +160,14 @@ pub struct JavaInstallErrorEvent {
 impl Topic for JavaInstallErrorEvent {
     const TOPIC: &'static str = "java.install.error";
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
+/// A runtime install stopped at the caller's request. Nothing is registered: the install stages into `.staging` and only a rename makes it real, so a cancelled one leaves no runtime behind.
+pub struct JavaInstallCancelledEvent {
+    pub id: String,
+}
+impl Topic for JavaInstallCancelledEvent {
+    const TOPIC: &'static str = "java.install.cancelled";
+}

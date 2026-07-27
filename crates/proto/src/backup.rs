@@ -166,3 +166,14 @@ pub struct BackupErrorEvent {
 impl Topic for BackupErrorEvent {
     const TOPIC: &'static str = "backup.error";
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
+/// A backup or restore stopped at the caller's request. The archive it was writing is reclaimed; a restore's staging directory is discarded, so the live data is untouched.
+pub struct BackupCancelledEvent {
+    pub id: String,
+}
+impl Topic for BackupCancelledEvent {
+    const TOPIC: &'static str = "backup.cancelled";
+}

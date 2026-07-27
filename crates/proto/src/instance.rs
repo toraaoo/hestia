@@ -581,3 +581,14 @@ pub struct InstanceLaunchErrorEvent {
 impl Topic for InstanceLaunchErrorEvent {
     const TOPIC: &'static str = "instance.launch.error";
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
+/// A launch stopped before the game was spawned. Nothing was started, and whatever it had materialised stays — those files are shared and idempotent, so the next launch resumes from them.
+pub struct InstanceLaunchCancelledEvent {
+    pub id: String,
+}
+impl Topic for InstanceLaunchCancelledEvent {
+    const TOPIC: &'static str = "instance.launch.cancelled";
+}

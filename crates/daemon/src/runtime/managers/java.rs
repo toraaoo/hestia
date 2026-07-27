@@ -1,23 +1,25 @@
 use std::sync::Arc;
 
 use engine::Engine;
-use proto::java::{JavaInstallDoneEvent, JavaInstallErrorEvent};
+use proto::java::{JavaInstallCancelledEvent, JavaInstallDoneEvent, JavaInstallErrorEvent};
 
-use super::job::{coalesce_progress, job_id, topic_event, InFlight};
+use super::job::{coalesce_progress, job_id, topic_event, Cancellations, InFlight};
 use crate::runtime::EventHub;
 
 pub struct JavaInstallManager {
     engine: Arc<Engine>,
     hub: Arc<EventHub>,
     active: InFlight<i32>,
+    cancellations: Cancellations,
 }
 
 impl JavaInstallManager {
-    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>) -> Self {
+    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, cancellations: Cancellations) -> Self {
         JavaInstallManager {
             engine,
             hub,
             active: InFlight::new(),
+            cancellations,
         }
     }
 
@@ -32,6 +34,7 @@ impl JavaInstallManager {
 
         let engine = self.engine.clone();
         let hub = self.hub.clone();
+        let cancellations = self.cancellations.clone();
         let job_id = id.clone();
         tracing::info!(job = %id, major, force, "java install started");
 
@@ -46,9 +49,10 @@ impl JavaInstallManager {
                 }));
             });
 
+            let (cancel, _registered) = cancellations.register(&job_id);
             let result = engine
                 .java()
-                .install(major, force, Some(engine.cache()), on_progress)
+                .install(major, force, Some(engine.cache()), &cancel, on_progress)
                 .await;
 
             match result {
@@ -63,6 +67,12 @@ impl JavaInstallManager {
                         id: job_id.clone(),
                         runtime: outcome.runtime,
                         already_installed: outcome.already_installed,
+                    }));
+                }
+                Err(e) if engine::is_cancelled(&e) => {
+                    tracing::info!(job = %job_id, major, "java install cancelled");
+                    hub.publish(&topic_event(&JavaInstallCancelledEvent {
+                        id: job_id.clone(),
                     }));
                 }
                 Err(e) => {

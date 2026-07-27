@@ -21,6 +21,27 @@ pub const CALL_TIMEOUT: Duration = Duration::from_secs(10);
 
 type EventCallback = Arc<dyn Fn(&Event) + Send + Sync>;
 
+/// How a job ended, other than well. Cancellation is kept apart from failure
+/// because nothing went wrong: a front-end must be able to say "cancelled"
+/// rather than render it as an error.
+enum Terminal {
+    Cancelled,
+    Failed(ErrorInfo),
+}
+
+impl Terminal {
+    fn into_error(self) -> IpcError {
+        match self {
+            Terminal::Cancelled => IpcError::Cancelled,
+            Terminal::Failed(info) => IpcError::Daemon {
+                code: info.code().to_string(),
+                message: info.to_string(),
+                info: serde_json::to_value(&info).unwrap_or(Value::Null),
+            },
+        }
+    }
+}
+
 struct Shared {
     pending: Mutex<HashMap<i64, oneshot::Sender<Response>>>,
     event_cb: Mutex<Option<EventCallback>>,
@@ -186,7 +207,7 @@ impl Session {
         Fut: std::future::Future<Output = Result<(), IpcError>>,
     {
         struct Outcome {
-            state: Mutex<Option<Result<Value, ErrorInfo>>>,
+            state: Mutex<Option<Result<Value, Terminal>>>,
             notify: Notify,
         }
         let outcome = Arc::new(Outcome {
@@ -197,6 +218,11 @@ impl Session {
         let id_owned = id.to_string();
         let done = done_topic.to_string();
         let error = error_topic.to_string();
+        // Every job family's terminal topics share one prefix
+        // (`<family>.done|error|cancelled`), so the third is derived rather than
+        // threaded through all seven facades — and `tests/wire.rs` fails the
+        // build if a family ever names it otherwise.
+        let cancelled = done.replace(".done", ".cancelled");
         let cb_outcome = outcome.clone();
         self.set_event_callback(Some(Arc::new(move |event: &Event| {
             if event.payload.get("id").and_then(Value::as_str) != Some(id_owned.as_str()) {
@@ -204,6 +230,9 @@ impl Session {
             }
             if event.topic == done {
                 *cb_outcome.state.lock().unwrap() = Some(Ok(event.payload.clone()));
+                cb_outcome.notify.notify_waiters();
+            } else if event.topic == cancelled {
+                *cb_outcome.state.lock().unwrap() = Some(Err(Terminal::Cancelled));
                 cb_outcome.notify.notify_waiters();
             } else if event.topic == error {
                 let info = event
@@ -213,7 +242,7 @@ impl Session {
                     .unwrap_or_else(|| ErrorInfo::Internal {
                         detail: "the job failed".into(),
                     });
-                *cb_outcome.state.lock().unwrap() = Some(Err(info));
+                *cb_outcome.state.lock().unwrap() = Some(Err(Terminal::Failed(info)));
                 cb_outcome.notify.notify_waiters();
             } else {
                 on_event(event);
@@ -231,7 +260,7 @@ impl Session {
         &self,
         id: &str,
         start: F,
-        state: &Mutex<Option<Result<Value, ErrorInfo>>>,
+        state: &Mutex<Option<Result<Value, Terminal>>>,
         notify: &Notify,
     ) -> Result<Value, IpcError>
     where
@@ -245,11 +274,7 @@ impl Session {
 
         loop {
             if let Some(result) = state.lock().unwrap().take() {
-                return result.map_err(|info| IpcError::Daemon {
-                    code: info.code().to_string(),
-                    message: info.to_string(),
-                    info: serde_json::to_value(&info).unwrap_or(Value::Null),
-                });
+                return result.map_err(Terminal::into_error);
             }
             if self.is_closed() {
                 return Err(self.shared.close_error());

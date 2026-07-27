@@ -11,6 +11,7 @@ export type * from "./events";
 export type * from "./health";
 export type * from "./instance";
 export type * from "./java";
+export type * from "./job";
 export type * from "./minecraft";
 export type * from "./process";
 export type * from "./profile";

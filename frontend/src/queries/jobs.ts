@@ -16,7 +16,7 @@ import {
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { logger } from '@/lib/log';
 import type { ProvisionProgress } from '../api';
-import { HestiaError, TRANSPORT } from '../api';
+import { HestiaError, job as jobApi, TRANSPORT, watchNextJob } from '../api';
 import { invalidate } from './client';
 
 const log = logger('jobs');
@@ -40,6 +40,7 @@ export interface JobMeta {
 export type JobStatus = 'running' | 'done' | 'error';
 
 export interface Job<TProgress = unknown> extends JobMeta {
+  /** The daemon's job id — what its events carry and `job.cancel` takes. */
   id: string;
   status: JobStatus;
   progress: TProgress | null;
@@ -55,7 +56,6 @@ const MAX_SETTLED = 50;
 const jobs = new Map<string, Job>();
 const listeners = new Set<() => void>();
 let snapshot: Job[] = [];
-let seq = 0;
 
 function emit(): void {
   snapshot = [...jobs.values()];
@@ -102,8 +102,16 @@ export function startJob<TData, TProgress>(
   meta: JobMeta,
   run: (onProgress: (progress: TProgress) => void) => Promise<TData>,
 ): JobHandle<TData> {
-  seq += 1;
-  const id = `job-${seq}`;
+  // Keyed by the daemon's own job id, which the API function mints and `runJob`
+  // reports back — the id `job.cancel` takes.
+  let id = '';
+  watchNextJob((jobId) => {
+    id = jobId;
+  });
+  const started = run((progress) => {
+    if (jobs.get(id)?.status === 'running') patch(id, { progress });
+  });
+
   log.debug({ id, op: meta.kind, entry: meta.entry?.id }, 'job started');
   jobs.set(id, {
     ...meta,
@@ -118,9 +126,7 @@ export function startJob<TData, TProgress>(
   pruneSettled();
   emit();
 
-  const result = run((progress) => {
-    if (jobs.get(id)?.status === 'running') patch(id, { progress });
-  }).then(
+  const result = started.then(
     (data) => {
       log.debug({ id, op: meta.kind }, 'job done');
       patch(id, { status: 'done', settledAt: Date.now() });
@@ -148,6 +154,12 @@ export function foregroundJob(id: string): void {
 export function backgroundJob(id: string): void {
   if (jobs.get(id)?.background === true) return;
   patch(id, { background: true });
+}
+
+/** Ask the daemon to stop a running job; it settles on its cancelled event. */
+export async function cancelJob(id: string): Promise<void> {
+  if (jobs.get(id)?.status !== 'running') return;
+  await jobApi.cancel(id);
 }
 
 /** Drop one settled job from the store; a running job stays. */

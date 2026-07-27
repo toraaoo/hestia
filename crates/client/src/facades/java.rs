@@ -36,15 +36,23 @@ impl Java<'_> {
     /// Install a runtime, blocking until the daemon reports done or error and
     /// forwarding each progress event to `on_progress`. Returns the registered
     /// runtime and whether it was already installed.
+    ///
+    /// `id` is the caller's job id — pass one to be able to cancel this install
+    /// (`Client::cancel_job`); empty generates one, which is fine for a caller
+    /// that will never cancel.
     pub async fn install(
         &self,
         major: i32,
         force: bool,
+        id: &str,
         on_progress: impl Fn(&proto::java::JavaInstallProgress) + Send + Sync + 'static,
     ) -> Result<(proto::java::JavaRuntime, bool), IpcError> {
         use proto::java::{JavaInstall, JavaInstallParams};
 
-        let id = job_id("java-install");
+        let id = match id.is_empty() {
+            true => job_id("java-install"),
+            false => id.to_string(),
+        };
         let on_event = move |event: &Event| {
             if let Ok(progress) =
                 serde_json::from_value::<proto::java::JavaInstallProgress>(event.payload.clone())

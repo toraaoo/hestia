@@ -25,15 +25,21 @@ impl Engine {
         let detail = format!("java {major}");
         let outcome = self
             .java
-            .install(major, false, Some(&self.cache), |jp| {
-                on_progress(&ProvisionProgress {
-                    phase: ProvisionPhase::Java,
-                    current: jp.current,
-                    total: jp.total,
-                    detail: detail.clone(),
-                    ..ProvisionProgress::default()
-                });
-            })
+            .install(
+                major,
+                false,
+                Some(&self.cache),
+                on_progress.cancel(),
+                |jp| {
+                    on_progress.report(&ProvisionProgress {
+                        phase: ProvisionPhase::Java,
+                        current: jp.current,
+                        total: jp.total,
+                        detail: detail.clone(),
+                        ..ProvisionProgress::default()
+                    });
+                },
+            )
             .await?;
         Ok(outcome.runtime.executable)
     }

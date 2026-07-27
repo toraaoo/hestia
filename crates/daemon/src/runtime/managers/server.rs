@@ -3,24 +3,27 @@ use std::sync::Arc;
 use engine::{Engine, ServerCreateSpec, ServerUpdateSpec};
 use proto::minecraft::ProvisionProgress;
 use proto::server::{
-    ServerCreateDoneEvent, ServerCreateErrorEvent, ServerCreateParams, ServerCreateProgressEvent,
-    ServerUpdateDoneEvent, ServerUpdateErrorEvent, ServerUpdateParams, ServerUpdateProgressEvent,
+    ServerCreateCancelledEvent, ServerCreateDoneEvent, ServerCreateErrorEvent, ServerCreateParams,
+    ServerCreateProgressEvent, ServerUpdateCancelledEvent, ServerUpdateDoneEvent,
+    ServerUpdateErrorEvent, ServerUpdateParams, ServerUpdateProgressEvent,
 };
 
-use super::job::{coalesce_progress, job_id, topic_event, InFlight};
+use super::job::{coalesce_progress, job_id, topic_event, Cancellations, InFlight};
 use crate::runtime::{server_info, EventHub};
 
 pub struct ServerCreateManager {
     engine: Arc<Engine>,
     hub: Arc<EventHub>,
+    cancellations: Cancellations,
     active: InFlight<String>,
 }
 
 impl ServerCreateManager {
-    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>) -> Self {
+    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, cancellations: Cancellations) -> Self {
         ServerCreateManager {
             engine,
             hub,
+            cancellations,
             active: InFlight::new(),
         }
     }
@@ -46,6 +49,7 @@ impl ServerCreateManager {
 
         let engine = self.engine.clone();
         let hub = self.hub.clone();
+        let cancellations = self.cancellations.clone();
         let job_id = id.clone();
         tracing::info!(
             job = %id,
@@ -76,7 +80,9 @@ impl ServerCreateManager {
                 config: params.config,
             };
 
-            match engine.provision_server(spec, on_progress.as_ref()).await {
+            let (cancel, _registered) = cancellations.register(&job_id);
+            let running = engine::Job::new(on_progress.as_ref(), &cancel);
+            match engine.provision_server(spec, &running).await {
                 Ok((record, warnings)) => {
                     tracing::info!(
                         job = %job_id,
@@ -89,6 +95,12 @@ impl ServerCreateManager {
                         id: job_id.clone(),
                         server: server_info(record, None),
                         warnings,
+                    }));
+                }
+                Err(e) if engine::is_cancelled(&e) => {
+                    tracing::info!(job = %job_id, "server create cancelled");
+                    hub.publish(&topic_event(&ServerCreateCancelledEvent {
+                        id: job_id.clone(),
                     }));
                 }
                 Err(e) => {
@@ -107,14 +119,16 @@ impl ServerCreateManager {
 pub struct ServerUpdateManager {
     engine: Arc<Engine>,
     hub: Arc<EventHub>,
+    cancellations: Cancellations,
     active: InFlight<String>,
 }
 
 impl ServerUpdateManager {
-    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>) -> Self {
+    pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, cancellations: Cancellations) -> Self {
         ServerUpdateManager {
             engine,
             hub,
+            cancellations,
             active: InFlight::new(),
         }
     }
@@ -135,6 +149,7 @@ impl ServerUpdateManager {
 
         let engine = self.engine.clone();
         let hub = self.hub.clone();
+        let cancellations = self.cancellations.clone();
         let job_id = id.clone();
         tracing::info!(
             job = %id,
@@ -163,7 +178,9 @@ impl ServerUpdateManager {
                 allow_downgrade: params.allow_downgrade,
             };
 
-            match engine.update_server(spec, on_progress.as_ref()).await {
+            let (cancel, _registered) = cancellations.register(&job_id);
+            let running = engine::Job::new(on_progress.as_ref(), &cancel);
+            match engine.update_server(spec, &running).await {
                 Ok((record, warnings)) => {
                     tracing::info!(
                         job = %job_id,
@@ -176,6 +193,12 @@ impl ServerUpdateManager {
                         id: job_id.clone(),
                         server: server_info(record, None),
                         warnings,
+                    }));
+                }
+                Err(e) if engine::is_cancelled(&e) => {
+                    tracing::info!(job = %job_id, server = %server_id, "server update cancelled");
+                    hub.publish(&topic_event(&ServerUpdateCancelledEvent {
+                        id: job_id.clone(),
                     }));
                 }
                 Err(e) => {
