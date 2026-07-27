@@ -22,12 +22,14 @@ export function ServerConsoleTab({
   running: boolean;
   name: string;
 }) {
-  const logs = useServerLogs(id, { follow: running, tail: 500 });
+  // Followed whether or not it is running: the subject is the server, so a
+  // stop leaves its output on screen and a restart streams into the same view.
+  const logs = useServerLogs(id, { follow: true, tail: 500 });
   const command = useMutation(serverMutations.command(id));
   const [line, setLine] = useState('');
   const entries = useConsoleHistory(id);
 
-  if (!running) {
+  if (!running && logs.lines.length === 0 && entries.length === 0) {
     return <Empty className="h-full">{m['detail.console_empty']()}</Empty>;
   }
 
@@ -72,11 +74,15 @@ export function ServerConsoleTab({
         }}
       >
         <Input
-          placeholder={m['detail.console_placeholder']()}
+          placeholder={
+            running
+              ? m['detail.console_placeholder']()
+              : m['detail.console_empty']()
+          }
           className="font-mono"
           value={line}
           onChange={(e) => setLine(e.target.value)}
-          disabled={command.isPending}
+          disabled={!running || command.isPending}
         />
       </form>
     </div>

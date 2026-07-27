@@ -38,6 +38,52 @@ pub fn reference_matches(reference: &str, id: &str, name: &str) -> bool {
     )
 }
 
+/// The supervisor key a managed server's process runs under — deterministic,
+/// so every channel (and every front-end) can name a server's process from its
+/// id alone, running or not.
+pub fn server_process_id(id: &str) -> String {
+    format!("server-{id}")
+}
+
+/// The instance *entry* key — the unit for the backup/content/update in-flight
+/// sets and the lifecycle guards. Not a supervisor process key: an instance can
+/// have many concurrent sessions, each keyed by [`instance_session_id`].
+pub fn instance_process_id(id: &str) -> String {
+    format!("instance-{id}")
+}
+
+/// The supervisor process key for one launch (session) of an instance. An id
+/// never contains `_` (it is a uuid hex string), so the `_` separator keeps the
+/// prefix `instance-<id>_` unambiguous across instances.
+pub fn instance_session_id(id: &str, seq: u32) -> String {
+    format!("instance-{id}_{seq}")
+}
+
+/// The prefix every session key of one instance shares.
+pub fn instance_session_prefix(id: &str) -> String {
+    format!("instance-{id}_")
+}
+
+/// The instance id embedded in a session key (`instance-<id>_<seq>`).
+pub fn instance_id_of_session(session_id: &str) -> Option<String> {
+    session_id
+        .strip_prefix("instance-")
+        .and_then(|rest| rest.rsplit_once('_'))
+        .map(|(id, _seq)| id.to_string())
+}
+
+/// Does a subscription scoped to `key` cover events from process `id`? An entry
+/// key covers itself and every session key beneath it (`instance-<id>_<seq>`),
+/// so following an *entry* outlives the individual processes it runs — a
+/// restart resumes the same stream. Job ids carry no `_`, so a job filter still
+/// matches exactly one job.
+pub fn process_in_scope(key: &str, id: &str) -> bool {
+    id == key
+        || id
+            .strip_prefix(key)
+            .is_some_and(|rest| rest.starts_with('_'))
+}
+
 /// Translate a `config.*` key segment from its kebab-case vocabulary
 /// (`jvm-args`) to the camelCase field the settings serialize as (`jvmArgs`).
 /// The config keys are a deliberately stable kebab-case CLI vocabulary while
@@ -109,6 +155,42 @@ mod tests {
         assert!(reference_matches("my-server", id, name), "slugged name");
         assert!(reference_matches("MY  SERVER", id, name), "loose spelling");
         assert!(!reference_matches("other", id, name));
+    }
+
+    #[test]
+    fn a_sessions_prefix_never_matches_a_similarly_named_instance() {
+        // Ids never contain `_`; using it as the session separator keeps one
+        // instance's session prefix from matching another's sessions.
+        let foo = instance_session_id("foo", 3);
+        let foo_two = instance_session_id("foo-2", 1);
+        assert!(foo.starts_with(&instance_session_prefix("foo")));
+        assert!(!foo_two.starts_with(&instance_session_prefix("foo")));
+        assert!(foo_two.starts_with(&instance_session_prefix("foo-2")));
+    }
+
+    #[test]
+    fn session_seq_parses_back_off_the_prefix() {
+        let id = instance_session_id("cozy", 7);
+        let seq: u32 = id
+            .strip_prefix(&instance_session_prefix("cozy"))
+            .and_then(|s| s.parse().ok())
+            .unwrap();
+        assert_eq!(seq, 7);
+        assert_eq!(instance_id_of_session(&id).as_deref(), Some("cozy"));
+    }
+
+    #[test]
+    fn an_entry_key_scopes_its_own_sessions_only() {
+        let entry = instance_process_id("foo");
+        assert!(process_in_scope(&entry, &entry));
+        assert!(process_in_scope(&entry, &instance_session_id("foo", 2)));
+        assert!(!process_in_scope(&entry, &instance_session_id("foo-2", 1)));
+        assert!(!process_in_scope(&entry, &instance_process_id("foo-2")));
+        let server = server_process_id("abc");
+        assert!(process_in_scope(&server, &server));
+        assert!(!process_in_scope(&server, &server_process_id("abcd")));
+        // Job ids share a prefix vocabulary but never a `_`.
+        assert!(!process_in_scope("content-42", "content-42-7"));
     }
 
     #[test]

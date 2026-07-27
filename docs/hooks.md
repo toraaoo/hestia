@@ -220,6 +220,12 @@ per-process form. While following, the tail query stops refetching (the
 stream is the freshness) and the live buffer is capped by `limit`
 (default 1000).
 
+Following is scoped to the **entry**, not to one run of it, so leave
+`follow` on while the entry is stopped: the stream resumes on the next
+start with no remount and no manual refresh. A `process.started` for the
+entry resets the live buffer, since the new run writes a fresh log — the
+refetched tail is that run's history.
+
 **Raw events** — for the rare component that needs a daemon topic directly
 (the payload shapes mirror `crates/proto`'s `Topic` structs):
 

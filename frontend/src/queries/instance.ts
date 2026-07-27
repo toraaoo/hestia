@@ -300,7 +300,11 @@ export function useInstance(id: string) {
   });
 }
 
-/** Follows the named session, or every session of the instance. */
+/**
+ * Follows the named session, or every session of the instance — including
+ * sessions launched later, so following survives a stop and picks the next
+ * launch up.
+ */
 export function useInstanceLogs(
   id: string,
   options: LogsOptions & { session?: string } = {},

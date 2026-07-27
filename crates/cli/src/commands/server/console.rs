@@ -60,10 +60,13 @@ pub(crate) async fn attach(client: Client, server: &str) -> Result<()> {
         while let Some(event) = process_events.recv().await {
             let sent = match event {
                 ProcessEvent::Output(line) => forward_tx.send(ui::ConsoleEvent::Output(line.line)),
+                // The console drives one running server over its rcon channel,
+                // so it closes with that process rather than following the entry.
                 ProcessEvent::Exit(_) => {
                     let _ = forward_tx.send(ui::ConsoleEvent::Closed("server stopped".into()));
                     break;
                 }
+                ProcessEvent::Started(_) => continue,
             };
             if sent.is_err() {
                 break;

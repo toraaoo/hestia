@@ -105,7 +105,9 @@ hestia server smp attach         # interactive console: live logs, type to send
                                  #   commands, Esc detaches (alias: console)
 hestia server smp command say hi # one-shot console command (alias: cmd)
 hestia server smp logs -n 50     # captured output (-f opens the fullscreen
-                                 #   log session; piped it streams plainly)
+                                 #   log session; piped it streams plainly).
+                                 #   -f follows the *server*: it works on a
+                                 #   stopped one and rides through a restart
 hestia server smp status         # live process state + a running server's ping
 hestia server smp info           # descriptor, on-disk folder, and disk footprint
 hestia server smp stop           # stop the running server
@@ -145,7 +147,8 @@ hestia instance modded update 1.21.4  # move to another version (saves stay,
 hestia instance modded config set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
 hestia instance modded logs -n 50 # captured output — the newest running session
                                  #   (-f opens the fullscreen log session; piped
-                                 #   it streams plainly)
+                                 #   it streams plainly). -f follows the
+                                 #   *instance*, so it picks up the next launch
 hestia instance modded info      # descriptor, folder, disk footprint, and each
                                  #   running session (handles)
 hestia instance modded stop      # kill every session (--session <h> targets one)
@@ -176,7 +179,9 @@ process id):
 
 ```bash
 hestia instance modded stop --session 1      # stop just session 1
-hestia instance modded logs --session 2 -f   # follow session 2's output
+hestia instance modded logs --session 2 -f   # follow session 2's output (ends
+                                             #   with that session, unlike the
+                                             #   instance-wide follow)
 hestia instance modded restart --session 1   # replace session 1 (others keep running)
 
 hestia stop modded --session 1               # the shortcuts take it too
@@ -248,7 +253,9 @@ hestia start modded              # start a server (attaches its console) or laun
                                  #   returns immediately
 hestia stop modded               # stop whichever it is (all sessions, for an instance)
 hestia restart modded            # restart whichever it is (attaches like start)
-hestia logs modded -f            # follow its captured output fullscreen
+hestia logs modded -f            # follow its captured output fullscreen (the
+                                 #   entry is the subject: a stop is a line in
+                                 #   the stream, not the end of it)
 ```
 
 ## Content discovery

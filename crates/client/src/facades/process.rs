@@ -2,14 +2,15 @@ use ipc::errors::IpcError;
 use ipc::protocol::Event;
 use proto::process::{
     ProcessExitEvent, ProcessInfo, ProcessList, ProcessLogLine, ProcessLogs, ProcessLogsParams,
-    ProcessMetrics, ProcessRef, ProcessSpec, ProcessStart, ProcessStartResult, ProcessStatus,
-    ProcessStop,
+    ProcessMetrics, ProcessRef, ProcessSpec, ProcessStart, ProcessStartResult, ProcessStartedEvent,
+    ProcessStatus, ProcessStop,
 };
 
 use crate::session::{job_id, Session};
 
 /// One event from a subscribed process's live stream.
 pub enum ProcessEvent {
+    Started(ProcessStartedEvent),
     Output(ProcessLogLine),
     Exit(ProcessExitEvent),
 }
@@ -56,10 +57,12 @@ impl Process<'_> {
         Ok(self.session.call::<ProcessLogs>(&params).await?.lines)
     }
 
-    /// Stream a process's output and exit as they happen. Installs the
-    /// session's (single) event callback, so it composes with `call`s on the
-    /// same client but not with `run_job` or another subscription; the stream
-    /// ends when the connection closes.
+    /// Stream a process's start, output, and exit as they happen. `id` is a
+    /// process key, or an *entry* key (`server-<id>`, `instance-<id>`) to follow
+    /// the entry across stops and starts — its processes come and go on the one
+    /// stream. Installs the session's (single) event callback, so it composes
+    /// with `call`s on the same client but not with `run_job` or another
+    /// subscription; the stream ends when the connection closes.
     pub async fn subscribe(
         &self,
         id: &str,
@@ -74,6 +77,13 @@ impl Process<'_> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         self.session.set_event_callback(Some(std::sync::Arc::new(
             move |event: &Event| match event.topic.as_str() {
+                ProcessStartedEvent::TOPIC => {
+                    if let Ok(e) =
+                        serde_json::from_value::<ProcessStartedEvent>(event.payload.clone())
+                    {
+                        let _ = tx.send(ProcessEvent::Started(e));
+                    }
+                }
                 ProcessOutputEvent::TOPIC => {
                     if let Ok(e) =
                         serde_json::from_value::<ProcessOutputEvent>(event.payload.clone())

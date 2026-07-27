@@ -279,6 +279,9 @@ export function useServer(id: string) {
  * composes the follow matcher; every other read/write is consumed directly
  * through `serverQueries`/`serverMutations` (with `useQuery`/`useMutation`/
  * `useJobMutation`, spreading `{ enabled }` at the call site when gated).
+ *
+ * Following is scoped to the server, not to one run of it: leave `follow` on
+ * while it is stopped and the stream resumes on the next start.
  */
 export function useServerLogs(
   id: string,

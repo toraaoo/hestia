@@ -31,38 +31,13 @@ pub use process::{ExitObserver, ProcessSupervisor, StartError};
 pub use router::{error_response, Channels, Router};
 pub use scheduler::spawn_backup_scheduler;
 
-/// The supervisor id a managed server runs under — deterministic, so every
-/// channel can find a server's process without bookkeeping.
-pub fn server_process_id(id: &str) -> String {
-    format!("server-{id}")
-}
-
-/// The instance *entry* key — the unit for the backup/content/update in-flight
-/// sets and the lifecycle guards. Not a supervisor process key: an instance can
-/// have many concurrent sessions, each keyed by `instance_session_id`.
-pub fn instance_process_id(id: &str) -> String {
-    format!("instance-{id}")
-}
-
-/// The supervisor process key for one launch (session) of an instance. An id
-/// never contains `_` (it is a slug plus a hex tag, all `[a-z0-9-]`), so the
-/// `_` separator keeps the prefix `instance-<id>_` unambiguous across instances.
-pub fn instance_session_id(id: &str, seq: u32) -> String {
-    format!("instance-{id}_{seq}")
-}
-
-/// The prefix every session key of one instance shares.
-pub fn instance_session_prefix(id: &str) -> String {
-    format!("instance-{id}_")
-}
-
-/// The instance id embedded in a session key (`instance-<id>_<seq>`).
-pub fn instance_id_of_session(session_id: &str) -> Option<String> {
-    session_id
-        .strip_prefix("instance-")
-        .and_then(|rest| rest.rsplit_once('_'))
-        .map(|(id, _seq)| id.to_string())
-}
+// The supervisor key vocabulary lives in `proto::naming`: a front-end names the
+// process it follows from the entry's id alone, so both sides must derive the
+// same keys.
+pub use proto::naming::{
+    instance_id_of_session, instance_process_id, instance_session_id, instance_session_prefix,
+    server_process_id,
+};
 
 fn now_unix() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -300,30 +275,4 @@ pub struct HandlerContext {
     // Carried on every request even though no handler consumes it yet.
     #[allow(dead_code)]
     pub peer: Peer,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{instance_session_id, instance_session_prefix};
-
-    #[test]
-    fn a_sessions_prefix_never_matches_a_similarly_named_instance() {
-        // Ids are slugs ([a-z0-9-]); using `_` as the session separator keeps
-        // one instance's session prefix from matching another's sessions.
-        let foo = instance_session_id("foo", 3);
-        let foo_two = instance_session_id("foo-2", 1);
-        assert!(foo.starts_with(&instance_session_prefix("foo")));
-        assert!(!foo_two.starts_with(&instance_session_prefix("foo")));
-        assert!(foo_two.starts_with(&instance_session_prefix("foo-2")));
-    }
-
-    #[test]
-    fn session_seq_parses_back_off_the_prefix() {
-        let id = instance_session_id("cozy", 7);
-        let seq: u32 = id
-            .strip_prefix(&instance_session_prefix("cozy"))
-            .and_then(|s| s.parse().ok())
-            .unwrap();
-        assert_eq!(seq, 7);
-    }
 }

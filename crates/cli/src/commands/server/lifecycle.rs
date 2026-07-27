@@ -63,6 +63,10 @@ pub(crate) async fn rename(client: &Client, server: &str, new_name: &str) -> Res
     )))
 }
 
+/// Read (or follow) the server's captured output. Following is scoped to the
+/// **server**, not to the process it happens to be running: a stop leaves the
+/// stream open and the next start resumes it, and a stopped server can be
+/// followed from the start.
 pub(crate) async fn logs(
     client: &Client,
     server: &str,
@@ -70,28 +74,26 @@ pub(crate) async fn logs(
     follow: bool,
 ) -> Result<()> {
     let lines = client.server().logs(server, tail).await?;
-    if follow && ui::interactive_output() {
+    if follow {
         let info = client.server().status(server).await?;
-        let process = entry::running_process(&info)
-            .with_context(|| format!("server '{}' is not running", info.name))?;
-        let backfill = lines.into_iter().map(|l| l.line).collect();
-        return crate::commands::lifecycle::log_session(
-            client,
-            &info.name,
-            &process.id,
-            backfill,
-            "server",
-        )
-        .await;
+        let key = client::proto::naming::server_process_id(&info.id);
+        if ui::interactive_output() {
+            let backfill = lines.into_iter().map(|l| l.line).collect();
+            return crate::commands::lifecycle::entry_log_session(
+                client, &info.name, &key, backfill, "server",
+            )
+            .await;
+        }
+        for line in lines {
+            ui::show(View::line(line.line))?;
+        }
+        return follow_logs(client, &info.name, &key).await;
     }
-    if lines.is_empty() && !follow {
+    if lines.is_empty() {
         return ui::show(View::note("no output captured (has it been started?)"));
     }
     for line in lines {
         ui::show(View::line(line.line))?;
-    }
-    if follow {
-        follow_logs(client, server).await?;
     }
     Ok(())
 }
@@ -127,17 +129,18 @@ pub(crate) async fn monitor(client: &Client, server: &str) -> Result<()> {
     result
 }
 
-async fn follow_logs(client: &Client, server: &str) -> Result<()> {
-    let info = client.server().status(server).await?;
-    let process = entry::running_process(&info)
-        .with_context(|| format!("server '{}' is not running", info.name))?;
-    let mut events = client.process().subscribe(&process.id).await?;
+/// The piped `-f`: `tail -f` semantics over the entry, so a stop is a note in
+/// the stream rather than the end of it.
+async fn follow_logs(client: &Client, name: &str, entry_key: &str) -> Result<()> {
+    let mut events = client.process().subscribe(entry_key).await?;
     while let Some(event) = events.recv().await {
         match event {
             ProcessEvent::Output(line) => ui::show(View::line(line.line))?,
-            ProcessEvent::Exit(_) => {
-                return ui::show(View::note("server stopped"));
-            }
+            ProcessEvent::Started(e) => ui::show(View::note(format!(
+                "server '{name}' started (pid {})",
+                e.pid
+            )))?,
+            ProcessEvent::Exit(_) => ui::show(View::note(format!("server '{name}' stopped")))?,
         }
     }
     Ok(())

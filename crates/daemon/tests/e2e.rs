@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use client::proto::process::{ProcessSpec, ProcessState};
-use client::Client;
+use client::{Client, ProcessEvent};
 
 /// A spawned daemon that is stopped and reaped on drop.
 struct Daemon {
@@ -247,6 +247,119 @@ async fn supervised_processes_survive_a_daemon_restart() {
 
     drop(daemon2);
     drop(daemon);
+}
+
+/// Following an entry outlives the processes it runs: one subscription taken
+/// against the entry key sees the current run's output, its exit, and the next
+/// run's start and output — the CLI's `logs -f` and the desktop's log panel both
+/// stay on the stream across a stop/start instead of ending with the process.
+#[tokio::test]
+async fn following_an_entry_survives_a_stop_and_start() {
+    let (daemon, client) = spawn_daemon().await;
+    let entry = client::proto::naming::server_process_id("e2e");
+
+    let spec = |marker: &str| ProcessSpec {
+        id: entry.clone(),
+        program: "/bin/sh".into(),
+        args: vec![
+            "-c".into(),
+            format!("while true; do echo {marker}; sleep 1; done"),
+        ],
+        ..Default::default()
+    };
+
+    client
+        .process()
+        .start(spec("first"))
+        .await
+        .expect("process.start");
+
+    // Subscribed before anything happens, and never re-subscribed below.
+    let mut events = client
+        .process()
+        .subscribe(&entry)
+        .await
+        .expect("process.subscribe");
+
+    wait_for(
+        &mut events,
+        |e| matches!(e, ProcessEvent::Output(l) if l.line == "first"),
+    )
+    .await;
+
+    client.process().stop(&entry).await.expect("process.stop");
+    wait_for(&mut events, |e| matches!(e, ProcessEvent::Exit(_))).await;
+
+    // Restarting under the same entry key resumes the *same* stream.
+    client
+        .process()
+        .start(spec("second"))
+        .await
+        .expect("process.start after stop");
+    wait_for(&mut events, |e| matches!(e, ProcessEvent::Started(_))).await;
+    wait_for(
+        &mut events,
+        |e| matches!(e, ProcessEvent::Output(l) if l.line == "second"),
+    )
+    .await;
+
+    client.process().stop(&entry).await.expect("process.stop");
+    client.daemon().stop(true).await.expect("daemon.stop");
+    drop(daemon);
+}
+
+/// An instance runs each launch under its own session key, so following the
+/// instance means the subscription must cover the session keys beneath its
+/// entry key — including sessions that start after the subscription.
+#[tokio::test]
+async fn following_an_instance_covers_its_later_sessions() {
+    let (daemon, client) = spawn_daemon().await;
+    let entry = client::proto::naming::instance_process_id("e2e");
+
+    let mut events = client
+        .process()
+        .subscribe(&entry)
+        .await
+        .expect("process.subscribe");
+
+    client
+        .process()
+        .start(ProcessSpec {
+            id: client::proto::naming::instance_session_id("e2e", 1),
+            program: "/bin/sh".into(),
+            args: vec![
+                "-c".into(),
+                "while true; do echo session; sleep 1; done".into(),
+            ],
+            ..Default::default()
+        })
+        .await
+        .expect("process.start");
+
+    wait_for(&mut events, |e| matches!(e, ProcessEvent::Started(_))).await;
+    wait_for(
+        &mut events,
+        |e| matches!(e, ProcessEvent::Output(l) if l.line == "session"),
+    )
+    .await;
+
+    client.daemon().stop(true).await.expect("daemon.stop");
+    drop(daemon);
+}
+
+/// Pull events until one satisfies `wanted`, failing the test on a timeout —
+/// a stream that ended is exactly the defect under test.
+async fn wait_for(
+    events: &mut tokio::sync::mpsc::UnboundedReceiver<ProcessEvent>,
+    wanted: impl Fn(&ProcessEvent) -> bool,
+) {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    while let Ok(Some(event)) = tokio::time::timeout_at(deadline, events.recv()).await {
+        if wanted(&event) {
+            return;
+        }
+    }
+    panic!("the event stream ended or timed out before the expected event");
 }
 
 #[tokio::test]

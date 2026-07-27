@@ -158,6 +158,10 @@ pub(crate) async fn rename(client: &Client, instance: &str, new_name: &str) -> R
     )))
 }
 
+/// Read (or follow) an instance's captured output. A named `--session` is one
+/// process and its exit ends the follow; without one the subject is the
+/// **instance**, so the stream survives a session ending and picks up the next
+/// launch — and can be started against a stopped instance.
 pub(crate) async fn logs(
     client: &Client,
     instance: &str,
@@ -170,28 +174,38 @@ pub(crate) async fn logs(
         .instance()
         .logs(instance, target.clone(), tail)
         .await?;
-    if follow && ui::interactive_output() {
+    if follow {
         let info = entry::fetch(client, instance).await?;
-        let process_id = follow_target(&info, &target)?;
-        let backfill = lines.into_iter().map(|l| l.line).collect();
-        return crate::commands::lifecycle::log_session(
-            client,
-            &info.name,
-            &process_id,
-            backfill,
-            "instance",
-        )
-        .await;
+        let key = target
+            .clone()
+            .unwrap_or_else(|| client::proto::naming::instance_process_id(&info.id));
+        if ui::interactive_output() {
+            let backfill = lines.into_iter().map(|l| l.line).collect();
+            return match &target {
+                Some(process_id) => {
+                    crate::commands::lifecycle::log_session(
+                        client, &info.name, process_id, backfill, "instance",
+                    )
+                    .await
+                }
+                None => {
+                    crate::commands::lifecycle::entry_log_session(
+                        client, &info.name, &key, backfill, "instance",
+                    )
+                    .await
+                }
+            };
+        }
+        for line in lines {
+            ui::show(View::line(line.line))?;
+        }
+        return follow_logs(client, &info.name, &key, target.is_some()).await;
     }
-    if lines.is_empty() && !follow {
+    if lines.is_empty() {
         return ui::show(View::note("no output captured (has it been launched?)"));
     }
     for line in lines {
         ui::show(View::line(line.line))?;
-    }
-    if follow {
-        let info = entry::fetch(client, instance).await?;
-        follow_logs(client, &info, &target).await?;
     }
     Ok(())
 }
@@ -243,18 +257,22 @@ fn follow_target(
     }
 }
 
-async fn follow_logs(
-    client: &Client,
-    info: &client::proto::instance::InstanceInfo,
-    target: &Option<String>,
-) -> Result<()> {
-    let process_id = follow_target(info, target)?;
-    let mut events = client.process().subscribe(&process_id).await?;
+/// The piped `-f`: a named session ends the stream when it exits; following the
+/// instance keeps `tail -f` semantics across launches.
+async fn follow_logs(client: &Client, name: &str, key: &str, one_session: bool) -> Result<()> {
+    let mut events = client.process().subscribe(key).await?;
     while let Some(event) = events.recv().await {
         match event {
             ProcessEvent::Output(line) => ui::show(View::line(line.line))?,
+            ProcessEvent::Started(e) => ui::show(View::note(format!(
+                "instance '{name}' session started (pid {})",
+                e.pid
+            )))?,
             ProcessEvent::Exit(_) => {
-                return ui::show(View::note("instance stopped"));
+                ui::show(View::note(format!("instance '{name}' session stopped")))?;
+                if one_session {
+                    return Ok(());
+                }
             }
         }
     }

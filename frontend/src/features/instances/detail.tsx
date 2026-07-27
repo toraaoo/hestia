@@ -394,7 +394,7 @@ export function InstanceDetailPage({
         </TabsContent>
 
         <TabsContent value="logs" className="flex min-h-0 flex-col p-5">
-          <InstanceLogsTab id={id} running={running} name={instance.name} />
+          <InstanceLogsTab id={id} name={instance.name} />
         </TabsContent>
 
         <TabsContent value="settings" className="p-5">

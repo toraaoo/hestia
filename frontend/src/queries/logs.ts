@@ -3,6 +3,10 @@
  * fetched tail (the query) plus `process.output` events accumulated on top.
  * The buffer resets whenever a fresh tail lands, so a refetch never
  * duplicates lines it already contains.
+ *
+ * The subject is the entry, not one process: the matcher accepts the entry's
+ * whole process family, so a stop leaves the stream in place and the next
+ * start resumes it without a remount.
  */
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useMemo, useRef, useState } from 'react';
@@ -48,6 +52,13 @@ export function useFollowedLogs(
     setSeenFetchAt(query.dataUpdatedAt);
     if (!following) setLive([]);
   }
+
+  // A new process writes a fresh log (the game rotates `latest.log` at
+  // startup), so the accumulated buffer belongs to the run that just ended:
+  // drop it and let the refetched tail be the new run's history.
+  useDaemonEvent<{ id: string }>('process.started', (payload) => {
+    if (matchesRef.current?.(payload.id)) setLive([]);
+  });
 
   useDaemonEvent<ProcessOutputPayload>('process.output', (payload) => {
     if (!matchesRef.current?.(payload.id) || payload.lines.length === 0) return;

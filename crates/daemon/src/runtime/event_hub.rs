@@ -11,8 +11,9 @@ use tokio::sync::mpsc::UnboundedSender;
 struct Sub {
     conn_id: u64,
     out: UnboundedSender<String>,
-    // Filter to a single job id (matched against the event payload's "id");
-    // None subscribes to every event.
+    // Filter to one id (matched against the event payload's "id"); None
+    // subscribes to every event. An entry key also covers the session keys
+    // beneath it, so following an entry outlives its processes.
     filter: Option<String>,
 }
 
@@ -61,7 +62,7 @@ impl EventHub {
         let mut subs = self.subs.lock().unwrap();
         subs.retain(|sub| {
             if let Some(filter) = &sub.filter {
-                if Some(filter.as_str()) != id {
+                if !id.is_some_and(|id| proto::naming::process_in_scope(filter, id)) {
                     return !sub.out.is_closed();
                 }
             }
