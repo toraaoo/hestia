@@ -11,6 +11,7 @@ use client::proto::content::{
 use client::Client;
 
 use client::proto::content::SearchQuery;
+use client::proto::instance::WorldInfo;
 
 use super::entry::ContentEntry;
 use super::format::{kind_plural, source_label, world_label};
@@ -204,7 +205,8 @@ async fn add_session(
         if worlds.is_empty() {
             bail!("no save worlds yet — launch the instance and create a world first");
         }
-        worlds
+        // The session installs by folder; its picker only needs the identity.
+        worlds.into_iter().map(|w| w.folder).collect()
     } else {
         Vec::new()
     };
@@ -527,9 +529,25 @@ async fn pick_worlds(client: &Client, id: &str, world: Vec<String>) -> Result<Ve
     if worlds.is_empty() {
         bail!("no save worlds yet — launch the instance and create a world first");
     }
-    let picks = ui::multi_select("select world(s)", &worlds)
+    // Labelled by what the player named the world, but installed by folder —
+    // the identity the game and the index both key on.
+    let labels: Vec<String> = worlds.iter().map(save_label).collect();
+    let picks = ui::multi_select("select world(s)", &labels)
         .context("pass --world to name the world(s)")?;
-    Ok(picks.into_iter().map(|i| worlds[i].clone()).collect())
+    Ok(picks
+        .into_iter()
+        .map(|i| worlds[i].folder.clone())
+        .collect())
+}
+
+/// A save world for a picker line: its in-game name, plus the folder when they
+/// differ (the folder is what gets installed into).
+fn save_label(world: &WorldInfo) -> String {
+    if world.name == world.folder {
+        world.folder.clone()
+    } else {
+        format!("{} ({})", world.name, world.folder)
+    }
 }
 
 /// What a content command needs to know about its entry.

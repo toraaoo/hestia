@@ -23,6 +23,7 @@ import type {
   InstanceProfileListResult,
   InstanceUpdateParams,
   Profile,
+  WorldInfo,
 } from './types/instance';
 import type {
   ConfigEntry,
@@ -105,9 +106,9 @@ export async function remove(instance: string): Promise<void> {
   await call('instance.remove', { instance });
 }
 
-/** Save-world folder names, for the datapack world picker. */
-export async function worlds(instance: string): Promise<string[]> {
-  const result = await call<{ worlds: string[] }>('instance.worlds', {
+/** The save worlds, each described from its own `level.dat`. */
+export async function worlds(instance: string): Promise<WorldInfo[]> {
+  const result = await call<{ worlds: WorldInfo[] }>('instance.worlds', {
     instance,
   });
   return result.worlds;

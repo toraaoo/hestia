@@ -16,6 +16,7 @@ mod update;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use client::proto::content::ContentKind;
+use client::proto::instance::WorldInfo;
 use client::Client;
 
 use crate::commands::content::{self, ContentCmd, EntryKind};
@@ -110,6 +111,8 @@ enum InstanceAction {
     },
     /// The instance's record and running sessions
     Info,
+    /// The instance's save worlds (where datapacks install)
+    Worlds,
     /// Watch a running session's CPU and memory on a fullscreen graph
     Monitor {
         #[arg(
@@ -261,6 +264,7 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             let sessions = entry::fetch(client, &name).await?.sessions;
             entry::show_detail(&info, &sessions)
         }
+        InstanceAction::Worlds => worlds(client, &name).await,
         InstanceAction::Monitor { session } => lifecycle::monitor(client, &name, session).await,
         InstanceAction::Logs {
             tail,
@@ -305,6 +309,56 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
         } => adopt(client, &name, targets).await,
         InstanceAction::Remove => lifecycle::remove(client, &name).await,
     }
+}
+
+/// The instance's save worlds, as each `level.dat` describes itself. A
+/// first-class verb, not just the datapack picker's private read: every daemon
+/// capability gets a scriptable form.
+async fn worlds(client: &Client, name: &str) -> Result<()> {
+    let worlds = client.instance().worlds(name).await?;
+    if worlds.is_empty() {
+        return crate::ui::show(crate::ui::View::note(
+            "no worlds yet — create one in-game first",
+        ));
+    }
+    let rows = worlds
+        .iter()
+        .map(|world| {
+            vec![
+                world.name.clone(),
+                world.folder.clone(),
+                world.version.clone(),
+                mode_label(world),
+                mc::last_played_label(world.last_played_unix),
+                crate::ui::human_bytes(world.size_bytes),
+            ]
+        })
+        .collect();
+    crate::ui::show(crate::ui::View::table(
+        "Worlds",
+        ["NAME", "FOLDER", "VERSION", "MODE", "PLAYED", "SIZE"],
+        rows,
+    ))
+}
+
+/// The world's game mode, with the flags that change how it plays.
+fn mode_label(world: &WorldInfo) -> String {
+    if !world.read {
+        return "unreadable".into();
+    }
+    let mut label = format!("{:?}", world.game_mode).to_lowercase();
+    if world.hardcore {
+        label.push_str(" hardcore");
+    } else {
+        label = format!(
+            "{label} ({})",
+            format!("{:?}", world.difficulty).to_lowercase()
+        );
+    }
+    if world.cheats {
+        label.push_str(" +cheats");
+    }
+    label
 }
 
 async fn adopt(client: &Client, name: &str, targets: Vec<String>) -> Result<()> {

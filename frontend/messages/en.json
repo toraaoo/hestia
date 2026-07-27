@@ -685,5 +685,18 @@
    "has_contents": "the folder already has contents",
    "foreign_link": "the folder is a link you made"
   }
+ },
+ "worlds": {
+  "hardcore": "Hardcore",
+  "cheats": "Cheats",
+  "unreadable": "This world's level.dat could not be read",
+  "mode_survival": "Survival",
+  "mode_creative": "Creative",
+  "mode_adventure": "Adventure",
+  "mode_spectator": "Spectator",
+  "difficulty_peaceful": "Peaceful",
+  "difficulty_easy": "Easy",
+  "difficulty_normal": "Normal",
+  "difficulty_hard": "Hard"
  }
 }

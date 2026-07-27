@@ -40,6 +40,7 @@ sha1 = "0.11"
 sha2 = "0.11"
 tar = "0.4.46"
 flate2 = "1.1.9"
+fastnbt = "2.5.0"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 uuid = { version = "1.23.4", features = ["v7"] }
 junction = "1.2.0"

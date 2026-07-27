@@ -676,5 +676,18 @@
    "has_contents": "a pasta já tem conteúdo",
    "foreign_link": "a pasta é um vínculo criado por você"
   }
+ },
+ "worlds": {
+  "hardcore": "Hardcore",
+  "cheats": "Comandos",
+  "unreadable": "Não foi possível ler o level.dat deste mundo",
+  "mode_survival": "Sobrevivência",
+  "mode_creative": "Criativo",
+  "mode_adventure": "Aventura",
+  "mode_spectator": "Espectador",
+  "difficulty_peaceful": "Pacífico",
+  "difficulty_easy": "Fácil",
+  "difficulty_normal": "Normal",
+  "difficulty_hard": "Difícil"
  }
 }

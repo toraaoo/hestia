@@ -151,6 +151,9 @@ hestia instance modded logs -n 50 # captured output — the newest running sessi
                                  #   *instance*, so it picks up the next launch
 hestia instance modded info      # descriptor, folder, disk footprint, and each
                                  #   running session (handles)
+hestia instance modded worlds    # the save worlds, read from each level.dat:
+                                 #   in-game name, folder, version, mode, when
+                                 #   it was last played, and its size
 hestia instance modded stop      # kill every session (--session <h> targets one)
 hestia instance modded restart   # stop, then launch again (--session <h> for one)
 hestia instance modded rename mp # rename (stopped): rewrites the display name;

@@ -19,7 +19,7 @@ use proto::instance::{
     InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename,
     InstanceProfileRenameParams, InstanceProfileUse, InstanceRef, InstanceRemove, InstanceRename,
     InstanceRenameParams, InstanceResolve, InstanceStop, InstanceStopParams, InstanceUpdate,
-    InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile,
+    InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile, WorldInfo,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, LoadersParams, ProvisionProgress,
@@ -139,9 +139,9 @@ impl Instance<'_> {
             .await
     }
 
-    /// The instance's save-world folder names — the worlds a datapack can
-    /// install into.
-    pub async fn worlds(&self, instance: &str) -> Result<Vec<String>, IpcError> {
+    /// The instance's save worlds, each described from its own `level.dat` —
+    /// the worlds a datapack can install into.
+    pub async fn worlds(&self, instance: &str) -> Result<Vec<WorldInfo>, IpcError> {
         Ok(self
             .session
             .call::<InstanceWorlds>(&instance_ref(instance))

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
+import { WorldIcon } from '@/features/instances/components/world-icon';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { instanceQueries } from '@/queries/instance';
@@ -25,12 +26,14 @@ export function WorldsStep({
   }
   return (
     <div className="flex flex-col gap-1.5 p-0.5">
-      {list.map((w) => {
-        const checked = selected.includes(w);
-        const id = `world-${w}`;
+      {list.map((world) => {
+        // Selected and installed by folder — the identity the game reads —
+        // while the player picks by the name they gave the world.
+        const checked = selected.includes(world.folder);
+        const id = `world-${world.folder}`;
         return (
           <label
-            key={w}
+            key={world.folder}
             htmlFor={id}
             className={cn(
               'flex cursor-pointer items-center gap-2.5 border px-3 py-2.5 text-sm transition-colors',
@@ -42,9 +45,13 @@ export function WorldsStep({
             <Checkbox
               id={id}
               checked={checked}
-              onCheckedChange={(c) => onToggle(w, c)}
+              onCheckedChange={(c) => onToggle(world.folder, c)}
             />
-            {w}
+            <WorldIcon world={world} />
+            <span className="min-w-0 flex-1 truncate">{world.name}</span>
+            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+              {world.version}
+            </span>
           </label>
         );
       })}

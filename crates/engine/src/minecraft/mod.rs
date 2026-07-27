@@ -11,6 +11,7 @@ pub(crate) mod ping;
 mod provider;
 pub(crate) mod rcon;
 mod vanilla;
+pub(crate) mod world;
 
 use anyhow::{Context, Result};
 use proto::minecraft::{Flavor, GameVersion, InstanceProfile, ServerProfile};

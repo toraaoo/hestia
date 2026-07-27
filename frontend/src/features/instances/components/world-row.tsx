@@ -1,0 +1,52 @@
+import type { WorldInfo } from '@/api';
+import { Badge } from '@/components/ui/badge';
+import { WorldIcon } from '@/features/instances/components/world-icon';
+import { agoLabel, bytes } from '@/lib/format';
+import { m } from '@/paraglide/messages.js';
+
+const msg = m as unknown as Record<string, () => string>;
+
+/**
+ * One save world, as its own `level.dat` describes it: the player's name for it
+ * over the folder the game reads, with the flags that change how it plays. A
+ * world we could not read shows its folder and says so, rather than presenting
+ * defaults as facts.
+ */
+export function WorldRow({ world }: { world: WorldInfo }) {
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5">
+      <WorldIcon world={world} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm">{world.name}</span>
+          {world.hardcore && (
+            <Badge variant="outline" className="shrink-0">
+              {m['worlds.hardcore']()}
+            </Badge>
+          )}
+          {world.cheats && (
+            <Badge variant="outline" className="shrink-0">
+              {m['worlds.cheats']()}
+            </Badge>
+          )}
+        </div>
+        <div className="truncate font-mono text-[11px] text-muted-foreground">
+          {world.read
+            ? `${world.folder} · ${msg[`worlds.mode_${world.gameMode}`]()} · ${msg[`worlds.difficulty_${world.difficulty}`]()}`
+            : m['worlds.unreadable']()}
+        </div>
+      </div>
+      <div className="shrink-0 text-right text-[11px] text-muted-foreground">
+        {world.lastPlayedUnix != null && (
+          <div>{agoLabel(world.lastPlayedUnix)}</div>
+        )}
+        <div className="font-mono">{bytes(world.sizeBytes)}</div>
+      </div>
+      {world.version && (
+        <Badge variant="outline" className="shrink-0 font-mono">
+          {world.version}
+        </Badge>
+      )}
+    </div>
+  );
+}

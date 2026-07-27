@@ -69,6 +69,8 @@ tray    → bin tray            (tray-icon + tao)                   → client, 
   (downloader, Adoptium, Mojang/Fabric meta, Microsoft auth).
 - [p256](https://github.com/RustCrypto/elliptic-curves) — Xbox proof-key ECDSA
   (one cross-platform impl; no OpenSSL/CNG split).
+- [fastnbt](https://github.com/owengage/fastnbt) — reading a save world's own
+  `level.dat` (gzipped NBT) through serde.
 - `sha1`/`sha2`, `tar`+`flate2`, `zip` — in-process checksums and archive
   extraction (no shelling out to system tools).
 - [Tauri v2](https://tauri.app/) + [React](https://react.dev/)/[Vite](https://vitejs.dev/)
@@ -751,6 +753,29 @@ The subsystems behind the aggregate:
 > has no backup story at all (the instance `update` downgrade warning states
 > that nothing is backed up).
 
+> **A world describes itself; a directory listing does not.** `instance.worlds`
+> began as a `read_dir` of `data/saves/` returning folder names, which is all the
+> datapack picker it was written for needed. But a folder name is not the world:
+> the player names a world in-game, so `saves/New World (2)` may be "Hardcore
+> Attempt 4", and only the save knows which version wrote it, how it plays, or
+> when it was last opened. So a world is read from its own `level.dat` (gzipped
+> NBT, via `fastnbt`) — `minecraft/world.rs` — and `WorldInfo` carries the
+> display name, version, game mode, difficulty, hardcore and cheat flags, last
+> played, footprint, and the world's own `icon.png`.
+>
+> Two rules keep it honest. **The folder stays the identity**: every operation
+> still addresses a world by folder (a datapack installs into
+> `data/saves/<folder>/datapacks/`), because that is what the game reads and what
+> the content index keys on — the display name is presentation, and two worlds may
+> share one. And **every field but the folder is best-effort**: saves span more
+> than a decade of formats, an old one carries no `Version`, a corrupt or
+> half-written one cannot be parsed, and a world a running game is flushing may be
+> caught mid-write. None of that may hide a world from a listing, so a failure
+> yields the folder alone with `read: false`, and a front-end says "could not be
+> read" rather than rendering defaults as facts. The icon is **inlined as base64**
+> rather than served as a path: the alternative is widening the webview's
+> asset-protocol scope to the data home, which also holds `accounts.json`.
+
 > **A temp artifact is only valid while its job holds the claim — so a restart
 > invalidates every one.** Write-through-a-temp is used all over: the backup
 > archive's `.part`, the downloader's `.part`, the Java installer's `.staging`
@@ -989,7 +1014,8 @@ supervises launched processes, and manages autostart. The only crate that links
   backup exists before answering with the job id), and the `instance.*`
   counterparts:
   `flavors|versions|resolve|create|update|rename|list|info|remove|worlds`
-  (`worlds` lists a client's save worlds for the datapack picker; `info` is the
+  (`worlds` describes a client's save worlds from each one's own `level.dat` —
+  see the decision note below; `info` is the
   static, informational view — descriptor, on-disk locations, and disk footprint
   — the instance twin of `server.info`), plus
   `instance.launch|stop|logs` (concurrent sessions are opt-in — `launch`

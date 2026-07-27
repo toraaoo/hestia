@@ -1,7 +1,6 @@
 import {
   CopyIcon,
   FolderOpenIcon,
-  GlobeHemisphereWestIcon,
   PlayIcon,
   PlusIcon,
   PowerIcon,
@@ -33,6 +32,7 @@ import {
   ResourceCards,
 } from '@/features/entries/components/resource-panel';
 import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
+import { WorldRow } from '@/features/instances/components/world-row';
 import { useLaunchModal } from '@/features/instances/launch-modal';
 import { InstanceLogsTab } from '@/features/instances/tabs/logs';
 import { InstanceSettingsTab } from '@/features/instances/tabs/settings';
@@ -144,7 +144,7 @@ export function InstanceDetailPage({
       });
   };
 
-  const worldNames = worlds.data ?? [];
+  const worldList = worlds.data ?? [];
 
   return (
     <div className="flex h-full flex-col">
@@ -235,7 +235,7 @@ export function InstanceDetailPage({
           </TabsTrigger>
           <TabsTrigger value="worlds">
             {m['tab.worlds']()}
-            <TabCount n={worldNames.length} />
+            <TabCount n={worldList.length} />
           </TabsTrigger>
           <TabsTrigger value="logs">{m['tab.logs']()}</TabsTrigger>
           <TabsTrigger value="settings">{m['tab.settings']()}</TabsTrigger>
@@ -249,13 +249,13 @@ export function InstanceDetailPage({
                   flavor: instance.flavor,
                   version: instance.gameVersion,
                   mods: contentCount,
-                  worlds: worldNames.length,
+                  worlds: worldList.length,
                 })}
               </p>
               <div className="grid grid-cols-3 gap-3">
                 <StatCard value={contentCount} label={m['label.content']()} />
                 <StatCard
-                  value={worldNames.length}
+                  value={worldList.length}
                   label={m['label.worlds']()}
                 />
                 <StatCard
@@ -379,15 +379,12 @@ export function InstanceDetailPage({
               <Bone className="h-10" />
               <Bone className="h-10" />
             </div>
-          ) : worldNames.length === 0 ? (
+          ) : worldList.length === 0 ? (
             <Empty>{m['detail.no_worlds']()}</Empty>
           ) : (
             <div className="divide-y divide-border border border-border">
-              {worldNames.map((w) => (
-                <div key={w} className="flex items-center gap-3 px-3 py-2.5">
-                  <GlobeHemisphereWestIcon className="size-4 text-muted-foreground" />
-                  <span className="text-sm">{w}</span>
-                </div>
+              {worldList.map((world) => (
+                <WorldRow key={world.folder} world={world} />
               ))}
             </div>
           )}

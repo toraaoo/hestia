@@ -184,12 +184,77 @@ impl Contract for InstanceInfoQuery {
     type Result = InstanceDetails;
 }
 
+/// How a world plays, from its `level.dat` `GameType`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "snake_case")]
+pub enum GameMode {
+    #[default]
+    Survival,
+    Creative,
+    Adventure,
+    Spectator,
+}
+
+/// A world's difficulty, from its `level.dat` `Difficulty`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "snake_case")]
+pub enum Difficulty {
+    Peaceful,
+    Easy,
+    #[default]
+    Normal,
+    Hard,
+}
+
+/// One save world of an instance, described from its own `level.dat` rather than
+/// from the directory listing: the folder name is what the game reads, but the
+/// *world* is what the player recognises, and only the save itself knows its
+/// display name, the version that wrote it, or when it was last opened.
+///
+/// Every field but `folder` is best-effort — a world whose `level.dat` is
+/// missing, truncated, or from a layout we cannot read still lists, carrying
+/// only its folder. `read` is false in that case, so a front-end can say so
+/// instead of rendering confident defaults.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct WorldInfo {
+    /// The directory under `data/saves/` — the identity every other call takes
+    /// (a datapack installs by folder, not by display name).
+    pub folder: String,
+    /// `LevelName`: the in-game name, which need not match the folder.
+    pub name: String,
+    /// Whether `level.dat` could be read; false leaves the rest at defaults.
+    pub read: bool,
+    /// `Version.Name`, e.g. `1.21.1`; empty for a save too old to carry it.
+    pub version: String,
+    pub game_mode: GameMode,
+    pub difficulty: Difficulty,
+    pub hardcore: bool,
+    /// `allowCommands` — cheats.
+    pub cheats: bool,
+    /// `LastPlayed`, in seconds (the save stores milliseconds); `None` when the
+    /// save does not carry it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_played_unix: Option<i64>,
+    /// The world directory's footprint, in bytes — a directory walk.
+    pub size_bytes: u64,
+    /// The world's own `icon.png` (the in-game thumbnail), base64-encoded and
+    /// empty when the save has none. Inlined rather than served as a path: the
+    /// alternative widens the webview's asset-protocol reach to the whole data
+    /// home, which also holds `accounts.json`.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub icon: String,
+}
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceWorldsResult {
-    /// Save-world folder names under the instance's `data/saves/`, sorted.
-    pub worlds: Vec<String>,
+    /// The instance's save worlds, sorted by folder name.
+    pub worlds: Vec<WorldInfo>,
 }
 
 pub struct InstanceWorlds;

@@ -96,7 +96,7 @@ export function ContentSection({
       lists={lists}
       updates={updates}
       handlers={handlers}
-      entryWorlds={worlds.data ?? []}
+      entryWorlds={(worlds.data ?? []).map((world) => world.folder)}
     />
   );
 }

@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use proto::instance::InstanceDetails;
+use proto::instance::{InstanceDetails, WorldInfo};
 use proto::minecraft::{ConfigEntry, ProvisionPhase};
 use proto::warning::WarningInfo;
 
@@ -15,25 +15,30 @@ use crate::instances::InstanceRecord;
 use crate::minecraft::launch::{self, InstancePaths, LaunchAccount, LaunchPlan};
 use crate::minecraft::log4j;
 use crate::minecraft::materialize::{self, OnProgress};
+use crate::minecraft::world;
 
 impl Engine {
-    /// The instance's save-world folder names (sorted) under `data/saves/` —
-    /// the worlds a datapack can install into.
-    pub fn instance_worlds(&self, reference: &str) -> Result<Vec<String>> {
+    /// The instance's save worlds under `data/saves/`, each described from its
+    /// own `level.dat` — the worlds a datapack can install into, and what the
+    /// player calls them. Sorted by folder, since that is the stable identity.
+    pub fn instance_worlds(&self, reference: &str) -> Result<Vec<WorldInfo>> {
         let record = self
             .instances
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
         let saves = self.instances.data_dir(&record).join("saves");
-        let mut worlds: Vec<String> = std::fs::read_dir(&saves)
+        let mut folders: Vec<String> = std::fs::read_dir(&saves)
             .into_iter()
             .flatten()
             .flatten()
             .filter(|e| e.path().is_dir())
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .collect();
-        worlds.sort();
-        Ok(worlds)
+        folders.sort();
+        Ok(folders
+            .iter()
+            .map(|folder| world::describe(&saves, folder))
+            .collect())
     }
 
     pub fn instance_disk_usage(&self, reference: &str) -> Result<u64> {
