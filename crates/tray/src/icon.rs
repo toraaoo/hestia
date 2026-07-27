@@ -8,7 +8,7 @@
 use anyhow::{ensure, Context, Result};
 use tray_icon::Icon;
 
-// Rasterized from `icon.svg` at 256x256 with librsvg.
+// Generated from assets/icons/ember.svg by scripts/gen-icons.sh — do not edit.
 const ICON_PNG: &[u8] = include_bytes!("../assets/icon.png");
 
 pub fn load() -> Result<Icon> {
