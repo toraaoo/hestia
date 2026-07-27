@@ -22,6 +22,7 @@ use client::Client;
 
 use crate::commands::content::{self, ContentCmd, EntryKind};
 use crate::commands::mc;
+use crate::exit::ExitStatus;
 use crate::ui::Spinner;
 
 pub use backup::BackupCmd;
@@ -168,7 +169,7 @@ enum ServerAction {
     Remove,
 }
 
-pub async fn run(cmd: ServerCmd) -> Result<()> {
+pub async fn run(cmd: ServerCmd) -> Result<ExitStatus> {
     match cmd {
         ServerCmd::Entry(argv) => {
             let ServerEntry { name, action } = match ServerEntry::try_parse_from(argv) {
@@ -188,24 +189,36 @@ pub async fn run(cmd: ServerCmd) -> Result<()> {
                 ServerCmd::Loaders { flavor, version } => loaders(&client, flavor, version).await,
                 ServerCmd::Entry(_) => unreachable!("handled above"),
             }
+            .map(|()| ExitStatus::Active)
         }
     }
 }
 
-async fn run_action(client: Client, name: String, action: ServerAction) -> Result<()> {
+async fn run_action(client: Client, name: String, action: ServerAction) -> Result<ExitStatus> {
+    // The state query answers through the exit code too: a stopped server is
+    // reported, not an error (see `exit.rs`).
+    if let ServerAction::Status = action {
+        let info = client.server().status(&name).await?;
+        let running = entry::running_process(&info).is_some();
+        let ping = if running {
+            client.server().ping(&name).await.ok()
+        } else {
+            None
+        };
+        entry::show_status(&info, ping.as_ref())?;
+        return Ok(ExitStatus::running(running));
+    }
+    run_unit_action(client, name, action)
+        .await
+        .map(|()| ExitStatus::Active)
+}
+
+async fn run_unit_action(client: Client, name: String, action: ServerAction) -> Result<()> {
     match action {
         ServerAction::Start { detach } => console::start_attached(client, &name, detach).await,
         ServerAction::Stop => lifecycle::stop(&client, &name).await,
         ServerAction::Restart { detach } => console::restart_attached(client, &name, detach).await,
-        ServerAction::Status => {
-            let info = client.server().status(&name).await?;
-            let ping = if entry::running_process(&info).is_some() {
-                client.server().ping(&name).await.ok()
-            } else {
-                None
-            };
-            entry::show_status(&info, ping.as_ref())
-        }
+        ServerAction::Status => unreachable!("handled by run_action"),
         ServerAction::Info => {
             let info = client.server().info(&name).await?;
             entry::show_info(&info)

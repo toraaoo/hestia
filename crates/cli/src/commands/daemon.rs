@@ -5,6 +5,7 @@ use clap::Subcommand;
 use client::proto::process::ProcessState;
 use client::Client;
 
+use crate::exit::ExitStatus;
 use crate::ui::{self, View};
 
 #[derive(Subcommand)]
@@ -28,21 +29,29 @@ pub enum DaemonCmd {
     Restart,
 }
 
-pub async fn run(cmd: DaemonCmd) -> Result<()> {
+pub async fn run(cmd: DaemonCmd) -> Result<ExitStatus> {
     match cmd {
-        DaemonCmd::Status => match super::connect_running().await {
-            Ok(client) => {
-                let s = client.daemon().status().await?;
-                ui::show(View::line("running"))?;
-                ui::show(View::detail([
-                    ("pid", s.pid.to_string()),
-                    ("uptime", format!("{}s", s.uptime_seconds)),
-                    ("home", s.home.display().to_string()),
-                    ("log", s.log.display().to_string()),
-                ]))?;
+        // The one verb whose *answer* is the exit code: a stopped daemon is
+        // reported, not an error, so it exits 3 rather than 0 or 1.
+        DaemonCmd::Status => {
+            return match super::connect_running().await {
+                Ok(client) => {
+                    let s = client.daemon().status().await?;
+                    ui::show(View::line("running"))?;
+                    ui::show(View::detail([
+                        ("pid", s.pid.to_string()),
+                        ("uptime", format!("{}s", s.uptime_seconds)),
+                        ("home", s.home.display().to_string()),
+                        ("log", s.log.display().to_string()),
+                    ]))?;
+                    Ok(ExitStatus::Active)
+                }
+                Err(_) => {
+                    ui::show(View::line("stopped"))?;
+                    Ok(ExitStatus::Inactive)
+                }
             }
-            Err(_) => ui::show(View::line("stopped"))?,
-        },
+        }
         DaemonCmd::Start => {
             let client = super::start().await?;
             let info = client.app().info().await?;
@@ -81,7 +90,7 @@ pub async fn run(cmd: DaemonCmd) -> Result<()> {
             )))?;
         }
     }
-    Ok(())
+    Ok(ExitStatus::Active)
 }
 
 /// Resolve what `daemon stop` means this time. Stopping the daemon has three

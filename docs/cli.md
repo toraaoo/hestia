@@ -389,3 +389,30 @@ hestia -q java list              # errors only on the console
 hestia --home /path/to/dir config get home
 hestia --version
 ```
+
+## Exit codes
+
+A state query has two honest answers, and a shell reads only the exit code — so
+"the daemon is stopped" must not look like "the daemon is running", nor like
+"I could not tell". The vocabulary is systemd's:
+
+| code | meaning                                                             |
+|------|---------------------------------------------------------------------|
+| `0`  | the command did what was asked; a state query found the subject running |
+| `3`  | the query was answered and the subject is **not** running            |
+| `1`  | the command failed — no daemon, invalid input, or the operation errored |
+| `2`  | usage error (an unknown flag or subcommand)                          |
+
+```bash
+if hestia daemon status >/dev/null; then echo up; fi   # true only when running
+hestia server smp status >/dev/null; case $? in
+  0) echo running ;;
+  3) echo stopped ;;
+  *) echo "could not ask" ;;
+esac
+```
+
+Only verbs that assert whether one subject is running use `3` — `daemon status`
+and `server <name> status`. Verbs that *describe* rather than assert (`info`,
+`sync status`, every `list`) always exit `0`: "inactive" is not a claim they
+make.

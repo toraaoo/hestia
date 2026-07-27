@@ -1,6 +1,7 @@
 //! hestia — the Hestia command-line interface. A thin client over the daemon.
 
 mod commands;
+mod exit;
 mod ui;
 
 use std::path::Path;
@@ -8,6 +9,8 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use common::LogLevel;
+
+use crate::exit::ExitStatus;
 
 #[derive(Parser)]
 #[command(name = "hestia", version = common::app::VERSION_LABEL, about = "Hestia command-line interface")]
@@ -225,7 +228,7 @@ fn main() -> ExitCode {
     let result = rt.block_on(dispatch(command));
 
     match result {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(status) => status.code(),
         Err(e) => {
             eprintln!("{e:#}");
             ExitCode::FAILURE
@@ -233,7 +236,20 @@ fn main() -> ExitCode {
     }
 }
 
-async fn dispatch(command: Command) -> anyhow::Result<()> {
+/// Run the command and report how the shell should read it. Only the state
+/// queries answer anything but [`ExitStatus::Active`] — see `exit.rs` for the
+/// contract.
+async fn dispatch(command: Command) -> anyhow::Result<ExitStatus> {
+    match command {
+        Command::Daemon { cmd } => return commands::daemon::run(cmd).await,
+        Command::Server { cmd } => return commands::server::run(cmd).await,
+        _ => {}
+    }
+    run_command(command).await.map(|()| ExitStatus::Active)
+}
+
+/// Everything that simply succeeds or fails.
+async fn run_command(command: Command) -> anyhow::Result<()> {
     match command {
         Command::Play {
             instance,
@@ -243,7 +259,6 @@ async fn dispatch(command: Command) -> anyhow::Result<()> {
         } => commands::play::run(instance, account, new_session, detach).await,
         Command::Account { cmd } => commands::account::run(cmd).await,
         Command::Java { cmd } => commands::java::run(cmd).await,
-        Command::Server { cmd } => commands::server::run(cmd).await,
         Command::Instance { cmd } => commands::instance::run(cmd).await,
         Command::Start {
             target,
@@ -305,6 +320,7 @@ async fn dispatch(command: Command) -> anyhow::Result<()> {
         Command::Cache { cmd } => commands::cache::run(cmd).await,
         Command::Config { cmd } => commands::config::run(cmd).await,
         Command::Sync { cmd } => commands::sync::run(cmd).await,
-        Command::Daemon { cmd } => commands::daemon::run(cmd).await,
+        // Handled by `dispatch`: these answer with their own exit status.
+        Command::Daemon { .. } | Command::Server { .. } => unreachable!(),
     }
 }
