@@ -22,5 +22,6 @@ pub mod profile;
 pub mod server;
 pub mod skins;
 pub mod sync;
+pub mod warning;
 
 pub use contract::{Contract, Empty, Topic};

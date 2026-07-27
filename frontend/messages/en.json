@@ -664,5 +664,21 @@
   "adopt_description": "Moves the instance’s existing folder contents into the shared store and links them. The instance must be stopped.",
   "adopted": "Adopted: {targets}",
   "no_folder_targets": "No folder targets configured."
+ },
+ "warning": {
+  "kind": {
+   "properties_schema_missing": "'{name}' has no property schema, so its server.properties keys cannot be checked.",
+   "sync_target_not_shared": "'{target}' is not shared with your other instances: {reason}.",
+   "sync_target_skipped": "'{target}' could not be synced: {detail}"
+  },
+  "hint": {
+   "properties_schema_missing": "Any key is accepted until it can be derived again, so check spelling yourself. Updating the server re-derives it.",
+   "sync_target_not_shared": "Adopt the folder to move its contents into the shared store and link it.",
+   "sync_target_skipped": "Check the folder's permissions, then launch again."
+  },
+  "token": {
+   "has_contents": "the folder already has contents",
+   "foreign_link": "the folder is a link you made"
+  }
  }
 }

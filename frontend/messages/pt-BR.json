@@ -655,5 +655,21 @@
   "adopt_description": "Move o conteúdo existente das pastas da instância para o armazenamento compartilhado e as vincula. A instância precisa estar parada.",
   "adopted": "Adotado: {targets}",
   "no_folder_targets": "Nenhuma pasta configurada."
+ },
+ "warning": {
+  "kind": {
+   "properties_schema_missing": "'{name}' não tem esquema de propriedades, então suas chaves de server.properties não podem ser verificadas.",
+   "sync_target_not_shared": "'{target}' não está compartilhado com suas outras instâncias: {reason}.",
+   "sync_target_skipped": "'{target}' não pôde ser sincronizado: {detail}"
+  },
+  "hint": {
+   "properties_schema_missing": "Qualquer chave é aceita até que ele possa ser derivado novamente, então confira a grafia você mesmo. Atualizar o servidor o deriva de novo.",
+   "sync_target_not_shared": "Adote a pasta para mover o conteúdo dela para o armazenamento compartilhado e criar o vínculo.",
+   "sync_target_skipped": "Verifique as permissões da pasta e inicie novamente."
+  },
+  "token": {
+   "has_contents": "a pasta já tem conteúdo",
+   "foreign_link": "a pasta é um vínculo criado por você"
+  }
  }
 }

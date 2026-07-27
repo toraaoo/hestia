@@ -9,6 +9,7 @@ use proto::instance::{
 };
 use proto::minecraft::ProvisionProgress;
 use proto::process::{LogSource, ProcessSpec, RestartPolicy};
+use proto::warning::WarningInfo;
 
 use super::job::{coalesce_progress, job_id, topic_event};
 use crate::runtime::{
@@ -83,12 +84,19 @@ impl InstanceLaunchManager {
             // The supervisor now owns the id (or the launch failed) — release it.
             reserved.lock().unwrap().remove(&session_id);
             match outcome {
-                Ok((process_id, pid)) => {
-                    tracing::info!(job = %job_id, process = %process_id, pid, "instance launch done");
+                Ok(launched) => {
+                    tracing::info!(
+                        job = %job_id,
+                        process = %launched.process_id,
+                        pid = launched.pid,
+                        warnings = launched.warnings.len(),
+                        "instance launch done"
+                    );
                     hub.publish(&topic_event(&InstanceLaunchDoneEvent {
                         id: job_id.clone(),
-                        process_id,
-                        pid,
+                        process_id: launched.process_id,
+                        pid: launched.pid,
+                        warnings: launched.warnings,
                     }));
                 }
                 Err(error) => {
@@ -140,18 +148,18 @@ async fn launch(
     profile: &str,
     reconcile: bool,
     on_progress: &(dyn Fn(&ProvisionProgress) + Send + Sync),
-) -> Result<(String, u32), ErrorInfo> {
-    let (_record, plan, log_file) = engine
+) -> Result<Launched, ErrorInfo> {
+    let prepared = engine
         .prepare_instance(instance_id, account, seq, profile, reconcile, on_progress)
         .await
         .map_err(crate::runtime::engine_error)?;
 
     let spec = ProcessSpec {
         id: session_id.to_string(),
-        program: plan.program.to_string_lossy().into_owned(),
-        args: plan.args,
-        log: LogSource::File(log_file),
-        cwd: Some(plan.cwd),
+        program: prepared.plan.program.to_string_lossy().into_owned(),
+        args: prepared.plan.args,
+        log: LogSource::File(prepared.log_file),
+        cwd: Some(prepared.plan.cwd),
         env: BTreeMap::new(),
         restart: RestartPolicy::Never,
     };
@@ -160,7 +168,11 @@ async fn launch(
             if let Err(e) = engine.instances().mark_launched(instance_id) {
                 tracing::warn!(instance = %instance_id, error = %e, "failed to stamp last-played");
             }
-            Ok((info.id, info.pid))
+            Ok(Launched {
+                process_id: info.id,
+                pid: info.pid,
+                warnings: prepared.warnings,
+            })
         }
         Err(StartError::EmptyProgram | StartError::InvalidId) => Err(ErrorInfo::Internal {
             detail: "invalid launch plan".to_string(),
@@ -169,4 +181,11 @@ async fn launch(
             detail: format!("cannot spawn the game: {e}"),
         }),
     }
+}
+
+/// A started session, with whatever the preparation could not do properly.
+struct Launched {
+    process_id: String,
+    pid: u32,
+    warnings: Vec<WarningInfo>,
 }

@@ -68,12 +68,14 @@ pub(super) async fn run(
         .update(params, move |p| progress.update(p))
         .await;
     reporter.finish();
-    let server = result?;
+    let done = result?;
+    let server = done.server;
     ui::show(View::line(format!(
         "server '{}' updated to {}",
         server.name, server.game_version
     )))?;
     entry::show_status(&server, None)?;
+    ui::show_warnings(&done.warnings)?;
     if was_running {
         lifecycle::start(client, &server.id).await?;
     }

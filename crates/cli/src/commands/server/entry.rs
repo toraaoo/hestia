@@ -111,7 +111,8 @@ pub(super) fn show_info(info: &ServerDetails) -> Result<()> {
         ("disk", ui::human_bytes(info.disk_bytes)),
         ("folder", info.entry_dir.clone()),
         ("data", info.data_dir.clone()),
-    ]))
+    ]))?;
+    ui::show_warnings(&info.warnings)
 }
 
 fn address_label(info: &ServerInfo) -> String {

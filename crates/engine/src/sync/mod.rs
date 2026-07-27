@@ -32,6 +32,7 @@ use std::time::SystemTime;
 
 use anyhow::{bail, Context, Result};
 use proto::sync::{LinkState, SyncTargets, TargetLinkState};
+use proto::warning::{NotSharedReason, WarningInfo};
 
 const TARGETS_FILE: &str = "targets.json";
 const OPTIONS_TXT: &str = "options.txt";
@@ -107,13 +108,24 @@ impl Sync {
     /// targets newest-wins, then ensure each folder target is a link into the
     /// store (the apply pass). With a `profile_store` (a captured profile's
     /// launch), the settings-class targets reconcile/link against it instead
-    /// of the global store — worlds and screenshots stay global. Best-effort
-    /// per target: a single failing target is logged and skipped rather than
-    /// failing the launch.
-    pub fn apply(&self, data_dir: &Path, profile_store: Option<&Path>) -> Result<()> {
+    /// of the global store — worlds and screenshots stay global.
+    ///
+    /// Best-effort per target: a target that cannot be reconciled is skipped
+    /// rather than failing the launch — refusing to launch over a leftover
+    /// folder would be worse than launching unshared. Every skip is **returned**
+    /// as a warning, because the user configured that target expecting it to be
+    /// shared and would otherwise play against the wrong data with no sign of
+    /// it.
+    pub fn apply(
+        &self,
+        instance: &str,
+        data_dir: &Path,
+        profile_store: Option<&Path>,
+    ) -> Vec<WarningInfo> {
         let targets = self.targets();
         let shared = self.dir();
         fs::create_dir_all(&shared).ok();
+        let mut warnings = Vec::new();
 
         for raw in &targets.files {
             let Some(rel) = safe_rel(raw) else { continue };
@@ -125,21 +137,37 @@ impl Sync {
             };
             if let Err(e) = result {
                 tracing::warn!(target = %rel.display(), error = %e, "config sync skipped a file");
+                warnings.push(WarningInfo::SyncTargetSkipped {
+                    target: raw.clone(),
+                    detail: format!("{e:#}"),
+                });
             }
         }
 
         for raw in &targets.folders {
             let Some(rel) = safe_rel(raw) else { continue };
             let store = scope_root(&shared, profile_store, raw, CAPTURE_FOLDERS);
-            if let Err(e) = ensure_link(&store.join(&rel), &data_dir.join(&rel), &rel) {
-                tracing::warn!(
-                    target = %rel.display(),
-                    error = format!("{e:#}"),
-                    "cannot link a sync folder"
-                );
+            match ensure_link(&store.join(&rel), &data_dir.join(&rel), &rel) {
+                Ok(Linked::Yes) => {}
+                Ok(Linked::No(reason)) => warnings.push(WarningInfo::SyncTargetNotShared {
+                    instance: instance.to_string(),
+                    target: raw.clone(),
+                    reason,
+                }),
+                Err(e) => {
+                    tracing::warn!(
+                        target = %rel.display(),
+                        error = format!("{e:#}"),
+                        "cannot link a sync folder"
+                    );
+                    warnings.push(WarningInfo::SyncTargetSkipped {
+                        target: raw.clone(),
+                        detail: format!("{e:#}"),
+                    });
+                }
             }
         }
-        Ok(())
+        warnings
     }
 
     /// Seed a profile's captured store from the global one: the settings-class
@@ -262,14 +290,16 @@ fn default_targets() -> SyncTargets {
 /// a stale hestia-store link (the data home moved) is relinked; a missing or
 /// empty directory becomes a link; a non-empty real directory — or a foreign
 /// link the user made — is left untouched (Pandora's empty-or-linked guard).
-fn ensure_link(store: &Path, at: &Path, rel: &Path) -> Result<()> {
+/// The guard's refusals are reported, not just logged: the target the user asked
+/// to share is not shared.
+fn ensure_link(store: &Path, at: &Path, rel: &Path) -> Result<Linked> {
     if link::is_linked_to(store, at) {
-        return Ok(());
+        return Ok(Linked::Yes);
     }
     if let Some(target) = link::read_target(at) {
         if !is_store_target(&target, rel) {
             tracing::debug!(at = %at.display(), "leaving a foreign link alone");
-            return Ok(());
+            return Ok(Linked::No(NotSharedReason::ForeignLink));
         }
         link::unlink_dir(at)?;
     } else if at.symlink_metadata().is_ok() {
@@ -278,11 +308,19 @@ fn ensure_link(store: &Path, at: &Path, rel: &Path) -> Result<()> {
                 at = %at.display(),
                 "not linking a non-empty directory (run `sync adopt` to move it into the store)"
             );
-            return Ok(());
+            return Ok(Linked::No(NotSharedReason::HasContents));
         }
         fs::remove_dir(at)?;
     }
-    make_link(store, at)
+    make_link(store, at)?;
+    Ok(Linked::Yes)
+}
+
+/// Whether a folder target ended up linked into the store, and if not, which
+/// arm of the empty-or-linked guard refused it.
+enum Linked {
+    Yes,
+    No(NotSharedReason),
 }
 
 /// The adopt pass for one folder target. Collision checks run before any move,
@@ -614,7 +652,7 @@ mod tests {
         fs::create_dir_all(&shared).unwrap();
         fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
 
-        Sync::new(shared).apply(&data, None).unwrap();
+        Sync::new(shared).apply("test", &data, None);
 
         let seeded = fs::read_to_string(data.join("options.txt")).unwrap();
         assert!(seeded.contains("guiScale:3"));
@@ -633,7 +671,7 @@ mod tests {
         )
         .unwrap();
 
-        Sync::new(shared.clone()).apply(&data, None).unwrap();
+        Sync::new(shared.clone()).apply("test", &data, None);
 
         let stored = fs::read_to_string(shared.join("options.txt")).unwrap();
         assert!(stored.contains("guiScale:2"));
@@ -654,7 +692,7 @@ mod tests {
         let data = base.join("data");
         fs::create_dir_all(data.join("config")).unwrap();
 
-        Sync::new(shared.clone()).apply(&data, None).unwrap();
+        Sync::new(shared.clone()).apply("test", &data, None);
 
         assert!(link::is_linked_to(
             &shared.join("saves"),
@@ -669,7 +707,7 @@ mod tests {
         fs::create_dir_all(data.join("saves").join("world")).unwrap();
         let data2 = base.join("data2");
         fs::create_dir_all(&data2).unwrap();
-        Sync::new(shared.clone()).apply(&data2, None).unwrap();
+        Sync::new(shared.clone()).apply("test", &data2, None);
         assert!(data2.join("saves").join("world").is_dir());
         fs::remove_dir_all(&base).ok();
     }
@@ -683,7 +721,7 @@ mod tests {
         fs::write(data.join("saves").join("old-world").join("level.dat"), "x").unwrap();
 
         let sync = Sync::new(shared.clone());
-        sync.apply(&data, None).unwrap();
+        sync.apply("test", &data, None);
 
         assert!(link::read_target(&data.join("saves")).is_none());
         assert!(data
@@ -707,7 +745,7 @@ mod tests {
         link::link_dir(&old_shared.join("saves"), &data.join("saves")).unwrap();
 
         let shared = base.join("new-home").join("shared");
-        Sync::new(shared.clone()).apply(&data, None).unwrap();
+        Sync::new(shared.clone()).apply("test", &data, None);
 
         assert!(link::is_linked_to(
             &shared.join("saves"),
@@ -726,7 +764,7 @@ mod tests {
         fs::create_dir_all(&data).unwrap();
         link::link_dir(&elsewhere, &data.join("saves")).unwrap();
 
-        Sync::new(shared.clone()).apply(&data, None).unwrap();
+        Sync::new(shared.clone()).apply("test", &data, None);
 
         assert_eq!(link::read_target(&data.join("saves")), Some(elsewhere));
         fs::remove_dir_all(&base).ok();
@@ -823,7 +861,7 @@ mod tests {
 
         let sync = Sync::new(shared.clone());
         sync.capture(&store).unwrap();
-        sync.apply(&data, Some(&store)).unwrap();
+        sync.apply("test", &data, Some(&store));
 
         // config links into the captured store; saves stays on the global one.
         assert!(link::is_linked_to(
@@ -843,7 +881,7 @@ mod tests {
 
         // options.txt reconciles against the captured store.
         fs::write(data.join("options.txt"), "guiScale:2\n").unwrap();
-        sync.apply(&data, Some(&store)).unwrap();
+        sync.apply("test", &data, Some(&store));
         assert!(fs::read_to_string(store.join("options.txt"))
             .unwrap()
             .contains("guiScale:2"));
@@ -853,7 +891,7 @@ mod tests {
         // the stale captured-store link counts as a hestia store target.
         sync.release(&store).unwrap();
         assert!(!store.exists());
-        sync.apply(&data, None).unwrap();
+        sync.apply("test", &data, None);
         assert!(link::is_linked_to(
             &shared.join("config"),
             &data.join("config")

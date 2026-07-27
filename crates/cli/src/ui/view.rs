@@ -7,6 +7,9 @@ pub enum View {
     Line(String),
     /// A secondary line (dimmed on a terminal): empty-state notes, hints.
     Note(String),
+    /// A degraded outcome of an operation that otherwise succeeded. Deliberately
+    /// heavier than a `Note`: the command worked, but not the way the user asked.
+    Warning(String),
     /// A key/value block, keys aligned.
     Detail(Vec<(String, String)>),
     /// A titled table; long tables page interactively on a terminal.
@@ -24,6 +27,10 @@ impl View {
 
     pub fn note(text: impl Into<String>) -> View {
         View::Note(text.into())
+    }
+
+    pub fn warning(text: impl Into<String>) -> View {
+        View::Warning(text.into())
     }
 
     pub fn detail<K: Into<String>, V: Into<String>>(

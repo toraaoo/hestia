@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use crate::facades::jobs::{forward, run_backup_job, run_content_job};
+use crate::session::{job_id, Session};
 use ipc::errors::IpcError;
 use proto::backup::{
     BackupInfo, ServerBackupCreate, ServerBackupCreateParams, ServerBackupList, ServerBackupRef,
@@ -19,16 +21,13 @@ use proto::minecraft::{
 use proto::process::ProcessLogLine;
 use proto::server::{
     ServerCommand, ServerCommandParams, ServerConfigGet, ServerConfigGetParams, ServerConfigList,
-    ServerConfigSet, ServerConfigSetParams, ServerCreate, ServerCreateParams, ServerDetail,
-    ServerDetails, ServerFlavors, ServerInfo, ServerList, ServerLoaders, ServerLogs,
-    ServerLogsParams, ServerPing, ServerPingResult, ServerRef, ServerRemove, ServerRename,
-    ServerRenameParams, ServerResolve, ServerStart, ServerStartResult, ServerStatus, ServerStop,
-    ServerUpdate, ServerUpdateParams, ServerVersions,
+    ServerConfigSet, ServerConfigSetParams, ServerCreate, ServerCreateDoneEvent,
+    ServerCreateParams, ServerDetail, ServerDetails, ServerFlavors, ServerInfo, ServerList,
+    ServerLoaders, ServerLogs, ServerLogsParams, ServerPing, ServerPingResult, ServerRef,
+    ServerRemove, ServerRename, ServerRenameParams, ServerResolve, ServerStart, ServerStartResult,
+    ServerStatus, ServerStop, ServerUpdate, ServerUpdateDoneEvent, ServerUpdateParams,
+    ServerVersions,
 };
-use serde_json::Value;
-
-use crate::facades::jobs::{forward, run_backup_job, run_content_job};
-use crate::session::{job_id, Session};
 
 pub struct Server<'a> {
     pub(crate) session: &'a Session,
@@ -75,12 +74,13 @@ impl Server<'_> {
     /// Create a fully provisioned server, blocking until the daemon reports
     /// done or error and forwarding each progress event to `on_progress`.
     /// `params.eula` asserts the user accepted the Minecraft EULA; the job id
-    /// is filled in here.
+    /// is filled in here. The result carries any degraded outcome of the
+    /// pipeline — a create can succeed with a best-effort step having failed.
     pub async fn create(
         &self,
         mut params: ServerCreateParams,
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
-    ) -> Result<ServerInfo, IpcError> {
+    ) -> Result<ServerCreateDoneEvent, IpcError> {
         let id = job_id("server-create");
         params.id = id.clone();
 
@@ -96,8 +96,7 @@ impl Server<'_> {
             )
             .await?;
 
-        serde_json::from_value(payload.get("server").cloned().unwrap_or(Value::Null))
-            .map_err(|e| IpcError::Malformed(e.to_string()))
+        serde_json::from_value(payload).map_err(|e| IpcError::Malformed(e.to_string()))
     }
 
     /// Move a stopped server to another version, blocking until the daemon
@@ -108,7 +107,7 @@ impl Server<'_> {
         &self,
         mut params: ServerUpdateParams,
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
-    ) -> Result<ServerInfo, IpcError> {
+    ) -> Result<ServerUpdateDoneEvent, IpcError> {
         let id = job_id("server-update");
         params.id = id.clone();
 
@@ -124,8 +123,7 @@ impl Server<'_> {
             )
             .await?;
 
-        serde_json::from_value(payload.get("server").cloned().unwrap_or(Value::Null))
-            .map_err(|e| IpcError::Malformed(e.to_string()))
+        serde_json::from_value(payload).map_err(|e| IpcError::Malformed(e.to_string()))
     }
 
     pub async fn list(&self) -> Result<Vec<ServerInfo>, IpcError> {

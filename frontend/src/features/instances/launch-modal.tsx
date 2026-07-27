@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ProvisionProgressView } from '@/features/entries/components/provision-progress';
+import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations } from '@/queries/instance';
 import { backgroundJob, foregroundJob, useJobMutation } from '@/queries/jobs';
@@ -45,7 +46,11 @@ export function LaunchModalProvider({
   );
 
   const launch = (instance: InstanceInfo) => {
-    mutation.mutate(instance.id);
+    // The session is running either way; the warnings say what it runs against
+    // (an unshared saves folder, say), so they follow a backgrounded launch too.
+    mutation.mutate(instance.id, {
+      onSuccess: (done) => toastWarnings(done.warnings),
+    });
     if (instance.lastPlayedUnix == null) {
       setTarget({ id: instance.id, name: instance.name });
     }

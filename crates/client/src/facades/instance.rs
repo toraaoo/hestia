@@ -12,21 +12,20 @@ use proto::content::{
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceDetails,
-    InstanceFlavors, InstanceInfo, InstanceInfoQuery, InstanceLaunch, InstanceLaunchParams,
-    InstanceList, InstanceLoaders, InstanceLogs, InstanceLogsParams, InstanceProfileCapture,
-    InstanceProfileCreate, InstanceProfileCreateParams, InstanceProfileEdit,
-    InstanceProfileEditParams, InstanceProfileList, InstanceProfileRef, InstanceProfileRelease,
-    InstanceProfileRemove, InstanceProfileRename, InstanceProfileRenameParams, InstanceProfileUse,
-    InstanceRef, InstanceRemove, InstanceRename, InstanceRenameParams, InstanceResolve,
-    InstanceStop, InstanceStopParams, InstanceUpdate, InstanceUpdateParams, InstanceVersions,
-    InstanceWorlds, Profile,
+    InstanceFlavors, InstanceInfo, InstanceInfoQuery, InstanceLaunch, InstanceLaunchDoneEvent,
+    InstanceLaunchParams, InstanceList, InstanceLoaders, InstanceLogs, InstanceLogsParams,
+    InstanceProfileCapture, InstanceProfileCreate, InstanceProfileCreateParams,
+    InstanceProfileEdit, InstanceProfileEditParams, InstanceProfileList, InstanceProfileRef,
+    InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename,
+    InstanceProfileRenameParams, InstanceProfileUse, InstanceRef, InstanceRemove, InstanceRename,
+    InstanceRenameParams, InstanceResolve, InstanceStop, InstanceStopParams, InstanceUpdate,
+    InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, LoadersParams, ProvisionProgress,
     ResolveParams, VersionsParams,
 };
 use proto::process::ProcessLogLine;
-use serde_json::Value;
 
 use crate::facades::jobs::{forward, run_content_job};
 use crate::session::{job_id, Session};
@@ -228,7 +227,8 @@ impl Instance<'_> {
     /// preparation failed) and forwarding each progress event to `on_progress`.
     /// `profile` overrides the active content profile for this launch (empty
     /// keeps it; `none` launches with no profile). Returns the supervised
-    /// process id and pid.
+    /// process id and pid, plus anything the preparation could not do properly
+    /// (a sync target left unshared, for instance).
     pub async fn launch(
         &self,
         instance: &str,
@@ -236,7 +236,7 @@ impl Instance<'_> {
         new_session: bool,
         profile: &str,
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
-    ) -> Result<(String, u32), IpcError> {
+    ) -> Result<InstanceLaunchDoneEvent, IpcError> {
         let id = job_id("instance-launch");
         let session = self.session;
         let params = InstanceLaunchParams {
@@ -257,13 +257,7 @@ impl Instance<'_> {
             )
             .await?;
 
-        let process_id = payload
-            .get("process_id")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string();
-        let pid = payload.get("pid").and_then(Value::as_u64).unwrap_or(0) as u32;
-        Ok((process_id, pid))
+        serde_json::from_value(payload).map_err(|e| IpcError::Malformed(e.to_string()))
     }
 
     /// Install a batch of content into an instance, blocking until the daemon

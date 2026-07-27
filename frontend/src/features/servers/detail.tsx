@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { WarningNotice } from '@/components/warning-notice';
 import { ContentInstallModal, serverTarget } from '@/features/content/install';
 import { EntryIconMenu } from '@/features/entries/components/icon-menu';
 import {
@@ -199,6 +200,10 @@ export function ServerDetailPage({
         <TabsContent value="overview" keepMounted className="flex flex-col p-5">
           <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_260px]">
             <div className="flex flex-col gap-5">
+              <WarningNotice
+                warnings={info.data?.warnings}
+                className="max-w-2xl"
+              />
               {ping.data?.motd && (
                 <p className="max-w-2xl text-sm leading-relaxed text-foreground/90">
                   {ping.data.motd}

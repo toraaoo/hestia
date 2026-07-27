@@ -13,6 +13,7 @@ use crate::minecraft::{
     ServerProfile, VersionsParams, VersionsResult,
 };
 use crate::process::{ProcessInfo, ProcessLogsResult};
+use crate::warning::WarningInfo;
 
 pub struct ServerFlavors;
 impl Contract for ServerFlavors {
@@ -92,6 +93,10 @@ pub struct ServerDetails {
     pub data_dir: String,
     /// The entry's total on-disk footprint, in bytes.
     pub disk_bytes: u64,
+    /// Standing degraded state — a create's warnings scroll past, so `info`
+    /// keeps reporting the ones that are still true.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<WarningInfo>,
 }
 
 pub struct ServerDetail;
@@ -372,6 +377,10 @@ impl Topic for ServerCreateProgressEvent {
 pub struct ServerCreateDoneEvent {
     pub id: String,
     pub server: ServerInfo,
+    /// Degraded outcomes of a create that nonetheless succeeded — a front-end
+    /// shows these under the success line.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<WarningInfo>,
 }
 impl Topic for ServerCreateDoneEvent {
     const TOPIC: &'static str = "server.create.done";
@@ -407,6 +416,9 @@ impl Topic for ServerUpdateProgressEvent {
 pub struct ServerUpdateDoneEvent {
     pub id: String,
     pub server: ServerInfo,
+    /// Degraded outcomes of an update that nonetheless succeeded.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<WarningInfo>,
 }
 impl Topic for ServerUpdateDoneEvent {
     const TOPIC: &'static str = "server.update.done";

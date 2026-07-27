@@ -77,16 +77,18 @@ impl ServerCreateManager {
             };
 
             match engine.provision_server(spec, on_progress.as_ref()).await {
-                Ok(record) => {
+                Ok((record, warnings)) => {
                     tracing::info!(
                         job = %job_id,
                         server = %record.id,
                         name = %record.name,
+                        warnings = warnings.len(),
                         "server create done"
                     );
                     hub.publish(&topic_event(&ServerCreateDoneEvent {
                         id: job_id.clone(),
                         server: server_info(record, None),
+                        warnings,
                     }));
                 }
                 Err(e) => {
@@ -162,16 +164,18 @@ impl ServerUpdateManager {
             };
 
             match engine.update_server(spec, on_progress.as_ref()).await {
-                Ok(record) => {
+                Ok((record, warnings)) => {
                     tracing::info!(
                         job = %job_id,
                         server = %record.id,
                         version = %record.profile.game_version,
+                        warnings = warnings.len(),
                         "server update done"
                     );
                     hub.publish(&topic_event(&ServerUpdateDoneEvent {
                         id: job_id.clone(),
                         server: server_info(record, None),
+                        warnings,
                     }));
                 }
                 Err(e) => {

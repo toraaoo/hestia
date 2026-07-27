@@ -12,6 +12,7 @@ use crate::minecraft::{
     ResolveParams, VersionsParams, VersionsResult,
 };
 use crate::process::{ProcessInfo, ProcessLogsResult};
+use crate::warning::WarningInfo;
 
 pub struct InstanceFlavors;
 impl Contract for InstanceFlavors {
@@ -494,6 +495,11 @@ pub struct InstanceLaunchDoneEvent {
     pub id: String,
     pub process_id: String,
     pub pid: u32,
+    /// Degraded outcomes of a launch that nonetheless started the game — a
+    /// sync target left unshared, for instance. The session is running; these
+    /// say what it is running against.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<WarningInfo>,
 }
 impl Topic for InstanceLaunchDoneEvent {
     const TOPIC: &'static str = "instance.launch.done";

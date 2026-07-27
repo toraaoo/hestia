@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
+use client::proto::instance::InstanceLaunchDoneEvent;
 use client::proto::process::ProcessState;
 use client::{Client, ProcessEvent};
 
@@ -23,12 +24,18 @@ pub async fn launch(
     new_session: bool,
     detach: bool,
 ) -> Result<()> {
-    let (process_id, pid) = launch_once(client, reference, account, new_session).await?;
+    let launched = launch_once(client, reference, account, new_session).await?;
+    let process_id = launched.process_id;
     if detach || !ui::interactive_output() {
-        return ui::show(View::line(format!(
-            "instance '{reference}' launched (pid {pid})"
-        )));
+        ui::show(View::line(format!(
+            "instance '{reference}' launched (pid {})",
+            launched.pid
+        )))?;
+        return ui::show_warnings(&launched.warnings);
     }
+    // Before the alternate screen takes the terminal: a warning printed after
+    // the session ends would be lost above the scrollback it produces.
+    ui::show_warnings(&launched.warnings)?;
     let backfill = client
         .instance()
         .logs(reference, Some(process_id.clone()), Some(100))
@@ -47,7 +54,7 @@ async fn launch_once(
     reference: &str,
     account: &str,
     new_session: bool,
-) -> Result<(String, u32)> {
+) -> Result<InstanceLaunchDoneEvent> {
     let mut retried = false;
     loop {
         let reporter = Arc::new(ProvisionReporter::new());

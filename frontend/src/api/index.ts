@@ -33,6 +33,7 @@ export {
   UNKNOWN_CHANNEL,
 } from './core/ipc';
 export { type JobOptions, type JobTopics, jobId, runJob } from './core/jobs';
+export { warningHint, warningMessage } from './core/warnings';
 export * as daemon from './daemon';
 export * as dialog from './dialog';
 export * as download from './download';

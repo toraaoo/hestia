@@ -27,6 +27,7 @@ import {
 } from '@/features/entries/lib/schema';
 import { useAppForm } from '@/hooks/form';
 import { memGb } from '@/lib/format';
+import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import { configQueries } from '@/queries/config';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
@@ -115,10 +116,11 @@ export function CreateEntryModal({
           : [{ key: 'memory', value: `${value.details.memory}G` }];
       try {
         if (kind === 'server') {
-          const server = await createServer.mutateAsync(
+          const created = await createServer.mutateAsync(
             serverParams(value, memoryEntries),
           );
-          toast.success(m['toast.created']({ name: server.name }));
+          toast.success(m['toast.created']({ name: created.server.name }));
+          toastWarnings(created.warnings);
         } else {
           const instance = await createInstance.mutateAsync(
             instanceParams(value, memoryEntries),

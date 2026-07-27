@@ -6,6 +6,7 @@ use proto::backup::BackupKind;
 use proto::minecraft::ProvisionPhase;
 
 use proto::server::{ServerDetails, ServerPingResult};
+use proto::warning::WarningInfo;
 
 use super::{effective_name, guard_downgrade, phase_progress};
 use crate::content::install;
@@ -21,11 +22,13 @@ impl Engine {
     /// record, ensure the Java runtime, and download its files. A failure after
     /// registration removes the record so nothing half-built is left behind.
     /// The caller is responsible for having obtained the user's EULA acceptance.
+    /// Returns the record with any degraded outcome of the pipeline — a create
+    /// can succeed while a best-effort step did not.
     pub async fn provision_server(
         &self,
         spec: ServerCreateSpec,
         on_progress: OnProgress<'_>,
-    ) -> Result<ServerRecord> {
+    ) -> Result<(ServerRecord, Vec<WarningInfo>)> {
         on_progress(&phase_progress(ProvisionPhase::Resolving));
         let profile = self
             .minecraft
@@ -54,7 +57,20 @@ impl Engine {
             let _ = self.servers.remove(&record.id);
         }
         provisioned?;
-        self.servers.mark_ready(&record.id)
+        let record = self.servers.mark_ready(&record.id)?;
+        let warnings = self.server_warnings(&record);
+        Ok((record, warnings))
+    }
+
+    /// The degraded state a server carries right now — what a create's warnings
+    /// said, still true long after that output scrolled past.
+    pub(crate) fn server_warnings(&self, record: &ServerRecord) -> Vec<WarningInfo> {
+        if self.servers.has_schema(record) {
+            return Vec::new();
+        }
+        vec![WarningInfo::PropertiesSchemaMissing {
+            name: record.name.clone(),
+        }]
     }
 
     /// Move a server to another version of its flavor. A downgrade must be
@@ -64,7 +80,7 @@ impl Engine {
         &self,
         spec: ServerUpdateSpec,
         on_progress: OnProgress<'_>,
-    ) -> Result<ServerRecord> {
+    ) -> Result<(ServerRecord, Vec<WarningInfo>)> {
         let record = self
             .servers
             .get(&spec.server)
@@ -93,9 +109,12 @@ impl Engine {
                 .context("pre-update backup failed")?;
         }
         let java = self.ensure_java(profile.java_major, on_progress).await?;
-        self.servers
+        let record = self
+            .servers
             .update(&record.id, profile, Some(&self.cache), &java, on_progress)
-            .await
+            .await?;
+        let warnings = self.server_warnings(&record);
+        Ok((record, warnings))
     }
 
     /// The ready-to-spawn invocation for a provisioned server, with its ports
@@ -166,6 +185,7 @@ impl Engine {
             .with_context(|| format!("unknown server: {reference}"))?;
         let entry_dir = self.servers.server_dir(&record);
         let data_dir = self.servers.data_dir(&record);
+        let warnings = self.server_warnings(&record);
         Ok(ServerDetails {
             id: record.id,
             name: record.name,
@@ -178,6 +198,7 @@ impl Engine {
             disk_bytes: usage::dir_size(&entry_dir),
             entry_dir: entry_dir.to_string_lossy().into_owned(),
             data_dir: data_dir.to_string_lossy().into_owned(),
+            warnings,
         })
     }
 }

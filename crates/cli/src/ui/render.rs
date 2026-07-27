@@ -26,6 +26,7 @@ pub fn show(view: View) -> Result<()> {
     match view {
         View::Line(text) => println!("{text}"),
         View::Note(text) => note(&text),
+        View::Warning(text) => warning(&text),
         View::Detail(rows) => detail(&rows),
         View::Table { headers, rows, .. } => print_table(&headers, &rows),
     }
@@ -60,6 +61,16 @@ fn note(text: &str) {
         println!("{}", text.dark_grey());
     } else {
         println!("{text}");
+    }
+}
+
+/// A warning keeps the `warning:` prefix when redirected, so a script that
+/// captures stdout can still see the operation was degraded.
+fn warning(text: &str) {
+    if stdout_is_tty() {
+        println!("{} {text}", "warning:".yellow());
+    } else {
+        println!("warning: {text}");
     }
 }
 

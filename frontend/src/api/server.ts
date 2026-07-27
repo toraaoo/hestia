@@ -26,10 +26,12 @@ import type {
 } from './types/minecraft';
 import type { ProcessLogLine } from './types/process';
 import type {
+  ServerCreateDoneEvent,
   ServerCreateParams,
   ServerDetails,
   ServerInfo,
   ServerPingResult,
+  ServerUpdateDoneEvent,
   ServerUpdateParams,
 } from './types/server';
 
@@ -86,9 +88,9 @@ export function ping(server: string): Promise<ServerPingResult> {
 export async function create(
   params: Partial<ServerCreateParams>,
   onProgress?: OnProgress,
-): Promise<ServerInfo> {
+): Promise<ServerCreateDoneEvent> {
   const id = jobId('server-create');
-  const done = await runJob<{ id: string; server: ServerInfo }>({
+  return await runJob<ServerCreateDoneEvent>({
     id,
     topics: {
       progress: 'server.create.progress',
@@ -98,15 +100,14 @@ export async function create(
     onProgress,
     start: () => call('server.create', { ...params, id }),
   });
-  return done.server;
 }
 
 export async function update(
   params: Omit<ServerUpdateParams, 'id'>,
   onProgress?: OnProgress,
-): Promise<ServerInfo> {
+): Promise<ServerUpdateDoneEvent> {
   const id = jobId('server-update');
-  const done = await runJob<{ id: string; server: ServerInfo }>({
+  return await runJob<ServerUpdateDoneEvent>({
     id,
     topics: {
       progress: 'server.update.progress',
@@ -116,7 +117,6 @@ export async function update(
     onProgress,
     start: () => call('server.update', { ...params, id }),
   });
-  return done.server;
 }
 
 export function rename(server: string, name: string): Promise<ServerInfo> {

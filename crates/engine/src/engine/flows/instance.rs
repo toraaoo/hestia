@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use proto::instance::InstanceDetails;
 use proto::minecraft::{ConfigEntry, ProvisionPhase};
+use proto::warning::WarningInfo;
 
 use super::{effective_name, guard_downgrade};
 use crate::content::{install, profiles};
@@ -149,7 +150,7 @@ impl Engine {
         profile: &str,
         reconcile: bool,
         on_progress: OnProgress<'_>,
-    ) -> Result<(InstanceRecord, LaunchPlan, PathBuf)> {
+    ) -> Result<PreparedLaunch> {
         let record = self
             .instances
             .get(reference)
@@ -202,6 +203,7 @@ impl Engine {
         let game_dir = self.instances.data_dir(&record);
         std::fs::create_dir_all(&game_dir)
             .with_context(|| format!("cannot create {}", game_dir.display()))?;
+        let mut warnings = Vec::new();
         if reconcile {
             // A captured profile scopes the settings-class sync targets to its
             // own store; an uncaptured one inherits the global store.
@@ -209,7 +211,7 @@ impl Engine {
                 .as_ref()
                 .filter(|p| p.captured)
                 .map(|p| profiles::store_dir(&entry_dir, &p.name));
-            self.sync.apply(&game_dir, store.as_deref())?;
+            warnings = self.sync.apply(&record.name, &game_dir, store.as_deref());
             let selection: Option<std::collections::HashSet<String>> =
                 launch_profile.map(|p| p.members.into_iter().collect());
             let worlds = crate::instances::save_worlds(&game_dir);
@@ -247,7 +249,12 @@ impl Engine {
             &account,
             &jvm,
         );
-        Ok((record, plan, log_file))
+        Ok(PreparedLaunch {
+            record,
+            plan,
+            log_file,
+            warnings,
+        })
     }
 
     async fn launch_account(&self, reference: &str) -> Result<LaunchAccount> {
@@ -269,6 +276,17 @@ impl Engine {
             access_token,
         })
     }
+}
+
+/// Everything a launch needs to spawn, plus what went less than perfectly on
+/// the way there. The warnings ride out on the result rather than staying in the
+/// daemon log, so the caller can tell the user what the session is running
+/// against.
+pub struct PreparedLaunch {
+    pub record: InstanceRecord,
+    pub plan: LaunchPlan,
+    pub log_file: PathBuf,
+    pub warnings: Vec<WarningInfo>,
 }
 
 /// The root for launcher-managed shared game files (versions, libraries,

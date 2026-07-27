@@ -20,6 +20,7 @@ use std::io::{IsTerminal, Write};
 use std::sync::OnceLock;
 
 use anyhow::{anyhow, bail, Result};
+use client::proto::warning::WarningInfo;
 
 pub use components::PickerItem;
 pub use progress::{InstallReporter, ProvisionReporter, Spinner};
@@ -48,6 +49,17 @@ pub(crate) fn interactive_output() -> bool {
 /// which page in a fullscreen session when interactive.
 pub fn show(view: View) -> Result<()> {
     render::show(view)
+}
+
+/// Report the degraded outcomes an operation returned. Printed after the result
+/// it qualifies, so the success line stays first and the caveats follow it, each
+/// with the hint for fixing it.
+pub fn show_warnings(warnings: &[WarningInfo]) -> Result<()> {
+    for warning in warnings {
+        show(View::warning(warning.to_string()))?;
+        show(View::note(format!("  {}", warning.hint())))?;
+    }
+    Ok(())
 }
 
 /// Prompt the user to pick one of `items`, returning its index. Requires an
