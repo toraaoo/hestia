@@ -15,7 +15,6 @@ import { serverMutations, serverQueries } from '@/queries/server';
 
 import {
   installedRef,
-  itemWorlds,
   type ListResult,
   type RowHandlers,
   rowKey,
@@ -56,18 +55,18 @@ export function ContentSection({
   const update = useJobMutation(content.update(id));
   const setVersion = useJobMutation(content.setVersion(id));
   const handlers: RowHandlers = {
+    // A row is the whole installed item, so a toggle or removal covers every
+    // world it targets — the wire reads an empty `worlds` as all of them.
     onEnable: (item, enabled) =>
       enable.mutate({
         kind: item.kind,
         item: installedRef(item),
         enabled,
-        worlds: itemWorlds(item),
       }),
     onRemove: (item) =>
       remove.mutate({
         kind: item.kind,
         item: installedRef(item),
-        worlds: itemWorlds(item),
       }),
     onUpdate: (item) =>
       update.mutate({ kind: item.kind, item: installedRef(item) }),

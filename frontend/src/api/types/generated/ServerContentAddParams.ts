@@ -4,8 +4,8 @@ import type { ContentKind } from "./ContentKind";
 
 export type ServerContentAddParams = { server: string, id: string, kind: ContentKind, source: string, items: Array<ContentAddItem>, 
 /**
- * For datapacks on an instance: the save worlds each item installs into
- * (the game loads datapacks from inside a world). Ignored for other
- * kinds; a server uses its single `level-name` world.
+ * For datapacks on an instance: the save worlds to mirror into, empty
+ * meaning every world. Ignored for other kinds; a server always uses its
+ * single `level-name` world.
  */
 worlds: Array<string>, };

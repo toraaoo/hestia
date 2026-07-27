@@ -4,12 +4,7 @@
  * One installed item's update status: its current pin against the newest
  * compatible version resolved upstream.
  */
-export type ContentUpdate = { filename: string, projectId: string, 
-/**
- * For a datapack: the world the copy lives in (disambiguates one project
- * installed into several worlds). Empty for the other kinds.
- */
-world: string, currentVersionId: string, currentVersionNumber: string, latestVersionId: string, latestVersionNumber: string, 
+export type ContentUpdate = { filename: string, projectId: string, currentVersionId: string, currentVersionNumber: string, latestVersionId: string, latestVersionNumber: string, 
 /**
  * True when the newest compatible version differs from the current pin.
  */

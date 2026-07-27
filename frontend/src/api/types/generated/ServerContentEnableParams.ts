@@ -3,8 +3,8 @@ import type { ContentKind } from "./ContentKind";
 
 /**
  * Enable or disable one installed item (matched by project id, slug, filename,
- * or title). Disabling drops it from the game's load dir while keeping the
- * managed copy and provenance; enabling restores the mirror. `worlds` narrows
- * a datapack toggle to those save worlds (empty toggles every copy).
+ * or title). Disabling drops it from the game's load dirs while keeping the
+ * managed copy and provenance; enabling restores the mirror. `worlds` scopes a
+ * datapack toggle to those save worlds, leaving the others as they are.
  */
 export type ServerContentEnableParams = { server: string, kind: ContentKind, item: string, enabled: boolean, worlds: Array<string>, };

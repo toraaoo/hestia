@@ -2,7 +2,8 @@
 import type { ContentKind } from "./ContentKind";
 
 /**
- * `worlds` narrows a datapack removal to those save worlds (empty removes
- * every copy); it is rejected for the other kinds, which have no worlds.
+ * `worlds` narrows a datapack removal to those save worlds — the pack stops
+ * loading in them and its copies there go; it is uninstalled outright when no
+ * world is left targeting it. Rejected for the kinds that have no worlds.
  */
 export type ServerContentRemoveParams = { server: string, kind: ContentKind, item: string, worlds: Array<string>, };

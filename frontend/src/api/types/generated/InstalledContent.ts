@@ -8,26 +8,28 @@ import type { ContentKind } from "./ContentKind";
  */
 export type InstalledContent = { kind: ContentKind, source: string, projectId: string, slug: string, title: string, versionId: string, versionNumber: string, filename: string, sha1: string, url: string, 
 /**
- * The project's icon, carried for the desktop UI so an installed item
- * renders its artwork; empty for local-file imports (no project) and for
- * records written before this field.
+ * The project's icon, carried for the desktop UI; empty for a local-file
+ * import, which has no project.
  */
 iconUrl: string, installedUnix: number, 
 /**
- * For datapacks: the world directory (relative to the entry's `data/`)
- * the file lives in — datapacks load from inside a world, not a flat dir.
- * Empty for every other kind.
+ * For datapacks: the save worlds (relative to the entry's `data/`) the
+ * managed file is mirrored into, empty meaning every world the entry has.
+ * Always empty for the other kinds, which mirror into one flat dir.
  */
-world: string, 
+worlds: Array<string>, 
 /**
  * Who put the item in the pool: empty = user-installed; a global profile
  * apply tags its installs `profile:<name>`.
  */
 origin: string, 
 /**
- * Whether the launch-time mirror installs this item into `data/`. A
- * disabled item keeps its managed copy and provenance but is not loaded by
- * the game (for a datapack, its in-world file is renamed `.disabled`).
- * Defaults to `true` so records written before this field decode enabled.
+ * Whether the launch-time mirror places this item in the game's load dirs.
+ * A disabled item keeps its managed copy and provenance, and is not loaded.
  */
-enabled: boolean, };
+enabled: boolean, 
+/**
+ * For datapacks: worlds it targets but is not loaded in — the per-world
+ * twin of `enabled`. Empty for the other kinds.
+ */
+disabledWorlds: Array<string>, };
