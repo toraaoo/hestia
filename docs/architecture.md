@@ -240,7 +240,9 @@ targets an explicit socket.
   marshals through the contract and returns the `proto` result directly;
   `try_call` maps a `not_found` to `None`; `call_with_timeout` overrides the 10 s
   default; `run_job` drives a long-running operation, forwarding its progress
-  events and blocking until a done/error topic arrives.
+  events and blocking until a done/error topic arrives. It is also where the
+  **wire tracing** lives (`trace!` per frame sent/received, plus connection
+  transitions) — the CLI's `-vv` — see the decision note below.
 - **facades** (`facades/`) — one struct per domain in its own module, reached
   through a `Client` accessor (`client.java().install(21, …)`), mirroring the
   engine's domain modules on the other side of the socket. Facade methods are
@@ -1247,6 +1249,21 @@ stay aligned with the wire channels (`remove`, not `delete`).
 > cross-registry name lookup to avoid. Everything scriptable still has an
 > explicit, unambiguous noun-first form; the shortcuts are additive sugar over
 > it.
+
+> **`-vv` buys wire visibility, not more volume.** The CLI advertised three
+> verbosity levels but `cli` and `client` contained zero `trace!` statements, so
+> `-v` and `-vv` emitted byte-identical output — a flag the binary could not
+> honour. The fix was not to sprinkle `trace!` until the line count differs:
+> that satisfies a test while leaving the level meaning "more, somehow". A
+> verbosity level should buy a *capability*, and there is exactly one thing a
+> client can show that the daemon's own logs cannot — **the wire**. So `-vv` is
+> frames: each request and reply with its channel, correlation id, byte size and
+> round-trip time, plus session open/close and the count of waiters a close woke.
+> That is precisely what someone debugging a CLI-versus-daemon disagreement
+> needs, it lives in one place (`client/src/session.rs`), and it is the same
+> stream for every front-end that links `client`. Payloads are deliberately **not**
+> logged — they carry access tokens and rcon passwords — so a frame reports its
+> size, never its contents.
 
 > **A state query answers through its exit code, not only its stdout.**
 > `hestia daemon status` printed `stopped` and exited 0, so

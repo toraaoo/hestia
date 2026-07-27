@@ -47,6 +47,7 @@ impl Session {
             mismatch: Mutex::new(None),
         });
         let reader_shared = shared.clone();
+        tracing::trace!("session opened");
         let handle = tokio::spawn(async move {
             while let Ok(Some(frame)) = reader.recv().await {
                 reader_shared.dispatch(&frame);
@@ -82,25 +83,47 @@ impl Session {
 
         let req = Request::new(channel, payload, Some(id));
         tracing::debug!(channel, id, "call");
-        if let Err(e) = self
-            .writer
-            .lock()
-            .await
-            .send(&protocol::encode_request(&req))
-            .await
-        {
+        let frame = protocol::encode_request(&req);
+        // The wire is what a client can show that the daemon's own logs cannot:
+        // which frames this process sent, correlated, sized and timed. Payloads
+        // are never logged — they carry access tokens and rcon passwords — so
+        // only the byte count goes out.
+        tracing::trace!(
+            direction = "send",
+            channel,
+            id,
+            bytes = frame.len(),
+            "frame"
+        );
+        let started = std::time::Instant::now();
+        if let Err(e) = self.writer.lock().await.send(&frame).await {
             self.shared.pending.lock().unwrap().remove(&id);
+            tracing::trace!(channel, id, error = %e, "send failed");
             return Err(e);
         }
 
         match tokio::time::timeout(timeout, rx).await {
             Ok(Ok(res)) => {
                 tracing::debug!(channel, id, ok = res.ok, "call complete");
+                tracing::trace!(
+                    direction = "recv",
+                    channel,
+                    id,
+                    ok = res.ok,
+                    elapsed_ms = started.elapsed().as_millis(),
+                    "frame"
+                );
                 Ok(res)
             }
             Ok(Err(_)) => Err(self.shared.close_error()),
             Err(_) => {
                 self.shared.pending.lock().unwrap().remove(&id);
+                tracing::trace!(
+                    channel,
+                    id,
+                    elapsed_ms = started.elapsed().as_millis(),
+                    "timed out waiting for a reply"
+                );
                 Err(IpcError::Timeout(channel.to_string()))
             }
         }
@@ -239,12 +262,22 @@ impl Session {
 impl Shared {
     fn dispatch(&self, frame: &str) {
         let Ok(value) = serde_json::from_str::<Value>(frame) else {
+            tracing::trace!(bytes = frame.len(), "ignoring a malformed frame");
             return; // ignore a malformed frame rather than tear down
         };
         if protocol::is_event(&value) {
+            let event = protocol::decode_event(&value);
+            // Unsolicited, so it correlates with no call: the topic is what a
+            // reader needs to see a job's progress arriving (or not).
+            tracing::trace!(
+                direction = "recv",
+                topic = %event.topic,
+                bytes = frame.len(),
+                "event"
+            );
             let cb = self.event_cb.lock().unwrap().clone();
             if let Some(cb) = cb {
-                cb(&protocol::decode_event(&value));
+                cb(&event);
             }
             return;
         }
@@ -276,7 +309,8 @@ impl Shared {
     fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
         // Wake every waiter so they fail instead of blocking forever.
-        self.pending.lock().unwrap().clear();
+        let waiting = self.pending.lock().unwrap().drain().count();
+        tracing::trace!(waiting, "connection closed");
     }
 
     /// The error a waiter woken by a torn-down connection should report: a

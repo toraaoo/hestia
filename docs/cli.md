@@ -383,12 +383,20 @@ behalf.
 Accepted in any position.
 
 ```bash
-hestia -v java list              # verbose / debug logging (-vv for trace);
-                                 #   diagnostics also land in logs/hestia.log
+hestia -v java list              # debug logging: what the command is doing
+hestia -vv java list             # …plus the wire: every frame this process sent
+                                 #   and received, with its channel, correlation
+                                 #   id, size and round-trip time
 hestia -q java list              # errors only on the console
 hestia --home /path/to/dir config get home
 hestia --version
 ```
+
+Diagnostics also land in `logs/hestia.log` regardless of the console level.
+`-vv` is specifically for a CLI-versus-daemon disagreement: it shows the
+conversation from this side, which the daemon's own logs cannot. Payloads are
+never logged — they carry access tokens and RCON passwords — so a frame reports
+its size, not its contents.
 
 ## Exit codes
 
