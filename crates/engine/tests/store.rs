@@ -321,21 +321,25 @@ fn server_config_covers_jvm_and_properties() {
     let managed = servers.config_set(id, "server-port", "25570").unwrap_err();
     assert!(managed.to_string().contains("managed by hestia"));
 
-    // No generated server.properties yet: there is no ground truth, so any
-    // (unmanaged) key is accepted rather than everything rejected.
+    // No derived schema yet: there is no ground truth, so any (unmanaged) key
+    // is accepted rather than everything rejected.
+    assert!(!servers.has_schema(&record));
     servers.config_set(id, "no-schema-yet", "1").unwrap();
     assert_eq!(
         servers.config_get(id, "no-schema-yet").unwrap().as_deref(),
         Some("1")
     );
 
-    // Seed the file as the generation run would: every key the server's
+    // Store the schema as the pristine generation run would: every key this
     // version knows, with its default.
-    let properties = servers.data_dir(&record).join("server.properties");
-    std::fs::create_dir_all(properties.parent().unwrap()).unwrap();
-    std::fs::write(&properties, "motd=A Minecraft Server\nview-distance=10\n").unwrap();
+    std::fs::write(
+        servers.schema_path(&record),
+        "motd=A Minecraft Server\nview-distance=10\n",
+    )
+    .unwrap();
+    assert!(servers.has_schema(&record));
 
-    // A key in the generated schema is accepted and reads back.
+    // A key in the schema is accepted and reads back.
     servers.config_set(id, "motd", "hi there").unwrap();
     assert_eq!(
         servers.config_get(id, "motd").unwrap().as_deref(),
@@ -347,10 +351,29 @@ fn server_config_covers_jvm_and_properties() {
     let unknown = servers.config_set(id, "this-is-a-typo", "x").unwrap_err();
     assert!(unknown.to_string().contains("unknown config key"));
 
+    // The live file is values, not the schema: a key vanilla preserved through
+    // an update is still readable and listable, but no longer settable, because
+    // the version that carried it is gone.
+    let properties = servers.data_dir(&record).join("server.properties");
+    std::fs::create_dir_all(properties.parent().unwrap()).unwrap();
+    let existing = std::fs::read_to_string(&properties).unwrap_or_default();
+    std::fs::write(&properties, format!("{existing}retired-key=leftover\n")).unwrap();
+    assert_eq!(
+        servers.config_get(id, "retired-key").unwrap().as_deref(),
+        Some("leftover")
+    );
+    assert!(servers
+        .config_set(id, "retired-key", "x")
+        .unwrap_err()
+        .to_string()
+        .contains("unknown config key"));
+
     // Managed keys stay rejected even though the file now exists.
     assert!(servers.config_set(id, "rcon.port", "25580").is_err());
 
-    // list surfaces both reserved JVM keys plus the properties entries.
+    // list surfaces the reserved JVM keys, the values the user set, and the
+    // keys the file kept from an earlier version.
+    servers.config_set(id, "view-distance", "10").unwrap();
     let entries = servers.config_list(id).unwrap();
     assert!(entries.iter().any(|(k, v)| k == "memory" && v == "4G"));
     assert!(entries.iter().any(|(k, _)| k == "jvm-args"));
@@ -358,6 +381,9 @@ fn server_config_covers_jvm_and_properties() {
     assert!(entries
         .iter()
         .any(|(k, v)| k == "view-distance" && v == "10"));
+    assert!(entries
+        .iter()
+        .any(|(k, v)| k == "retired-key" && v == "leftover"));
 
     std::fs::remove_dir_all(&dir).ok();
 }

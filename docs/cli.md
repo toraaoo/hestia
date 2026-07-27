@@ -78,7 +78,7 @@ hestia server smp config list    # memory, jvm-args, and server.properties keys
 hestia server smp config set memory 4G          # applies from the next start
 hestia server smp config set motd "hi"          # any server.properties key its
                                                 #   version knows (validated
-                                                #   against the generated file)
+                                                #   against the derived schema)
 hestia server smp update 1.21.4  # move the server to another version (world,
                                  #   ports, config stay, and the data is
                                  #   backed up automatically first; prompts

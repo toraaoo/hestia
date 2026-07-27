@@ -22,6 +22,11 @@ use crate::registry;
 
 const RECORD: &str = "server.json";
 const PROPERTIES: &str = "server.properties";
+// The key set the server's own pristine generation run emitted — the schema
+// `config_set` validates against, kept beside the record because it describes
+// the version hestia installed, not the values the game currently holds.
+const SCHEMA: &str = "schema.properties";
+const SCHEMA_RUN: &str = ".schema";
 const DATA: &str = "data";
 const GAME_PORT_BASE: u16 = 25565;
 const RCON_PORT_BASE: u16 = 25575;
@@ -101,6 +106,19 @@ impl Servers {
     /// writes (jar, libraries, `eula.txt`, `server.properties`, the world).
     pub fn data_dir(&self, record: &ServerRecord) -> PathBuf {
         self.server_dir(record).join(DATA)
+    }
+
+    /// The `server.properties` schema derived for this server's version. Absent
+    /// when the generation run could not produce one, in which case `config_set`
+    /// validates nothing.
+    pub fn schema_path(&self, record: &ServerRecord) -> PathBuf {
+        self.server_dir(record).join(SCHEMA)
+    }
+
+    /// Whether this server has a validatable property schema. False means every
+    /// unmanaged key is accepted — see [`Servers::config_set`].
+    pub fn has_schema(&self, record: &ServerRecord) -> bool {
+        self.schema_path(record).is_file()
     }
 
     pub fn list(&self) -> Vec<ServerRecord> {
@@ -264,23 +282,76 @@ impl Servers {
             detail: "generating server.properties".into(),
             ..ProvisionProgress::default()
         });
-        if let Err(e) = self.generate_properties(record, java).await {
-            tracing::warn!(id = %record.id, error = format!("{e:#}"), "server.properties generation failed");
-        } else if !data.join(PROPERTIES).exists() {
-            tracing::warn!(id = %record.id, "the server did not write server.properties");
-        }
+        self.derive_schema(record, java).await;
 
         std::fs::write(data.join("eula.txt"), "eula=true\n").context("cannot write eula.txt")?;
         tracing::info!(id = %record.id, "server provisioned");
         Ok(())
     }
 
-    /// Run the server once, before `eula.txt` exists, to make it write the
-    /// complete `server.properties` for exactly its version: the EULA gate
-    /// stops it right after, before it binds ports or generates a world. The
-    /// file is the ground truth `config_set` validates against.
-    async fn generate_properties(&self, record: &ServerRecord, java: &Path) -> Result<()> {
-        let plan = self.launch_plan(record, java, &record.jvm);
+    /// Derive this version's `server.properties` **schema** and seed the live
+    /// file with any key it is missing. Best-effort: a server with no schema
+    /// accepts any property key rather than rejecting every one, so a failure
+    /// here degrades validation instead of failing the operation — the caller
+    /// reports it by asking [`Servers::has_schema`].
+    async fn derive_schema(&self, record: &ServerRecord, java: &Path) {
+        match self.generate_schema(record, java).await {
+            Ok(schema) if schema.is_empty() => {
+                tracing::warn!(id = %record.id, "the schema run wrote no server.properties");
+            }
+            Ok(schema) => {
+                let keys = schema.len();
+                if let Err(e) = seed_properties(&self.data_dir(record).join(PROPERTIES), &schema) {
+                    tracing::warn!(id = %record.id, error = format!("{e:#}"), "cannot seed server.properties");
+                }
+                tracing::info!(id = %record.id, keys, "server.properties schema derived");
+            }
+            Err(e) => {
+                tracing::warn!(id = %record.id, error = format!("{e:#}"), "server.properties schema generation failed");
+            }
+        }
+    }
+
+    /// Run the server once in a throwaway directory to make it write the
+    /// complete `server.properties` for exactly its version, and store that
+    /// pristine file as the schema. The run has no `eula.txt`, so the gate stops
+    /// it right after the write, before it binds ports or generates a world; and
+    /// it has no properties file to round-trip, so what it writes is the keys
+    /// this version knows rather than a rewrite of the values the user set.
+    async fn generate_schema(
+        &self,
+        record: &ServerRecord,
+        java: &Path,
+    ) -> Result<Vec<(String, String)>> {
+        let scratch = self.server_dir(record).join(SCHEMA_RUN);
+        let _ = std::fs::remove_dir_all(&scratch);
+        std::fs::create_dir_all(&scratch)
+            .with_context(|| format!("cannot create {}", scratch.display()))?;
+        let generated = self.run_schema_generation(record, java, &scratch).await;
+        let pristine = scratch.join(PROPERTIES);
+        let schema = read_properties(&pristine);
+        if !schema.is_empty() {
+            std::fs::copy(&pristine, self.schema_path(record))
+                .context("cannot store the properties schema")?;
+        }
+        let _ = std::fs::remove_dir_all(&scratch);
+        generated?;
+        Ok(schema)
+    }
+
+    async fn run_schema_generation(
+        &self,
+        record: &ServerRecord,
+        java: &Path,
+        scratch: &Path,
+    ) -> Result<()> {
+        let plan = launch::server_schema_plan(
+            &record.profile,
+            java,
+            &self.data_dir(record),
+            scratch,
+            &record.jvm,
+        );
         let mut child = tokio::process::Command::new(&plan.program)
             .args(&plan.args)
             .current_dir(&plan.cwd)
@@ -292,12 +363,12 @@ impl Servers {
             .with_context(|| format!("cannot run {}", plan.program.display()))?;
         match tokio::time::timeout(GENERATE_TIMEOUT, child.wait()).await {
             Ok(status) => {
-                let status = status.context("waiting for the generation run")?;
-                tracing::debug!(id = %record.id, %status, "server.properties generation run exited");
+                let status = status.context("waiting for the schema run")?;
+                tracing::debug!(id = %record.id, %status, "server.properties schema run exited");
             }
             Err(_) => {
                 let _ = child.kill().await;
-                tracing::debug!(id = %record.id, "server.properties generation run timed out (no EULA gate?)");
+                tracing::debug!(id = %record.id, "server.properties schema run timed out (no EULA gate?)");
             }
         }
         Ok(())
@@ -350,9 +421,7 @@ impl Servers {
             detail: "regenerating server.properties".into(),
             ..ProvisionProgress::default()
         });
-        if let Err(e) = self.regenerate_properties(&record, java).await {
-            tracing::warn!(id = %record.id, error = format!("{e:#}"), "server.properties regeneration failed");
-        }
+        self.derive_schema(&record, java).await;
 
         if previous_primary != record.profile.primary.filename {
             let _ = std::fs::remove_file(data.join(&previous_primary));
@@ -364,21 +433,6 @@ impl Servers {
             "server updated"
         );
         self.mark_ready(&record.id)
-    }
-
-    /// Rerun the schema-generation trick for the record's new version: with
-    /// `eula.txt` suspended the gate stops the run right after it rewrites
-    /// `server.properties` — set values survive, keys the version does not
-    /// know are dropped. The acceptance recorded at create is rewritten even
-    /// when the run fails.
-    async fn regenerate_properties(&self, record: &ServerRecord, java: &Path) -> Result<()> {
-        let eula = self.data_dir(record).join("eula.txt");
-        if eula.exists() {
-            std::fs::remove_file(&eula).context("cannot suspend eula.txt for the schema run")?;
-        }
-        let generated = self.generate_properties(record, java).await;
-        std::fs::write(&eula, "eula=true\n").context("cannot restore eula.txt")?;
-        generated
     }
 
     pub fn mark_ready(&self, id: &str) -> Result<ServerRecord> {
@@ -459,12 +513,13 @@ impl Servers {
     }
 
     /// Write one setting: a reserved JVM or backup key onto the record, or a
-    /// `server.properties` key through to the file. A property key must exist
-    /// in the file the server itself generated at create — the ground truth
-    /// for exactly its version — so a typo cannot silently drift the file
-    /// (without a file to check against, any key is accepted). The
-    /// hestia-managed keys are rejected. An empty value clears a JVM key.
-    /// Settings take effect on the next start.
+    /// `server.properties` key through to the file. A property key must exist in
+    /// the **schema** the server itself generated for its version — not in the
+    /// live file, which also carries keys no current version knows — so a typo
+    /// cannot silently drift the file. A server with no derived schema accepts
+    /// any unmanaged key rather than rejecting every one. The hestia-managed
+    /// keys are rejected. An empty value clears a JVM key. Settings take effect
+    /// on the next start.
     pub fn config_set(&self, id: &str, key: &str, value: &str) -> Result<()> {
         let _claims = self.claims.lock().unwrap();
         let mut record = self
@@ -481,8 +536,9 @@ impl Servers {
             );
         }
         let properties = self.data_dir(&record).join(PROPERTIES);
-        if properties.exists() {
-            if read_property(&properties, key).is_none() {
+        let schema = self.schema_path(&record);
+        if schema.is_file() {
+            if read_property(&schema, key).is_none() {
                 bail!(proto::error::ErrorInfo::ConfigKeyUnknown {
                     key: key.to_string()
                 });
@@ -491,7 +547,7 @@ impl Servers {
             tracing::debug!(
                 id = %record.id,
                 key,
-                "no server.properties to validate against; accepting the key"
+                "no properties schema to validate against; accepting the key"
             );
         }
         if HARDCORE_KEYS.contains(&key) {
@@ -635,6 +691,25 @@ fn generate_password() -> String {
         .collect()
 }
 
+/// Add the keys the file does not yet carry, leaving every present key at its
+/// current value. This is how a version update introduces the keys its schema
+/// added without touching what the user set — and how a fresh server's file
+/// starts out as the full schema. Keys no current version knows stay in the
+/// file: it holds values, and deleting lines the user or a mod may own is worse
+/// than the drift.
+fn seed_properties(path: &Path, schema: &[(String, String)]) -> Result<()> {
+    let present: HashSet<String> = read_properties(path).into_iter().map(|(k, _)| k).collect();
+    let missing: Vec<(&str, String)> = schema
+        .iter()
+        .filter(|(key, _)| !present.contains(key))
+        .map(|(key, value)| (key.as_str(), value.clone()))
+        .collect();
+    if missing.is_empty() {
+        return Ok(());
+    }
+    merge_properties(path, &missing)
+}
+
 /// Rewrite `entries` into the properties file, preserving every other line
 /// (user edits included) and appending keys not yet present. The data
 /// directory appears on demand with the file.
@@ -658,4 +733,50 @@ fn merge_properties(path: &Path, entries: &[(&str, String)]) -> Result<()> {
     }
     std::fs::write(path, lines.join("\n") + "\n")
         .with_context(|| format!("cannot write {}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn schema(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn seeding_adds_new_keys_and_keeps_every_existing_value() {
+        let dir = std::env::temp_dir().join(format!("hestia-seed-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(PROPERTIES);
+
+        // A fresh server starts out as the whole schema.
+        seed_properties(&path, &schema(&[("motd", "A Minecraft Server")])).unwrap();
+        assert_eq!(
+            read_property(&path, "motd").as_deref(),
+            Some("A Minecraft Server")
+        );
+
+        // The user changes a value and the file keeps a key from an older
+        // version; an update's schema adds one key.
+        merge_properties(&path, &[("motd", "mine".to_string())]).unwrap();
+        merge_properties(&path, &[("retired", "leftover".to_string())]).unwrap();
+        seed_properties(
+            &path,
+            &schema(&[("motd", "A Minecraft Server"), ("new-key", "default")]),
+        )
+        .unwrap();
+
+        assert_eq!(read_property(&path, "motd").as_deref(), Some("mine"));
+        assert_eq!(read_property(&path, "new-key").as_deref(), Some("default"));
+        assert_eq!(
+            read_property(&path, "retired").as_deref(),
+            Some("leftover"),
+            "a key the new version does not know is values, not schema — never deleted"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }

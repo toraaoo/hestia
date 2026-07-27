@@ -182,19 +182,43 @@ pub fn server_plan(
     dir: &Path,
     settings: &JavaSettings,
 ) -> LaunchPlan {
+    server_invocation(profile, java, Path::new(""), dir, settings)
+}
+
+/// The same invocation, but with every artifact named relative to `artifacts`
+/// and run from `cwd` — how the schema-generation run boots the server in a
+/// throwaway directory instead of the game's own data dir.
+pub fn server_schema_plan(
+    profile: &ServerProfile,
+    java: &Path,
+    artifacts: &Path,
+    cwd: &Path,
+    settings: &JavaSettings,
+) -> LaunchPlan {
+    server_invocation(profile, java, artifacts, cwd, settings)
+}
+
+fn server_invocation(
+    profile: &ServerProfile,
+    java: &Path,
+    artifacts: &Path,
+    cwd: &Path,
+    settings: &JavaSettings,
+) -> LaunchPlan {
     let mut args = settings.flags();
+    let primary = join_str(artifacts, &profile.primary.filename);
     if profile.main_class.is_empty() {
         args.push("-jar".to_string());
-        args.push(profile.primary.filename.clone());
+        args.push(primary);
     } else {
         let mut entries: Vec<String> = Vec::new();
         for library in &profile.libraries {
             push_unique(
                 &mut entries,
-                join_str(Path::new("libraries"), &library.path),
+                join_str(&artifacts.join("libraries"), &library.path),
             );
         }
-        entries.push(profile.primary.filename.clone());
+        entries.push(primary);
         args.push("-cp".to_string());
         args.push(entries.join(CLASSPATH_SEPARATOR));
         args.push(profile.main_class.clone());
@@ -203,7 +227,7 @@ pub fn server_plan(
     LaunchPlan {
         program: java.to_path_buf(),
         args,
-        cwd: dir.to_path_buf(),
+        cwd: cwd.to_path_buf(),
     }
 }
 
@@ -398,6 +422,32 @@ mod tests {
         assert!(classpath.contains("launcher.jar"));
         assert_eq!(plan.args[2], "net.example.Main");
         assert_eq!(plan.args.last().map(String::as_str), Some("nogui"));
+    }
+
+    #[test]
+    fn server_schema_plan_names_artifacts_outside_its_cwd() {
+        let profile = ServerProfile {
+            primary: Artifact {
+                filename: "server.jar".into(),
+                ..Default::default()
+            },
+            libraries: vec![library("a/b.jar")],
+            main_class: "net.example.Main".into(),
+            ..Default::default()
+        };
+        let plan = server_schema_plan(
+            &profile,
+            Path::new("java"),
+            Path::new("/srv/data"),
+            Path::new("/srv/.schema"),
+            &JavaSettings::default(),
+        );
+        // The run happens in the scratch dir, so nothing it writes can land in
+        // the game's data dir — but it still boots that dir's jar.
+        assert_eq!(plan.cwd, Path::new("/srv/.schema"));
+        let classpath = &plan.args[1];
+        assert!(classpath.contains(&join_str(Path::new("/srv/data"), "server.jar")));
+        assert!(classpath.contains(&join_str(Path::new("/srv/data/libraries"), "a/b.jar")));
     }
 
     #[test]
