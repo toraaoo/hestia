@@ -32,6 +32,11 @@ use records::ProcessRecord;
 const DEFAULT_LOG_LINES: usize = 2000;
 /// How many times `OnFailure` re-spawns a process before giving up.
 const MAX_RESTARTS: u32 = 3;
+
+/// How many finished processes keep their directory (logs included) for
+/// post-mortem. Count-based like `backup prune`, and for the same reason:
+/// retention has to be stated, or "keep the logs" means "grow forever".
+const TOMBSTONE_KEEP: usize = 20;
 /// How long a stop waits between the polite signal and the hard kill.
 const STOP_GRACE: Duration = Duration::from_secs(10);
 /// How often an adopted (non-child) process is checked for exit.
@@ -241,7 +246,25 @@ impl ProcessSupervisor {
                 ));
             } else {
                 tracing::info!(id = %record.id, pid = record.pid, "process exited while unsupervised");
-                records::remove(&proc_dir);
+                // It ended while nobody was watching, so nothing wrote its
+                // tombstone at the time; write it now, or its logs would be a
+                // stray to the next sweep.
+                records::entomb(
+                    &proc_dir,
+                    &records::Tombstone {
+                        id: record.id.clone(),
+                        pid: record.pid,
+                        state: ProcessState::Exited,
+                        exit_code: None,
+                        program: record.spec.program.clone(),
+                        args: record.spec.args.clone(),
+                        started_unix: record.started_unix,
+                        ended_unix: now_unix(),
+                        log_path: entry.log_path.clone(),
+                        err_path: entry.err_path.clone(),
+                    },
+                );
+                self.table.lock().unwrap().remove(&record.id);
                 self.hub.publish(&topic_event(&ProcessExitEvent {
                     id: record.id,
                     state: ProcessState::Exited,
@@ -251,18 +274,36 @@ impl ProcessSupervisor {
             }
         }
         self.sweep(&recorded);
+        self.prune_tombstones();
     }
 
+    /// Delete only true strays — a directory belonging to no process, live or
+    /// finished. A finished one keeps its tombstone and its logs; `prune` is
+    /// what eventually reclaims those, by age, so the post-mortem guarantee and
+    /// the cleanup are no longer in conflict.
     fn sweep(&self, keep: &HashSet<String>) {
         let Ok(entries) = std::fs::read_dir(&self.dir) else {
             return;
         };
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
-            if !keep.contains(&name) {
-                tracing::debug!(id = %name, "sweeping stale process directory");
-                let _ = std::fs::remove_dir_all(entry.path());
+            if keep.contains(&name) || records::is_known(&entry.path()) {
+                continue;
             }
+            tracing::debug!(id = %name, "sweeping a process directory belonging to no process");
+            let _ = std::fs::remove_dir_all(entry.path());
+        }
+    }
+
+    /// Drop the oldest finished processes' directories, logs and all, once more
+    /// than [`TOMBSTONE_KEEP`] have accumulated. Stated retention is what makes
+    /// keeping them safe: a launcher that never forgets a session would grow a
+    /// log directory without bound.
+    fn prune_tombstones(&self) {
+        let tombstones = records::scan_tombstones(&self.dir);
+        for stale in tombstones.iter().skip(TOMBSTONE_KEEP) {
+            tracing::debug!(id = %stale.id, "pruning a finished process directory");
+            let _ = std::fs::remove_dir_all(self.dir.join(&stale.id));
         }
     }
 
@@ -322,26 +363,46 @@ impl ProcessSupervisor {
         true
     }
 
+    /// Every process the daemon knows: the live ones, plus the finished ones it
+    /// has not yet pruned. The terminal entries come from their tombstones, not
+    /// from memory, so what the list says does not depend on whether the daemon
+    /// happens to have restarted since.
     pub fn list(&self) -> Vec<ProcessInfo> {
-        self.table
-            .lock()
-            .unwrap()
-            .values()
-            .map(|e| e.snapshot())
-            .collect()
+        let live = self.table.lock().unwrap();
+        let mut all: Vec<ProcessInfo> = live.values().map(|e| e.snapshot()).collect();
+        all.extend(
+            records::scan_tombstones(&self.dir)
+                .into_iter()
+                .filter(|t| !live.contains_key(&t.id))
+                .map(finished_info),
+        );
+        all
     }
 
     pub fn status(&self, id: &str) -> Option<ProcessInfo> {
-        self.table.lock().unwrap().get(id).map(|e| e.snapshot())
+        if let Some(entry) = self.table.lock().unwrap().get(id) {
+            return Some(entry.snapshot());
+        }
+        records::load_tombstone(&self.dir.join(id)).map(finished_info)
     }
 
+    /// A process's captured output — including a finished one's, which is the
+    /// whole point of keeping its directory. The tombstone records where the
+    /// logs are, since that is not derivable once the spec is gone.
     pub fn logs(&self, id: &str, tail: Option<usize>) -> Option<Vec<ProcessLogLine>> {
-        let entry = self.table.lock().unwrap().get(id).cloned()?;
+        let live = self.table.lock().unwrap().get(id).cloned();
+        let (log_path, err_path) = match live {
+            Some(entry) => (entry.log_path.clone(), entry.err_path.clone()),
+            None => {
+                let tombstone = records::load_tombstone(&self.dir.join(id))?;
+                (tombstone.log_path, tombstone.err_path)
+            }
+        };
         let limit = tail.unwrap_or(DEFAULT_LOG_LINES);
         let mut stream = LogStream::Stdout;
-        let mut lines = tail::read_last_lines(&entry.log_path, limit);
+        let mut lines = tail::read_last_lines(&log_path, limit);
         if lines.is_empty() {
-            if let Some(err_path) = &entry.err_path {
+            if let Some(err_path) = &err_path {
                 lines = tail::read_last_lines(err_path, limit);
                 stream = LogStream::Stderr;
             }
@@ -499,9 +560,28 @@ async fn supervise(
             && !success
             && attempts < MAX_RESTARTS;
         if !should_restart {
-            records::remove(&proc_dir);
+            // Label the end rather than merely dropping the record: an
+            // unmarked directory is indistinguishable from a stray, and the
+            // startup sweep deletes strays — which is how post-mortem logs used
+            // to vanish at the next restart.
+            let snapshot = entry.snapshot();
+            records::entomb(
+                &proc_dir,
+                &records::Tombstone {
+                    id: spec.id.clone(),
+                    pid: snapshot.pid,
+                    state,
+                    exit_code: code,
+                    program: spec.program.clone(),
+                    args: spec.args.clone(),
+                    started_unix: snapshot.started_unix,
+                    ended_unix: now_unix(),
+                    log_path: entry.log_path.clone(),
+                    err_path: entry.err_path.clone(),
+                },
+            );
             if let Some(observe) = &on_exit {
-                observe(&entry.snapshot());
+                observe(&snapshot);
             }
             return;
         }
@@ -599,5 +679,19 @@ async fn wait_or_stop(entry: &Entry, watched: &mut Watched, id: &str) -> Option<
                 }
             }
         }
+    }
+}
+
+/// A finished process, as its tombstone describes it. The shape a live entry
+/// reports, so a caller need not care which side of the end it is looking at.
+fn finished_info(tombstone: records::Tombstone) -> ProcessInfo {
+    ProcessInfo {
+        id: tombstone.id,
+        pid: tombstone.pid,
+        program: tombstone.program,
+        args: tombstone.args,
+        state: tombstone.state,
+        exit_code: tombstone.exit_code,
+        started_unix: tombstone.started_unix,
     }
 }

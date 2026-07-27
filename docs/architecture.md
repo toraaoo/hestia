@@ -994,9 +994,11 @@ supervises launched processes, and manages autostart. The only crate that links
       `process.logs` reads its tail on demand, so log history survives daemon
       restarts. Stops are polite: SIGTERM (the JVM saves and exits), a hard
       kill only after a grace period. Cleanup is lifecycle-driven: a terminal
-      state removes the record but keeps logs for post-mortem, removing the
-      server/instance discards its process dir, and a startup sweep deletes
-      recordless dirs.
+      state replaces the record with a **tombstone** (`exit.json`) so the
+      directory keeps its logs *and* says what it is, removing the
+      server/instance discards its process dir, a startup sweep deletes only
+      directories with neither marker, and retention prunes the oldest
+      tombstoned dirs — see the decision note below.
     - **`event_hub.rs`** — `EventHub` fans daemon events out to subscribed
       connections, filtered by job id, and unsubscribes them on disconnect.
 - **`services/`** — the single wire-in point, one registrar per domain
@@ -1129,6 +1131,36 @@ supervises launched processes, and manages autostart. The only crate that links
 > effect of daemon lifetime. The cost is honest bookkeeping — on-disk records,
 > start-time identity checks, file-based logs — and one observable gap: an
 > adopted process's exit code is unknowable.
+
+> **A finished process is labelled, not merely unrecorded.** Two promises here
+> could not both hold: "a terminal state keeps its logs for post-mortem" and "a
+> startup sweep deletes recordless dirs". A finished process leaves *exactly* a
+> recordless dir — `records::remove` drops `record.json` and leaves the logs — so
+> the sweep destroyed the post-mortem at the next restart, and the guarantee
+> survived only until then. The observable symptom was the odd one: a killed
+> process lingered in `process.list` (in memory only) until an unrelated daemon
+> restart, and that same restart deleted its logs. There was no state in which
+> the list was clean *and* the logs existed.
+>
+> The bug was the sweep's criterion. "Has no `record.json`" was standing in for
+> "is a stray", but it is also the normal resting state of a finished process. So
+> the end is now **explicit on disk**, the disk-is-the-registry discipline used
+> for java runtimes, backups and server records: on exit the record is replaced
+> by a tombstone (`exit.json`: state, exit code, when it ended, and where its
+> logs are, since that is not derivable once the spec is gone). The sweep then
+> deletes only directories with **neither** marker — a true stray, hand-made or
+> half-written — and `TOMBSTONE_KEEP` prunes the oldest finished ones, because
+> "keep the logs" without stated retention means "grow forever" (count-based, as
+> `backup prune` is).
+>
+> `process.list`/`status`/`logs` read terminal entries from the tombstones rather
+> than from memory, so what the daemon reports about a finished process no longer
+> depends on whether it has restarted since — including its logs, which is the
+> whole reason for keeping the directory. A process that died while unsupervised
+> is entombed by `recover()` at the moment it is noticed. The rejected
+> alternatives were exempting process dirs from the sweep (they then accumulate
+> forever, which is what the sweep exists to prevent) and adding a `process.clean`
+> verb (asking the user to resolve a contradiction the daemon should not have).
 
 > **Stopping the daemon has three meanings; the front-end picks one, the wire
 > carries two.** `daemon.stop` takes a boolean `stop_processes`, but a user
