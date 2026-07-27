@@ -111,12 +111,15 @@ impl Worker {
         }
     }
 
+    /// Quit means "stop the daemon, leave the workloads" — the third meaning of
+    /// `daemon stop` (ask) has nowhere to go from a menu item, and a tray quit
+    /// silently killing someone's running server would be the worse guess.
     fn stop_daemon(&mut self) {
         if !self.connect_if_needed() {
             return;
         }
         let c = self.client.as_ref().expect("connected");
-        tracing::info!("quit: stopping the daemon");
+        tracing::info!("quit: stopping the daemon, keeping supervised workloads");
         if let Err(e) = self.rt.block_on(c.daemon().stop(false)) {
             tracing::warn!("daemon stop failed: {e}");
         }

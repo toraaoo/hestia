@@ -13,7 +13,8 @@ pub enum DaemonCmd {
     Status,
     /// Start the daemon
     Start,
-    /// Stop the daemon; supervised processes keep running unless --all
+    /// Stop the daemon; asks what to do with running workloads (--all stops
+    /// them too, --keep leaves them running)
     Stop {
         /// Also stop every supervised process (servers, instances)
         #[arg(long, conflicts_with = "keep")]
@@ -83,6 +84,11 @@ pub async fn run(cmd: DaemonCmd) -> Result<()> {
     Ok(())
 }
 
+/// Resolve what `daemon stop` means this time. Stopping the daemon has three
+/// meanings, not two — stop it alone, stop it with its workloads, or *ask* —
+/// and with workloads running the user's intent is genuinely ambiguous, so an
+/// unqualified stop never guesses: it prompts on a terminal and refuses when
+/// piped, naming both flags. With nothing running there is nothing to decide.
 async fn stop_choice(client: &Client, all: bool, keep: bool) -> Result<(bool, Vec<String>)> {
     if all {
         return Ok((true, Vec::new()));

@@ -370,6 +370,14 @@ hestia daemon stop --all         # stop supervised processes too
 hestia daemon stop --keep        # leave them running (script-safe)
 ```
 
+A plain `hestia daemon stop` with a server or instance running does **not**
+guess: "stop the launcher" says nothing about the server, so it prompts on a
+terminal and, when piped, exits non-zero naming both flags — a script has to
+state which it meant. With nothing running there is nothing to ask and it stops
+immediately. The tray's **Quit** and the desktop's stop button always mean
+`--keep`: neither can ask, and neither should end a running server on your
+behalf.
+
 ## Global flags
 
 Accepted in any position.

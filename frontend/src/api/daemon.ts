@@ -9,7 +9,12 @@ export function status(): Promise<DaemonStatusResult> {
   return call('daemon.status');
 }
 
-/** Without `stopProcesses`, supervised workloads keep running. */
+/**
+ * Stop the daemon. Without `stopProcesses`, supervised workloads keep running —
+ * which is what the shell's stop button means: a running server is not the
+ * app's to end. The CLI's third option (ask which) is a terminal affordance;
+ * a button has to have already decided.
+ */
 export async function stop(stopProcesses = false): Promise<boolean> {
   const result = await call<{ stopping: boolean }>('daemon.stop', {
     stopProcesses,
