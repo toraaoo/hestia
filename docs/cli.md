@@ -370,6 +370,19 @@ hestia daemon stop --all         # stop supervised processes too
 hestia daemon stop --keep        # leave them running (script-safe)
 ```
 
+Underneath the entry verbs sits the supervisor's own view — every workload the
+daemon is running, across servers and instances, keyed the way the supervisor
+keys them. Reach for it when the entry-scoped verbs cannot answer: a server's
+`status` cannot show you an instance session, and neither shows a process whose
+entry was removed out from under it.
+
+```bash
+hestia process list              # everything supervised, with state and pid
+hestia process status server-<id>   # one process (exits 3 when not running)
+hestia process logs instance-<id>_1 -n 50   # its captured output
+hestia process stop server-<id>  # SIGTERM, then a hard kill after the grace
+```
+
 A plain `hestia daemon stop` with a server or instance running does **not**
 guess: "stop the launcher" says nothing about the server, so it prompts on a
 terminal and, when piped, exits non-zero naming both flags — a script has to

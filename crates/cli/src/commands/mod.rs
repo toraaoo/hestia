@@ -10,6 +10,7 @@ pub mod java;
 pub mod lifecycle;
 mod mc;
 pub mod play;
+pub mod process;
 pub mod server;
 pub mod sync;
 mod wizard;

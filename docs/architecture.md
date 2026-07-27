@@ -1197,7 +1197,7 @@ supervises launched processes, and manages autostart. The only crate that links
 A thin client over the daemon, built on clap's derive API. `main.rs` defines a
 `Command` enum — `play`, `account` (alias `auth`), `java`, `server`, `instance`,
 the cross-entry shortcuts `start`/`stop`/`restart`/`logs`, `cache`, `config`,
-`sync`, `daemon` — each a module under `commands/` exposing a `Subcommand` enum and a
+`sync`, `process`, `daemon` — each a module under `commands/` exposing a `Subcommand` enum and a
 `run()`. A domain with many verbs is a directory whose `mod.rs` holds only that
 grammar and dispatch, with one file per verb group: `server/` and `instance/`
 split into their verb groups (`create`, `update`, `config`, `lifecycle`,
@@ -1249,6 +1249,21 @@ stay aligned with the wire channels (`remove`, not `delete`).
 > cross-registry name lookup to avoid. Everything scriptable still has an
 > explicit, unambiguous noun-first form; the shortcuts are additive sugar over
 > it.
+
+> **Every daemon capability gets a scriptable verb, or a written reason it has
+> none.** Diffing the channels registered in `daemon/src/services/` against the
+> CLI grammar found four families with no verb. Three are deliberate and
+> documented — `skin.*`/`cape.*` (picking a skin is visual), `profile.*` and
+> `instance.profile.*` (desktop surfaces by design). Two were drift:
+> `instance.worlds`, reachable only as a side effect of the datapack picker, and
+> the whole `process.*` surface, which nothing but `daemon stop`'s internal
+> workload check ever read. Both now have verbs. The distinction that matters is
+> *stated intent*: a channel with no CLI verb is fine when the architecture says
+> why, and a bug when it does not — so the audit is repeatable rather than a
+> matter of taste. `hestia process` is deliberately the supervisor's own view,
+> keyed by supervisor id, not a second way to drive an entry: it answers the
+> questions the entry-scoped verbs structurally cannot (every workload at once,
+> and a process whose entry was removed under it).
 
 > **`-vv` buys wire visibility, not more volume.** The CLI advertised three
 > verbosity levels but `cli` and `client` contained zero `trace!` statements, so

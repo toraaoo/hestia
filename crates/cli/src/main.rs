@@ -182,6 +182,11 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::sync::SyncCmd,
     },
+    /// Supervised processes, across every server and instance
+    Process {
+        #[command(subcommand)]
+        cmd: commands::process::ProcessCmd,
+    },
     /// Daemon lifecycle
     Daemon {
         #[command(subcommand)]
@@ -243,6 +248,7 @@ async fn dispatch(command: Command) -> anyhow::Result<ExitStatus> {
     match command {
         Command::Daemon { cmd } => return commands::daemon::run(cmd).await,
         Command::Server { cmd } => return commands::server::run(cmd).await,
+        Command::Process { cmd } => return commands::process::run(cmd).await,
         _ => {}
     }
     run_command(command).await.map(|()| ExitStatus::Active)
@@ -321,6 +327,8 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
         Command::Config { cmd } => commands::config::run(cmd).await,
         Command::Sync { cmd } => commands::sync::run(cmd).await,
         // Handled by `dispatch`: these answer with their own exit status.
-        Command::Daemon { .. } | Command::Server { .. } => unreachable!(),
+        Command::Daemon { .. } | Command::Server { .. } | Command::Process { .. } => {
+            unreachable!()
+        }
     }
 }
