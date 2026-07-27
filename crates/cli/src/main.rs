@@ -225,7 +225,7 @@ fn main() -> ExitCode {
     let Some(command) = cli.command else {
         // No subcommand given: show usage.
         let _ = <Cli as clap::CommandFactory>::command().print_help();
-        println!();
+        let _ = std::io::Write::write_all(&mut std::io::stdout(), b"\n");
         return ExitCode::SUCCESS;
     };
 
@@ -234,11 +234,19 @@ fn main() -> ExitCode {
 
     match result {
         Ok(status) => status.code(),
+        Err(e) if is_broken_pipe(&e) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{e:#}");
             ExitCode::FAILURE
         }
     }
+}
+
+fn is_broken_pipe(error: &anyhow::Error) -> bool {
+    error
+        .chain()
+        .filter_map(|e| e.downcast_ref::<std::io::Error>())
+        .any(|e| e.kind() == std::io::ErrorKind::BrokenPipe)
 }
 
 /// Run the command and report how the shell should read it. Only the state

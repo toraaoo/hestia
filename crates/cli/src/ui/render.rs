@@ -24,13 +24,20 @@ pub fn show(view: View) -> Result<()> {
         }
     }
     match view {
-        View::Line(text) => println!("{text}"),
-        View::Note(text) => note(&text),
-        View::Warning(text) => warning(&text),
-        View::Detail(rows) => detail(&rows),
-        View::Table { headers, rows, .. } => print_table(&headers, &rows),
+        View::Line(text) => line(&text)?,
+        View::Note(text) => note(&text)?,
+        View::Warning(text) => warning(&text)?,
+        View::Detail(rows) => detail(&rows)?,
+        View::Table { headers, rows, .. } => print_table(&headers, &rows)?,
     }
     Ok(())
+}
+
+/// Write one line to stdout. Returns rather than panics on a closed pipe, which
+/// is what `println!` does and what made `hestia … | head` a crash report.
+fn line(text: &str) -> io::Result<()> {
+    use std::io::Write;
+    writeln!(io::stdout().lock(), "{text}")
 }
 
 /// Page a table too tall for the terminal in a fullscreen session; `false`
@@ -56,49 +63,47 @@ fn stdout_is_tty() -> bool {
     io::stdout().is_terminal()
 }
 
-fn note(text: &str) {
-    if stdout_is_tty() {
-        println!("{}", text.dark_grey());
-    } else {
-        println!("{text}");
+fn note(text: &str) -> io::Result<()> {
+    match stdout_is_tty() {
+        true => line(&text.dark_grey().to_string()),
+        false => line(text),
     }
 }
 
 /// A warning keeps the `warning:` prefix when redirected, so a script that
 /// captures stdout can still see the operation was degraded.
-fn warning(text: &str) {
-    if stdout_is_tty() {
-        println!("{} {text}", "warning:".yellow());
-    } else {
-        println!("warning: {text}");
+fn warning(text: &str) -> io::Result<()> {
+    match stdout_is_tty() {
+        true => line(&format!("{} {text}", "warning:".yellow())),
+        false => line(&format!("warning: {text}")),
     }
 }
 
-fn detail(rows: &[(String, String)]) {
+fn detail(rows: &[(String, String)]) -> io::Result<()> {
     let width = rows.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
     for (key, value) in rows {
         let label = format!("{key:width$}");
-        if stdout_is_tty() {
-            println!("{}  {value}", label.dark_grey());
-        } else {
-            println!("{label}  {value}");
+        match stdout_is_tty() {
+            true => line(&format!("{}  {value}", label.dark_grey()))?,
+            false => line(&format!("{label}  {value}"))?,
         }
     }
+    Ok(())
 }
 
 /// Print a left-aligned table (the plain path).
-fn print_table(headers: &[String], rows: &[Vec<String>]) {
+fn print_table(headers: &[String], rows: &[Vec<String>]) -> io::Result<()> {
     let header_refs: Vec<&str> = headers.iter().map(String::as_str).collect();
     let widths = column_widths(&header_refs, rows);
     let header = render_row(&header_refs, &widths);
-    if stdout_is_tty() {
-        println!("{}", header.dark_grey());
-    } else {
-        println!("{header}");
+    match stdout_is_tty() {
+        true => line(&header.dark_grey().to_string())?,
+        false => line(&header)?,
     }
     for row in rows {
-        println!("{}", render_row(row, &widths));
+        line(&render_row(row, &widths))?;
     }
+    Ok(())
 }
 
 /// The width each column must be padded to: the widest of its header and cells.
