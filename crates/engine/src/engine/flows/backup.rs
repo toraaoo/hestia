@@ -32,7 +32,7 @@ impl Engine {
             .servers
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
-        if !record.ready {
+        if !record.ready() {
             bail!("server '{}' is still provisioning", record.name);
         }
         let _claim = self.claim_backup(format!("server-{}", record.id))?;
@@ -80,7 +80,7 @@ impl Engine {
             .servers
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
-        if !record.ready {
+        if !record.ready() {
             bail!("server '{}' is still provisioning", record.name);
         }
         let _claim = self.claim_backup(format!("server-{}", record.id))?;

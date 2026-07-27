@@ -1,7 +1,7 @@
 //! Behaviour-parity tests for the pure-filesystem engine stores (config, cache,
 //! servers, instances).
 
-use engine::{Cache, Config, Instances, Servers};
+use engine::{Cache, Config, Instances, ServerPhase, Servers};
 use proto::download::{Checksum, HashAlgorithm};
 use proto::minecraft::{InstanceProfile, ServerProfile};
 
@@ -96,7 +96,7 @@ fn servers_store_round_trips_records() {
         "id is an opaque uuid, not the slug: {}",
         record.id
     );
-    assert!(!record.ready);
+    assert!(!record.ready());
     assert!(record.game_port.is_some());
     let entry_dir = servers.server_dir(&record);
     assert!(entry_dir.is_dir());
@@ -119,7 +119,7 @@ fn servers_store_round_trips_records() {
     assert!(servers.remove(&second.id).unwrap());
 
     let ready = servers.mark_ready(&record.id).unwrap();
-    assert!(ready.ready);
+    assert!(ready.ready());
     assert_eq!(servers.get(&record.id).unwrap().name, "My Server!");
     assert_eq!(servers.get("My Server!").unwrap().id, record.id);
     // A reference resolves by any spelling that slugs to the name.
@@ -132,6 +132,54 @@ fn servers_store_round_trips_records() {
     assert!(servers.remove(&record.id).unwrap());
     assert!(!servers.remove(&record.id).unwrap());
     assert!(servers.list().is_empty());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn recovery_discards_a_half_created_server_but_never_a_half_updated_one() {
+    let dir = temp_dir("server-reconcile");
+    let servers = Servers::new(dir.join("servers"));
+    let profile = ServerProfile {
+        flavor: "vanilla".into(),
+        game_version: "1.21.1".into(),
+        ..Default::default()
+    };
+
+    // What a daemon killed mid-create leaves: registered to hold its port
+    // claim, never provisioned, and — before this — un-startable forever.
+    let orphan = servers
+        .create("Half Created", profile.clone(), None)
+        .unwrap();
+    assert_eq!(orphan.phase, ServerPhase::Provisioning);
+
+    // A ready server, and one caught mid-update: the latter was ready before,
+    // so its world is on disk and discarding it would destroy real data.
+    let ready = servers.create("Fine", profile.clone(), None).unwrap();
+    servers.mark_ready(&ready.id).unwrap();
+    let updating = servers.create("Mid Update", profile, None).unwrap();
+    servers.mark_ready(&updating.id).unwrap();
+    servers
+        .mark_phase(&updating.id, ServerPhase::Updating)
+        .unwrap();
+
+    let discarded = servers.reconcile();
+    assert_eq!(discarded, vec!["Half Created".to_string()]);
+    assert!(servers.get(&orphan.id).is_none(), "the orphan is gone");
+    assert!(!servers.server_dir(&orphan).exists());
+
+    assert!(servers.get(&ready.id).unwrap().ready());
+    let survivor = servers
+        .get(&updating.id)
+        .expect("a mid-update server stays");
+    assert_eq!(
+        survivor.phase,
+        ServerPhase::Updating,
+        "its phase is kept, so updating again is what recovers it"
+    );
+    assert!(!survivor.ready(), "and it stays un-startable until then");
+
+    // Recovery is idempotent: a second pass has nothing left to discard.
+    assert!(servers.reconcile().is_empty());
     std::fs::remove_dir_all(&dir).ok();
 }
 

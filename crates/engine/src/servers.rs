@@ -47,15 +47,33 @@ pub struct RconConfig {
     pub password: String,
 }
 
+/// Where a server is in its lifecycle. The disk is the registry, so this has to
+/// survive a crash *and* say which kind of unfinished it is: a create that never
+/// completed holds nothing of the user's and is an orphan to discard, while an
+/// update that never completed belongs to a real server with a world and must be
+/// left alone. A single `ready: bool` conflated the two, and a daemon killed
+/// mid-create left a permanently un-startable entry nothing ever reconciled.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ServerPhase {
+    /// The create job is still provisioning files; nothing here is the user's.
+    #[default]
+    Provisioning,
+    /// Fully provisioned and startable.
+    Ready,
+    /// A version update is in flight over an entry that was ready — it has a
+    /// world, so it is never discarded; updating again recovers it.
+    Updating,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerRecord {
     pub id: String,
     pub name: String,
     pub created_unix: i64,
-    /// False until the create job has finished provisioning files.
     #[serde(default)]
-    pub ready: bool,
+    pub phase: ServerPhase,
     /// Claimed at create and never moved — players connect to it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub game_port: Option<u16>,
@@ -70,6 +88,13 @@ pub struct ServerRecord {
     #[serde(default)]
     pub backup: BackupSettings,
     pub profile: ServerProfile,
+}
+
+impl ServerRecord {
+    /// Whether the server can be started: fully provisioned, nothing in flight.
+    pub fn ready(&self) -> bool {
+        self.phase == ServerPhase::Ready
+    }
 }
 
 pub struct Servers {
@@ -156,7 +181,7 @@ impl Servers {
             id,
             name: name.to_string(),
             created_unix: registry::now_unix(),
-            ready: false,
+            phase: ServerPhase::Provisioning,
             game_port: Some(game_port),
             rcon: None,
             jvm: JavaSettings::default(),
@@ -390,10 +415,14 @@ impl Servers {
             .get(id)
             .with_context(|| format!("unknown server: {id}"))?;
         let previous_primary = record.profile.primary.filename.clone();
+        materialize::validate_filename(&profile.primary.filename)?;
+        // Mark the phase before the profile swap, so a crash anywhere in the
+        // update leaves a record that says "updating" rather than one that looks
+        // finished — startup recovery keeps it and updating again finishes it.
+        self.mark_phase(id, ServerPhase::Updating)?;
         record.profile = profile;
-        record.ready = false;
+        record.phase = ServerPhase::Updating;
         let data = self.data_dir(&record);
-        materialize::validate_filename(&record.profile.primary.filename)?;
         registry::write_record(&self.server_dir(&record), RECORD, &record)?;
 
         if !record.profile.libraries.is_empty() {
@@ -436,12 +465,58 @@ impl Servers {
     }
 
     pub fn mark_ready(&self, id: &str) -> Result<ServerRecord> {
+        self.mark_phase(id, ServerPhase::Ready)
+    }
+
+    /// Move a server to another lifecycle phase, persisted immediately — the
+    /// disk is the registry, and startup recovery reads exactly this.
+    pub fn mark_phase(&self, id: &str, phase: ServerPhase) -> Result<ServerRecord> {
         let mut record = self
             .get(id)
             .with_context(|| format!("unknown server: {id}"))?;
-        record.ready = true;
+        record.phase = phase;
         registry::write_record(&self.server_dir(&record), RECORD, &record)?;
         Ok(record)
+    }
+
+    /// Reconcile records a crash left mid-lifecycle. No job survives a restart,
+    /// so anything still `Provisioning` belongs to a create that will never
+    /// finish — an entry that never existed as far as the user is concerned, and
+    /// which otherwise persists forever as an un-startable orphan holding a port
+    /// claim. It is discarded, the same conclusion `provision_server` reaches
+    /// when the create fails while the daemon is alive.
+    ///
+    /// An `Updating` record is left alone: it was a real, ready server before
+    /// the update began, so its world is on disk. Updating it again recovers it.
+    /// Returns the names discarded.
+    pub fn reconcile(&self) -> Vec<String> {
+        let mut discarded = Vec::new();
+        for record in self.list() {
+            match record.phase {
+                ServerPhase::Ready => {}
+                ServerPhase::Updating => tracing::warn!(
+                    id = %record.id,
+                    name = %record.name,
+                    "server was mid-update when the daemon stopped; update it again to finish"
+                ),
+                ServerPhase::Provisioning => {
+                    tracing::warn!(
+                        id = %record.id,
+                        name = %record.name,
+                        "discarding a server whose create never finished"
+                    );
+                    match self.remove(&record.id) {
+                        Ok(_) => discarded.push(record.name),
+                        Err(e) => tracing::warn!(
+                            id = %record.id,
+                            error = format!("{e:#}"),
+                            "cannot discard an unprovisioned server"
+                        ),
+                    }
+                }
+            }
+        }
+        discarded
     }
 
     /// Rename a server: rewrite the display name and move its directory to the

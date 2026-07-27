@@ -124,7 +124,7 @@ impl Engine {
             .servers
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
-        if !record.ready {
+        if !record.ready() {
             anyhow::bail!("server '{}' is still provisioning", record.name);
         }
         let record = self.servers.ensure_start_config(&record.id)?;

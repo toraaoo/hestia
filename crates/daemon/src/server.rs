@@ -31,9 +31,10 @@ pub async fn run_daemon(log_path: std::path::PathBuf) -> i32 {
         "hestiad starting"
     );
     runtime.processes().recover();
-    // Recovery's other half: a process record can be re-adopted, but a temp
-    // artifact whose job is gone cannot — reclaim before anything writes.
-    runtime.engine().reclaim_temp();
+    // Recovery's other half: a process can be re-adopted, but a job cannot —
+    // so its leftovers (temp artifacts, a record still mid-create) are settled
+    // before anything else writes.
+    runtime.engine().recover();
     crate::runtime::spawn_backup_scheduler(runtime.clone());
     crate::runtime::spawn_metrics_sampler(runtime.clone());
     let router = Arc::new(make_router());

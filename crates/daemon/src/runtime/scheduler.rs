@@ -32,7 +32,7 @@ async fn run_due_backups(runtime: &Runtime) {
         let Some(interval) = record.backup.interval() else {
             continue;
         };
-        if !record.ready {
+        if !record.ready() {
             continue;
         }
         let running = runtime

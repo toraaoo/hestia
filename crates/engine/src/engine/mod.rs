@@ -99,12 +99,21 @@ impl Engine {
         self.data_home.lock().unwrap().clone()
     }
 
+    /// Everything a restart invalidates. No job survives a daemon stop, so at
+    /// startup any half-finished state on disk belongs to a job that will never
+    /// come back to finish it: temp artifacts have no owner, and a record still
+    /// mid-create is an entry that never came into existence. Call once the data
+    /// home is settled, before serving.
+    pub fn recover(&self) {
+        self.reclaim_temp();
+        self.servers.reconcile();
+    }
+
     /// Reclaim every abandoned temp artifact in the data home. A `.part` or
     /// `.staging` artifact is only valid while its job holds the matching
     /// in-flight claim, and no claim survives a restart — so at startup each of
-    /// these belongs to a job that will never finish. Call once the data home is
-    /// settled, before serving.
-    pub fn reclaim_temp(&self) {
+    /// these belongs to a job that will never finish.
+    fn reclaim_temp(&self) {
         let mut freed = self.java.reclaim();
         for record in self.servers.list() {
             freed += crate::backup::reclaim(&self.servers.server_dir(&record));
@@ -135,9 +144,9 @@ impl Engine {
         self.profiles.reload(resolved.join("profiles"));
         *self.data_home.lock().unwrap() = resolved.clone();
         tracing::info!(home = %resolved.display(), "engine data home changed");
-        // The new home may carry artifacts from whichever daemon last used it;
-        // no job of ours holds a claim on them either.
-        self.reclaim_temp();
+        // The new home may carry half-finished state from whichever daemon last
+        // used it; no job of ours owns any of it either.
+        self.recover();
         Ok(resolved)
     }
 

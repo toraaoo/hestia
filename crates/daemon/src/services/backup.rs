@@ -15,7 +15,7 @@ use crate::runtime::{server_process_id, BackupJob, Channels};
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<ServerBackupCreate, _, _>(|p, ctx| async move {
         let record = find_server(&ctx, &p.server)?;
-        if !record.ready {
+        if !record.ready() {
             return Err(ErrorInfo::Provisioning {
                 name: record.name.clone(),
             });

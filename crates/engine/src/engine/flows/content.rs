@@ -309,7 +309,7 @@ impl Engine {
             .servers
             .get(reference)
             .with_context(|| format!("unknown server: {reference}"))?;
-        if !record.ready {
+        if !record.ready() {
             bail!(proto::error::ErrorInfo::Provisioning {
                 name: record.name.clone()
             });

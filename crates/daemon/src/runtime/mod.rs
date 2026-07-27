@@ -51,6 +51,7 @@ pub fn server_info(
     record: ServerRecord,
     process: Option<proto::process::ProcessInfo>,
 ) -> ServerInfo {
+    let ready = record.ready();
     ServerInfo {
         id: record.id,
         name: record.name,
@@ -59,7 +60,7 @@ pub fn server_info(
         loader_version: record.profile.loader_version,
         java_major: record.profile.java_major,
         created_unix: record.created_unix,
-        ready: record.ready,
+        ready,
         game_port: record.game_port,
         console: record.rcon.is_some(),
         process,
