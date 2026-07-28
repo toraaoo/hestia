@@ -154,6 +154,11 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::content::BrowseCmd,
     },
+    /// Browse server plugins on a content source
+    Plugin {
+        #[command(subcommand)]
+        cmd: commands::content::BrowseCmd,
+    },
     /// Search mods on a content source (alias for `mod search`)
     Search {
         /// Search terms
@@ -308,6 +313,9 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
         }
         Command::Datapack { cmd } => {
             commands::content::run_browse(client::proto::content::ContentKind::DataPack, cmd).await
+        }
+        Command::Plugin { cmd } => {
+            commands::content::run_browse(client::proto::content::ContentKind::Plugin, cmd).await
         }
         Command::Search {
             query,

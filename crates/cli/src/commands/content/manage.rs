@@ -215,7 +215,7 @@ async fn add_session(
         .await?;
     let base = SearchQuery {
         kind,
-        loader: (kind == ContentKind::Mod).then(|| info.flavor.clone()),
+        loader: matches!(kind, ContentKind::Mod | ContentKind::Plugin).then(|| info.flavor.clone()),
         game_version: Some(info.game_version.clone()),
         limit: PAGE,
         ..SearchQuery::default()

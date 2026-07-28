@@ -133,6 +133,11 @@ enum ServerAction {
         #[command(subcommand)]
         cmd: ContentCmd,
     },
+    /// Install, list, remove, or update the server's plugins
+    Plugin {
+        #[command(subcommand)]
+        cmd: ContentCmd,
+    },
     /// Install, list, remove, or update the server's datapacks
     Datapack {
         #[command(subcommand)]
@@ -234,6 +239,9 @@ async fn run_unit_action(client: Client, name: String, action: ServerAction) -> 
         ServerAction::Backup { cmd } => backup::run(&client, &name, cmd).await,
         ServerAction::Mod { cmd } => {
             content::run_entry(&client, EntryKind::Server, ContentKind::Mod, &name, cmd).await
+        }
+        ServerAction::Plugin { cmd } => {
+            content::run_entry(&client, EntryKind::Server, ContentKind::Plugin, &name, cmd).await
         }
         ServerAction::Datapack { cmd } => {
             content::run_entry(
