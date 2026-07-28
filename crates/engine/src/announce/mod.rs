@@ -327,6 +327,23 @@ mod tests {
         assert!(verify_and_parse("not json", Trust::Unchecked).is_err());
     }
 
+    /// Output of `scripts/announce.sh --sign`; regenerate it on a key rotation.
+    const SIGNED_FEED: &str = include_str!("fixtures/signed-feed.json");
+
+    #[test]
+    fn a_feed_from_the_publishing_pipeline_verifies_against_the_compiled_key() {
+        let feed = verify_and_parse(SIGNED_FEED, Trust::Signed)
+            .expect("the fixture verifies against ANNOUNCE_PUBKEY");
+        assert!(!feed.entries.is_empty());
+    }
+
+    #[test]
+    fn a_tampered_payload_is_refused() {
+        let tampered = SIGNED_FEED.replace("news feed", "n3ws feed");
+        assert_ne!(tampered, SIGNED_FEED);
+        assert!(verify_and_parse(&tampered, Trust::Signed).is_err());
+    }
+
     #[test]
     fn the_real_endpoint_always_demands_a_signature() {
         // The waiver is reachable only through an overridden endpoint, so the

@@ -32,13 +32,20 @@ case "$mode" in
   --sign)
     : "${ANNOUNCE_SIGNING_KEY:?ANNOUNCE_SIGNING_KEY is not set}"
     tmp="$(mktemp -d)"
+    chmod 700 "$tmp"
     trap 'rm -rf "$tmp"' EXIT
     printf '%s' "$payload" > "$tmp/payload.json"
-    printf '%s' "$ANNOUNCE_SIGNING_KEY" > "$tmp/key"
-    # minisign writes a two-line document; the wire carries it base64-wrapped,
-    # matching how tauri's signer hands over an artifact signature.
-    minisign -S -s "$tmp/key" -m "$tmp/payload.json" -x "$tmp/payload.sig" \
-      ${ANNOUNCE_SIGNING_KEY_PASSWORD:+-W} > /dev/null
+    # The secret is stored base64-wrapped, exactly as `tauri signer generate`
+    # writes it (and as TAURI_SIGNING_PRIVATE_KEY holds its own), so setting the
+    # secret is a straight copy of the file. minisign wants the raw document.
+    printf '%s' "$ANNOUNCE_SIGNING_KEY" | base64 -d > "$tmp/key"
+    # minisign only ever reads the password from stdin, so it is piped rather
+    # than passed as an argument — an argument would be visible in the process
+    # list. An unencrypted key still works: it ignores the input.
+    printf '%s' "${ANNOUNCE_SIGNING_KEY_PASSWORD:-}" \
+      | minisign -S -s "$tmp/key" -m "$tmp/payload.json" -x "$tmp/payload.sig" > /dev/null
+    # Wrapped to match how the engine's verifier (and tauri's own signer) hands
+    # a signature over: base64 around the whole minisign document.
     signature="$(base64 -w0 < "$tmp/payload.sig")"
     jq -n --arg s "$signature" --arg p "$payload" '{signature: $s, payload: $p}'
     ;;

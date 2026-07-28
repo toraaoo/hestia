@@ -60,16 +60,16 @@ pub const ANNOUNCE_ENDPOINT: &str =
 /// a commit, so the lower-stakes artifact gets its own trust root: a compromised
 /// announcement key can say things, never ship code.
 ///
-/// Generate with `minisign -G`, keep the private half offline, and paste the
-/// public half here. **An empty key set fails closed** — the engine refuses an
-/// unverifiable feed rather than trusting it — so announcements simply do not
-/// appear until this is filled in.
-pub const ANNOUNCE_PUBKEY: &str = "";
+/// Generated with `cargo tauri signer generate` (which writes the public half
+/// already base64-wrapped, so it is pasted here verbatim). **An empty key set
+/// fails closed** — the engine refuses an unverifiable feed rather than
+/// trusting it — so announcements do not appear until this is filled in.
+pub const ANNOUNCE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM5NTNFNDNFMDM2ODJBOEMKUldTTUttZ0RQdVJUT1RhdTBLTU9UMW4rbnkvQnpRdzN1K1JiNGhTVUxFWGZFdjFUeSs2bUI2UTQK";
 
 /// The announcement rotation spare, with the same rules as [`UPDATE_PUBKEY_NEXT`]:
 /// a binary trusts only what is compiled into it, so the successor must ship
 /// before it is needed.
-pub const ANNOUNCE_PUBKEY_NEXT: &str = "";
+pub const ANNOUNCE_PUBKEY_NEXT: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg2QzZFMjFENTFDOUQ5MDYKUldRRzJjbFJIZUxHaGxaRXgzTjlTd0N4SDlaazN6QWhTWHJrZGhoby8wMTRQY05ZYisyaDlRYkMK";
 
 /// Every key the announcement feed may be signed with, newest last.
 pub fn announce_pubkeys() -> impl Iterator<Item = &'static str> {
