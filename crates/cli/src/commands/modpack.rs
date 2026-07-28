@@ -60,7 +60,7 @@ pub struct InstallArgs {
     #[arg(
         short = 'S',
         long,
-        help = "Content source to resolve the pack on (default: modrinth)"
+        help = "Content source to resolve the pack on (default: the first configured one)"
     )]
     pub source: Option<String>,
     #[arg(long, help = "Accept the Minecraft EULA (creating a server)")]

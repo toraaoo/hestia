@@ -17,7 +17,7 @@ use super::super::content::entry::{content_target, EntryContent, EntrySide};
 use super::super::phase_progress;
 use super::{pack_display_name, FileIdentity};
 use crate::cancel::Job;
-use crate::content::{install, modpack, mrpack};
+use crate::content::{install, modpack, pack};
 use crate::engine::Engine;
 use crate::minecraft::materialize;
 use crate::registry;
@@ -31,14 +31,14 @@ impl Engine {
         ctx: &EntryContent,
         resolved: &ResolvedModpack,
         project: Option<&ContentProject>,
-        archive: &mut mrpack::Archive,
+        archive: &mut pack::Archive,
         job: &Job<'_>,
     ) -> Result<(InstalledModpack, Vec<ContentFailure>, Vec<WarningInfo>)> {
         self.ensure_entry_matches(ctx, resolved)?;
         let previous = modpack::load(&ctx.entry_dir);
         let side = match ctx.side {
-            EntrySide::Server => mrpack::Side::Server,
-            EntrySide::Client => mrpack::Side::Client,
+            EntrySide::Server => pack::Side::Server,
+            EntrySide::Client => pack::Side::Client,
         };
         let accepts = self.accepted_kinds(ctx);
         let mut warnings = Vec::new();
@@ -150,7 +150,7 @@ impl Engine {
         job: &Job<'_>,
     ) -> (Vec<InstalledContent>, Vec<ContentFailure>) {
         let mut refs = self.identify(&resolved.source, files);
-        let catalogue = self.hydrate(&resolved.source, &refs).await;
+        let catalogue = self.hydrate(&resolved.source, &mut refs).await;
 
         let mut items = Vec::new();
         let mut failures = Vec::new();

@@ -33,7 +33,7 @@ use proto::warning::WarningInfo;
 use super::content::entry::{EntryContent, EntrySide};
 use crate::cancel::Job;
 use crate::content::provider::FileRef;
-use crate::content::{install, modpack, mrpack};
+use crate::content::{install, modpack, pack};
 use crate::engine::{Engine, ServerCreateSpec, ServerUpdateSpec};
 
 /// What a finished install or update produced. `entry` is the entry's id —
@@ -233,7 +233,7 @@ impl Engine {
         reference: &str,
         resolved: &ResolvedModpack,
         project: Option<&ContentProject>,
-        archive: &mut mrpack::Archive,
+        archive: &mut pack::Archive,
         job: &Job<'_>,
     ) -> Result<ModpackOutcome> {
         let (record, ctx) = self.instance_content_ctx(reference)?;
@@ -254,7 +254,7 @@ impl Engine {
         reference: &str,
         resolved: &ResolvedModpack,
         project: Option<&ContentProject>,
-        archive: &mut mrpack::Archive,
+        archive: &mut pack::Archive,
         job: &Job<'_>,
     ) -> Result<ModpackOutcome> {
         let (record, ctx) = self.server_content_ctx(reference)?;

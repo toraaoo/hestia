@@ -16,13 +16,13 @@ use proto::modpack::{InstalledModpack, ModpackRef};
 use super::super::content::entry::{EntryContent, EntrySide};
 use super::super::phase_progress;
 use crate::cancel::Job;
-use crate::content::mrpack;
+use crate::content::pack;
 use crate::content::provider::FileRef;
 use crate::engine::Engine;
 
 /// A pack ready to install: its manifest, the project detail it has when it came
 /// from a catalogue, and the archive its `overrides/` live in.
-pub(super) type FetchedPack = (ResolvedModpack, Option<ContentProject>, mrpack::Archive);
+pub(super) type FetchedPack = (ResolvedModpack, Option<ContentProject>, pack::Archive);
 
 /// What the catalogue knows about the pack's files, looked up in bulk. Empty
 /// where the source could not be reached — the install proceeds regardless.
@@ -106,7 +106,7 @@ impl Engine {
 
         if !reference.path.is_empty() {
             let path = Path::new(&reference.path);
-            let mut archive = mrpack::Archive::read(path)?;
+            let mut archive = pack::Archive::read(path)?;
             let mut resolved = archive.index()?;
             resolved.source = "file".to_string();
             if resolved.name.is_empty() {
@@ -149,7 +149,7 @@ impl Engine {
         let version = self.pick_pack_version(&source, &project.id, &pin).await?;
         job.check()?;
         let (resolved, bytes) = self.content.fetch_modpack(&source, &version).await?;
-        Ok((resolved, Some(project), mrpack::Archive::open(bytes)?))
+        Ok((resolved, Some(project), pack::Archive::open(bytes)?))
     }
 
     /// The pack an update moves to: the same project at another (or the newest)
@@ -198,6 +198,17 @@ impl Engine {
                 .find(|v| v.channel == ReleaseChannel::Release)
                 .or_else(|| versions.first()),
         };
+        // A pin the listing did not carry may still be a version id — a URL
+        // pins one directly, and a long-published pack's list is paged. Asking
+        // for it by id is the same request either way, so it costs a miss.
+        if picked.is_none() && !pin.is_empty() {
+            let pinned = [pin.to_string()];
+            if let Ok(found) = self.content.versions_by_id(source, &pinned).await {
+                if let Some(version) = found.into_iter().next() {
+                    return Ok(version.id);
+                }
+            }
+        }
         picked.map(|v| v.id.clone()).ok_or_else(|| {
             ErrorInfo::VersionNotFound {
                 reference: match pin.is_empty() {
@@ -224,40 +235,67 @@ impl Engine {
         out
     }
 
-    /// Two bulk lookups for everything the pack's files belong to — projects by
-    /// id for the titles and icons, versions by id for the version *numbers* —
+    /// Two bulk lookups for everything the pack's files belong to — versions by
+    /// id for the version *numbers*, projects by id for the titles and icons —
     /// so the pool reads like ordinary installed content rather than a hundred
     /// bare filenames. Best-effort in both halves: a pack still installs when
     /// the catalogue is unreachable, it just reads less well.
-    pub(super) async fn hydrate(&self, source: &str, refs: &HashMap<&str, FileRef>) -> Catalogue {
-        let mut projects: Vec<String> = refs.values().map(|r| r.project_id.clone()).collect();
+    ///
+    /// Versions are looked up first because a source may name only the file in
+    /// its download URLs (CurseForge does): the file is what knows its project,
+    /// so `refs` are completed from the answer before the projects are asked
+    /// for.
+    pub(super) async fn hydrate(
+        &self,
+        source: &str,
+        refs: &mut HashMap<&str, FileRef>,
+    ) -> Catalogue {
+        let mut wanted: Vec<String> = refs
+            .values()
+            .map(|r| r.version_id.clone())
+            .filter(|id| !id.is_empty())
+            .collect();
+        wanted.sort();
+        wanted.dedup();
+        let found = match self.content.versions_by_id(source, &wanted).await {
+            Ok(found) => found,
+            Err(e) => {
+                tracing::warn!(error = %e, count = wanted.len(), "cannot look up modpack versions");
+                Vec::new()
+            }
+        };
+        for reference in refs.values_mut() {
+            if !reference.project_id.is_empty() {
+                continue;
+            }
+            if let Some(version) = found.iter().find(|v| v.id == reference.version_id) {
+                reference.project_id = version.project_id.clone();
+            }
+        }
+
+        let mut projects: Vec<String> = refs
+            .values()
+            .map(|r| r.project_id.clone())
+            .filter(|id| !id.is_empty())
+            .collect();
         projects.sort();
         projects.dedup();
-        if projects.is_empty() {
-            return Catalogue::default();
-        }
-        let mut versions: Vec<String> = refs.values().map(|r| r.version_id.clone()).collect();
-        versions.sort();
-        versions.dedup();
 
         Catalogue {
-            projects: match self.content.projects(source, &projects).await {
-                Ok(found) => found.into_iter().map(|p| (p.id.clone(), p)).collect(),
-                Err(e) => {
-                    tracing::warn!(error = %e, count = projects.len(), "cannot look up modpack projects");
-                    HashMap::new()
-                }
+            projects: match projects.is_empty() {
+                true => HashMap::new(),
+                false => match self.content.projects(source, &projects).await {
+                    Ok(found) => found.into_iter().map(|p| (p.id.clone(), p)).collect(),
+                    Err(e) => {
+                        tracing::warn!(error = %e, count = projects.len(), "cannot look up modpack projects");
+                        HashMap::new()
+                    }
+                },
             },
-            versions: match self.content.versions_by_id(source, &versions).await {
-                Ok(found) => found
-                    .into_iter()
-                    .map(|v| (v.id.clone(), v.version_number))
-                    .collect(),
-                Err(e) => {
-                    tracing::warn!(error = %e, count = versions.len(), "cannot look up modpack versions");
-                    HashMap::new()
-                }
-            },
+            versions: found
+                .into_iter()
+                .map(|v| (v.id, v.version_number))
+                .collect(),
         }
     }
 }

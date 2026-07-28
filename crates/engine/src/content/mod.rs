@@ -10,7 +10,7 @@ pub(crate) mod inspect;
 pub(crate) mod install;
 pub(crate) mod modpack;
 mod modrinth;
-pub(crate) mod mrpack;
+pub(crate) mod pack;
 pub(crate) mod profiles;
 pub(crate) mod provider;
 

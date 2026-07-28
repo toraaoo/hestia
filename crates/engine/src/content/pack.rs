@@ -1,11 +1,22 @@
-//! The `.mrpack` archive format: a zip carrying `modrinth.index.json` (the
-//! manifest of files to fetch) beside the `overrides/`, `client-overrides/` and
-//! `server-overrides/` trees the pack writes straight into the game directory.
+//! A modpack archive: the zip a pack is distributed as, and the trees inside it
+//! the pack writes straight into the game directory.
+//!
+//! Two formats are read here, because the install path asks both the same
+//! question — which entries are game-directory files? Modrinth's `.mrpack`
+//! carries `modrinth.index.json` beside fixed `overrides/`, `client-overrides/`
+//! and `server-overrides/` trees; CurseForge's carries a `manifest.json` that
+//! *names* its single overrides tree (usually `overrides`, but the author
+//! chooses). An archive knows its own format, so no caller has to be told which
+//! platform served it.
+//!
+//! Only the `.mrpack` index is parsed here. A CurseForge manifest lists its
+//! files by project and file id, which only that platform's API can resolve into
+//! downloads, so its manifest is read in `curseforge.rs` where the API lives.
 //!
 //! Deliberately platform-agnostic. A pack picked off disk has no source, and the
-//! provider that serves packs over HTTP parses the same bytes — so the format
-//! lives here rather than inside `modrinth.rs`, which keeps only the API calls
-//! that fetch it.
+//! provider that serves packs over HTTP parses the same bytes — so the formats
+//! live here rather than inside a provider, which keeps only the API calls that
+//! fetch them.
 
 use std::io::{Cursor, Read};
 use std::path::{Component, Path, PathBuf};
@@ -20,6 +31,8 @@ use crate::cancel::Job;
 use crate::checksum::Hasher;
 
 const INDEX: &str = "modrinth.index.json";
+const MANIFEST: &str = "manifest.json";
+const DEFAULT_OVERRIDES: &str = "overrides";
 
 /// The dependency keys that name a modloader, newest-preferred order. The loader
 /// name is the key with any `-loader` suffix stripped.
@@ -34,7 +47,7 @@ pub enum Side {
 }
 
 impl Side {
-    /// The override tree that belongs to this side alone. The shared
+    /// The `.mrpack` override tree that belongs to this side alone. The shared
     /// `overrides/` tree applies to both and is written first, so a side tree
     /// wins where the two name the same path.
     fn overrides_dir(self) -> &'static str {
@@ -63,21 +76,32 @@ pub struct WrittenOverride {
     pub sha1: String,
 }
 
-/// An opened `.mrpack`, read from memory. Pack archives are indexes and configs
-/// — references rather than embedded jars — so holding one in memory is cheap;
-/// each override is streamed to disk individually rather than all at once.
+/// Which format an archive is in — what its override trees are called, and
+/// whether its manifest can be read without the serving platform's help.
+enum Format {
+    /// Modrinth's, whose trees the spec fixes.
+    Mrpack,
+    /// CurseForge's, which names its single tree in the manifest.
+    CurseForge { overrides: String },
+}
+
+/// An opened pack archive, read from memory. Pack archives are indexes and
+/// configs — references rather than embedded jars — so holding one in memory is
+/// cheap; each override is streamed to disk individually rather than all at once.
 pub struct Archive {
     zip: zip::ZipArchive<Cursor<Vec<u8>>>,
+    format: Format,
 }
 
 impl Archive {
     pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        let zip = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| {
+        let mut zip = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| {
             anyhow::Error::from(proto::error::ErrorInfo::ModpackInvalid {
                 detail: format!("not a valid archive: {e}"),
             })
         })?;
-        Ok(Archive { zip })
+        let format = detect(&mut zip);
+        Ok(Archive { zip, format })
     }
 
     pub fn read(path: &Path) -> Result<Self> {
@@ -89,6 +113,14 @@ impl Archive {
     /// The pack's manifest. Ids are left empty — only the platform that served
     /// the archive knows them, and a pack read off disk has none.
     pub fn index(&mut self) -> Result<ResolvedModpack> {
+        if let Format::CurseForge { .. } = self.format {
+            bail!(proto::error::ErrorInfo::ModpackInvalid {
+                detail: "a CurseForge pack names its files by id, which only \
+                         CurseForge can resolve — install it from the source \
+                         rather than from a file"
+                    .to_string(),
+            });
+        }
         let entry = self.zip.by_name(INDEX).map_err(|_| {
             anyhow::Error::from(proto::error::ErrorInfo::ModpackInvalid {
                 detail: format!("{INDEX} is missing from the archive"),
@@ -100,6 +132,20 @@ impl Archive {
             })
         })?;
         parse_index(&index)
+    }
+
+    /// The override trees to write out, in the order they are written — a later
+    /// one wins where two name the same path, which is what `.mrpack`'s
+    /// side-specific tree is for. A CurseForge pack has the one its manifest
+    /// names and nothing side-specific: the format says nothing about sides.
+    fn overrides_dirs(&self, side: Side) -> Vec<String> {
+        match &self.format {
+            Format::Mrpack => vec![
+                DEFAULT_OVERRIDES.to_string(),
+                side.overrides_dir().to_string(),
+            ],
+            Format::CurseForge { overrides } => vec![overrides.clone()],
+        }
     }
 
     /// Write the pack's own game-directory files for `side` into `dest`,
@@ -117,7 +163,8 @@ impl Archive {
         mut keep: impl FnMut(&str) -> bool,
     ) -> Result<Vec<WrittenOverride>> {
         let mut planned: Vec<(usize, String)> = Vec::new();
-        for prefix in ["overrides", side.overrides_dir()] {
+        for prefix in self.overrides_dirs(side) {
+            let prefix = prefix.as_str();
             for i in 0..self.zip.len() {
                 let entry = self
                     .zip
@@ -198,6 +245,30 @@ impl Archive {
             .with_context(|| format!("cannot place {}", target.display()))?;
         Ok(hasher.hex_digest())
     }
+}
+
+/// Which format the zip is in, by what it carries. A `modrinth.index.json` is
+/// conclusive; a CurseForge manifest identifies itself by `manifestType`, and
+/// names the overrides tree it ships. Anything else is left as `.mrpack` so the
+/// missing-index error is what a caller sees, rather than a guess.
+fn detect(zip: &mut zip::ZipArchive<Cursor<Vec<u8>>>) -> Format {
+    if zip.by_name(INDEX).is_ok() {
+        return Format::Mrpack;
+    }
+    let Ok(entry) = zip.by_name(MANIFEST) else {
+        return Format::Mrpack;
+    };
+    let Ok(manifest) = serde_json::from_reader::<_, Value>(entry) else {
+        return Format::Mrpack;
+    };
+    if str_field(&manifest, "manifestType") != "minecraftModpack" {
+        return Format::Mrpack;
+    }
+    let overrides = match manifest.get("overrides").and_then(Value::as_str) {
+        Some(dir) if !dir.trim().is_empty() => dir.trim().to_string(),
+        _ => DEFAULT_OVERRIDES.to_string(),
+    };
+    Format::CurseForge { overrides }
 }
 
 fn temp_path(target: &Path) -> PathBuf {
@@ -506,6 +577,74 @@ mod tests {
             "the side tree is written after the shared one, so it wins"
         );
         std::fs::remove_dir_all(&dest).ok();
+    }
+
+    #[test]
+    fn a_curseforge_pack_uses_the_tree_its_manifest_names() {
+        let manifest = r#"{"manifestType":"minecraftModpack","manifestVersion":1,
+                           "overrides":"pack-files"}"#;
+        let mut pack = archive(&[
+            ("manifest.json", manifest),
+            ("pack-files/config/cozy.toml", "cf"),
+            ("overrides/config/ignored.toml", "not this pack's tree"),
+        ]);
+        let dest = temp("cf-overrides");
+
+        let written = extract(&mut pack, Side::Client, &dest);
+
+        assert!(dest.join("config/cozy.toml").is_file());
+        assert!(
+            !dest.join("config/ignored.toml").exists(),
+            "only the tree the manifest names belongs to the pack"
+        );
+        assert_eq!(written.len(), 1);
+        std::fs::remove_dir_all(&dest).ok();
+    }
+
+    #[test]
+    fn a_curseforge_pack_defaults_to_overrides_and_has_no_side_tree() {
+        let manifest = r#"{"manifestType":"minecraftModpack","manifestVersion":1}"#;
+        let mut pack = archive(&[
+            ("manifest.json", manifest),
+            ("overrides/config/cozy.toml", "cf"),
+            ("client-overrides/options.txt", "mrpack only"),
+        ]);
+        let dest = temp("cf-default");
+
+        extract(&mut pack, Side::Client, &dest);
+
+        assert!(dest.join("config/cozy.toml").is_file());
+        assert!(
+            !dest.join("options.txt").exists(),
+            "CurseForge has no side-specific tree, so nothing claims one"
+        );
+        std::fs::remove_dir_all(&dest).ok();
+    }
+
+    #[test]
+    fn a_curseforge_pack_cannot_be_read_without_its_platform() {
+        let mut pack = archive(&[(
+            "manifest.json",
+            r#"{"manifestType":"minecraftModpack","manifestVersion":1}"#,
+        )]);
+        // Its files are project/file ids, so the archive alone resolves nothing.
+        assert!(pack.index().is_err());
+    }
+
+    #[test]
+    fn an_mrpack_index_wins_over_anything_else_in_the_zip() {
+        let mut pack = archive(&[
+            (
+                "modrinth.index.json",
+                r#"{"formatVersion":1,"name":"Cozy",
+              "dependencies":{"minecraft":"1.21.1"}}"#,
+            ),
+            (
+                "manifest.json",
+                r#"{"manifestType":"minecraftModpack","manifestVersion":1}"#,
+            ),
+        ]);
+        assert_eq!(pack.index().unwrap().name, "Cozy");
     }
 
     #[test]

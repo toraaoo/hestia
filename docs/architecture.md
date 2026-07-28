@@ -393,10 +393,12 @@ The subsystems behind the aggregate:
   and datapacks. `Engine` composes the flows
   (`add_server_content`/`add_instance_content`, list/remove/update) and a
   `sync` pass re-mirrors any missing managed file at every start/launch (below).
-- **`modpack`** (`content/mrpack.rs`, `content/modpack.rs`) — installing a whole
-  pack. `mrpack` owns the *format* (the manifest, and extracting the
-  `overrides/` trees), deliberately apart from the platform that serves it: a
-  pack picked off disk has no source and is read the same way. `modpack` is the
+- **`modpack`** (`content/pack.rs`, `content/modpack.rs`) — installing a whole
+  pack. `pack` owns the *formats* (the `.mrpack` manifest, and extracting the
+  override trees of either format — `.mrpack`'s fixed three or the single one a
+  CurseForge manifest names), deliberately apart from the platform that serves
+  them: a pack picked off disk has no source and is read the same way. `modpack`
+  is the
   per-entry record (`<entry>/modpack.json`) of which pack an entry runs and
   which game-directory files it owns, with the hash each was written with.
   `Engine`'s flows (`engine/flows/modpack/`) compose them: `resolve` turns a
@@ -673,8 +675,9 @@ The subsystems behind the aggregate:
 > work with. But a platform's own CDN URL carries both ids
 > (`cdn.modrinth.com/data/<project>/versions/<version>/…`), so `parse_file_url`
 > recovers them at no cost, and one bulk `projects` call fills in every title
-> and icon. Both are provider-trait methods, so CurseForge slots in behind the
-> same seam. A file the source does not serve is recorded as `source: "file"` —
+> and icon. Both are provider-trait methods, so another source slots in behind
+> the same seam — CurseForge does, with the twist noted below: its URLs name the
+> file alone, so the version lookup runs first and answers the project. A file the source does not serve is recorded as `source: "file"` —
 > it installs, it is simply not updatable, exactly like a local import.
 >
 > **What a pack cannot do:** it cannot be installed into an entry whose flavor
@@ -738,7 +741,32 @@ The subsystems behind the aggregate:
 > path to download it anyway (Prism's own fallback is a Modrinth hash lookup
 > behind an opt-in setting, never a bypass). The check lives in
 > `install_version_file` rather than the provider, because an artifact with no
-> URL is unusable whoever produced it.
+> URL is unusable whoever produced it — and in the pack installer for the same
+> reason, where a blocked file is routine rather than odd: a CurseForge pack
+> listing one still installs, minus that file, naming it.
+>
+> **A pack archive knows its own format.** CurseForge modpacks arrive as a zip
+> like Modrinth's, but with a `manifest.json` that *names* its single overrides
+> tree instead of `.mrpack`'s fixed `overrides/` + `client-overrides/` +
+> `server-overrides/`, and with a file list of project/file ids rather than
+> URLs. Only the second difference needed the platform: `pack.rs` (was
+> `mrpack.rs`) detects which format a zip is and answers with that format's
+> override trees, so the install flow extracts either without being told where
+> the archive came from — while the id-based file list stays in `curseforge.rs`,
+> since resolving those ids into downloads *is* an API call. A CurseForge pack
+> installed from a **local file** is refused for exactly that reason, naming it:
+> the archive alone cannot say what its files are.
+>
+> **A pack's mods stay identifiable, the long way round.** The pool identifies a
+> pack's files from their download URLs, and CurseForge's carry the file id but
+> no project (`…/files/<id / 1000>/<id % 1000>/<name>`) — which would have made
+> every CurseForge pack a list of anonymous, un-updatable jars. Rather than give
+> up the ids, `hydrate` now looks the **versions** up first and back-fills the
+> project each file names, then asks for the projects: a file knows its project
+> on every platform, so the extra hop costs nothing where the URL was already
+> enough (Modrinth's refs arrive complete and skip the back-fill). CurseForge's
+> two bulk endpoints — `POST /v1/mods` and `POST /v1/mods/files` — are exactly
+> the shape the `projects`/`versions_by_id` trait methods were added for.
 
 > **Installed content is managed-dir-of-record, mirrored into `data/`.** A mod
 > is written to the entry root's `mods/` (hestia's namespace) with its
@@ -1903,7 +1931,8 @@ datapacks on instances, from a platform project, a source page URL, or a local
 file, with required dependencies resolved and a `data/` mirror that heals across
 backups (datapacks install into their world, which the world backup already
 covers); **modpacks** installed into a new or existing server or instance from a
-project, a URL, or a local `.mrpack` — the pack's own loader and version
+project, a URL, or a local `.mrpack` (a CurseForge pack from its source only) —
+the pack's own loader and version
 building the entry, its mods joining the pool as ordinary origin-tagged content,
 and its `overrides/` written into the game directory under a hash record that
 keeps a user's edits through an update; the kind-first browse and management CLI

@@ -25,7 +25,7 @@ use std::io::{Cursor, Read};
 
 use crate::config::ContentSettings;
 
-use super::provider::{ContentProvider, UrlRef};
+use super::provider::{ContentProvider, FileRef, UrlRef};
 
 const API: &str = "https://api.curseforge.com/v1";
 const SITE: &str = "curseforge.com";
@@ -34,6 +34,11 @@ const NAME: &str = "CurseForge";
 
 /// CurseForge's own id for Minecraft; every catalogue call is scoped to it.
 const GAME: u32 = 432;
+
+/// The pack manifest inside a CurseForge modpack archive. Its file list is
+/// project and file ids, so only this module can resolve it into downloads —
+/// the archive's override trees are `pack.rs`'s half of the format.
+const MANIFEST: &str = "manifest.json";
 
 /// The key a distributor baked in at build time, empty in a plain
 /// `cargo build`. The `content.curseforge-key` setting overrides it, so a user
@@ -178,6 +183,29 @@ impl ContentProvider for CurseForge {
         })
     }
 
+    /// A CurseForge download URL is `…/files/<id / 1000>/<id % 1000>/<name>`,
+    /// which names the *file* and nothing else — unlike Modrinth's, it does not
+    /// carry the project. That half is recovered from the file itself
+    /// ([`ContentProvider::versions_by_id`] answers a file's project), so a
+    /// pack's mods still land in the pool as tracked, updatable items.
+    fn parse_file_url(&self, url: &str) -> Option<FileRef> {
+        let rest = url.strip_prefix("https://")?;
+        let (host, path) = rest.split_once('/')?;
+        if !host.ends_with("forgecdn.net") {
+            return None;
+        }
+        let mut segments = path.strip_prefix("files/")?.split('/');
+        let high: u64 = segments.next()?.parse().ok()?;
+        let low: u64 = segments.next()?.parse().ok()?;
+        if low >= 1000 || segments.next().is_none() {
+            return None;
+        }
+        Some(FileRef {
+            project_id: String::new(),
+            version_id: (high * 1000 + low).to_string(),
+        })
+    }
+
     async fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
         let limit = if query.limit == 0 {
             10
@@ -296,7 +324,32 @@ impl ContentProvider for CurseForge {
         Ok(versions)
     }
 
+    /// CurseForge answers a project or a file by id in bulk, which is what the
+    /// pack index needs: a hundred-odd ids in two requests rather than two
+    /// hundred, on an API that rate-limits.
+    async fn projects(&self, ids: &[String]) -> Result<Vec<ContentProject>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut out = Vec::with_capacity(ids.len());
+        for chunk in ids.chunks(BATCH) {
+            let body = self.post("/mods", json!({ "modIds": chunk })).await?;
+            if let Some(arr) = data(&body).as_array() {
+                out.extend(arr.iter().map(|m| parse_mod(m, None, String::new())));
+            }
+        }
+        Ok(out)
+    }
+
+    async fn versions_by_id(&self, ids: &[String]) -> Result<Vec<ContentVersion>> {
+        Ok(self.files(ids).await?.iter().map(parse_file).collect())
+    }
+
     async fn resolve_modpack(&self, version_id: &str) -> Result<ResolvedModpack> {
+        Ok(self.fetch_modpack(version_id).await?.0)
+    }
+
+    async fn fetch_modpack(&self, version_id: &str) -> Result<(ResolvedModpack, Vec<u8>)> {
         let file = self
             .files(&[version_id.to_string()])
             .await?
@@ -307,20 +360,20 @@ impl ContentProvider for CurseForge {
                     reference: version_id.to_string(),
                 })
             })?;
-        let name = str_field(&file, "displayName");
+        let display = str_field(&file, "displayName");
         let url = str_field(&file, "downloadUrl");
         if url.is_empty() {
             bail!(ErrorInfo::ContentDownloadBlocked {
-                title: name,
+                title: display,
                 source: ID.to_string(),
             });
         }
 
         let bytes = self.download(&url).await?;
-        let mut archive = zip::ZipArchive::new(Cursor::new(bytes))
+        let mut archive = zip::ZipArchive::new(Cursor::new(bytes.clone()))
             .context("the modpack archive could not be read")?;
         let manifest: Value = {
-            let mut entry = archive.by_name("manifest.json").map_err(|_| {
+            let mut entry = archive.by_name(MANIFEST).map_err(|_| {
                 anyhow::Error::from(ErrorInfo::NotAModpack {
                     reference: version_id.to_string(),
                 })
@@ -336,8 +389,12 @@ impl ContentProvider for CurseForge {
         resolved.source = ID.to_string();
         resolved.version_id = u64_field(&file, "id").to_string();
         resolved.project_id = u64_field(&file, "modId").to_string();
+        // The manifest's own `version` is free text the pack author writes; the
+        // file's display name is what CurseForge published it as, and what an
+        // update compares against.
+        resolved.version_number = display;
         resolved.files = self.resolve_manifest_files(&manifest).await?;
-        Ok(resolved)
+        Ok((resolved, bytes))
     }
 }
 
@@ -609,7 +666,11 @@ fn parse_manifest(manifest: &Value) -> Result<ResolvedModpack> {
         source: String::new(),
         project_id: String::new(),
         version_id: String::new(),
+        version_number: str_field(manifest, "version"),
         name: str_field(manifest, "name"),
+        // A CurseForge manifest carries no description; the project detail is
+        // where a pack's summary comes from.
+        summary: String::new(),
         game_version,
         loader,
         loader_version,
@@ -1007,6 +1068,34 @@ mod tests {
             parse_mod(&datapack, Some(ContentKind::Shader), String::new()).kind,
             ContentKind::DataPack
         );
+    }
+
+    #[test]
+    fn download_urls_name_the_file_but_never_the_project() {
+        let cf = CurseForge::default();
+        let parsed = cf
+            .parse_file_url("https://edge.forgecdn.net/files/5101/466/jei-1.21.1.jar")
+            .unwrap();
+        assert_eq!(parsed.version_id, "5101466");
+        assert!(
+            parsed.project_id.is_empty(),
+            "the URL carries no project — the file lookup answers that"
+        );
+        assert_eq!(
+            cf.parse_file_url("https://mediafilez.forgecdn.net/files/6/12/small.jar")
+                .unwrap()
+                .version_id,
+            "6012",
+            "the low segment is the remainder, so it keeps its place value"
+        );
+
+        for url in [
+            "https://cdn.modrinth.com/data/AAA/versions/BBB/sodium.jar",
+            "https://edge.forgecdn.net/files/5101/466",
+            "https://edge.forgecdn.net/files/5101/notanumber/x.jar",
+        ] {
+            assert!(cf.parse_file_url(url).is_none(), "should not parse {url}");
+        }
     }
 
     #[test]

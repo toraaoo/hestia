@@ -307,8 +307,10 @@ hestia sources                   # the sources that can serve, and what each has
 A pack pins its own loader and game version, so installing one *builds* the
 entry it wants. The one argument takes any of the three ways to name a pack —
 an existing path is a `.mrpack`, a scheme is a URL, anything else is a project
-on the source; omit it on a terminal and a searchable picker opens over live
-search results.
+on the source (`-S`); omit it on a terminal and a searchable picker opens over
+live search results. A CurseForge pack installs from the source or a page URL,
+but not from a file: its manifest names its mods by id, which only CurseForge
+can resolve.
 
 ```bash
 hestia modpack install fabulously-optimized     # → a new instance
@@ -316,6 +318,7 @@ hestia modpack install                          # pick one interactively
 hestia modpack install fabulously-optimized --name cozy
 hestia modpack install ./pack.mrpack            # a local .mrpack
 hestia modpack install https://modrinth.com/modpack/…/version/6.2.1
+hestia modpack install all-the-mods-10 -S curseforge   # from another source
 hestia modpack install <pack> --server --eula   # → a new server instead
 hestia modpack install <pack> --into cozy       # into an existing entry
 hestia instance create --modpack <pack>         # the same thing, noun-first

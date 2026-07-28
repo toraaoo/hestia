@@ -47,7 +47,9 @@ it's just as comfortable from a terminal as from a window.
 > instance's version/loader and installed as ordinary origin-tagged content
 > (all a daemon/desktop surface, no CLI verbs). A whole **modpack** installs
 > into a new or existing server or instance from a project, a page URL, or a
-> local `.mrpack`: the pack's own loader and version build the entry, its mods
+> local `.mrpack` (a CurseForge pack from its source, which alone can resolve
+> the ids its manifest names): the pack's own loader and version build the
+> entry, its mods
 > join the pool as ordinary origin-tagged content (individually listable and
 > updatable), and its `overrides/` are written into the game directory under a
 > hash record, so updating the pack replaces the files it still owns and leaves

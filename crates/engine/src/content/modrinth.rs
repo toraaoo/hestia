@@ -1,6 +1,6 @@
 //! The Modrinth (`api.modrinth.com/v2`) content provider: search with facets,
 //! project detail, project versions, and fetching a `.mrpack` (parsed by the
-//! format-owning [`super::mrpack`], which a local file goes through too).
+//! format-owning [`super::pack`], which a local file goes through too).
 //! Modrinth's raw JSON is mapped into the normalized `proto::content` types
 //! here; the rest of the engine never sees a Modrinth-specific shape. No API key
 //! is required.
@@ -16,7 +16,7 @@ use proto::download::{Checksum, HashAlgorithm};
 use proto::minecraft::Artifact;
 use serde_json::Value;
 
-use super::mrpack;
+use super::pack;
 use super::provider::{ContentProvider, FileRef, UrlRef};
 
 const API: &str = "https://api.modrinth.com/v2";
@@ -246,7 +246,7 @@ impl ContentProvider for Modrinth {
             .context("modpack file has no download url")?;
 
         let bytes = download_bytes(url).await?;
-        let mut archive = mrpack::Archive::open(bytes.clone())?;
+        let mut archive = pack::Archive::open(bytes.clone())?;
         let mut resolved = archive.index()?;
         resolved.source = self.id().to_string();
         resolved.version_id = version
