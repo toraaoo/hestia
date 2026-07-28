@@ -147,7 +147,7 @@ impl Runtime {
         let backups = BackupManager::new(engine.clone(), hub.clone(), cancellations.clone());
         let content_jobs = ContentManager::new(engine.clone(), hub.clone(), cancellations.clone());
         let modpack_jobs = ModpackManager::new(engine.clone(), hub.clone(), cancellations.clone());
-        let updates = UpdateManager::new(engine.clone(), hub.clone());
+        let updates = UpdateManager::new(engine.clone(), hub.clone(), cancellations.clone());
         Runtime {
             engine,
             hub,

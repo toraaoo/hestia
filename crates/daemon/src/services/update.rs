@@ -3,7 +3,7 @@
 use proto::update::{UpdateCheck, UpdateDownload, UpdateDownloadResult};
 use proto::Empty;
 
-use crate::runtime::{Channels, ServiceError};
+use crate::runtime::Channels;
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<UpdateCheck, _, _>(|_: Empty, ctx| async move {
@@ -12,7 +12,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .update()
             .check()
             .await
-            .map_err(|e| ServiceError::handler_error(format!("{e:#}")))
+            .map_err(crate::runtime::engine_error)
     });
 
     on.handle::<UpdateDownload, _, _>(|params, ctx| async move {

@@ -1,10 +1,3 @@
-//! The in-app updater — the shell's own path to a new release.
-//!
-//! Deliberately not the generic bridge: `tauri-plugin-updater` runs the
-//! platform installer and restarts the process, which only the shell can do.
-//! The daemon's `update.*` channels cover the same ground for the CLI, and
-//! both verify against the one minisign key in `tauri.conf.json`.
-
 use serde::Serialize;
 use tauri_plugin_updater::UpdaterExt;
 
