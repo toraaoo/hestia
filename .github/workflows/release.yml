@@ -28,6 +28,21 @@ jobs:
     permissions:
       contents: write
     steps:
+      # A tag publishes installers before the manifest job runs, so a missing
+      # key must stop the release here rather than after the artifacts are
+      # already attached: those builds would poll a latest.json that never
+      # appears, and nothing can sign an update they would accept.
+      - name: Require the updater signing key for a tagged release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set. See docs/packaging.md#signing."
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
 
       - name: Install Tauri Linux dependencies

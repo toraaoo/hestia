@@ -77,22 +77,84 @@ signed NSIS setup (`windows-x86_64`) and AppImage (`linux-x86_64`) and attaches
 it to the Release. On Windows the update runs the NSIS installer passively, so
 the custom template's remembered install dir + components apply.
 
-Updater artifacts are signed (`bundle.createUpdaterArtifacts`); the public key
-lives in `tauri.conf.json`, and CI signs with two repository secrets:
-
-- `TAURI_SIGNING_PRIVATE_KEY` — the private key (generated with
-  `cargo tauri signer generate`; **losing it means shipped apps can no longer
-  accept updates**).
-- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — its password (empty if the key has
-  none).
-
-Local `scripts/package.sh` runs without the key and simply skips the
-signatures/updater artifacts.
-
 The **portable archives** are the same four binaries (`hestia`, `hestiad`,
 `tray`, `hestia-desktop`) plus `LICENSE`/`README`, packed flat by
 [`scripts/package.sh`](../scripts/package.sh) — Tauri has no portable target, so
 this is a plain `tar`/`Compress-Archive` step.
+
+## Signing
+
+Two independent signatures, often confused. Only one of them is mandatory.
+
+| | What it proves | Who checks it | Required? |
+|---|---|---|---|
+| **Updater signature** (minisign/Ed25519) | this download came from us | the app's own updater | **yes** — the updater cannot work without it |
+| **Authenticode** (code signing cert) | Windows knows who published this | Windows SmartScreen + UAC | no — costs a warning, not a failure |
+
+### The updater key
+
+One minisign keypair, generated with `cargo tauri signer generate -w
+~/.tauri/hestia.key`. The **public** half lives in two places kept in agreement
+by `crates/common/tests/updater.rs`:
+
+- `plugins.updater.pubkey` in [`tauri.conf.json`](../crates/desktop/tauri.conf.json)
+  — what the desktop shell's `tauri-plugin-updater` verifies against;
+- `common::app::UPDATE_PUBKEY` — what the daemon and CLI verify against
+  (`engine/src/update.rs`), since neither links Tauri.
+
+The **private** half signs releases, either as the `TAURI_SIGNING_PRIVATE_KEY`
+repository secret (with `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) or locally by
+whoever cuts the release. Offline is the safer default, because:
+
+> **The updater key cannot be rotated.** A binary verifies only against the key
+> compiled into it, and Tauri's `pubkey` field holds exactly one — so every
+> shipped build trusts that key permanently. Lose it and those installs can
+> never accept another update; leak it and nothing recovers them remotely.
+> Changing it is not a deploy, it is abandoning every existing install.
+
+`scripts/package.sh` builds without the key by flipping
+`createUpdaterArtifacts` off, so local packaging works unsigned. CI refuses a
+**tagged** release with no key configured — the guard is the first step of the
+`package` job, because a tag attaches installers to the Release before the
+`manifest` job runs, and builds published without a `latest.json` would poll an
+endpoint that never answers.
+
+### Authenticode — the path, not the requirement
+
+Windows installers currently ship **unsigned**. This is deliberate and costs
+only warnings:
+
+| Install mode | First install | Auto-update |
+|---|---|---|
+| per-user | SmartScreen once | silent |
+| per-machine | SmartScreen once, UAC "Unknown publisher" | UAC every update |
+
+`nsis.installMode` is `both`, so the user chooses; the template's
+`MULTIUSER_EXECUTIONLEVEL Highest` means an admin account elevates at launch.
+Signing does **not** remove the UAC prompt — a per-machine install requires
+elevation regardless — it changes the dialog from "Unknown publisher" to the
+publisher name, and it removes the SmartScreen block. The recurring per-machine
+update prompt is the real argument for a certificate; the install-day scare is
+the lesser one.
+
+The intended route is [SignPath Foundation](https://signpath.org/terms.html),
+which issues a free OV certificate to qualifying open source projects and signs
+in its own pipeline (the key is never held here). Hestia meets the licence
+(GPL-3.0-only, no dual-licensing), no-proprietary-components, maintained and
+documented conditions. Two things are outstanding, and their order is forced:
+
+1. **A release must exist first** — the Foundation signs already-released
+   software, so the first tags necessarily ship unsigned.
+2. **Role separation** — Authors, Reviewers and Approvers as distinct people
+   with MFA, plus a published code signing policy page. This is the condition a
+   single-maintainer project has to resolve with them.
+
+Expect OV, not EV: SmartScreen reputation accrues per certificate over
+downloads and time, so warnings fade rather than vanish on approval. Switching
+or renewing a certificate later is cheap — reputation resets, nothing breaks —
+which is the opposite of the updater key above. Always timestamp Authenticode
+signatures once a certificate is in use, or every shipped binary becomes
+untrusted the day it expires.
 
 ## Runtime dependency: the system WebView
 
