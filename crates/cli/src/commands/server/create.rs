@@ -56,6 +56,14 @@ pub struct CreateArgs {
         help = "Set any other server.properties entry (repeatable; wins over the dedicated flags)"
     )]
     prop: Vec<String>,
+    /// Build the server from a modpack — a slug, a URL, or a .mrpack path. The
+    /// pack names the flavor and version, so both are ignored.
+    #[arg(
+        long,
+        conflicts_with_all = ["flavor", "version", "loader"],
+        help = "Build from a modpack (slug, URL, or .mrpack path)"
+    )]
+    modpack: Option<String>,
 }
 
 impl CreateArgs {
@@ -75,10 +83,25 @@ impl CreateArgs {
             && self.gamemode.is_none()
             && self.seed.is_none()
             && self.prop.is_empty()
+            && self.modpack.is_none()
     }
 }
 
 pub(super) async fn run(client: &Client, args: CreateArgs) -> Result<()> {
+    if let Some(pack) = args.modpack.clone() {
+        return crate::commands::modpack::install(
+            client,
+            crate::commands::modpack::InstallArgs {
+                pack: Some(pack),
+                server: true,
+                name: args.name,
+                eula: args.eula,
+                port: args.port,
+                ..Default::default()
+            },
+        )
+        .await;
+    }
     if args.is_bare() && ui::interactive_output() {
         return run_wizard(client, args).await;
     }

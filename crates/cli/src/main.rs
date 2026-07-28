@@ -134,10 +134,10 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::content::BrowseCmd,
     },
-    /// Browse modpacks on a content source
+    /// Browse modpacks, and install one into a new or existing entry
     Modpack {
         #[command(subcommand)]
-        cmd: commands::content::BrowseCmd,
+        cmd: commands::modpack::ModpackCmd,
     },
     /// Browse resource packs on a content source
     Resourcepack {
@@ -301,9 +301,7 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
         Command::Mod { cmd } => {
             commands::content::run_browse(client::proto::content::ContentKind::Mod, cmd).await
         }
-        Command::Modpack { cmd } => {
-            commands::content::run_browse(client::proto::content::ContentKind::Modpack, cmd).await
-        }
+        Command::Modpack { cmd } => commands::modpack::run(cmd).await,
         Command::Resourcepack { cmd } => {
             commands::content::run_browse(client::proto::content::ContentKind::ResourcePack, cmd)
                 .await

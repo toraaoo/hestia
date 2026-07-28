@@ -21,6 +21,7 @@ use client::Client;
 
 use crate::commands::content::{self, ContentCmd, EntryKind};
 use crate::commands::mc;
+use crate::commands::modpack::EntryModpackCmd;
 use crate::ui::Spinner;
 
 pub use lifecycle::launch;
@@ -49,6 +50,14 @@ pub enum InstanceCmd {
         name: Option<String>,
         #[arg(long, help = "Set -Xms and -Xmx together (e.g. 4G, 2048M)")]
         memory: Option<String>,
+        /// Build the instance from a modpack — a slug, a URL, or a .mrpack
+        /// path. The pack names the flavor and version, so both are ignored.
+        #[arg(
+            long,
+            conflicts_with_all = ["flavor", "version", "loader"],
+            help = "Build from a modpack (slug, URL, or .mrpack path)"
+        )]
+        modpack: Option<String>,
     },
     /// Managed instances and their state
     #[command(visible_alias = "ls")]
@@ -158,6 +167,11 @@ enum InstanceAction {
         #[command(subcommand)]
         cmd: ContentCmd,
     },
+    /// The modpack this instance runs: status, update, remove
+    Modpack {
+        #[command(subcommand)]
+        cmd: EntryModpackCmd,
+    },
     /// Move the instance to another version (prompts for anything omitted)
     Update {
         /// Target game version (prompts when omitted)
@@ -218,6 +232,26 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
                     loader,
                     name,
                     memory,
+                    modpack: Some(pack),
+                } => {
+                    let _ = (flavor, version, loader, memory);
+                    crate::commands::modpack::install(
+                        &client,
+                        crate::commands::modpack::InstallArgs {
+                            pack: Some(pack),
+                            name,
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                }
+                InstanceCmd::Create {
+                    flavor,
+                    version,
+                    loader,
+                    name,
+                    memory,
+                    modpack: None,
                 } => create::run(&client, flavor, version, loader, name, memory).await,
                 InstanceCmd::List => entry::list(&client).await,
                 InstanceCmd::Versions { flavor, all } => versions(&client, flavor, all).await,
@@ -297,6 +331,9 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
                 cmd,
             )
             .await
+        }
+        InstanceAction::Modpack { cmd } => {
+            crate::commands::modpack::run_entry(EntryKind::Instance, name, cmd).await
         }
         InstanceAction::Update {
             version,

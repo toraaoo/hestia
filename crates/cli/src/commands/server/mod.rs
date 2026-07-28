@@ -22,6 +22,7 @@ use client::Client;
 
 use crate::commands::content::{self, ContentCmd, EntryKind};
 use crate::commands::mc;
+use crate::commands::modpack::EntryModpackCmd;
 use crate::exit::ExitStatus;
 use crate::ui::Spinner;
 
@@ -143,6 +144,11 @@ enum ServerAction {
         #[command(subcommand)]
         cmd: ContentCmd,
     },
+    /// The modpack this server runs: status, update, remove
+    Modpack {
+        #[command(subcommand)]
+        cmd: EntryModpackCmd,
+    },
     /// Move the server to another version (prompts for anything omitted)
     Update {
         /// Target game version (prompts when omitted)
@@ -252,6 +258,9 @@ async fn run_unit_action(client: Client, name: String, action: ServerAction) -> 
                 cmd,
             )
             .await
+        }
+        ServerAction::Modpack { cmd } => {
+            crate::commands::modpack::run_entry(EntryKind::Server, name, cmd).await
         }
         ServerAction::Update {
             version,
