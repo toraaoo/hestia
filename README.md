@@ -31,9 +31,9 @@ it's just as comfortable from a terminal as from a window.
 > on Windows), with `sync status` link states and a per-instance `sync
 > adopt` migration for pre-existing folders. **Content** —
 > mods, plugins, resourcepacks, shaders, datapacks — is discovered on Modrinth
-> (search, browse, resolve versions) and installed into a server (mods or
-> plugins, whichever its flavor loads, plus datapacks) or
-> instance (mods/resourcepacks/shaders/datapacks) from a project, a Modrinth
+> and CurseForge (search, browse, resolve versions) and installed into a server
+> (mods or plugins, whichever its flavor loads, plus datapacks) or
+> instance (mods/resourcepacks/shaders/datapacks) from a project, a source
 > page URL, or a local file, with required dependencies pulled in and a `data/`
 > mirror that survives backup/restore (datapacks install straight into their
 > world, which the world backup already covers). An instance's installed pool

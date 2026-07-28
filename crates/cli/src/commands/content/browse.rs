@@ -30,7 +30,11 @@ pub enum BrowseCmd {
         category: Vec<String>,
         #[arg(short, long, value_enum, default_value_t = SortArg::Relevance, help = "Result ordering")]
         sort: SortArg,
-        #[arg(short = 'S', long, help = "Content source (default: modrinth)")]
+        #[arg(
+            short = 'S',
+            long,
+            help = "Content source (default: the first configured one)"
+        )]
         source: Option<String>,
         #[arg(long, default_value_t = PAGE, help = "Results per page")]
         limit: u32,
@@ -41,7 +45,11 @@ pub enum BrowseCmd {
     Info {
         /// Project slug or id
         project: String,
-        #[arg(short = 'S', long, help = "Content source (default: modrinth)")]
+        #[arg(
+            short = 'S',
+            long,
+            help = "Content source (default: the first configured one)"
+        )]
         source: Option<String>,
     },
     /// A project's downloadable versions, newest first
@@ -52,7 +60,11 @@ pub enum BrowseCmd {
         loader: Option<String>,
         #[arg(short = 'g', long = "game-version", help = "Filter by game version")]
         game_version: Option<String>,
-        #[arg(short = 'S', long, help = "Content source (default: modrinth)")]
+        #[arg(
+            short = 'S',
+            long,
+            help = "Content source (default: the first configured one)"
+        )]
         source: Option<String>,
     },
 }

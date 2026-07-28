@@ -61,13 +61,31 @@ impl From<SortArg> for SearchSort {
     }
 }
 
-/// `hestia sources`.
+/// `hestia sources`. Only sources that can serve are listed — a platform
+/// needing an API key it has not been given is not one of them.
 pub async fn run_sources() -> Result<()> {
     let client = connect().await?;
     let sources = client.content().sources().await?;
+    if sources.is_empty() {
+        return ui::show(View::note("no content source is configured"));
+    }
     let rows = sources
         .into_iter()
-        .map(|s| vec![s.id, s.name])
+        .map(|s| {
+            vec![
+                s.id,
+                s.name,
+                s.kinds
+                    .iter()
+                    .map(|k| format::kind_plural(*k))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ]
+        })
         .collect::<Vec<_>>();
-    ui::show(View::table("content sources", ["ID", "NAME"], rows))
+    ui::show(View::table(
+        "content sources",
+        ["ID", "NAME", "SERVES"],
+        rows,
+    ))
 }

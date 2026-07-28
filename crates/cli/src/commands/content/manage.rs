@@ -39,6 +39,12 @@ pub enum ContentCmd {
         #[arg(long, help = "Override the stored filename (url/file installs)")]
         filename: Option<String>,
         #[arg(
+            short = 'S',
+            long,
+            help = "Content source to install from (default: the first configured one)"
+        )]
+        source: Option<String>,
+        #[arg(
             long,
             help = "For a datapack on an instance: a save world to load it in (repeatable; every world when omitted)"
         )]
@@ -105,10 +111,11 @@ pub async fn run_entry(
             version,
             file,
             filename,
+            source,
             world,
         } => {
             add(
-                client, entry, kind, reference, item, version, file, filename, world,
+                client, entry, kind, reference, item, version, file, filename, source, world,
             )
             .await
         }
@@ -145,15 +152,17 @@ async fn add(
     version: Option<String>,
     file: Option<String>,
     filename: Option<String>,
+    source: Option<String>,
     world: Vec<String>,
 ) -> Result<()> {
     let info = resolve_entry(client, entry, reference).await?;
+    let source = source.unwrap_or_default();
 
     if item.is_none() && file.is_none() {
         if !ui::interactive_output() {
             bail!("name an item to install (a project slug/id, a source URL, or --file)");
         }
-        return add_session(client, entry, kind, info).await;
+        return add_session(client, entry, kind, info, source).await;
     }
 
     let mut add_item = ContentAddItem {
@@ -183,9 +192,9 @@ async fn add(
 
     let spec = ContentAddSpec {
         kind,
+        source,
         items: vec![add_item],
         worlds,
-        ..ContentAddSpec::default()
     };
     let (installed, failures) = install_spec(client, entry, &info.id, spec).await?;
     show_install_report(&info.name, &installed, &[], &failures)
@@ -199,6 +208,7 @@ async fn add_session(
     entry: EntryKind,
     kind: ContentKind,
     info: EntryInfo,
+    source: String,
 ) -> Result<()> {
     let worlds = if kind == ContentKind::DataPack && matches!(entry, EntryKind::Instance) {
         let worlds = client.instance().worlds(&info.id).await?;
@@ -215,6 +225,7 @@ async fn add_session(
         .await?;
     let base = SearchQuery {
         kind,
+        source,
         loader: matches!(kind, ContentKind::Mod | ContentKind::Plugin).then(|| info.flavor.clone()),
         game_version: Some(info.game_version.clone()),
         limit: PAGE,

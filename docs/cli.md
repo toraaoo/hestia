@@ -225,6 +225,8 @@ hestia instance modded mod add sodium      # install a mod (resolves required
                                  #   deps; --version pins one; the file is
                                  #   mirrored into the game dir at launch)
 hestia instance modded mod add https://modrinth.com/mod/lithium  # a page URL
+hestia instance modded mod add jei -S curseforge     # from another source (a
+                                 #   page URL names its own, so -S is for slugs)
 hestia instance modded mod add --file ./my-mod.jar   # import a local file
 hestia instance modded mod list  # installed mods (+ any untracked jars in the
                                  #   game dir)
@@ -278,7 +280,11 @@ hestia logs modded -f            # follow its captured output fullscreen (the
 
 ## Content discovery
 
-Modrinth today; installs are per-entry (above).
+Modrinth and CurseForge; installs are per-entry (above). Every browse verb
+takes `-S/--source` and defaults to the first configured source — CurseForge
+needs an API key before it serves anything (see [Configuration](#configuration)),
+and `hestia sources` lists only the sources that can, with the kinds each one
+catalogues.
 
 ```bash
 hestia mod search                # bare, on a terminal: the fullscreen browser
@@ -292,7 +298,8 @@ hestia resourcepack search faithful            #   shader, datapack, plugin
 hestia plugin search luckperms   # server plugins (paper/folia/bukkit/spigot)
 hestia mod info sodium           # a project's details (downloads, sides, …)
 hestia mod versions sodium -l fabric -g 1.21.1  # downloadable versions
-hestia sources                   # the available content sources
+hestia mod search jei -S curseforge             # search another source
+hestia sources                   # the sources that can serve, and what each has
 ```
 
 ## Modpacks
@@ -402,7 +409,15 @@ hestia config get home           # resolved data directory
 hestia config set home <dir>     # persist the data dir (empty reverts to default)
 hestia config get autostart      # true if the daemon starts at login
 hestia config set autostart true # register the daemon to start at login
+hestia config set content.curseforge-key <key>   # unlock the CurseForge source
 ```
+
+CurseForge's API refuses every request without a key, so that source is
+offered only once one resolves: this setting, else a key the distributor baked
+into the build. Get one from the [CurseForge developer
+console](https://console.curseforge.com/) — it is stored in plain text in
+`config.json`, like every other setting. Nothing else changes when it is unset;
+`hestia sources` simply does not list CurseForge.
 
 The data directory is resolved as: `--home` → `$HESTIA_HOME` → a persisted
 pointer (`config set home`) → the platform default (`~/.hestia`, or

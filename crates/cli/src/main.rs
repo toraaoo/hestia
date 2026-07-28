@@ -167,10 +167,14 @@ enum Command {
         loader: Option<String>,
         #[arg(short = 'g', long = "game-version", help = "Filter by game version")]
         game_version: Option<String>,
-        #[arg(short = 'S', long, help = "Content source (default: modrinth)")]
+        #[arg(
+            short = 'S',
+            long,
+            help = "Content source (default: the first configured one)"
+        )]
         source: Option<String>,
     },
-    /// The available content sources
+    /// The content sources that can serve
     Sources,
     /// Download cache
     Cache {

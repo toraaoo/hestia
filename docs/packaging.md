@@ -88,6 +88,14 @@ scripts/package.sh portable
 
 `cargo tauri build` runs the frontend build itself (via `beforeBuildCommand`), so
 only `bun install` (in `frontend/`) and a staged sidecar set are prerequisites.
+
+**`HESTIA_CURSEFORGE_API_KEY`** is read at compile time by the `engine` crate: a
+distributor that has registered for a [CurseForge
+key](https://console.curseforge.com/) sets it in the build environment and the
+CurseForge content source works out of the box. Built without it, the source
+stays hidden until a user sets `content.curseforge-key` themselves, which
+overrides the baked-in key either way. It is baked into the binary, so it is
+extractable — do not use a key you are not willing to distribute.
 Bundles land in `target/release/bundle/{deb,rpm,appimage,nsis,msi}/`; portable
 archives in `target/package/`. On Windows use `scripts\win.ps1 package`; the MSI
 additionally needs the WiX Toolset the bundler fetches on first run.

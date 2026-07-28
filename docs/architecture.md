@@ -358,10 +358,11 @@ The subsystems behind the aggregate:
 - **`content`** (`Content`) — the third-party content provider registry: mods,
   modpacks, resourcepacks, shaders discovered on a *source* platform. The
   `ContentProvider` trait is the seam (search with pagination, project detail,
-  version resolution filtered by loader/game version, and modpack resolution);
-  `modrinth` is the shipped source, CurseForge is a future impl behind the same
-  trait — adding a source is a new impl plus one line in `Content::new`, the
-  same shape as `minecraft`'s flavor registry. Stateless, like `minecraft`.
+  version resolution filtered by loader/game version, and modpack resolution,
+  plus the kinds a source catalogues and whether it is configured enough to
+  serve); `modrinth` and `curseforge` are the shipped sources — adding one is a
+  new impl plus one line in `Content::new`, the same shape as `minecraft`'s
+  flavor registry. Stateless but for the API keys `configure()` hands down.
   Every platform response is mapped into the normalized `proto::content` types
   at this boundary (projects carry `icon_url`/gallery images for the desktop
   UI); `resolve_modpack` fetches a version's `.mrpack`, reads its
@@ -691,6 +692,53 @@ The subsystems behind the aggregate:
 > server's automatic pre-update backup included) behind the same explicit
 > `allow_downgrade` gate. A loader change still refuses: the flavor is baked
 > into the resolved profile.
+
+> **A second source pays for the trait — and it is only offered when it can
+> serve.** CurseForge is the impl the `ContentProvider` seam was written for,
+> and it arrived carrying every asymmetry a normalized trait exists to absorb:
+> it keys projects by *class* rather than project type (no plugins — the API
+> stopped serving class 5, so hestia does not list a kind that returns
+> nothing), models only modloaders (so a datapack's files name no loader at
+> all, and the version pick's `datapack` pseudo-loader is stamped on from the
+> class the request already named), publishes no per-project side support, has
+> no created-at ordering (so "newest" and "recently updated" both resolve to
+> `LastUpdated`), and wraps every response in `data`. None of that reaches the
+> rest of the engine — the flows, the CLI and the desktop drive both sources
+> through one vocabulary.
+>
+> The API key is the interesting part, because it makes *availability* a
+> property of a source rather than a constant. CurseForge refuses every request
+> without an `x-api-key`, so the trait grew `available()` and `configure()`:
+> `content.sources` lists only sources that can serve, `content.*` refuses a
+> named-but-unconfigured one with `ContentSourceUnavailable` (naming what to
+> set, rather than the "unknown source" a filtered registry would have to
+> claim), and a pasted `curseforge.com` URL still parses — it is recognised,
+> then refused for the reason that is actionable. Resolution follows Prism's:
+> the `content.curseforge-key` setting, else a key a distributor baked in at
+> build time (`HESTIA_CURSEFORGE_API_KEY`), so official builds can ship one
+> while a source build simply has none and the source stays hidden. It is
+> re-applied on every `config set` (`Engine::set_config`, the reason that
+> wrapper exists), so a key takes effect on the running daemon. The key is
+> never logged — only whether one resolved.
+>
+> Two shapes had to change for it. A `ContentSource` now carries the `kinds` it
+> catalogues, because "which sources can I browse mods on" is a daemon fact and
+> a front-end must not keep its own table (the same no-drift rule `accepts`
+> follows on the entry views). And a `ContentAddItem` may name its **own**
+> source, overriding the batch's: with two sources a user's selection is
+> naturally mixed, and a spec-wide source would have forced the front-end to
+> split a batch it has no other reason to split — a URL item already resolved
+> its own source this way.
+>
+> **A blocked file fails its item, and nothing else.** CurseForge lets an author
+> opt out of third-party distribution; the API then lists the file with a null
+> download URL. The `ContentDownloadBlocked` refusal says so and names the
+> source, the rest of the batch installs, and local-file import is the
+> documented way through — Hestia deliberately does not reconstruct the CDN
+> path to download it anyway (Prism's own fallback is a Modrinth hash lookup
+> behind an opt-in setting, never a bypass). The check lives in
+> `install_version_file` rather than the provider, because an artifact with no
+> URL is unusable whoever produced it.
 
 > **Installed content is managed-dir-of-record, mirrored into `data/`.** A mod
 > is written to the entry root's `mods/` (hestia's namespace) with its
@@ -1847,7 +1895,8 @@ behind an explicit confirmation, the existing data backed up automatically
 first); backups for both (on-demand archive/restore with live progress — a
 running server is archived under the RCON save-off dance — plus per-server
 scheduled backups with retention pruning); the content provider layer
-(Modrinth search/project/versions/modpack resolution) with per-entry
+(Modrinth and — behind an API key — CurseForge: search/project/versions/modpack
+resolution) with per-entry
 install/management — mods or plugins on a server depending on its flavor, plus
 datapacks; mods/resourcepacks/shaders/
 datapacks on instances, from a platform project, a source page URL, or a local
@@ -1900,8 +1949,9 @@ are in place; pages are not).
   injection) is unit-tested in `minecraft/launch.rs`, the Log4Shell-safe
   session config in `minecraft/log4j.rs`, the config reconciliation, folder
   linking/adopt, and `options.txt` merge in `sync/`, the Modrinth mapping and `.mrpack`/URL
-  parsing in `content/modrinth.rs`, and content version-pick / reference-matching
-  in `content/install.rs`. The per-flavor accepted-kind composition is pinned in
+  parsing in `content/modrinth.rs`, the CurseForge mapping, manifest and key
+  resolution in `content/curseforge.rs`, and content version-pick /
+  reference-matching in `content/install.rs`. The per-flavor accepted-kind composition is pinned in
   `engine/flows/content.rs` and the JVM-args precedence in
   `engine/flows/server.rs`; PaperMC build parsing is unit-tested in
   `minecraft/meta/paper.rs`.
