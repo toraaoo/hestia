@@ -36,7 +36,6 @@ import { serverMutations, serverQueries } from '@/queries/server';
 
 import {
   FlavorOption,
-  flavorSummary,
   type Kind,
   STEP_HINTS,
   STEPS,
@@ -230,8 +229,7 @@ export function CreateEntryModal({
                       {flavors.map((f) => (
                         <FlavorOption
                           key={f.id}
-                          name={f.name}
-                          summary={flavorSummary(f.id)}
+                          flavor={f}
                           selected={field.state.value === f.id}
                           onSelect={() => {
                             field.handleChange(f.id);

@@ -7,16 +7,28 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::content::ContentKind;
 use crate::download::Checksum;
 
 /// A distribution offered by a domain: the first level of the `available`
 /// selector (`vanilla`, `fabric`, …).
+///
+/// Everything a front-end needs to render the choice travels with it — the
+/// blurb explaining what it is and the content kinds an entry of it would
+/// accept — so shipping a flavor is a daemon-side change alone. A front-end
+/// that kept its own table of either would drift the moment one was added,
+/// which is the same no-drift rule `ServerInfo::accepts` follows.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct Flavor {
     pub id: String,
     pub name: String,
+    /// One line saying what this distribution is and what it costs to run,
+    /// authored beside the provider. English; a front-end with its own
+    /// translation for a known id may prefer it.
+    pub summary: String,
+    pub accepts: Vec<ContentKind>,
 }
 
 /// One key/value setting, shared by the server and instance `config` channels

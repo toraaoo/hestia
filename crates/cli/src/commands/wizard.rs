@@ -19,7 +19,7 @@ use ratatui::widgets::{List, ListItem, ListState, Paragraph};
 use ratatui::Frame;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-use crate::commands::mc::kind_label;
+use crate::commands::mc::{flavor_label, kind_label};
 use crate::ui::components::working::draw_working;
 use crate::ui::components::{Picker, PickerItem, SelectList, TextInput};
 use crate::ui::session::{self, Flow, Screen};
@@ -282,9 +282,11 @@ struct WizardScreen {
 
 impl WizardScreen {
     fn new(seed: WizardSeed, requests: UnboundedSender<Request>) -> Self {
-        let flavor_labels: Vec<String> = seed.flavors.iter().map(|f| f.name.clone()).collect();
+        let flavor_labels: Vec<String> = seed.flavors.iter().map(flavor_label).collect();
+        let flavor_summaries: Vec<String> =
+            seed.flavors.iter().map(|f| f.summary.clone()).collect();
         let mut screen = WizardScreen {
-            flavor_list: SelectList::new(flavor_labels),
+            flavor_list: SelectList::new(flavor_labels).with_details(flavor_summaries),
             flavor: seed.flavor.clone().unwrap_or_default(),
             version: seed.version.clone().unwrap_or_default(),
             name: TextInput::with_text(seed.name.as_deref().unwrap_or("")),

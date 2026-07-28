@@ -8,8 +8,18 @@ const now = () => Math.floor(Date.now() / 1000);
 const ok = () => ({});
 
 const flavors = [
-  { id: 'vanilla', name: 'Vanilla' },
-  { id: 'fabric', name: 'Fabric' },
+  {
+    id: 'vanilla',
+    name: 'Vanilla',
+    summary: "Mojang's game, unmodified. Takes datapacks and nothing else.",
+    accepts: ['data_pack'],
+  },
+  {
+    id: 'fabric',
+    name: 'Fabric',
+    summary: 'Lightweight mod loader, quick to support each new game version.',
+    accepts: ['mod', 'resource_pack', 'shader', 'data_pack'],
+  },
 ];
 
 const versions = [

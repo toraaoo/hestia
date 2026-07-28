@@ -16,6 +16,7 @@ use super::provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 const ID: &str = "fabric";
 const NAME: &str = "Fabric";
+const SUMMARY: &str = "Lightweight mod loader, quick to support each new game version.";
 
 async fn game_versions() -> Result<Vec<GameVersion>> {
     Ok(fabric::game_versions()
@@ -49,6 +50,9 @@ impl ServerProvider for FabricServer {
     }
     fn name(&self) -> &'static str {
         NAME
+    }
+    fn summary(&self) -> &'static str {
+        SUMMARY
     }
 
     fn loads(&self) -> Loads {
@@ -137,6 +141,9 @@ impl InstanceProvider for FabricInstance {
     }
     fn name(&self) -> &'static str {
         NAME
+    }
+    fn summary(&self) -> &'static str {
+        SUMMARY
     }
 
     fn loads(&self) -> Loads {

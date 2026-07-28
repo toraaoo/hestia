@@ -1,5 +1,7 @@
+import type { Flavor } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { kindInfo } from '@/features/content/lib/kinds';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
@@ -103,16 +105,15 @@ export function PropToggle({
 }
 
 export function FlavorOption({
-  name,
-  summary,
+  flavor,
   selected,
   onSelect,
 }: {
-  name: string;
-  summary: string;
+  flavor: Flavor;
   selected: boolean;
   onSelect: () => void;
 }) {
+  const summary = flavorSummary(flavor);
   return (
     <button
       type="button"
@@ -125,7 +126,14 @@ export function FlavorOption({
           : 'ring-border hover:bg-muted/60 hover:ring-foreground/20',
       )}
     >
-      <span className="text-sm font-medium">{name}</span>
+      <span className="flex w-full items-center gap-2">
+        <span className="flex-1 text-sm font-medium">{flavor.name}</span>
+        {(flavor.accepts ?? []).map((kind) => (
+          <Badge key={kind} variant="outline" className="text-[10px]">
+            {kindInfo[kind].label()}
+          </Badge>
+        ))}
+      </span>
       {summary && (
         <span className="text-xs text-muted-foreground">{summary}</span>
       )}
@@ -171,11 +179,11 @@ export function VersionRow({
 }
 
 /**
- * The static per-flavor blurb, by id; empty for a flavor with no message. Keyed
- * dynamically so a flavor the daemon adds needs only its message, not a branch
- * here — the flavor list itself comes from `{server,instance}.flavors`.
+ * A flavor's blurb: the localised message for a known id, else the daemon's own
+ * summary. So a flavor the daemon ships renders immediately with nothing added
+ * here, and a locale that has translated it keeps its translation.
  */
-export function flavorSummary(id: string): string {
+export function flavorSummary(flavor: Flavor): string {
   const messages = m as unknown as Record<string, (() => string) | undefined>;
-  return messages[`flavor.${id}_summary`]?.() ?? '';
+  return messages[`flavor.${flavor.id}_summary`]?.() ?? flavor.summary ?? '';
 }

@@ -18,7 +18,7 @@ pub(crate) mod world;
 use anyhow::{Context, Result};
 use proto::minecraft::{Flavor, GameVersion, InstanceProfile, ServerProfile};
 
-pub use provider::InstallRequest;
+pub use provider::{accepted_kinds, InstallRequest, Side};
 use provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 /// The Java majors Minecraft launch profiles ever require: 8 (pre-1.17),
@@ -58,14 +58,14 @@ impl Minecraft {
     pub fn server_flavors(&self) -> Vec<Flavor> {
         self.servers
             .iter()
-            .map(|p| flavor(p.id(), p.name()))
+            .map(|p| flavor(p.id(), p.name(), p.summary(), Side::Server, p.loads()))
             .collect()
     }
 
     pub fn instance_flavors(&self) -> Vec<Flavor> {
         self.instances
             .iter()
-            .map(|p| flavor(p.id(), p.name()))
+            .map(|p| flavor(p.id(), p.name(), p.summary(), Side::Client, p.loads()))
             .collect()
     }
 
@@ -170,9 +170,11 @@ impl Minecraft {
     }
 }
 
-fn flavor(id: &str, name: &str) -> Flavor {
+fn flavor(id: &str, name: &str, summary: &str, side: Side, loads: Loads) -> Flavor {
     Flavor {
         id: id.to_string(),
         name: name.to_string(),
+        summary: summary.to_string(),
+        accepts: accepted_kinds(side, loads),
     }
 }

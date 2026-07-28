@@ -26,6 +26,8 @@ use crate::download::Downloader;
 
 const ID: &str = "neoforge";
 const NAME: &str = "NeoForge";
+const SUMMARY: &str =
+    "Mod loader for large, content-heavy modpacks. Its game jar is built here, so a first launch takes a few minutes.";
 
 /// The game versions NeoForge builds exist for, newest first and typed by
 /// Mojang's manifest — the same ground truth every other flavor is ordered by.
@@ -176,6 +178,9 @@ impl ServerProvider for NeoForgeServer {
     fn name(&self) -> &'static str {
         NAME
     }
+    fn summary(&self) -> &'static str {
+        SUMMARY
+    }
     fn loads(&self) -> Loads {
         Some(ContentKind::Mod)
     }
@@ -221,6 +226,9 @@ impl InstanceProvider for NeoForgeInstance {
     }
     fn name(&self) -> &'static str {
         NAME
+    }
+    fn summary(&self) -> &'static str {
+        SUMMARY
     }
     fn loads(&self) -> Loads {
         Some(ContentKind::Mod)

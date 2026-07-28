@@ -592,6 +592,19 @@ The subsystems behind the aggregate:
 > `flavor === 'fabric'` test), it was already wrong for neoforge, and that is
 > precisely the drift the no-drift seam exists to prevent.
 >
+> **A flavor therefore describes itself on the wire, catalogue included.**
+> `Flavor` is not `{id, name}`: it carries the `summary` a picker renders and
+> the `accepts` set an entry of it *would* have, so shipping a flavor is a
+> daemon-side change alone. The composition itself (`accepted_kinds`) sits
+> beside the provider trait that defines `Loads`, so the catalogue and an
+> existing entry's `accepts` cannot disagree. The front-ends were each keeping
+> the missing half: the CLI's flavor table was `ID`/`NAME` and its picker a bare
+> name, and the desktop looked up a per-flavor `flavor.<id>_summary` message
+> that a new flavor simply did not have (rendering blank). Both now read the
+> wire — the desktop still *prefers* its own translation when it has one and
+> falls back to the daemon's English, so a new flavor renders in every locale
+> immediately and a translated one stays translated.
+>
 > Plugins otherwise reuse the managed-dir model unchanged: `<entry>/plugins/`
 > mirrored into `data/plugins/`, provenance in `content.json`, `plugins/` added
 > to the backup exclude set so a restore heals it. **Folia is filtered strictly

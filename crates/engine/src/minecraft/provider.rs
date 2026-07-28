@@ -42,13 +42,42 @@ pub struct InstallRequest<'a> {
 /// The third-party content a flavor's own loader consumes: mods for a
 /// modloader, plugins for a server platform, nothing for vanilla. Datapacks
 /// (and, client-side, resourcepacks and shaders) belong to the game rather than
-/// the flavor, so they are not named here — the content flows add them.
+/// the flavor, so they are not named here — [`accepted_kinds`] adds them.
 pub type Loads = Option<ContentKind>;
+
+/// Which half of the game an entry is, for the rules that differ between them.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    Server,
+    Client,
+}
+
+/// Everything an entry of this flavor and side accepts, composed from two
+/// independent facts: whatever the flavor's own loader takes, plus what the
+/// side reads for itself — a client its resourcepacks and shaders, either side
+/// the datapacks that are world data rather than loader content.
+///
+/// It lives beside `Loads` because it is the same vocabulary: adding a flavor
+/// is one impl plus one registry line, with no table to update here or in any
+/// front-end.
+pub fn accepted_kinds(side: Side, loads: Loads) -> Vec<ContentKind> {
+    let mut kinds: Vec<ContentKind> = loads.into_iter().collect();
+    if side == Side::Client {
+        kinds.push(ContentKind::ResourcePack);
+        kinds.push(ContentKind::Shader);
+    }
+    kinds.push(ContentKind::DataPack);
+    kinds
+}
 
 #[async_trait]
 pub trait ServerProvider: Send + Sync {
     fn id(&self) -> &'static str;
     fn name(&self) -> &'static str;
+    /// One line describing the distribution — what it is, and anything about
+    /// running it a user should know before choosing it. Rendered by every
+    /// front-end, so a new flavor needs no front-end change to explain itself.
+    fn summary(&self) -> &'static str;
     fn loads(&self) -> Loads;
     async fn versions(&self) -> Result<Vec<GameVersion>>;
     async fn resolve(&self, request: &ResolveRequest) -> Result<ServerProfile>;
@@ -68,6 +97,8 @@ pub trait ServerProvider: Send + Sync {
 pub trait InstanceProvider: Send + Sync {
     fn id(&self) -> &'static str;
     fn name(&self) -> &'static str;
+    /// See [`ServerProvider::summary`].
+    fn summary(&self) -> &'static str;
     fn loads(&self) -> Loads;
     async fn versions(&self) -> Result<Vec<GameVersion>>;
     async fn resolve(&self, request: &ResolveRequest) -> Result<InstanceProfile>;
@@ -82,5 +113,37 @@ pub trait InstanceProvider: Send + Sync {
     /// every launch and must cost nothing once done.
     async fn install(&self, _request: &InstallRequest<'_>, _on: OnProgress<'_>) -> Result<()> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_flavor_contributes_its_loader_kind_and_the_side_the_rest() {
+        assert_eq!(
+            accepted_kinds(Side::Server, Some(ContentKind::Plugin)),
+            vec![ContentKind::Plugin, ContentKind::DataPack],
+            "a paper or spigot server takes plugins, never mods"
+        );
+        assert_eq!(
+            accepted_kinds(Side::Server, Some(ContentKind::Mod)),
+            vec![ContentKind::Mod, ContentKind::DataPack]
+        );
+        assert_eq!(
+            accepted_kinds(Side::Server, None),
+            vec![ContentKind::DataPack],
+            "vanilla loads nothing of its own, but a world still takes datapacks"
+        );
+        assert_eq!(
+            accepted_kinds(Side::Client, None),
+            vec![
+                ContentKind::ResourcePack,
+                ContentKind::Shader,
+                ContentKind::DataPack
+            ],
+            "a client reads packs whatever its flavor loads"
+        );
     }
 }
