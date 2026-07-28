@@ -750,6 +750,7 @@ dependencies = [
  "chrono",
  "flexi_logger",
  "husky-rs",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]

@@ -16,6 +16,15 @@ pub const DESKTOP_QUIT_ARG: &str = "--quit";
 pub const VENDOR: &str = "toraaoo";
 pub const CHANNEL: &str = "dev";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The release manifest every front-end checks for a newer version, and the
+/// minisign public key its artifacts are verified against. Both must match
+/// `plugins.updater` in `crates/desktop/tauri.conf.json` — the desktop shell
+/// reads them from there through `tauri-plugin-updater`, and
+/// `crates/common/tests/updater.rs` fails the build when the two disagree.
+pub const UPDATE_ENDPOINT: &str =
+    "https://github.com/toraaoo/hestia/releases/latest/download/latest.json";
+pub const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNENjExOURFRjg3QjFGMjUKUldRbEgzdjQzaGxoUFc4SzZjQ3N1V3VIRWQxSnJ4eWNXZHdUcis3ZFlQdGZDcGZDYk1ZcWMreDUK";
 /// The agent every outbound HTTP request identifies itself with.
 ///
 /// PaperMC and Modrinth both *ask* for a contact URL or address alongside the

@@ -1,43 +1,16 @@
 //! Self-update over the published release manifest (`latest.json`): a version
 //! check and the signed installer download. Network reads are stateless; the
 //! staging directory only holds the downloaded installer.
-//!
-//! The endpoint and the minisign public key are read from the desktop app's
-//! `tauri.conf.json` (`plugins.updater`), embedded at compile time — one
-//! source of truth for every front-end, so a regenerated key or a moved feed
-//! is a single-file change.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 
 use anyhow::{anyhow, Context, Result};
 use base64::Engine as _;
 use proto::update::{UpdateCheckResult, UpdateInfo};
 
 use crate::download::{http_client, Downloader, ProgressFn};
-
-const DESKTOP_CONF: &str = include_str!("../../desktop/tauri.conf.json");
-
-struct UpdaterConfig {
-    endpoint: String,
-    pubkey: String,
-}
-
-fn updater_config() -> Result<&'static UpdaterConfig> {
-    static CONFIG: OnceLock<Option<UpdaterConfig>> = OnceLock::new();
-    CONFIG
-        .get_or_init(|| {
-            let conf: serde_json::Value = serde_json::from_str(DESKTOP_CONF).ok()?;
-            let updater = conf.get("plugins")?.get("updater")?;
-            Some(UpdaterConfig {
-                endpoint: updater.get("endpoints")?.get(0)?.as_str()?.to_string(),
-                pubkey: updater.get("pubkey")?.as_str()?.to_string(),
-            })
-        })
-        .as_ref()
-        .context("no updater endpoint/pubkey configured in tauri.conf.json")
-}
 
 pub struct Update {
     dir: Mutex<PathBuf>,
@@ -112,7 +85,7 @@ impl Update {
 
 async fn fetch_manifest() -> Result<Manifest> {
     http_client()
-        .get(&updater_config()?.endpoint)
+        .get(common::app::UPDATE_ENDPOINT)
         .send()
         .await
         .context("cannot reach the update endpoint")?
@@ -158,7 +131,7 @@ fn parse_version(v: &str) -> Option<(u64, u64, u64)> {
 fn verify_signature(path: &Path, signature: &str) -> Result<()> {
     // Wire contract with tauri's signer: the public key and the signature are
     // both base64-wrapped minisign documents.
-    let pubkey = base64_text(&updater_config()?.pubkey).context("bad update public key")?;
+    let pubkey = base64_text(common::app::UPDATE_PUBKEY).context("bad update public key")?;
     let pubkey = minisign_verify::PublicKey::decode(&pubkey).map_err(|e| anyhow!("{e}"))?;
     let signature = base64_text(signature).context("bad update signature")?;
     let signature = minisign_verify::Signature::decode(&signature).map_err(|e| anyhow!("{e}"))?;
