@@ -227,8 +227,10 @@ pub struct ModpackFile {
     pub server: SideSupport,
 }
 
-/// A resolved modpack: the loader/game version it targets and the files to
-/// place. `overrides/` handling is a materialize-time concern, deferred.
+/// A resolved modpack: the loader/game version it targets and the files it
+/// pulls from the network. A pack's own `overrides/` are carried inside the
+/// archive rather than listed here, so they stay an install-time concern (see
+/// [`crate::modpack`]) and never cross the wire.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
@@ -236,7 +238,9 @@ pub struct ResolvedModpack {
     pub source: String,
     pub project_id: String,
     pub version_id: String,
+    pub version_number: String,
     pub name: String,
+    pub summary: String,
     pub game_version: String,
     pub loader: Option<String>,
     pub loader_version: Option<String>,

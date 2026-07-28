@@ -433,6 +433,27 @@ pub enum ErrorInfo {
     ModpackInvalid {
         detail: String,
     },
+    /// The pack pins a mod loader this launcher has no flavor for. Carried as
+    /// the loader's own name, since the set of shipped flavors moves.
+    ModpackLoaderUnsupported {
+        loader: String,
+    },
+    /// The pack targets a different game version or loader than the entry it
+    /// was aimed at. Both are baked into the entry's resolved profile, so the
+    /// pack cannot be installed there — a new entry has to be created instead.
+    ModpackEntryMismatch {
+        entry: EntryKind,
+        name: String,
+        flavor: String,
+        game_version: String,
+        pack_flavor: String,
+        pack_game_version: String,
+    },
+    /// An entry with no pack was asked to update or remove one.
+    ModpackNotInstalled {
+        entry: EntryKind,
+        name: String,
+    },
     UnsupportedContentUrl {
         url: String,
     },
@@ -607,6 +628,27 @@ impl fmt::Display for ErrorInfo {
             LoginTimedOut => write!(f, "the sign-in timed out — try again"),
             NotAModpack { reference } => write!(f, "'{reference}' is not a modpack"),
             ModpackInvalid { detail } => write!(f, "this modpack could not be read: {detail}"),
+            ModpackLoaderUnsupported { loader } => {
+                write!(
+                    f,
+                    "this modpack needs the {loader} loader, which hestia does not have"
+                )
+            }
+            ModpackEntryMismatch {
+                entry,
+                name,
+                flavor,
+                game_version,
+                pack_flavor,
+                pack_game_version,
+            } => write!(
+                f,
+                "this modpack is for {pack_flavor} {pack_game_version}, but {entry} '{name}' is \
+                 {flavor} {game_version} — create a new {entry} from the pack instead"
+            ),
+            ModpackNotInstalled { entry, name } => {
+                write!(f, "{entry} '{name}' was not built from a modpack")
+            }
             UnsupportedContentUrl { url } => {
                 write!(
                     f,

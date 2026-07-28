@@ -59,6 +59,12 @@ pub enum WarningInfo {
     /// A sync target could not be reconciled at all. `detail` is operational
     /// English, shown as secondary text.
     SyncTargetSkipped { target: String, detail: String },
+    /// Game-directory files the pack owns were left as the user edited them, so
+    /// this entry is not running the pack's own configuration for them.
+    ModpackOverridesKept { paths: Vec<String> },
+    /// The pack named files of a kind this entry's flavor cannot load, so they
+    /// were not installed — a client-shaped pack put on a server, typically.
+    ModpackFilesNotAccepted { count: u32, flavor: String },
 }
 
 impl WarningInfo {
@@ -86,6 +92,15 @@ impl WarningInfo {
             SyncTargetSkipped { target, .. } => {
                 format!("check permissions on `data/{target}`, then launch again")
             }
+            ModpackOverridesKept { .. } => {
+                "delete a file under `data/` to take the pack's version of it at the next update"
+                    .to_string()
+            }
+            ModpackFilesNotAccepted { .. } => {
+                "nothing to do — the pack ships them for the other side; install the pack on an \
+                 instance to get them"
+                    .to_string()
+            }
         }
     }
 }
@@ -105,6 +120,15 @@ impl fmt::Display for WarningInfo {
             SyncTargetSkipped { target, detail } => {
                 write!(f, "'{target}' could not be synced: {detail}")
             }
+            ModpackOverridesKept { paths } => write!(
+                f,
+                "{} file(s) you had edited were kept instead of the modpack's",
+                paths.len()
+            ),
+            ModpackFilesNotAccepted { count, flavor } => write!(
+                f,
+                "{count} of the modpack's file(s) are not loaded by a {flavor} entry and were skipped"
+            ),
         }
     }
 }

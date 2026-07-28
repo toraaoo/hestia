@@ -197,6 +197,8 @@ pub enum ProvisionPhase {
     Libraries,
     Assets,
     Content,
+    /// Writing a modpack's own game-directory files (its `overrides/`).
+    Overrides,
 }
 
 /// Progress for a provisioning job. `current`/`total` are bytes for a

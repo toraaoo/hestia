@@ -17,6 +17,7 @@ pub mod instance;
 pub mod java;
 pub mod job;
 pub mod minecraft;
+pub mod modpack;
 pub mod naming;
 pub mod process;
 pub mod profile;
