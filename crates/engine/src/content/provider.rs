@@ -9,6 +9,8 @@ use proto::content::{
     ContentKind, ContentProject, ContentVersion, ResolvedModpack, SearchQuery, VersionQuery,
 };
 
+use crate::config::ContentSettings;
+
 /// A project reference recognised in a platform's own site URL, optionally
 /// pinned to one version. `kind` is what the URL's own path says the project is.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +34,18 @@ pub struct FileRef {
 pub trait ContentProvider: Send + Sync {
     fn id(&self) -> &'static str;
     fn name(&self) -> &'static str;
+    /// What this platform catalogues, so a front-end offers it for those kinds
+    /// alone rather than searching a kind it cannot serve.
+    fn kinds(&self) -> Vec<ContentKind>;
+    /// Whether the platform can serve requests as configured. An API key it has
+    /// not been given is the one reason today.
+    fn available(&self) -> bool {
+        true
+    }
+    /// Take the launcher settings that concern this source. Called at startup
+    /// and after every `config set`, so a key takes effect on the running
+    /// daemon.
+    fn configure(&self, _settings: &ContentSettings) {}
     /// Recognise a project/version page URL on this platform's site.
     fn parse_url(&self, url: &str) -> Option<UrlRef>;
     /// Recognise one of this platform's own file download URLs, when it carries

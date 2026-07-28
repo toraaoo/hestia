@@ -1,8 +1,11 @@
-//! Third-party content provider aggregate: the source registry (Modrinth today,
-//! CurseForge behind the same trait later) and the search/project/versions/
-//! modpack entry points over it. Stateless — every result is fetched upstream —
-//! so it needs no data directory, exactly like the `minecraft` aggregate.
+//! Third-party content provider aggregate: the source registry (Modrinth and
+//! CurseForge behind one trait) and the search/project/versions/modpack entry
+//! points over it. Stateless — every result is fetched upstream — so it needs no
+//! data directory, exactly like the `minecraft` aggregate. The only state is the
+//! per-source configuration `configure()` hands down, since CurseForge serves
+//! nothing without an API key.
 
+pub(crate) mod curseforge;
 pub(crate) mod inspect;
 pub(crate) mod install;
 pub(crate) mod modpack;
@@ -19,6 +22,7 @@ use proto::content::{
     ResolvedModpack, ResolvedUrl, SearchQuery, SearchResult, VersionQuery,
 };
 
+use crate::config::ContentSettings;
 use provider::ContentProvider;
 pub(crate) use provider::UrlRef;
 
@@ -29,7 +33,10 @@ pub struct Content {
 impl Default for Content {
     fn default() -> Self {
         Content {
-            providers: vec![Box::new(modrinth::Modrinth)],
+            providers: vec![
+                Box::new(modrinth::Modrinth),
+                Box::new(curseforge::CurseForge::default()),
+            ],
         }
     }
 }
@@ -37,6 +44,14 @@ impl Default for Content {
 impl Content {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Hand each source the settings it needs. Called at startup and after
+    /// every `config set`, so a key takes effect on the running daemon.
+    pub fn configure(&self, settings: &ContentSettings) {
+        for provider in &self.providers {
+            provider.configure(settings);
+        }
     }
 
     /// Classify a local file for import (the daemon is the only side that can
@@ -77,12 +92,16 @@ impl Content {
         }
     }
 
+    /// The sources that can actually serve a request — a platform whose API key
+    /// is unset is registered but not offered.
     pub fn sources(&self) -> Vec<ContentSource> {
         self.providers
             .iter()
+            .filter(|p| p.available())
             .map(|p| ContentSource {
                 id: p.id().to_string(),
                 name: p.name().to_string(),
+                kinds: p.kinds(),
             })
             .collect()
     }
@@ -211,19 +230,31 @@ impl Content {
             .find_map(|p| p.parse_url(url).map(|r| (p.id().to_string(), r)))
     }
 
-    /// The provider for `id`; an empty id selects the default (first) source.
+    /// The provider for `id`; an empty id selects the default — the first
+    /// source that can serve. A source that is registered but unconfigured is
+    /// refused by name rather than reported unknown, since the difference is
+    /// what the user has to act on.
     fn provider(&self, id: &str) -> Result<&dyn ContentProvider> {
         if id.is_empty() {
             return self
                 .providers
-                .first()
+                .iter()
                 .map(AsRef::as_ref)
-                .context("no content providers are registered");
+                .find(|p| p.available())
+                .context("no content source is configured");
         }
-        self.providers
+        let provider = self
+            .providers
             .iter()
             .map(AsRef::as_ref)
             .find(|p| p.id() == id)
-            .with_context(|| format!("unknown content source: {id}"))
+            .with_context(|| format!("unknown content source: {id}"))?;
+        if !provider.available() {
+            return Err(proto::error::ErrorInfo::ContentSourceUnavailable {
+                source: provider.id().to_string(),
+            }
+            .into());
+        }
+        Ok(provider)
     }
 }

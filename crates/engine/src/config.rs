@@ -21,6 +21,8 @@ pub struct Settings {
     /// JVM defaults applied to any server or instance whose record leaves the
     /// matching per-entry setting unset.
     pub defaults: JvmDefaults,
+    /// Credentials for the content sources that need one.
+    pub content: ContentSettings,
 }
 
 /// The launcher-wide JVM defaults, addressed by the kebab-case config keys
@@ -33,6 +35,16 @@ pub struct Settings {
 pub struct JvmDefaults {
     pub memory: String,
     pub jvm_args: String,
+}
+
+/// The content sources' own settings, addressed by the kebab-case config key
+/// `content.curseforge-key`. CurseForge's API refuses every request without a
+/// key, so the source is offered only once one resolves — this setting, else
+/// the key a distributor baked in at build time.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ContentSettings {
+    pub curseforge_key: String,
 }
 
 impl Settings {
@@ -48,6 +60,7 @@ impl Settings {
         self.defaults.jvm_args = parse_jvm_args(&self.defaults.jvm_args)
             .map_err(|e| e.to_string())?
             .join(" ");
+        self.content.curseforge_key = self.content.curseforge_key.trim().to_string();
         Ok(())
     }
 

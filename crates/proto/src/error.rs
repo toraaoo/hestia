@@ -194,6 +194,7 @@ pub enum Service {
     Fabric,
     Paper,
     Modrinth,
+    CurseForge,
     Microsoft,
     Xbox,
 }
@@ -206,6 +207,7 @@ impl fmt::Display for Service {
             Service::Fabric => "Fabric",
             Service::Paper => "PaperMC",
             Service::Modrinth => "Modrinth",
+            Service::CurseForge => "CurseForge",
             Service::Microsoft => "Microsoft",
             Service::Xbox => "Xbox",
         })
@@ -468,6 +470,18 @@ pub enum ErrorInfo {
         actual: ContentKind,
         expected: ContentKind,
     },
+    /// A registered source that cannot serve requests as configured — today,
+    /// a platform whose API key is unset.
+    ContentSourceUnavailable {
+        source: String,
+    },
+    /// The source lists the file but publishes no download for it: CurseForge
+    /// lets an author opt out of third-party distribution. Nothing to retry —
+    /// the file has to come from the project page by hand.
+    ContentDownloadBlocked {
+        title: String,
+        source: String,
+    },
 
     // --- sync ---
     SyncTargetInvalid {
@@ -665,6 +679,14 @@ impl fmt::Display for ErrorInfo {
                 actual,
                 expected,
             } => write!(f, "'{title}' is {actual} content, not {expected}"),
+            ContentSourceUnavailable { source } => {
+                write!(f, "the {source} content source is not configured")
+            }
+            ContentDownloadBlocked { title, source } => write!(
+                f,
+                "'{title}' cannot be downloaded through the {source} API — \
+                 get the file from its project page and import it"
+            ),
             SyncTargetInvalid { path, reason } => {
                 write!(f, "'{path}' cannot be a sync target: {reason}")
             }

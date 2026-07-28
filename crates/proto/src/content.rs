@@ -64,13 +64,17 @@ pub enum ReleaseChannel {
     Alpha,
 }
 
-/// A source platform (modrinth, curseforge) — the first selector level.
+/// A source platform (modrinth, curseforge) — the first selector level. Only
+/// sources that can actually serve requests are listed (a platform whose API
+/// key is unset is not), and `kinds` is what this one catalogues, so a
+/// front-end offers it for those kinds alone.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentSource {
     pub id: String,
     pub name: String,
+    pub kinds: Vec<ContentKind>,
 }
 
 /// A gallery image on a project. Search hits carry only `url`; the detail call
@@ -344,7 +348,9 @@ pub struct ContentListResult {
 
 /// One thing to install: exactly one of `project` (a platform project,
 /// optionally pinned by `version`), `url` (a project/version page URL on a
-/// supported source), or `path` (a daemon-local file to import).
+/// supported source), or `path` (a daemon-local file to import). `source`
+/// overrides the batch's for this item, so one batch may mix platforms; a URL
+/// always names its own source.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
@@ -354,6 +360,7 @@ pub struct ContentAddItem {
     pub url: String,
     pub path: String,
     pub filename: String,
+    pub source: String,
 }
 
 /// What to install: one or more items of one `kind` from one `source`,

@@ -76,6 +76,10 @@ impl ContentProvider for Modrinth {
         "Modrinth"
     }
 
+    fn kinds(&self) -> Vec<ContentKind> {
+        SITE_TYPES.iter().filter_map(|(_, kind)| *kind).collect()
+    }
+
     /// `modrinth.com/<type>/<slug>` names a project;
     /// `…/<slug>/version/<number-or-id>` pins one of its versions.
     fn parse_url(&self, url: &str) -> Option<UrlRef> {

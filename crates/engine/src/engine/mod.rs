@@ -80,6 +80,8 @@ impl Engine {
         let skins = Skins::new(data_home.join("skins"));
         let sync = Sync::new(data_home.join("shared"));
         let profiles = Profiles::new(data_home.join("profiles"));
+        let content = Content::new();
+        content.configure(&config.settings().content);
         Engine {
             data_home: Mutex::new(data_home),
             config,
@@ -87,7 +89,7 @@ impl Engine {
             java,
             accounts,
             minecraft: Minecraft::new(),
-            content: Content::new(),
+            content,
             servers,
             instances,
             skins,
@@ -136,6 +138,7 @@ impl Engine {
         let resolved = common::paths::data_home(None);
         self.config
             .reload(common::paths::config_path(Some(&resolved)));
+        self.content.configure(&self.config.settings().content);
         self.cache.reload(resolved.join("cache"));
         self.java.reload(resolved.join("java"));
         self.accounts.reload(resolved.join("accounts.json"));
@@ -154,6 +157,19 @@ impl Engine {
 
     pub fn config(&self) -> &Config {
         &self.config
+    }
+
+    /// Set a config value, then re-apply the settings a subsystem keeps its own
+    /// copy of — a content source's API key takes effect on the running daemon,
+    /// not at the next start.
+    pub fn set_config(
+        &self,
+        key: &str,
+        value: serde_json::Value,
+    ) -> Result<(), crate::config::ConfigError> {
+        self.config.set(key, value)?;
+        self.content.configure(&self.config.settings().content);
+        Ok(())
     }
 
     pub fn cache(&self) -> &Cache {

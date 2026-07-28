@@ -56,8 +56,10 @@ it's just as comfortable from a terminal as from a window.
 > built locally from its installer, so a first launch or create takes a few
 > minutes. **Paper** and **Folia** are shipped for
 > servers, which take **plugins** rather than mods and start on the JVM flags
-> PaperMC recommends for that version. Modrinth is the shipped content source.
-> A **system tray**
+> PaperMC recommends for that version. Modrinth and CurseForge are the shipped
+> content sources — CurseForge's API needs a key
+> (`config set content.curseforge-key`), and the source is not offered until
+> one is set. A **system tray**
 > accompanies every serving daemon — open the app, status, start/restart, a
 > start-at-login toggle, quit; a left-click (or the Open item) launches the
 > desktop shell. The **desktop shell** talks to the daemon through a generic

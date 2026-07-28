@@ -207,9 +207,14 @@ impl Engine {
         identity: &FileIdentity,
         job: &Job<'_>,
     ) -> Result<InstalledContent> {
+        // A pack may name a file its own platform publishes no download for —
+        // CurseForge lets an author opt out of third-party distribution, and a
+        // pack listing one is the common case, not an odd one. It is a per-file
+        // failure naming what to fetch by hand, never a failed install.
         if file.artifact.url.is_empty() {
-            bail!(ErrorInfo::FieldRequired {
-                field: proto::error::Field::Url
+            bail!(ErrorInfo::ContentDownloadBlocked {
+                title: identity.label(file),
+                source: source.to_string(),
             });
         }
         materialize::validate_filename(&file.artifact.filename)?;

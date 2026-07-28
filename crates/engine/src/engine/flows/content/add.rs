@@ -90,7 +90,10 @@ impl Engine {
             } else if !item.project.is_empty() {
                 roots.push(PlatformRoot {
                     given: item.project.clone(),
-                    source: spec.source.clone(),
+                    source: match item.source.is_empty() {
+                        true => spec.source.clone(),
+                        false => item.source.clone(),
+                    },
                     project: item.project.clone(),
                     pin: item.version.clone(),
                 });
@@ -350,6 +353,15 @@ impl Engine {
         on_progress: OnProgress<'_>,
     ) -> Result<InstalledContent> {
         let file = install::primary_file(version)?;
+        // A source may list a file it publishes no download for — CurseForge
+        // lets an author opt out of third-party distribution. Nothing to
+        // retry: say so, and the batch moves on to the next item.
+        if file.artifact.url.is_empty() {
+            bail!(ErrorInfo::ContentDownloadBlocked {
+                title: project.title.clone(),
+                source: version.source.clone(),
+            });
+        }
         materialize::validate_filename(&file.artifact.filename)?;
         let managed = content_target(ctx, kind, &file.artifact.filename)?;
         materialize::ensure_artifact(

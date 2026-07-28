@@ -79,8 +79,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         }
         ctx.runtime
             .engine()
-            .config()
-            .set(&p.key, p.value)
+            .set_config(&p.key, p.value)
             .map_err(config_err)?;
         tracing::info!(key = %p.key, "config updated");
         Ok(Empty {})
