@@ -345,10 +345,11 @@ mod tests {
     #[test]
     fn a_bracketed_coordinate_becomes_a_library_path() {
         let processor = json!({ "args": ["--input", "[net.neoforged:neoform:1.21.1@zip]"] });
-        let args = arguments(&processor, &table(), Path::new("/libs")).unwrap();
+        let libs = Path::new("/libs");
+        let args = arguments(&processor, &table(), libs).unwrap();
         assert_eq!(
             args[1],
-            "/libs/net/neoforged/neoform/1.21.1/neoform-1.21.1.zip"
+            path_string(&libs.join("net/neoforged/neoform/1.21.1/neoform-1.21.1.zip"))
         );
     }
 
@@ -372,7 +373,7 @@ mod tests {
         let libs = Path::new("/libs");
         assert_eq!(
             resolve("[net.neoforged:neoforge:21.1.244:server]", libs, &staged).unwrap(),
-            "/libs/net/neoforged/neoforge/21.1.244/neoforge-21.1.244-server.jar"
+            path_string(&libs.join("net/neoforged/neoforge/21.1.244/neoforge-21.1.244-server.jar"))
         );
         assert_eq!(
             resolve("/data/server.lzma", libs, &staged).unwrap(),

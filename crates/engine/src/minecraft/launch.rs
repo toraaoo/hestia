@@ -480,7 +480,10 @@ mod tests {
         assert_eq!(plan.cwd, Path::new("/srv/.schema"));
         let classpath = &plan.args[1];
         assert!(classpath.contains(&join_str(Path::new("/srv/data"), "server.jar")));
-        assert!(classpath.contains(&join_str(Path::new("/srv/data/libraries"), "a/b.jar")));
+        assert!(classpath.contains(&join_str(
+            &Path::new("/srv/data").join("libraries"),
+            "a/b.jar"
+        )));
     }
 
     #[test]
