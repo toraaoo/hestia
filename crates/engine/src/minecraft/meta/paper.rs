@@ -3,9 +3,9 @@
 //! service — Paper and Folia are the two Hestia registers as flavors.
 //!
 //! Fill v2 (`api.papermc.io`) stopped receiving builds at the end of 2025 and
-//! was disabled on 1 July 2026; v3 is the only live surface, and it refuses a
-//! request whose user agent does not identify its caller (see
-//! `common::app::user_agent`).
+//! was disabled on 1 July 2026, so v3 is the only live surface. Its docs ask
+//! for a user agent identifying the caller; it does not enforce one, so that is
+//! etiquette rather than a requirement (see `common::app::user_agent`).
 
 use anyhow::{Context, Result};
 use proto::download::{Checksum, HashAlgorithm};

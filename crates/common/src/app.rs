@@ -16,14 +16,15 @@ pub const DESKTOP_QUIT_ARG: &str = "--quit";
 pub const VENDOR: &str = "toraaoo";
 pub const CHANNEL: &str = "dev";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-/// Where the project lives. Carried as the contact in [`user_agent`]: PaperMC
-/// rejects a request whose agent does not identify the software with a way to
-/// reach its author, and Modrinth asks for the same.
-pub const HOMEPAGE: &str = "https://github.com/toraaoo/hestia";
-
 /// The agent every outbound HTTP request identifies itself with.
+///
+/// PaperMC and Modrinth both *ask* for a contact URL or address alongside the
+/// name — so an upstream can reach a misbehaving client instead of blocking it
+/// — but neither enforces it, and Hestia has no published home to name yet. A
+/// contact belongs here when there is a real one; an invented URL would point
+/// upstreams somewhere that is not us, which is worse than staying anonymous.
 pub fn user_agent() -> String {
-    format!("{NAME}/{VERSION} (+{HOMEPAGE})")
+    format!("{NAME}/{VERSION}")
 }
 
 #[cfg(debug_assertions)]
