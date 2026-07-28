@@ -392,8 +392,16 @@ The subsystems behind the aggregate:
   and datapacks. `Engine` composes the flows
   (`add_server_content`/`add_instance_content`, list/remove/update) and a
   `sync` pass re-mirrors any missing managed file at every start/launch (below).
-  Installing a modpack's files and `overrides/` is the remaining materialize
-  step.
+- **`modpack`** (`content/mrpack.rs`, `content/modpack.rs`) — installing a whole
+  pack. `mrpack` owns the *format* (the manifest, and extracting the
+  `overrides/` trees), deliberately apart from the platform that serves it: a
+  pack picked off disk has no source and is read the same way. `modpack` is the
+  per-entry record (`<entry>/modpack.json`) of which pack an entry runs and
+  which game-directory files it owns, with the hash each was written with.
+  `Engine`'s flows (`engine/flows/modpack/`) compose them: `resolve` turns a
+  reference — a project, a source page URL, or a local `.mrpack` — into an
+  archive, and `apply` puts it onto a new or existing entry. See the decision
+  note below.
 - **`sync`** (`Sync`) — shared settings/configs propagated across instances
   through a persistent `<data_home>/shared/` store (one flat store, one
   `targets.json`). Two target classes: **files are copied** (`options.txt`
@@ -618,8 +626,71 @@ The subsystems behind the aggregate:
 > file manifest (path, URL, checksum, client/server side) rather than writing
 > anything, because installing must compose with the entry stores' layout and
 > locking (`data/` vs the managed `mods/`/`resourcepacks/` roots, the backup
-> in-flight keys) — that materialize step lands with mod management, and the
-> wire contract does not change when it does.
+> in-flight keys) — that materialize step landed later (below), and the wire
+> contract did not change when it did.
+
+> **A modpack is three things at once, and each goes where it already belongs.**
+> Installing a pack could have been a store of its own — a `modpack/` tree, its
+> own mirror, its own update logic. It is not, because a pack decomposes cleanly
+> into things this codebase already has:
+>
+> - its **loader and game version** become the entry's flavor and version, so
+>   creating from a pack is the ordinary create with those filled in (which is
+>   also why `instance|server create --modpack` and `modpack install` are one
+>   code path);
+> - its **index files under a flat managed load dir** become ordinary pool items
+>   tagged `modpack:<project>`, so the launch-time mirror, the backup heal,
+>   `content list`, per-item enable and per-item update all work on them
+>   unchanged — the same origin-tag mechanism global profiles already use;
+> - **everything else it ships** — its `overrides/`, plus any index file outside
+>   a managed dir — is written straight into `data/` and recorded in
+>   `modpack.json`.
+>
+> Only the third needed anything new, and only for one reason: those files are
+> configs and keymaps *the user edits*. So the record stores the sha1 each was
+> written with, and an update replaces a file the pack still owns while leaving
+> a tweaked one exactly as found, reporting which through
+> `WarningInfo::ModpackOverridesKept`. They are not given a managed copy of
+> their own: unlike a jar, a config lives inside the backup archive already, so
+> a restore covers them and a second copy would double every config on disk to
+> re-solve a solved problem. Both references agree on this much (Modrinth's
+> launcher and Prism both extract overrides in place and track their hashes);
+> the divergence is that hestia's *mods* are pool items rather than pack-owned
+> files, which is what makes a pack's mod individually updatable.
+>
+> **The server side is new ground.** Both references are client-only — Modrinth
+> handles `overrides/` and `client-overrides/` and skips `server-overrides/`
+> outright — so the server half follows the format spec rather than a
+> precedent: `env.server` decides which index files are wanted, and
+> `server-overrides/` takes the place of `client-overrides/`. The shared tree is
+> written first so a side tree wins where both name a path, which is what having
+> two trees means.
+>
+> **A pack's mods are identified for free.** A pack index names each file by URL
+> and hash alone, with no project or version id — which would make a 150-mod
+> pack list as 150 anonymous filenames and leave `content update` nothing to
+> work with. But a platform's own CDN URL carries both ids
+> (`cdn.modrinth.com/data/<project>/versions/<version>/…`), so `parse_file_url`
+> recovers them at no cost, and one bulk `projects` call fills in every title
+> and icon. Both are provider-trait methods, so CurseForge slots in behind the
+> same seam. A file the source does not serve is recorded as `source: "file"` —
+> it installs, it is simply not updatable, exactly like a local import.
+>
+> **What a pack cannot do:** it cannot be installed into an entry whose flavor
+> or game version differs from what it pins (`ModpackEntryMismatch` names both
+> sides — the entry's profile is resolved and neither can change in place), and
+> a pack pinning a loader with no hestia flavor is refused by name rather than
+> quietly installed as vanilla. The flavor check is the *registry*, not a match
+> arm: a pack's loader name **is** hestia's flavor id, so adding a flavor needs
+> no edit in the modpack flow.
+>
+> **A pack update carries the game version with it**, because that is what
+> updating a pack means — a pack that bumps 1.21.1 → 1.21.4 is the common case,
+> and refusing it would leave `modpack update` useful only for the rare
+> same-version bump. So it runs the entry's existing version-update flow (a
+> server's automatic pre-update backup included) behind the same explicit
+> `allow_downgrade` gate. A loader change still refuses: the flavor is baked
+> into the resolved profile.
 
 > **Installed content is managed-dir-of-record, mirrored into `data/`.** A mod
 > is written to the entry root's `mods/` (hestia's namespace) with its
@@ -1201,7 +1272,14 @@ supervises launched processes, and manages autostart. The only crate that links
   `server.content.add|list|remove|update` and its `instance.content.*`
   counterpart (add/update are jobs over a `ContentManager`, publishing the
   `content.*` topics; list/remove are plain request/response; all refuse a
-  running or busy entry). Plus `profile.list|create|remove|edit` — the global
+  running or busy entry). Plus
+  `server.modpack.install|update|status|remove` and its `instance.modpack.*`
+  counterpart — install and update are jobs over a `ModpackManager` publishing
+  the `modpack.*` topics, keyed by the entry's process id like every other
+  per-entry job; an install that *creates* its entry has no key to conflict
+  with and claims its own job id instead. Split per side rather than taking one
+  target-tagged channel, so the router's account gate covers the instance half
+  by prefix. Plus `profile.list|create|remove|edit` — the global
   content-profile reference lists (edit resolves adds through the content
   registry) — and `instance.profile.apply`, a `ContentManager` job installing
   a global profile's references into a stopped, non-busy instance.
@@ -1775,7 +1853,12 @@ datapacks; mods/resourcepacks/shaders/
 datapacks on instances, from a platform project, a source page URL, or a local
 file, with required dependencies resolved and a `data/` mirror that heals across
 backups (datapacks install into their world, which the world backup already
-covers); the kind-first browse and management CLI (`hestia mod search`,
+covers); **modpacks** installed into a new or existing server or instance from a
+project, a URL, or a local `.mrpack` — the pack's own loader and version
+building the entry, its mods joining the pool as ordinary origin-tagged content,
+and its `overrides/` written into the game directory under a hash record that
+keeps a user's edits through an update; the kind-first browse and management CLI
+(`hestia mod search`, `hestia modpack install`,
 `instance <name> mod add|list|remove|update`, `hestia search`); the CLI
 front-end over all of it; and the system tray (spawned by every serving
 daemon, quick actions for open/start/restart/autostart/quit, left-click
@@ -1783,10 +1866,9 @@ launches the desktop shell).
 
 **Pending:** natives-classifier extraction for pre-1.19 clients (the resolver
 skips legacy `natives-<os>` classifier libraries, so old versions launch
-without their LWJGL natives) and the legacy (virtual) asset layout; installing
-a resolved modpack (its files and `overrides/`, e.g. `instance create
---modpack`); and the desktop UI over the wired shell (the daemon bridge and
-typed API/hooks layer are in place; pages are not).
+without their LWJGL natives) and the legacy (virtual) asset layout; and the
+desktop UI over the wired shell (the daemon bridge and typed API/hooks layer
+are in place; pages are not).
 
 > **Server provisioning is front-loaded by design.** A server is a long-lived,
 > repeatedly-started thing, often driven headless/scripted — `create` pays the

@@ -45,7 +45,13 @@ it's just as comfortable from a terminal as from a window.
 > **Global profiles** are data-home-level project reference lists applied
 > into an instance in one shot — each reference resolved against that
 > instance's version/loader and installed as ordinary origin-tagged content
-> (all a daemon/desktop surface, no CLI verbs). Vanilla and Fabric are the
+> (all a daemon/desktop surface, no CLI verbs). A whole **modpack** installs
+> into a new or existing server or instance from a project, a page URL, or a
+> local `.mrpack`: the pack's own loader and version build the entry, its mods
+> join the pool as ordinary origin-tagged content (individually listable and
+> updatable), and its `overrides/` are written into the game directory under a
+> hash record, so updating the pack replaces the files it still owns and leaves
+> the ones you have edited. Vanilla and Fabric are the
 > shipped flavors for both sides, joined by **NeoForge** — whose game jar is
 > built locally from its installer, so a first launch or create takes a few
 > minutes. **Paper** and **Folia** are shipped for
@@ -56,7 +62,7 @@ it's just as comfortable from a terminal as from a window.
 > start-at-login toggle, quit; a left-click (or the Open item) launches the
 > desktop shell. The **desktop shell** talks to the daemon through a generic
 > Tauri IPC bridge with a typed TS API layer (React Query hooks included).
-> Still to come: installing a whole modpack and the desktop UI itself.
+> Still to come: the desktop UI itself.
 
 ## Front-ends
 
