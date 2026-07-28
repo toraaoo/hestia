@@ -8,7 +8,8 @@ use crate::contract::{Contract, Empty, Topic};
 use crate::download::DownloadProgress;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
 pub struct UpdateInfo {
     pub version: String,
     pub notes: String,
@@ -16,7 +17,8 @@ pub struct UpdateInfo {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
 pub struct UpdateCheckResult {
     pub current: String,
     pub available: Option<UpdateInfo>,
@@ -30,13 +32,15 @@ impl Contract for UpdateCheck {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
 pub struct UpdateDownloadParams {
     pub id: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[serde(default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
 pub struct UpdateDownloadResult {
     pub id: String,
 }
@@ -49,6 +53,8 @@ impl Contract for UpdateDownload {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateProgressEvent {
     pub id: String,
     #[serde(flatten)]
@@ -59,6 +65,8 @@ impl Topic for UpdateProgressEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateDoneEvent {
     pub id: String,
     pub path: PathBuf,
@@ -69,6 +77,8 @@ impl Topic for UpdateDoneEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateErrorEvent {
     pub id: String,
     pub message: String,
