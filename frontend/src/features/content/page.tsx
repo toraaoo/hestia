@@ -10,7 +10,7 @@ import { Bone, CardGridSkeleton } from '@/components/skeleton';
 import { ContentCard } from '@/features/content/components/content-card';
 import {
   SourceChips,
-  useContentSources,
+  useSourceOptions,
 } from '@/features/content/components/sources';
 import { contentKinds, kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
@@ -30,7 +30,7 @@ export function BrowsePage({
 }) {
   const { query } = useSearch();
   const q = query.trim();
-  const sources = useContentSources(kind, source);
+  const sources = useSourceOptions(kind, source);
   // The default source is the absence of the param, not an empty one.
   const sourceParam = source ? { source } : {};
 

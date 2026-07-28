@@ -1,20 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
-
 import type { ContentKind, ContentSource } from '@/api';
 import { chipClass } from '@/components/chip';
 import { Badge } from '@/components/ui/badge';
-import { contentQueries } from '@/queries/content';
+import { useContentSources } from '@/queries/content';
 
 /**
  * The sources a kind can be browsed on. The daemon answers only the sources
  * that can serve — a platform whose API key is unset is never among them — so
  * this never offers one that would come back empty.
  */
-export function useContentSources(
-  kind: ContentKind | undefined,
-  value: string,
-) {
-  const sources = useQuery(contentQueries.sources());
+export function useSourceOptions(kind: ContentKind | undefined, value: string) {
+  const sources = useContentSources();
   const list = (sources.data ?? []).filter(
     (s) => !kind || s.kinds.includes(kind),
   );
@@ -54,7 +49,7 @@ export function SourceChips({
 
 /** Which platform a project came from — only worth saying with more than one. */
 export function SourceBadge({ source }: { source: string }) {
-  const sources = useQuery(contentQueries.sources());
+  const sources = useContentSources();
   const list = sources.data ?? [];
   if (!source || list.length < 2) return null;
   return (

@@ -16,7 +16,7 @@ import { projectKey } from '@/features/content/components/content-card';
 import { PickRow } from '@/features/content/components/pick-row';
 import {
   SourceChips,
-  useContentSources,
+  useSourceOptions,
 } from '@/features/content/components/sources';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
@@ -62,7 +62,7 @@ export function ContentStep({
   const activeKind = kind ?? kinds[0];
   const pickedKeys = new Set(picked.map(projectKey));
   const installedRefs = useInstalledRefs(target, activeKind);
-  const sources = useContentSources(activeKind, source);
+  const sources = useSourceOptions(activeKind, source);
 
   const url = isContentUrl(search) ? search.trim() : '';
   const link = useQuery(contentQueries.url(url));

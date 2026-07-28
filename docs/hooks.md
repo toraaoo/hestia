@@ -347,7 +347,7 @@ marks a job mutation — pair with `useJobMutation` semantics above.
 
 | Hook | Channel | Variables |
 |---|---|---|
-| `useContentSources()` | `content.sources` | — |
+| `useContentSources()` | `content.sources` | — (only the sources that can serve) |
 | `useContentSearch(query)` | `content.search` | — |
 | `useContentProject(project, source?)` | `content.project` | — |
 | `useContentVersions(query)` | `content.versions` | — |
