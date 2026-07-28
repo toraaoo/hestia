@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use clap::Subcommand;
-use proto::announce::{Announcement, Severity};
+use proto::announce::{AnnounceListResult, Announcement, Severity};
 
 use crate::commands::mc;
 use crate::ui::{self, View};
@@ -32,7 +32,7 @@ pub async fn run(cmd: Option<NewsCmd>) -> Result<()> {
     match cmd.unwrap_or(NewsCmd::List { all: false }) {
         NewsCmd::List { all } => {
             let result = client.announce().list().await?;
-            list(result.announcements, result.fetched, all)
+            list(result, all)
         }
         NewsCmd::Show { id } => {
             let result = client.announce().list().await?;
@@ -56,7 +56,7 @@ pub async fn run(cmd: Option<NewsCmd>) -> Result<()> {
         }
         NewsCmd::Refresh => {
             let result = client.announce().refresh().await?;
-            list(result.announcements, result.fetched, false)
+            list(result, false)
         }
     }
 }
@@ -73,16 +73,19 @@ fn severity_label(severity: Severity) -> &'static str {
     }
 }
 
-fn list(announcements: Vec<Announcement>, fetched: i64, all: bool) -> Result<()> {
-    if announcements.is_empty() {
-        // An empty list and a feed that was never reached read the same in a
-        // table, and they are not the same thing.
-        return ui::show(View::note(if fetched == 0 {
+fn list(result: AnnounceListResult, all: bool) -> Result<()> {
+    if result.announcements.is_empty() {
+        // Three different empties that render identically in a table: switched
+        // off, never fetched, and nothing published. Say which.
+        return ui::show(View::note(if !result.enabled {
+            "announcements are off — `hestia config set announcements.enabled true` turns them on"
+        } else if result.fetched == 0 {
             "no announcements — the feed has not been fetched yet"
         } else {
             "no announcements"
         }));
     }
+    let announcements = result.announcements;
     let shown: Vec<&Announcement> = if all {
         announcements.iter().collect()
     } else {

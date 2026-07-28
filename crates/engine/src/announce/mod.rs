@@ -108,7 +108,7 @@ impl Announce {
 
     async fn fetch(&self) -> Result<String> {
         Ok(http_client()
-            .get(endpoint())
+            .get(endpoint().url)
             .send()
             .await
             .context("cannot reach the announcement endpoint")?
@@ -121,18 +121,25 @@ impl Announce {
     /// Verify and adopt a feed document. Separate from [`Announce::fetch`] so
     /// the trust and parsing rules are exercisable without a network.
     fn ingest(&self, document: &str, now: i64) -> Result<Refreshed> {
-        let parsed = verify_and_parse(document)?;
+        let source = endpoint();
+        let parsed = verify_and_parse(document, source.trust)?;
         let mut inner = self.inner.lock().unwrap();
         let changed = inner.visible_ids(now) != visible_ids(&parsed.entries, now);
         inner.entries = parsed.entries;
         inner.fetched = now;
-        if let Err(e) = inner.store.save_feed(document, now) {
-            // The feed is live in memory either way; a cache that cannot be
-            // written costs a re-fetch at the next start, not this result.
-            tracing::warn!(
-                error = format!("{e:#}"),
-                "cannot cache the announcement feed"
-            );
+        // An unsigned feed is held in memory and never written: the cache is
+        // read back under `Trust::Signed`, so caching one would either fail at
+        // the next start or — worse — need the exemption widened to the load
+        // path, where nothing knows it came from an override.
+        if source.trust == Trust::Signed {
+            if let Err(e) = inner.store.save_feed(document, now) {
+                // The feed is live in memory either way; a cache that cannot be
+                // written costs a re-fetch at the next start, not this result.
+                tracing::warn!(
+                    error = format!("{e:#}"),
+                    "cannot cache the announcement feed"
+                );
+            }
         }
         Ok(Refreshed {
             result: inner.list(now),
@@ -159,7 +166,9 @@ impl Inner {
         let Some(cached) = self.store.load_feed() else {
             return;
         };
-        match verify_and_parse(&cached.document) {
+        // Always `Signed`: the cache is a file on disk with no provenance, so
+        // it is trusted only because it verifies now.
+        match verify_and_parse(&cached.document, Trust::Signed) {
             Ok(parsed) => {
                 self.entries = parsed.entries;
                 self.fetched = cached.fetched;
@@ -189,6 +198,9 @@ impl Inner {
         AnnounceListResult {
             announcements,
             fetched: self.fetched,
+            // The subsystem knows nothing of the setting that governs it; the
+            // flow that owns the gate stamps this on the way out.
+            enabled: true,
         }
     }
 
@@ -208,15 +220,21 @@ fn visible_ids(entries: &[feed::Entry], now: i64) -> Vec<String> {
     ids
 }
 
-fn verify_and_parse(document: &str) -> Result<Feed> {
+fn verify_and_parse(document: &str, trust: Trust) -> Result<Feed> {
     let envelope: Envelope =
         serde_json::from_str(document).context("malformed announcement envelope")?;
-    verify_bytes(
-        envelope.payload.as_bytes(),
-        &envelope.signature,
-        common::app::announce_pubkeys(),
-    )
-    .context("announcement signature verification failed")?;
+    if trust == Trust::Signed {
+        verify_bytes(
+            envelope.payload.as_bytes(),
+            &envelope.signature,
+            common::app::announce_pubkeys(),
+        )
+        .context("announcement signature verification failed")?;
+    } else {
+        tracing::warn!(
+            "announcement signature not checked — debug build on an overridden endpoint"
+        );
+    }
     let parsed: Feed =
         serde_json::from_str(&envelope.payload).context("malformed announcement feed")?;
     if parsed.version > feed::SCHEMA_VERSION {
@@ -229,17 +247,48 @@ fn verify_and_parse(document: &str) -> Result<Feed> {
     Ok(parsed)
 }
 
-/// Debug builds may point at a local feed so the surface can be exercised
-/// without publishing. The signature is still enforced — the override moves
-/// where the document comes from, never whether it is trusted.
-fn endpoint() -> String {
+/// Whether a document has to carry a signature this build trusts.
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum Trust {
+    Signed,
+    /// A debug build reading an overridden endpoint. The whole point of the
+    /// override is to render a hand-written feed, which by definition nothing
+    /// can sign.
+    Unchecked,
+}
+
+struct Source {
+    url: String,
+    trust: Trust,
+}
+
+/// Where the feed comes from, and what that implies about trusting it.
+///
+/// `HESTIA_ANNOUNCE_ENDPOINT` lets a **debug** build point at a local file so
+/// the surface can be exercised before anything is published — the same escape
+/// hatch `HESTIA_SOCK` is for the transport. It also waives the signature
+/// check, deliberately: requiring a signature would mean keeping a throwaway
+/// keypair just to see a news card render.
+///
+/// The waiver is narrow by construction. It exists only in a debug binary
+/// (`cfg(debug_assertions)` — a release build has no code path to it at all),
+/// only for an explicitly overridden endpoint, it is logged at WARN each time,
+/// and an unchecked feed is never cached, so it cannot outlive the process that
+/// read it. A release build fetching the real endpoint is unaffected.
+fn endpoint() -> Source {
     #[cfg(debug_assertions)]
     if let Ok(override_url) = std::env::var("HESTIA_ANNOUNCE_ENDPOINT") {
         if !override_url.trim().is_empty() {
-            return override_url;
+            return Source {
+                url: override_url,
+                trust: Trust::Unchecked,
+            };
         }
     }
-    common::app::ANNOUNCE_ENDPOINT.to_string()
+    Source {
+        url: common::app::ANNOUNCE_ENDPOINT.to_string(),
+        trust: Trust::Signed,
+    }
 }
 
 fn now_unix() -> i64 {
@@ -251,19 +300,38 @@ fn now_unix() -> i64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{verify_and_parse, Announce};
+    use super::{endpoint, verify_and_parse, Announce, Trust};
 
     #[test]
     fn an_unsigned_feed_is_refused() {
         // No announcement key is compiled in yet, so nothing verifies — the
         // build must show no announcements rather than trust the document.
         let document = r#"{"signature":"","payload":"{\"version\":1,\"entries\":[]}"}"#;
-        assert!(verify_and_parse(document).is_err());
+        assert!(verify_and_parse(document, Trust::Signed).is_err());
     }
 
     #[test]
     fn a_malformed_envelope_is_refused() {
-        assert!(verify_and_parse("not json").is_err());
+        assert!(verify_and_parse("not json", Trust::Signed).is_err());
+    }
+
+    #[test]
+    fn the_unchecked_waiver_skips_the_signature_but_not_the_schema() {
+        // The debug-override waiver drops the signature check and nothing else:
+        // a malformed envelope, bad JSON, or a future schema is still refused.
+        let document = r#"{"signature":"","payload":"{\"version\":1,\"entries\":[]}"}"#;
+        assert!(verify_and_parse(document, Trust::Unchecked).is_ok());
+
+        let future = r#"{"signature":"","payload":"{\"version\":99,\"entries\":[]}"}"#;
+        assert!(verify_and_parse(future, Trust::Unchecked).is_err());
+        assert!(verify_and_parse("not json", Trust::Unchecked).is_err());
+    }
+
+    #[test]
+    fn the_real_endpoint_always_demands_a_signature() {
+        // The waiver is reachable only through an overridden endpoint, so the
+        // default source must ask for `Signed` even in a debug build.
+        assert!(endpoint().trust == Trust::Signed);
     }
 
     #[test]

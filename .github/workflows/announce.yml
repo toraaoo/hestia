@@ -1,0 +1,77 @@
+name: announce
+
+# Publishing an announcement is a commit. This compiles news/*.md into one
+# signed document and replaces the asset on the standing `announcements`
+# release tag, which every launcher polls.
+#
+# Deliberately a *separate* key from the updater's: this workflow runs on a
+# push to the default branch, while installers are signed only from a release
+# tag. Sharing one key would put the installer-signing secret within reach of
+# anything that can land a commit here.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "news/**"
+      - "scripts/announce.py"
+      - "scripts/announce.sh"
+      - ".github/workflows/announce.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: announce
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install minisign
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends minisign
+
+      # A dispatch with no key is a dry run: it proves the feed compiles without
+      # publishing anything, which is the useful half of the check.
+      - name: Compile the feed
+        run: scripts/announce.sh > /dev/null
+
+      - name: Require the announcement signing key to publish
+        if: github.event_name == 'push'
+        env:
+          ANNOUNCE_SIGNING_KEY: ${{ secrets.ANNOUNCE_SIGNING_KEY }}
+        run: |
+          if [ -z "${ANNOUNCE_SIGNING_KEY:-}" ]; then
+            echo "::error::ANNOUNCE_SIGNING_KEY is not set. See news/README.md." && exit 1
+          fi
+
+      - name: Sign the feed
+        if: github.event_name == 'push'
+        env:
+          ANNOUNCE_SIGNING_KEY: ${{ secrets.ANNOUNCE_SIGNING_KEY }}
+          ANNOUNCE_SIGNING_KEY_PASSWORD: ${{ secrets.ANNOUNCE_SIGNING_KEY_PASSWORD }}
+        run: scripts/announce.sh --sign > announcements.json
+
+      # Images are referenced by absolute URL in the compiled feed, so they must
+      # land on the same tag. They are outside the signature — see news/README.md.
+      - name: Collect referenced images
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          mkdir -p upload && cp announcements.json upload/
+          if [ -d news/images ]; then cp -r news/images/. upload/ || true; fi
+          ls -la upload
+
+      - name: Replace the announcements release asset
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: announcements
+          name: Announcements
+          body: >
+            The launcher's news feed. Published from news/ on the default
+            branch; not a software release.
+          prerelease: true
+          files: upload/*

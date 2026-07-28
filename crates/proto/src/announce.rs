@@ -55,6 +55,11 @@ pub struct AnnounceListResult {
     /// A front-end reports staleness from this rather than being told the
     /// last fetch failed — an unreachable feed is a state, not an error.
     pub fetched: i64,
+    /// Whether the feed is switched on (`announcements.enabled`). An empty
+    /// list means something different either way — "nothing to show" versus
+    /// "you turned this off" — and a front-end cannot tell them apart from
+    /// the list alone.
+    pub enabled: bool,
 }
 
 pub struct AnnounceList;

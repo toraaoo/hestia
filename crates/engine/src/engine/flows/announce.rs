@@ -16,12 +16,23 @@ impl Engine {
         self.config.settings().announcements.enabled
     }
 
+    /// An empty result that still says *why* it is empty.
+    fn disabled() -> AnnounceListResult {
+        AnnounceListResult {
+            enabled: false,
+            ..AnnounceListResult::default()
+        }
+    }
+
     /// Everything that applies to this build, or nothing when the feed is off.
     pub fn announcements(&self) -> AnnounceListResult {
         if !self.announcements_enabled() {
-            return AnnounceListResult::default();
+            return Self::disabled();
         }
-        self.announce.list()
+        AnnounceListResult {
+            enabled: true,
+            ..self.announce.list()
+        }
     }
 
     /// Mark announcements read. Accepted even with the feed off: the ids are
@@ -30,9 +41,12 @@ impl Engine {
     pub fn dismiss_announcements(&self, ids: &[String]) -> anyhow::Result<AnnounceListResult> {
         let result = self.announce.dismiss(ids)?;
         Ok(if self.announcements_enabled() {
-            result
+            AnnounceListResult {
+                enabled: true,
+                ..result
+            }
         } else {
-            AnnounceListResult::default()
+            Self::disabled()
         })
     }
 
@@ -40,10 +54,17 @@ impl Engine {
     pub async fn refresh_announcements(&self) -> Refreshed {
         if !self.announcements_enabled() {
             return Refreshed {
-                result: AnnounceListResult::default(),
+                result: Self::disabled(),
                 changed: false,
             };
         }
-        self.announce.refresh().await
+        let refreshed = self.announce.refresh().await;
+        Refreshed {
+            result: AnnounceListResult {
+                enabled: true,
+                ..refreshed.result
+            },
+            ..refreshed
+        }
     }
 }
