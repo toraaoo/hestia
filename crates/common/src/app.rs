@@ -44,6 +44,39 @@ pub fn update_pubkeys() -> impl Iterator<Item = &'static str> {
         .into_iter()
         .filter(|key| !key.is_empty())
 }
+
+/// The announcement feed: the news and notices the launcher shows. A standing
+/// `announcements` release tag whose asset is replaced in place, so publishing
+/// is decoupled from cutting a version — `releases/latest/` would tie the two
+/// together and 404 on any release that omitted the asset.
+pub const ANNOUNCE_ENDPOINT: &str =
+    "https://github.com/toraaoo/hestia/releases/download/announcements/announcements.json";
+
+/// The announcement feed's own signing key — deliberately *not* [`UPDATE_PUBKEY`].
+///
+/// The feed is published by a workflow that runs on a push to the default
+/// branch, while installers are signed only from a release tag. Sharing one key
+/// would put the installer-signing secret within reach of anything that can land
+/// a commit, so the lower-stakes artifact gets its own trust root: a compromised
+/// announcement key can say things, never ship code.
+///
+/// Generate with `minisign -G`, keep the private half offline, and paste the
+/// public half here. **An empty key set fails closed** — the engine refuses an
+/// unverifiable feed rather than trusting it — so announcements simply do not
+/// appear until this is filled in.
+pub const ANNOUNCE_PUBKEY: &str = "";
+
+/// The announcement rotation spare, with the same rules as [`UPDATE_PUBKEY_NEXT`]:
+/// a binary trusts only what is compiled into it, so the successor must ship
+/// before it is needed.
+pub const ANNOUNCE_PUBKEY_NEXT: &str = "";
+
+/// Every key the announcement feed may be signed with, newest last.
+pub fn announce_pubkeys() -> impl Iterator<Item = &'static str> {
+    [ANNOUNCE_PUBKEY, ANNOUNCE_PUBKEY_NEXT]
+        .into_iter()
+        .filter(|key| !key.is_empty())
+}
 /// The agent every outbound HTTP request identifies itself with.
 ///
 /// PaperMC and Modrinth both *ask* for a contact URL or address alongside the
