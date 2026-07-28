@@ -430,6 +430,27 @@ pointer (`config set home`) → the platform default (`~/.hestia`, or
 `%APPDATA%\Hestia` on Windows). **Debug builds** anchor the default at
 `<workspace>/.hestia` so development never populates the real per-user directory.
 
+### Modpack corrections
+
+Modpacks routinely declare client-only mods as server-compatible, which is how a
+pack that plays fine as an instance breaks as a server. Hestia ships the same
+correction table `itzg/docker-minecraft-server` maintains, applied to **server**
+installs only:
+
+```bash
+hestia config set modpack.default-excludes false      # trust the pack's own env
+hestia config set modpack.force-include-files sodium  # install one anyway
+hestia config set modpack.exclude-files "mod-a, mod-b # why"
+hestia config set modpack.overrides-exclusions "config/**"
+```
+
+The three list keys take comma- or newline-separated entries with `#` comments,
+matched case-insensitively against any part of a file's path — so a
+`MODRINTH_EXCLUDE_FILES` value from docker-mc-server pastes in unchanged.
+`overrides-exclusions` takes ant-style patterns (`?` one character, `*` a run
+within one path segment, `**` a run across segments). Anything held back is
+reported on the install result, naming each file.
+
 ## Daemon lifecycle
 
 Servers and instances keep running across daemon stops/restarts and are

@@ -25,6 +25,34 @@ pub struct Settings {
     pub announcements: AnnounceSettings,
     /// Shared settings/configs across instances.
     pub sync: SyncSettings,
+    /// Corrections applied over a modpack's own declarations.
+    pub modpack: ModpackSettings,
+}
+
+/// The corrections over what a modpack claims about itself, addressed by the
+/// kebab-case keys `modpack.default-excludes`, `modpack.exclude-files`,
+/// `modpack.force-include-files` and `modpack.overrides-exclusions`. The three
+/// list keys take itzg's own delimiters (comma or newline, `#` comments), so a
+/// docker-mc-server user's `MODRINTH_EXCLUDE_FILES` pastes in unchanged.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ModpackSettings {
+    /// Whether the shipped client-mod exclude table applies to server installs.
+    pub default_excludes: bool,
+    pub exclude_files: String,
+    pub force_include_files: String,
+    pub overrides_exclusions: String,
+}
+
+impl Default for ModpackSettings {
+    fn default() -> Self {
+        ModpackSettings {
+            default_excludes: true,
+            exclude_files: String::new(),
+            force_include_files: String::new(),
+            overrides_exclusions: String::new(),
+        }
+    }
 }
 
 /// Whether instances share their settings targets at all. Sync moves a user's

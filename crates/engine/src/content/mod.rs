@@ -3,6 +3,7 @@
 //! modpack entry points over it. Stateless — every result is fetched upstream —
 //! so it needs no data directory, exactly like the `minecraft` aggregate.
 
+pub(crate) mod exclude;
 pub(crate) mod inspect;
 pub(crate) mod install;
 pub(crate) mod modpack;

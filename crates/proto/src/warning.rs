@@ -66,9 +66,11 @@ pub enum WarningInfo {
     /// `count` alongside `paths` so the headline is one interpolation rather
     /// than a joined list a front-end would have to shorten itself.
     ModpackOverridesKept { count: u32, paths: Vec<String> },
-    /// The pack named files of a kind this entry's flavor cannot load, so they
-    /// were not installed — a client-shaped pack put on a server, typically.
-    ModpackFilesNotAccepted { count: u32, flavor: String },
+    /// The pack declared client-only mods as server-compatible, so they were
+    /// held back — a correction over the pack's own `env`, which packs get
+    /// wrong routinely. Named individually: which mod was dropped is exactly
+    /// what someone debugging a pack needs, and the list is short.
+    ModpackFilesExcluded { count: u32, files: Vec<String> },
 }
 
 impl WarningInfo {
@@ -100,9 +102,9 @@ impl WarningInfo {
                 "delete a file under `data/` to take the pack's version of it at the next update"
                     .to_string()
             }
-            ModpackFilesNotAccepted { .. } => {
-                "nothing to do — the pack ships them for the other side; install the pack on an \
-                 instance to get them"
+            ModpackFilesExcluded { .. } => {
+                "they would break a server; `config set modpack.force-include-files <name>` \
+                 installs one anyway, and `modpack.default-excludes false` trusts the pack"
                     .to_string()
             }
         }
@@ -128,9 +130,9 @@ impl fmt::Display for WarningInfo {
                 f,
                 "{count} file(s) you had edited were kept instead of the modpack's"
             ),
-            ModpackFilesNotAccepted { count, flavor } => write!(
+            ModpackFilesExcluded { count, .. } => write!(
                 f,
-                "{count} of the modpack's file(s) are not loaded by a {flavor} entry and were skipped"
+                "{count} client-only mod(s) the pack called server-compatible were not installed"
             ),
         }
     }

@@ -582,7 +582,19 @@
 		"clear_cache_description": "Frees the cached downloads. Files are re-fetched from the network the next time they're needed.",
 		"shared_config": "Shared config",
 		"shared_config_hint": "Files synced across entries.",
-		"no_default": "No default set"
+		"no_default": "No default set",
+		"modpack": {
+			"title": "Modpacks",
+			"hint": "Packs routinely declare client-only mods as server-compatible. Hestia holds those back when installing a pack on a server.",
+			"default_excludes": "Correct a pack's server declarations",
+			"default_excludes_hint": "Off, a pack is trusted exactly as published — client mods included.",
+			"force_include": "Always install",
+			"exclude": "Never install",
+			"mod_placeholder": "mod name",
+			"pattern_placeholder": "config/**",
+			"overrides_exclusions": "Skip pack files",
+			"overrides_exclusions_hint": "Config and world files the pack ships that should not be written. ? one character, * a run within one folder, ** a run across folders."
+		}
 	},
 	"skins": {
 		"subtitle": "Your Minecraft character",
@@ -696,14 +708,14 @@
 			"sync_target_not_shared": "'{target}' is not shared with your other instances: {reason}.",
 			"sync_target_skipped": "'{target}' could not be synced: {detail}",
 			"modpack_overrides_kept": "{count} file(s) you had edited were kept instead of the modpack's.",
-			"modpack_files_not_accepted": "{count} of the modpack's file(s) are not loaded by a {flavor} entry and were skipped."
+			"modpack_files_excluded": "{count} client-only mod(s) the pack called server-compatible were not installed."
 		},
 		"hint": {
 			"properties_schema_missing": "Any key is accepted until it can be derived again, so check spelling yourself. Updating the server re-derives it.",
 			"sync_target_not_shared": "Rename or delete the clashing files in the instance’s folder, then launch again to share it.",
 			"sync_target_skipped": "Check the folder's permissions, then launch again.",
 			"modpack_overrides_kept": "Delete a file under the game directory to take the pack's version of it at the next update.",
-			"modpack_files_not_accepted": "Nothing to do — the pack ships them for the other side. Install the pack on an instance to get them."
+			"modpack_files_excluded": "They would break a server. Add one under Always install in Settings to install it anyway, or turn the correction off to trust the pack."
 		},
 		"token": {
 			"collides": "files of the same name are already shared",

@@ -573,7 +573,19 @@
   "clear_cache_description": "Libera os downloads em cache. Os arquivos são baixados novamente da rede na próxima vez que forem necessários.",
   "shared_config": "Configuração compartilhada",
   "shared_config_hint": "Arquivos sincronizados entre entradas.",
-  "no_default": "Nenhum padrão definido"
+  "no_default": "Nenhum padrão definido",
+  "modpack": {
+   "title": "Modpacks",
+   "hint": "Pacotes costumam declarar mods exclusivos de cliente como compatíveis com servidor. O Hestia os retém ao instalar um pacote em um servidor.",
+   "default_excludes": "Corrigir as declarações de servidor do pacote",
+   "default_excludes_hint": "Desligado, o pacote é aceito exatamente como publicado — mods de cliente inclusos.",
+   "force_include": "Sempre instalar",
+   "exclude": "Nunca instalar",
+   "mod_placeholder": "nome do mod",
+   "pattern_placeholder": "config/**",
+   "overrides_exclusions": "Ignorar arquivos do pacote",
+   "overrides_exclusions_hint": "Arquivos de configuração e de mundo que o pacote traz e não devem ser escritos. ? um caractere, * um trecho dentro de uma pasta, ** um trecho entre pastas."
+  }
  },
  "skins": {
   "subtitle": "Seu personagem do Minecraft",
@@ -687,14 +699,14 @@
    "sync_target_not_shared": "'{target}' não está compartilhado com suas outras instâncias: {reason}.",
    "sync_target_skipped": "'{target}' não pôde ser sincronizado: {detail}",
    "modpack_overrides_kept": "{count} arquivo(s) que você editou foram mantidos em vez dos do modpack.",
-   "modpack_files_not_accepted": "{count} arquivo(s) do modpack não são carregados por um item {flavor} e foram ignorados."
+   "modpack_files_excluded": "{count} mod(s) exclusivo(s) de cliente que o pacote declarou compatíveis com servidor não foram instalados."
   },
   "hint": {
    "properties_schema_missing": "Qualquer chave é aceita até que ele possa ser derivado novamente, então confira a grafia você mesmo. Atualizar o servidor o deriva de novo.",
    "sync_target_not_shared": "Renomeie ou apague os arquivos em conflito na pasta da instância e inicie novamente para compartilhá-la.",
    "sync_target_skipped": "Verifique as permissões da pasta e inicie novamente.",
    "modpack_overrides_kept": "Exclua um arquivo no diretório do jogo para usar a versão do pacote na próxima atualização.",
-   "modpack_files_not_accepted": "Nada a fazer — o pacote os traz para o outro lado. Instale o pacote em uma instância para obtê-los."
+   "modpack_files_excluded": "Eles quebrariam um servidor. Adicione um em Sempre instalar nas Configurações para instalá-lo mesmo assim, ou desligue a correção para aceitar o pacote."
   },
   "token": {
    "collides": "arquivos com o mesmo nome já são compartilhados",

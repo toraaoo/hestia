@@ -23,6 +23,10 @@ import {
   CheckboxRow,
   LanguageField,
 } from '@/features/settings/components/fields';
+import {
+  type ModpackConfig,
+  ModpackSection,
+} from '@/features/settings/components/modpack-section';
 import { SyncSection } from '@/features/settings/components/sync-section';
 import { UpdateSection } from '@/features/settings/components/update-section';
 import { bytes, memGb } from '@/lib/format';
@@ -40,6 +44,7 @@ interface ConfigEntries {
   autostart?: boolean;
   defaults?: { memory?: string; 'jvm-args'?: string };
   announcements?: { enabled?: boolean };
+  modpack?: ModpackConfig;
 }
 
 export function SettingsPage() {
@@ -279,6 +284,11 @@ export function SettingsPage() {
           </FieldSet>
 
           <SyncSection />
+
+          <ModpackSection
+            config={entries.modpack ?? {}}
+            pending={config.isPending}
+          />
 
           <FieldSet>
             <FieldLegend>{m['settings.storage_daemon']()}</FieldLegend>
