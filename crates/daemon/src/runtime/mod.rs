@@ -1,6 +1,7 @@
 //! The daemon's long-lived collaborators in one place — the anti-churn seam a
 //! new subsystem hangs off, mirroring the engine's aggregate root.
 
+mod announce;
 mod event_hub;
 mod managers;
 mod metrics;
@@ -19,6 +20,7 @@ use proto::server::ServerInfo;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Notify;
 
+pub use announce::spawn_announcement_poller;
 pub use engine::error_info as engine_error;
 pub use engine::{ExitObserver, ProcessSupervisor, StartError};
 pub use event_hub::EventHub;

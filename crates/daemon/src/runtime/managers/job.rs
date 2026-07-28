@@ -75,7 +75,7 @@ where
     }
 }
 
-pub(super) fn topic_event<E: proto::Topic + serde::Serialize>(event: &E) -> Event {
+pub(crate) fn topic_event<E: proto::Topic + serde::Serialize>(event: &E) -> Event {
     Event {
         topic: E::TOPIC.to_string(),
         payload: serde_json::to_value(event).unwrap_or_default(),
