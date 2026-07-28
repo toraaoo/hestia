@@ -63,7 +63,13 @@ it's just as comfortable from a terminal as from a window.
 > the wire (name, blurb, and the content kinds it takes), so a front-end
 > renders whatever the daemon ships without a table of its own. Modrinth is the
 > shipped content source.
-> A **system tray**
+> **Announcements** reach both front-ends from a signed feed published out of
+> `news/` in this repo: each entry is filtered against the running build
+> (platform, release channel, version range), so a notice about a bug in
+> 0.0.1–0.0.3 reaches only those builds. Severity picks how loudly it lands —
+> a dialog once, a standing banner, or just the news page and an unread badge —
+> and the whole thing switches off with `announcements.enabled`, after which
+> nothing is fetched. A **system tray**
 > accompanies every serving daemon — open the app, status, start/restart, a
 > start-at-login toggle, quit; a left-click (or the Open item) launches the
 > desktop shell. The **desktop shell** talks to the daemon through a generic
@@ -187,6 +193,7 @@ pointer (`config set home`) → the platform default (`~/.hestia`, or
 - **[docs/architecture.md](docs/architecture.md)** — the target graph and the
   daemon/engine boundary.
 - **[docs/contributing.md](docs/contributing.md)** — conventions and recipes.
+- **[news/README.md](news/README.md)** — how to publish an announcement.
 - **[docs/hooks.md](docs/hooks.md)** — the desktop UI's queries layer: hook
   usage for frontend development.
 

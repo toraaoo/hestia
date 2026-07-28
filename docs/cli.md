@@ -454,6 +454,47 @@ immediately. The tray's **Quit** and the desktop's stop button always mean
 `--keep`: neither can ask, and neither should end a running server on your
 behalf.
 
+## News and notices
+
+Announcements about Hestia itself, fetched from its published feed. Every entry
+is filtered against *this* build — an entry can name a platform, a release
+channel and a version range — so what you see is what applies to you.
+
+```bash
+hestia news                      # what applies to this build and is unread
+hestia news list --all           # including what you've already read
+hestia news show <id>            # one announcement in full
+hestia news read                 # mark every unread one read
+hestia news read <id>...         # mark specific ones read
+hestia news refresh              # check now instead of waiting for the poll
+```
+
+Reads answer from the daemon's cache, so they are instant and work offline;
+`refresh` is the only verb that touches the network. The daemon polls every six
+hours, and read state is shared with the desktop — marking something read in
+one is marking it read in both.
+
+The feed is the daemon's only unprompted outbound request. Turn it off with:
+
+```bash
+hestia config set announcements.enabled false
+```
+
+Nothing is fetched while it is off, and `hestia news` says so rather than
+pretending the feed is empty.
+
+## Updating Hestia
+
+```bash
+hestia self-update               # check, confirm, download and apply
+hestia self-update --yes         # no confirmation prompt
+```
+
+The installer is verified against a compiled-in signing key before it runs; an
+artifact that fails to verify is discarded rather than applied. The desktop has
+its own updater under Settings (it can replace a running binary and restart
+into it, which the CLI path cannot).
+
 ## Global flags
 
 Accepted in any position.
