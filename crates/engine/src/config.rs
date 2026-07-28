@@ -23,6 +23,24 @@ pub struct Settings {
     pub defaults: JvmDefaults,
     /// The news and notices feed.
     pub announcements: AnnounceSettings,
+    /// Shared settings/configs across instances.
+    pub sync: SyncSettings,
+}
+
+/// Whether instances share their settings targets at all. Sync moves a user's
+/// own files into a common store, so it is switchable: off, a launch reconciles
+/// nothing and every instance keeps what it has — links already made stay, since
+/// hestia never breaks one behind the user's back.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncSettings {
+    pub enabled: bool,
+}
+
+impl Default for SyncSettings {
+    fn default() -> Self {
+        SyncSettings { enabled: true }
+    }
 }
 
 /// Whether the launcher fetches its announcement feed. This is the daemon's

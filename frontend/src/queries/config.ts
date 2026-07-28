@@ -22,6 +22,7 @@ export const configMutations = {
     mutation<void, { key: string; value: unknown }>({
       mutationKey: [...keys.config.all, 'set'],
       mutationFn: ({ key, value }) => api.set(key, value),
-      invalidates: () => [keys.config.all],
+      // `sync.get` reports `sync.enabled` back, so a config write can change it.
+      invalidates: () => [keys.config.all, keys.sync.all],
     }),
 };

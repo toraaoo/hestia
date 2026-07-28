@@ -28,8 +28,10 @@ it's just as comfortable from a terminal as from a window.
 > still to come. Instance settings and worlds are **shared** across
 > instances (`sync`): `options.txt` and `servers.dat` copied and merged,
 > `saves`/`config`/`screenshots` linked into one store (symlinks; junctions
-> on Windows), with `sync status` link states and a per-instance `sync
-> adopt` migration for pre-existing folders. **Content** —
+> on Windows). A folder that already has the instance's own files is adopted
+> into the store rather than left behind; only a name clash stops it. An
+> instance running a modpack keeps its own `config/` unless you adopt it,
+> and the whole thing switches off with `sync.enabled`. **Content** —
 > mods, plugins, resourcepacks, shaders, datapacks — is discovered on Modrinth
 > (search, browse, resolve versions) and installed into a server (mods or
 > plugins, whichever its flavor loads, plus datapacks) or

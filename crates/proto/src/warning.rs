@@ -18,14 +18,16 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 /// Why a folder target stayed instance-local instead of being linked into the
-/// shared store — the empty-or-linked guard's two refusals.
+/// shared store. A folder holding only the instance's own files is adopted
+/// automatically, so both of these are cases where a move would have destroyed
+/// something.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum NotSharedReason {
-    /// The folder is a real directory with contents; linking would have merged
-    /// or replaced them, so it was left alone.
-    HasContents,
+    /// The store already holds files by the same names, so moving the folder's
+    /// own into it would overwrite them.
+    Collides,
     /// The folder is a symlink the user made, pointing somewhere that is not a
     /// hestia store. Only hestia's own links are ever touched.
     ForeignLink,
@@ -34,7 +36,7 @@ pub enum NotSharedReason {
 impl fmt::Display for NotSharedReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            NotSharedReason::HasContents => "the folder already has contents",
+            NotSharedReason::Collides => "files of the same name are already shared",
             NotSharedReason::ForeignLink => "the folder is a link you made",
         })
     }
@@ -81,12 +83,12 @@ impl WarningInfo {
                  `hestia server {name} update <version>` re-derives it"
             ),
             SyncTargetNotShared {
-                instance,
                 target,
-                reason: NotSharedReason::HasContents,
+                reason: NotSharedReason::Collides,
+                ..
             } => format!(
-                "`hestia instance {instance} sync adopt {target}` moves those contents into the \
-                 shared store and links the folder"
+                "rename or delete the clashing files under `data/{target}`, then launch again to \
+                 share it"
             ),
             SyncTargetNotShared { target, .. } => format!(
                 "remove or repoint the link at `data/{target}`, then launch again to share it"

@@ -675,14 +675,16 @@
 	"sync": {
 		"section": "Shared between instances",
 		"description": "Files are copied and merged at each launch; folders are linked into one shared store.",
+		"enabled_label": "Share settings between instances",
+		"enabled_description": "Off, every instance keeps its own settings, configs and worlds. Folders already shared stay shared.",
 		"files": "Copied files",
 		"folders": "Linked folders",
 		"add_file_placeholder": "options.txt",
 		"add_folder_placeholder": "saves",
 		"status_title": "Instance link status",
 		"state_linked": "linked",
-		"state_pending": "links at next launch",
-		"state_cannot_link": "needs adopt",
+		"state_pending": "shares at next launch",
+		"state_cannot_link": "clashes with the store",
 		"adopt": "Adopt",
 		"adopt_description": "Moves the instance’s existing folder contents into the shared store and links them. The instance must be stopped.",
 		"adopted": "Adopted: {targets}",
@@ -698,13 +700,13 @@
 		},
 		"hint": {
 			"properties_schema_missing": "Any key is accepted until it can be derived again, so check spelling yourself. Updating the server re-derives it.",
-			"sync_target_not_shared": "Adopt the folder to move its contents into the shared store and link it.",
+			"sync_target_not_shared": "Rename or delete the clashing files in the instance’s folder, then launch again to share it.",
 			"sync_target_skipped": "Check the folder's permissions, then launch again.",
 			"modpack_overrides_kept": "Delete a file under the game directory to take the pack's version of it at the next update.",
 			"modpack_files_not_accepted": "Nothing to do — the pack ships them for the other side. Install the pack on an instance to get them."
 		},
 		"token": {
-			"has_contents": "the folder already has contents",
+			"collides": "files of the same name are already shared",
 			"foreign_link": "the folder is a link you made"
 		}
 	},

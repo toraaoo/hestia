@@ -136,6 +136,14 @@ impl Engine {
             let _ = self.instances.remove(&record.id);
             return Err(e);
         }
+
+        let data_dir = self.instances.data_dir(&record);
+        if let Err(e) = std::fs::create_dir_all(&data_dir) {
+            tracing::warn!(id = %record.id, error = %e, "cannot create the game directory");
+        } else {
+            self.link_new_instance(&record.name, &data_dir);
+        }
+
         self.instances
             .get(&record.id)
             .with_context(|| format!("instance '{}' vanished after create", record.id))
@@ -239,7 +247,8 @@ impl Engine {
                 .as_ref()
                 .filter(|p| p.captured)
                 .map(|p| profiles::store_dir(&entry_dir, &p.name));
-            warnings = self.sync.apply(&record.name, &game_dir, store.as_deref());
+            warnings =
+                self.apply_instance_sync(&record.name, &entry_dir, &game_dir, store.as_deref());
             let selection: Option<std::collections::HashSet<String>> =
                 launch_profile.map(|p| p.members.into_iter().collect());
             let worlds = crate::instances::save_worlds(&game_dir);

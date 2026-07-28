@@ -6,11 +6,16 @@
 //!   store at every launch. File symlinks would need elevation on Windows.
 //! - **Folders are linked** (a symlink on POSIX, a junction on Windows) into
 //!   the store, so folder content — worlds above all — is stored once and
-//!   shared live between instances. A folder only becomes a link when it is
-//!   missing, empty, or already linked into a hestia store (the
-//!   empty-or-linked guard): a non-empty real directory is never merged or
-//!   overwritten — it is reported `cannot_link` until `adopt` moves its
-//!   entries into the store.
+//!   shared live between instances. A folder that is missing, empty, or already
+//!   linked into a hestia store becomes a link; one holding the instance's own
+//!   files is **adopted** — its entries move into the store, which is what
+//!   making it a target asked for. Nothing is ever merged or overwritten: a
+//!   name the store already has stops the move and is reported `cannot_link`
+//!   until the user resolves the clash.
+//!
+//! Sharing is switchable (`sync.enabled`): off, no pass runs at all. Links
+//! already made are left alone — hestia never breaks one behind the user's
+//! back.
 //!
 //! Sync is **instance-only**: a client-side quality-of-life feature. A server's
 //! configuration is per-server infrastructure (`server.config.*`,
@@ -50,6 +55,28 @@ const LOCAL_OPTION_KEYS: &[&str] = &["resourcePacks", "incompatibleResourcePacks
 /// *settings*, not game data.
 const CAPTURE_FILES: &[&str] = &[OPTIONS_TXT];
 const CAPTURE_FOLDERS: &[&str] = &["config"];
+
+/// Where an instance's settings-class targets reconcile for one pass.
+#[derive(Clone, Copy, Default)]
+pub enum Settings<'a> {
+    /// The global shared store — the ordinary instance.
+    #[default]
+    Shared,
+    /// A captured profile's own store.
+    Profile(&'a Path),
+    /// The instance owns them: a modpack ships its config tree, so hestia does
+    /// not link or adopt one behind the user's back. An `adopt` the user asks
+    /// for still opts in, and the link it leaves is honoured from then on.
+    Local,
+}
+
+impl Settings<'_> {
+    /// Whether this target is one the instance keeps to itself unless the user
+    /// has already opted in by adopting it.
+    fn owns_locally(&self, target: &str) -> bool {
+        matches!(self, Settings::Local) && CAPTURE_FOLDERS.contains(&target)
+    }
+}
 
 pub struct Sync {
     dir: Mutex<PathBuf>,
@@ -106,9 +133,13 @@ impl Sync {
 
     /// Reconcile an instance's `data/` with the store: copy-reconcile the file
     /// targets newest-wins, then ensure each folder target is a link into the
-    /// store (the apply pass). With a `profile_store` (a captured profile's
-    /// launch), the settings-class targets reconcile/link against it instead
-    /// of the global store — worlds and screenshots stay global.
+    /// store (the apply pass). [`Settings`] says where the settings-class
+    /// targets reconcile — worlds and screenshots are always global.
+    ///
+    /// A folder that already holds the instance's own files is **adopted**: its
+    /// entries move into the store and it becomes a link, which is what the
+    /// user asked for by making it a target. Only a name the store already has
+    /// stops that, since a move would then overwrite something.
     ///
     /// Best-effort per target: a target that cannot be reconciled is skipped
     /// rather than failing the launch — refusing to launch over a leftover
@@ -116,12 +147,7 @@ impl Sync {
     /// as a warning, because the user configured that target expecting it to be
     /// shared and would otherwise play against the wrong data with no sign of
     /// it.
-    pub fn apply(
-        &self,
-        instance: &str,
-        data_dir: &Path,
-        profile_store: Option<&Path>,
-    ) -> Vec<WarningInfo> {
+    pub fn apply(&self, instance: &str, data_dir: &Path, settings: Settings) -> Vec<WarningInfo> {
         let targets = self.targets();
         let shared = self.dir();
         fs::create_dir_all(&shared).ok();
@@ -129,7 +155,7 @@ impl Sync {
 
         for raw in &targets.files {
             let Some(rel) = safe_rel(raw) else { continue };
-            let store = scope_root(&shared, profile_store, raw, CAPTURE_FILES);
+            let store = scope_root(&shared, settings, raw, CAPTURE_FILES);
             let result = if rel.as_os_str() == OPTIONS_TXT {
                 merge_options(&store.join(&rel), &data_dir.join(&rel))
             } else {
@@ -146,8 +172,13 @@ impl Sync {
 
         for raw in &targets.folders {
             let Some(rel) = safe_rel(raw) else { continue };
-            let store = scope_root(&shared, profile_store, raw, CAPTURE_FOLDERS);
-            match ensure_link(&store.join(&rel), &data_dir.join(&rel), &rel) {
+            let store = scope_root(&shared, settings, raw, CAPTURE_FOLDERS);
+            let at = data_dir.join(&rel);
+            if settings.owns_locally(raw) && !links_into_a_store(&at, &rel) {
+                tracing::debug!(target = %rel.display(), "leaving a pack-owned folder local");
+                continue;
+            }
+            match ensure_link(&store.join(&rel), &at, &rel) {
                 Ok(Linked::Yes) => {}
                 Ok(Linked::No(reason)) => warnings.push(WarningInfo::SyncTargetNotShared {
                     instance: instance.to_string(),
@@ -288,10 +319,11 @@ fn default_targets() -> SyncTargets {
 
 /// The apply pass for one folder target: nothing to do when already linked;
 /// a stale hestia-store link (the data home moved) is relinked; a missing or
-/// empty directory becomes a link; a non-empty real directory — or a foreign
-/// link the user made — is left untouched (Pandora's empty-or-linked guard).
-/// The guard's refusals are reported, not just logged: the target the user asked
-/// to share is not shared.
+/// empty directory becomes a link; a directory holding the instance's own files
+/// is adopted into the store and linked. Two things are still never touched —
+/// a foreign link the user made, and a folder whose names the store already has
+/// (moving those would overwrite). Both are reported rather than logged: the
+/// target the user asked to share is not shared.
 fn ensure_link(store: &Path, at: &Path, rel: &Path) -> Result<Linked> {
     if link::is_linked_to(store, at) {
         return Ok(Linked::Yes);
@@ -304,11 +336,18 @@ fn ensure_link(store: &Path, at: &Path, rel: &Path) -> Result<Linked> {
         link::unlink_dir(at)?;
     } else if at.symlink_metadata().is_ok() {
         if !link::is_empty_dir(at) {
-            tracing::warn!(
-                at = %at.display(),
-                "not linking a non-empty directory (run `sync adopt` to move it into the store)"
-            );
-            return Ok(Linked::No(NotSharedReason::HasContents));
+            let collisions = store_collisions(store, at)?;
+            if !collisions.is_empty() {
+                tracing::warn!(
+                    at = %at.display(),
+                    collisions = collisions.join(", "),
+                    "not adopting a folder whose names the store already has"
+                );
+                return Ok(Linked::No(NotSharedReason::Collides));
+            }
+            adopt_folder(store, at, rel)?;
+            tracing::info!(at = %at.display(), "adopted a folder into the shared store");
+            return Ok(Linked::Yes);
         }
         fs::remove_dir(at)?;
     }
@@ -347,21 +386,7 @@ fn adopt_folder(store: &Path, at: &Path, rel: &Path) -> Result<()> {
         return make_link(store, at);
     }
 
-    let entries: Vec<PathBuf> = fs::read_dir(at)
-        .with_context(|| format!("cannot read {}", at.display()))?
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .collect();
-    let collisions: Vec<String> = entries
-        .iter()
-        .filter_map(|path| {
-            let name = path.file_name()?;
-            store
-                .join(name)
-                .symlink_metadata()
-                .is_ok()
-                .then(|| name.to_string_lossy().into_owned())
-        })
-        .collect();
+    let collisions = store_collisions(store, at)?;
     if !collisions.is_empty() {
         bail!(
             "the store already has: {} (in {} — rename these, then retry)",
@@ -371,12 +396,35 @@ fn adopt_folder(store: &Path, at: &Path, rel: &Path) -> Result<()> {
     }
 
     fs::create_dir_all(store).with_context(|| format!("cannot create {}", store.display()))?;
-    for path in entries {
+    for path in folder_entries(at)? {
         let name = path.file_name().context("entry without a name")?;
         move_entry(&path, &store.join(name))?;
     }
     fs::remove_dir(at).with_context(|| format!("cannot remove the emptied {}", at.display()))?;
     make_link(store, at)
+}
+
+/// The names in `at` the store already holds — what an adopt would overwrite,
+/// and the one thing that keeps a folder out of the store.
+fn store_collisions(store: &Path, at: &Path) -> Result<Vec<String>> {
+    Ok(folder_entries(at)?
+        .iter()
+        .filter_map(|path| {
+            let name = path.file_name()?;
+            store
+                .join(name)
+                .symlink_metadata()
+                .is_ok()
+                .then(|| name.to_string_lossy().into_owned())
+        })
+        .collect())
+}
+
+fn folder_entries(at: &Path) -> Result<Vec<PathBuf>> {
+    Ok(fs::read_dir(at)
+        .with_context(|| format!("cannot read {}", at.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .collect())
 }
 
 fn make_link(store: &Path, at: &Path) -> Result<()> {
@@ -437,19 +485,30 @@ fn link_state(store: &Path, at: &Path, rel: &Path) -> LinkState {
         };
     }
     if at.symlink_metadata().is_err() || link::is_empty_dir(at) {
-        LinkState::Pending
-    } else {
-        LinkState::CannotLink
+        return LinkState::Pending;
+    }
+    // A folder with contents is adopted at the next launch unless the store
+    // already holds one of its names.
+    match store_collisions(store, at) {
+        Ok(collisions) if collisions.is_empty() => LinkState::Pending,
+        _ => LinkState::CannotLink,
     }
 }
 
 /// The store root a target reconciles against: the profile's captured store
 /// for settings-class targets when one is in scope, the global store otherwise.
-fn scope_root(shared: &Path, profile_store: Option<&Path>, raw: &str, scoped: &[&str]) -> PathBuf {
-    match profile_store {
-        Some(store) if scoped.contains(&raw) => store.to_path_buf(),
+fn scope_root(shared: &Path, settings: Settings, raw: &str, scoped: &[&str]) -> PathBuf {
+    match settings {
+        Settings::Profile(store) if scoped.contains(&raw) => store.to_path_buf(),
         _ => shared.to_path_buf(),
     }
+}
+
+/// Whether the instance is already sharing this folder — a link into any hestia
+/// store, including a stale one. A pack-owned target the user adopted by hand
+/// reads as opted in and keeps reconciling.
+fn links_into_a_store(at: &Path, rel: &Path) -> bool {
+    link::read_target(at).is_some_and(|target| is_store_target(&target, rel))
 }
 
 /// Whether a link target points into *a* hestia store (this data home's, a
@@ -650,7 +709,7 @@ mod tests {
         fs::create_dir_all(&shared).unwrap();
         fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
 
-        Sync::new(shared).apply("test", &data, None);
+        Sync::new(shared).apply("test", &data, Settings::Shared);
 
         let seeded = fs::read_to_string(data.join("options.txt")).unwrap();
         assert!(seeded.contains("guiScale:3"));
@@ -668,7 +727,7 @@ mod tests {
         )
         .unwrap();
 
-        Sync::new(shared.clone()).apply("test", &data, None);
+        Sync::new(shared.clone()).apply("test", &data, Settings::Shared);
 
         let stored = fs::read_to_string(shared.join("options.txt")).unwrap();
         assert!(stored.contains("guiScale:2"));
@@ -688,7 +747,7 @@ mod tests {
         let data = base.path().join("data");
         fs::create_dir_all(data.join("config")).unwrap();
 
-        Sync::new(shared.clone()).apply("test", &data, None);
+        Sync::new(shared.clone()).apply("test", &data, Settings::Shared);
 
         assert!(link::is_linked_to(
             &shared.join("saves"),
@@ -703,30 +762,111 @@ mod tests {
         fs::create_dir_all(data.join("saves").join("world")).unwrap();
         let data2 = base.path().join("data2");
         fs::create_dir_all(&data2).unwrap();
-        Sync::new(shared.clone()).apply("test", &data2, None);
+        Sync::new(shared.clone()).apply("test", &data2, Settings::Shared);
         assert!(data2.join("saves").join("world").is_dir());
     }
 
     #[test]
-    fn apply_never_touches_a_non_empty_folder() {
-        let base = temp_dir("guard");
+    fn apply_adopts_a_folder_the_store_cannot_clash_with() {
+        let base = temp_dir("adopt-apply");
         let shared = base.path().join("shared");
         let data = base.path().join("data");
         fs::create_dir_all(data.join("saves").join("old-world")).unwrap();
         fs::write(data.join("saves").join("old-world").join("level.dat"), "x").unwrap();
 
         let sync = Sync::new(shared.clone());
-        sync.apply("test", &data, None);
+        let warnings = sync.apply("test", &data, Settings::Shared);
 
-        assert!(link::read_target(&data.join("saves")).is_none());
+        assert!(
+            warnings.is_empty(),
+            "the user did nothing to be warned about"
+        );
+        assert!(link::is_linked_to(
+            &shared.join("saves"),
+            &data.join("saves")
+        ));
+        assert_eq!(
+            fs::read_to_string(shared.join("saves").join("old-world").join("level.dat")).unwrap(),
+            "x",
+            "the world moved into the store"
+        );
+        // And still opens where the game looks for it.
         assert!(data
             .join("saves")
             .join("old-world")
             .join("level.dat")
             .exists());
+    }
+
+    #[test]
+    fn apply_leaves_a_folder_that_would_overwrite_the_store() {
+        let base = temp_dir("guard");
+        let shared = base.path().join("shared");
+        fs::create_dir_all(shared.join("saves").join("old-world")).unwrap();
+        fs::write(
+            shared.join("saves").join("old-world").join("level.dat"),
+            "store",
+        )
+        .unwrap();
+        let data = base.path().join("data");
+        fs::create_dir_all(data.join("saves").join("old-world")).unwrap();
+        fs::write(
+            data.join("saves").join("old-world").join("level.dat"),
+            "mine",
+        )
+        .unwrap();
+
+        let sync = Sync::new(shared.clone());
+        let warnings = sync.apply("test", &data, Settings::Shared);
+
+        assert!(link::read_target(&data.join("saves")).is_none());
+        assert_eq!(
+            fs::read_to_string(data.join("saves").join("old-world").join("level.dat")).unwrap(),
+            "mine"
+        );
+        assert_eq!(
+            fs::read_to_string(shared.join("saves").join("old-world").join("level.dat")).unwrap(),
+            "store"
+        );
+        assert!(warnings.iter().any(|w| matches!(
+            w,
+            WarningInfo::SyncTargetNotShared {
+                reason: NotSharedReason::Collides,
+                ..
+            }
+        )));
         let states = sync.status(&data);
         let saves = states.iter().find(|t| t.target == "saves").unwrap();
         assert_eq!(saves.state, LinkState::CannotLink);
+    }
+
+    #[test]
+    fn a_pack_owned_config_stays_local_until_adopted() {
+        let base = temp_dir("packlocal");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        fs::create_dir_all(data.join("config")).unwrap();
+        fs::write(data.join("config").join("pack.toml"), "x=1").unwrap();
+
+        let sync = Sync::new(shared.clone());
+        let warnings = sync.apply("test", &data, Settings::Local);
+
+        assert!(link::read_target(&data.join("config")).is_none());
+        assert!(warnings.is_empty(), "keeping it local is not a degradation");
+        // Worlds are not settings — they share as usual.
+        assert!(link::is_linked_to(
+            &shared.join("saves"),
+            &data.join("saves")
+        ));
+
+        // Adopting is the opt-in, and the link is honoured from then on.
+        sync.adopt(&data, &["config".to_string()]).unwrap();
+        sync.apply("test", &data, Settings::Local);
+        assert!(link::is_linked_to(
+            &shared.join("config"),
+            &data.join("config")
+        ));
+        assert!(shared.join("config").join("pack.toml").is_file());
     }
 
     #[test]
@@ -739,7 +879,7 @@ mod tests {
         link::link_dir(&old_shared.join("saves"), &data.join("saves")).unwrap();
 
         let shared = base.path().join("new-home").join("shared");
-        Sync::new(shared.clone()).apply("test", &data, None);
+        Sync::new(shared.clone()).apply("test", &data, Settings::Shared);
 
         assert!(link::is_linked_to(
             &shared.join("saves"),
@@ -757,7 +897,7 @@ mod tests {
         fs::create_dir_all(&data).unwrap();
         link::link_dir(&elsewhere, &data.join("saves")).unwrap();
 
-        Sync::new(shared.clone()).apply("test", &data, None);
+        Sync::new(shared.clone()).apply("test", &data, Settings::Shared);
 
         assert_eq!(link::read_target(&data.join("saves")), Some(elsewhere));
     }
@@ -858,7 +998,7 @@ mod tests {
 
         let sync = Sync::new(shared.clone());
         sync.capture(&store).unwrap();
-        sync.apply("test", &data, Some(&store));
+        sync.apply("test", &data, Settings::Profile(&store));
 
         // config links into the captured store; saves stays on the global one.
         assert!(link::is_linked_to(
@@ -878,7 +1018,7 @@ mod tests {
 
         // options.txt reconciles against the captured store.
         fs::write(data.join("options.txt"), "guiScale:2\n").unwrap();
-        sync.apply("test", &data, Some(&store));
+        sync.apply("test", &data, Settings::Profile(&store));
         assert!(fs::read_to_string(store.join("options.txt"))
             .unwrap()
             .contains("guiScale:2"));
@@ -888,7 +1028,7 @@ mod tests {
         // the stale captured-store link counts as a hestia store target.
         sync.release(&store).unwrap();
         assert!(!store.exists());
-        sync.apply("test", &data, None);
+        sync.apply("test", &data, Settings::Shared);
         assert!(link::is_linked_to(
             &shared.join("config"),
             &data.join("config")

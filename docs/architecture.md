@@ -411,12 +411,17 @@ The subsystems behind the aggregate:
   (`saves`, `config`, `screenshots` — a symlink on POSIX, a junction on
   Windows, via `sync/link.rs`), so folder content is stored once and shared
   live. `apply` runs at every launch (hooked into `prepare_instance`,
-  before the content re-mirror): it reconciles the file targets and links
-  each folder target under the empty-or-linked guard; `status` reports each
-  instance's per-target link state and `adopt` migrates existing folder
-  contents into the store. Sync is **instance-only**: servers are
-  deliberately decoupled from it. The managed content dirs are rejected as
-  targets at the edge — see the decision note below.
+  before the content re-mirror) and once at create, before anything can fill
+  a folder: it reconciles the file targets and links each folder target,
+  **adopting** one that already holds the instance's own files (a name the
+  store already has is the only thing that stops the move); `status` reports
+  each instance's per-target link state and `adopt` is the same migration on
+  demand. A `Settings` scope says where the settings-class targets reconcile
+  — the global store, a captured profile's, or nowhere (a modpack owns its
+  config tree). Sharing is switchable wholesale (`sync.enabled`). Sync is
+  **instance-only**: servers are deliberately decoupled from it. The managed
+  content dirs are rejected as targets at the edge — see the decision note
+  below.
 - **`process`** (`ProcessSupervisor`) — launched processes whose lifetime is
   decoupled from the daemon's (own process group / job object, no
   `kill_on_drop`, no pipes back), tracked with a restart policy. Each live
@@ -990,11 +995,15 @@ The subsystems behind the aggregate:
 > cross-entry store); content ownership → the managed content dirs are still
 > rejected as targets (per-instance selection is impossible over a shared
 > dir); backups archiving through links → instance backups no longer exist.
-> The safety story is Pandora's **empty-or-linked guard**: a folder becomes
+> The safety story was Pandora's **empty-or-linked guard**: a folder became
 > a link only when missing, empty, or already linked into a hestia store —
-> a non-empty real directory is never merged or overwritten, only surfaced
-> as `cannot_link` until an explicit `sync adopt` moves its entries into
-> the store (all-or-nothing per target, refused on any name collision).
+> a non-empty real directory was never touched, only surfaced as
+> `cannot_link` until an explicit `sync adopt` moved its entries into the
+> store (all-or-nothing per target, refused on any name collision). That
+> guard is now **narrowed to the collision it was really about** — see the
+> warning-noise decision note below: a folder holding only the instance's
+> own files is adopted automatically, since moving it can destroy nothing,
+> and only a name the store already has stops it.
 > Only links pointing into a hestia store (`…/shared/<target>`) are ever
 > touched, so a user's own symlinks survive; a stale store link after a
 > data-home move is relinked at the next launch. Pack selection
@@ -1196,6 +1205,42 @@ The subsystems behind the aggregate:
 > folder, or refusing to create a server whose schema run timed out — both break
 > a recoverable situation). A front-end must not have to *ask* whether the thing
 > it just did worked properly.
+
+> **A warning the user did not cause is a bug in the launcher, not a notice.**
+> The rule above earned its keep and then over-fired: the two warnings a normal
+> user actually met were both about hestia's own limitations. Every NeoForge
+> create said its property schema could not be derived (structural — see the
+> NeoForge note), and an instance whose `data/config` had contents — which a
+> modpack's `overrides/` puts there before the first launch ever runs — said
+> `config` was not shared, pointing at an `adopt` chore hestia could perfectly
+> well do itself. Neither followed from anything the user did, and the second's
+> "remediation" was work the daemon was declining to do.
+>
+> So the fix in both cases was to **remove the degradation**, not to soften the
+> text. The schema run stopped using an argument file it could not resolve; the
+> folder guard was narrowed from "never touch a non-empty directory" to "never
+> overwrite" — a folder holding only the instance's own files is adopted at the
+> launch that would have warned, silently, because moving files into the store
+> is exactly what making it a target asked for and nothing can be lost. What
+> survives is a warning about a **name clash** (`NotSharedReason::Collides`),
+> which the user must resolve because either copy could be the one they want,
+> and a foreign link, which is theirs to repoint.
+>
+> Two rules keep the automatic pass honest. **A modpack owns its config tree**:
+> a pack ships `config/` as part of what it is, so folding it into the store
+> every other instance reads would push one pack's settings onto all of them —
+> `Settings::Local` leaves those folders alone, with no warning, since it is a
+> deliberate outcome rather than a degraded one. It is the automatic pass only:
+> an `adopt` the user asks for still opts the folder in, and the link it leaves
+> is reconciled from then on, so a pack *can* share if that is what the user
+> wants. And **hestia never breaks a link it did not just make** — a folder
+> already sharing keeps sharing, whatever else changes.
+>
+> Sharing is now switchable outright (`sync.enabled`, the config store like
+> `announcements.enabled`): moving a user's files into a common store is a
+> policy some people simply do not want, and the honest answer to that is a
+> switch, not a warning they cannot turn off. Off, no pass runs — and existing
+> links are left exactly where they are.
 
 > **Everything serialized is camelCase, except the `config.*` key vocabulary
 > and upstream DTOs.** The wire is camelCase (`proto` structs carry

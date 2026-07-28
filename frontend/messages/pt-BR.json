@@ -666,14 +666,16 @@
  "sync": {
   "section": "Compartilhado entre instâncias",
   "description": "Arquivos são copiados e mesclados a cada inicialização; pastas são vinculadas a um armazenamento compartilhado.",
+  "enabled_label": "Compartilhar configurações entre instâncias",
+  "enabled_description": "Desligado, cada instância mantém suas próprias configurações e mundos. Pastas já compartilhadas continuam assim.",
   "files": "Arquivos copiados",
   "folders": "Pastas vinculadas",
   "add_file_placeholder": "options.txt",
   "add_folder_placeholder": "saves",
   "status_title": "Estado dos vínculos por instância",
   "state_linked": "vinculada",
-  "state_pending": "vincula na próxima inicialização",
-  "state_cannot_link": "requer adoção",
+  "state_pending": "compartilha no próximo início",
+  "state_cannot_link": "conflita com o armazenamento",
   "adopt": "Adotar",
   "adopt_description": "Move o conteúdo existente das pastas da instância para o armazenamento compartilhado e as vincula. A instância precisa estar parada.",
   "adopted": "Adotado: {targets}",
@@ -689,13 +691,13 @@
   },
   "hint": {
    "properties_schema_missing": "Qualquer chave é aceita até que ele possa ser derivado novamente, então confira a grafia você mesmo. Atualizar o servidor o deriva de novo.",
-   "sync_target_not_shared": "Adote a pasta para mover o conteúdo dela para o armazenamento compartilhado e criar o vínculo.",
+   "sync_target_not_shared": "Renomeie ou apague os arquivos em conflito na pasta da instância e inicie novamente para compartilhá-la.",
    "sync_target_skipped": "Verifique as permissões da pasta e inicie novamente.",
    "modpack_overrides_kept": "Exclua um arquivo no diretório do jogo para usar a versão do pacote na próxima atualização.",
    "modpack_files_not_accepted": "Nada a fazer — o pacote os traz para o outro lado. Instale o pacote em uma instância para obtê-los."
   },
   "token": {
-   "has_contents": "a pasta já tem conteúdo",
+   "collides": "arquivos com o mesmo nome já são compartilhados",
    "foreign_link": "a pasta é um vínculo criado por você"
   }
  },

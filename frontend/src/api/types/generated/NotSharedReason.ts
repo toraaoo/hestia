@@ -2,6 +2,8 @@
 
 /**
  * Why a folder target stayed instance-local instead of being linked into the
- * shared store — the empty-or-linked guard's two refusals.
+ * shared store. A folder holding only the instance's own files is adopted
+ * automatically, so both of these are cases where a move would have destroyed
+ * something.
  */
-export type NotSharedReason = "has_contents" | "foreign_link";
+export type NotSharedReason = "collides" | "foreign_link";

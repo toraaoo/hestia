@@ -361,22 +361,31 @@ symlink on Linux/macOS, a junction on Windows): every instance opens the
 same physical folders, so a world exists once and appears everywhere
 instantly. It works out of the box — no setup.
 
-A folder is only linked when it is missing, empty, or already linked — an
-existing non-empty folder (a pre-linking instance's `saves/`, say) is never
-touched. `sync status` shows it as *cannot link*; move its contents into the
-store with `adopt`:
+A folder that already holds an instance's own files is **adopted**: its
+contents move into the store and the folder becomes a link, at the launch that
+would otherwise have left it unshared. Nothing is ever merged or overwritten,
+so the one thing that stops it is a name the store already has (two instances
+with a world called `New World`) — `sync status` shows that folder as
+*clashes with the store*, and it stays local until you rename or delete the
+clashing files. Adopt on demand is the same migration:
 
 ```bash
-hestia sync status               # store path, targets, per-instance link state
+hestia sync status               # sharing on/off, store path, targets, link state
 
 hestia instance modded sync adopt        # move existing folders into the store
 hestia instance modded sync adopt saves  # …or just one target
 ```
 
-Adopt is all-or-nothing per folder: a name that already exists in the store
-(two instances with a world called `New World`) refuses that folder and
-lists the collisions — rename one, then retry. Nothing is ever merged or
-overwritten.
+An instance running a **modpack** keeps its own `config/`: the pack ships that
+tree, so it is not folded into what every other instance reads. Adopt it
+explicitly if you want it shared anyway — the link is honoured from then on.
+
+Sharing can be switched off entirely; folders already linked stay linked.
+
+```bash
+hestia config set sync.enabled false    # every instance keeps its own settings
+hestia config get sync.enabled
+```
 
 Sync is **instance-only**: a server's configuration is per-server
 infrastructure, managed through `server <name> config …` and
@@ -412,6 +421,8 @@ hestia config get home           # resolved data directory
 hestia config set home <dir>     # persist the data dir (empty reverts to default)
 hestia config get autostart      # true if the daemon starts at login
 hestia config set autostart true # register the daemon to start at login
+hestia config set sync.enabled false          # stop sharing settings across instances
+hestia config set announcements.enabled false # stop fetching news and notices
 ```
 
 The data directory is resolved as: `--home` → `$HESTIA_HOME` → a persisted

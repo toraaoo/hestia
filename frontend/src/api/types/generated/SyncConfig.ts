@@ -2,6 +2,10 @@
 import type { SyncTargets } from "./SyncTargets";
 
 /**
- * The sync store location plus the current targets.
+ * The sync store location plus the current targets. `enabled` is the
+ * `sync.enabled` setting read back: an empty reconcile means something
+ * different when sharing is switched off than when nothing is targeted, and a
+ * front-end cannot tell those apart from the targets alone. It is *set*
+ * through `config.set`, like every other launcher-wide setting.
  */
-export type SyncConfig = { sharedDir: string, targets: SyncTargets, };
+export type SyncConfig = { enabled: boolean, sharedDir: string, targets: SyncTargets, };

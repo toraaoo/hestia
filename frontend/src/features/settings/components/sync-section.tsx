@@ -18,8 +18,10 @@ import {
   FieldSet,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { CheckboxRow } from '@/features/settings/components/fields';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+import { configMutations } from '@/queries/config';
 import { syncMutations, syncQueries } from '@/queries/sync';
 
 const stateLabel: Record<LinkState, () => string> = {
@@ -29,16 +31,18 @@ const stateLabel: Record<LinkState, () => string> = {
 };
 
 /**
- * The instance-sync settings: the shared target set (files copied, folders
- * linked) and every instance's per-folder link state, with adopt for a
- * non-empty folder the guard refuses to link.
+ * The instance-sync settings: whether instances share at all, the shared target
+ * set (files copied, folders linked), and every instance's per-folder link
+ * state — with adopt for a folder whose names clash with the store.
  */
 export function SyncSection() {
   const config = useQuery(syncQueries.config());
   const status = useQuery(syncQueries.status());
   const setTargets = useMutation(syncMutations.set());
+  const setConfig = useMutation(configMutations.set());
 
   const targets = config.data?.targets ?? { files: [], folders: [] };
+  const enabled = config.data?.enabled ?? true;
 
   const commit = (next: SyncTargets) => setTargets.mutate(next);
 
@@ -48,7 +52,20 @@ export function SyncSection() {
       <FieldGroup>
         <FieldDescription>{m['sync.description']()}</FieldDescription>
 
-        {config.isPending ? (
+        <Field>
+          <CheckboxRow
+            id="sync-enabled"
+            label={m['sync.enabled_label']()}
+            checked={enabled}
+            disabled={config.isPending || setConfig.isPending}
+            onChange={(checked) =>
+              setConfig.mutate({ key: 'sync.enabled', value: checked })
+            }
+          />
+          <FieldDescription>{m['sync.enabled_description']()}</FieldDescription>
+        </Field>
+
+        {!enabled ? null : config.isPending ? (
           <div className="space-y-2">
             <Bone className="h-9" />
             <Bone className="h-9" />
@@ -72,44 +89,46 @@ export function SyncSection() {
           </>
         )}
 
-        <Field>
-          <FieldLabel>{m['sync.status_title']()}</FieldLabel>
-          {status.isPending ? (
-            <Bone className="h-10" />
-          ) : targets.folders.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {m['sync.no_folder_targets']()}
-            </p>
-          ) : (
-            <div className="divide-y divide-border border border-border">
-              {(status.data ?? []).map((inst) => (
-                <div
-                  key={inst.id}
-                  className="flex flex-wrap items-center gap-2 px-3 py-2"
-                >
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {inst.name}
-                  </span>
-                  {inst.targets.map((t) => (
-                    <Badge
-                      key={t.target}
-                      variant={t.state === 'linked' ? 'secondary' : 'outline'}
-                      className={cn(
-                        'font-mono text-[10px]',
-                        t.state === 'cannot_link' && 'text-destructive',
-                      )}
-                    >
-                      {t.target}: {stateLabel[t.state]()}
-                    </Badge>
-                  ))}
-                  {inst.targets.some((t) => t.state === 'cannot_link') && (
-                    <AdoptButton id={inst.id} name={inst.name} />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </Field>
+        {enabled && (
+          <Field>
+            <FieldLabel>{m['sync.status_title']()}</FieldLabel>
+            {status.isPending ? (
+              <Bone className="h-10" />
+            ) : targets.folders.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {m['sync.no_folder_targets']()}
+              </p>
+            ) : (
+              <div className="divide-y divide-border border border-border">
+                {(status.data ?? []).map((inst) => (
+                  <div
+                    key={inst.id}
+                    className="flex flex-wrap items-center gap-2 px-3 py-2"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {inst.name}
+                    </span>
+                    {inst.targets.map((t) => (
+                      <Badge
+                        key={t.target}
+                        variant={t.state === 'linked' ? 'secondary' : 'outline'}
+                        className={cn(
+                          'font-mono text-[10px]',
+                          t.state === 'cannot_link' && 'text-destructive',
+                        )}
+                      >
+                        {t.target}: {stateLabel[t.state]()}
+                      </Badge>
+                    ))}
+                    {inst.targets.some((t) => t.state === 'cannot_link') && (
+                      <AdoptButton id={inst.id} name={inst.name} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Field>
+        )}
       </FieldGroup>
     </FieldSet>
   );
