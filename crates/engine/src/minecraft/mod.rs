@@ -7,6 +7,7 @@ pub(crate) mod launch;
 pub(crate) mod log4j;
 pub(crate) mod materialize;
 mod meta;
+mod paper;
 pub(crate) mod ping;
 mod provider;
 pub(crate) mod rcon;
@@ -34,6 +35,8 @@ impl Default for Minecraft {
             servers: vec![
                 Box::new(vanilla::VanillaServer),
                 Box::new(fabric::FabricServer),
+                Box::new(paper::PaperServer),
+                Box::new(paper::FoliaServer),
             ],
             instances: vec![
                 Box::new(vanilla::VanillaInstance),

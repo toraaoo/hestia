@@ -24,7 +24,7 @@ pub(crate) fn http_client() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
     CLIENT.get_or_init(|| {
         reqwest::Client::builder()
-            .user_agent(format!("{}/{}", common::app::NAME, common::app::VERSION))
+            .user_agent(common::app::user_agent())
             .build()
             .expect("default reqwest client builds")
     })

@@ -4,6 +4,7 @@
 
 pub mod fabric;
 pub mod mojang;
+pub mod paper;
 
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
