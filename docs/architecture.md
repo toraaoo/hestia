@@ -563,12 +563,23 @@ The subsystems behind the aggregate:
 > primary artifact even though it is never launched: it is the input the
 > processors patch, and keeping it there is what makes provisioning fetch it.
 >
-> **Known degradation:** a NeoForge server's property schema cannot be derived.
-> The schema run boots the server in a throwaway directory, and the generated
-> argument file resolves its libraries relative to the *data* directory, so it
-> cannot run there. The create succeeds and reports
-> `PropertiesSchemaMissing` — the warning that exists for exactly this — so the
-> server accepts any unmanaged property key rather than validating it.
+> **The schema run therefore ignores the argument file.** A NeoForge server's
+> property schema used to be underivable — twice over: the generated argument
+> file resolves its libraries relative to the *data* directory, so it cannot run
+> from the throwaway dir, and FML gates on the EULA *before* vanilla writes
+> `server.properties` (vanilla writes it first), so even running it there yields
+> no file. Every NeoForge create then reported `PropertiesSchemaMissing`, a
+> warning about nothing the user did and nothing they could fix — its own hint
+> pointed at `update`, which failed identically.
+>
+> The fix is what the profile already carries: the vanilla server jar. A
+> properties schema *is* the vanilla key set for that game version — the loader
+> contributes none, and no mods are installed at create — so
+> `server_schema_plan` drops `args_file` and boots the primary artifact
+> (`-jar server.jar nogui`), which stops at the EULA gate having written the
+> file, exactly as every other flavor does. Nothing else in the pipeline
+> changed, and the warning now fires only for a run that genuinely failed (a
+> timeout, a crash), which is a thing worth saying.
 
 > **A Paper build is a loader version, and Mojang orders the catalogue.**
 > Paper and Folia are one self-contained jar per build, so a profile is the
