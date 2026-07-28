@@ -1,29 +1,32 @@
 //! The Modrinth (`api.modrinth.com/v2`) content provider: search with facets,
-//! project detail, project versions, and `.mrpack` modpack resolution. Modrinth's
-//! raw JSON is mapped into the normalized `proto::content` types here; the rest of
-//! the engine never sees a Modrinth-specific shape. No API key is required.
+//! project detail, project versions, and fetching a `.mrpack` (parsed by the
+//! format-owning [`super::mrpack`], which a local file goes through too).
+//! Modrinth's raw JSON is mapped into the normalized `proto::content` types
+//! here; the rest of the engine never sees a Modrinth-specific shape. No API key
+//! is required.
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use proto::content::{
     ContentDependency, ContentFile, ContentKind, ContentProject, ContentVersion, DependencyKind,
-    GalleryImage, ModpackFile, ReleaseChannel, ResolvedModpack, SearchQuery, SearchResult,
-    SearchSort, SideSupport, VersionQuery,
+    GalleryImage, ReleaseChannel, ResolvedModpack, SearchQuery, SearchResult, SearchSort,
+    SideSupport, VersionQuery,
 };
 use proto::download::{Checksum, HashAlgorithm};
 use proto::minecraft::Artifact;
-use serde_json::{Map, Value};
-use std::io::Cursor;
-use std::path::{Component, Path};
+use serde_json::Value;
 
-use super::provider::{ContentProvider, UrlRef};
+use super::mrpack;
+use super::provider::{ContentProvider, FileRef, UrlRef};
 
 const API: &str = "https://api.modrinth.com/v2";
 const SITE: &str = "modrinth.com";
-
-/// Modrinth dependency keys that name a modloader, newest-preferred order. The
-/// loader name is the key with any `-loader` suffix stripped.
-const LOADER_KEYS: [&str; 4] = ["fabric-loader", "quilt-loader", "neoforge", "forge"];
+/// Where Modrinth serves project files from. The path carries both ids, so a
+/// pack index's bare download URL is enough to make its file a tracked item.
+const CDN: &str = "cdn.modrinth.com";
+/// Ids per bulk request. The whole query goes in the URL, so a big pack's ids
+/// are chunked rather than sent as one over-long line.
+const BULK_LIMIT: usize = 100;
 
 /// The site's project-type path segments (`modrinth.com/<type>/<slug>`) and the
 /// kind each names.
@@ -100,6 +103,24 @@ impl ContentProvider for Modrinth {
         })
     }
 
+    /// `cdn.modrinth.com/data/<project>/versions/<version>/<filename>`. Any
+    /// other host is somebody else's file — a pack may name one, and it stays
+    /// an untracked direct download rather than being guessed at.
+    fn parse_file_url(&self, url: &str) -> Option<FileRef> {
+        let rest = url.strip_prefix("https://")?;
+        let path = rest.strip_prefix(CDN)?.strip_prefix("/data/")?;
+        let mut segments = path.split('/');
+        let project_id = segments.next().filter(|s| !s.is_empty())?.to_string();
+        if segments.next()? != "versions" {
+            return None;
+        }
+        let version_id = segments.next().filter(|s| !s.is_empty())?.to_string();
+        Some(FileRef {
+            project_id,
+            version_id,
+        })
+    }
+
     async fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
         let limit = if query.limit == 0 {
             10
@@ -142,6 +163,24 @@ impl ContentProvider for Modrinth {
         Ok(parse_project(self.id(), &body, kind))
     }
 
+    /// One `GET /projects?ids=[…]` for the lot. A pack index resolves to a
+    /// hundred-odd ids at once and Modrinth rate-limits hard, so the per-project
+    /// default would be the slowest part of every pack install.
+    async fn projects(&self, ids: &[String]) -> Result<Vec<ContentProject>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut out = Vec::with_capacity(ids.len());
+        for chunk in ids.chunks(BULK_LIMIT) {
+            let params = [("ids", serde_json::to_string(chunk).unwrap_or_default())];
+            let body = get_json(&format!("{API}/projects"), &params).await?;
+            if let Some(arr) = body.as_array() {
+                out.extend(arr.iter().map(|p| parse_project(self.id(), p, None)));
+            }
+        }
+        Ok(out)
+    }
+
     async fn versions(&self, query: &VersionQuery) -> Result<Vec<ContentVersion>> {
         let mut params: Vec<(&str, String)> = Vec::new();
         if let Some(loader) = non_empty(&query.loader) {
@@ -158,6 +197,10 @@ impl ContentProvider for Modrinth {
     }
 
     async fn resolve_modpack(&self, version_id: &str) -> Result<ResolvedModpack> {
+        Ok(self.fetch_modpack(version_id).await?.0)
+    }
+
+    async fn fetch_modpack(&self, version_id: &str) -> Result<(ResolvedModpack, Vec<u8>)> {
         let version = get_json(&format!("{API}/version/{version_id}"), &[]).await?;
         let files = version
             .get("files")
@@ -184,16 +227,8 @@ impl ContentProvider for Modrinth {
             .context("modpack file has no download url")?;
 
         let bytes = download_bytes(url).await?;
-        let mut archive = zip::ZipArchive::new(Cursor::new(bytes))
-            .context("the modpack .mrpack is not a valid archive")?;
-        let index: Value = {
-            let entry = archive
-                .by_name("modrinth.index.json")
-                .context("modrinth.index.json is missing from the .mrpack")?;
-            serde_json::from_reader(entry).context("modrinth.index.json is malformed")?
-        };
-
-        let mut resolved = parse_index(&index)?;
+        let mut archive = mrpack::Archive::open(bytes.clone())?;
+        let mut resolved = archive.index()?;
         resolved.source = self.id().to_string();
         resolved.version_id = version
             .get("id")
@@ -205,100 +240,15 @@ impl ContentProvider for Modrinth {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string();
-        Ok(resolved)
-    }
-}
-
-/// Parse a `modrinth.index.json` (the `.mrpack` manifest) into a resolved
-/// modpack. Pure — the source/project/version ids come from the API version
-/// response, not the index. Rejects an unsupported format version, a file with
-/// an unsafe (absolute or parent-escaping) path, or a missing Minecraft version.
-fn parse_index(index: &Value) -> Result<ResolvedModpack> {
-    let format = index
-        .get("formatVersion")
-        .and_then(Value::as_u64)
-        .unwrap_or(0);
-    if format != 1 {
-        bail!(proto::error::ErrorInfo::ModpackInvalid {
-            detail: format!("unsupported format version: {format} (expected 1)")
-        });
-    }
-
-    let mut files = Vec::new();
-    if let Some(arr) = index.get("files").and_then(Value::as_array) {
-        for f in arr {
-            let path = f.get("path").and_then(Value::as_str).unwrap_or_default();
-            if !is_safe_path(path) {
-                bail!("modpack file has an unsafe path: {path}");
-            }
-            let url = f
-                .get("downloads")
-                .and_then(Value::as_array)
-                .and_then(|d| d.first())
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
-            let size = f.get("fileSize").and_then(Value::as_u64).unwrap_or(0);
-            let sha1 = f
-                .get("hashes")
-                .and_then(|h| h.get("sha1"))
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
-            let env = f.get("env");
-            // A missing `env` means the file applies to both sides (Modrinth spec).
-            let client = env
-                .and_then(|e| e.get("client"))
-                .and_then(Value::as_str)
-                .map(parse_side)
-                .unwrap_or(SideSupport::Required);
-            let server = env
-                .and_then(|e| e.get("server"))
-                .and_then(Value::as_str)
-                .map(parse_side)
-                .unwrap_or(SideSupport::Required);
-            files.push(ModpackFile {
-                path: path.to_string(),
-                artifact: Artifact {
-                    url,
-                    filename: filename_of(path),
-                    size,
-                    checksum: (!sha1.is_empty()).then_some(Checksum {
-                        algorithm: HashAlgorithm::Sha1,
-                        hex: sha1,
-                    }),
-                },
-                client,
-                server,
-            });
-        }
-    }
-
-    let deps = index.get("dependencies").and_then(Value::as_object);
-    let game_version = deps
-        .and_then(|d| d.get("minecraft"))
-        .and_then(Value::as_str)
-        .context("modpack does not pin a Minecraft version")?
-        .to_string();
-    let (loader, loader_version) = deps
-        .and_then(find_loader)
-        .map(|(l, v)| (Some(l), Some(v)))
-        .unwrap_or((None, None));
-
-    Ok(ResolvedModpack {
-        source: String::new(),
-        project_id: String::new(),
-        version_id: String::new(),
-        name: index
-            .get("name")
+        // The index's own `versionId` is free text the pack author writes; the
+        // platform's version number is what `modpack update` compares against.
+        resolved.version_number = version
+            .get("version_number")
             .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string(),
-        game_version,
-        loader,
-        loader_version,
-        files,
-    })
+            .unwrap_or(&resolved.version_number)
+            .to_string();
+        Ok((resolved, bytes))
+    }
 }
 
 fn parse_hit(source: &str, hit: &Value, requested: ContentKind) -> ContentProject {
@@ -526,30 +476,6 @@ fn parse_dependency_kind(s: &str) -> DependencyKind {
     }
 }
 
-fn find_loader(deps: &Map<String, Value>) -> Option<(String, String)> {
-    for key in LOADER_KEYS {
-        if let Some(version) = deps.get(key).and_then(Value::as_str) {
-            let name = key.strip_suffix("-loader").unwrap_or(key).to_string();
-            return Some((name, version.to_string()));
-        }
-    }
-    None
-}
-
-/// A relative path that stays inside the game directory: not empty, not
-/// absolute, and with no parent (`..`), root, or drive-prefix components.
-fn is_safe_path(path: &str) -> bool {
-    if path.is_empty() {
-        return false;
-    }
-    let p = Path::new(path);
-    if p.is_absolute() {
-        return false;
-    }
-    p.components()
-        .all(|c| matches!(c, Component::Normal(_) | Component::CurDir))
-}
-
 fn categories(v: &Value) -> Vec<String> {
     let display = str_array(v, "display_categories");
     if display.is_empty() {
@@ -588,10 +514,6 @@ fn non_empty(opt: &Option<String>) -> Option<&str> {
 
 fn json_array(value: &str) -> String {
     serde_json::to_string(&[value]).unwrap_or_default()
-}
-
-fn filename_of(path: &str) -> String {
-    path.rsplit(['/', '\\']).next().unwrap_or(path).to_string()
 }
 
 async fn get_json(url: &str, query: &[(&str, String)]) -> Result<Value> {
@@ -639,76 +561,25 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    const SHA1: &str = "da39a3ee5e6b4b0d3255bfef95601890afd80709";
-
     #[test]
-    fn parse_index_maps_files_and_loader() {
-        let index = json!({
-            "formatVersion": 1,
-            "game": "minecraft",
-            "versionId": "1.2.3",
-            "name": "Test Pack",
-            "files": [{
-                "path": "mods/sodium.jar",
-                "hashes": { "sha1": SHA1, "sha512": "ignored" },
-                "env": { "client": "required", "server": "unsupported" },
-                "downloads": ["https://cdn.modrinth.com/sodium.jar"],
-                "fileSize": 1234
-            }],
-            "dependencies": { "minecraft": "1.21.1", "fabric-loader": "0.16.0" }
-        });
-        let resolved = parse_index(&index).unwrap();
-        assert_eq!(resolved.name, "Test Pack");
-        assert_eq!(resolved.game_version, "1.21.1");
-        assert_eq!(resolved.loader.as_deref(), Some("fabric"));
-        assert_eq!(resolved.loader_version.as_deref(), Some("0.16.0"));
-        assert_eq!(resolved.files.len(), 1);
-        let file = &resolved.files[0];
-        assert_eq!(file.path, "mods/sodium.jar");
-        assert_eq!(file.artifact.filename, "sodium.jar");
-        assert_eq!(file.artifact.url, "https://cdn.modrinth.com/sodium.jar");
-        assert_eq!(file.artifact.size, 1234);
-        assert_eq!(file.artifact.checksum.as_ref().unwrap().hex, SHA1);
-        assert_eq!(file.client, SideSupport::Required);
-        assert_eq!(file.server, SideSupport::Unsupported);
+    fn a_cdn_file_url_carries_both_ids() {
+        let parsed = Modrinth
+            .parse_file_url(
+                "https://cdn.modrinth.com/data/AANobbMI/versions/HFxNoSNH/sodium-fabric-0.6.0.jar",
+            )
+            .unwrap();
+        assert_eq!(parsed.project_id, "AANobbMI");
+        assert_eq!(parsed.version_id, "HFxNoSNH");
     }
 
     #[test]
-    fn parse_index_missing_env_defaults_to_required() {
-        let index = json!({
-            "formatVersion": 1,
-            "name": "x",
-            "files": [{ "path": "mods/a.jar", "downloads": ["u"] }],
-            "dependencies": { "minecraft": "1.21", "quilt-loader": "0.1" }
-        });
-        let resolved = parse_index(&index).unwrap();
-        assert_eq!(resolved.loader.as_deref(), Some("quilt"));
-        assert_eq!(resolved.files[0].client, SideSupport::Required);
-        assert_eq!(resolved.files[0].server, SideSupport::Required);
-        assert!(resolved.files[0].artifact.checksum.is_none());
-    }
-
-    #[test]
-    fn parse_index_rejects_bad_format() {
-        let index = json!({ "formatVersion": 2, "dependencies": { "minecraft": "1.21" } });
-        assert!(parse_index(&index).is_err());
-    }
-
-    #[test]
-    fn parse_index_requires_minecraft() {
-        let index = json!({ "formatVersion": 1, "dependencies": { "fabric-loader": "0.1" } });
-        assert!(parse_index(&index).is_err());
-    }
-
-    #[test]
-    fn parse_index_rejects_unsafe_paths() {
-        for bad in ["../evil", "/etc/passwd", "mods/../../escape"] {
-            let index = json!({
-                "formatVersion": 1,
-                "files": [{ "path": bad, "downloads": ["u"] }],
-                "dependencies": { "minecraft": "1.21" }
-            });
-            assert!(parse_index(&index).is_err(), "should reject {bad}");
+    fn a_foreign_download_url_is_not_guessed_at() {
+        for url in [
+            "https://example.com/data/AAA/versions/BBB/x.jar",
+            "https://cdn.modrinth.com/data/AAA/files/BBB/x.jar",
+            "https://cdn.modrinth.com/data/AAA",
+        ] {
+            assert!(Modrinth.parse_file_url(url).is_none(), "should skip {url}");
         }
     }
 

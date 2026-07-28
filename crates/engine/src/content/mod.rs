@@ -6,8 +6,9 @@
 pub(crate) mod inspect;
 pub(crate) mod install;
 mod modrinth;
+pub(crate) mod mrpack;
 pub(crate) mod profiles;
-mod provider;
+pub(crate) mod provider;
 
 use std::path::Path;
 
