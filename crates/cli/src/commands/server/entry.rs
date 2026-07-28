@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use client::proto::process::{ProcessInfo, ProcessState};
-use client::proto::server::{ServerDetails, ServerInfo, ServerPingResult};
+use client::proto::server::{JvmArgsSource, ServerDetails, ServerInfo, ServerPingResult};
 use client::Client;
 
 use crate::commands::mc;
@@ -109,10 +109,25 @@ pub(super) fn show_info(info: &ServerDetails) -> Result<()> {
             },
         ),
         ("disk", ui::human_bytes(info.disk_bytes)),
+        ("jvm args", jvm_args_label(info)),
         ("folder", info.entry_dir.clone()),
         ("data", info.data_dir.clone()),
     ]))?;
     ui::show_warnings(&info.warnings)
+}
+
+/// The flags the server starts with, named by where they came from. A flavor's
+/// own recommendation is the one source the user never typed, so saying which
+/// layer won is the point — `config get jvm-args` answers for the setting, this
+/// answers for the launch.
+fn jvm_args_label(info: &ServerDetails) -> String {
+    let source = match info.jvm_args_source {
+        JvmArgsSource::None => return "-".into(),
+        JvmArgsSource::Entry => "set here",
+        JvmArgsSource::Defaults => "from defaults.jvm-args",
+        JvmArgsSource::Flavor => "recommended by the flavor",
+    };
+    format!("{} ({source})", info.jvm_args.join(" "))
 }
 
 fn address_label(info: &ServerInfo) -> String {

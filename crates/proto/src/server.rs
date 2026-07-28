@@ -93,10 +93,33 @@ pub struct ServerDetails {
     pub data_dir: String,
     /// The entry's total on-disk footprint, in bytes.
     pub disk_bytes: u64,
+    /// The JVM flags this server actually starts with, and which layer supplied
+    /// them. A flavor can recommend its own (Paper ships a tuned G1GC set), so
+    /// `config get jvm-args` reporting "unset" is true of the *setting* while
+    /// the server still runs with flags — this is where that is visible.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub jvm_args: Vec<String>,
+    pub jvm_args_source: JvmArgsSource,
     /// Standing degraded state — a create's warnings scroll past, so `info`
     /// keeps reporting the ones that are still true.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<WarningInfo>,
+}
+
+/// Which layer the effective `jvm-args` came from, innermost first.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "snake_case")]
+pub enum JvmArgsSource {
+    /// Nothing set them anywhere; the server runs on the JVM's own defaults.
+    #[default]
+    None,
+    /// The entry's own `jvm-args`.
+    Entry,
+    /// The launcher-wide `defaults.jvm-args`.
+    Defaults,
+    /// The flavor's published recommendation.
+    Flavor,
 }
 
 pub struct ServerDetail;

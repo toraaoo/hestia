@@ -5,13 +5,13 @@ use anyhow::{Context, Result};
 use proto::backup::BackupKind;
 use proto::minecraft::ProvisionPhase;
 
-use proto::server::{ServerDetails, ServerPingResult};
+use proto::server::{JvmArgsSource, ServerDetails, ServerPingResult};
 use proto::warning::WarningInfo;
 
 use super::{effective_name, guard_downgrade, phase_progress};
 use crate::content::install;
 use crate::engine::{Engine, ServerCreateSpec, ServerUpdateSpec};
-use crate::minecraft::launch::LaunchPlan;
+use crate::minecraft::launch::{JavaSettings, LaunchPlan};
 use crate::minecraft::materialize::OnProgress;
 use crate::minecraft::{ping, rcon};
 use crate::servers::ServerRecord;
@@ -145,7 +145,8 @@ impl Engine {
         let java = self.installed_java(record.profile.java_major)?;
         let jvm = record
             .jvm
-            .or_defaults(&self.config.settings().java_defaults());
+            .or_defaults(&self.config.settings().java_defaults())
+            .or_defaults(&flavor_defaults(&record.profile));
         let plan = self.servers.launch_plan(&record, &java, &jvm);
         Ok((record, plan))
     }
@@ -193,6 +194,13 @@ impl Engine {
         let entry_dir = self.servers.server_dir(&record);
         let data_dir = self.servers.data_dir(&record);
         let warnings = self.server_warnings(&record);
+        let defaults = self.config.settings().java_defaults();
+        let jvm_args_source = jvm_args_source(&record.jvm, &defaults, &record.profile.jvm_args);
+        let jvm_args = record
+            .jvm
+            .or_defaults(&defaults)
+            .or_defaults(&flavor_defaults(&record.profile))
+            .jvm_args;
         Ok(ServerDetails {
             id: record.id,
             name: record.name,
@@ -205,7 +213,103 @@ impl Engine {
             disk_bytes: usage::dir_size(&entry_dir),
             entry_dir: entry_dir.to_string_lossy().into_owned(),
             data_dir: data_dir.to_string_lossy().into_owned(),
+            jvm_args,
+            jvm_args_source,
             warnings,
         })
+    }
+}
+
+/// The flavor's own recommended JVM flags as the last fallback layer, beneath
+/// the entry's `jvm-args` and the launcher-wide `defaults.jvm-args`. Paper
+/// publishes a tuned G1GC set per version and running without it is a
+/// measurably worse server, but a user who wrote their own flags meant them —
+/// so this only fills what neither of the two settings layers did, which is
+/// exactly what `or_defaults` means.
+fn flavor_defaults(profile: &proto::minecraft::ServerProfile) -> JavaSettings {
+    JavaSettings {
+        memory: None,
+        jvm_args: profile.jvm_args.clone(),
+    }
+}
+
+/// Which layer supplies the flags a server will actually start with — the same
+/// order `or_defaults` resolves them in, reported so `info` can say it.
+fn jvm_args_source(
+    entry: &JavaSettings,
+    defaults: &JavaSettings,
+    flavor: &[String],
+) -> JvmArgsSource {
+    if !entry.jvm_args.is_empty() {
+        JvmArgsSource::Entry
+    } else if !defaults.jvm_args.is_empty() {
+        JvmArgsSource::Defaults
+    } else if !flavor.is_empty() {
+        JvmArgsSource::Flavor
+    } else {
+        JvmArgsSource::None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn settings(args: &[&str]) -> JavaSettings {
+        JavaSettings {
+            memory: None,
+            jvm_args: args.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    fn flavor(args: &[&str]) -> Vec<String> {
+        args.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn the_innermost_set_layer_wins() {
+        assert_eq!(
+            jvm_args_source(&settings(&[]), &settings(&[]), &flavor(&["-XX:+UseG1GC"])),
+            JvmArgsSource::Flavor,
+            "nothing set, so paper's own recommendation runs"
+        );
+        assert_eq!(
+            jvm_args_source(
+                &settings(&[]),
+                &settings(&["-Xss1M"]),
+                &flavor(&["-XX:+UseG1GC"])
+            ),
+            JvmArgsSource::Defaults,
+            "a launcher-wide default outranks the flavor's"
+        );
+        assert_eq!(
+            jvm_args_source(
+                &settings(&["-Xss2M"]),
+                &settings(&["-Xss1M"]),
+                &flavor(&["-XX:+UseG1GC"])
+            ),
+            JvmArgsSource::Entry,
+            "a user who wrote flags meant them"
+        );
+        assert_eq!(
+            jvm_args_source(&settings(&[]), &settings(&[]), &flavor(&[])),
+            JvmArgsSource::None
+        );
+    }
+
+    #[test]
+    fn a_flavor_recommends_flags_but_never_memory() {
+        let profile = proto::minecraft::ServerProfile {
+            jvm_args: flavor(&["-XX:+UseG1GC"]),
+            ..proto::minecraft::ServerProfile::default()
+        };
+        let resolved = settings(&[])
+            .or_defaults(&settings(&[]))
+            .or_defaults(&flavor_defaults(&profile));
+        assert_eq!(
+            resolved.flags(),
+            ["-XX:+UseG1GC"],
+            "memory stays the user's call; the flavor only recommends flags"
+        );
     }
 }
