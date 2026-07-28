@@ -37,10 +37,8 @@ pub struct JvmDefaults {
     pub jvm_args: String,
 }
 
-/// The content sources' own settings, addressed by the kebab-case config key
-/// `content.curseforge-key`. CurseForge's API refuses every request without a
-/// key, so the source is offered only once one resolves — this setting, else
-/// the key a distributor baked in at build time.
+/// Per-source credentials, keyed `content.curseforge-key`. CurseForge is
+/// offered only once a key resolves — this, else the build-time one.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentSettings {

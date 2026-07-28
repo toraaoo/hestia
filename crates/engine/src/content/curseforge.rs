@@ -3,10 +3,9 @@
 //! JSON is mapped into the normalized `proto::content` types here; the rest of
 //! the engine never sees a CurseForge-specific shape.
 //!
-//! Unlike Modrinth, every request must carry an `x-api-key` header — so this
-//! source only serves once a key resolves (the `content.curseforge-key` setting,
-//! else one baked in at build time), and `Content` leaves it out of the source
-//! list until then.
+//! Every request must carry an `x-api-key`, so the source serves only once a
+//! key resolves — the `content.curseforge-key` setting, else one baked in at
+//! build time — and `Content` leaves it out of the source list until then.
 
 use std::sync::RwLock;
 
@@ -35,14 +34,12 @@ const NAME: &str = "CurseForge";
 /// CurseForge's own id for Minecraft; every catalogue call is scoped to it.
 const GAME: u32 = 432;
 
-/// The pack manifest inside a CurseForge modpack archive. Its file list is
-/// project and file ids, so only this module can resolve it into downloads —
-/// the archive's override trees are `pack.rs`'s half of the format.
+/// Names its files by id, so only this module resolves them into downloads;
+/// the archive's override trees are `pack.rs`'s half.
 const MANIFEST: &str = "manifest.json";
 
-/// The key a distributor baked in at build time, empty in a plain
-/// `cargo build`. The `content.curseforge-key` setting overrides it, so a user
-/// can always bring their own key without rebuilding.
+/// Baked in by a distributor, empty in a plain `cargo build`; the
+/// `content.curseforge-key` setting overrides it without a rebuild.
 const BUILD_KEY: &str = match option_env!("HESTIA_CURSEFORGE_API_KEY") {
     Some(key) => key,
     None => "",
@@ -52,17 +49,15 @@ const BUILD_KEY: &str = match option_env!("HESTIA_CURSEFORGE_API_KEY") {
 const PAGE: u32 = 50;
 const MAX_INDEX: u32 = 10_000;
 
-/// How deep a version lookup pages before it stops asking. The query is already
-/// filtered by game version and loader, so a project with more matching files
-/// than this has far more than a pick needs.
+/// How deep a version lookup pages; the query is already filtered, so a pick
+/// never needs more.
 const MAX_FILES: usize = 200;
 
 /// How many ids one batched `mods`/`mods/files` POST carries.
 const BATCH: usize = 50;
 
-/// A CurseForge *class* is what hestia calls a kind. Bukkit plugins (class 5)
-/// are deliberately absent: the API no longer serves that class, so offering it
-/// would list nothing.
+/// A *class* is what hestia calls a kind. Bukkit plugins (class 5) are absent:
+/// the API no longer serves them.
 const CLASSES: [(ContentKind, u64); 5] = [
     (ContentKind::Mod, 6),
     (ContentKind::ResourcePack, 12),
@@ -75,9 +70,8 @@ const CLASSES: [(ContentKind, u64); 5] = [
 /// class instead (a datapack, a world) has no entry here.
 const LOADERS: [(&str, u32); 4] = [("forge", 1), ("fabric", 4), ("quilt", 5), ("neoforge", 6)];
 
-/// A file's `gameVersions` array mixes Minecraft versions with these loader
-/// names and the `Client`/`Server` side markers; anything else with a dot in it
-/// is taken for a game version.
+/// A file's `gameVersions` mixes these with Minecraft versions and side
+/// markers; anything else carrying a dot is taken for a game version.
 const LOADER_NAMES: [&str; 6] = [
     "neoforge",
     "forge",
@@ -183,11 +177,8 @@ impl ContentProvider for CurseForge {
         })
     }
 
-    /// A CurseForge download URL is `…/files/<id / 1000>/<id % 1000>/<name>`,
-    /// which names the *file* and nothing else — unlike Modrinth's, it does not
-    /// carry the project. That half is recovered from the file itself
-    /// ([`ContentProvider::versions_by_id`] answers a file's project), so a
-    /// pack's mods still land in the pool as tracked, updatable items.
+    /// `…/files/<id / 1000>/<id % 1000>/<name>` — the file, never the project,
+    /// which `versions_by_id` answers instead.
     fn parse_file_url(&self, url: &str) -> Option<FileRef> {
         let rest = url.strip_prefix("https://")?;
         let (host, path) = rest.split_once('/')?;
@@ -311,10 +302,8 @@ impl ContentProvider for CurseForge {
             }
         }
 
-        // CurseForge types datapacks by class, not by loader, so their files
-        // name none — while hestia picks a version by the `datapack`
-        // pseudo-loader. Stamp what the caller asked for; the class already
-        // decided what these files are.
+        // CurseForge types datapacks by class, so their files name no loader
+        // for the `datapack` pseudo-loader a version pick filters on.
         if query.loader.as_deref() == Some("datapack") {
             for version in &mut versions {
                 version.loaders.push("datapack".to_string());
@@ -324,9 +313,7 @@ impl ContentProvider for CurseForge {
         Ok(versions)
     }
 
-    /// CurseForge answers a project or a file by id in bulk, which is what the
-    /// pack index needs: a hundred-odd ids in two requests rather than two
-    /// hundred, on an API that rate-limits.
+    /// Bulk by id, so a pack index costs two requests rather than two hundred.
     async fn projects(&self, ids: &[String]) -> Result<Vec<ContentProject>> {
         if ids.is_empty() {
             return Ok(Vec::new());
@@ -389,9 +376,8 @@ impl ContentProvider for CurseForge {
         resolved.source = ID.to_string();
         resolved.version_id = u64_field(&file, "id").to_string();
         resolved.project_id = u64_field(&file, "modId").to_string();
-        // The manifest's own `version` is free text the pack author writes; the
-        // file's display name is what CurseForge published it as, and what an
-        // update compares against.
+        // The manifest's own `version` is free text; an update compares against
+        // what the platform published.
         resolved.version_number = display;
         resolved.files = self.resolve_manifest_files(&manifest).await?;
         Ok((resolved, bytes))
@@ -470,9 +456,8 @@ impl CurseForge {
         Ok(u64_field(&self.find_mod(reference, None).await?, "id"))
     }
 
-    /// A project by id or slug. CurseForge has no by-slug endpoint, so a slug
-    /// is looked up through search — narrowed by class when the caller named a
-    /// kind, since slugs are unique only within one.
+    /// A project by id or slug. There is no by-slug endpoint, and a slug is
+    /// unique only within a class, so a slug searches with one where known.
     async fn find_mod(&self, reference: &str, kind: Option<ContentKind>) -> Result<Value> {
         if is_numeric(reference) {
             let body = self.get(&format!("/mods/{reference}"), &[]).await?;
@@ -834,10 +819,8 @@ fn loader_type(loader: &str) -> Option<u32> {
         .map(|(_, id)| *id)
 }
 
-/// `ModsSearchSortField`. CurseForge orders by relevance when no field is
-/// given, and has no created-at ordering at all — so "newest" and "recently
-/// updated" both resolve to `LastUpdated`, and "follows" to the popularity
-/// score its thumbs-up count feeds.
+/// `ModsSearchSortField`: no field means relevance, and there is no created-at
+/// ordering, so newest and updated share `LastUpdated`.
 fn sort_field(sort: SearchSort) -> Option<u32> {
     match sort {
         SearchSort::Relevance => None,

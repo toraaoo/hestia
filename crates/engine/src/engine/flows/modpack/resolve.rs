@@ -198,9 +198,7 @@ impl Engine {
                 .find(|v| v.channel == ReleaseChannel::Release)
                 .or_else(|| versions.first()),
         };
-        // A pin the listing did not carry may still be a version id — a URL
-        // pins one directly, and a long-published pack's list is paged. Asking
-        // for it by id is the same request either way, so it costs a miss.
+        // A paged listing may not carry the pin a URL named; ask for it by id.
         if picked.is_none() && !pin.is_empty() {
             let pinned = [pin.to_string()];
             if let Ok(found) = self.content.versions_by_id(source, &pinned).await {
@@ -241,10 +239,8 @@ impl Engine {
     /// bare filenames. Best-effort in both halves: a pack still installs when
     /// the catalogue is unreachable, it just reads less well.
     ///
-    /// Versions are looked up first because a source may name only the file in
-    /// its download URLs (CurseForge does): the file is what knows its project,
-    /// so `refs` are completed from the answer before the projects are asked
-    /// for.
+    /// Versions go first: a source whose URLs name only the file (CurseForge)
+    /// gets its `refs` completed from the answer before the projects are asked.
     pub(super) async fn hydrate(
         &self,
         source: &str,

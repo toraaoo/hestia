@@ -159,9 +159,8 @@ impl Engine {
         &self.config
     }
 
-    /// Set a config value, then re-apply the settings a subsystem keeps its own
-    /// copy of — a content source's API key takes effect on the running daemon,
-    /// not at the next start.
+    /// Set a value, then re-apply the settings a subsystem holds its own copy
+    /// of, so a change lands on the running daemon.
     pub fn set_config(
         &self,
         key: &str,

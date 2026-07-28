@@ -353,9 +353,7 @@ impl Engine {
         on_progress: OnProgress<'_>,
     ) -> Result<InstalledContent> {
         let file = install::primary_file(version)?;
-        // A source may list a file it publishes no download for — CurseForge
-        // lets an author opt out of third-party distribution. Nothing to
-        // retry: say so, and the batch moves on to the next item.
+        // CurseForge lists files whose author opted out of distribution.
         if file.artifact.url.is_empty() {
             bail!(ErrorInfo::ContentDownloadBlocked {
                 title: project.title.clone(),

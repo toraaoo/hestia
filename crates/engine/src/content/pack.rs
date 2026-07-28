@@ -1,22 +1,13 @@
-//! A modpack archive: the zip a pack is distributed as, and the trees inside it
-//! the pack writes straight into the game directory.
-//!
-//! Two formats are read here, because the install path asks both the same
-//! question — which entries are game-directory files? Modrinth's `.mrpack`
-//! carries `modrinth.index.json` beside fixed `overrides/`, `client-overrides/`
-//! and `server-overrides/` trees; CurseForge's carries a `manifest.json` that
-//! *names* its single overrides tree (usually `overrides`, but the author
-//! chooses). An archive knows its own format, so no caller has to be told which
-//! platform served it.
-//!
-//! Only the `.mrpack` index is parsed here. A CurseForge manifest lists its
-//! files by project and file id, which only that platform's API can resolve into
-//! downloads, so its manifest is read in `curseforge.rs` where the API lives.
+//! A modpack archive: the zip a pack is distributed as, its manifest, and the
+//! trees it writes straight into the game directory. An archive knows its own
+//! format — `.mrpack`'s fixed `overrides/`, `client-overrides/` and
+//! `server-overrides/`, or the single tree a CurseForge `manifest.json` names —
+//! so no caller is told which platform served it. Only the `.mrpack` index is
+//! parsed here; a CurseForge manifest names files by id, which its API alone
+//! resolves, so that half lives in `curseforge.rs`.
 //!
 //! Deliberately platform-agnostic. A pack picked off disk has no source, and the
-//! provider that serves packs over HTTP parses the same bytes — so the formats
-//! live here rather than inside a provider, which keeps only the API calls that
-//! fetch them.
+//! provider that serves packs over HTTP parses the same bytes.
 
 use std::io::{Cursor, Read};
 use std::path::{Component, Path, PathBuf};
@@ -134,10 +125,8 @@ impl Archive {
         parse_index(&index)
     }
 
-    /// The override trees to write out, in the order they are written — a later
-    /// one wins where two name the same path, which is what `.mrpack`'s
-    /// side-specific tree is for. A CurseForge pack has the one its manifest
-    /// names and nothing side-specific: the format says nothing about sides.
+    /// In write order, so a later tree wins a path the earlier one also names.
+    /// CurseForge says nothing about sides, so it has the one tree.
     fn overrides_dirs(&self, side: Side) -> Vec<String> {
         match &self.format {
             Format::Mrpack => vec![
@@ -247,10 +236,8 @@ impl Archive {
     }
 }
 
-/// Which format the zip is in, by what it carries. A `modrinth.index.json` is
-/// conclusive; a CurseForge manifest identifies itself by `manifestType`, and
-/// names the overrides tree it ships. Anything else is left as `.mrpack` so the
-/// missing-index error is what a caller sees, rather than a guess.
+/// Anything unrecognised stays `.mrpack`, so a caller sees the missing-index
+/// error rather than a guess.
 fn detect(zip: &mut zip::ZipArchive<Cursor<Vec<u8>>>) -> Format {
     if zip.by_name(INDEX).is_ok() {
         return Format::Mrpack;
