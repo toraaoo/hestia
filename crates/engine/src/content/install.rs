@@ -447,16 +447,15 @@ mod tests {
         assert!(kind_dir(ContentKind::Modpack).is_err());
     }
 
-    fn temp_entry(tag: &str) -> (PathBuf, PathBuf) {
-        let entry = std::env::temp_dir().join(format!(
-            "hestia-install-test-{}-{}",
-            tag,
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&entry);
+    fn temp_entry(tag: &str) -> (tempfile::TempDir, PathBuf, PathBuf) {
+        let dir = tempfile::Builder::new()
+            .prefix(&format!("hestia-install-{tag}-"))
+            .tempdir()
+            .expect("temp dir");
+        let entry = dir.path().join("entry");
         let data = entry.join("data");
         std::fs::create_dir_all(&data).unwrap();
-        (entry, data)
+        (dir, entry, data)
     }
 
     fn tracked(kind: ContentKind, filename: &str) -> InstalledContent {
@@ -479,7 +478,7 @@ mod tests {
 
     #[test]
     fn sync_without_selection_heals_all_tracked_items() {
-        let (entry, data) = temp_entry("healall");
+        let (_dir, entry, data) = temp_entry("healall");
         let items = vec![
             tracked(ContentKind::Mod, "sodium.jar"),
             tracked(ContentKind::ResourcePack, "cozy.zip"),
@@ -494,12 +493,11 @@ mod tests {
 
         assert!(data.join("mods/sodium.jar").is_file());
         assert!(data.join("resourcepacks/cozy.zip").is_file());
-        std::fs::remove_dir_all(&entry).ok();
     }
 
     #[test]
     fn sync_with_selection_mirrors_members_and_removes_non_members() {
-        let (entry, data) = temp_entry("selection");
+        let (_dir, entry, data) = temp_entry("selection");
         let items = vec![
             tracked(ContentKind::Mod, "sodium.jar"),
             tracked(ContentKind::Mod, "lithium.jar"),
@@ -537,12 +535,11 @@ mod tests {
         sync(&entry, &data, None, &[]).unwrap();
         assert!(data.join("mods/lithium.jar").is_file());
         assert!(data.join("resourcepacks/cozy.zip").is_file());
-        std::fs::remove_dir_all(&entry).ok();
     }
 
     #[test]
     fn datapacks_mirror_into_every_world_and_ignore_profile_selection() {
-        let (entry, data) = temp_entry("datapack");
+        let (_dir, entry, data) = temp_entry("datapack");
         let mut pack = tracked(ContentKind::DataPack, "terralith.zip");
         pack.worlds = Vec::new();
         install_tracked(&entry, &data, &pack);
@@ -558,12 +555,11 @@ mod tests {
                 "mirrored into {world} despite the profile selection"
             );
         }
-        std::fs::remove_dir_all(&entry).ok();
     }
 
     #[test]
     fn a_datapack_selection_bounds_which_worlds_get_it() {
-        let (entry, data) = temp_entry("dp-selection");
+        let (_dir, entry, data) = temp_entry("dp-selection");
         let mut pack = tracked(ContentKind::DataPack, "terralith.zip");
         pack.worlds = vec!["saves/one".to_string()];
         install_tracked(&entry, &data, &pack);
@@ -580,12 +576,11 @@ mod tests {
 
         assert!(datapack_path(&data, "saves/one", &pack.filename).is_file());
         assert!(!datapack_path(&data, "saves/two", &pack.filename).exists());
-        std::fs::remove_dir_all(&entry).ok();
     }
 
     #[test]
     fn sync_keeps_disabled_items_out_of_data() {
-        let (entry, data) = temp_entry("disabled");
+        let (_dir, entry, data) = temp_entry("disabled");
         let mut mod_item = tracked(ContentKind::Mod, "sodium.jar");
         install_tracked(&entry, &data, &mod_item);
         mod_item.enabled = false;
@@ -601,12 +596,11 @@ mod tests {
             entry.join("mods/sodium.jar").is_file(),
             "managed copy stays"
         );
-        std::fs::remove_dir_all(&entry).ok();
     }
 
     #[test]
     fn disabling_one_world_leaves_the_others_loaded() {
-        let (entry, data) = temp_entry("dp-disable");
+        let (_dir, entry, data) = temp_entry("dp-disable");
         let mut pack = tracked(ContentKind::DataPack, "terralith.zip");
         pack.disabled_worlds = vec!["saves/two".to_string()];
         install_tracked(&entry, &data, &pack);
@@ -621,7 +615,6 @@ mod tests {
             managed_path(&entry, &pack).unwrap().is_file(),
             "managed copy stays"
         );
-        std::fs::remove_dir_all(&entry).ok();
     }
 
     #[test]
@@ -634,7 +627,7 @@ mod tests {
 
     #[test]
     fn untracked_datapacks_are_reported_per_world() {
-        let (entry, data) = temp_entry("dp-untracked");
+        let (_dir, entry, data) = temp_entry("dp-untracked");
         let pack = tracked(ContentKind::DataPack, "terralith.zip");
         install_tracked(&entry, &data, &pack);
         let stray = datapack_path(&data, "saves/one", "handmade.zip");
@@ -649,6 +642,5 @@ mod tests {
         );
 
         assert_eq!(found, vec!["one/handmade.zip".to_string()]);
-        std::fs::remove_dir_all(&entry).ok();
     }
 }

@@ -852,9 +852,8 @@ mod tests {
 
     #[test]
     fn seeding_adds_new_keys_and_keeps_every_existing_value() {
-        let dir = std::env::temp_dir().join(format!("hestia-seed-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join(PROPERTIES);
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join(PROPERTIES);
 
         // A fresh server starts out as the whole schema.
         seed_properties(&path, &schema(&[("motd", "A Minecraft Server")])).unwrap();

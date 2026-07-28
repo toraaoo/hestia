@@ -189,20 +189,23 @@ mod tests {
     use super::*;
     use std::io::Write;
 
-    fn temp_file(name: &str, contents: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!("hestia-tail-{}-{name}", std::process::id()));
-        let mut f = File::create(&path).unwrap();
+    fn temp_file(name: &str, contents: &str) -> tempfile::NamedTempFile {
+        let path = tempfile::Builder::new()
+            .prefix(&format!("hestia-tail-{name}-"))
+            .tempfile()
+            .expect("temp file");
+        let mut f = File::create(path.path()).unwrap();
         f.write_all(contents.as_bytes()).unwrap();
         path
     }
 
     #[test]
     fn reads_the_last_lines() {
-        let path = temp_file("last", "one\ntwo\nthree\n");
-        assert_eq!(read_last_lines(&path, 2), vec!["two", "three"]);
-        assert_eq!(read_last_lines(&path, 10), vec!["one", "two", "three"]);
-        assert!(read_last_lines(&path, 0).is_empty());
-        let _ = std::fs::remove_file(&path);
+        let file = temp_file("last", "one\ntwo\nthree\n");
+        let path = file.path();
+        assert_eq!(read_last_lines(path, 2), vec!["two", "three"]);
+        assert_eq!(read_last_lines(path, 10), vec!["one", "two", "three"]);
+        assert!(read_last_lines(path, 0).is_empty());
     }
 
     #[test]
@@ -212,16 +215,16 @@ mod tests {
 
     #[test]
     fn drain_emits_new_complete_lines_and_handles_truncation() {
-        let path = temp_file("drain", "first\nsecond\npart");
+        let file = temp_file("drain", "first\nsecond\npart");
+        let path = file.path();
         let mut offset = 0;
         let mut pending = Vec::new();
         let mut lines = Vec::new();
-        drain(&path, &mut offset, &mut pending, |l| lines.push(l));
+        drain(path, &mut offset, &mut pending, |l| lines.push(l));
         assert_eq!(lines, vec!["first", "second"]);
 
-        std::fs::write(&path, "fresh\n").unwrap();
-        drain(&path, &mut offset, &mut pending, |l| lines.push(l));
+        std::fs::write(path, "fresh\n").unwrap();
+        drain(path, &mut offset, &mut pending, |l| lines.push(l));
         assert_eq!(lines, vec!["first", "second", "fresh"]);
-        let _ = std::fs::remove_file(&path);
     }
 }

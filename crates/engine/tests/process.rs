@@ -8,15 +8,13 @@ use std::time::Duration;
 use engine::ProcessSupervisor;
 use proto::process::{LogSource, ProcessSpec, ProcessState, RestartPolicy};
 
-fn temp_dir(tag: &str) -> std::path::PathBuf {
-    let base = std::env::temp_dir().join(format!(
-        "hestia-process-test-{}-{}",
-        tag,
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&base);
-    std::fs::create_dir_all(&base).unwrap();
-    base
+/// A directory that removes itself when the test ends, named after the test so
+/// a leftover under a debugger says which one left it.
+fn temp_dir(tag: &str) -> tempfile::TempDir {
+    tempfile::Builder::new()
+        .prefix(&format!("hestia-process-{tag}-"))
+        .tempdir()
+        .expect("temp dir")
 }
 
 fn alive(pid: u32) -> bool {
@@ -36,8 +34,8 @@ async fn wait_for(mut ready: impl FnMut() -> bool) -> bool {
 #[tokio::test]
 async fn stopping_a_process_stops_its_children() {
     let dir = temp_dir("tree");
-    let supervisor = ProcessSupervisor::new(dir.join("processes"));
-    let child_pid_file = dir.join("child.pid");
+    let supervisor = ProcessSupervisor::new(dir.path().join("processes"));
+    let child_pid_file = dir.path().join("child.pid");
 
     supervisor
         .start(ProcessSpec {
@@ -50,7 +48,7 @@ async fn stopping_a_process_stops_its_children() {
                     child_pid_file.to_string_lossy()
                 ),
             ],
-            cwd: Some(dir.clone()),
+            cwd: Some(dir.path().to_path_buf()),
             env: BTreeMap::new(),
             restart: RestartPolicy::Never,
             log: LogSource::Capture,

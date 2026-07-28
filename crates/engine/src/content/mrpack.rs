@@ -434,12 +434,11 @@ mod tests {
         Archive::open(buffer).unwrap()
     }
 
-    fn temp(tag: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("hestia-mrpack-test-{tag}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
+    fn temp(tag: &str) -> tempfile::TempDir {
+        tempfile::Builder::new()
+            .prefix(&format!("hestia-mrpack-{tag}-"))
+            .tempdir()
+            .expect("temp dir")
     }
 
     fn extract(archive: &mut Archive, side: Side, dest: &Path) -> Vec<WrittenOverride> {
@@ -459,9 +458,10 @@ mod tests {
             ("client-overrides/options.txt", "client"),
             ("server-overrides/server-icon.png", "server"),
         ]);
-        let dest = temp("sides");
+        let dest_dir = temp("sides");
+        let dest = dest_dir.path();
 
-        let written = extract(&mut pack, Side::Client, &dest);
+        let written = extract(&mut pack, Side::Client, dest);
 
         assert!(dest.join("config/shared.toml").is_file(), "shared tree");
         assert!(dest.join("options.txt").is_file(), "the client's own tree");
@@ -470,7 +470,6 @@ mod tests {
             "the other side's tree is not this side's"
         );
         assert_eq!(written.len(), 2);
-        std::fs::remove_dir_all(&dest).ok();
     }
 
     #[test]
@@ -480,14 +479,14 @@ mod tests {
             ("client-overrides/options.txt", "client"),
             ("server-overrides/server-icon.png", "server"),
         ]);
-        let dest = temp("server-side");
+        let dest_dir = temp("server-side");
+        let dest = dest_dir.path();
 
-        extract(&mut pack, Side::Server, &dest);
+        extract(&mut pack, Side::Server, dest);
 
         assert!(dest.join("config/shared.toml").is_file());
         assert!(dest.join("server-icon.png").is_file());
         assert!(!dest.join("options.txt").exists());
-        std::fs::remove_dir_all(&dest).ok();
     }
 
     #[test]
@@ -496,24 +495,25 @@ mod tests {
             ("overrides/config/cozy.toml", "shared value"),
             ("client-overrides/config/cozy.toml", "client value"),
         ]);
-        let dest = temp("precedence");
+        let dest_dir = temp("precedence");
+        let dest = dest_dir.path();
 
-        extract(&mut pack, Side::Client, &dest);
+        extract(&mut pack, Side::Client, dest);
 
         assert_eq!(
             std::fs::read_to_string(dest.join("config/cozy.toml")).unwrap(),
             "client value",
             "the side tree is written after the shared one, so it wins"
         );
-        std::fs::remove_dir_all(&dest).ok();
     }
 
     #[test]
     fn nested_directories_are_created_and_hashed() {
         let mut pack = archive(&[("overrides/config/deep/nested/file.json", "{}")]);
-        let dest = temp("nested");
+        let dest_dir = temp("nested");
+        let dest = dest_dir.path();
 
-        let written = extract(&mut pack, Side::Client, &dest);
+        let written = extract(&mut pack, Side::Client, dest);
 
         assert!(dest.join("config/deep/nested/file.json").is_file());
         assert_eq!(written[0].path, "config/deep/nested/file.json");
@@ -522,7 +522,6 @@ mod tests {
             crate::content::install::sha1_file(&dest.join("config/deep/nested/file.json")).unwrap(),
             "the recorded hash is what was written"
         );
-        std::fs::remove_dir_all(&dest).ok();
     }
 
     #[test]
@@ -531,7 +530,8 @@ mod tests {
             ("overrides/config/mine.toml", "the pack's"),
             ("overrides/config/theirs.toml", "the pack's"),
         ]);
-        let dest = temp("keep");
+        let dest_dir = temp("keep");
+        let dest = dest_dir.path();
         std::fs::create_dir_all(dest.join("config")).unwrap();
         std::fs::write(dest.join("config/mine.toml"), "my edit").unwrap();
 
@@ -539,7 +539,7 @@ mod tests {
         let noop = |_: &proto::minecraft::ProvisionProgress| {};
         let job = Job::new(&noop, &cancel);
         let written = pack
-            .extract_overrides(Side::Client, &dest, &job, |path| path != "config/mine.toml")
+            .extract_overrides(Side::Client, dest, &job, |path| path != "config/mine.toml")
             .unwrap();
 
         assert_eq!(
@@ -549,29 +549,28 @@ mod tests {
         );
         assert_eq!(written.len(), 1, "and is not reported as written");
         assert_eq!(written[0].path, "config/theirs.toml");
-        std::fs::remove_dir_all(&dest).ok();
     }
 
     #[test]
     fn an_override_escaping_the_game_directory_is_refused() {
         let mut pack = archive(&[("overrides/../../escape.txt", "no")]);
-        let dest = temp("escape");
+        let dest_dir = temp("escape");
+        let dest = dest_dir.path();
         let cancel = crate::cancel::Cancel::new();
         let noop = |_: &proto::minecraft::ProvisionProgress| {};
         let job = Job::new(&noop, &cancel);
 
         assert!(pack
-            .extract_overrides(Side::Client, &dest, &job, |_| true)
+            .extract_overrides(Side::Client, dest, &job, |_| true)
             .is_err());
-        std::fs::remove_dir_all(&dest).ok();
     }
 
     #[test]
     fn a_pack_with_no_override_trees_writes_nothing() {
         let mut pack = archive(&[("modrinth.index.json", "{}")]);
-        let dest = temp("empty");
-        assert!(extract(&mut pack, Side::Client, &dest).is_empty());
-        std::fs::remove_dir_all(&dest).ok();
+        let dest_dir = temp("empty");
+        let dest = dest_dir.path();
+        assert!(extract(&mut pack, Side::Client, dest).is_empty());
     }
 
     #[test]

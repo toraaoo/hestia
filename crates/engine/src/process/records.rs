@@ -156,12 +156,11 @@ pub fn scan(dir: &Path) -> Vec<ProcessRecord> {
 mod tests {
     use super::*;
 
-    fn temp_dir(name: &str) -> std::path::PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("hestia-records-{}-{name}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        dir
+    fn temp_dir(name: &str) -> tempfile::TempDir {
+        tempfile::Builder::new()
+            .prefix(&format!("hestia-records-{name}-"))
+            .tempdir()
+            .expect("temp dir")
     }
 
     #[test]
@@ -172,32 +171,30 @@ mod tests {
             program: "java".into(),
             ..Default::default()
         };
-        let proc_dir = dir.join(&spec.id);
+        let proc_dir = dir.path().join(&spec.id);
         fs::create_dir_all(&proc_dir).unwrap();
         save(
             &proc_dir,
             &ProcessRecord::for_spawn(&spec, std::process::id(), 42),
         );
 
-        let scanned = scan(&dir);
+        let scanned = scan(dir.path());
         assert_eq!(scanned.len(), 1);
         assert_eq!(scanned[0].id, "server-x");
         assert_eq!(scanned[0].started_unix, 42);
         assert!(identity::is_same(scanned[0].pid, scanned[0].pid_started));
 
         remove(&proc_dir);
-        assert!(scan(&dir).is_empty());
-        let _ = fs::remove_dir_all(&dir);
+        assert!(scan(dir.path()).is_empty());
     }
 
     #[test]
     fn scan_skips_malformed_records() {
         let dir = temp_dir("malformed");
-        let proc_dir = dir.join("broken");
+        let proc_dir = dir.path().join("broken");
         fs::create_dir_all(&proc_dir).unwrap();
         fs::write(proc_dir.join(FILE), b"not json").unwrap();
-        assert!(scan(&dir).is_empty());
-        let _ = fs::remove_dir_all(&dir);
+        assert!(scan(dir.path()).is_empty());
     }
 
     fn tombstone(id: &str, ended_unix: i64) -> Tombstone {
@@ -218,7 +215,7 @@ mod tests {
     #[test]
     fn a_tombstone_labels_the_end_so_the_dir_is_not_a_stray() {
         let dir = temp_dir("tombstone");
-        let proc_dir = dir.join("server-x");
+        let proc_dir = dir.path().join("server-x");
         fs::create_dir_all(&proc_dir).unwrap();
 
         // A directory with neither marker is a stray: nothing claims it.
@@ -237,26 +234,27 @@ mod tests {
             is_known(&proc_dir),
             "and so does a tombstone — the sweep must not take a finished process's logs"
         );
-        assert!(scan(&dir).is_empty(), "it is no longer a live record");
+        assert!(scan(dir.path()).is_empty(), "it is no longer a live record");
 
         let found = load_tombstone(&proc_dir).expect("the end state is readable");
         assert_eq!(found.state, ProcessState::Exited);
         assert_eq!(found.exit_code, Some(0));
         assert_eq!(found.log_path, Path::new("/tmp/out.log"));
-        fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn tombstones_scan_newest_first() {
         let dir = temp_dir("tombstone-order");
         for (id, ended) in [("a", 300), ("b", 100), ("c", 200)] {
-            let proc_dir = dir.join(id);
+            let proc_dir = dir.path().join(id);
             fs::create_dir_all(&proc_dir).unwrap();
             entomb(&proc_dir, &tombstone(id, ended));
         }
         // Retention prunes from the end, so the order is the policy.
-        let ids: Vec<String> = scan_tombstones(&dir).into_iter().map(|t| t.id).collect();
+        let ids: Vec<String> = scan_tombstones(dir.path())
+            .into_iter()
+            .map(|t| t.id)
+            .collect();
         assert_eq!(ids, ["a", "c", "b"]);
-        fs::remove_dir_all(&dir).ok();
     }
 }

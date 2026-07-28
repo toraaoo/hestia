@@ -18,7 +18,10 @@ use client::{Client, ProcessEvent};
 struct Daemon {
     child: Child,
     home: std::path::PathBuf,
-    cleanup: bool,
+    /// Held when this daemon owns its data home, so the directory outlives the
+    /// process and is removed with it. A test driving two daemons over one home
+    /// keeps the guard itself instead.
+    _home: Option<tempfile::TempDir>,
 }
 
 impl Daemon {
@@ -37,25 +40,25 @@ impl Drop for Daemon {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
-        if self.cleanup {
-            let _ = std::fs::remove_dir_all(&self.home);
-        }
     }
 }
 
-fn unique_dir() -> std::path::PathBuf {
-    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("hestia-e2e-{}-{}", std::process::id(), n));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+fn temp_home() -> tempfile::TempDir {
+    tempfile::Builder::new()
+        .prefix("hestia-e2e-")
+        .tempdir()
+        .expect("temp dir")
 }
 
 async fn spawn_daemon() -> (Daemon, Client) {
-    spawn_daemon_at(unique_dir(), true).await
+    let home = temp_home();
+    spawn_daemon_at(home.path().to_path_buf(), Some(home)).await
 }
 
-async fn spawn_daemon_at(home: std::path::PathBuf, cleanup: bool) -> (Daemon, Client) {
+async fn spawn_daemon_at(
+    home: std::path::PathBuf,
+    guard: Option<tempfile::TempDir>,
+) -> (Daemon, Client) {
     let sock = home.join("hestiad.sock");
     let child = Command::new(env!("CARGO_BIN_EXE_hestiad"))
         .arg("serve")
@@ -81,7 +84,7 @@ async fn spawn_daemon_at(home: std::path::PathBuf, cleanup: bool) -> (Daemon, Cl
         Daemon {
             child,
             home,
-            cleanup,
+            _home: guard,
         },
         client,
     )
@@ -195,8 +198,11 @@ async fn daemon_serves_the_full_client_surface() {
 
 #[tokio::test]
 async fn supervised_processes_survive_a_daemon_restart() {
-    let home = unique_dir();
-    let (mut daemon, client) = spawn_daemon_at(home.clone(), false).await;
+    // The home outlives both daemons, so the test holds the guard rather than
+    // either of them.
+    let home = temp_home();
+    let path = home.path().to_path_buf();
+    let (mut daemon, client) = spawn_daemon_at(path.clone(), None).await;
 
     let started = client
         .process()
@@ -219,7 +225,7 @@ async fn supervised_processes_survive_a_daemon_restart() {
         "the process should outlive the daemon that spawned it"
     );
 
-    let (daemon2, client) = spawn_daemon_at(home.clone(), true).await;
+    let (daemon2, client) = spawn_daemon_at(path, None).await;
     let status = client
         .process()
         .status("e2e-survivor")

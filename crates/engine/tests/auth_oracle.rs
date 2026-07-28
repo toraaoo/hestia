@@ -14,9 +14,8 @@ use proto::accounts::LoginMethod;
 #[tokio::test]
 #[ignore = "hits live Microsoft endpoints; run with --ignored"]
 async fn device_code_begin_returns_a_user_code() {
-    let dir = std::env::temp_dir().join(format!("hestia-auth-oracle-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let accounts = Accounts::new(dir.join("accounts.json"));
+    let dir = tempfile::tempdir().expect("temp dir");
+    let accounts = Accounts::new(dir.path().join("accounts.json"));
 
     let challenge = accounts
         .begin_login(LoginMethod::DeviceCode)
@@ -35,6 +34,4 @@ async fn device_code_begin_returns_a_user_code() {
         "enter code {} at {}",
         challenge.user_code, challenge.verification_uri
     );
-
-    std::fs::remove_dir_all(&dir).ok();
 }

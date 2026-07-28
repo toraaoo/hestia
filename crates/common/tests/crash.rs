@@ -1,16 +1,10 @@
 use std::panic;
-use std::path::PathBuf;
-
-fn temp_home() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("hestia-crash-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
-}
 
 #[test]
 fn a_panic_writes_a_report_carrying_the_log_tail() {
-    let home = temp_home();
-    let file = common::FileLog::for_binary("test", Some(&home), common::LogLevel::Debug);
+    let home = tempfile::tempdir().expect("temp dir");
+    let home = home.path();
+    let file = common::FileLog::for_binary("test", Some(home), common::LogLevel::Debug);
     let _guard = common::init_logging(common::LogLevel::Off, Some(file));
 
     tracing::info!(target: "common", "a line the report should carry");
@@ -33,6 +27,4 @@ fn a_panic_writes_a_report_carrying_the_log_tail() {
 
     common::crash::clear().expect("reports are removable");
     assert!(common::crash::list().is_empty());
-
-    let _ = std::fs::remove_dir_all(&home);
 }

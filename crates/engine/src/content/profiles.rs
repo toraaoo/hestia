@@ -287,106 +287,105 @@ pub(crate) fn remap(entry_dir: &Path, old: &str, new: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
 
-    fn temp_dir(tag: &str) -> PathBuf {
-        let base = std::env::temp_dir().join(format!(
-            "hestia-profiles-test-{}-{}",
-            tag,
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&base);
-        std::fs::create_dir_all(&base).unwrap();
-        base
+    fn temp_dir(tag: &str) -> tempfile::TempDir {
+        tempfile::Builder::new()
+            .prefix(&format!("hestia-content-profiles-{tag}-"))
+            .tempdir()
+            .expect("temp dir")
     }
 
     #[test]
     fn absent_file_means_no_profiles() {
         let dir = temp_dir("absent");
-        let (active, profiles) = list(&dir);
+        let (active, profiles) = list(dir.path());
         assert!(active.is_empty());
         assert!(profiles.is_empty());
-        assert_eq!(selection(&dir, "").unwrap(), None);
-        std::fs::remove_dir_all(&dir).ok();
+        assert_eq!(selection(dir.path(), "").unwrap(), None);
+        std::fs::remove_dir_all(dir.path()).ok();
     }
 
     #[test]
     fn create_use_and_remove_round_trip() {
         let dir = temp_dir("crud");
-        create(&dir, "perf", vec!["sodium.jar".to_string()]).unwrap();
-        set_active(&dir, "perf").unwrap();
-        let (active, profiles) = list(&dir);
+        create(dir.path(), "perf", vec!["sodium.jar".to_string()]).unwrap();
+        set_active(dir.path(), "perf").unwrap();
+        let (active, profiles) = list(dir.path());
         assert_eq!(active, "perf");
         assert_eq!(profiles.len(), 1);
 
-        remove(&dir, "perf").unwrap();
-        let (active, profiles) = list(&dir);
+        remove(dir.path(), "perf").unwrap();
+        let (active, profiles) = list(dir.path());
         assert!(active.is_empty(), "removing the active profile clears it");
         assert!(profiles.is_empty());
-        std::fs::remove_dir_all(&dir).ok();
+        std::fs::remove_dir_all(dir.path()).ok();
     }
 
     #[test]
     fn names_are_unique_case_insensitively_and_none_is_reserved() {
         let dir = temp_dir("names");
-        create(&dir, "Perf", vec![]).unwrap();
-        assert!(create(&dir, "perf", vec![]).is_err());
-        assert!(create(&dir, "none", vec![]).is_err());
-        assert!(create(&dir, "NONE", vec![]).is_err());
-        assert!(create(&dir, "  ", vec![]).is_err());
-        assert!(rename(&dir, "Perf", "none").is_err());
-        std::fs::remove_dir_all(&dir).ok();
+        create(dir.path(), "Perf", vec![]).unwrap();
+        assert!(create(dir.path(), "perf", vec![]).is_err());
+        assert!(create(dir.path(), "none", vec![]).is_err());
+        assert!(create(dir.path(), "NONE", vec![]).is_err());
+        assert!(create(dir.path(), "  ", vec![]).is_err());
+        assert!(rename(dir.path(), "Perf", "none").is_err());
+        std::fs::remove_dir_all(dir.path()).ok();
     }
 
     #[test]
     fn rename_follows_the_active_pointer() {
         let dir = temp_dir("rename");
-        create(&dir, "perf", vec!["a.jar".to_string()]).unwrap();
-        set_active(&dir, "perf").unwrap();
-        let renamed = rename(&dir, "perf", "speed").unwrap();
+        create(dir.path(), "perf", vec!["a.jar".to_string()]).unwrap();
+        set_active(dir.path(), "perf").unwrap();
+        let renamed = rename(dir.path(), "perf", "speed").unwrap();
         assert_eq!(renamed.name, "speed");
         assert_eq!(renamed.members, vec!["a.jar".to_string()]);
-        let (active, _) = list(&dir);
+        let (active, _) = list(dir.path());
         assert_eq!(active, "speed");
-        std::fs::remove_dir_all(&dir).ok();
+        std::fs::remove_dir_all(dir.path()).ok();
     }
 
     #[test]
     fn selection_resolves_override_active_and_none() {
         let dir = temp_dir("selection");
-        create(&dir, "perf", vec!["sodium.jar".to_string()]).unwrap();
-        create(&dir, "vanilla-ish", vec![]).unwrap();
-        set_active(&dir, "perf").unwrap();
+        create(dir.path(), "perf", vec!["sodium.jar".to_string()]).unwrap();
+        create(dir.path(), "vanilla-ish", vec![]).unwrap();
+        set_active(dir.path(), "perf").unwrap();
 
-        let active = selection(&dir, "").unwrap().unwrap();
+        let active = selection(dir.path(), "").unwrap().unwrap();
         assert!(active.contains("sodium.jar"));
-        let named = selection(&dir, "vanilla-ish").unwrap().unwrap();
+        let named = selection(dir.path(), "vanilla-ish").unwrap().unwrap();
         assert!(named.is_empty());
-        assert_eq!(selection(&dir, "none").unwrap(), None);
-        assert!(selection(&dir, "ghost").is_err());
-        std::fs::remove_dir_all(&dir).ok();
+        assert_eq!(selection(dir.path(), "none").unwrap(), None);
+        assert!(selection(dir.path(), "ghost").is_err());
+        std::fs::remove_dir_all(dir.path()).ok();
     }
 
     #[test]
     fn prune_and_remap_touch_every_profile() {
         let dir = temp_dir("prune");
-        create(&dir, "a", vec!["x.jar".to_string(), "y.jar".to_string()]).unwrap();
-        create(&dir, "b", vec!["x.jar".to_string()]).unwrap();
+        create(
+            dir.path(),
+            "a",
+            vec!["x.jar".to_string(), "y.jar".to_string()],
+        )
+        .unwrap();
+        create(dir.path(), "b", vec!["x.jar".to_string()]).unwrap();
 
-        remap(&dir, "x.jar", "x2.jar").unwrap();
-        let (_, profiles) = list(&dir);
+        remap(dir.path(), "x.jar", "x2.jar").unwrap();
+        let (_, profiles) = list(dir.path());
         assert!(profiles
             .iter()
             .all(|p| p.members.contains(&"x2.jar".to_string())));
 
-        prune(&dir, &["x2.jar".to_string()]).unwrap();
-        let (_, profiles) = list(&dir);
+        prune(dir.path(), &["x2.jar".to_string()]).unwrap();
+        let (_, profiles) = list(dir.path());
         assert!(profiles
             .iter()
             .all(|p| !p.members.contains(&"x2.jar".to_string())));
         assert!(profiles[0].members.contains(&"y.jar".to_string()));
-        std::fs::remove_dir_all(&dir).ok();
+        std::fs::remove_dir_all(dir.path()).ok();
     }
 }

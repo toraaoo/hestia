@@ -609,12 +609,11 @@ fn write_options(path: &Path, values: &BTreeMap<String, String>) -> Result<()> {
 mod tests {
     use super::*;
 
-    fn temp_dir(tag: &str) -> PathBuf {
-        let base =
-            std::env::temp_dir().join(format!("hestia-sync-test-{}-{}", tag, std::process::id()));
-        let _ = fs::remove_dir_all(&base);
-        fs::create_dir_all(&base).unwrap();
-        base
+    fn temp_dir(tag: &str) -> tempfile::TempDir {
+        tempfile::Builder::new()
+            .prefix(&format!("hestia-sync-{tag}-"))
+            .tempdir()
+            .expect("temp dir")
     }
 
     #[test]
@@ -632,7 +631,7 @@ mod tests {
     #[test]
     fn saves_is_a_folder_target_only() {
         let base = temp_dir("savesclass");
-        let sync = Sync::new(base.join("shared"));
+        let sync = Sync::new(base.path().join("shared"));
 
         let mut targets = SyncTargets::default();
         targets.folders.insert("saves".to_string());
@@ -641,14 +640,13 @@ mod tests {
         let mut targets = SyncTargets::default();
         targets.files.insert("saves".to_string());
         assert!(sync.set_targets(targets).is_err());
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn seeds_a_new_instance_from_the_store() {
         let base = temp_dir("seed");
-        let shared = base.join("shared");
-        let data = base.join("data");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
         fs::create_dir_all(&shared).unwrap();
         fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
 
@@ -656,14 +654,13 @@ mod tests {
 
         let seeded = fs::read_to_string(data.join("options.txt")).unwrap();
         assert!(seeded.contains("guiScale:3"));
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn pack_selection_stays_entry_local() {
         let base = temp_dir("packs");
-        let shared = base.join("shared");
-        let data = base.join("data");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
         fs::create_dir_all(&data).unwrap();
         fs::write(
             data.join("options.txt"),
@@ -682,14 +679,13 @@ mod tests {
         // The entry keeps its own pack selection.
         let local = fs::read_to_string(data.join("options.txt")).unwrap();
         assert!(local.contains("resourcePacks"));
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn apply_links_missing_and_empty_folders() {
         let base = temp_dir("linkfresh");
-        let shared = base.join("shared");
-        let data = base.join("data");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
         fs::create_dir_all(data.join("config")).unwrap();
 
         Sync::new(shared.clone()).apply("test", &data, None);
@@ -705,18 +701,17 @@ mod tests {
 
         // A world created through one instance's link is visible in another's.
         fs::create_dir_all(data.join("saves").join("world")).unwrap();
-        let data2 = base.join("data2");
+        let data2 = base.path().join("data2");
         fs::create_dir_all(&data2).unwrap();
         Sync::new(shared.clone()).apply("test", &data2, None);
         assert!(data2.join("saves").join("world").is_dir());
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn apply_never_touches_a_non_empty_folder() {
         let base = temp_dir("guard");
-        let shared = base.join("shared");
-        let data = base.join("data");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
         fs::create_dir_all(data.join("saves").join("old-world")).unwrap();
         fs::write(data.join("saves").join("old-world").join("level.dat"), "x").unwrap();
 
@@ -732,49 +727,46 @@ mod tests {
         let states = sync.status(&data);
         let saves = states.iter().find(|t| t.target == "saves").unwrap();
         assert_eq!(saves.state, LinkState::CannotLink);
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn apply_relinks_a_stale_store_link() {
         let base = temp_dir("stale");
-        let old_shared = base.join("old-home").join("shared");
+        let old_shared = base.path().join("old-home").join("shared");
         fs::create_dir_all(old_shared.join("saves")).unwrap();
-        let data = base.join("data");
+        let data = base.path().join("data");
         fs::create_dir_all(&data).unwrap();
         link::link_dir(&old_shared.join("saves"), &data.join("saves")).unwrap();
 
-        let shared = base.join("new-home").join("shared");
+        let shared = base.path().join("new-home").join("shared");
         Sync::new(shared.clone()).apply("test", &data, None);
 
         assert!(link::is_linked_to(
             &shared.join("saves"),
             &data.join("saves")
         ));
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn apply_leaves_a_foreign_link_alone() {
         let base = temp_dir("foreign");
-        let shared = base.join("shared");
-        let elsewhere = base.join("elsewhere");
+        let shared = base.path().join("shared");
+        let elsewhere = base.path().join("elsewhere");
         fs::create_dir_all(&elsewhere).unwrap();
-        let data = base.join("data");
+        let data = base.path().join("data");
         fs::create_dir_all(&data).unwrap();
         link::link_dir(&elsewhere, &data.join("saves")).unwrap();
 
         Sync::new(shared.clone()).apply("test", &data, None);
 
         assert_eq!(link::read_target(&data.join("saves")), Some(elsewhere));
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn adopt_moves_entries_and_links() {
         let base = temp_dir("adopt");
-        let shared = base.join("shared");
-        let data = base.join("data");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
         fs::create_dir_all(data.join("saves").join("world-a")).unwrap();
         fs::write(data.join("saves").join("world-a").join("level.dat"), "a").unwrap();
         fs::create_dir_all(data.join("saves").join("world-b")).unwrap();
@@ -799,20 +791,19 @@ mod tests {
             .join("world-a")
             .join("level.dat")
             .exists());
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn adopt_refuses_the_whole_target_on_collision() {
         let base = temp_dir("collide");
-        let shared = base.join("shared");
+        let shared = base.path().join("shared");
         fs::create_dir_all(shared.join("saves").join("world")).unwrap();
         fs::write(
             shared.join("saves").join("world").join("level.dat"),
             "store",
         )
         .unwrap();
-        let data = base.join("data");
+        let data = base.path().join("data");
         fs::create_dir_all(data.join("saves").join("world")).unwrap();
         fs::write(data.join("saves").join("world").join("level.dat"), "mine").unwrap();
         fs::create_dir_all(data.join("saves").join("other")).unwrap();
@@ -828,18 +819,21 @@ mod tests {
             fs::read_to_string(shared.join("saves").join("world").join("level.dat")).unwrap(),
             "store"
         );
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn capture_seeds_the_profile_store_from_the_global_one() {
         let base = temp_dir("capture");
-        let shared = base.join("shared");
+        let shared = base.path().join("shared");
         fs::create_dir_all(shared.join("config")).unwrap();
         fs::write(shared.join("config").join("mod.toml"), "x=1").unwrap();
         fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
 
-        let store = base.join("instance").join("profiles").join("showcase");
+        let store = base
+            .path()
+            .join("instance")
+            .join("profiles")
+            .join("showcase");
         Sync::new(shared.clone()).capture(&store).unwrap();
 
         assert_eq!(
@@ -847,16 +841,19 @@ mod tests {
             "x=1"
         );
         assert!(store.join("options.txt").is_file());
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn apply_scopes_settings_targets_to_the_profile_store() {
         let base = temp_dir("scoped");
-        let shared = base.join("shared");
+        let shared = base.path().join("shared");
         fs::create_dir_all(&shared).unwrap();
-        let store = base.join("instance").join("profiles").join("showcase");
-        let data = base.join("data");
+        let store = base
+            .path()
+            .join("instance")
+            .join("profiles")
+            .join("showcase");
+        let data = base.path().join("data");
         fs::create_dir_all(&data).unwrap();
 
         let sync = Sync::new(shared.clone());
@@ -896,6 +893,5 @@ mod tests {
             &shared.join("config"),
             &data.join("config")
         ));
-        fs::remove_dir_all(&base).ok();
     }
 }

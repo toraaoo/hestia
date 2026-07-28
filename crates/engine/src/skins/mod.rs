@@ -274,7 +274,8 @@ mod tests {
 
     #[test]
     fn profile_cache_stores_and_invalidates() {
-        let skins = Skins::new(std::env::temp_dir());
+        let dir = tempfile::tempdir().expect("temp dir");
+        let skins = Skins::new(dir.path().to_path_buf());
         assert!(skins.cached_profile("u1").is_none());
         skins.store_profile("u1", Profile::default());
         assert!(skins.cached_profile("u1").is_some());
@@ -285,9 +286,8 @@ mod tests {
 
     #[test]
     fn library_round_trip_and_rekey() {
-        let dir = std::env::temp_dir().join(format!("hestia-skins-test-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        let skins = Skins::new(dir.clone());
+        let dir = tempfile::tempdir().expect("temp dir");
+        let skins = Skins::new(dir.path().join("skins"));
 
         let entry = skins
             .add_keyed("local-key", &png(64, 64), SkinVariant::Slim, "My Skin")
