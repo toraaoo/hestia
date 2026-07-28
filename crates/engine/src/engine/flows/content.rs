@@ -300,7 +300,10 @@ impl Engine {
         Ok(out)
     }
 
-    fn server_content_ctx(&self, reference: &str) -> Result<(ServerRecord, EntryContent)> {
+    pub(super) fn server_content_ctx(
+        &self,
+        reference: &str,
+    ) -> Result<(ServerRecord, EntryContent)> {
         let record = self
             .servers
             .get(reference)
@@ -320,7 +323,10 @@ impl Engine {
         Ok((record, ctx))
     }
 
-    fn instance_content_ctx(&self, reference: &str) -> Result<(InstanceRecord, EntryContent)> {
+    pub(super) fn instance_content_ctx(
+        &self,
+        reference: &str,
+    ) -> Result<(InstanceRecord, EntryContent)> {
         let record = self
             .instances
             .get(reference)
@@ -852,16 +858,16 @@ fn item_label(item: &ContentAddItem) -> String {
 
 /// The entry-shape a content operation needs, independent of whether the entry
 /// is a server or an instance.
-struct EntryContent {
-    entry_dir: PathBuf,
-    data_dir: PathBuf,
-    game_version: String,
-    flavor: String,
-    side: EntrySide,
+pub(super) struct EntryContent {
+    pub(super) entry_dir: PathBuf,
+    pub(super) data_dir: PathBuf,
+    pub(super) game_version: String,
+    pub(super) flavor: String,
+    pub(super) side: EntrySide,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum EntrySide {
+pub(super) enum EntrySide {
     Server,
     Client,
 }
@@ -878,7 +884,7 @@ impl EntrySide {
 impl EntryContent {
     /// The entry's worlds, data-relative: a server's single `level-name`, an
     /// instance's save folders.
-    fn worlds(&self) -> Vec<String> {
+    pub(super) fn worlds(&self) -> Vec<String> {
         match self.side {
             EntrySide::Server => vec![crate::servers::level_name(&self.data_dir)],
             EntrySide::Client => crate::instances::save_worlds(&self.data_dir),
@@ -908,7 +914,7 @@ impl Engine {
         })
     }
 
-    fn accepted_kinds(&self, ctx: &EntryContent) -> Vec<ContentKind> {
+    pub(super) fn accepted_kinds(&self, ctx: &EntryContent) -> Vec<ContentKind> {
         let loads = match ctx.side {
             EntrySide::Server => self.minecraft().server_loads(&ctx.flavor),
             EntrySide::Client => self.minecraft().instance_loads(&ctx.flavor),
@@ -994,7 +1000,11 @@ fn datapack_worlds(ctx: &EntryContent, spec: &ContentAddSpec) -> Result<Vec<Stri
 
 /// The managed path a kind's file occupies under the entry root — the source of
 /// truth every mirror is placed from.
-fn content_target(ctx: &EntryContent, kind: ContentKind, filename: &str) -> Result<PathBuf> {
+pub(super) fn content_target(
+    ctx: &EntryContent,
+    kind: ContentKind,
+    filename: &str,
+) -> Result<PathBuf> {
     Ok(ctx.entry_dir.join(install::kind_dir(kind)?).join(filename))
 }
 

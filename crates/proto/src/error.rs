@@ -166,6 +166,7 @@ pub enum Unsupported {
     WorldsForDatapacksOnly,
     DatapacksPerWorld,
     ModpackNotSingleFile,
+    ModpackNotUpdatable,
 }
 
 impl fmt::Display for Unsupported {
@@ -175,6 +176,9 @@ impl fmt::Display for Unsupported {
             Unsupported::DatapacksPerWorld => "only datapacks are installed per world",
             Unsupported::ModpackNotSingleFile => {
                 "modpack content cannot be installed as a single file"
+            }
+            Unsupported::ModpackNotUpdatable => {
+                "this modpack came from a file, so there is no source to update it against"
             }
         })
     }

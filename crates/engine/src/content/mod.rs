@@ -5,6 +5,7 @@
 
 pub(crate) mod inspect;
 pub(crate) mod install;
+pub(crate) mod modpack;
 mod modrinth;
 pub(crate) mod mrpack;
 pub(crate) mod profiles;
@@ -157,6 +158,40 @@ impl Content {
             "modpack resolved"
         );
         Ok(resolved)
+    }
+
+    /// The pack version's whole archive alongside its manifest — what installing
+    /// needs, since a pack's `overrides/` exist only inside the zip.
+    pub async fn fetch_modpack(
+        &self,
+        source: &str,
+        version_id: &str,
+    ) -> Result<(ResolvedModpack, Vec<u8>)> {
+        let provider = self.provider(source)?;
+        tracing::info!(source = provider.id(), version_id, "modpack fetch");
+        let (resolved, bytes) = provider.fetch_modpack(version_id).await?;
+        tracing::info!(
+            source = %resolved.source,
+            version_id = %resolved.version_id,
+            files = resolved.files.len(),
+            bytes = bytes.len(),
+            game_version = %resolved.game_version,
+            loader = ?resolved.loader,
+            "modpack fetched"
+        );
+        Ok((resolved, bytes))
+    }
+
+    /// Several projects at once — one request where the provider has a bulk
+    /// endpoint, which is what keeps a pack's hundred-odd lookups affordable.
+    pub async fn projects(&self, source: &str, ids: &[String]) -> Result<Vec<ContentProject>> {
+        self.provider(source)?.projects(ids).await
+    }
+
+    /// What a platform's own download URL says about the file behind it, so a
+    /// pack index's bare URLs become tracked pool items.
+    pub(crate) fn parse_file_url(&self, source: &str, url: &str) -> Option<provider::FileRef> {
+        self.provider(source).ok()?.parse_file_url(url)
     }
 
     /// Recognise a project/version page URL on any registered platform's site,
