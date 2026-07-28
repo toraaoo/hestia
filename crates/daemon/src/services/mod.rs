@@ -13,6 +13,7 @@ mod guards;
 mod instance;
 mod java;
 mod lifecycle;
+mod modpack;
 mod process;
 mod profile;
 mod server;
@@ -37,6 +38,7 @@ pub fn make_router() -> Router {
     instance::register(&mut on);
     backup::register(&mut on);
     content::register(&mut on);
+    modpack::register(&mut on);
     profile::register(&mut on);
     sync::register(&mut on);
 

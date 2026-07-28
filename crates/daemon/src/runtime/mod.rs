@@ -24,7 +24,8 @@ pub use engine::error_info as engine_error;
 pub use event_hub::EventHub;
 pub use managers::{
     BackupJob, BackupManager, Cancellations, ContentJob, ContentManager, DownloadManager,
-    InstanceLaunchManager, JavaInstallManager, ServerCreateManager, ServerUpdateManager,
+    InstanceLaunchManager, JavaInstallManager, ModpackJob, ModpackManager, ServerCreateManager,
+    ServerUpdateManager,
 };
 pub use metrics::spawn_metrics_sampler;
 pub use process::{ExitObserver, ProcessSupervisor, StartError};
@@ -99,6 +100,7 @@ pub struct Runtime {
     instance_launches: InstanceLaunchManager,
     backups: BackupManager,
     content_jobs: ContentManager,
+    modpack_jobs: ModpackManager,
     processes: Arc<ProcessSupervisor>,
     log_path: PathBuf,
     cancellations: Cancellations,
@@ -147,6 +149,7 @@ impl Runtime {
         );
         let backups = BackupManager::new(engine.clone(), hub.clone(), cancellations.clone());
         let content_jobs = ContentManager::new(engine.clone(), hub.clone(), cancellations.clone());
+        let modpack_jobs = ModpackManager::new(engine.clone(), hub.clone(), cancellations.clone());
         Runtime {
             engine,
             hub,
@@ -157,6 +160,7 @@ impl Runtime {
             instance_launches,
             backups,
             content_jobs,
+            modpack_jobs,
             cancellations,
             processes,
             log_path,
@@ -253,6 +257,10 @@ impl Runtime {
 
     pub fn content_jobs(&self) -> &ContentManager {
         &self.content_jobs
+    }
+
+    pub fn modpack_jobs(&self) -> &ModpackManager {
+        &self.modpack_jobs
     }
 
     pub fn processes(&self) -> &ProcessSupervisor {

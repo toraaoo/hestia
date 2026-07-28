@@ -6,6 +6,8 @@ mod backup;
 mod content;
 mod instance;
 mod modpack;
+
+pub use modpack::ModpackOutcome;
 mod profiles;
 mod server;
 mod skins;

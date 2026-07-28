@@ -95,6 +95,22 @@ pub(super) fn ensure_no_content(
     Ok(())
 }
 
+/// Refuse operations that would race an in-flight pack install or update. A
+/// pack rewrites both the pool and the game directory, so it is held apart from
+/// everything else the same way a content job is.
+pub(super) fn ensure_no_modpack(
+    ctx: &HandlerContext,
+    key: &str,
+    name: &str,
+) -> Result<(), ErrorInfo> {
+    if ctx.runtime.modpack_jobs().in_flight(key) {
+        return Err(ErrorInfo::ContentInProgress {
+            name: name.to_string(),
+        });
+    }
+    Ok(())
+}
+
 /// Refuse lifecycle changes (start, update, remove) while an archive is being
 /// written or restored — they would race the file tree it is reading. The
 /// entry's process id doubles as the backup in-flight key.

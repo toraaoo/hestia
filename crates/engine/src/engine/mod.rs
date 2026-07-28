@@ -7,6 +7,8 @@
 
 mod flows;
 
+pub use flows::ModpackOutcome;
+
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;

@@ -31,7 +31,7 @@ pub use cancel::{is_cancelled, Cancel, Job};
 pub use config::{Config, ConfigError, Settings};
 pub use content::Content;
 pub use download::Downloader;
-pub use engine::{Engine, ServerCreateSpec, ServerUpdateSpec};
+pub use engine::{Engine, ModpackOutcome, ServerCreateSpec, ServerUpdateSpec};
 pub use error::error_info;
 pub use instances::{InstanceRecord, Instances};
 pub use java::{Java, JavaInstallOutcome};

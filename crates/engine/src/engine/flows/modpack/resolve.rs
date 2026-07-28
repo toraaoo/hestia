@@ -43,7 +43,6 @@ impl Engine {
                 EntrySide::Server => EntryKind::Server,
                 EntrySide::Client => EntryKind::Instance,
             },
-            name: entry_name(&ctx.entry_dir),
             flavor: ctx.flavor.clone(),
             game_version: ctx.game_version.clone(),
             pack_flavor,
@@ -238,11 +237,4 @@ impl Engine {
             }
         }
     }
-}
-
-fn entry_name(entry_dir: &Path) -> String {
-    entry_dir
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default()
 }

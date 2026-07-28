@@ -445,9 +445,11 @@ pub enum ErrorInfo {
     /// The pack targets a different game version or loader than the entry it
     /// was aimed at. Both are baked into the entry's resolved profile, so the
     /// pack cannot be installed there — a new entry has to be created instead.
+    /// The entry is not named: the caller named it in the request, and a fifth
+    /// string here would make `ErrorInfo` large enough to be worth boxing at
+    /// every call site that returns one.
     ModpackEntryMismatch {
         entry: EntryKind,
-        name: String,
         flavor: String,
         game_version: String,
         pack_flavor: String,
@@ -640,14 +642,13 @@ impl fmt::Display for ErrorInfo {
             }
             ModpackEntryMismatch {
                 entry,
-                name,
                 flavor,
                 game_version,
                 pack_flavor,
                 pack_game_version,
             } => write!(
                 f,
-                "this modpack is for {pack_flavor} {pack_game_version}, but {entry} '{name}' is \
+                "this modpack is for {pack_flavor} {pack_game_version}, but that {entry} is \
                  {flavor} {game_version} — create a new {entry} from the pack instead"
             ),
             ModpackNotInstalled { entry, name } => {

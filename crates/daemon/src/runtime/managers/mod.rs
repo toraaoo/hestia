@@ -8,6 +8,7 @@ mod download;
 mod instance;
 mod java;
 mod job;
+mod modpack;
 mod server;
 
 pub use backup::{BackupJob, BackupManager};
@@ -16,4 +17,5 @@ pub use download::DownloadManager;
 pub use instance::InstanceLaunchManager;
 pub use java::JavaInstallManager;
 pub use job::Cancellations;
+pub use modpack::{ModpackJob, ModpackManager};
 pub use server::{ServerCreateManager, ServerUpdateManager};
