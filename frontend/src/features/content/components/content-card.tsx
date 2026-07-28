@@ -15,7 +15,14 @@ import { m } from '@/paraglide/messages.js';
 export const projectRef = (p: Pick<ContentProject, 'slug' | 'id'>) =>
   p.slug || p.id;
 
-export function ContentCard({ project }: { project: ContentProject }) {
+export function ContentCard({
+  project,
+  pinnedVersion,
+}: {
+  project: ContentProject;
+  /** The version a pasted link named, carried on so the pin is not lost. */
+  pinnedVersion?: string;
+}) {
   const Icon = contentIcon(project.kind);
   const [installing, setInstalling] = useState(false);
 
@@ -24,6 +31,7 @@ export function ContentCard({ project }: { project: ContentProject }) {
       <Link
         to="/browse/$kind/$id"
         params={{ kind: kindInfo[project.kind].slug, id: projectRef(project) }}
+        search={pinnedVersion ? { version: pinnedVersion } : {}}
         className="group block outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         <Card size="sm" className="transition-colors group-hover:bg-muted/40">
@@ -90,6 +98,7 @@ export function ContentCard({ project }: { project: ContentProject }) {
 
       <ContentInstallModal
         project={project}
+        pinnedVersion={pinnedVersion}
         open={installing}
         onOpenChange={setInstalling}
       />

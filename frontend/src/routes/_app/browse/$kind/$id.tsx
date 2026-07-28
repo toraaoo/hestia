@@ -3,8 +3,13 @@ import { ProjectDetailPage, type ProjectTab } from '@/features/content/detail';
 import { kindBySlug } from '@/features/content/lib/kinds';
 
 export const Route = createFileRoute('/_app/browse/$kind/$id')({
-  validateSearch: (search: Record<string, unknown>): { tab?: ProjectTab } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tab?: ProjectTab; version?: string } => ({
     tab: search.tab === 'versions' ? 'versions' : undefined,
+    // Carried by a pasted link that named a version, so opening the project it
+    // points at still installs the one it pinned.
+    version: typeof search.version === 'string' ? search.version : undefined,
   }),
   beforeLoad: ({ params }) => {
     if (!kindBySlug(params.kind)) throw redirect({ to: '/browse' });
@@ -14,7 +19,7 @@ export const Route = createFileRoute('/_app/browse/$kind/$id')({
 
 function RouteComponent() {
   const { kind, id } = Route.useParams();
-  const { tab = 'description' } = Route.useSearch();
+  const { tab = 'description', version } = Route.useSearch();
   const navigate = Route.useNavigate();
 
   const resolvedKind = kindBySlug(kind);
@@ -24,10 +29,11 @@ function RouteComponent() {
     <ProjectDetailPage
       kind={resolvedKind}
       id={id}
+      pinnedVersion={version}
       tab={tab}
       onTabChange={(next) =>
         navigate({
-          search: next === 'description' ? {} : { tab: next },
+          search: next === 'description' ? { version } : { version, tab: next },
           replace: true,
         })
       }

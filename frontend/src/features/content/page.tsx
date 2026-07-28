@@ -1,8 +1,8 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 
-import type { ContentKind, ContentProject } from '@/api';
+import { type ContentKind, type ContentProject, errorMessage } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
 import { chipClass } from '@/components/chip';
 import { Page } from '@/components/page';
@@ -10,7 +10,7 @@ import { Bone, CardGridSkeleton } from '@/components/skeleton';
 import { ContentCard } from '@/features/content/components/content-card';
 import { contentKinds, kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
-import { contentQueries } from '@/queries/content';
+import { contentQueries, isContentUrl } from '@/queries/content';
 
 /** Merge/sort key so the same project from one source is never listed twice. */
 const projectKey = (p: ContentProject) => `${p.source}:${p.id}`;
@@ -19,10 +19,18 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
   const { query } = useSearch();
   const q = query.trim();
 
+  // A pasted link is not a search term: the daemon says which project it names,
+  // and that one project is the result.
+  const url = isContentUrl(q) ? q : '';
+  const link = useQuery(contentQueries.url(url));
+
   // A specific kind is one search; "All" fans out over every kind and merges,
   // since a source's search is scoped to a single project type.
   const kinds = kind ? [kind] : contentKinds;
-  const search = useInfiniteQuery(contentQueries.searchPaged(kinds, q));
+  const search = useInfiniteQuery({
+    ...contentQueries.searchPaged(kinds, q),
+    enabled: !url,
+  });
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = search;
 
   const hits = (search.data?.pages ?? [])
@@ -54,7 +62,7 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
       title={m['nav.browse']()}
       subtitle={m['browse.subtitle']()}
       search
-      searchPlaceholder={m['search.modrinth']()}
+      searchPlaceholder={m['search.content_or_link']()}
       skeleton={
         <div>
           <div className="mb-5 flex flex-wrap gap-1.5">
@@ -86,7 +94,26 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
         ))}
       </div>
 
-      {search.isPending ? (
+      {url ? (
+        link.isPending ? (
+          <CardGridSkeleton
+            grid="grid grid-cols-1 gap-3 xl:grid-cols-2"
+            count={1}
+            card="h-28"
+          />
+        ) : link.data ? (
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            <ContentCard
+              project={link.data.project}
+              pinnedVersion={link.data.versionId || undefined}
+            />
+          </div>
+        ) : (
+          <p className="border border-dashed border-border px-4 py-10 text-center text-xs text-destructive">
+            {errorMessage(link.error)}
+          </p>
+        )
+      ) : search.isPending ? (
         <CardGridSkeleton
           grid="grid grid-cols-1 gap-3 xl:grid-cols-2"
           count={8}

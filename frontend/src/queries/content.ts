@@ -22,6 +22,15 @@ const BROWSE_STALE_MS = 60_000;
 /** Hits fetched per page when paging the browse grid. */
 export const SEARCH_PAGE = 20;
 
+/**
+ * Whether a search box holds a link rather than search terms. Only the shape is
+ * judged here — which sources are supported is the daemon's answer, so an
+ * unrecognised one comes back as a refusal to show rather than a guess made in
+ * the UI.
+ */
+export const isContentUrl = (text: string): boolean =>
+  /^https?:\/\/\S+$/i.test(text.trim());
+
 /** Per-kind browse offset; `null` once that kind is exhausted. */
 type PagedOffsets = Partial<Record<ContentKind, number | null>>;
 
@@ -95,6 +104,18 @@ export const contentQueries = {
       queryKey: keys.content.versions(query),
       queryFn: () => api.versions(query),
       enabled: (query.project ?? '').length > 0,
+      staleTime: BROWSE_STALE_MS,
+    }),
+  /**
+   * What a pasted project/version page URL names. Enabled only for something
+   * URL-shaped, so a search box can hand it whatever was typed.
+   */
+  url: (url: string) =>
+    queryOptions({
+      queryKey: keys.content.url(url),
+      queryFn: () => api.resolveUrl(url),
+      enabled: isContentUrl(url),
+      retry: false,
       staleTime: BROWSE_STALE_MS,
     }),
   /** Downloads and reads the `.mrpack` index — mount deliberately. */

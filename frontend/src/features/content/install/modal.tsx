@@ -46,11 +46,14 @@ import { useInstallWizard } from './use-wizard';
  */
 export function ContentInstallModal({
   project,
+  pinnedVersion,
   entry,
   open,
   onOpenChange,
 }: {
   project?: ContentProject;
+  /** The version a pasted link named; preselected instead of the newest. */
+  pinnedVersion?: string;
   entry?: Target;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -62,6 +65,7 @@ export function ContentInstallModal({
     open,
     entryId: entry?.id ?? '',
     project,
+    versionId: pinnedVersion,
   });
   const {
     step,
@@ -93,8 +97,14 @@ export function ContentInstallModal({
     selectedKinds.includes('data_pack') && target?.type === 'instance';
   const isProfile = target?.type === 'profile';
 
-  const toggleProject = (p: ContentProject) =>
+  // A pasted link may pin a version; the toggle clears any previous pin, so the
+  // new one is set after it.
+  const toggleProject = (p: ContentProject, versionId?: string) => {
     dispatch({ type: 'toggleProject', project: p });
+    if (versionId) {
+      dispatch({ type: 'version', ref: projectRef(p), id: versionId });
+    }
+  };
 
   const pickStep = mode === 'browse' ? 'target' : 'content';
   const steps: string[] =

@@ -24,11 +24,14 @@ export type ProjectTab = 'description' | 'versions';
 export function ProjectDetailPage({
   kind,
   id,
+  pinnedVersion,
   tab,
   onTabChange,
 }: {
   kind: ContentKind;
   id: string;
+  /** The version a pasted link named, installed instead of the newest. */
+  pinnedVersion?: string;
   tab: ProjectTab;
   onTabChange: (tab: ProjectTab) => void;
 }) {
@@ -172,12 +175,14 @@ export function ProjectDetailPage({
       {p.kind === 'modpack' ? (
         <ModpackInstallModal
           project={p}
+          pinnedVersion={pinnedVersion}
           open={installOpen}
           onOpenChange={setInstallOpen}
         />
       ) : (
         <ContentInstallModal
           project={p}
+          pinnedVersion={pinnedVersion}
           open={installOpen}
           onOpenChange={setInstallOpen}
         />

@@ -99,6 +99,7 @@
   "instances": "Search instances",
   "servers": "Search servers",
   "modrinth": "Search Modrinth",
+  "content_or_link": "Search, or paste a project link",
   "targets": "Search servers and instances"
  },
  "account": {
@@ -483,6 +484,9 @@
   "change_version_title": "Change version — {name}",
   "change_version_description": "Pick any published version; the swap applies at the next launch.",
   "current_version": "current",
+  "resolving_link": "Reading the link…",
+  "pinned_version": "Pinned version",
+  "kind_not_taken": "Not accepted here",
   "import_file": "Import a local file",
   "import_file_hint": "Installs as-is — no updates or dependency resolution.",
   "local_file": "local file",

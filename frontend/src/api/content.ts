@@ -12,6 +12,7 @@ import type {
   ContentSource,
   ContentVersion,
   ResolvedModpack,
+  ResolvedUrl,
   SearchQuery,
   SearchResult,
   VersionQuery,
@@ -35,6 +36,15 @@ export function project(
   source = '',
 ): Promise<ContentProject> {
   return call('content.project', { source, project: projectId });
+}
+
+/**
+ * What a project (or version) page URL on a supported source names. The daemon
+ * recognises the URL, so which platform served it is its answer, not a guess
+ * made here.
+ */
+export function resolveUrl(url: string): Promise<ResolvedUrl> {
+  return call('content.resolve_url', { url });
 }
 
 export async function versions(

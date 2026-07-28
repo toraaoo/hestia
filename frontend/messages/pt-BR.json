@@ -98,6 +98,7 @@
   "instances": "Pesquisar instâncias",
   "servers": "Pesquisar servidores",
   "modrinth": "Pesquisar no Modrinth",
+  "content_or_link": "Pesquise ou cole o link de um projeto",
   "targets": "Pesquisar servidores e instâncias"
  },
  "account": {
@@ -482,6 +483,9 @@
   "change_version_title": "Trocar versão — {name}",
   "change_version_description": "Escolha qualquer versão publicada; a troca é aplicada no próximo início.",
   "current_version": "atual",
+  "resolving_link": "Lendo o link…",
+  "pinned_version": "Versão fixada",
+  "kind_not_taken": "Não aceito aqui",
   "import_file": "Importar um arquivo local",
   "import_file_hint": "Instala como está — sem atualizações nem resolução de dependências.",
   "local_file": "arquivo local",

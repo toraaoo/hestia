@@ -135,6 +135,7 @@ export const keys = {
       [...keys.content.all, 'search', 'paged', kinds, query] as const,
     project: (source: string, project: string) =>
       [...keys.content.all, 'project', source, project] as const,
+    url: (url: string) => [...keys.content.all, 'url', url] as const,
     versions: (query: Partial<VersionQuery>) =>
       [...keys.content.all, 'versions', query] as const,
     modpack: (source: string, versionId: string) =>

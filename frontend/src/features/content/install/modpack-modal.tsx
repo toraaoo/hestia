@@ -38,10 +38,13 @@ type Mode = 'instance' | 'server' | 'existing';
 
 export function ModpackInstallModal({
   project,
+  pinnedVersion,
   open,
   onOpenChange,
 }: {
   project: ContentProject;
+  /** The pack version a pasted link named; the newest when absent. */
+  pinnedVersion?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -82,7 +85,11 @@ export function ModpackInstallModal({
   async function run() {
     try {
       const result = await install.mutateAsync({
-        pack: { source: project.source, project: project.id },
+        pack: {
+          source: project.source,
+          project: project.id,
+          version: pinnedVersion ?? '',
+        },
         target:
           mode === 'existing'
             ? { mode: 'existing', entry }

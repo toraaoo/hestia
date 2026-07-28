@@ -8,6 +8,8 @@ export interface WizardInit {
   open: boolean;
   entryId: string;
   project?: ContentProject;
+  /** A version the opening link pinned, preselected for that project. */
+  versionId?: string;
 }
 
 export interface WizardState {
@@ -43,7 +45,10 @@ function initial(init: WizardInit): WizardState {
     picked: init.project ? [init.project] : [],
     files: [],
     kindFilter: null,
-    versionIds: {},
+    versionIds:
+      init.project && init.versionId
+        ? { [projectRef(init.project)]: init.versionId }
+        : {},
     worlds: [],
     installing: false,
     error: '',

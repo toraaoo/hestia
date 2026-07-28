@@ -1,5 +1,5 @@
 import { UploadSimpleIcon } from '@phosphor-icons/react';
-import { useQuery } from '@tanstack/react-query';
+import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import {
@@ -7,6 +7,8 @@ import {
   type ContentProject,
   content as contentApi,
   dialog,
+  errorMessage,
+  type ResolvedUrl,
 } from '@/api';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { PickerPanel } from '@/components/picker-panel';
@@ -14,7 +16,7 @@ import { projectRef } from '@/features/content/components/content-card';
 import { PickRow } from '@/features/content/components/pick-row';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
-import { contentQueries } from '@/queries/content';
+import { contentQueries, isContentUrl } from '@/queries/content';
 import { instanceQueries } from '@/queries/instance';
 
 import { FilterBar } from '../filter-bar';
@@ -37,7 +39,8 @@ export function ContentStep({
   kind: ContentKind | null;
   onKindChange: (kind: ContentKind | null) => void;
   picked: ContentProject[];
-  onToggle: (p: ContentProject) => void;
+  /** `versionId` is set when a pasted link pinned one. */
+  onToggle: (p: ContentProject, versionId?: string) => void;
   onAddFiles: (files: PickedFile[]) => void;
 }) {
   const [search, setSearch] = useState('');
@@ -53,15 +56,22 @@ export function ContentStep({
   const pickedRefs = new Set(picked.map(projectRef));
   const installedRefs = useInstalledRefs(target, activeKind);
 
-  const results = useQuery(
-    contentQueries.search({
+  // A pasted link is not a search term: the daemon resolves it to the project
+  // it names (and the version, where the URL pins one), which then picks like
+  // any other hit.
+  const url = isContentUrl(search) ? search.trim() : '';
+  const link = useQuery(contentQueries.url(url));
+
+  const results = useQuery({
+    ...contentQueries.search({
       kind: activeKind,
       query: search.trim(),
       loader: activeKind === 'mod' ? target.flavor : undefined,
       gameVersion: target.gameVersion || undefined,
       limit: 30,
     }),
-  );
+    enabled: !url,
+  });
   const hits = results.data?.hits ?? [];
 
   return (
@@ -71,7 +81,7 @@ export function ContentStep({
           <FilterBar
             search={search}
             onSearch={setSearch}
-            placeholder={m['search.modrinth']()}
+            placeholder={m['search.content_or_link']()}
             chips={kinds.map((k) => ({
               label: kindInfo[k].label(),
               active: activeKind === k,
@@ -91,6 +101,14 @@ export function ContentStep({
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
           {m['content.no_worlds_datapack']()}
         </p>
+      ) : url ? (
+        <LinkResult
+          query={link}
+          accepts={kinds}
+          installed={installedRefs}
+          picked={pickedRefs}
+          onToggle={onToggle}
+        />
       ) : results.isPending ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
           {m['content.installing']()}
@@ -120,6 +138,66 @@ export function ContentStep({
         </div>
       )}
     </PickerPanel>
+  );
+}
+
+/**
+ * What a pasted link resolved to, as one selectable row. A kind the target
+ * cannot take is shown and refused rather than hidden: the link is what the
+ * user asked for, so the answer names why it will not go in.
+ */
+function LinkResult({
+  query,
+  accepts,
+  installed,
+  picked,
+  onToggle,
+}: {
+  query: UseQueryResult<ResolvedUrl>;
+  accepts: ContentKind[];
+  installed: Set<string>;
+  picked: Set<string>;
+  onToggle: (p: ContentProject, versionId?: string) => void;
+}) {
+  if (query.isPending) {
+    return (
+      <p className="px-1 py-8 text-center text-xs text-muted-foreground">
+        {m['content.resolving_link']()}
+      </p>
+    );
+  }
+  if (query.error || !query.data) {
+    return (
+      <p className="px-1 py-8 text-center text-xs text-destructive">
+        {errorMessage(query.error)}
+      </p>
+    );
+  }
+
+  const { project, versionId } = query.data;
+  const taken = accepts.includes(project.kind);
+  const already = installed.has(`${project.source}:${project.id}`);
+  return (
+    <div className="grid gap-2 p-0.5">
+      <PickRow
+        icon={contentIcon(project.kind)}
+        imageUrl={project.iconUrl}
+        title={project.title}
+        subtitle={`${contentKindLabel[project.kind]()} · ${m['browse.by_author']({ name: project.author })}`}
+        badge={
+          taken
+            ? already
+              ? m['content.installed']()
+              : versionId
+                ? m['content.pinned_version']()
+                : undefined
+            : m['content.kind_not_taken']()
+        }
+        disabled={already || !taken}
+        selected={picked.has(projectRef(project))}
+        onSelect={() => onToggle(project, versionId)}
+      />
+    </div>
   );
 }
 
