@@ -24,6 +24,16 @@ use crate::engine::Engine;
 /// from a catalogue, and the archive its `overrides/` live in.
 pub(super) type FetchedPack = (ResolvedModpack, Option<ContentProject>, mrpack::Archive);
 
+/// What the catalogue knows about the pack's files, looked up in bulk. Empty
+/// where the source could not be reached — the install proceeds regardless.
+#[derive(Default)]
+pub(super) struct Catalogue {
+    pub(super) projects: HashMap<String, ContentProject>,
+    /// Version id → version number, so a pack's mod lists a version like every
+    /// other installed item.
+    pub(super) versions: HashMap<String, String>,
+}
+
 impl Engine {
     /// A pack can only be installed into an entry that already runs what it
     /// pins: both are baked into the entry's resolved profile, and neither can
@@ -214,27 +224,40 @@ impl Engine {
         out
     }
 
-    /// One bulk lookup for every project the pack's files belong to, so the pool
-    /// shows titles and icons instead of a hundred bare filenames. Best-effort:
-    /// a pack still installs when the catalogue is unreachable, it just reads
-    /// less well.
-    pub(super) async fn hydrate(
-        &self,
-        source: &str,
-        refs: &HashMap<&str, FileRef>,
-    ) -> HashMap<String, ContentProject> {
-        let mut ids: Vec<String> = refs.values().map(|r| r.project_id.clone()).collect();
-        ids.sort();
-        ids.dedup();
-        if ids.is_empty() {
-            return HashMap::new();
+    /// Two bulk lookups for everything the pack's files belong to — projects by
+    /// id for the titles and icons, versions by id for the version *numbers* —
+    /// so the pool reads like ordinary installed content rather than a hundred
+    /// bare filenames. Best-effort in both halves: a pack still installs when
+    /// the catalogue is unreachable, it just reads less well.
+    pub(super) async fn hydrate(&self, source: &str, refs: &HashMap<&str, FileRef>) -> Catalogue {
+        let mut projects: Vec<String> = refs.values().map(|r| r.project_id.clone()).collect();
+        projects.sort();
+        projects.dedup();
+        if projects.is_empty() {
+            return Catalogue::default();
         }
-        match self.content.projects(source, &ids).await {
-            Ok(projects) => projects.into_iter().map(|p| (p.id.clone(), p)).collect(),
-            Err(e) => {
-                tracing::warn!(error = %e, count = ids.len(), "cannot look up modpack projects");
-                HashMap::new()
-            }
+        let mut versions: Vec<String> = refs.values().map(|r| r.version_id.clone()).collect();
+        versions.sort();
+        versions.dedup();
+
+        Catalogue {
+            projects: match self.content.projects(source, &projects).await {
+                Ok(found) => found.into_iter().map(|p| (p.id.clone(), p)).collect(),
+                Err(e) => {
+                    tracing::warn!(error = %e, count = projects.len(), "cannot look up modpack projects");
+                    HashMap::new()
+                }
+            },
+            versions: match self.content.versions_by_id(source, &versions).await {
+                Ok(found) => found
+                    .into_iter()
+                    .map(|v| (v.id.clone(), v.version_number))
+                    .collect(),
+                Err(e) => {
+                    tracing::warn!(error = %e, count = versions.len(), "cannot look up modpack versions");
+                    HashMap::new()
+                }
+            },
         }
     }
 }

@@ -188,6 +188,15 @@ impl Content {
         self.provider(source)?.projects(ids).await
     }
 
+    /// Several versions by id — the bulk twin of [`Content::projects`].
+    pub async fn versions_by_id(
+        &self,
+        source: &str,
+        ids: &[String],
+    ) -> Result<Vec<ContentVersion>> {
+        self.provider(source)?.versions_by_id(ids).await
+    }
+
     /// What a platform's own download URL says about the file behind it, so a
     /// pack index's bare URLs become tracked pool items.
     pub(crate) fn parse_file_url(&self, source: &str, url: &str) -> Option<provider::FileRef> {

@@ -181,6 +181,21 @@ impl ContentProvider for Modrinth {
         Ok(out)
     }
 
+    async fn versions_by_id(&self, ids: &[String]) -> Result<Vec<ContentVersion>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut out = Vec::with_capacity(ids.len());
+        for chunk in ids.chunks(BULK_LIMIT) {
+            let params = [("ids", serde_json::to_string(chunk).unwrap_or_default())];
+            let body = get_json(&format!("{API}/versions"), &params).await?;
+            if let Some(arr) = body.as_array() {
+                out.extend(arr.iter().map(|v| parse_version(self.id(), v)));
+            }
+        }
+        Ok(out)
+    }
+
     async fn versions(&self, query: &VersionQuery) -> Result<Vec<ContentVersion>> {
         let mut params: Vec<(&str, String)> = Vec::new();
         if let Some(loader) = non_empty(&query.loader) {

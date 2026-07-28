@@ -150,7 +150,7 @@ impl Engine {
         job: &Job<'_>,
     ) -> (Vec<InstalledContent>, Vec<ContentFailure>) {
         let mut refs = self.identify(&resolved.source, files);
-        let titles = self.hydrate(&resolved.source, &refs).await;
+        let catalogue = self.hydrate(&resolved.source, &refs).await;
 
         let mut items = Vec::new();
         let mut failures = Vec::new();
@@ -163,8 +163,13 @@ impl Engine {
             let identity = FileIdentity {
                 project: reference
                     .as_ref()
-                    .and_then(|r| titles.get(r.project_id.as_str()))
+                    .and_then(|r| catalogue.projects.get(r.project_id.as_str()))
                     .cloned(),
+                version: reference
+                    .as_ref()
+                    .and_then(|r| catalogue.versions.get(r.version_id.as_str()))
+                    .cloned()
+                    .unwrap_or_default(),
                 reference,
             };
             let label = identity.label(file);
@@ -233,7 +238,7 @@ impl Engine {
             slug: project.map(|p| p.slug.clone()).unwrap_or_default(),
             title: identity.label(file),
             version_id: reference.map(|r| r.version_id.clone()).unwrap_or_default(),
-            version_number: String::new(),
+            version_number: identity.version.clone(),
             filename: file.artifact.filename.clone(),
             sha1: file
                 .artifact

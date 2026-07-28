@@ -52,6 +52,9 @@ pub struct ModpackOutcome {
 struct FileIdentity {
     reference: Option<FileRef>,
     project: Option<ContentProject>,
+    /// The version *number* behind `reference.version_id`; empty when the
+    /// catalogue could not be reached.
+    version: String,
 }
 
 impl FileIdentity {

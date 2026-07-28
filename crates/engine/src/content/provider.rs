@@ -54,6 +54,14 @@ pub trait ContentProvider: Send + Sync {
         Ok(out)
     }
     async fn versions(&self, query: &VersionQuery) -> Result<Vec<ContentVersion>>;
+    /// Several versions by id. The bulk twin of [`ContentProvider::projects`],
+    /// and wanted for the same reason: a pack index identifies its files by
+    /// version id, and without their *numbers* the pool lists a hundred mods
+    /// with no version against their name.
+    async fn versions_by_id(&self, ids: &[String]) -> Result<Vec<ContentVersion>> {
+        let _ = ids;
+        Ok(Vec::new())
+    }
     /// A modpack version's manifest, without its archive.
     async fn resolve_modpack(&self, version_id: &str) -> Result<ResolvedModpack>;
     /// The modpack version's whole archive. Installing needs the bytes as well
