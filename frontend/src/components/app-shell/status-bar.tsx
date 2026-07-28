@@ -13,6 +13,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
 import {
+  isMeasurable,
   overallRatio,
   ProvisionProgressView,
 } from '@/features/entries/components/provision-progress';
@@ -86,7 +87,10 @@ function JobActivity({
 }) {
   const primary = jobs[0];
   const progress = primary.progress as ProvisionProgress | null;
-  const pct = progress ? Math.round(overallRatio(progress) * 100) : null;
+  const pct =
+    progress && isMeasurable(progress)
+      ? Math.round(overallRatio(progress) * 100)
+      : null;
 
   return (
     <Popover>

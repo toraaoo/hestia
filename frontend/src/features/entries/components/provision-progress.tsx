@@ -58,6 +58,11 @@ export function overallRatio(p: ProvisionProgress): number {
   return unit;
 }
 
+/** Whether the step has an extent to fill; a bar pinned at 0% reads as stuck. */
+export function isMeasurable(p: ProvisionProgress): boolean {
+  return p.total > 0 || (p.items ?? 0) > 0;
+}
+
 /**
  * The numeric detail line under the bar: `item/items · detail · current /
  * total · rate/s` for a byte phase, `current / total` for a count phase
@@ -122,18 +127,25 @@ export function ProvisionProgressView({
   fallbackLabel?: string;
   className?: string;
 }) {
-  const rate = useRate(indeterminate ? null : progress);
+  const measurable =
+    !indeterminate && progress !== null && isMeasurable(progress);
+  const rate = useRate(measurable ? progress : null);
   const label = progress
     ? phaseLabel(progress.phase)
     : (fallbackLabel ?? m['phase.resolving_profile']());
 
-  if (indeterminate) {
+  if (!measurable) {
     return (
-      <div className={cn('flex flex-col gap-3', className)}>
+      <div className={cn('flex flex-col gap-2', className)}>
         <span className="text-xs">{label}</span>
         <div className="relative h-1 w-full overflow-hidden bg-muted">
           <div className="progress-sweep absolute inset-y-0 left-0 bg-primary" />
         </div>
+        {progress?.detail && (
+          <p className="truncate text-xs text-muted-foreground">
+            {progress.detail}
+          </p>
+        )}
       </div>
     );
   }

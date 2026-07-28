@@ -241,6 +241,7 @@ pub struct ProvisionReporter {
     animator: Option<Animator>,
     rate: Mutex<RateMeter>,
     last_phase: Mutex<Option<ProvisionPhase>>,
+    last_detail: Mutex<String>,
 }
 
 impl ProvisionReporter {
@@ -251,6 +252,19 @@ impl ProvisionReporter {
             )),
             rate: Mutex::new(RateMeter::default()),
             last_phase: Mutex::new(None),
+            last_detail: Mutex::new(String::new()),
+        }
+    }
+
+    /// Redirected: print each new thing a long step says, not just its phase.
+    fn echo_narration(&self, progress: &ProvisionProgress) {
+        if progress.total > 0 || progress.detail.is_empty() {
+            return;
+        }
+        let mut last = self.last_detail.lock().unwrap();
+        if *last != progress.detail {
+            last.clone_from(&progress.detail);
+            eprintln!("  {}", progress.detail);
         }
     }
 
@@ -265,12 +279,16 @@ impl ProvisionReporter {
             if phase_changed {
                 eprintln!("{}", provision_label(progress.phase));
             }
+            self.echo_narration(progress);
             return;
         };
         if phase_changed {
             *self.rate.lock().unwrap() = RateMeter::default();
         }
         let view = match progress.phase {
+            _ if progress.total == 0 && !progress.detail.is_empty() => {
+                View::Spinner(progress.detail.clone())
+            }
             ProvisionPhase::Java
             | ProvisionPhase::Server
             | ProvisionPhase::Client

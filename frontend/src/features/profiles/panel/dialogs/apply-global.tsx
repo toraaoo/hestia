@@ -13,12 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Progress,
-  ProgressLabel,
-  ProgressValue,
-} from '@/components/ui/progress';
 import { PickRow } from '@/features/content/components/pick-row';
+import { ProvisionProgressView } from '@/features/entries/components/provision-progress';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations } from '@/queries/instance';
 import { useJobMutation } from '@/queries/jobs';
@@ -41,10 +37,6 @@ export function ApplyGlobalDialog({
 
   const list = globals.data ?? [];
   const progress = apply.progress;
-  const percent =
-    progress && progress.total > 0
-      ? Math.round((progress.current / progress.total) * 100)
-      : 0;
 
   const close = (next: boolean) => {
     if (apply.isPending) return;
@@ -75,14 +67,10 @@ export function ApplyGlobalDialog({
         </DialogHeader>
         {apply.isPending ? (
           <div className="flex min-h-24 flex-col justify-center px-1">
-            <Progress value={percent}>
-              <ProgressLabel>
-                {progress?.detail ||
-                  progress?.phase ||
-                  m['profiles.apply_global']()}
-              </ProgressLabel>
-              <ProgressValue />
-            </Progress>
+            <ProvisionProgressView
+              progress={progress ?? null}
+              fallbackLabel={m['profiles.apply_global']()}
+            />
           </div>
         ) : list.length === 0 ? (
           <Empty>{m['profiles.global_empty']()}</Empty>
