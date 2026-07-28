@@ -266,7 +266,8 @@
   "downloading": "Downloading {name}",
   "mirroring": "Mirroring into data/",
   "importing": "Importing {name}…",
-  "backing_up": "Backing up"
+  "backing_up": "Backing up",
+  "writing_pack_files": "Writing pack files"
  },
  "jobs": {
   "title": "Background jobs ({count})",
@@ -354,7 +355,10 @@
    "unsupported_content_url": "'{url}' is not a project URL on a supported content source.",
    "content_kind_mismatch": "'{title}' is {actual} content, not {expected}.",
    "content_kind_rejected": "A {flavor} {entry} cannot take {requested} content — it takes {accepts}.",
-   "incompatible_version": "This app and the daemon are on different versions (protocol {got} vs {want}). Update Hestia."
+   "incompatible_version": "This app and the daemon are on different versions (protocol {got} vs {want}). Update Hestia.",
+   "modpack_loader_unsupported": "This modpack needs the {loader} loader, which Hestia does not have.",
+   "modpack_entry_mismatch": "This modpack is for {packFlavor} {packGameVersion}, but that {entry} is {flavor} {gameVersion}.",
+   "modpack_not_installed": "'{name}' was not built from a modpack."
   },
   "token": {
    "server": "server",
@@ -422,7 +426,8 @@
    "resource_pack": "resource pack",
    "shader": "shader",
    "data_pack": "datapack",
-   "plugin": "plugin"
+   "plugin": "plugin",
+   "modpack_not_updatable": "this modpack came from a file, so there is no source to update it against"
   }
  },
  "kind": {
@@ -680,12 +685,16 @@
   "kind": {
    "properties_schema_missing": "'{name}' has no property schema, so its server.properties keys cannot be checked.",
    "sync_target_not_shared": "'{target}' is not shared with your other instances: {reason}.",
-   "sync_target_skipped": "'{target}' could not be synced: {detail}"
+   "sync_target_skipped": "'{target}' could not be synced: {detail}",
+   "modpack_overrides_kept": "{count} file(s) you had edited were kept instead of the modpack's.",
+   "modpack_files_not_accepted": "{count} of the modpack's file(s) are not loaded by a {flavor} entry and were skipped."
   },
   "hint": {
    "properties_schema_missing": "Any key is accepted until it can be derived again, so check spelling yourself. Updating the server re-derives it.",
    "sync_target_not_shared": "Adopt the folder to move its contents into the shared store and link it.",
-   "sync_target_skipped": "Check the folder's permissions, then launch again."
+   "sync_target_skipped": "Check the folder's permissions, then launch again.",
+   "modpack_overrides_kept": "Delete a file under the game directory to take the pack's version of it at the next update.",
+   "modpack_files_not_accepted": "Nothing to do — the pack ships them for the other side. Install the pack on an instance to get them."
   },
   "token": {
    "has_contents": "the folder already has contents",
@@ -704,5 +713,38 @@
   "difficulty_easy": "Easy",
   "difficulty_normal": "Normal",
   "difficulty_hard": "Hard"
+ },
+ "modpack": {
+  "title": "Modpack",
+  "none": "Not built from a modpack.",
+  "none_hint": "Install one to set this up in a single step.",
+  "install": "Install modpack",
+  "install_into": "Install into {name}",
+  "installing": "Installing {name}…",
+  "update": "Update pack",
+  "update_available": "A newer version of this pack is available.",
+  "remove": "Remove pack",
+  "remove_title": "Remove {name}?",
+  "remove_body": "Its mods and the game-directory files it wrote are removed. Files you have edited are kept, and the {entry} itself stays.",
+  "removed": "Removed {files} file(s) and {overrides} pack file(s).",
+  "kept": "Kept {count} file(s) you had edited.",
+  "target": "Where to install",
+  "target_new_instance": "New instance",
+  "target_new_server": "New server",
+  "target_existing": "An existing entry",
+  "name": "Name",
+  "name_placeholder": "Defaults to the pack's own name",
+  "version": "Pack version",
+  "version_latest": "Newest",
+  "installed_version": "Installed",
+  "game": "Game",
+  "loader": "Loader",
+  "content_count": "Mods",
+  "pack_files": "Pack files",
+  "from_file": "From a file",
+  "downgrade_warning": "This pack targets an older game version. Worlds and saves do not downgrade.",
+  "downgrade_confirm": "Update anyway",
+  "mismatch": "This pack does not match this {entry}.",
+  "mismatch_hint": "Create a new one from the pack instead."
  }
 }

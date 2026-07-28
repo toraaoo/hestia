@@ -48,6 +48,7 @@ export {
   type ProcessMetricsResult,
   useProcessMetrics,
 } from './metrics';
+export * from './modpack';
 export * from './prefs';
 export * from './process';
 export * from './profile';

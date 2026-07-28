@@ -3,4 +3,4 @@
 /**
  * Where a provisioning job (server create, instance launch preparation) is.
  */
-export type ProvisionPhase = "resolving" | "backup" | "java" | "server" | "client" | "libraries" | "assets" | "content";
+export type ProvisionPhase = "resolving" | "backup" | "java" | "server" | "client" | "libraries" | "assets" | "content" | "overrides";

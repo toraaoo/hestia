@@ -2,7 +2,9 @@
 import type { ModpackFile } from "./ModpackFile";
 
 /**
- * A resolved modpack: the loader/game version it targets and the files to
- * place. `overrides/` handling is a materialize-time concern, deferred.
+ * A resolved modpack: the loader/game version it targets and the files it
+ * pulls from the network. A pack's own `overrides/` are carried inside the
+ * archive rather than listed here, so they stay an install-time concern (see
+ * [`crate::modpack`]) and never cross the wire.
  */
-export type ResolvedModpack = { source: string, projectId: string, versionId: string, name: string, gameVersion: string, loader?: string, loaderVersion?: string, files: Array<ModpackFile>, };
+export type ResolvedModpack = { source: string, projectId: string, versionId: string, versionNumber: string, name: string, summary: string, gameVersion: string, loader?: string, loaderVersion?: string, files: Array<ModpackFile>, };

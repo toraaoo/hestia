@@ -265,7 +265,8 @@
   "downloading": "Baixando {name}",
   "mirroring": "Espelhando em data/",
   "importing": "Importando {name}…",
-  "backing_up": "Fazendo backup"
+  "backing_up": "Fazendo backup",
+  "writing_pack_files": "Gravando arquivos do pacote"
  },
  "jobs": {
   "title": "Tarefas em segundo plano ({count})",
@@ -353,7 +354,10 @@
    "unsupported_content_url": "'{url}' não é uma URL de projeto em uma fonte de conteúdo suportada.",
    "content_kind_mismatch": "'{title}' é conteúdo do tipo {actual}, não {expected}.",
    "content_kind_rejected": "{entry} {flavor} não aceita conteúdo do tipo {requested} — aceita {accepts}.",
-   "incompatible_version": "Este app e o daemon estão em versões diferentes (protocolo {got} vs {want}). Atualize o Hestia."
+   "incompatible_version": "Este app e o daemon estão em versões diferentes (protocolo {got} vs {want}). Atualize o Hestia.",
+   "modpack_loader_unsupported": "Este modpack precisa do loader {loader}, que o Hestia não possui.",
+   "modpack_entry_mismatch": "Este modpack é para {packFlavor} {packGameVersion}, mas esse {entry} é {flavor} {gameVersion}.",
+   "modpack_not_installed": "'{name}' não foi criado a partir de um modpack."
   },
   "token": {
    "server": "servidor",
@@ -421,7 +425,8 @@
    "resource_pack": "pacote de recursos",
    "shader": "shader",
    "data_pack": "datapack",
-   "plugin": "plugin"
+   "plugin": "plugin",
+   "modpack_not_updatable": "este modpack veio de um arquivo, então não há fonte para atualizá-lo"
   }
  },
  "kind": {
@@ -671,12 +676,16 @@
   "kind": {
    "properties_schema_missing": "'{name}' não tem esquema de propriedades, então suas chaves de server.properties não podem ser verificadas.",
    "sync_target_not_shared": "'{target}' não está compartilhado com suas outras instâncias: {reason}.",
-   "sync_target_skipped": "'{target}' não pôde ser sincronizado: {detail}"
+   "sync_target_skipped": "'{target}' não pôde ser sincronizado: {detail}",
+   "modpack_overrides_kept": "{count} arquivo(s) que você editou foram mantidos em vez dos do modpack.",
+   "modpack_files_not_accepted": "{count} arquivo(s) do modpack não são carregados por um item {flavor} e foram ignorados."
   },
   "hint": {
    "properties_schema_missing": "Qualquer chave é aceita até que ele possa ser derivado novamente, então confira a grafia você mesmo. Atualizar o servidor o deriva de novo.",
    "sync_target_not_shared": "Adote a pasta para mover o conteúdo dela para o armazenamento compartilhado e criar o vínculo.",
-   "sync_target_skipped": "Verifique as permissões da pasta e inicie novamente."
+   "sync_target_skipped": "Verifique as permissões da pasta e inicie novamente.",
+   "modpack_overrides_kept": "Exclua um arquivo no diretório do jogo para usar a versão do pacote na próxima atualização.",
+   "modpack_files_not_accepted": "Nada a fazer — o pacote os traz para o outro lado. Instale o pacote em uma instância para obtê-los."
   },
   "token": {
    "has_contents": "a pasta já tem conteúdo",
@@ -695,5 +704,38 @@
   "difficulty_easy": "Fácil",
   "difficulty_normal": "Normal",
   "difficulty_hard": "Difícil"
+ },
+ "modpack": {
+  "title": "Modpack",
+  "none": "Não foi criado a partir de um modpack.",
+  "none_hint": "Instale um para configurar isto em uma única etapa.",
+  "install": "Instalar modpack",
+  "install_into": "Instalar em {name}",
+  "installing": "Instalando {name}…",
+  "update": "Atualizar pacote",
+  "update_available": "Há uma versão mais recente deste pacote.",
+  "remove": "Remover pacote",
+  "remove_title": "Remover {name}?",
+  "remove_body": "Seus mods e os arquivos que ele gravou no diretório do jogo são removidos. Arquivos que você editou são mantidos, e o {entry} em si permanece.",
+  "removed": "Removidos {files} arquivo(s) e {overrides} arquivo(s) do pacote.",
+  "kept": "Mantidos {count} arquivo(s) que você editou.",
+  "target": "Onde instalar",
+  "target_new_instance": "Nova instância",
+  "target_new_server": "Novo servidor",
+  "target_existing": "Um item existente",
+  "name": "Nome",
+  "name_placeholder": "Usa o nome do próprio pacote",
+  "version": "Versão do pacote",
+  "version_latest": "Mais recente",
+  "installed_version": "Instalada",
+  "game": "Jogo",
+  "loader": "Loader",
+  "content_count": "Mods",
+  "pack_files": "Arquivos do pacote",
+  "from_file": "De um arquivo",
+  "downgrade_warning": "Este pacote tem como alvo uma versão mais antiga do jogo. Mundos e saves não retrocedem.",
+  "downgrade_confirm": "Atualizar mesmo assim",
+  "mismatch": "Este pacote não corresponde a esse {entry}.",
+  "mismatch_hint": "Crie um novo a partir do pacote."
  }
 }

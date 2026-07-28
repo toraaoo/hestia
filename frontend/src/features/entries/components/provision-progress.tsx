@@ -13,7 +13,12 @@ import { m } from '@/paraglide/messages.js';
 /** Phases whose `current`/`total` are bytes — the ones that carry a speed. */
 const BYTE_PHASES: ProvisionPhase[] = ['java', 'server', 'client', 'content'];
 /** Phases whose `current`/`total` are completed/total unit counts. */
-const COUNT_PHASES: ProvisionPhase[] = ['libraries', 'assets', 'backup'];
+const COUNT_PHASES: ProvisionPhase[] = [
+  'libraries',
+  'assets',
+  'backup',
+  'overrides',
+];
 
 /** Map a live provisioning phase to a human label; falls back to the raw id. */
 export function phaseLabel(phase: ProvisionPhase): string {
@@ -32,6 +37,8 @@ export function phaseLabel(phase: ProvisionPhase): string {
       return m['phase.downloading']({ name: phase });
     case 'content':
       return m['phase.mirroring']();
+    case 'overrides':
+      return m['phase.writing_pack_files']();
     default:
       return phase;
   }

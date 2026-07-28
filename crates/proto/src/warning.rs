@@ -61,7 +61,9 @@ pub enum WarningInfo {
     SyncTargetSkipped { target: String, detail: String },
     /// Game-directory files the pack owns were left as the user edited them, so
     /// this entry is not running the pack's own configuration for them.
-    ModpackOverridesKept { paths: Vec<String> },
+    /// `count` alongside `paths` so the headline is one interpolation rather
+    /// than a joined list a front-end would have to shorten itself.
+    ModpackOverridesKept { count: u32, paths: Vec<String> },
     /// The pack named files of a kind this entry's flavor cannot load, so they
     /// were not installed — a client-shaped pack put on a server, typically.
     ModpackFilesNotAccepted { count: u32, flavor: String },
@@ -120,10 +122,9 @@ impl fmt::Display for WarningInfo {
             SyncTargetSkipped { target, detail } => {
                 write!(f, "'{target}' could not be synced: {detail}")
             }
-            ModpackOverridesKept { paths } => write!(
+            ModpackOverridesKept { count, .. } => write!(
                 f,
-                "{} file(s) you had edited were kept instead of the modpack's",
-                paths.len()
+                "{count} file(s) you had edited were kept instead of the modpack's"
             ),
             ModpackFilesNotAccepted { count, flavor } => write!(
                 f,

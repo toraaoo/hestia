@@ -72,6 +72,9 @@ const TOPICS: Record<string, (payload: Record<string, unknown>) => QueryKey[]> =
     // footprint walk lives outside `all` and is never triggered.
     'backup.done': () => [keys.servers.all],
     'content.done': () => [keys.servers.all, keys.instances.all],
+    // A pack install can have *created* its entry, so neither list is known to
+    // be current — and the CLI or another window may have run it.
+    'modpack.done': () => [keys.servers.all, keys.instances.all],
   };
 
 /** The key prefixes a daemon topic outdates — exported for the regression test. */

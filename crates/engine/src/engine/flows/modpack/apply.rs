@@ -120,7 +120,10 @@ impl Engine {
         if !kept.is_empty() {
             kept.sort();
             kept.dedup();
-            warnings.push(WarningInfo::ModpackOverridesKept { paths: kept });
+            warnings.push(WarningInfo::ModpackOverridesKept {
+                count: kept.len() as u32,
+                paths: kept,
+            });
         }
         modpack::save(&ctx.entry_dir, &pack)?;
         tracing::info!(

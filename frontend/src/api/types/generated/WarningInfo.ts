@@ -5,4 +5,4 @@ import type { NotSharedReason } from "./NotSharedReason";
  * One degraded outcome. The `kind` tag is the wire discriminant; front-ends
  * switch on it exhaustively.
  */
-export type WarningInfo = { "kind": "properties_schema_missing", name: string, } | { "kind": "sync_target_not_shared", instance: string, target: string, reason: NotSharedReason, } | { "kind": "sync_target_skipped", target: string, detail: string, };
+export type WarningInfo = { "kind": "properties_schema_missing", name: string, } | { "kind": "sync_target_not_shared", instance: string, target: string, reason: NotSharedReason, } | { "kind": "sync_target_skipped", target: string, detail: string, } | { "kind": "modpack_overrides_kept", count: number, paths: Array<string>, } | { "kind": "modpack_files_not_accepted", count: number, flavor: string, };

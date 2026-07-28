@@ -47,6 +47,8 @@ export * as download from './download';
 export * as instance from './instance';
 export * as java from './java';
 export * as job from './job';
+export type { PackRef } from './modpack';
+export * as modpack from './modpack';
 export * as prefs from './prefs';
 export * as process from './process';
 export * as profile from './profile';

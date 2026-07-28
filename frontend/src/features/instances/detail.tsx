@@ -31,7 +31,12 @@ import {
   type LiveResources,
   ResourceCards,
 } from '@/features/entries/components/resource-panel';
-import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
+import {
+  ContentSection,
+  ModpackCard,
+  SideCard,
+  StatCard,
+} from '@/features/entries/detail';
 import { WorldRow } from '@/features/instances/components/world-row';
 import { useLaunchModal } from '@/features/instances/launch-modal';
 import { InstanceLogsTab } from '@/features/instances/tabs/logs';
@@ -298,6 +303,12 @@ export function InstanceDetailPage({
                   />
                 </div>
               </SideCard>
+              <ModpackCard
+                kind="instance"
+                id={instance.id}
+                name={instance.name}
+                running={!!live}
+              />
               <SideCard title={m['detail.quick_actions']()}>
                 <div className="flex flex-col gap-1">
                   <Button

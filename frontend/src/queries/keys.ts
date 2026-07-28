@@ -88,6 +88,7 @@ export const keys = {
       [...keys.servers.content(id), kind] as const,
     contentUpdates: (id: string, kind: ContentKind) =>
       [...keys.servers.content(id), 'updates', kind] as const,
+    modpack: (id: string) => [...keys.servers.detail(id), 'modpack'] as const,
   },
   instances: {
     all: ['instances'] as const,
@@ -117,6 +118,7 @@ export const keys = {
       [...keys.instances.content(id), kind] as const,
     contentUpdates: (id: string, kind: ContentKind) =>
       [...keys.instances.content(id), 'updates', kind] as const,
+    modpack: (id: string) => [...keys.instances.detail(id), 'modpack'] as const,
     profiles: (id: string) =>
       [...keys.instances.detail(id), 'profiles'] as const,
   },

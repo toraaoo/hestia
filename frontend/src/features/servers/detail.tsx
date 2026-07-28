@@ -26,7 +26,12 @@ import {
   type LiveResources,
   ResourceCards,
 } from '@/features/entries/components/resource-panel';
-import { ContentSection, SideCard, StatCard } from '@/features/entries/detail';
+import {
+  ContentSection,
+  ModpackCard,
+  SideCard,
+  StatCard,
+} from '@/features/entries/detail';
 import { ServerBackupsTab } from '@/features/servers/tabs/backups';
 import { ServerConsoleTab } from '@/features/servers/tabs/console';
 import { ServerSettingsTab } from '@/features/servers/tabs/settings';
@@ -250,6 +255,12 @@ export function ServerDetailPage({
                   />
                 </div>
               </SideCard>
+              <ModpackCard
+                kind="server"
+                id={server.id}
+                name={server.name}
+                running={running}
+              />
             </div>
           </div>
         </TabsContent>
