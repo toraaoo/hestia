@@ -98,7 +98,7 @@ hestia/
 │   ├── ipc/                   transport (unix socket / named pipe) + envelope (tokio)
 │   ├── common/                logging (tracing) + app identity + paths
 │   ├── client/                typed client SDK (facades over a Session)
-│   ├── engine/                config·cache·download·java·accounts·skins  (daemon-only)
+│   ├── engine/                config·cache·download·java·accounts·skins·process (daemon-only)
 │   ├── cli/                   bin: hestia   (clap)
 │   ├── daemon/                bin: hestiad  (router, services, supervisor)
 │   ├── tray/                  bin: tray     (tray-icon + tao)

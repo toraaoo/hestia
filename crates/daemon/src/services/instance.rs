@@ -23,7 +23,7 @@ use crate::runtime::{instance_process_id, Channels};
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<InstanceFlavors, _, _>(|_: Empty, ctx| async move {
         Ok(FlavorsResult {
-            flavors: ctx.runtime.engine().minecraft().instance_flavors(),
+            flavors: ctx.runtime.engine().instance_flavors().await,
         })
     });
 

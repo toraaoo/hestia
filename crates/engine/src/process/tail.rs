@@ -9,12 +9,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use ipc::protocol::Event;
 use proto::process::{LogStream, ProcessLogLine, ProcessOutputEvent};
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
-use crate::runtime::event_hub::EventHub;
+use super::{emit, ProcessEvents};
 
 const POLL: Duration = Duration::from_millis(250);
 const CHUNK: usize = 64 * 1024;
@@ -43,10 +42,15 @@ impl Tailer {
     }
 }
 
-pub fn spawn(path: PathBuf, from: u64, id: String, hub: Arc<EventHub>) -> Tailer {
+pub fn spawn(
+    path: PathBuf,
+    from: u64,
+    id: String,
+    events: Option<Arc<dyn ProcessEvents>>,
+) -> Tailer {
     let done = Arc::new(AtomicBool::new(false));
     let wake = Arc::new(Notify::new());
-    let handle = tokio::spawn(run(path, from, id, hub, done.clone(), wake.clone()));
+    let handle = tokio::spawn(run(path, from, id, events, done.clone(), wake.clone()));
     Tailer { done, wake, handle }
 }
 
@@ -54,7 +58,7 @@ async fn run(
     path: PathBuf,
     mut offset: u64,
     id: String,
-    hub: Arc<EventHub>,
+    events: Option<Arc<dyn ProcessEvents>>,
     done: Arc<AtomicBool>,
     wake: Arc<Notify>,
 ) {
@@ -73,11 +77,11 @@ async fn run(
                 line,
             });
             if batch.len() >= MAX_LINES_PER_EVENT {
-                hub.publish(&output_event(&id, std::mem::take(&mut batch)));
+                publish(events.as_ref(), &id, std::mem::take(&mut batch));
             }
         });
         if !batch.is_empty() {
-            hub.publish(&output_event(&id, batch));
+            publish(events.as_ref(), &id, batch);
         }
         if finishing {
             break;
@@ -89,15 +93,14 @@ async fn run(
     }
 }
 
-fn output_event(id: &str, lines: Vec<ProcessLogLine>) -> Event {
-    let event = ProcessOutputEvent {
-        id: id.to_string(),
-        lines,
-    };
-    Event {
-        topic: <ProcessOutputEvent as proto::Topic>::TOPIC.to_string(),
-        payload: serde_json::to_value(&event).unwrap_or_default(),
-    }
+fn publish(events: Option<&Arc<dyn ProcessEvents>>, id: &str, lines: Vec<ProcessLogLine>) {
+    emit(
+        events,
+        &ProcessOutputEvent {
+            id: id.to_string(),
+            lines,
+        },
+    );
 }
 
 fn drain(path: &Path, offset: &mut u64, pending: &mut Vec<u8>, mut emit: impl FnMut(String)) {

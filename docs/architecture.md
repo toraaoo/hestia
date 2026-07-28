@@ -38,7 +38,7 @@ proto   → wire contracts + domain types (serde)                    leaf
 ipc     → transport (unix socket / named pipe) + JSON envelope      leaf   → (tokio, libc)
 common  → logging (tracing) + app identity + path resolution        leaf
 client  → typed client SDK (Session + one facade per domain)       → proto, ipc, common
-engine  → config·cache·download·java·accounts·skins·minecraft·content → proto, common       (daemon-only)
+engine  → config·cache·download·java·accounts·skins·minecraft·content·process → proto, common  (daemon-only)
 cli     → bin hestia          (clap + ratatui presentation)        → client, common, proto
 daemon  → bin hestiad         (router, services, supervisor)       → engine, proto, ipc, common, client
 desktop → bin hestia-desktop  (Tauri v2 shell)                     → (tauri)                 (+ frontend/)
@@ -417,6 +417,29 @@ The subsystems behind the aggregate:
   contents into the store. Sync is **instance-only**: servers are
   deliberately decoupled from it. The managed content dirs are rejected as
   targets at the edge — see the decision note below.
+- **`process`** (`ProcessSupervisor`) — launched processes whose lifetime is
+  decoupled from the daemon's (own process group / job object, no
+  `kill_on_drop`, no pipes back), tracked with a restart policy. Each live
+  process has a record under `<data_home>/processes/<id>/` —
+  `{pid, start-time token, spec}` (`records.rs`, owner-only: the spec can carry
+  launch credentials) — and `recover()` re-adopts survivors at the next daemon
+  start, verifying the pid against the start-time token (`identity.rs`,
+  per-platform) so pid reuse is never mistaken for the old process. An adopted
+  process is not our child: exit is detected by polling and its exit code
+  reports `null`. Output lives on disk, not in pipes: `LogSource::File` points
+  at a log the process writes itself (Minecraft's `logs/latest.log`; a
+  `jvm.log` catches pre-log4j stderr), `LogSource::Capture` redirects into a
+  supervisor-owned `output.log` — either way `tail.rs` polls the file for
+  `process.output` events and `process.logs` reads its tail on demand, so log
+  history survives daemon restarts. Stops are polite: SIGTERM (the JVM saves and
+  exits), a hard kill only after a grace period — both addressed at the whole
+  tree. Cleanup is lifecycle-driven: a terminal state replaces the record with a
+  **tombstone** (`exit.json`) so the directory keeps its logs *and* says what it
+  is, removing the server/instance discards its process dir, a startup sweep
+  deletes only directories with neither marker, and retention prunes the oldest
+  tombstoned dirs. `task.rs` is the provisioning half: `run(Task, Job)` drives a
+  program to completion, relays what it narrates as progress and is cancelled
+  through the supervisor, so no engine flow spawns a bare child.
 - **`servers`** / **`instances`** (`Servers`, `Instances`) — the persistent
   stores, one directory per entry beside a JSON record (`servers/<id>/server.json`
   holding the resolved profile snapshot; the disk is the registry, as with
@@ -574,6 +597,18 @@ The subsystems behind the aggregate:
 > whose user agent does not identify its caller — so `common::app::user_agent`
 > now builds one identity for every outbound request rather than paper alone.
 
+> **A flavor states what it needs, before the user commits to it.** Spigot and
+> CraftBukkit are the first flavors that can be *unavailable on this machine*:
+> BuildTools drives git, and bootstraps its own only on Windows. Failing at
+> create would tell a user who has never heard of git that something went wrong
+> minutes in, so `Flavor` carries `requires` — the prerequisites resolved as
+> **missing** when the catalogue is built, each with a name the user would
+> recognise and where to get it. A front-end renders them beside the flavor
+> without knowing which flavor needs what; the refusal itself is
+> `ErrorInfo::MissingRequirement`, the same structured shape. The check is
+> `Engine`'s, not `Minecraft`'s: whether a tool is installed is a question about
+> this computer, and the catalogue stays a pure read of the providers.
+
 > **Spigot and CraftBukkit are compiled here, because no one may ship them.**
 > Mojang's takedown means neither jar legally exists as a download: SpigotMC
 > publishes **BuildTools**, which clones the four upstream repositories,
@@ -608,13 +643,14 @@ The subsystems behind the aggregate:
 > narrowed to a runtime the launcher can actually install so a mismatch fails
 > at resolution rather than at the Java step.
 >
-> **The cost is an external toolchain, stated up front.** BuildTools shells out
-> to git and a POSIX shell, and bootstraps its own PortableGit on Windows
-> alone — so the other platforms are checked *before* the create commits to
-> anything, and the error names the fix, since nothing in the launcher can
-> install git for the user. The build is one process, so it is a single
-> cancellation checkpoint polled while it runs; killing it leaves a partial
-> work tree that the next build repairs exactly as a failed one does.
+> **The build is a supervised workload, not a bare child.** It drives git,
+> maven and a decompiler JVM, so it runs through `ProcessSupervisor::run` like
+> a server does: its output is captured to a file (`hestia process logs
+> build-spigot-<version>` reads it live), a cancel reaches the whole tree, and a
+> build that outlives a daemon restart is re-adopted rather than orphaned. Its
+> id is derived from the game version, so two creates racing on one version —
+> or a create after a restart — join the build already running instead of
+> starting a second.
 
 > **What an entry takes is a property of its flavor, and the flavor says so.**
 > Two guards used to hard-code the answer: one refused anything but mods and
@@ -1176,9 +1212,10 @@ composes many fallible steps (accounts, minecraft, java, provisioning).
 
 ## `daemon` — hestiad
 
-The resident core: it owns the IPC endpoint, routes requests to handlers,
-supervises launched processes, and manages autostart. The only crate that links
-`engine`.
+The resident core: it owns the IPC endpoint, routes requests to handlers, and
+manages autostart. The only crate that links `engine` — including its process
+supervisor, which the daemon drives (`recover()` at boot, `stop_all_and_wait()`
+at shutdown) and reaches through `runtime.processes()`.
 
 - **`main.rs`** — bootstrap only: clap parsing (`serve`, the default, `ping`, or
   `stop` — a graceful self-stop that leaves supervised processes running, letting
@@ -1232,29 +1269,6 @@ supervises launched processes, and manages autostart. The only crate that links
       the clock), then prune its `scheduled` archives beyond
       `backup-retention`. A stopped server's world cannot change, so it is
       never re-archived on schedule.
-    - **`process/`** — `ProcessSupervisor`: launches processes whose lifetime
-      is decoupled from the daemon's (own process group, no `kill_on_drop`, no
-      pipes back to the daemon), tracks them, and applies a restart policy.
-      Emits `process.started` / `process.output` / `process.exit`. Each live
-      process has a record under `<data_home>/processes/<id>/` —
-      `{pid, start-time token, spec}` (`records.rs`, owner-only: the spec can
-      carry launch credentials) — and `recover()` re-adopts survivors at the
-      next daemon start, verifying the pid against the start-time token
-      (`identity.rs`, per-platform) so pid reuse is never mistaken for the old
-      process. An adopted process is not our child: exit is detected by
-      polling and its exit code reports `null`. Output lives on disk, not in
-      pipes: `LogSource::File` points at a log the process writes itself
-      (Minecraft's `logs/latest.log`; a `jvm.log` catches pre-log4j stderr),
-      `LogSource::Capture` redirects into a supervisor-owned `output.log` —
-      either way `tail.rs` polls the file for `process.output` events and
-      `process.logs` reads its tail on demand, so log history survives daemon
-      restarts. Stops are polite: SIGTERM (the JVM saves and exits), a hard
-      kill only after a grace period. Cleanup is lifecycle-driven: a terminal
-      state replaces the record with a **tombstone** (`exit.json`) so the
-      directory keeps its logs *and* says what it is, removing the
-      server/instance discards its process dir, a startup sweep deletes only
-      directories with neither marker, and retention prunes the oldest
-      tombstoned dirs — see the decision note below.
     - **`event_hub.rs`** — `EventHub` fans daemon events out to subscribed
       connections, filtered by job id, and unsubscribes them on disconnect.
 - **`services/`** — the single wire-in point, one registrar per domain
@@ -1415,6 +1429,27 @@ supervises launched processes, and manages autostart. The only crate that links
 > from the done topic), surfaces as `IpcError::Cancelled` / `JobCancelled` rather
 > than a daemon error, and is logged at info. A front-end that rendered
 > cancellation as a failure would be blaming the user for what they asked for.
+
+> **Supervision is engine state, and one stop reaches the whole tree.** The
+> supervisor lived in the daemon, which made two things impossible. Its
+> directory is `<data_home>/processes/`, engine-owned like every other registry
+> here, but `set_data_home()` could not repoint it — nine subsystems moved on a
+> `config set home` and the supervisor kept writing to the old one. And every
+> engine flow that shells out (NeoForge's processor chain, the
+> `server.properties` schema run, a Spigot build) had to spawn a bare child,
+> because it could not reach the supervisor at all — three ad-hoc spawns with no
+> containment, no records and no adoption. Moving it into the engine settles
+> both: the only thing it could not know is where its events go, and that is a
+> one-method [`ProcessEvents`] sink the daemon supplies at boot, so the engine
+> still does not know a socket exists.
+>
+> That merge exposed the bug the split had hidden. The supervisor started every
+> process as its own group leader and then signalled the *pid*, so stopping a
+> workload orphaned whatever it had spawned. Termination is now the tree —
+> the negated pid on POSIX, a kill-on-close job object on Windows, since it has
+> no group that cascades — for servers and game sessions as much as for builds.
+> The regression test is `crates/engine/tests/process.rs`: it fails against the
+> old single-pid kill.
 
 > **Workloads outlive the daemon by design.** The supervisor originally spawned
 > children with `kill_on_drop` and piped output, which killed every server and
@@ -1884,7 +1919,7 @@ Adoptium); Microsoft account sign-in (device-code and sisu) with token rotation;
 skin and cape management for signed-in accounts (a preserved local skin
 library, the vanilla defaults, upload/equip/reset and cape selection over the
 Mojang profile API — daemon and desktop layers only, no CLI);
-the daemon's process supervisor; the Minecraft provider layer (flavors, versions,
+the process supervisor; the Minecraft provider layer (flavors, versions,
 and profile resolution — vanilla, fabric and neoforge on both sides, paper,
 folia, spigot and bukkit for servers only, the last two compiled locally with
 SpigotMC's BuildTools); server

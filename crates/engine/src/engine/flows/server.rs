@@ -62,12 +62,13 @@ impl Engine {
                         minecraft_jar: &data.join(&record.profile.primary.filename),
                         java: &java,
                         cache: Some(&self.cache),
+                        processes: self.processes(),
                     },
                     on_progress,
                 )
                 .await?;
             self.servers
-                .derive_properties_schema(&record, &java, on_progress)
+                .derive_properties_schema(&record, &java, self.processes(), on_progress)
                 .await;
             for entry in &spec.config {
                 self.servers
@@ -151,12 +152,13 @@ impl Engine {
                     minecraft_jar: &data.join(&record.profile.primary.filename),
                     java: &java,
                     cache: Some(&self.cache),
+                    processes: self.processes(),
                 },
                 on_progress,
             )
             .await?;
         self.servers
-            .derive_properties_schema(&record, &java, on_progress)
+            .derive_properties_schema(&record, &java, self.processes(), on_progress)
             .await;
         let warnings = self.server_warnings(&record);
         Ok((record, warnings))

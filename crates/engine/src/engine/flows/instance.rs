@@ -213,6 +213,7 @@ impl Engine {
                     minecraft_jar: &client_jar,
                     java: &java,
                     cache: Some(&self.cache),
+                    processes: self.processes(),
                 },
                 on_progress,
             )

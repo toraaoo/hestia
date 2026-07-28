@@ -237,8 +237,8 @@ pub fn pick_flavor(flavors: Vec<Flavor>, provided: Option<String>) -> Result<Str
         bail!("unknown flavor '{id}' (available: {})", ids.join(", "));
     }
     let labels: Vec<String> = flavors.iter().map(flavor_label).collect();
-    let summaries: Vec<String> = flavors.iter().map(|f| f.summary.clone()).collect();
-    let index = ui::select_detailed("select a flavor", &labels, &summaries)?;
+    let details: Vec<String> = flavors.iter().map(flavor_detail).collect();
+    let index = ui::select_detailed("select a flavor", &labels, &details)?;
     Ok(flavors[index].id.clone())
 }
 
@@ -299,7 +299,7 @@ pub fn show_flavors(flavors: &[Flavor]) -> Result<()> {
                 f.id.clone(),
                 f.name.clone(),
                 accepts_label(f),
-                f.summary.clone(),
+                flavor_detail(f),
             ]
         })
         .collect();
@@ -314,6 +314,20 @@ pub fn show_flavors(flavors: &[Flavor]) -> Result<()> {
 /// row's second line.
 pub fn flavor_label(flavor: &Flavor) -> String {
     format!("{} ({})", flavor.name, accepts_label(flavor))
+}
+
+/// The summary, prefixed with anything this machine is missing — a flavor that
+/// cannot be used yet has to say so before it is picked, not after.
+pub fn flavor_detail(flavor: &Flavor) -> String {
+    let missing: Vec<String> = flavor
+        .requires
+        .iter()
+        .map(|r| format!("needs {} ({})", r.name, r.url))
+        .collect();
+    match missing.is_empty() {
+        true => flavor.summary.clone(),
+        false => format!("{} — {}", missing.join(", "), flavor.summary),
+    }
 }
 
 fn accepts_label(flavor: &Flavor) -> String {

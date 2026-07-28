@@ -16,7 +16,8 @@ use super::provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 const ID: &str = "fabric";
 const NAME: &str = "Fabric";
-const SUMMARY: &str = "Lightweight mod loader, quick to support each new game version.";
+const SUMMARY: &str =
+    "A light, fast-moving mod loader. Usually the first to support a new Minecraft version.";
 
 async fn game_versions() -> Result<Vec<GameVersion>> {
     Ok(fabric::game_versions()

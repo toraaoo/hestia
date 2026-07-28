@@ -4,6 +4,7 @@
 
 mod backup;
 mod content;
+mod flavors;
 mod instance;
 mod modpack;
 

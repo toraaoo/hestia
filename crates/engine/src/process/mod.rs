@@ -5,19 +5,22 @@
 //! token, so pid reuse cannot be mistaken for the old process). A launched
 //! process runs as the same user the daemon runs as, so this is no more
 //! privileged than the user spawning it directly.
+//!
+//! The engine does not know a socket exists, so where lifecycle events go
+//! arrives from outside through [`ProcessEvents`].
 
 mod identity;
 mod records;
 mod tail;
+mod task;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use ipc::protocol::Event;
 use proto::process::{
     LogSource, LogStream, ProcessExitEvent, ProcessInfo, ProcessLogLine, ProcessSpec,
     ProcessStartedEvent, ProcessState, RestartPolicy,
@@ -25,7 +28,6 @@ use proto::process::{
 use tokio::process::{Child, Command};
 use tokio::sync::Notify;
 
-use super::event_hub::EventHub;
 use records::ProcessRecord;
 
 /// Lines `process.logs` returns when no explicit tail is given.
@@ -49,10 +51,18 @@ fn now_unix() -> i64 {
         .unwrap_or(0)
 }
 
-fn topic_event<E: proto::Topic + serde::Serialize>(event: &E) -> Event {
-    Event {
-        topic: E::TOPIC.to_string(),
-        payload: serde_json::to_value(event).unwrap_or_default(),
+/// Where the supervisor's lifecycle events go. One method, since the topic name
+/// comes from `proto` and the sink never needs to know the payload shapes.
+pub trait ProcessEvents: Send + Sync {
+    fn publish(&self, topic: &str, payload: serde_json::Value);
+}
+
+pub(crate) fn emit<E: proto::Topic + serde::Serialize>(
+    events: Option<&Arc<dyn ProcessEvents>>,
+    event: &E,
+) {
+    if let Some(events) = events {
+        events.publish(E::TOPIC, serde_json::to_value(event).unwrap_or_default());
     }
 }
 
@@ -93,33 +103,57 @@ impl Entry {
 }
 
 enum Watched {
-    Owned(Box<Child>),
+    Owned {
+        child: Box<Child>,
+        tree: Option<identity::Tree>,
+    },
     /// Recovered from a record: not our child, so the exit code is
     /// unobservable and exit is detected by polling the identity.
-    Adopted {
-        pid: u32,
-        token: u64,
-    },
+    Adopted { pid: u32, token: u64 },
 }
+
+pub use task::{silent, Outcome, Task};
 
 /// Notified once when a supervised process terminally exits, with its final info.
 pub type ExitObserver = Arc<dyn Fn(&ProcessInfo) + Send + Sync>;
 
 pub struct ProcessSupervisor {
-    hub: Arc<EventHub>,
-    dir: PathBuf,
+    events: OnceLock<Arc<dyn ProcessEvents>>,
+    on_exit: OnceLock<ExitObserver>,
+    dir: Mutex<PathBuf>,
     table: Mutex<HashMap<String, Arc<Entry>>>,
-    on_exit: Option<ExitObserver>,
 }
 
 impl ProcessSupervisor {
-    pub fn new(hub: Arc<EventHub>, dir: PathBuf, on_exit: Option<ExitObserver>) -> Self {
+    pub fn new(dir: PathBuf) -> Self {
         ProcessSupervisor {
-            hub,
-            dir,
+            events: OnceLock::new(),
+            on_exit: OnceLock::new(),
+            dir: Mutex::new(dir),
             table: Mutex::new(HashMap::new()),
-            on_exit,
         }
+    }
+
+    /// Called once at boot. Before it, a process still runs and is still
+    /// recorded; it simply publishes nowhere.
+    pub fn attach(&self, events: Arc<dyn ProcessEvents>, on_exit: Option<ExitObserver>) {
+        let _ = self.events.set(events);
+        if let Some(on_exit) = on_exit {
+            let _ = self.on_exit.set(on_exit);
+        }
+    }
+
+    /// Live processes keep the absolute paths they were started with.
+    pub fn reload(&self, dir: PathBuf) {
+        *self.dir.lock().unwrap() = dir;
+    }
+
+    fn dir(&self) -> PathBuf {
+        self.dir.lock().unwrap().clone()
+    }
+
+    fn events(&self) -> Option<&Arc<dyn ProcessEvents>> {
+        self.events.get()
     }
 
     pub async fn start(&self, mut spec: ProcessSpec) -> Result<ProcessInfo, StartError> {
@@ -130,14 +164,18 @@ impl ProcessSupervisor {
             spec.id = generate_id();
         }
         if !is_safe_id(&spec.id) {
-            return Err(StartError::InvalidId);
+            return Err(StartError::InvalidId(spec.id.clone()));
         }
 
-        let proc_dir = self.dir.join(&spec.id);
-        let io = prepare_stdio(&spec, &proc_dir).map_err(StartError::Spawn)?;
+        let proc_dir = self.dir().join(&spec.id);
+        let failed = |source| StartError::Spawn {
+            program: spec.program.clone(),
+            source,
+        };
+        let io = prepare_stdio(&spec, &proc_dir).map_err(failed)?;
         let child = build_command(&spec, io.out, io.err)
             .spawn()
-            .map_err(StartError::Spawn)?;
+            .map_err(failed)?;
         let pid = child.id().unwrap_or(0);
         let started_unix = now_unix();
 
@@ -174,19 +212,25 @@ impl ProcessSupervisor {
             cwd = spec.cwd.as_ref().map(|p| p.display().to_string()),
             "process started"
         );
-        self.hub.publish(&topic_event(&ProcessStartedEvent {
-            id: spec.id.clone(),
-            pid,
-        }));
+        emit(
+            self.events(),
+            &ProcessStartedEvent {
+                id: spec.id.clone(),
+                pid,
+            },
+        );
 
         tokio::spawn(supervise(
             entry,
-            Watched::Owned(Box::new(child)),
+            Watched::Owned {
+                tree: identity::Tree::hold(&child),
+                child: Box::new(child),
+            },
             spec,
-            self.hub.clone(),
+            self.events().cloned(),
             proc_dir,
             io.tail_from,
-            self.on_exit.clone(),
+            self.on_exit.get().cloned(),
         ));
         Ok(snapshot)
     }
@@ -194,9 +238,9 @@ impl ProcessSupervisor {
     /// Called once at daemon start, before the endpoint accepts requests.
     pub fn recover(&self) {
         let mut recorded = HashSet::new();
-        for record in records::scan(&self.dir) {
+        for record in records::scan(&self.dir()) {
             recorded.insert(record.id.clone());
-            let proc_dir = self.dir.join(&record.id);
+            let proc_dir = self.dir().join(&record.id);
             let (log_path, err_path) = log_paths(&record.spec, &proc_dir);
             let alive = identity::is_same(record.pid, record.pid_started);
             let entry = Arc::new(Entry {
@@ -225,10 +269,13 @@ impl ProcessSupervisor {
 
             if alive {
                 tracing::info!(id = %record.id, pid = record.pid, "re-adopted process");
-                self.hub.publish(&topic_event(&ProcessStartedEvent {
-                    id: record.id.clone(),
-                    pid: record.pid,
-                }));
+                emit(
+                    self.events(),
+                    &ProcessStartedEvent {
+                        id: record.id.clone(),
+                        pid: record.pid,
+                    },
+                );
                 let tail_from = std::fs::metadata(&entry.log_path)
                     .map(|m| m.len())
                     .unwrap_or(0);
@@ -239,10 +286,10 @@ impl ProcessSupervisor {
                         token: record.pid_started,
                     },
                     record.spec,
-                    self.hub.clone(),
+                    self.events().cloned(),
                     proc_dir,
                     tail_from,
-                    self.on_exit.clone(),
+                    self.on_exit.get().cloned(),
                 ));
             } else {
                 tracing::info!(id = %record.id, pid = record.pid, "process exited while unsupervised");
@@ -265,12 +312,15 @@ impl ProcessSupervisor {
                     },
                 );
                 self.table.lock().unwrap().remove(&record.id);
-                self.hub.publish(&topic_event(&ProcessExitEvent {
-                    id: record.id,
-                    state: ProcessState::Exited,
-                    exit_code: None,
-                    success: false,
-                }));
+                emit(
+                    self.events(),
+                    &ProcessExitEvent {
+                        id: record.id,
+                        state: ProcessState::Exited,
+                        exit_code: None,
+                        success: false,
+                    },
+                );
             }
         }
         self.sweep(&recorded);
@@ -282,7 +332,7 @@ impl ProcessSupervisor {
     /// what eventually reclaims those, by age, so the post-mortem guarantee and
     /// the cleanup are no longer in conflict.
     fn sweep(&self, keep: &HashSet<String>) {
-        let Ok(entries) = std::fs::read_dir(&self.dir) else {
+        let Ok(entries) = std::fs::read_dir(self.dir()) else {
             return;
         };
         for entry in entries.flatten() {
@@ -300,10 +350,10 @@ impl ProcessSupervisor {
     /// keeping them safe: a launcher that never forgets a session would grow a
     /// log directory without bound.
     fn prune_tombstones(&self) {
-        let tombstones = records::scan_tombstones(&self.dir);
+        let tombstones = records::scan_tombstones(&self.dir());
         for stale in tombstones.iter().skip(TOMBSTONE_KEEP) {
             tracing::debug!(id = %stale.id, "pruning a finished process directory");
-            let _ = std::fs::remove_dir_all(self.dir.join(&stale.id));
+            let _ = std::fs::remove_dir_all(self.dir().join(&stale.id));
         }
     }
 
@@ -359,7 +409,7 @@ impl ProcessSupervisor {
         table.remove(id);
         drop(table);
         tracing::debug!(id, "discarding process state");
-        let _ = std::fs::remove_dir_all(self.dir.join(id));
+        let _ = std::fs::remove_dir_all(self.dir().join(id));
         true
     }
 
@@ -371,7 +421,7 @@ impl ProcessSupervisor {
         let live = self.table.lock().unwrap();
         let mut all: Vec<ProcessInfo> = live.values().map(|e| e.snapshot()).collect();
         all.extend(
-            records::scan_tombstones(&self.dir)
+            records::scan_tombstones(&self.dir())
                 .into_iter()
                 .filter(|t| !live.contains_key(&t.id))
                 .map(finished_info),
@@ -383,7 +433,7 @@ impl ProcessSupervisor {
         if let Some(entry) = self.table.lock().unwrap().get(id) {
             return Some(entry.snapshot());
         }
-        records::load_tombstone(&self.dir.join(id)).map(finished_info)
+        records::load_tombstone(&self.dir().join(id)).map(finished_info)
     }
 
     /// A process's captured output — including a finished one's, which is the
@@ -394,7 +444,7 @@ impl ProcessSupervisor {
         let (log_path, err_path) = match live {
             Some(entry) => (entry.log_path.clone(), entry.err_path.clone()),
             None => {
-                let tombstone = records::load_tombstone(&self.dir.join(id))?;
+                let tombstone = records::load_tombstone(&self.dir().join(id))?;
                 (tombstone.log_path, tombstone.err_path)
             }
         };
@@ -417,11 +467,18 @@ impl ProcessSupervisor {
 }
 
 /// A typed launch failure, mapped to a protocol error code at the service edge.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum StartError {
+    #[error("a process needs a program to run")]
     EmptyProgram,
-    InvalidId,
-    Spawn(std::io::Error),
+    #[error("'{0}' is not a usable process id")]
+    InvalidId(String),
+    #[error("cannot spawn {program}: {source}")]
+    Spawn {
+        program: String,
+        #[source]
+        source: std::io::Error,
+    },
 }
 
 struct PreparedIo {
@@ -513,19 +570,19 @@ async fn supervise(
     entry: Arc<Entry>,
     mut watched: Watched,
     spec: ProcessSpec,
-    hub: Arc<EventHub>,
+    events: Option<Arc<dyn ProcessEvents>>,
     proc_dir: PathBuf,
     mut tail_from: u64,
     on_exit: Option<ExitObserver>,
 ) {
     let mut attempts = 0u32;
     loop {
-        let owned = matches!(watched, Watched::Owned(_));
+        let owned = matches!(watched, Watched::Owned { .. });
         let tailer = tail::spawn(
             entry.log_path.clone(),
             tail_from,
             spec.id.clone(),
-            hub.clone(),
+            events.clone(),
         );
         let code = wait_or_stop(&entry, &mut watched, &spec.id).await;
         tailer.finish().await;
@@ -547,12 +604,15 @@ async fn supervise(
         } else {
             tracing::warn!(id = %spec.id, ?state, exit_code = code, "process exited with failure");
         }
-        hub.publish(&topic_event(&ProcessExitEvent {
-            id: spec.id.clone(),
-            state,
-            exit_code: code,
-            success,
-        }));
+        emit(
+            events.as_ref(),
+            &ProcessExitEvent {
+                id: spec.id.clone(),
+                state,
+                exit_code: code,
+                success,
+            },
+        );
 
         let should_restart = owned
             && !killed
@@ -612,11 +672,17 @@ async fn supervise(
                     &ProcessRecord::for_spawn(&spec, pid, started_unix),
                 );
                 tracing::info!(id = %spec.id, pid, "process restarted");
-                hub.publish(&topic_event(&ProcessStartedEvent {
-                    id: spec.id.clone(),
-                    pid,
-                }));
-                watched = Watched::Owned(Box::new(next));
+                emit(
+                    events.as_ref(),
+                    &ProcessStartedEvent {
+                        id: spec.id.clone(),
+                        pid,
+                    },
+                );
+                watched = Watched::Owned {
+                    tree: identity::Tree::hold(&next),
+                    child: Box::new(next),
+                };
                 tail_from = from;
             }
             Err(e) => {
@@ -630,13 +696,16 @@ async fn supervise(
 
 async fn wait_or_stop(entry: &Entry, watched: &mut Watched, id: &str) -> Option<i32> {
     match watched {
-        Watched::Owned(child) => {
+        Watched::Owned { child, tree } => {
             let pid = child.id().unwrap_or(0);
             tokio::select! {
                 status = child.wait() => status.ok().and_then(|s| s.code()),
                 _ = entry.stop_notify.notified() => {
                     tracing::debug!(id, pid, "requesting graceful stop");
-                    identity::request_stop(pid);
+                    match tree.as_ref() {
+                        Some(tree) => tree.stop(),
+                        None => identity::request_stop(pid),
+                    }
                     let graceful = tokio::select! {
                         status = child.wait() => Some(status),
                         _ = tokio::time::sleep(STOP_GRACE) => None,
@@ -645,7 +714,10 @@ async fn wait_or_stop(entry: &Entry, watched: &mut Watched, id: &str) -> Option<
                         Some(status) => status.ok().and_then(|s| s.code()),
                         None => {
                             tracing::warn!(id, pid, "grace period expired; killing process");
-                            let _ = child.start_kill();
+                            match tree.as_ref() {
+                                Some(tree) => tree.kill(),
+                                None => identity::kill(pid),
+                            }
                             child.wait().await.ok().and_then(|s| s.code())
                         }
                     }

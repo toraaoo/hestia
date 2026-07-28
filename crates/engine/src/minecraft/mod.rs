@@ -19,7 +19,7 @@ pub(crate) mod world;
 use anyhow::{Context, Result};
 use proto::minecraft::{Flavor, GameVersion, InstanceProfile, ServerProfile};
 
-pub use provider::{accepted_kinds, InstallRequest, Side};
+pub use provider::{accepted_kinds, unmet, InstallRequest, Prerequisite, Side};
 use provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 /// The Java majors Minecraft launch profiles ever require: 8 (pre-1.17),
@@ -70,6 +70,17 @@ impl Minecraft {
             .iter()
             .map(|p| flavor(p.id(), p.name(), p.summary(), Side::Client, p.loads()))
             .collect()
+    }
+
+    /// What a flavor needs on the machine. Whether it is *there* is a question
+    /// about this computer, not about the catalogue — `Engine::server_flavors`
+    /// answers that.
+    pub fn server_requires(&self, flavor: &str) -> &'static [Prerequisite] {
+        self.server(flavor).map(|p| p.requires()).unwrap_or(&[])
+    }
+
+    pub fn instance_requires(&self, flavor: &str) -> &'static [Prerequisite] {
+        self.instance(flavor).map(|p| p.requires()).unwrap_or(&[])
     }
 
     /// The content kind a server flavor's own loader consumes. An unregistered
@@ -179,5 +190,6 @@ fn flavor(id: &str, name: &str, summary: &str, side: Side, loads: Loads) -> Flav
         name: name.to_string(),
         summary: summary.to_string(),
         accepts: accepted_kinds(side, loads),
+        requires: Vec::new(),
     }
 }

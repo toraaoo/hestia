@@ -137,6 +137,20 @@ export function FlavorOption({
       {summary && (
         <span className="text-xs text-muted-foreground">{summary}</span>
       )}
+      {(flavor.requires ?? []).map((requirement) => (
+        <span key={requirement.name} className="text-xs text-amber">
+          {m['flavor.requires']({ name: requirement.name })}{' '}
+          <a
+            href={requirement.url}
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {requirement.url}
+          </a>
+        </span>
+      ))}
     </button>
   );
 }

@@ -2,6 +2,10 @@
 //! a start-time value that is stable for one process and different for any
 //! later process reusing its pid — the guard that re-adoption never grabs a
 //! stranger.
+//!
+//! Termination addresses the whole tree: a supervised workload is routinely not
+//! a leaf, so signalling the pid alone orphans its children. POSIX uses the
+//! process group; Windows uses the job object held at the spawn site.
 
 #[cfg(target_os = "linux")]
 pub fn identify(pid: u32) -> Option<u64> {
@@ -86,21 +90,46 @@ pub fn is_same(pid: u32, token: u64) -> bool {
     token != 0 && identify(pid) == Some(token)
 }
 
-// pid 0 would address the daemon's own process group.
+/// A spawned process and everything under it, addressed as one unit.
 #[cfg(unix)]
-pub fn request_stop(pid: u32) {
-    if pid != 0 {
-        unsafe {
-            libc::kill(pid as libc::pid_t, libc::SIGTERM);
-        }
+pub struct Tree(u32);
+
+#[cfg(unix)]
+impl Tree {
+    pub fn hold(child: &tokio::process::Child) -> Option<Tree> {
+        child.id().map(Tree)
+    }
+
+    pub fn stop(&self) {
+        signal_tree(self.0, libc::SIGTERM);
+    }
+
+    pub fn kill(&self) {
+        signal_tree(self.0, libc::SIGKILL);
     }
 }
 
 #[cfg(unix)]
+pub fn request_stop(pid: u32) {
+    signal_tree(pid, libc::SIGTERM);
+}
+
+#[cfg(unix)]
 pub fn kill(pid: u32) {
-    if pid != 0 {
-        unsafe {
-            libc::kill(pid as libc::pid_t, libc::SIGKILL);
+    signal_tree(pid, libc::SIGKILL);
+}
+
+/// Signal the group this process leads, falling back to the bare pid when it
+/// leads none. pid 0 is skipped: negated it addresses every process on the
+/// system, un-negated the daemon's own group.
+#[cfg(unix)]
+fn signal_tree(pid: u32, signal: libc::c_int) {
+    if pid == 0 {
+        return;
+    }
+    unsafe {
+        if libc::kill(-(pid as libc::pid_t), signal) != 0 {
+            libc::kill(pid as libc::pid_t, signal);
         }
     }
 }
@@ -113,6 +142,69 @@ pub fn request_stop(pid: u32) {
 #[cfg(windows)]
 pub fn kill(pid: u32) {
     terminate(pid);
+}
+
+/// Windows has no process group that cascades a kill, so the tree is a job
+/// object: its members die with the handle.
+#[cfg(windows)]
+pub struct Tree(windows_sys::Win32::Foundation::HANDLE);
+
+#[cfg(windows)]
+unsafe impl Send for Tree {}
+#[cfg(windows)]
+unsafe impl Sync for Tree {}
+
+#[cfg(windows)]
+impl Tree {
+    pub fn stop(&self) {
+        self.kill();
+    }
+
+    pub fn hold(child: &tokio::process::Child) -> Option<Tree> {
+        use windows_sys::Win32::Foundation::HANDLE;
+        use windows_sys::Win32::System::JobObjects::{
+            AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+            SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        };
+        let process = child.raw_handle()?;
+        unsafe {
+            let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+            if job.is_null() {
+                return None;
+            }
+            let tree = Tree(job);
+            let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            let set = SetInformationJobObject(
+                tree.0,
+                JobObjectExtendedLimitInformation,
+                std::ptr::from_mut(&mut limits).cast(),
+                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            );
+            if set == 0 || AssignProcessToJobObject(tree.0, process as HANDLE) == 0 {
+                return None;
+            }
+            Some(tree)
+        }
+    }
+
+    pub fn kill(&self) {
+        use windows_sys::Win32::System::JobObjects::TerminateJobObject;
+        unsafe {
+            TerminateJobObject(self.0, 1);
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for Tree {
+    fn drop(&mut self) {
+        use windows_sys::Win32::Foundation::CloseHandle;
+        unsafe {
+            CloseHandle(self.0);
+        }
+    }
 }
 
 #[cfg(windows)]

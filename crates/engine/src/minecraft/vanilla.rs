@@ -10,7 +10,7 @@ use super::provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 const ID: &str = "vanilla";
 const NAME: &str = "Vanilla";
-const SUMMARY: &str = "Mojang's game, unmodified. Takes datapacks and nothing else.";
+const SUMMARY: &str = "Mojang's game, unchanged. Takes datapacks only — no mods or plugins.";
 
 pub struct VanillaServer;
 

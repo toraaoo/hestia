@@ -4,7 +4,6 @@
 mod event_hub;
 mod managers;
 mod metrics;
-mod process;
 pub mod router;
 mod scheduler;
 
@@ -21,6 +20,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Notify;
 
 pub use engine::error_info as engine_error;
+pub use engine::{ExitObserver, ProcessSupervisor, StartError};
 pub use event_hub::EventHub;
 pub use managers::{
     BackupJob, BackupManager, Cancellations, ContentJob, ContentManager, DownloadManager,
@@ -28,7 +28,6 @@ pub use managers::{
     ServerUpdateManager,
 };
 pub use metrics::spawn_metrics_sampler;
-pub use process::{ExitObserver, ProcessSupervisor, StartError};
 pub use router::{error_response, Channels, Router};
 pub use scheduler::spawn_backup_scheduler;
 
@@ -132,11 +131,8 @@ impl Runtime {
                 tracing::warn!(instance = %instance_id, error = %e, "failed to record playtime");
             }
         });
-        let processes = Arc::new(ProcessSupervisor::new(
-            hub.clone(),
-            engine.data_home().join("processes"),
-            Some(on_exit),
-        ));
+        let processes = engine.processes().clone();
+        processes.attach(hub.clone(), Some(on_exit));
         let server_creates =
             ServerCreateManager::new(engine.clone(), hub.clone(), cancellations.clone());
         let server_updates =

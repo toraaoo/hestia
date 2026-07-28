@@ -249,13 +249,14 @@
   "hard": "Difícil"
  },
  "flavor": {
-  "vanilla_summary": "O jogo da Mojang, sem modificações.",
-  "fabric_summary": "Loader leve para mods, pacotes de recursos e datapacks.",
-  "neoforge_summary": "Loader de mods para modpacks grandes. A primeira execução monta o jar do jogo, então leva alguns minutos.",
-  "paper_summary": "Servidor de alto desempenho que roda plugins do Bukkit.",
-  "folia_summary": "Paper com multithreading regionalizado, para mundos muito grandes. Apenas plugins compatíveis com Folia funcionam.",
-  "spigot_summary": "Bukkit com patches de desempenho e o maior ecossistema de plugins. Compilado aqui na criação, o que leva vários minutos e exige o git instalado.",
-  "bukkit_summary": "O servidor de plugins original, sem os patches do Spigot. Compilado aqui na criação, o que leva vários minutos e exige o git instalado."
+  "vanilla_summary": "O jogo da Mojang, sem alterações. Aceita apenas datapacks — nada de mods ou plugins.",
+  "fabric_summary": "Um loader de mods leve e ágil. Costuma ser o primeiro a suportar uma nova versão do Minecraft.",
+  "neoforge_summary": "Loader de mods para modpacks grandes e cheios de conteúdo. A primeira execução prepara os arquivos do jogo, então leva alguns minutos.",
+  "paper_summary": "Um servidor mais rápido que roda plugins do Bukkit, ajustado pela equipe do Paper para cada versão.",
+  "folia_summary": "Paper distribuído entre os núcleos da CPU, para mundos muito grandes. Só funcionam plugins feitos para o Folia.",
+  "spigot_summary": "O servidor de plugins clássico, com a maior biblioteca de plugins. Ninguém pode distribuí-lo pronto, então o Hestia o compila aqui na primeira vez — reserve alguns minutos.",
+  "bukkit_summary": "O servidor de plugins em que o Spigot se baseia, sem as melhorias dele. Escolha o Spigot a menos que precise exatamente deste.",
+  "requires": "Precisa do {name} instalado neste computador:"
  },
  "phase": {
   "resolving_profile": "Resolvendo perfil",

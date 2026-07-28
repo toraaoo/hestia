@@ -27,7 +27,7 @@ use crate::download::Downloader;
 const ID: &str = "neoforge";
 const NAME: &str = "NeoForge";
 const SUMMARY: &str =
-    "Mod loader for large, content-heavy modpacks. Its game jar is built here, so a first launch takes a few minutes.";
+    "Mod loader for big, content-heavy modpacks. The first launch prepares the game files, so it takes a few minutes.";
 
 /// The game versions NeoForge builds exist for, newest first and typed by
 /// Mojang's manifest — the same ground truth every other flavor is ordered by.
@@ -150,6 +150,7 @@ async fn run_install(
             minecraft_jar: request.minecraft_jar,
             side,
             java: request.java,
+            processes: request.processes,
         },
         on_progress,
     )

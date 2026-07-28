@@ -8,10 +8,11 @@ use std::path::Path;
 use anyhow::Result;
 use async_trait::async_trait;
 use proto::content::ContentKind;
-use proto::minecraft::{GameVersion, InstanceProfile, ServerProfile};
+use proto::minecraft::{GameVersion, InstanceProfile, Requirement, ServerProfile};
 
 use crate::cache::Cache;
 use crate::minecraft::materialize::OnProgress;
+use crate::process::ProcessSupervisor;
 
 /// A resolution request: a game version and, for modloaders, an optional pinned
 /// loader version (the newest stable loader is chosen when absent).
@@ -20,28 +21,22 @@ pub struct ResolveRequest {
     pub loader_version: Option<String>,
 }
 
-/// What a flavor needs to build whatever its profile cannot simply name.
-///
-/// Most flavors need nothing: a profile is a list of downloads, and the
-/// materialize pass fetches it. NeoForge is the exception — the jar its loader
-/// runs does not exist anywhere to download and is produced locally from the
-/// vanilla one — as are Bukkit and Spigot, which no one may redistribute at
-/// all. So the flavor gets a hook rather than the launch flows growing a branch
-/// on a flavor name.
+/// What a flavor needs to build whatever its profile cannot simply name — the
+/// patched jar a NeoForge loader runs, or a Spigot server nobody may
+/// redistribute. Given to [`ServerProvider::install`].
 pub struct InstallRequest<'a> {
     pub game_version: &'a str,
     pub loader_version: Option<&'a str>,
-    /// The root the install writes under — `meta/` for a client (whose
-    /// `libraries/` is the shared root) and the server's own data directory.
+    /// Where this entry's install writes: `meta/` for a client, the server's
+    /// own data directory otherwise.
     pub root: &'a Path,
-    /// The shared `meta/` root, for work that belongs to no single entry: a
-    /// build every entry on that version can reuse. Same path as `root` for a
-    /// client, which already installs there.
+    /// The shared `meta/` root, for work no single entry owns.
     pub meta: &'a Path,
     /// The vanilla jar for this side, already materialized.
     pub minecraft_jar: &'a Path,
     pub java: &'a Path,
     pub cache: Option<&'a Cache>,
+    pub processes: &'a ProcessSupervisor,
 }
 
 /// The third-party content a flavor's own loader consumes: mods for a
@@ -75,6 +70,53 @@ pub fn accepted_kinds(side: Side, loads: Loads) -> Vec<ContentKind> {
     kinds
 }
 
+/// A tool a flavor needs on the machine that Hestia cannot install itself.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Prerequisite {
+    Git,
+}
+
+impl Prerequisite {
+    pub fn name(self) -> &'static str {
+        match self {
+            Prerequisite::Git => "Git",
+        }
+    }
+
+    pub fn url(self) -> &'static str {
+        match self {
+            Prerequisite::Git => "https://git-scm.com/downloads",
+        }
+    }
+
+    pub async fn installed(self) -> bool {
+        tokio::process::Command::new(match self {
+            Prerequisite::Git => "git",
+        })
+        .arg("--version")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .await
+        .is_ok_and(|status| status.success())
+    }
+}
+
+/// Which of `required` are not on this machine, in the shape the wire carries.
+pub async fn unmet(required: &[Prerequisite]) -> Vec<Requirement> {
+    let mut missing = Vec::new();
+    for prerequisite in required {
+        if !prerequisite.installed().await {
+            missing.push(Requirement {
+                name: prerequisite.name().to_string(),
+                url: prerequisite.url().to_string(),
+            });
+        }
+    }
+    missing
+}
+
 #[async_trait]
 pub trait ServerProvider: Send + Sync {
     fn id(&self) -> &'static str;
@@ -84,6 +126,11 @@ pub trait ServerProvider: Send + Sync {
     /// front-end, so a new flavor needs no front-end change to explain itself.
     fn summary(&self) -> &'static str;
     fn loads(&self) -> Loads;
+    /// Tools this flavor needs on the machine; none for all but a flavor that
+    /// builds its own artifacts.
+    fn requires(&self) -> &'static [Prerequisite] {
+        &[]
+    }
     async fn versions(&self) -> Result<Vec<GameVersion>>;
     async fn resolve(&self, request: &ResolveRequest) -> Result<ServerProfile>;
     /// The loader builds available for a game version, newest first. A flavor
@@ -105,6 +152,11 @@ pub trait InstanceProvider: Send + Sync {
     /// See [`ServerProvider::summary`].
     fn summary(&self) -> &'static str;
     fn loads(&self) -> Loads;
+    /// Tools this flavor needs on the machine; none for all but a flavor that
+    /// builds its own artifacts.
+    fn requires(&self) -> &'static [Prerequisite] {
+        &[]
+    }
     async fn versions(&self) -> Result<Vec<GameVersion>>;
     async fn resolve(&self, request: &ResolveRequest) -> Result<InstanceProfile>;
     /// The loader builds available for a game version, newest first. A flavor

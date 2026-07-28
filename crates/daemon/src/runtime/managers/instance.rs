@@ -191,12 +191,12 @@ async fn launch(
                 warnings: prepared.warnings,
             })
         }
-        Err(StartError::EmptyProgram | StartError::InvalidId) => {
+        Err(StartError::EmptyProgram | StartError::InvalidId(_)) => {
             Err(LaunchFailure::Failed(ErrorInfo::Internal {
                 detail: "invalid launch plan".to_string(),
             }))
         }
-        Err(StartError::Spawn(e)) => Err(LaunchFailure::Failed(ErrorInfo::Internal {
+        Err(e @ StartError::Spawn { .. }) => Err(LaunchFailure::Failed(ErrorInfo::Internal {
             detail: format!("cannot spawn the game: {e}"),
         })),
     }

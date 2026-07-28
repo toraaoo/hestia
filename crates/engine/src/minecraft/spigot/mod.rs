@@ -1,15 +1,7 @@
-//! Bukkit and Spigot — the two server platforms SpigotMC publishes, and the
-//! only flavors whose jar is compiled on the machine that runs it.
-//!
-//! Mojang's takedown means neither jar may be redistributed, so unlike every
-//! other flavor there is nothing to fetch: the launch profile *names* a jar
-//! that does not exist yet, carrying no URL, and the provider `install` hook
-//! runs SpigotMC's BuildTools to produce it (see [`buildtools`]). That is the
-//! seam NeoForge already established for a flavor whose jar has to be built.
-//!
-//! There is one build per game version, not a stream of them, so neither
-//! flavor has a loader version to pin — the game version selects the build.
-//! Neither has a client either, so neither implements `InstanceProvider`.
+//! Bukkit and Spigot — server platforms whose jar may not be redistributed, so
+//! the profile names a jar that does not exist yet (carrying no URL) and the
+//! `install` hook compiles it with BuildTools. Server-side only, and one build
+//! per game version, so neither has a loader version to pin.
 
 mod buildtools;
 
@@ -21,8 +13,17 @@ use proto::minecraft::{Artifact, GameVersion, ServerProfile};
 use self::buildtools::Product;
 use super::materialize::OnProgress;
 use super::meta::{mojang, spigot};
-use super::provider::{InstallRequest, Loads, ResolveRequest, ServerProvider};
+use super::provider::{InstallRequest, Loads, Prerequisite, ResolveRequest, ServerProvider};
 use super::REQUIRED_JAVA_MAJORS;
+
+/// BuildTools bootstraps its own Git on Windows and nowhere else.
+pub(crate) fn prerequisites() -> &'static [Prerequisite] {
+    if cfg!(windows) {
+        &[]
+    } else {
+        &[Prerequisite::Git]
+    }
+}
 
 /// What the versions predating the hub's `javaVersions` field (the 1.8 line and
 /// older) were built with.
@@ -105,10 +106,13 @@ impl ServerProvider for BukkitServer {
         "CraftBukkit"
     }
     fn summary(&self) -> &'static str {
-        "The original plugin server, without Spigot's patches. Compiled here at create, which takes several minutes and needs git installed."
+        "The plugin server Spigot is built on, without its speed-ups. Pick Spigot unless you need this exactly."
     }
     fn loads(&self) -> Loads {
         Some(ContentKind::Plugin)
+    }
+    fn requires(&self) -> &'static [Prerequisite] {
+        prerequisites()
     }
 
     async fn versions(&self) -> Result<Vec<GameVersion>> {
@@ -135,13 +139,16 @@ impl ServerProvider for SpigotServer {
         "Spigot"
     }
     fn summary(&self) -> &'static str {
-        "Bukkit with performance patches, and the widest plugin ecosystem. Compiled here at create, which takes several minutes and needs git installed."
+        "The classic plugin server, with the largest plugin library. Nobody may hand it out ready-made, so Hestia builds it here the first time — allow a few minutes."
     }
     /// Spigot's plugins are filtered as `spigot`, never widened to `bukkit`:
     /// the two are separate Modrinth loaders, and a Spigot build carries API a
     /// plugin written against it may require.
     fn loads(&self) -> Loads {
         Some(ContentKind::Plugin)
+    }
+    fn requires(&self) -> &'static [Prerequisite] {
+        prerequisites()
     }
 
     async fn versions(&self) -> Result<Vec<GameVersion>> {

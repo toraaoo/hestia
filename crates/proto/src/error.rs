@@ -331,6 +331,14 @@ pub enum ErrorInfo {
         requested: ContentKind,
         accepts: Vec<ContentKind>,
     },
+    /// A flavor needs something installed that Hestia cannot install itself
+    /// (Spigot and CraftBukkit are compiled on the machine, which needs Git).
+    /// Carries where to get it, so no front-end has to know.
+    MissingRequirement {
+        flavor: String,
+        name: String,
+        url: String,
+    },
     InvalidTexture {
         detail: String,
     },
@@ -594,6 +602,11 @@ impl fmt::Display for ErrorInfo {
                     "a {flavor} {entry} cannot take {requested}s — it takes {taken}"
                 )
             }
+            MissingRequirement { flavor, name, url } => write!(
+                f,
+                "a {flavor} server is built on this computer, and that needs {name}, \
+                 which Hestia cannot install for you — get it from {url}, then try again"
+            ),
             InvalidTexture { detail } => write!(f, "{detail}"),
             EntryNotFound { entry, reference } => write!(f, "no {entry} matches '{reference}'"),
             ProcessNotFound { id } => write!(f, "no process '{id}'"),

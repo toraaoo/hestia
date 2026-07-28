@@ -250,13 +250,14 @@
   "hard": "Hard"
  },
  "flavor": {
-  "vanilla_summary": "Mojang's game, unmodified.",
-  "fabric_summary": "Lightweight loader for mods, resource packs and datapacks.",
-  "neoforge_summary": "Mod loader for large, content-heavy modpacks. First launch builds the game jar, so it takes a few minutes.",
-  "paper_summary": "High-performance server that runs Bukkit plugins.",
-  "folia_summary": "Paper with regionised multithreading, for very large worlds. Only Folia-ready plugins work.",
-  "spigot_summary": "Bukkit with performance patches, and the widest plugin ecosystem. Compiled here at create, which takes several minutes and needs git installed.",
-  "bukkit_summary": "The original plugin server, without Spigot's patches. Compiled here at create, which takes several minutes and needs git installed."
+  "vanilla_summary": "Mojang's game, unchanged. Takes datapacks only — no mods or plugins.",
+  "fabric_summary": "A light, fast-moving mod loader. Usually the first to support a new Minecraft version.",
+  "neoforge_summary": "Mod loader for big, content-heavy modpacks. The first launch prepares the game files, so it takes a few minutes.",
+  "paper_summary": "A faster server that runs Bukkit plugins, tuned by the Paper team for each version.",
+  "folia_summary": "Paper spread across CPU cores, for very large worlds. Only plugins made for Folia will work.",
+  "spigot_summary": "The classic plugin server, with the largest plugin library. Nobody may hand it out ready-made, so Hestia builds it here the first time — allow a few minutes.",
+  "bukkit_summary": "The plugin server Spigot is built on, without its speed-ups. Pick Spigot unless you need this exactly.",
+  "requires": "Needs {name} installed on this computer:"
  },
  "phase": {
   "resolving_profile": "Resolving profile",

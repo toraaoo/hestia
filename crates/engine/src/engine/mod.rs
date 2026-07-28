@@ -11,7 +11,7 @@ pub use flows::ModpackOutcome;
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use proto::minecraft::ConfigEntry;
 
@@ -22,6 +22,7 @@ use crate::content::Content;
 use crate::instances::Instances;
 use crate::java::Java;
 use crate::minecraft::Minecraft;
+use crate::process::ProcessSupervisor;
 use crate::profiles::Profiles;
 use crate::servers::Servers;
 use crate::skins::Skins;
@@ -62,6 +63,7 @@ pub struct Engine {
     skins: Skins,
     sync: Sync,
     profiles: Profiles,
+    processes: Arc<ProcessSupervisor>,
     // One backup or restore per entry at a time: two archives of the same
     // data would interleave the rcon save-off/save-on dance.
     backups_active: Mutex<HashSet<String>>,
@@ -80,6 +82,7 @@ impl Engine {
         let skins = Skins::new(data_home.join("skins"));
         let sync = Sync::new(data_home.join("shared"));
         let profiles = Profiles::new(data_home.join("profiles"));
+        let processes = Arc::new(ProcessSupervisor::new(data_home.join("processes")));
         Engine {
             data_home: Mutex::new(data_home),
             config,
@@ -93,6 +96,7 @@ impl Engine {
             skins,
             sync,
             profiles,
+            processes,
             backups_active: Mutex::new(HashSet::new()),
         }
     }
@@ -144,6 +148,7 @@ impl Engine {
         self.skins.reload(resolved.join("skins"));
         self.sync.reload(resolved.join("shared"));
         self.profiles.reload(resolved.join("profiles"));
+        self.processes.reload(resolved.join("processes"));
         *self.data_home.lock().unwrap() = resolved.clone();
         tracing::info!(home = %resolved.display(), "engine data home changed");
         // The new home may carry half-finished state from whichever daemon last
@@ -190,6 +195,10 @@ impl Engine {
 
     pub fn sync(&self) -> &Sync {
         &self.sync
+    }
+
+    pub fn processes(&self) -> &Arc<ProcessSupervisor> {
+        &self.processes
     }
 
     pub fn profiles(&self) -> &Profiles {
