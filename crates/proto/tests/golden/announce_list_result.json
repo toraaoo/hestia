@@ -1,0 +1,14 @@
+{
+  "announcements": [
+    {
+      "id": "neoforge-flavor",
+      "severity": "info",
+      "title": "NeoForge servers and instances",
+      "body": "NeoForge is now a shipped flavor on both sides.",
+      "link": "",
+      "published": 1753660800,
+      "dismissed": true
+    }
+  ],
+  "fetched": 1753747200
+}

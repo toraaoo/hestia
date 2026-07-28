@@ -1,0 +1,9 @@
+{
+  "id": "rcon-password-log-0-0-3",
+  "severity": "critical",
+  "title": "Update to 0.0.4 — rcon passwords could reach the debug log",
+  "body": "Builds from 0.0.1 to 0.0.3 wrote a server's rcon password into the\nfirehose log. Update, then rotate any exposed server's password.",
+  "link": "https://github.com/toraaoo/hestia/releases/tag/v0.0.4",
+  "published": 1753747200,
+  "dismissed": false
+}
