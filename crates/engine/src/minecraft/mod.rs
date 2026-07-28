@@ -7,6 +7,7 @@ pub(crate) mod launch;
 pub(crate) mod log4j;
 pub(crate) mod materialize;
 mod meta;
+mod neoforge;
 mod paper;
 pub(crate) mod ping;
 mod provider;
@@ -17,6 +18,7 @@ pub(crate) mod world;
 use anyhow::{Context, Result};
 use proto::minecraft::{Flavor, GameVersion, InstanceProfile, ServerProfile};
 
+pub use provider::InstallRequest;
 use provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 /// The Java majors Minecraft launch profiles ever require: 8 (pre-1.17),
@@ -41,6 +43,7 @@ impl Default for Minecraft {
             instances: vec![
                 Box::new(vanilla::VanillaInstance),
                 Box::new(fabric::FabricInstance),
+                Box::new(neoforge::NeoForgeInstance),
             ],
         }
     }
@@ -101,6 +104,18 @@ impl Minecraft {
                 loader_version,
             })
             .await
+    }
+
+    /// Build whatever a flavor's profile could not simply name (NeoForge's
+    /// locally-patched game jar). Idempotent, so the launch path calls it every
+    /// time rather than tracking whether it has run.
+    pub async fn install_instance(
+        &self,
+        flavor: &str,
+        request: &provider::InstallRequest<'_>,
+        on_progress: materialize::OnProgress<'_>,
+    ) -> Result<()> {
+        self.instance(flavor)?.install(request, on_progress).await
     }
 
     pub async fn instance_versions(&self, flavor: &str) -> Result<Vec<GameVersion>> {

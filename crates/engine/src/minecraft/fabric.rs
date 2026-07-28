@@ -97,7 +97,7 @@ impl ServerProvider for FabricServer {
 /// Keyed by the coordinate minus its version, so a jar and its `natives-*`
 /// sibling (same artifact, different classifier) both survive; the overlay wins
 /// a collision and first-seen order is preserved.
-fn merge_libraries(base: Vec<Library>, overlay: Vec<Library>) -> Vec<Library> {
+pub(super) fn merge_libraries(base: Vec<Library>, overlay: Vec<Library>) -> Vec<Library> {
     let mut order: Vec<String> = Vec::new();
     let mut by_key: HashMap<String, Library> = HashMap::new();
     for library in base.into_iter().chain(overlay) {

@@ -1,0 +1,225 @@
+//! NeoForge — a modloader whose launch profile layers over the base game
+//! version like Fabric's, but whose game jar has to be *built* locally first.
+//!
+//! Everything a version needs comes out of its installer jar on
+//! `maven.neoforged.net` (see `meta::neoforge`), and the patched jar the loader
+//! runs is produced by the processor chain in [`processors`] — there is no
+//! published artifact for it. That is why this flavor uses the provider's
+//! `install` hook where every other flavor only names downloads.
+//!
+//! The catalogue needs no service either: a NeoForge version *is* its game
+//! version plus a build number, so both lists come from one `maven-metadata.xml`.
+
+pub(crate) mod processors;
+
+use std::path::Path;
+
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use proto::content::ContentKind;
+use proto::minecraft::{GameVersion, InstanceProfile};
+
+use super::materialize::{self, OnProgress};
+use super::meta::{mojang, neoforge};
+use super::provider::{InstallRequest, InstanceProvider, Loads, ResolveRequest};
+use crate::download::Downloader;
+
+const ID: &str = "neoforge";
+const NAME: &str = "NeoForge";
+
+/// The game versions NeoForge builds exist for, newest first and typed by
+/// Mojang's manifest — the same ground truth every other flavor is ordered by.
+/// A derived game version the manifest does not list is dropped: the mapping is
+/// arithmetic on the version string, so a result naming no real version is a
+/// failed derivation rather than a version to offer.
+async fn game_versions() -> Result<Vec<GameVersion>> {
+    let targeted: Vec<String> = neoforge::versions()
+        .await?
+        .iter()
+        .filter_map(|v| neoforge::game_version(v))
+        .collect();
+    Ok(mojang::versions()
+        .await?
+        .into_iter()
+        .filter(|v| targeted.iter().any(|t| t == &v.id))
+        .collect())
+}
+
+/// Every NeoForge build for a game version, newest first. Maven lists versions
+/// oldest-first, so the order is reversed.
+async fn builds(game: &str) -> Result<Vec<String>> {
+    let mut builds: Vec<String> = neoforge::versions()
+        .await?
+        .into_iter()
+        .filter(|v| neoforge::game_version(v).as_deref() == Some(game))
+        .collect();
+    builds.reverse();
+    Ok(builds)
+}
+
+/// The build a resolve uses: the pinned one, else the newest stable build,
+/// falling back to the newest of any kind. NeoForge marks a prerelease with a
+/// `-beta` suffix and nothing else, so that suffix is the only stability signal
+/// there is.
+async fn resolve_loader(request: &ResolveRequest) -> Result<String> {
+    if let Some(pinned) = &request.loader_version {
+        return Ok(pinned.clone());
+    }
+    let builds = builds(&request.version).await?;
+    builds
+        .iter()
+        .find(|v| !v.contains("-beta"))
+        .or_else(|| builds.first())
+        .cloned()
+        .with_context(|| {
+            format!(
+                "no neoforge build is published for Minecraft {}",
+                request.version
+            )
+        })
+}
+
+/// Where a version's installer jar is kept once fetched. It is not a launch
+/// artifact — it is the *source* of the profile and the patches — so it lives
+/// beside the other derived game files under `meta/`.
+fn installer_path(root: &Path, loader: &str) -> std::path::PathBuf {
+    root.join("neoforge").join(format!("{loader}.jar"))
+}
+
+/// The patched jar the processors produce. Its presence is what makes the
+/// install idempotent: the chain is minutes of JVM work, so a launch that has
+/// already run it must cost nothing.
+fn patched_jar(root: &Path, loader: &str, side: &str) -> std::path::PathBuf {
+    root.join("libraries/net/neoforged/neoforge")
+        .join(loader)
+        .join(format!("neoforge-{loader}-{side}.jar"))
+}
+
+async fn read_installer(
+    request: &InstallRequest<'_>,
+    loader: &str,
+) -> Result<(std::path::PathBuf, neoforge::Installer)> {
+    let path = installer_path(request.root, loader);
+    if !path.is_file() {
+        // No published checksum to verify against, so the fetch is plain; a
+        // truncated jar fails to parse below rather than being trusted.
+        Downloader::new(request.cache)
+            .fetch(&neoforge::installer_url(loader), &path, None, &|_| Ok(()))
+            .await
+            .with_context(|| format!("cannot fetch the neoforge {loader} installer"))?;
+    }
+    let bytes = std::fs::read(&path).with_context(|| format!("cannot read {}", path.display()))?;
+    let installer = neoforge::read_installer(&bytes)?;
+    Ok((path, installer))
+}
+
+/// Download the tools and inputs the processors need, then run them. The install
+/// profile's libraries are a superset of the launch profile's — the extra ones
+/// are the processor tools themselves — and they share the libraries root, so
+/// what the launch already fetched is skipped.
+async fn run_install(
+    request: &InstallRequest<'_>,
+    side: processors::Side,
+    on_progress: OnProgress<'_>,
+) -> Result<()> {
+    let loader = request
+        .loader_version
+        .context("a neoforge install needs its build")?;
+    if patched_jar(request.root, loader, side.as_str()).is_file() {
+        return Ok(());
+    }
+
+    let (installer_jar, installer) = read_installer(request, loader).await?;
+    materialize::ensure_libraries(
+        request.cache,
+        &mojang::libraries(&installer.profile),
+        &request.root.join("libraries"),
+        on_progress,
+    )
+    .await?;
+
+    tracing::info!(
+        loader,
+        side = side.as_str(),
+        "building the neoforge game jar"
+    );
+    processors::run(
+        &installer,
+        &processors::Install {
+            root: request.root,
+            installer: &installer_jar,
+            minecraft_jar: request.minecraft_jar,
+            side,
+            java: request.java,
+        },
+        on_progress,
+    )
+    .await
+}
+
+pub struct NeoForgeInstance;
+
+#[async_trait]
+impl InstanceProvider for NeoForgeInstance {
+    fn id(&self) -> &'static str {
+        ID
+    }
+    fn name(&self) -> &'static str {
+        NAME
+    }
+    fn loads(&self) -> Loads {
+        Some(ContentKind::Mod)
+    }
+
+    async fn versions(&self) -> Result<Vec<GameVersion>> {
+        game_versions().await
+    }
+
+    async fn loader_versions(&self, game: &str) -> Result<Vec<String>> {
+        builds(game).await
+    }
+
+    async fn resolve(&self, request: &ResolveRequest) -> Result<InstanceProfile> {
+        let loader = resolve_loader(request).await?;
+        let base = mojang::version_json(&request.version).await?;
+        let installer = {
+            // Resolution is a catalogue read with nowhere to cache to, so the
+            // installer is fetched into memory here and again (from disk) at
+            // install time.
+            let bytes = crate::download::http_client()
+                .get(neoforge::installer_url(&loader))
+                .send()
+                .await
+                .with_context(|| format!("cannot fetch the neoforge {loader} installer"))?
+                .bytes()
+                .await?;
+            neoforge::read_installer(&bytes)?
+        };
+
+        let libraries = super::fabric::merge_libraries(
+            mojang::libraries(&base),
+            mojang::libraries(&installer.version),
+        );
+        let mut jvm_args = mojang::jvm_args(&base);
+        jvm_args.extend(mojang::jvm_args(&installer.version));
+        let mut game_args = mojang::game_args(&base);
+        game_args.extend(mojang::game_args(&installer.version));
+
+        Ok(InstanceProfile {
+            flavor: ID.to_string(),
+            game_version: request.version.clone(),
+            loader_version: Some(loader),
+            client: mojang::client_artifact(&base)?,
+            libraries,
+            asset_index: mojang::asset_index(&base)?,
+            java_major: mojang::java_major(&base),
+            main_class: mojang::main_class(&installer.version),
+            jvm_args,
+            game_args,
+        })
+    }
+
+    async fn install(&self, request: &InstallRequest<'_>, on: OnProgress<'_>) -> Result<()> {
+        run_install(request, processors::Side::Client, on).await
+    }
+}

@@ -196,6 +196,21 @@ impl Engine {
         )
         .await?;
 
+        self.minecraft
+            .install_instance(
+                &record.profile.flavor,
+                &crate::minecraft::InstallRequest {
+                    game_version: &record.profile.game_version,
+                    loader_version: record.profile.loader_version.as_deref(),
+                    root: &meta,
+                    minecraft_jar: &client_jar,
+                    java: &java,
+                    cache: Some(&self.cache),
+                },
+                on_progress,
+            )
+            .await?;
+
         let assets_root = meta.join("assets");
         materialize::ensure_assets(
             Some(&self.cache),

@@ -3,16 +3,40 @@
 //! a full launch profile. The `Minecraft` aggregate holds a boxed registry of
 //! each — adding a flavor is a new impl plus one line in `Minecraft::new`.
 
+use std::path::Path;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use proto::content::ContentKind;
 use proto::minecraft::{GameVersion, InstanceProfile, ServerProfile};
+
+use crate::cache::Cache;
+use crate::minecraft::materialize::OnProgress;
 
 /// A resolution request: a game version and, for modloaders, an optional pinned
 /// loader version (the newest stable loader is chosen when absent).
 pub struct ResolveRequest {
     pub version: String,
     pub loader_version: Option<String>,
+}
+
+/// What a flavor needs to build whatever its profile cannot simply name.
+///
+/// Most flavors need nothing: a profile is a list of downloads, and the
+/// materialize pass fetches it. NeoForge is the exception — the jar its loader
+/// runs does not exist anywhere to download and is produced locally from the
+/// vanilla one, so the flavor gets a hook rather than the launch flows growing a
+/// branch on a flavor name.
+pub struct InstallRequest<'a> {
+    pub game_version: &'a str,
+    pub loader_version: Option<&'a str>,
+    /// The root the install writes under — `meta/` for a client (whose
+    /// `libraries/` is the shared root) and the server's own data directory.
+    pub root: &'a Path,
+    /// The vanilla jar for this side, already materialized.
+    pub minecraft_jar: &'a Path,
+    pub java: &'a Path,
+    pub cache: Option<&'a Cache>,
 }
 
 /// The third-party content a flavor's own loader consumes: mods for a
@@ -46,5 +70,12 @@ pub trait InstanceProvider: Send + Sync {
     /// with no loader concept (vanilla) reports none — the default.
     async fn loader_versions(&self, _game: &str) -> Result<Vec<String>> {
         Ok(Vec::new())
+    }
+
+    /// Build whatever the profile cannot name — the patched jar a NeoForge
+    /// client runs, which exists nowhere to download. Idempotent: it runs on
+    /// every launch and must cost nothing once done.
+    async fn install(&self, _request: &InstallRequest<'_>, _on: OnProgress<'_>) -> Result<()> {
+        Ok(())
     }
 }

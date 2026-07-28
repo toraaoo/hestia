@@ -4,6 +4,7 @@
 
 pub mod fabric;
 pub mod mojang;
+pub mod neoforge;
 pub mod paper;
 
 use anyhow::{bail, Context, Result};
@@ -26,6 +27,27 @@ async fn fetch_json(url: &str) -> Result<Value> {
         .json()
         .await
         .with_context(|| format!("{url} returned malformed JSON"))
+}
+
+/// The same fetch for a document that is not JSON — NeoForge's
+/// `maven-metadata.xml` is the only one.
+async fn fetch_text(url: &str) -> Result<String> {
+    tracing::debug!(url, "minecraft meta GET");
+    let response = crate::download::http_client()
+        .get(url)
+        .send()
+        .await
+        .with_context(|| format!("request to {url} failed"))?;
+    if !response.status().is_success() {
+        bail!(
+            "request to {url} failed: HTTP {}",
+            response.status().as_u16()
+        );
+    }
+    response
+        .text()
+        .await
+        .with_context(|| format!("{url} returned an unreadable body"))
 }
 
 /// Host OS in Mojang's rule vocabulary (`os.name`).
@@ -75,7 +97,7 @@ fn rules_allow(rules: &Value) -> bool {
 
 /// Convert a Maven coordinate (`group:artifact:version[:classifier][@ext]`) into
 /// its repository-relative path.
-fn maven_path(coord: &str) -> Option<String> {
+pub(super) fn maven_path(coord: &str) -> Option<String> {
     let (coord, ext) = coord.split_once('@').unwrap_or((coord, "jar"));
     let parts: Vec<&str> = coord.split(':').collect();
     if parts.len() < 3 || parts.iter().take(3).any(|p| p.is_empty()) {

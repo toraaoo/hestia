@@ -290,6 +290,12 @@ fn build_vars(
     let path_str = |p: &Path| p.to_string_lossy().into_owned();
     HashMap::from([
         ("classpath", classpath),
+        // A modloader that boots off the module path (NeoForge's
+        // BootstrapLauncher) names its jars by these rather than by the
+        // classpath. An unknown placeholder substitutes to empty, so omitting
+        // them would silently produce a broken `-p` argument.
+        ("library_directory", path_str(paths.libraries_root)),
+        ("classpath_separator", CLASSPATH_SEPARATOR.to_string()),
         ("natives_directory", path_str(paths.natives_dir)),
         ("game_directory", path_str(paths.game_dir)),
         ("assets_root", path_str(paths.assets_root)),
