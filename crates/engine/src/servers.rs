@@ -275,7 +275,6 @@ impl Servers {
         &self,
         record: &ServerRecord,
         cache: Option<&Cache>,
-        java: &Path,
         on_progress: OnProgress<'_>,
     ) -> Result<()> {
         let data = self.data_dir(record);
@@ -300,17 +299,8 @@ impl Servers {
         )
         .await?;
 
-        on_progress.report(&ProvisionProgress {
-            phase: ProvisionPhase::Server,
-            current: 0,
-            total: 0,
-            detail: "generating server.properties".into(),
-            ..ProvisionProgress::default()
-        });
-        self.derive_schema(record, java).await;
-
         std::fs::write(data.join("eula.txt"), "eula=true\n").context("cannot write eula.txt")?;
-        tracing::info!(id = %record.id, "server provisioned");
+        tracing::info!(id = %record.id, "server files provisioned");
         Ok(())
     }
 
@@ -319,6 +309,26 @@ impl Servers {
     /// accepts any property key rather than rejecting every one, so a failure
     /// here degrades validation instead of failing the operation — the caller
     /// reports it by asking [`Servers::has_schema`].
+    /// Run the server once to derive its `server.properties` schema. Separate
+    /// from `provision` because a flavor that *builds* its server (NeoForge)
+    /// cannot be run until its install has finished, and the install needs the
+    /// provisioned jar — so the flow orders the three rather than nesting them.
+    pub(crate) async fn derive_properties_schema(
+        &self,
+        record: &ServerRecord,
+        java: &Path,
+        on_progress: OnProgress<'_>,
+    ) {
+        on_progress.report(&ProvisionProgress {
+            phase: ProvisionPhase::Server,
+            current: 0,
+            total: 0,
+            detail: "generating server.properties".into(),
+            ..ProvisionProgress::default()
+        });
+        self.derive_schema(record, java).await;
+    }
+
     async fn derive_schema(&self, record: &ServerRecord, java: &Path) {
         match self.generate_schema(record, java).await {
             Ok(schema) if schema.is_empty() => {
@@ -408,7 +418,6 @@ impl Servers {
         id: &str,
         profile: ServerProfile,
         cache: Option<&Cache>,
-        java: &Path,
         on_progress: OnProgress<'_>,
     ) -> Result<ServerRecord> {
         let mut record = self
@@ -442,15 +451,6 @@ impl Servers {
             on_progress,
         )
         .await?;
-
-        on_progress.report(&ProvisionProgress {
-            phase: ProvisionPhase::Server,
-            current: 0,
-            total: 0,
-            detail: "regenerating server.properties".into(),
-            ..ProvisionProgress::default()
-        });
-        self.derive_schema(&record, java).await;
 
         if previous_primary != record.profile.primary.filename {
             let _ = std::fs::remove_file(data.join(&previous_primary));

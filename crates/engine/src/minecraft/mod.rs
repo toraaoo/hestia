@@ -39,6 +39,7 @@ impl Default for Minecraft {
                 Box::new(fabric::FabricServer),
                 Box::new(paper::PaperServer),
                 Box::new(paper::FoliaServer),
+                Box::new(neoforge::NeoForgeServer),
             ],
             instances: vec![
                 Box::new(vanilla::VanillaInstance),
@@ -116,6 +117,16 @@ impl Minecraft {
         on_progress: materialize::OnProgress<'_>,
     ) -> Result<()> {
         self.instance(flavor)?.install(request, on_progress).await
+    }
+
+    /// The server twin of [`Minecraft::install_instance`].
+    pub async fn install_server(
+        &self,
+        flavor: &str,
+        request: &provider::InstallRequest<'_>,
+        on_progress: materialize::OnProgress<'_>,
+    ) -> Result<()> {
+        self.server(flavor)?.install(request, on_progress).await
     }
 
     pub async fn instance_versions(&self, flavor: &str) -> Result<Vec<GameVersion>> {

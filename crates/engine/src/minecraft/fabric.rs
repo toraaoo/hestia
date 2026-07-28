@@ -85,6 +85,7 @@ impl ServerProvider for FabricServer {
             java_major: mojang::java_major(&base),
             main_class: String::new(),
             jvm_args: Vec::new(),
+            args_file: String::new(),
         })
     }
 }

@@ -31,9 +31,6 @@ use super::super::meta::neoforge::Installer;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {
     Client,
-    // Constructed by the server provider, which is not wired yet; the chain
-    // itself is side-generic and both arms are covered by this module's tests.
-    #[allow(dead_code)]
     Server,
 }
 

@@ -17,11 +17,11 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use proto::content::ContentKind;
-use proto::minecraft::{GameVersion, InstanceProfile};
+use proto::minecraft::{GameVersion, InstanceProfile, ServerProfile};
 
 use super::materialize::{self, OnProgress};
 use super::meta::{mojang, neoforge};
-use super::provider::{InstallRequest, InstanceProvider, Loads, ResolveRequest};
+use super::provider::{InstallRequest, InstanceProvider, Loads, ResolveRequest, ServerProvider};
 use crate::download::Downloader;
 
 const ID: &str = "neoforge";
@@ -155,6 +155,64 @@ async fn run_install(
         on_progress,
     )
     .await
+}
+
+/// The arg file the server-side install generates, relative to the directory
+/// the server launches from. Its contents name every library relatively, so the
+/// path is stated the same way.
+pub(crate) fn server_args_file(loader: &str) -> String {
+    let name = if cfg!(windows) {
+        "win_args.txt"
+    } else {
+        "unix_args.txt"
+    };
+    format!("libraries/net/neoforged/neoforge/{loader}/{name}")
+}
+
+pub struct NeoForgeServer;
+
+#[async_trait]
+impl ServerProvider for NeoForgeServer {
+    fn id(&self) -> &'static str {
+        ID
+    }
+    fn name(&self) -> &'static str {
+        NAME
+    }
+    fn loads(&self) -> Loads {
+        Some(ContentKind::Mod)
+    }
+
+    async fn versions(&self) -> Result<Vec<GameVersion>> {
+        game_versions().await
+    }
+
+    async fn loader_versions(&self, game: &str) -> Result<Vec<String>> {
+        builds(game).await
+    }
+
+    async fn resolve(&self, request: &ResolveRequest) -> Result<ServerProfile> {
+        let loader = resolve_loader(request).await?;
+        let base = mojang::version_json(&request.version).await?;
+        Ok(ServerProfile {
+            flavor: ID.to_string(),
+            game_version: request.version.clone(),
+            args_file: server_args_file(&loader),
+            loader_version: Some(loader),
+            // The vanilla server jar is not launched — it is the input the
+            // processors patch. Keeping it as the primary artifact is what
+            // makes the existing provision step fetch it.
+            primary: mojang::server_artifact(&base)?,
+            libraries: Vec::new(),
+            java_major: mojang::java_major(&base),
+            main_class: String::new(),
+            jvm_args: Vec::new(),
+        })
+    }
+
+    async fn install(&self, request: &InstallRequest<'_>, on: OnProgress<'_>) -> Result<()> {
+        run_install(request, processors::Side::Server, on).await
+    }
 }
 
 pub struct NeoForgeInstance;

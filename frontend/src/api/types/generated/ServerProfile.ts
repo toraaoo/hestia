@@ -10,4 +10,12 @@ export type ServerProfile = { flavor: string, gameVersion: string, loaderVersion
  * The flavor's own recommended JVM flags, used only when the entry sets no
  * `jvm-args` of its own and no global default exists.
  */
-jvmArgs: Array<string>, };
+jvmArgs: Array<string>, 
+/**
+ * A JVM `@argfile` this server launches from, relative to its data
+ * directory, instead of a jar or a classpath. NeoForge's install generates
+ * one — the module path, system properties and launch target it needs are
+ * far past what a command line can carry — and the file names its own
+ * libraries relatively, so it is only valid from that directory.
+ */
+argsFile: string, };

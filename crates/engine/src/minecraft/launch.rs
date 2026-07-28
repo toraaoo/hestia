@@ -207,7 +207,11 @@ fn server_invocation(
 ) -> LaunchPlan {
     let mut args = settings.flags();
     let primary = join_str(artifacts, &profile.primary.filename);
-    if profile.main_class.is_empty() {
+    if !profile.args_file.is_empty() {
+        // The file names its libraries relative to the launch directory, so it
+        // is passed relative too and never resolved against `artifacts`.
+        args.push(format!("@{}", profile.args_file));
+    } else if profile.main_class.is_empty() {
         args.push("-jar".to_string());
         args.push(primary);
     } else {
@@ -384,6 +388,29 @@ mod tests {
         assert_eq!(substitute("${unknown_key}", &vars), "");
         assert_eq!(substitute("${broken", &vars), "${broken");
         assert_eq!(substitute("plain", &vars), "plain");
+    }
+
+    #[test]
+    fn an_args_file_replaces_the_jar_invocation() {
+        let mut profile = ServerProfile {
+            args_file: "libraries/net/neoforged/neoforge/21.1.244/unix_args.txt".into(),
+            ..ServerProfile::default()
+        };
+        profile.primary.filename = "server.jar".into();
+        let plan = server_plan(
+            &profile,
+            Path::new("/java"),
+            Path::new("/srv"),
+            &JavaSettings::default(),
+        );
+        assert_eq!(
+            plan.args,
+            [
+                "@libraries/net/neoforged/neoforge/21.1.244/unix_args.txt",
+                "nogui"
+            ],
+            "the file is passed relative — it names its own libraries that way"
+        );
     }
 
     #[test]

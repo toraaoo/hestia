@@ -48,8 +48,26 @@ impl Engine {
                 .await?;
             on_progress.check()?;
             self.servers
-                .provision(&record, Some(&self.cache), &java, on_progress)
+                .provision(&record, Some(&self.cache), on_progress)
                 .await?;
+            let data = self.servers.data_dir(&record);
+            self.minecraft
+                .install_server(
+                    &record.profile.flavor,
+                    &crate::minecraft::InstallRequest {
+                        game_version: &record.profile.game_version,
+                        loader_version: record.profile.loader_version.as_deref(),
+                        root: &data,
+                        minecraft_jar: &data.join(&record.profile.primary.filename),
+                        java: &java,
+                        cache: Some(&self.cache),
+                    },
+                    on_progress,
+                )
+                .await?;
+            self.servers
+                .derive_properties_schema(&record, &java, on_progress)
+                .await;
             for entry in &spec.config {
                 self.servers
                     .config_set(&record.id, &entry.key, &entry.value)?;
@@ -118,8 +136,26 @@ impl Engine {
         on_progress.check()?;
         let record = self
             .servers
-            .update(&record.id, profile, Some(&self.cache), &java, on_progress)
+            .update(&record.id, profile, Some(&self.cache), on_progress)
             .await?;
+        let data = self.servers.data_dir(&record);
+        self.minecraft
+            .install_server(
+                &record.profile.flavor,
+                &crate::minecraft::InstallRequest {
+                    game_version: &record.profile.game_version,
+                    loader_version: record.profile.loader_version.as_deref(),
+                    root: &data,
+                    minecraft_jar: &data.join(&record.profile.primary.filename),
+                    java: &java,
+                    cache: Some(&self.cache),
+                },
+                on_progress,
+            )
+            .await?;
+        self.servers
+            .derive_properties_schema(&record, &java, on_progress)
+            .await;
         let warnings = self.server_warnings(&record);
         Ok((record, warnings))
     }

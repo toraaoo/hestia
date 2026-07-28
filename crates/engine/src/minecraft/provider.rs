@@ -57,6 +57,11 @@ pub trait ServerProvider: Send + Sync {
     async fn loader_versions(&self, _game: &str) -> Result<Vec<String>> {
         Ok(Vec::new())
     }
+
+    /// See [`InstanceProvider::install`].
+    async fn install(&self, _request: &InstallRequest<'_>, _on: OnProgress<'_>) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[async_trait]

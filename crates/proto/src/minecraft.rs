@@ -99,6 +99,13 @@ pub struct ServerProfile {
     /// The flavor's own recommended JVM flags, used only when the entry sets no
     /// `jvm-args` of its own and no global default exists.
     pub jvm_args: Vec<String>,
+    /// A JVM `@argfile` this server launches from, relative to its data
+    /// directory, instead of a jar or a classpath. NeoForge's install generates
+    /// one — the module path, system properties and launch target it needs are
+    /// far past what a command line can carry — and the file names its own
+    /// libraries relatively, so it is only valid from that directory.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub args_file: String,
 }
 
 /// The resolved launch profile for a Minecraft *client* (instance).

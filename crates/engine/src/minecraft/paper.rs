@@ -61,6 +61,7 @@ async fn resolve(project: &str, request: &ResolveRequest) -> Result<ServerProfil
         java_major: java.major,
         main_class: String::new(),
         jvm_args: java.flags,
+        args_file: String::new(),
     })
 }
 
