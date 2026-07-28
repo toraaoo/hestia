@@ -86,15 +86,6 @@ fn installer_path(root: &Path, loader: &str) -> std::path::PathBuf {
     root.join("neoforge").join(format!("{loader}.jar"))
 }
 
-/// The patched jar the processors produce. Its presence is what makes the
-/// install idempotent: the chain is minutes of JVM work, so a launch that has
-/// already run it must cost nothing.
-fn patched_jar(root: &Path, loader: &str, side: &str) -> std::path::PathBuf {
-    root.join("libraries/net/neoforged/neoforge")
-        .join(loader)
-        .join(format!("neoforge-{loader}-{side}.jar"))
-}
-
 async fn read_installer(
     request: &InstallRequest<'_>,
     loader: &str,
@@ -125,15 +116,21 @@ async fn run_install(
     let loader = request
         .loader_version
         .context("a neoforge install needs its build")?;
-    if patched_jar(request.root, loader, side.as_str()).is_file() {
+    // The installer is read before the idempotence check rather than after: it
+    // is the only thing that states where the patched jar lands, and that
+    // coordinate has already changed once between NeoForge generations. It is
+    // on disk after the first fetch, so the re-read is cheap next to the chain
+    // it guards.
+    let (installer_jar, installer) = read_installer(request, loader).await?;
+    let libraries = request.root.join("libraries");
+    if processors::patched_output(&installer, side, &libraries).is_some_and(|jar| jar.is_file()) {
         return Ok(());
     }
 
-    let (installer_jar, installer) = read_installer(request, loader).await?;
     materialize::ensure_libraries(
         request.cache,
         &mojang::libraries(&installer.profile),
-        &request.root.join("libraries"),
+        &libraries,
         on_progress,
     )
     .await?;

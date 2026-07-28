@@ -161,6 +161,26 @@ const CLASSPATH_SEPARATOR: &str = ";";
 #[cfg(not(windows))]
 const CLASSPATH_SEPARATOR: &str = ":";
 
+/// Where this side's patched game jar lands, as the install profile's own data
+/// table declares it.
+///
+/// Never guessed from a naming convention: NeoForge changed the coordinate
+/// between installer generations — `net.neoforged:neoforge:<v>:server` for the
+/// 1.x line, `net.neoforged:minecraft-server-patched:<v>` for the calendar-
+/// versioned one. A hard-coded name silently stops matching, and since this is
+/// the install's idempotence check, the cost of that is re-running the whole
+/// processor chain on every single launch.
+pub fn patched_output(installer: &Installer, side: Side, libraries: &Path) -> Option<PathBuf> {
+    let raw = installer
+        .profile
+        .get("data")?
+        .get("PATCHED")?
+        .get(side.as_str())?
+        .as_str()?;
+    let coord = raw.strip_prefix('[')?.strip_suffix(']')?;
+    library_path(libraries, coord).ok()
+}
+
 /// A processor with no `sides` runs on both.
 fn runs_on(processor: &Value, side: Side) -> bool {
     match processor.get("sides").and_then(Value::as_array) {
@@ -362,6 +382,39 @@ mod tests {
             resolve("'1.21.1-20240808'", libs, &staged).unwrap(),
             "'1.21.1-20240808'",
             "a literal is left alone"
+        );
+    }
+
+    #[test]
+    fn the_patched_jar_is_read_from_the_profile_not_a_convention() {
+        let installer = |coord: &str| Installer {
+            version: json!({}),
+            profile: json!({ "data": { "PATCHED": { "client": coord, "server": coord } } }),
+            data: Vec::new(),
+        };
+        let libs = Path::new("/libs");
+        // The 1.x line.
+        assert_eq!(
+            patched_output(
+                &installer("[net.neoforged:neoforge:21.1.244:server]"),
+                Side::Server,
+                libs
+            )
+            .unwrap(),
+            Path::new("/libs/net/neoforged/neoforge/21.1.244/neoforge-21.1.244-server.jar")
+        );
+        // The calendar-versioned line renamed it; a hard-coded name would have
+        // missed here and re-run the whole chain on every launch.
+        assert_eq!(
+            patched_output(
+                &installer("[net.neoforged:minecraft-server-patched:26.1.2.87]"),
+                Side::Server,
+                libs
+            )
+            .unwrap(),
+            Path::new(
+                "/libs/net/neoforged/minecraft-server-patched/26.1.2.87/minecraft-server-patched-26.1.2.87.jar"
+            )
         );
     }
 
