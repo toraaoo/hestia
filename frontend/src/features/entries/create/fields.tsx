@@ -170,9 +170,12 @@ export function VersionRow({
   );
 }
 
-/** The static per-flavor blurb, by id; empty for an unknown flavor. */
+/**
+ * The static per-flavor blurb, by id; empty for a flavor with no message. Keyed
+ * dynamically so a flavor the daemon adds needs only its message, not a branch
+ * here — the flavor list itself comes from `{server,instance}.flavors`.
+ */
 export function flavorSummary(id: string): string {
-  if (id === 'vanilla') return m['flavor.vanilla_summary']();
-  if (id === 'fabric') return m['flavor.fabric_summary']();
-  return '';
+  const messages = m as unknown as Record<string, (() => string) | undefined>;
+  return messages[`flavor.${id}_summary`]?.() ?? '';
 }

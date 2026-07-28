@@ -250,7 +250,9 @@
  },
  "flavor": {
   "vanilla_summary": "Mojang's game, unmodified.",
-  "fabric_summary": "Lightweight loader for mods, resource packs and datapacks."
+  "fabric_summary": "Lightweight loader for mods, resource packs and datapacks.",
+  "paper_summary": "High-performance server that runs Bukkit plugins.",
+  "folia_summary": "Paper with regionised multithreading, for very large worlds. Only Folia-ready plugins work."
  },
  "phase": {
   "resolving_profile": "Resolving profile",
