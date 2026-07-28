@@ -24,6 +24,7 @@ import {
   LanguageField,
 } from '@/features/settings/components/fields';
 import { SyncSection } from '@/features/settings/components/sync-section';
+import { UpdateSection } from '@/features/settings/components/update-section';
 import { bytes, memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { cacheMutations, cacheQueries } from '@/queries/cache';
@@ -38,6 +39,7 @@ interface ConfigEntries {
   home?: string;
   autostart?: boolean;
   defaults?: { memory?: string; 'jvm-args'?: string };
+  announcements?: { enabled?: boolean };
 }
 
 export function SettingsPage() {
@@ -128,8 +130,24 @@ export function SettingsPage() {
                 checked={prefs.get('keepOpen', true)}
                 onChange={(checked) => prefs.set('keepOpen', checked)}
               />
+
+              <Field>
+                <CheckboxRow
+                  id="announcements-enabled"
+                  label={m['news.enabled_label']()}
+                  checked={entries.announcements?.enabled ?? true}
+                  onChange={(checked) =>
+                    commitConfig('announcements.enabled', checked)
+                  }
+                />
+                <FieldDescription>
+                  {m['news.enabled_description']()}
+                </FieldDescription>
+              </Field>
             </FieldGroup>
           </FieldSet>
+
+          <UpdateSection />
 
           <FieldSet>
             <FieldLegend>{m['settings.java_performance']()}</FieldLegend>

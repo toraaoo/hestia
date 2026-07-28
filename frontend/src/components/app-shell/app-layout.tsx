@@ -1,5 +1,9 @@
 import { Outlet, useLocation } from '@tanstack/react-router';
 
+import {
+  AnnouncementBanner,
+  CriticalAnnouncementDialog,
+} from '@/components/app-shell/announcement-surfaces';
 import { FirstRunOverlay } from '@/components/app-shell/first-run-overlay';
 import { OfflineOverlay } from '@/components/app-shell/offline-overlay';
 import { PlayBar } from '@/components/app-shell/play-bar';
@@ -22,6 +26,7 @@ export function AppLayout() {
             <Sidebar />
 
             <div className="flex min-w-0 flex-1 flex-col">
+              <AnnouncementBanner />
               <main className="flex-1 overflow-y-auto">
                 <Outlet />
               </main>
@@ -32,6 +37,7 @@ export function AppLayout() {
         </div>
         <FirstRunOverlay />
         <OfflineOverlay />
+        <CriticalAnnouncementDialog />
       </LaunchModalProvider>
     </SearchProvider>
   );

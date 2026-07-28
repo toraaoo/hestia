@@ -8,6 +8,7 @@
  * hooks (`useConnection`, `useDaemonEvent`, log following).
  */
 export * from './accounts';
+export * from './announce';
 export * from './app';
 export * from './cache';
 export { invalidate, queryClient } from './client';
@@ -55,3 +56,4 @@ export * from './profile';
 export * from './server';
 export * from './skins';
 export * from './sync';
+export * from './update';

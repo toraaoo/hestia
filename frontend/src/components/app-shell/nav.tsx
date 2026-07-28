@@ -3,6 +3,7 @@ import {
   CubeIcon,
   GearSixIcon,
   HardDrivesIcon,
+  NewspaperIcon,
   PackageIcon,
   StackIcon,
   StorefrontIcon,
@@ -48,6 +49,7 @@ export const nav: NavItem[] = [
     match: ['/profiles'],
   },
   { to: '/skins', label: m['nav.skins'], icon: TShirtIcon, match: ['/skins'] },
+  { to: '/news', label: m['news.nav'], icon: NewspaperIcon, match: ['/news'] },
 ];
 
 export const settingsItem: NavItem = {
@@ -67,7 +69,16 @@ export function isActive(
   );
 }
 
-export function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+export function NavLink({
+  item,
+  active,
+  badge,
+}: {
+  item: NavItem;
+  active: boolean;
+  /** Unread count; rendered only when above zero. */
+  badge?: number;
+}) {
   const { icon: Icon, to, label } = item;
   return (
     <Link
@@ -88,6 +99,11 @@ export function NavLink({ item, active }: { item: NavItem; active: boolean }) {
       />
       <Icon weight={active ? 'fill' : 'regular'} className="size-4.5" />
       {label()}
+      {badge !== undefined && badge > 0 && (
+        <span className="ml-auto min-w-4 rounded-full bg-ember px-1.5 py-0.5 text-center text-[0.65rem] leading-none font-semibold text-background">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
     </Link>
   );
 }

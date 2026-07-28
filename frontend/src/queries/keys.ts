@@ -150,4 +150,12 @@ export const keys = {
     config: () => [...keys.sync.all, 'config'] as const,
     status: () => [...keys.sync.all, 'status'] as const,
   },
+  announce: {
+    all: ['announce'] as const,
+    list: () => [...keys.announce.all, 'list'] as const,
+  },
+  update: {
+    all: ['update'] as const,
+    check: () => [...keys.update.all, 'check'] as const,
+  },
 };

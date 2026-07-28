@@ -4,6 +4,7 @@
  * `ipc_call` bridge; channel names and payload shapes mirror `crates/proto`.
  */
 export * as accounts from './accounts';
+export * as announce from './announce';
 export * as app from './app';
 export * as cache from './cache';
 export * as config from './config';
@@ -57,4 +58,5 @@ export * as skins from './skins';
 export * as sync from './sync';
 export * as system from './system';
 export type * from './types';
+export * as update from './update';
 export { downgradeBetween } from './version';
