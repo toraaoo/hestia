@@ -290,14 +290,7 @@ impl Servers {
             )
             .await?;
         }
-        materialize::ensure_artifact(
-            cache,
-            &record.profile.primary,
-            &data.join(&record.profile.primary.filename),
-            ProvisionPhase::Server,
-            on_progress,
-        )
-        .await?;
+        ensure_primary(cache, &record.profile, &data, on_progress).await?;
 
         std::fs::write(data.join("eula.txt"), "eula=true\n").context("cannot write eula.txt")?;
         tracing::info!(id = %record.id, "server files provisioned");
@@ -443,14 +436,7 @@ impl Servers {
             )
             .await?;
         }
-        materialize::ensure_artifact(
-            cache,
-            &record.profile.primary,
-            &data.join(&record.profile.primary.filename),
-            ProvisionPhase::Server,
-            on_progress,
-        )
-        .await?;
+        ensure_primary(cache, &record.profile, &data, on_progress).await?;
 
         if previous_primary != record.profile.primary.filename {
             let _ = std::fs::remove_file(data.join(&previous_primary));
@@ -642,6 +628,31 @@ impl Servers {
         entries.extend(read_properties(&self.data_dir(&record).join(PROPERTIES)));
         Ok(entries)
     }
+}
+
+/// Fetch the server's launchable jar into its data directory.
+///
+/// A flavor that *builds* its jar (bukkit, spigot) names it with no URL: the
+/// profile still has to name it, since that is what the launch plan runs and
+/// what a backup carries over, but there is nothing to download and the
+/// flavor's `install` hook produces the file straight after.
+async fn ensure_primary(
+    cache: Option<&Cache>,
+    profile: &ServerProfile,
+    data: &Path,
+    on_progress: OnProgress<'_>,
+) -> Result<()> {
+    if profile.primary.url.is_empty() {
+        return Ok(());
+    }
+    materialize::ensure_artifact(
+        cache,
+        &profile.primary,
+        &data.join(&profile.primary.filename),
+        ProvisionPhase::Server,
+        on_progress,
+    )
+    .await
 }
 
 /// Parse `server.properties` into key/value pairs, skipping blank and comment

@@ -333,16 +333,18 @@ The subsystems behind the aggregate:
   daemon's `JavaInstallManager`.
 - **`minecraft`** (`Minecraft`) — the server and instance (client) provider
   registries. A *flavor* is a distribution (`vanilla`, `fabric`, and the
-  server-only `paper` and `folia`, plus `neoforge`); a provider lists
+  server-only `paper`, `folia`, `spigot` and `bukkit`, plus `neoforge`); a
+  provider names itself (`id`, `name`, `summary`), lists
   the game *versions* it supports, states what content its loader takes
   (`loads`), and *resolves* a request into a launch profile —
   the full descriptor (`ServerProfile` / `InstanceProfile`: primary artifact,
   libraries, asset index, java major, main class, args) the launch pipeline
   consumes. The two registries are separate, so a flavor can serve one side
-  only: Paper and Folia have no client and appear in `server.flavors` alone.
+  only: Paper, Folia, Spigot and CraftBukkit have no client and appear in
+  `server.flavors` alone.
   Stateless (every result is fetched upstream), so it needs no data
   directory. Manifest parsing lives in `minecraft/meta/` (`mojang`, `fabric`,
-  `paper`).
+  `paper`, `spigot`).
   Two further modules are the launch pipeline over the profiles:
     - **`minecraft/materialize`** — idempotently ensures profile pieces on disk
       (skip-if-present): single jars, Maven-layout libraries under the shared
@@ -571,6 +573,48 @@ The subsystems behind the aggregate:
 > the end of 2025 and was disabled on 1 July 2026, and v3 refuses a request
 > whose user agent does not identify its caller — so `common::app::user_agent`
 > now builds one identity for every outbound request rather than paper alone.
+
+> **Spigot and CraftBukkit are compiled here, because no one may ship them.**
+> Mojang's takedown means neither jar legally exists as a download: SpigotMC
+> publishes **BuildTools**, which clones the four upstream repositories,
+> decompiles the vanilla server, applies the CraftBukkit and Spigot patch sets
+> and compiles the result on the user's own machine. So these flavors take the
+> `install` hook NeoForge already established for a jar that has to be built,
+> and the same shape holds — the profile *names* the jar the launch plan runs
+> (`spigot-<version>.jar`) while carrying no URL, which is exactly what tells
+> `Servers::provision` there is nothing to fetch. Deliberately no third-party
+> mirror fallback: the mirrors redistribute what the takedown covers, publish
+> no checksums, and would silently change the trust story mid-create.
+>
+> **One build serves both flavors and every entry on that version.** A
+> BuildTools run is minutes of decompilation and maven over a few hundred
+> megabytes of clones, and it emits `craftbukkit-<v>.jar` *and*
+> `spigot-<v>.jar` from the same work — so building per-server would pay that
+> cost again for a jar already on disk. The work tree is therefore shared
+> (`meta/spigot/`, with the outputs under `jars/<version>/`), which is why
+> `InstallRequest` grew a `meta` root beside the entry-scoped `root`: an
+> instance install already writes to `meta/`, and a server's did not have it.
+> The jar is copied from there into the entry's `data/`, so a server still owns
+> its own copy and the existing backup exclude/carry-over rule (keyed on
+> `primary.filename`) needs no change.
+>
+> **The catalogue is a filter, not a listing.** The hub indexes its version
+> metadata by Jenkins build number as well as by game version, so all but a few
+> dozen of the four thousand names it publishes are build numbers. Filtering
+> against Mojang's manifest is what leaves the game versions behind — the
+> inverse of Paper, where an unlisted name is kept as a snapshot. There is one
+> build per game version rather than a stream of them, so neither flavor has a
+> loader version to pin. The Java major comes from the hub's class-file range,
+> narrowed to a runtime the launcher can actually install so a mismatch fails
+> at resolution rather than at the Java step.
+>
+> **The cost is an external toolchain, stated up front.** BuildTools shells out
+> to git and a POSIX shell, and bootstraps its own PortableGit on Windows
+> alone — so the other platforms are checked *before* the create commits to
+> anything, and the error names the fix, since nothing in the launcher can
+> install git for the user. The build is one process, so it is a single
+> cancellation checkpoint polled while it runs; killing it leaves a partial
+> work tree that the next build repairs exactly as a failed one does.
 
 > **What an entry takes is a property of its flavor, and the flavor says so.**
 > Two guards used to hard-code the answer: one refused anything but mods and
@@ -1841,8 +1885,9 @@ skin and cape management for signed-in accounts (a preserved local skin
 library, the vanilla defaults, upload/equip/reset and cape selection over the
 Mojang profile API — daemon and desktop layers only, no CLI);
 the daemon's process supervisor; the Minecraft provider layer (flavors, versions,
-and profile resolution — vanilla, fabric and neoforge on both sides, paper and
-folia for servers only); server
+and profile resolution — vanilla, fabric and neoforge on both sides, paper,
+folia, spigot and bukkit for servers only, the last two compiled locally with
+SpigotMC's BuildTools); server
 management (create = fully provisioned: profile + java + jar + EULA, each
 server on its own claimed port; start/stop/status/logs over the supervisor;
 a console over rcon — one-shot `command`, followed logs, interactive
@@ -1915,9 +1960,11 @@ are in place; pages are not).
   linking/adopt, and `options.txt` merge in `sync/`, the Modrinth mapping and `.mrpack`/URL
   parsing in `content/modrinth.rs`, and content version-pick / reference-matching
   in `content/install.rs`. The per-flavor accepted-kind composition is pinned in
-  `engine/flows/content.rs` and the JVM-args precedence in
+  `minecraft/provider.rs` and the JVM-args precedence in
   `engine/flows/server.rs`; PaperMC build parsing is unit-tested in
-  `minecraft/meta/paper.rs`.
+  `minecraft/meta/paper.rs`, the SpigotMC version index in
+  `minecraft/meta/spigot.rs`, and BuildTools' output naming and narration
+  filter in `minecraft/spigot/buildtools.rs`.
 - `crates/daemon/tests/e2e.rs` — a client-to-daemon round trip over a real
   socket; the session-key prefix invariant is unit-tested in `runtime/mod.rs`.
 

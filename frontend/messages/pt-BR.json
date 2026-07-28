@@ -253,7 +253,9 @@
   "fabric_summary": "Loader leve para mods, pacotes de recursos e datapacks.",
   "neoforge_summary": "Loader de mods para modpacks grandes. A primeira execução monta o jar do jogo, então leva alguns minutos.",
   "paper_summary": "Servidor de alto desempenho que roda plugins do Bukkit.",
-  "folia_summary": "Paper com multithreading regionalizado, para mundos muito grandes. Apenas plugins compatíveis com Folia funcionam."
+  "folia_summary": "Paper com multithreading regionalizado, para mundos muito grandes. Apenas plugins compatíveis com Folia funcionam.",
+  "spigot_summary": "Bukkit com patches de desempenho e o maior ecossistema de plugins. Compilado aqui na criação, o que leva vários minutos e exige o git instalado.",
+  "bukkit_summary": "O servidor de plugins original, sem os patches do Spigot. Compilado aqui na criação, o que leva vários minutos e exige o git instalado."
  },
  "phase": {
   "resolving_profile": "Resolvendo perfil",

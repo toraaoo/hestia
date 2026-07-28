@@ -25,14 +25,19 @@ pub struct ResolveRequest {
 /// Most flavors need nothing: a profile is a list of downloads, and the
 /// materialize pass fetches it. NeoForge is the exception — the jar its loader
 /// runs does not exist anywhere to download and is produced locally from the
-/// vanilla one, so the flavor gets a hook rather than the launch flows growing a
-/// branch on a flavor name.
+/// vanilla one — as are Bukkit and Spigot, which no one may redistribute at
+/// all. So the flavor gets a hook rather than the launch flows growing a branch
+/// on a flavor name.
 pub struct InstallRequest<'a> {
     pub game_version: &'a str,
     pub loader_version: Option<&'a str>,
     /// The root the install writes under — `meta/` for a client (whose
     /// `libraries/` is the shared root) and the server's own data directory.
     pub root: &'a Path,
+    /// The shared `meta/` root, for work that belongs to no single entry: a
+    /// build every entry on that version can reuse. Same path as `root` for a
+    /// client, which already installs there.
+    pub meta: &'a Path,
     /// The vanilla jar for this side, already materialized.
     pub minecraft_jar: &'a Path,
     pub java: &'a Path,

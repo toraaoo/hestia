@@ -1,14 +1,14 @@
 //! Instance creation, in-place version updates, and the launch preparation that
 //! materialises the client jar, libraries, and assets.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use proto::instance::{InstanceDetails, WorldInfo};
 use proto::minecraft::{ConfigEntry, ProvisionPhase};
 use proto::warning::WarningInfo;
 
-use super::{effective_name, guard_downgrade};
+use super::{effective_name, guard_downgrade, meta_dir};
 use crate::content::{install, profiles};
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
@@ -209,6 +209,7 @@ impl Engine {
                     game_version: &record.profile.game_version,
                     loader_version: record.profile.loader_version.as_deref(),
                     root: &meta,
+                    meta: &meta,
                     minecraft_jar: &client_jar,
                     java: &java,
                     cache: Some(&self.cache),
@@ -313,11 +314,4 @@ pub struct PreparedLaunch {
     pub plan: LaunchPlan,
     pub log_file: PathBuf,
     pub warnings: Vec<WarningInfo>,
-}
-
-/// The root for launcher-managed shared game files (versions, libraries,
-/// assets, natives) — the Modrinth layout, keeping the data home itself to
-/// user-facing entries and launcher internals.
-fn meta_dir(home: &Path) -> PathBuf {
-    home.join("meta")
 }

@@ -54,9 +54,15 @@ it's just as comfortable from a terminal as from a window.
 > the ones you have edited. Vanilla and Fabric are the
 > shipped flavors for both sides, joined by **NeoForge** — whose game jar is
 > built locally from its installer, so a first launch or create takes a few
-> minutes. **Paper** and **Folia** are shipped for
-> servers, which take **plugins** rather than mods and start on the JVM flags
-> PaperMC recommends for that version. Modrinth is the shipped content source.
+> minutes. **Paper**, **Folia**, **Spigot** and **CraftBukkit** are shipped for
+> servers, which take **plugins** rather than mods; the PaperMC pair start on
+> the JVM flags PaperMC recommends for that version, while Spigot and
+> CraftBukkit are *compiled on the machine* at create with SpigotMC's
+> BuildTools — nobody may redistribute either jar — so a first create takes
+> several minutes and needs `git` installed. Each flavor describes itself over
+> the wire (name, blurb, and the content kinds it takes), so a front-end
+> renders whatever the daemon ships without a table of its own. Modrinth is the
+> shipped content source.
 > A **system tray**
 > accompanies every serving daemon — open the app, status, start/restart, a
 > start-at-login toggle, quit; a left-click (or the Open item) launches the

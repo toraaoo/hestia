@@ -12,6 +12,7 @@ mod paper;
 pub(crate) mod ping;
 mod provider;
 pub(crate) mod rcon;
+mod spigot;
 mod vanilla;
 pub(crate) mod world;
 
@@ -39,6 +40,8 @@ impl Default for Minecraft {
                 Box::new(fabric::FabricServer),
                 Box::new(paper::PaperServer),
                 Box::new(paper::FoliaServer),
+                Box::new(spigot::SpigotServer),
+                Box::new(spigot::BukkitServer),
                 Box::new(neoforge::NeoForgeServer),
             ],
             instances: vec![

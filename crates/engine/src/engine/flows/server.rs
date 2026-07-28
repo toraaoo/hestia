@@ -8,7 +8,7 @@ use proto::minecraft::ProvisionPhase;
 use proto::server::{JvmArgsSource, ServerDetails, ServerPingResult};
 use proto::warning::WarningInfo;
 
-use super::{effective_name, guard_downgrade, phase_progress};
+use super::{effective_name, guard_downgrade, meta_dir, phase_progress};
 use crate::content::install;
 use crate::engine::{Engine, ServerCreateSpec, ServerUpdateSpec};
 use crate::minecraft::launch::{JavaSettings, LaunchPlan};
@@ -58,6 +58,7 @@ impl Engine {
                         game_version: &record.profile.game_version,
                         loader_version: record.profile.loader_version.as_deref(),
                         root: &data,
+                        meta: &meta_dir(&self.data_home()),
                         minecraft_jar: &data.join(&record.profile.primary.filename),
                         java: &java,
                         cache: Some(&self.cache),
@@ -146,6 +147,7 @@ impl Engine {
                     game_version: &record.profile.game_version,
                     loader_version: record.profile.loader_version.as_deref(),
                     root: &data,
+                    meta: &meta_dir(&self.data_home()),
                     minecraft_jar: &data.join(&record.profile.primary.filename),
                     java: &java,
                     cache: Some(&self.cache),

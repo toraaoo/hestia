@@ -13,7 +13,7 @@ mod server;
 mod skins;
 mod sync;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use proto::minecraft::{ProvisionPhase, ProvisionProgress};
@@ -85,6 +85,14 @@ fn effective_name(name: &str, flavor: &str, version: &str) -> String {
     } else {
         name.trim().to_string()
     }
+}
+
+/// The root for launcher-managed shared game files (versions, libraries,
+/// assets, natives) — the Modrinth layout, keeping the data home itself to
+/// user-facing entries and launcher internals. Also where a flavor that builds
+/// its own artifacts works, since that build belongs to no single entry.
+fn meta_dir(home: &Path) -> PathBuf {
+    home.join("meta")
 }
 
 fn phase_progress(phase: ProvisionPhase) -> ProvisionProgress {

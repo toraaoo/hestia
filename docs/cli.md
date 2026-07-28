@@ -68,7 +68,8 @@ hestia server create vanilla 1.21.1 --eula -n smp   # scriptable (-l pins a
                                  #   common properties, --prop KEY=VALUE the rest)
 hestia server list               # managed servers, their address and state
 hestia server versions [flavor]  # game versions a flavor offers
-hestia server flavors            # the available flavors
+hestia server flavors            # the available flavors, what each takes, and
+                                 #   a line on what it is — all from the daemon
 ```
 
 Everything that acts on one server is entry-first — `hestia server <name> <action>`:
@@ -116,17 +117,26 @@ hestia server smp rename cozy    # rename (stopped): rewrites the display name;
                                  #   the id, directory, ports and data stay put
 hestia server smp remove         # delete the server (its jar, world and all)
 hestia server smp mod add <slug> # a modloader server (fabric) takes mods
-hestia server smp plugin add <slug>     # a paper/folia server takes plugins
+hestia server smp plugin add <slug>     # a paper/folia/spigot/bukkit server takes plugins
 hestia server smp datapack add <slug>   # datapacks install into the server's world
 hestia server smp datapack add --file ./pack.zip   # any kind imports a local file
 ```
 
 What a server takes depends on its flavor: mods on `fabric`/`neoforge`,
-plugins on `paper`/`folia`, datapacks on any of them, and nothing else on
-`vanilla`. A `neoforge` create builds its game jar locally, so it takes a few
+plugins on `paper`/`folia`/`spigot`/`bukkit`, datapacks on any of them, and
+nothing else on `vanilla` — `server flavors` prints the set per flavor rather
+than leaving you to remember it.
+A `neoforge` create builds its game jar locally, so it takes a few
 minutes and cannot derive a property schema (`server config set` accepts any
 key on one).
 Asking for the wrong kind is refused naming what that server does take.
+
+`spigot` and `bukkit` are compiled on this machine at create — nobody may
+redistribute either jar, so SpigotMC's BuildTools builds it here. Budget
+several minutes and a few hundred megabytes for the first one, and have `git`
+installed (the create refuses up front when it is missing; Windows needs
+nothing, BuildTools brings its own). One build produces both, so a later
+`spigot` or `bukkit` server on the same game version is immediate.
 
 `paper` and `folia` publish many builds per game version, so a build number is
 the flavor's *loader version* — `hestia server versions paper` lists the game
