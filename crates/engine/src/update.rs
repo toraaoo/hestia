@@ -3,14 +3,15 @@
 //! staging directory only holds the downloaded installer.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use anyhow::{anyhow, Context, Result};
-use base64::Engine as _;
 use proto::update::{UpdateCheckResult, UpdateInfo};
 
 use crate::download::{http_client, Downloader, ProgressFn};
+use crate::signature::verify_file;
+use crate::version::is_newer;
 
 pub struct Update {
     dir: Mutex<PathBuf>,
@@ -75,7 +76,7 @@ impl Update {
         Downloader::new(None)
             .fetch(&entry.url, &dest, None, on_progress)
             .await?;
-        if let Err(e) = verify_signature(&dest, &entry.signature) {
+        if let Err(e) = verify_file(&dest, &entry.signature, common::app::update_pubkeys()) {
             let _ = std::fs::remove_file(&dest);
             return Err(e.context("update signature verification failed"));
         }
@@ -107,72 +108,4 @@ fn available(manifest: &Manifest) -> Option<&PlatformEntry> {
         std::env::consts::OS,
         std::env::consts::ARCH
     ))
-}
-
-/// Strictly newer on the numeric `x.y.z` triple; anything unparsable is never
-/// newer, so a malformed manifest cannot trigger an update.
-fn is_newer(candidate: &str, current: &str) -> bool {
-    match (parse_version(candidate), parse_version(current)) {
-        (Some(a), Some(b)) => a > b,
-        _ => false,
-    }
-}
-
-fn parse_version(v: &str) -> Option<(u64, u64, u64)> {
-    let v = v.trim().trim_start_matches('v');
-    let v = v.split(['-', '+']).next()?;
-    let mut parts = v.split('.');
-    let major = parts.next()?.parse().ok()?;
-    let minor = parts.next().unwrap_or("0").parse().ok()?;
-    let patch = parts.next().unwrap_or("0").parse().ok()?;
-    Some((major, minor, patch))
-}
-
-/// Accept the artifact if *any* trusted key verifies it. The signature names
-/// one key, so a rotation signs with the successor while builds in the field
-/// still trust the predecessor — the reason the key set is a list rather than
-/// a constant.
-fn verify_signature(path: &Path, signature: &str) -> Result<()> {
-    // Wire contract with tauri's signer: the public key and the signature are
-    // both base64-wrapped minisign documents.
-    let signature = base64_text(signature).context("bad update signature")?;
-    let signature = minisign_verify::Signature::decode(&signature).map_err(|e| anyhow!("{e}"))?;
-    let data = std::fs::read(path).context("cannot read the downloaded installer")?;
-    for key in common::app::update_pubkeys() {
-        let pubkey = base64_text(key).context("bad update public key")?;
-        let pubkey = minisign_verify::PublicKey::decode(&pubkey).map_err(|e| anyhow!("{e}"))?;
-        if pubkey.verify(&data, &signature, true).is_ok() {
-            return Ok(());
-        }
-    }
-    Err(anyhow!("no trusted key verifies this artifact"))
-}
-
-fn base64_text(value: &str) -> Result<String> {
-    let bytes = base64::engine::general_purpose::STANDARD.decode(value.trim())?;
-    Ok(String::from_utf8(bytes)?)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{is_newer, parse_version};
-
-    #[test]
-    fn versions_parse_with_prefixes_and_prereleases() {
-        assert_eq!(parse_version("1.2.3"), Some((1, 2, 3)));
-        assert_eq!(parse_version("v0.1.0"), Some((0, 1, 0)));
-        assert_eq!(parse_version("1.2.3-beta.1"), Some((1, 2, 3)));
-        assert_eq!(parse_version("1.2"), Some((1, 2, 0)));
-        assert_eq!(parse_version("not-a-version"), None);
-    }
-
-    #[test]
-    fn newer_is_strict_and_rejects_garbage() {
-        assert!(is_newer("0.0.2", "0.0.1"));
-        assert!(is_newer("1.0.0", "0.9.9"));
-        assert!(!is_newer("0.0.1", "0.0.1"));
-        assert!(!is_newer("0.0.1", "0.0.2"));
-        assert!(!is_newer("garbage", "0.0.1"));
-        assert!(!is_newer("0.0.2", "garbage"));
-    }
 }

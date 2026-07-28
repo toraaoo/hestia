@@ -18,3 +18,4 @@ chrono = { workspace = true }
 [dev-dependencies]
 husky-rs = "0.3.3"
 serde_json = { workspace = true }
+tempfile.workspace = true

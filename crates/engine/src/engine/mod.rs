@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex};
 use proto::minecraft::ConfigEntry;
 
 use crate::accounts::Accounts;
+use crate::announce::Announce;
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::content::Content;
@@ -65,6 +66,7 @@ pub struct Engine {
     sync: Sync,
     profiles: Profiles,
     update: Update,
+    announce: Announce,
     processes: Arc<ProcessSupervisor>,
     // One backup or restore per entry at a time: two archives of the same
     // data would interleave the rcon save-off/save-on dance.
@@ -85,6 +87,7 @@ impl Engine {
         let sync = Sync::new(data_home.join("shared"));
         let profiles = Profiles::new(data_home.join("profiles"));
         let update = Update::new(data_home.join("updates"));
+        let announce = Announce::new(data_home.join("announce"));
         let processes = Arc::new(ProcessSupervisor::new(data_home.join("processes")));
         Engine {
             data_home: Mutex::new(data_home),
@@ -100,6 +103,7 @@ impl Engine {
             sync,
             profiles,
             update,
+            announce,
             processes,
             backups_active: Mutex::new(HashSet::new()),
         }
@@ -153,6 +157,7 @@ impl Engine {
         self.sync.reload(resolved.join("shared"));
         self.profiles.reload(resolved.join("profiles"));
         self.update.reload(resolved.join("updates"));
+        self.announce.reload(resolved.join("announce"));
         self.processes.reload(resolved.join("processes"));
         *self.data_home.lock().unwrap() = resolved.clone();
         tracing::info!(home = %resolved.display(), "engine data home changed");

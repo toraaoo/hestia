@@ -21,6 +21,23 @@ pub struct Settings {
     /// JVM defaults applied to any server or instance whose record leaves the
     /// matching per-entry setting unset.
     pub defaults: JvmDefaults,
+    /// The news and notices feed.
+    pub announcements: AnnounceSettings,
+}
+
+/// Whether the launcher fetches its announcement feed. This is the daemon's
+/// only *unprompted* outbound request — the update check runs on demand — so
+/// it is switchable rather than assumed.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AnnounceSettings {
+    pub enabled: bool,
+}
+
+impl Default for AnnounceSettings {
+    fn default() -> Self {
+        AnnounceSettings { enabled: true }
+    }
 }
 
 /// The launcher-wide JVM defaults, addressed by the kebab-case config keys
