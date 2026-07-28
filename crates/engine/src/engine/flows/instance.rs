@@ -174,10 +174,16 @@ impl Engine {
 
         materialize::validate_filename(&record.profile.game_version)?;
         let meta = meta_dir(&self.data_home());
+        // `versions/<id>/<id>.jar`, Mojang's own layout rather than a name of
+        // our choosing: a modloader that boots off the module path filters the
+        // vanilla jar out of it by that name (NeoForge passes
+        // `-DignoreList=…,${version_name}.jar`). Called anything else, the jar
+        // stays on the module path beside the loader's patched copy and the JVM
+        // refuses to resolve — two modules exporting the same packages.
         let client_jar = meta
             .join("versions")
             .join(&record.profile.game_version)
-            .join("client.jar");
+            .join(format!("{}.jar", record.profile.game_version));
         materialize::ensure_artifact(
             Some(&self.cache),
             &record.profile.client,
