@@ -106,11 +106,46 @@ The **private** half signs releases, either as the `TAURI_SIGNING_PRIVATE_KEY`
 repository secret (with `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) or locally by
 whoever cuts the release. Offline is the safer default, because:
 
-> **The updater key cannot be rotated.** A binary verifies only against the key
-> compiled into it, and Tauri's `pubkey` field holds exactly one — so every
-> shipped build trusts that key permanently. Lose it and those installs can
-> never accept another update; leak it and nothing recovers them remotely.
-> Changing it is not a deploy, it is abandoning every existing install.
+> **A build trusts only the keys compiled into it.** Nothing sent later changes
+> that, so a successor key has to ship *before* it is needed — which is what
+> `UPDATE_PUBKEY_NEXT` is for. Lose both halves of both keys and the installs
+> in the field can never accept another update.
+
+### Rotating the signing key
+
+Two keys ship in every build. `UPDATE_PUBKEY` signs releases;
+`UPDATE_PUBKEY_NEXT` is the successor, whose private half stays offline and out
+of CI until the day it is needed. To rotate:
+
+1. Swap the values — the spare becomes `UPDATE_PUBKEY`, in `common::app` *and*
+   in `tauri.conf.json` (`crates/common/tests/updater.rs` fails the build if the
+   two disagree).
+2. Generate a fresh spare into `UPDATE_PUBKEY_NEXT`, private half offline.
+3. Replace `TAURI_SIGNING_PRIVATE_KEY` / `..._PASSWORD` with the new signing
+   key's, and cut a release.
+
+Builds already in the field verify against the successor they were shipped
+with, so they accept the new release without an intermediate version.
+
+**Tauri's own procedure is different and weaker.** Upstream
+([tauri#7585](https://github.com/tauri-apps/tauri/issues/7585), open) documents
+a staggered rotation: sign v2 with the *old* key while shipping the *new*
+pubkey, then sign v3 with the new key. It needs no extra code, but it requires
+still holding the old key — useless if the key was lost or leaked — and it
+strands anyone who skips the intermediate version, which for a launcher is
+routine. Carrying the successor instead is what OpenBSD's signify does, what
+[sparkle#1501](https://github.com/sparkle-project/Sparkle/issues/1501) proposes
+for Sparkle, and what tauri#7585 asks for
+(`pubkey: Option<Vec<String>>`, "try the first, and if it fails try the
+second"). When that lands upstream, `update_pubkeys` and the desktop's retry
+loop can be deleted in favour of it.
+
+The daemon and CLI verify the key set directly (`engine/src/update.rs`). The
+desktop shell cannot: `tauri-plugin-updater` holds one `pubkey` in its config
+and verifies against only that, so `commands/update.rs` builds one updater per
+key through the builder's `.pubkey()` override — the hook the plugin's own docs
+point at for "key rotation logic". A retry re-downloads, which is acceptable
+for something that happens once per rotation.
 
 `scripts/package.sh` builds without the key by flipping
 `createUpdaterArtifacts` off, so local packaging works unsigned. CI refuses a

@@ -128,17 +128,24 @@ fn parse_version(v: &str) -> Option<(u64, u64, u64)> {
     Some((major, minor, patch))
 }
 
+/// Accept the artifact if *any* trusted key verifies it. The signature names
+/// one key, so a rotation signs with the successor while builds in the field
+/// still trust the predecessor — the reason the key set is a list rather than
+/// a constant.
 fn verify_signature(path: &Path, signature: &str) -> Result<()> {
     // Wire contract with tauri's signer: the public key and the signature are
     // both base64-wrapped minisign documents.
-    let pubkey = base64_text(common::app::UPDATE_PUBKEY).context("bad update public key")?;
-    let pubkey = minisign_verify::PublicKey::decode(&pubkey).map_err(|e| anyhow!("{e}"))?;
     let signature = base64_text(signature).context("bad update signature")?;
     let signature = minisign_verify::Signature::decode(&signature).map_err(|e| anyhow!("{e}"))?;
     let data = std::fs::read(path).context("cannot read the downloaded installer")?;
-    pubkey
-        .verify(&data, &signature, true)
-        .map_err(|e| anyhow!("{e}"))
+    for key in common::app::update_pubkeys() {
+        let pubkey = base64_text(key).context("bad update public key")?;
+        let pubkey = minisign_verify::PublicKey::decode(&pubkey).map_err(|e| anyhow!("{e}"))?;
+        if pubkey.verify(&data, &signature, true).is_ok() {
+            return Ok(());
+        }
+    }
+    Err(anyhow!("no trusted key verifies this artifact"))
 }
 
 fn base64_text(value: &str) -> Result<String> {

@@ -27,6 +27,24 @@ fn endpoint_matches_the_desktop_shell() {
 }
 
 #[test]
+fn the_rotation_spare_is_a_different_key() {
+    let next = common::app::UPDATE_PUBKEY_NEXT;
+    assert!(
+        next.is_empty() || next != common::app::UPDATE_PUBKEY,
+        "UPDATE_PUBKEY_NEXT repeats the primary key — a rotation would have \
+         nothing to rotate to"
+    );
+}
+
+#[test]
+fn the_primary_key_is_the_one_releases_are_signed_with() {
+    assert!(
+        common::app::update_pubkeys().next() == Some(common::app::UPDATE_PUBKEY),
+        "the primary key must stay first: it is the one tauri.conf.json pins"
+    );
+}
+
+#[test]
 fn pubkey_matches_the_desktop_shell() {
     let updater = updater_config();
     assert_eq!(
