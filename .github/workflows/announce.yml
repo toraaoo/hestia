@@ -54,6 +54,22 @@ jobs:
           ANNOUNCE_SIGNING_KEY_PASSWORD: ${{ secrets.ANNOUNCE_SIGNING_KEY_PASSWORD }}
         run: scripts/announce.sh --sign > announcements.json
 
+      # The signing secret and the key builds trust are set independently, so
+      # nothing else would notice them diverging until the feed reached users
+      # and verified against nothing.
+      - name: Verify against the key builds trust
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          sed -n 's/^pub const ANNOUNCE_PUBKEY: &str = "\(.*\)";$/\1/p' \
+            crates/common/src/app.rs | base64 -d > pubkey
+          # -j, not -r: the signature covers the payload bytes, and -r would
+          # append a newline that was never signed.
+          jq -j .payload announcements.json > payload.json
+          jq -r .signature announcements.json | base64 -d > payload.json.minisig
+          minisign -Vm payload.json -p pubkey
+          rm -f pubkey payload.json payload.json.minisig
+
       # Images are referenced by absolute URL in the compiled feed, so they must
       # land on the same tag. They are outside the signature — see news/README.md.
       - name: Collect referenced images
