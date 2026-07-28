@@ -19,6 +19,8 @@ export interface Target {
   flavor: string;
   gameVersion: string;
   running: boolean;
+  /** What this entry takes, as the daemon computed it from its flavor. */
+  accepts: ContentKind[];
 }
 
 export const serverTarget = (s: ServerInfo): Target => ({
@@ -28,6 +30,7 @@ export const serverTarget = (s: ServerInfo): Target => ({
   flavor: s.flavor,
   gameVersion: s.gameVersion,
   running: s.process?.state === 'running',
+  accepts: s.accepts ?? [],
 });
 
 export const instanceTarget = (i: InstanceInfo): Target => ({
@@ -37,6 +40,7 @@ export const instanceTarget = (i: InstanceInfo): Target => ({
   flavor: i.flavor,
   gameVersion: i.gameVersion,
   running: (i.sessions ?? []).some((s) => s.state === 'running'),
+  accepts: i.accepts ?? [],
 });
 
 /**
@@ -50,19 +54,24 @@ export const profileTarget = (p: GlobalProfile): Target => ({
   flavor: '',
   gameVersion: '',
   running: false,
+  accepts: PROFILE_ACCEPTS,
 });
 
-/** Which kinds each entry type accepts — mirrors the daemon's install surface. */
-export const ACCEPTS: Record<Target['type'], ContentKind[]> = {
-  profile: ['mod', 'resource_pack', 'shader'],
-  server: ['mod', 'data_pack'],
-  instance: ['mod', 'resource_pack', 'shader', 'data_pack'],
-};
+/**
+ * A global profile stores project references rather than jars, so it has no
+ * flavor to ask the daemon about — its kinds are the ones an instance can
+ * later resolve a reference into. Servers and instances carry their own
+ * `accepts` instead: what a paper server takes differs from what a fabric one
+ * does, and only the daemon's flavor registry knows that.
+ */
+export const PROFILE_ACCEPTS: ContentKind[] = [
+  'mod',
+  'resource_pack',
+  'shader',
+];
 
-/** A mod needs a loader; a vanilla entry cannot take one. */
 export const targetTakesKind = (t: Target, kind: ContentKind): boolean =>
-  ACCEPTS[t.type].includes(kind) &&
-  (kind !== 'mod' || t.flavor === 'fabric' || t.type === 'profile');
+  t.accepts.includes(kind);
 
 export const entryTypeLabel = (type: Target['type']): string =>
   type === 'server'

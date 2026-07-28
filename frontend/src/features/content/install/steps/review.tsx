@@ -20,12 +20,7 @@ import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
 
-import {
-  ACCEPTS,
-  type PickedFile,
-  type Target,
-  targetTakesKind,
-} from '../targets';
+import type { PickedFile, Target } from '../targets';
 
 export function ReviewStep({
   target,
@@ -107,9 +102,7 @@ function FileReviewRow({
   onSetKind: (kind: ContentKind) => void;
   onRemove: () => void;
 }) {
-  const kinds = target
-    ? ACCEPTS[target.type].filter((k) => targetTakesKind(target, k))
-    : [];
+  const kinds = target?.accepts ?? [];
 
   if (!file.valid) {
     return (

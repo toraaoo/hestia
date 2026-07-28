@@ -40,7 +40,11 @@ export const kindLoader = (
   kind: ContentKind,
   flavor: string,
 ): string | undefined =>
-  kind === 'mod' ? flavor : kind === 'data_pack' ? 'datapack' : undefined;
+  kind === 'mod' || kind === 'plugin'
+    ? flavor
+    : kind === 'data_pack'
+      ? 'datapack'
+      : undefined;
 
 export interface RowHandlers {
   /** `worlds` narrows a datapack to those saves; omitted covers every one. */

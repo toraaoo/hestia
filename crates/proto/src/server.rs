@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::content::ContentKind;
 use crate::contract::{Contract, Empty, Topic};
 use crate::error::ErrorInfo;
 use crate::minecraft::{
@@ -65,6 +66,11 @@ pub struct ServerInfo {
     /// True once RCON is configured (a server started before the console
     /// existed gains one on its next start).
     pub console: bool,
+    /// The content kinds this server can take, composed from its flavor's own
+    /// loader and its side. Carried rather than re-derived, so a front-end
+    /// never has to keep its own copy of the flavor table in step.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub accepts: Vec<ContentKind>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub process: Option<ProcessInfo>,
 }

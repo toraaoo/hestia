@@ -1,9 +1,9 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import type { ContentKind } from '@/api';
+import { isContentKind } from '@/features/content/lib/kinds';
 import {
   InstanceDetailPage,
   type InstanceTab,
-  instanceContentKinds,
 } from '@/features/instances/detail';
 import { ensureSignedIn } from '@/queries';
 
@@ -30,9 +30,8 @@ export const Route = createFileRoute('/_app/instances/$id')({
     return {
       tab,
       kind:
-        tab === 'content' &&
-        instanceContentKinds.includes(search.kind as ContentKind)
-          ? (search.kind as ContentKind)
+        tab === 'content' && isContentKind(search.kind)
+          ? search.kind
           : undefined,
     };
   },

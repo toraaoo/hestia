@@ -349,6 +349,7 @@
    "internal": "{detail}",
    "unsupported_content_url": "'{url}' não é uma URL de projeto em uma fonte de conteúdo suportada.",
    "content_kind_mismatch": "'{title}' é conteúdo do tipo {actual}, não {expected}.",
+   "content_kind_rejected": "{entry} {flavor} não aceita conteúdo do tipo {requested} — aceita {accepts}.",
    "incompatible_version": "Este app e o daemon estão em versões diferentes (protocolo {got} vs {want}). Atualize o Hestia."
   },
   "token": {
@@ -392,6 +393,7 @@
    "adoptium": "Adoptium",
    "mojang": "Mojang",
    "fabric": "Fabric",
+   "paper": "PaperMC",
    "modrinth": "Modrinth",
    "microsoft": "Microsoft",
    "xbox": "Xbox",
@@ -408,8 +410,6 @@
    "install": "instalar",
    "modify": "alterar",
    "back_up": "fazer backup",
-   "server_content_kinds": "um servidor aceita apenas mods e datapacks",
-   "vanilla_no_mods": "um jogo vanilla não carrega mods",
    "worlds_for_datapacks_only": "mundos se aplicam apenas a datapacks",
    "datapacks_per_world": "apenas datapacks são instalados por mundo",
    "modpack_not_single_file": "um modpack não pode ser instalado como arquivo único",
@@ -417,7 +417,8 @@
    "modpack": "modpack",
    "resource_pack": "pacote de recursos",
    "shader": "shader",
-   "data_pack": "datapack"
+   "data_pack": "datapack",
+   "plugin": "plugin"
   }
  },
  "kind": {
@@ -426,11 +427,13 @@
   "resourcepacks": "Pacotes de recursos",
   "shaders": "Shaders",
   "datapacks": "Datapacks",
+  "plugins": "Plugins",
   "mod": "Mod",
   "modpack": "Modpack",
   "resourcepack": "Pacote de recursos",
   "shader": "Shader",
-  "datapack": "Datapack"
+  "datapack": "Datapack",
+  "plugin": "Plugin"
  },
  "browse": {
   "subtitle": "Descubra mods, pacotes e shaders no Modrinth",

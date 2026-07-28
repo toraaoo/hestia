@@ -915,6 +915,17 @@ impl Engine {
         };
         accepted_kinds(ctx.side, loads)
     }
+
+    /// What a server of this flavor can take. Published on the entry views so a
+    /// front-end renders the daemon's answer instead of keeping its own copy of
+    /// the flavor table — the same no-drift rule the wire contracts follow.
+    pub fn server_accepts(&self, flavor: &str) -> Vec<ContentKind> {
+        accepted_kinds(EntrySide::Server, self.minecraft().server_loads(flavor))
+    }
+
+    pub fn instance_accepts(&self, flavor: &str) -> Vec<ContentKind> {
+        accepted_kinds(EntrySide::Client, self.minecraft().instance_loads(flavor))
+    }
 }
 
 /// The two facts composed: whatever the flavor's loader takes, plus what the

@@ -5,4 +5,9 @@ import type { Library } from "./Library";
 /**
  * The resolved launch profile for a Minecraft *server*.
  */
-export type ServerProfile = { flavor: string, gameVersion: string, loaderVersion?: string, primary: Artifact, libraries: Array<Library>, javaMajor: number, mainClass: string, };
+export type ServerProfile = { flavor: string, gameVersion: string, loaderVersion?: string, primary: Artifact, libraries: Array<Library>, javaMajor: number, mainClass: string, 
+/**
+ * The flavor's own recommended JVM flags, used only when the entry sets no
+ * `jvm-args` of its own and no global default exists.
+ */
+jvmArgs: Array<string>, };

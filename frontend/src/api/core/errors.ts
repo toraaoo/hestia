@@ -33,6 +33,7 @@ const TOKEN_FIELDS = new Set([
   'what',
   'actual',
   'expected',
+  'requested',
 ]);
 
 function token(value: unknown): string {

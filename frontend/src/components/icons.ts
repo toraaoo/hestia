@@ -5,6 +5,7 @@ import {
   HardDrivesIcon,
   ImagesIcon,
   PackageIcon,
+  PlugIcon,
   PuzzlePieceIcon,
   SparkleIcon,
   StackIcon,
@@ -33,6 +34,8 @@ export function contentIcon(kind: ContentKind): Icon {
       return DatabaseIcon;
     case 'modpack':
       return PackageIcon;
+    case 'plugin':
+      return PlugIcon;
   }
 }
 
@@ -42,4 +45,5 @@ export const contentKindLabel: Record<ContentKind, () => string> = {
   shader: m['kind.shader'],
   data_pack: m['kind.datapack'],
   modpack: m['kind.modpack'],
+  plugin: m['kind.plugin'],
 };

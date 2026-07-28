@@ -3,4 +3,4 @@
 /**
  * What a project is — the second selector level after the source.
  */
-export type ContentKind = "mod" | "modpack" | "resource_pack" | "shader" | "data_pack";
+export type ContentKind = "mod" | "modpack" | "resource_pack" | "shader" | "data_pack" | "plugin";

@@ -1,10 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import type { ContentKind } from '@/api';
-import {
-  ServerDetailPage,
-  type ServerTab,
-  serverContentKinds,
-} from '@/features/servers/detail';
+import { isContentKind } from '@/features/content/lib/kinds';
+import { ServerDetailPage, type ServerTab } from '@/features/servers/detail';
 
 const tabs: ServerTab[] = ['console', 'content', 'backups', 'settings'];
 
@@ -18,9 +15,8 @@ export const Route = createFileRoute('/_app/servers/$id')({
     return {
       tab,
       kind:
-        tab === 'content' &&
-        serverContentKinds.includes(search.kind as ContentKind)
-          ? (search.kind as ContentKind)
+        tab === 'content' && isContentKind(search.kind)
+          ? search.kind
           : undefined,
     };
   },

@@ -42,9 +42,6 @@ export type ServerTab =
   | 'backups'
   | 'settings';
 
-/** The content kinds a server takes (see `server.content.add`). */
-export const serverContentKinds: ContentKind[] = ['mod', 'data_pack'];
-
 function isRunning(server: ServerInfo): boolean {
   return server.process?.state === 'running';
 }
@@ -269,7 +266,7 @@ export function ServerDetailPage({
               flavor: server.flavor,
               gameVersion: server.gameVersion,
             }}
-            kinds={serverContentKinds}
+            kinds={server.accepts ?? []}
             kind={contentKind}
             onKindChange={onContentKindChange}
             action={

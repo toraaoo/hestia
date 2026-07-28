@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::content::ContentKind;
 use crate::contract::{Contract, Empty, Topic};
 use crate::error::ErrorInfo;
 use crate::minecraft::{
@@ -63,6 +64,9 @@ pub struct InstanceInfo {
     pub last_played_unix: Option<i64>,
     /// Cumulative seconds played across every session the daemon has observed.
     pub playtime_seconds: i64,
+    /// The content kinds this instance can take — see [`ServerInfo::accepts`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub accepts: Vec<ContentKind>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub sessions: Vec<ProcessInfo>,
 }

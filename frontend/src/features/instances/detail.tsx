@@ -54,14 +54,6 @@ export type InstanceTab =
   | 'logs'
   | 'settings';
 
-/** The content kinds an instance takes (see `instance.content.add`). */
-export const instanceContentKinds: ContentKind[] = [
-  'mod',
-  'resource_pack',
-  'shader',
-  'data_pack',
-];
-
 function runningSessions(instance: InstanceInfo): number {
   return (instance.sessions ?? []).filter((s) => s.state === 'running').length;
 }
@@ -87,17 +79,18 @@ export function InstanceDetailPage({
   const [addingContent, setAddingContent] = useState(false);
   const { launch, isLaunching } = useLaunchModal();
   const stop = useMutation(instanceMutations.stop(id));
+  const instance = query.data;
+  const accepts = instance?.accepts ?? [];
   // Shared with the content tab's own per-kind queries (cached), just for the
   // headline count.
   const contentLists = useQueries({
-    queries: instanceContentKinds.map((k) => instanceQueries.content(id, k)),
+    queries: accepts.map((k) => instanceQueries.content(id, k)),
   });
   const contentCount = contentLists.reduce(
     (n, q) => n + (q.data?.items.length ?? 0),
     0,
   );
 
-  const instance = query.data;
   const sessions = instance ? runningSessions(instance) : 0;
   const running = sessions > 0;
   const liveSession = (instance?.sessions ?? []).find(
@@ -352,7 +345,7 @@ export function InstanceDetailPage({
               flavor: instance.flavor,
               gameVersion: instance.gameVersion,
             }}
-            kinds={instanceContentKinds}
+            kinds={accepts}
             kind={contentKind}
             onKindChange={onContentKindChange}
             action={

@@ -19,11 +19,9 @@ import { instanceQueries } from '@/queries/instance';
 
 import { FilterBar } from '../filter-bar';
 import {
-  ACCEPTS,
   fileName,
   type PickedFile,
   type Target,
-  targetTakesKind,
   useInstalledRefs,
 } from '../targets';
 
@@ -43,7 +41,7 @@ export function ContentStep({
   onAddFiles: (files: PickedFile[]) => void;
 }) {
   const [search, setSearch] = useState('');
-  const kinds = ACCEPTS[target.type].filter((k) => targetTakesKind(target, k));
+  const kinds = target.accepts;
   // Datapacks land inside a world; an instance with none can take none.
   const worlds = useQuery({
     ...instanceQueries.worlds(target.id),

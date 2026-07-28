@@ -50,6 +50,7 @@ fn now_unix() -> i64 {
 pub fn server_info(
     record: ServerRecord,
     process: Option<proto::process::ProcessInfo>,
+    accepts: Vec<proto::content::ContentKind>,
 ) -> ServerInfo {
     let ready = record.ready();
     ServerInfo {
@@ -63,6 +64,7 @@ pub fn server_info(
         ready,
         game_port: record.game_port,
         console: record.rcon.is_some(),
+        accepts,
         process,
     }
 }
@@ -70,6 +72,7 @@ pub fn server_info(
 pub fn instance_info(
     record: InstanceRecord,
     sessions: Vec<proto::process::ProcessInfo>,
+    accepts: Vec<proto::content::ContentKind>,
 ) -> InstanceInfo {
     InstanceInfo {
         id: record.id,
@@ -81,6 +84,7 @@ pub fn instance_info(
         created_unix: record.created_unix,
         last_played_unix: record.last_played_unix,
         playtime_seconds: record.playtime_seconds,
+        accepts,
         sessions,
     }
 }
@@ -165,12 +169,14 @@ impl Runtime {
     /// A server's record merged with its live process state (when started).
     pub fn server_view(&self, record: ServerRecord) -> ServerInfo {
         let process = self.processes.status(&server_process_id(&record.id));
-        server_info(record, process)
+        let accepts = self.engine.server_accepts(&record.profile.flavor);
+        server_info(record, process, accepts)
     }
 
     pub fn instance_view(&self, record: InstanceRecord) -> InstanceInfo {
         let sessions = self.instance_sessions(&record.id);
-        instance_info(record, sessions)
+        let accepts = self.engine.instance_accepts(&record.profile.flavor);
+        instance_info(record, sessions, accepts)
     }
 
     /// Every live session of an instance, newest first.

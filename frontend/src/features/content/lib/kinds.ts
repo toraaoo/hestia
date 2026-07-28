@@ -6,7 +6,8 @@ export type KindSlug =
   | 'modpacks'
   | 'resourcepacks'
   | 'shaders'
-  | 'datapacks';
+  | 'datapacks'
+  | 'plugins';
 
 export const kindInfo: Record<
   ContentKind,
@@ -17,7 +18,16 @@ export const kindInfo: Record<
   resource_pack: { slug: 'resourcepacks', label: m['kind.resourcepacks'] },
   shader: { slug: 'shaders', label: m['kind.shaders'] },
   data_pack: { slug: 'datapacks', label: m['kind.datapacks'] },
+  plugin: { slug: 'plugins', label: m['kind.plugins'] },
 };
+
+/**
+ * Every kind the wire defines. Only for validating a URL search param, where
+ * the entry — and so the set it actually accepts — is not loaded yet; an entry
+ * carries its own `accepts` and that is what a surface renders.
+ */
+export const isContentKind = (value: unknown): value is ContentKind =>
+  typeof value === 'string' && value in kindInfo;
 
 export const contentKinds = Object.keys(kindInfo) as ContentKind[];
 

@@ -91,9 +91,10 @@ impl ServerCreateManager {
                         warnings = warnings.len(),
                         "server create done"
                     );
+                    let accepts = engine.server_accepts(&record.profile.flavor);
                     hub.publish(&topic_event(&ServerCreateDoneEvent {
                         id: job_id.clone(),
-                        server: server_info(record, None),
+                        server: server_info(record, None, accepts),
                         warnings,
                     }));
                 }
@@ -189,9 +190,10 @@ impl ServerUpdateManager {
                         warnings = warnings.len(),
                         "server update done"
                     );
+                    let accepts = engine.server_accepts(&record.profile.flavor);
                     hub.publish(&topic_event(&ServerUpdateDoneEvent {
                         id: job_id.clone(),
-                        server: server_info(record, None),
+                        server: server_info(record, None, accepts),
                         warnings,
                     }));
                 }
