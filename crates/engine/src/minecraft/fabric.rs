@@ -6,12 +6,13 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use proto::content::ContentKind;
 use proto::minecraft::{
     Artifact, GameVersion, InstanceProfile, Library, ServerProfile, VersionKind,
 };
 
 use super::meta::{fabric, mojang};
-use super::provider::{InstanceProvider, ResolveRequest, ServerProvider};
+use super::provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 const ID: &str = "fabric";
 const NAME: &str = "Fabric";
@@ -50,6 +51,10 @@ impl ServerProvider for FabricServer {
         NAME
     }
 
+    fn loads(&self) -> Loads {
+        Some(ContentKind::Mod)
+    }
+
     async fn versions(&self) -> Result<Vec<GameVersion>> {
         game_versions().await
     }
@@ -79,6 +84,7 @@ impl ServerProvider for FabricServer {
             libraries: Vec::new(),
             java_major: mojang::java_major(&base),
             main_class: String::new(),
+            jvm_args: Vec::new(),
         })
     }
 }
@@ -130,6 +136,10 @@ impl InstanceProvider for FabricInstance {
     }
     fn name(&self) -> &'static str {
         NAME
+    }
+
+    fn loads(&self) -> Loads {
+        Some(ContentKind::Mod)
     }
 
     async fn versions(&self) -> Result<Vec<GameVersion>> {

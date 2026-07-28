@@ -96,6 +96,9 @@ pub struct ServerProfile {
     pub libraries: Vec<Library>,
     pub java_major: i32,
     pub main_class: String,
+    /// The flavor's own recommended JVM flags, used only when the entry sets no
+    /// `jvm-args` of its own and no global default exists.
+    pub jvm_args: Vec<String>,
 }
 
 /// The resolved launch profile for a Minecraft *client* (instance).

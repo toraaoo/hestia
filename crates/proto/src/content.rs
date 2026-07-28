@@ -24,6 +24,7 @@ pub enum ContentKind {
     ResourcePack,
     Shader,
     DataPack,
+    Plugin,
 }
 
 impl fmt::Display for ContentKind {
@@ -34,6 +35,7 @@ impl fmt::Display for ContentKind {
             ContentKind::ResourcePack => "resource pack",
             ContentKind::Shader => "shader",
             ContentKind::DataPack => "datapack",
+            ContentKind::Plugin => "plugin",
         })
     }
 }

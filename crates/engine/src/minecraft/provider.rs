@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use proto::content::ContentKind;
 use proto::minecraft::{GameVersion, InstanceProfile, ServerProfile};
 
 /// A resolution request: a game version and, for modloaders, an optional pinned
@@ -14,10 +15,17 @@ pub struct ResolveRequest {
     pub loader_version: Option<String>,
 }
 
+/// The third-party content a flavor's own loader consumes: mods for a
+/// modloader, plugins for a server platform, nothing for vanilla. Datapacks
+/// (and, client-side, resourcepacks and shaders) belong to the game rather than
+/// the flavor, so they are not named here — the content flows add them.
+pub type Loads = Option<ContentKind>;
+
 #[async_trait]
 pub trait ServerProvider: Send + Sync {
     fn id(&self) -> &'static str;
     fn name(&self) -> &'static str;
+    fn loads(&self) -> Loads;
     async fn versions(&self) -> Result<Vec<GameVersion>>;
     async fn resolve(&self, request: &ResolveRequest) -> Result<ServerProfile>;
     /// The loader builds available for a game version, newest first. A flavor
@@ -31,6 +39,7 @@ pub trait ServerProvider: Send + Sync {
 pub trait InstanceProvider: Send + Sync {
     fn id(&self) -> &'static str;
     fn name(&self) -> &'static str;
+    fn loads(&self) -> Loads;
     async fn versions(&self) -> Result<Vec<GameVersion>>;
     async fn resolve(&self, request: &ResolveRequest) -> Result<InstanceProfile>;
     /// The loader builds available for a game version, newest first. A flavor

@@ -16,7 +16,7 @@ pub(crate) mod world;
 use anyhow::{Context, Result};
 use proto::minecraft::{Flavor, GameVersion, InstanceProfile, ServerProfile};
 
-use provider::{InstanceProvider, ResolveRequest, ServerProvider};
+use provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 /// The Java majors Minecraft launch profiles ever require: 8 (pre-1.17),
 /// 16 (1.17), 17 (1.18–1.20.4), 21 (1.20.5+). Catalogue surfaces (the
@@ -60,6 +60,17 @@ impl Minecraft {
             .iter()
             .map(|p| flavor(p.id(), p.name()))
             .collect()
+    }
+
+    /// The content kind a server flavor's own loader consumes. An unregistered
+    /// flavor — a record written by a build that had one we no longer ship —
+    /// loads nothing rather than failing the read.
+    pub fn server_loads(&self, flavor: &str) -> Loads {
+        self.server(flavor).ok().and_then(|p| p.loads())
+    }
+
+    pub fn instance_loads(&self, flavor: &str) -> Loads {
+        self.instance(flavor).ok().and_then(|p| p.loads())
     }
 
     pub async fn server_versions(&self, flavor: &str) -> Result<Vec<GameVersion>> {

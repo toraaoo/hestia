@@ -32,12 +32,8 @@ impl Engine {
         spec: &ContentAddSpec,
         on_progress: OnProgress<'_>,
     ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
-        if !matches!(spec.kind, ContentKind::Mod | ContentKind::DataPack) {
-            bail!(proto::error::ErrorInfo::UnsupportedOperation {
-                reason: proto::error::Unsupported::ServerContentKinds
-            });
-        }
         let (_, ctx) = self.server_content_ctx(reference)?;
+        self.ensure_accepts(&ctx, spec.kind)?;
         self.add_content(&ctx, spec, on_progress).await
     }
 
@@ -49,8 +45,8 @@ impl Engine {
         spec: &ContentAddSpec,
         on_progress: OnProgress<'_>,
     ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
-        install::kind_dir(spec.kind)?;
         let (_, ctx) = self.instance_content_ctx(reference)?;
+        self.ensure_accepts(&ctx, spec.kind)?;
         self.add_content(&ctx, spec, on_progress).await
     }
 
@@ -346,11 +342,6 @@ impl Engine {
         on_progress: OnProgress<'_>,
     ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
         install::kind_dir(spec.kind)?;
-        if spec.kind == ContentKind::Mod && ctx.flavor == "vanilla" {
-            bail!(proto::error::ErrorInfo::UnsupportedOperation {
-                reason: proto::error::Unsupported::VanillaNoMods
-            });
-        }
         if spec.items.is_empty() {
             bail!(proto::error::ErrorInfo::NothingToDo {
                 what: proto::error::Task::Install
@@ -820,13 +811,16 @@ struct Node {
     project: ContentProject,
 }
 
-/// The loader filter a kind's version lookup needs: the entry's own loader
-/// for mods, and the `datapack` pseudo-loader for datapacks — Modrinth types
-/// datapacks as mods carrying that loader, so the filter is what selects the
-/// datapack file over a jar.
+/// The loader filter a kind's version lookup needs: the entry's own loader for
+/// whatever its flavor loads (a mod on fabric, a plugin on paper — Modrinth
+/// names both by the flavor), and the `datapack` pseudo-loader for datapacks —
+/// Modrinth types datapacks as mods carrying that loader, so the filter is what
+/// selects the datapack file over a jar. Folia is filtered as `folia`, not
+/// widened to `paper`: a plugin that never claimed Folia support deadlocks on
+/// its regionised scheduler.
 fn content_loader(kind: ContentKind, flavor: &str) -> Option<String> {
     match kind {
-        ContentKind::Mod => Some(flavor.to_string()),
+        ContentKind::Mod | ContentKind::Plugin => Some(flavor.to_string()),
         ContentKind::DataPack => Some("datapack".to_string()),
         _ => None,
     }
@@ -890,6 +884,50 @@ impl EntryContent {
             EntrySide::Client => crate::instances::save_worlds(&self.data_dir),
         }
     }
+}
+
+impl Engine {
+    /// Refuse a kind the entry cannot load, naming what it can. Composed from
+    /// two independent facts: what the *flavor's* loader consumes (mods on
+    /// fabric, plugins on paper, nothing on vanilla) and what the *side* reads
+    /// for itself — a client its resourcepacks and shaders, either side the
+    /// datapacks that are world data rather than loader content.
+    fn ensure_accepts(&self, ctx: &EntryContent, requested: ContentKind) -> Result<()> {
+        let accepts = self.accepted_kinds(ctx);
+        if accepts.contains(&requested) {
+            return Ok(());
+        }
+        bail!(proto::error::ErrorInfo::ContentKindRejected {
+            entry: match ctx.side {
+                EntrySide::Server => proto::error::EntryKind::Server,
+                EntrySide::Client => proto::error::EntryKind::Instance,
+            },
+            flavor: ctx.flavor.clone(),
+            requested,
+            accepts,
+        })
+    }
+
+    fn accepted_kinds(&self, ctx: &EntryContent) -> Vec<ContentKind> {
+        let loads = match ctx.side {
+            EntrySide::Server => self.minecraft().server_loads(&ctx.flavor),
+            EntrySide::Client => self.minecraft().instance_loads(&ctx.flavor),
+        };
+        accepted_kinds(ctx.side, loads)
+    }
+}
+
+/// The two facts composed: whatever the flavor's loader takes, plus what the
+/// side reads for itself — a client its own resourcepacks and shaders, either
+/// side the datapacks that are world data rather than loader content.
+fn accepted_kinds(side: EntrySide, loads: Option<ContentKind>) -> Vec<ContentKind> {
+    let mut kinds: Vec<ContentKind> = loads.into_iter().collect();
+    if side == EntrySide::Client {
+        kinds.push(ContentKind::ResourcePack);
+        kinds.push(ContentKind::Shader);
+    }
+    kinds.push(ContentKind::DataPack);
+    kinds
 }
 
 /// Reject content the platform marks unsupported for the entry's side
@@ -1172,6 +1210,33 @@ mod tests {
             flavor: "fabric".to_string(),
             side: EntrySide::Client,
         }
+    }
+
+    #[test]
+    fn a_flavor_contributes_its_loader_kind_and_the_side_the_rest() {
+        assert_eq!(
+            accepted_kinds(EntrySide::Server, Some(ContentKind::Plugin)),
+            vec![ContentKind::Plugin, ContentKind::DataPack],
+            "a paper server takes plugins, never mods"
+        );
+        assert_eq!(
+            accepted_kinds(EntrySide::Server, Some(ContentKind::Mod)),
+            vec![ContentKind::Mod, ContentKind::DataPack]
+        );
+        assert_eq!(
+            accepted_kinds(EntrySide::Server, None),
+            vec![ContentKind::DataPack],
+            "vanilla loads nothing of its own, but a world still takes datapacks"
+        );
+        assert_eq!(
+            accepted_kinds(EntrySide::Client, None),
+            vec![
+                ContentKind::ResourcePack,
+                ContentKind::Shader,
+                ContentKind::DataPack
+            ],
+            "a client reads packs whatever its flavor loads"
+        );
     }
 
     #[test]

@@ -30,12 +30,13 @@ struct Index {
 
 /// The directory name for an installable kind — the game's own load-dir name
 /// (`shaderpacks`, as Iris/OptiFine read), so the managed dir and its `data/`
-/// mirror stay symmetric. Mods/resourcepacks/shaders have a flat managed dir
-/// mirrored into `data/`; a datapack's `datapacks` dir lives inside a world
+/// mirror stay symmetric. Mods/plugins/resourcepacks/shaders have a flat managed
+/// dir mirrored into `data/`; a datapack's `datapacks` dir lives inside a world
 /// instead (see [`datapack_path`]). Modpacks are not single-file installs.
 pub(crate) fn kind_dir(kind: ContentKind) -> Result<&'static str> {
     match kind {
         ContentKind::Mod => Ok("mods"),
+        ContentKind::Plugin => Ok("plugins"),
         ContentKind::ResourcePack => Ok("resourcepacks"),
         ContentKind::Shader => Ok("shaderpacks"),
         ContentKind::DataPack => Ok("datapacks"),

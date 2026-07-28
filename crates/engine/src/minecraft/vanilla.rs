@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use proto::minecraft::{GameVersion, InstanceProfile, ServerProfile};
 
 use super::meta::mojang;
-use super::provider::{InstanceProvider, ResolveRequest, ServerProvider};
+use super::provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 const ID: &str = "vanilla";
 const NAME: &str = "Vanilla";
@@ -20,6 +20,10 @@ impl ServerProvider for VanillaServer {
     }
     fn name(&self) -> &'static str {
         NAME
+    }
+
+    fn loads(&self) -> Loads {
+        None
     }
 
     async fn versions(&self) -> Result<Vec<GameVersion>> {
@@ -36,6 +40,7 @@ impl ServerProvider for VanillaServer {
             libraries: Vec::new(),
             java_major: mojang::java_major(&version),
             main_class: String::new(),
+            jvm_args: Vec::new(),
         })
     }
 }
@@ -49,6 +54,10 @@ impl InstanceProvider for VanillaInstance {
     }
     fn name(&self) -> &'static str {
         NAME
+    }
+
+    fn loads(&self) -> Loads {
+        None
     }
 
     async fn versions(&self) -> Result<Vec<GameVersion>> {

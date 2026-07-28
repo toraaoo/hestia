@@ -163,8 +163,6 @@ impl fmt::Display for Reason {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum Unsupported {
-    ServerContentKinds,
-    VanillaNoMods,
     WorldsForDatapacksOnly,
     DatapacksPerWorld,
     ModpackNotSingleFile,
@@ -173,8 +171,6 @@ pub enum Unsupported {
 impl fmt::Display for Unsupported {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Unsupported::ServerContentKinds => "a server takes mods and datapacks only",
-            Unsupported::VanillaNoMods => "a vanilla game cannot load mods",
             Unsupported::WorldsForDatapacksOnly => "worlds apply to datapacks only",
             Unsupported::DatapacksPerWorld => "only datapacks are installed per world",
             Unsupported::ModpackNotSingleFile => {
@@ -192,6 +188,7 @@ pub enum Service {
     Adoptium,
     Mojang,
     Fabric,
+    Paper,
     Modrinth,
     Microsoft,
     Xbox,
@@ -203,6 +200,7 @@ impl fmt::Display for Service {
             Service::Adoptium => "Adoptium",
             Service::Mojang => "Mojang",
             Service::Fabric => "Fabric",
+            Service::Paper => "PaperMC",
             Service::Modrinth => "Modrinth",
             Service::Microsoft => "Microsoft",
             Service::Xbox => "Xbox",
@@ -318,6 +316,16 @@ pub enum ErrorInfo {
     },
     UnsupportedOperation {
         reason: Unsupported,
+    },
+    /// What an entry can take is a property of its side *and* its flavor — a
+    /// paper server takes plugins where a fabric one takes mods — so the
+    /// accepted set travels with the refusal rather than being spelled out in
+    /// a sentence that goes stale when a flavor is added.
+    ContentKindRejected {
+        entry: EntryKind,
+        flavor: String,
+        requested: ContentKind,
+        accepts: Vec<ContentKind>,
     },
     InvalidTexture {
         detail: String,
@@ -538,6 +546,27 @@ impl fmt::Display for ErrorInfo {
             Busy { detail } => write!(f, "{detail}"),
             ReservedName { name } => write!(f, "'{name}' is a reserved name"),
             UnsupportedOperation { reason } => write!(f, "{reason}"),
+            ContentKindRejected {
+                entry,
+                flavor,
+                requested,
+                accepts,
+            } => {
+                let taken = accepts
+                    .iter()
+                    .map(|k| format!("{k}s"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let taken = if taken.is_empty() {
+                    "no content".to_string()
+                } else {
+                    taken
+                };
+                write!(
+                    f,
+                    "a {flavor} {entry} cannot take {requested}s — it takes {taken}"
+                )
+            }
             InvalidTexture { detail } => write!(f, "{detail}"),
             EntryNotFound { entry, reference } => write!(f, "no {entry} matches '{reference}'"),
             ProcessNotFound { id } => write!(f, "no process '{id}'"),

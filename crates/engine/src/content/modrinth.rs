@@ -33,16 +33,27 @@ const SITE_TYPES: [(&str, Option<ContentKind>); 6] = [
     ("resourcepack", Some(ContentKind::ResourcePack)),
     ("shader", Some(ContentKind::Shader)),
     ("datapack", Some(ContentKind::DataPack)),
-    ("plugin", None),
+    ("plugin", Some(ContentKind::Plugin)),
 ];
 
 /// Which kind each loader implies. Modrinth types a datapack project as `mod`,
-/// so the loaders are the only signal of what a project actually publishes.
-const LOADER_KINDS: [(&str, ContentKind); 9] = [
+/// so the loaders are the only signal of what a project actually publishes; the
+/// server-platform loaders are what distinguish a plugin from a mod, since both
+/// are jars a `mod`-typed project publishes.
+const LOADER_KINDS: [(&str, ContentKind); 18] = [
     ("fabric", ContentKind::Mod),
     ("forge", ContentKind::Mod),
     ("neoforge", ContentKind::Mod),
     ("quilt", ContentKind::Mod),
+    ("bukkit", ContentKind::Plugin),
+    ("spigot", ContentKind::Plugin),
+    ("paper", ContentKind::Plugin),
+    ("folia", ContentKind::Plugin),
+    ("purpur", ContentKind::Plugin),
+    ("sponge", ContentKind::Plugin),
+    ("bungeecord", ContentKind::Plugin),
+    ("waterfall", ContentKind::Plugin),
+    ("velocity", ContentKind::Plugin),
     ("datapack", ContentKind::DataPack),
     ("iris", ContentKind::Shader),
     ("optifine", ContentKind::Shader),
@@ -445,6 +456,7 @@ fn project_type(kind: ContentKind) -> &'static str {
         ContentKind::ResourcePack => "resourcepack",
         ContentKind::Shader => "shader",
         ContentKind::DataPack => "datapack",
+        ContentKind::Plugin => "plugin",
     }
 }
 
@@ -454,6 +466,7 @@ fn parse_kind(s: &str) -> ContentKind {
         "resourcepack" => ContentKind::ResourcePack,
         "shader" => ContentKind::Shader,
         "datapack" => ContentKind::DataPack,
+        "plugin" => ContentKind::Plugin,
         _ => ContentKind::Mod,
     }
 }
@@ -777,7 +790,7 @@ mod tests {
             m.parse_url("https://modrinth.com/plugin/luckperms")
                 .unwrap()
                 .kind,
-            None
+            Some(ContentKind::Plugin)
         );
     }
 
@@ -796,7 +809,17 @@ mod tests {
         );
         assert_eq!(of(&["iris", "optifine"]), vec![ContentKind::Shader]);
         assert_eq!(of(&["minecraft"]), vec![ContentKind::ResourcePack]);
-        assert_eq!(of(&["bukkit"]), vec![ContentKind::Mod], "falls back");
+        assert_eq!(
+            of(&["paper", "folia", "bukkit"]),
+            vec![ContentKind::Plugin],
+            "the server platforms all name one kind"
+        );
+        assert_eq!(
+            of(&["datapack", "paper"]),
+            vec![ContentKind::DataPack, ContentKind::Plugin],
+            "a project may publish both"
+        );
+        assert_eq!(of(&["nilloader"]), vec![ContentKind::Mod], "falls back");
     }
 
     #[test]

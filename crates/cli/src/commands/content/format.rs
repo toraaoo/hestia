@@ -39,6 +39,7 @@ pub(super) fn kind_plural(kind: ContentKind) -> &'static str {
         ContentKind::ResourcePack => "resourcepacks",
         ContentKind::Shader => "shaders",
         ContentKind::DataPack => "datapacks",
+        ContentKind::Plugin => "plugins",
     }
 }
 
