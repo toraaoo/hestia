@@ -20,7 +20,6 @@ export function ContentCard({
   pinnedVersion,
 }: {
   project: ContentProject;
-  /** The version a pasted link named, carried on so the pin is not lost. */
   pinnedVersion?: string;
 }) {
   const Icon = contentIcon(project.kind);

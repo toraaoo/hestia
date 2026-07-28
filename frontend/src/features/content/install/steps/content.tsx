@@ -39,7 +39,6 @@ export function ContentStep({
   kind: ContentKind | null;
   onKindChange: (kind: ContentKind | null) => void;
   picked: ContentProject[];
-  /** `versionId` is set when a pasted link pinned one. */
   onToggle: (p: ContentProject, versionId?: string) => void;
   onAddFiles: (files: PickedFile[]) => void;
 }) {
@@ -56,9 +55,6 @@ export function ContentStep({
   const pickedRefs = new Set(picked.map(projectRef));
   const installedRefs = useInstalledRefs(target, activeKind);
 
-  // A pasted link is not a search term: the daemon resolves it to the project
-  // it names (and the version, where the URL pins one), which then picks like
-  // any other hit.
   const url = isContentUrl(search) ? search.trim() : '';
   const link = useQuery(contentQueries.url(url));
 
@@ -141,11 +137,7 @@ export function ContentStep({
   );
 }
 
-/**
- * What a pasted link resolved to, as one selectable row. A kind the target
- * cannot take is shown and refused rather than hidden: the link is what the
- * user asked for, so the answer names why it will not go in.
- */
+/** A resolved link as one row; a kind the target refuses is shown, not hidden. */
 function LinkResult({
   query,
   accepts,

@@ -38,11 +38,7 @@ export function project(
   return call('content.project', { source, project: projectId });
 }
 
-/**
- * What a project (or version) page URL on a supported source names. The daemon
- * recognises the URL, so which platform served it is its answer, not a guess
- * made here.
- */
+/** The project (and pinned version) a source page URL names. */
 export function resolveUrl(url: string): Promise<ResolvedUrl> {
   return call('content.resolve_url', { url });
 }

@@ -35,8 +35,6 @@ const instance = {
   lastPlayedUnix: now() - 3_600,
   playtimeSeconds: 7_200,
   sessions: [],
-  // What the flavor's loader takes plus what the side reads — the daemon's
-  // answer, which the install surfaces render rather than deriving.
   accepts: ['mod', 'resource_pack', 'shader', 'data_pack'],
 };
 
@@ -50,7 +48,6 @@ const server = {
   ready: true,
   gamePort: 25_565,
   console: true,
-  // Vanilla loads nothing of its own; a world still takes datapacks.
   accepts: ['data_pack'],
 };
 
@@ -132,8 +129,6 @@ export const channels: Record<string, Handler> = {
     clientSide: 'optional',
     serverSide: 'optional',
   }),
-  // A link resolves to the project it names, its kind read from the path the
-  // same way the daemon's provider does; `/version/<id>` pins one.
   'content.resolve_url': (p) => {
     const url = String(p.url ?? '');
     const [, type = 'mod', slug = 'mock', version = ''] =

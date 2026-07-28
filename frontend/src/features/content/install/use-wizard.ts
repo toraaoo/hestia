@@ -8,7 +8,6 @@ export interface WizardInit {
   open: boolean;
   entryId: string;
   project?: ContentProject;
-  /** A version the opening link pinned, preselected for that project. */
   versionId?: string;
 }
 

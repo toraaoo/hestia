@@ -19,8 +19,6 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
   const { query } = useSearch();
   const q = query.trim();
 
-  // A pasted link is not a search term: the daemon says which project it names,
-  // and that one project is the result.
   const url = isContentUrl(q) ? q : '';
   const link = useQuery(contentQueries.url(url));
 

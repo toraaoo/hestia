@@ -30,7 +30,6 @@ export function ProjectDetailPage({
 }: {
   kind: ContentKind;
   id: string;
-  /** The version a pasted link named, installed instead of the newest. */
   pinnedVersion?: string;
   tab: ProjectTab;
   onTabChange: (tab: ProjectTab) => void;

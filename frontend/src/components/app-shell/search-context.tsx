@@ -15,12 +15,8 @@ const SearchCtx = createContext<SearchState | null>(null);
 
 export function SearchProvider({ children }: { children: ReactNode }) {
   const [query, setQuery] = useState('');
-  // Nothing unmounts the box on navigation, so a query typed for one list
-  // would arrive filtering the next. It belongs to the section that owns it:
-  // narrowing browse by kind stays within `/browse` and is the same list, so
-  // only the first path segment resets it. Reset during render rather than in
-  // an effect, so the page that navigated in never renders — or searches —
-  // against the query typed for the previous one.
+  // Nothing unmounts the box on navigation, so the query outlives the page
+  // that owns it; reset during render, before the new page reads it.
   const { pathname } = useLocation();
   const section = pathname.split('/')[1] ?? '';
   const [owner, setOwner] = useState(section);

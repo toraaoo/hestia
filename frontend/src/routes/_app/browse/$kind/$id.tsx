@@ -7,8 +7,6 @@ export const Route = createFileRoute('/_app/browse/$kind/$id')({
     search: Record<string, unknown>,
   ): { tab?: ProjectTab; version?: string } => ({
     tab: search.tab === 'versions' ? 'versions' : undefined,
-    // Carried by a pasted link that named a version, so opening the project it
-    // points at still installs the one it pinned.
     version: typeof search.version === 'string' ? search.version : undefined,
   }),
   beforeLoad: ({ params }) => {

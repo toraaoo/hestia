@@ -22,12 +22,7 @@ const BROWSE_STALE_MS = 60_000;
 /** Hits fetched per page when paging the browse grid. */
 export const SEARCH_PAGE = 20;
 
-/**
- * Whether a search box holds a link rather than search terms. Only the shape is
- * judged here — which sources are supported is the daemon's answer, so an
- * unrecognised one comes back as a refusal to show rather than a guess made in
- * the UI.
- */
+/** Shape only; which sources are recognised is the daemon's answer. */
 export const isContentUrl = (text: string): boolean =>
   /^https?:\/\/\S+$/i.test(text.trim());
 
@@ -106,10 +101,7 @@ export const contentQueries = {
       enabled: (query.project ?? '').length > 0,
       staleTime: BROWSE_STALE_MS,
     }),
-  /**
-   * What a pasted project/version page URL names. Enabled only for something
-   * URL-shaped, so a search box can hand it whatever was typed.
-   */
+  /** Enabled only for URL-shaped input, so a search box can hand it anything. */
   url: (url: string) =>
     queryOptions({
       queryKey: keys.content.url(url),

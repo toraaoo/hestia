@@ -52,7 +52,6 @@ export function ContentInstallModal({
   onOpenChange,
 }: {
   project?: ContentProject;
-  /** The version a pasted link named; preselected instead of the newest. */
   pinnedVersion?: string;
   entry?: Target;
   open: boolean;
@@ -97,8 +96,7 @@ export function ContentInstallModal({
     selectedKinds.includes('data_pack') && target?.type === 'instance';
   const isProfile = target?.type === 'profile';
 
-  // A pasted link may pin a version; the toggle clears any previous pin, so the
-  // new one is set after it.
+  // The toggle clears any pin, so a new one is set after it.
   const toggleProject = (p: ContentProject, versionId?: string) => {
     dispatch({ type: 'toggleProject', project: p });
     if (versionId) {

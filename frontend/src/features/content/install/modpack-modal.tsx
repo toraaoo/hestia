@@ -43,7 +43,6 @@ export function ModpackInstallModal({
   onOpenChange,
 }: {
   project: ContentProject;
-  /** The pack version a pasted link named; the newest when absent. */
   pinnedVersion?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
