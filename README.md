@@ -46,7 +46,9 @@ it's just as comfortable from a terminal as from a window.
 > into an instance in one shot — each reference resolved against that
 > instance's version/loader and installed as ordinary origin-tagged content
 > (all a daemon/desktop surface, no CLI verbs). Vanilla and Fabric are the
-> shipped flavors for both sides; **Paper** and **Folia** are shipped for
+> shipped flavors for both sides, joined by **NeoForge** — whose game jar is
+> built locally from its installer, so a first launch or create takes a few
+> minutes. **Paper** and **Folia** are shipped for
 > servers, which take **plugins** rather than mods and start on the JVM flags
 > PaperMC recommends for that version. Modrinth is the shipped content source.
 > A **system tray**

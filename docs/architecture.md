@@ -333,7 +333,7 @@ The subsystems behind the aggregate:
   daemon's `JavaInstallManager`.
 - **`minecraft`** (`Minecraft`) — the server and instance (client) provider
   registries. A *flavor* is a distribution (`vanilla`, `fabric`, and the
-  server-only `paper` and `folia`); a provider lists
+  server-only `paper` and `folia`, plus `neoforge`); a provider lists
   the game *versions* it supports, states what content its loader takes
   (`loads`), and *resolves* a request into a launch profile —
   the full descriptor (`ServerProfile` / `InstanceProfile`: primary artifact,
@@ -485,6 +485,57 @@ The subsystems behind the aggregate:
   restore runs per server at a time.
   Servers are fully provisioned at create so `start` is an immediate spawn;
   instances are records at create and pay at launch.
+
+> **NeoForge's game jar is built, not downloaded — so a flavor can install.**
+> NeoForge publishes no metadata service and no patched jar. Everything comes
+> out of its installer jar on `maven.neoforged.net`, read in-process with the
+> `zip` crate as a `.mrpack` index is: `version.json` is the launch profile,
+> `install_profile.json` names a chain of ten small Java tools, and running that
+> chain locally produces `net.neoforged:neoforge:<v>:{client,server}` — the jar
+> the loader actually runs. This follows theseus's technique but reads the
+> installer directly rather than Modrinth's pre-processed copy, keeping the
+> upstream-direct rule every other flavor follows and taking libraries from
+> NeoForged's own maven with their own checksums. Two things follow from that
+> choice, both normalised away before theseus sees them: the data table's
+> `/data/*.lzma` binary patches are extracted from the installer, and
+> substitution is side-aware (theseus is client-only and reads each entry's
+> `client` value).
+>
+> Building a jar is not something a profile can express, so the providers grew
+> an **`install` hook** rather than the launch flows branching on a flavor name.
+> It is idempotent on the patched jar's presence — the chain is minutes of JVM
+> work — and each processor is a cancellation checkpoint, leaving exactly what a
+> failed processor would.
+>
+> The catalogue needs no service either: a NeoForge version *is* its game
+> version plus a build number, under two schemes split by Minecraft's move to
+> calendar versioning (`21.1.244` → 1.21.1; `26.2.0.35-beta` → 26.2, a zero
+> patch or hotfix dropping). The rule reproduces Modrinth's published manifest
+> exactly across all 1629 published versions — artifacts included, since an
+> April Fools' build maps to a version that does not exist. Filtering the result
+> against Mojang's manifest drops it: a mapping naming no real version is a
+> failed derivation, not a version to offer.
+>
+> A **server** has no launchable jar at all. Its install generates an argument
+> file naming the module path, system properties and launch target — far past
+> what a command line carries — so `ServerProfile` gained `args_file` and the
+> server runs as `java @libraries/net/neoforged/neoforge/<v>/unix_args.txt
+> nogui` (`win_args.txt` on Windows). The path stays *relative* because the file
+> names its own libraries that way and is only valid from the data directory.
+> That reordered provisioning: `server.properties` is derived by running the
+> server once, which a flavor that builds its server cannot do until the install
+> has finished, and the install needs the jar provisioning fetched. The three
+> are now ordered by the flow — fetch, install, derive — rather than nested, and
+> `update` follows the same order. The vanilla server jar stays the profile's
+> primary artifact even though it is never launched: it is the input the
+> processors patch, and keeping it there is what makes provisioning fetch it.
+>
+> **Known degradation:** a NeoForge server's property schema cannot be derived.
+> The schema run boots the server in a throwaway directory, and the generated
+> argument file resolves its libraries relative to the *data* directory, so it
+> cannot run there. The create succeeds and reports
+> `PropertiesSchemaMissing` — the warning that exists for exactly this — so the
+> server accepts any unmanaged property key rather than validating it.
 
 > **A Paper build is a loader version, and Mojang orders the catalogue.**
 > Paper and Folia are one self-contained jar per build, so a profile is the
@@ -1699,8 +1750,8 @@ skin and cape management for signed-in accounts (a preserved local skin
 library, the vanilla defaults, upload/equip/reset and cape selection over the
 Mojang profile API — daemon and desktop layers only, no CLI);
 the daemon's process supervisor; the Minecraft provider layer (flavors, versions,
-and profile resolution — vanilla and fabric on both sides, paper and folia for
-servers only); server
+and profile resolution — vanilla, fabric and neoforge on both sides, paper and
+folia for servers only); server
 management (create = fully provisioned: profile + java + jar + EULA, each
 server on its own claimed port; start/stop/status/logs over the supervisor;
 a console over rcon — one-shot `command`, followed logs, interactive

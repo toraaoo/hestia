@@ -121,8 +121,11 @@ hestia server smp datapack add <slug>   # datapacks install into the server's wo
 hestia server smp datapack add --file ./pack.zip   # any kind imports a local file
 ```
 
-What a server takes depends on its flavor: mods on `fabric`, plugins on
-`paper`/`folia`, datapacks on any of them, and nothing else on `vanilla`.
+What a server takes depends on its flavor: mods on `fabric`/`neoforge`,
+plugins on `paper`/`folia`, datapacks on any of them, and nothing else on
+`vanilla`. A `neoforge` create builds its game jar locally, so it takes a few
+minutes and cannot derive a property schema (`server config set` accepts any
+key on one).
 Asking for the wrong kind is refused naming what that server does take.
 
 `paper` and `folia` publish many builds per game version, so a build number is
