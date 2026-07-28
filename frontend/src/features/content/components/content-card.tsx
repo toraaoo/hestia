@@ -53,7 +53,7 @@ export function ContentCard({
                   {project.title}
                 </span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">
-                  {m['browse.by_author']({ name: project.author })}
+                  {m['content.browse.by_author']({ name: project.author })}
                 </span>
                 <Badge variant="secondary" className="ml-auto shrink-0">
                   {contentKindLabel[project.kind]()}
@@ -87,7 +87,7 @@ export function ContentCard({
                   }}
                 >
                   <PlusIcon weight="bold" />
-                  {m['action.install']()}
+                  {m['app.action.install']()}
                 </Button>
               </div>
             </div>

@@ -12,7 +12,7 @@ export function InstanceLogsTab({ id, name }: { id: string; name: string }) {
   const logs = useInstanceLogs(id, { follow: true, tail: 500 });
 
   if (logs.lines.length === 0) {
-    return <Empty className="h-full">{m['detail.logs_empty']()}</Empty>;
+    return <Empty className="h-full">{m['instance.logs_empty']()}</Empty>;
   }
 
   return (

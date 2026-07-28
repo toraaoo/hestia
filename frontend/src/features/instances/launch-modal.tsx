@@ -94,9 +94,11 @@ export function LaunchModalProvider({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {m['launch.title']({ name: target?.name ?? '' })}
+              {m['instance.launch.title']({ name: target?.name ?? '' })}
             </DialogTitle>
-            <DialogDescription>{m['launch.preparing']()}</DialogDescription>
+            <DialogDescription>
+              {m['instance.launch.preparing']()}
+            </DialogDescription>
           </DialogHeader>
           <ProvisionProgressView
             progress={mutation.progress}

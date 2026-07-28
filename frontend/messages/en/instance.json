@@ -1,0 +1,21 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "instance": {
+    "launch": {
+      "preparing": "Preparing files for the first launch…",
+      "title": "Launching {name}"
+    },
+    "logs_empty": "Launch this instance to stream its log here.",
+    "missing": "That instance no longer exists.",
+    "new": "New instance",
+    "no_worlds": "No saved worlds yet.",
+    "none_match": "No instances match your search.",
+    "sign_in_hint": "Sign in with a Microsoft account to create and play instances.",
+    "subtitle": "Worlds you play",
+    "world": {
+      "cheats": "Cheats",
+      "hardcore": "Hardcore",
+      "unreadable": "This world's level.dat could not be read"
+    }
+  }
+}

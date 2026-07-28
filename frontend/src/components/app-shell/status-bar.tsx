@@ -36,7 +36,9 @@ export function StatusBar() {
     for (const job of jobs) {
       if (job.status === 'error' && !toasted.current.has(job.id)) {
         toasted.current.add(job.id);
-        toast.error(job.error ? errorMessage(job.error) : m['jobs.failed']());
+        toast.error(
+          job.error ? errorMessage(job.error) : m['app.jobs.failed'](),
+        );
       }
     }
   }, [jobs]);
@@ -62,7 +64,9 @@ export function StatusBar() {
     <footer className="flex h-8 shrink-0 items-center gap-3 border-t border-border bg-sidebar px-4 text-[11px] text-muted-foreground">
       <span className="inline-flex items-center gap-1.5">
         <StatusDot tone={daemon.connected ? 'on' : 'off'} />
-        {daemon.connected ? m['daemon.connected']() : m['daemon.offline']()}
+        {daemon.connected
+          ? m['app.daemon.connected']()
+          : m['app.daemon.offline']()}
       </span>
       {daemon.status && (
         <span className="font-mono">v{daemon.status.version}</span>
@@ -109,14 +113,14 @@ function JobActivity({
         </div>
         {jobs.length > 1 && (
           <span className="shrink-0">
-            {m['jobs.more']({ count: jobs.length - 1 })}
+            {m['app.jobs.more']({ count: jobs.length - 1 })}
           </span>
         )}
         <CaretUpIcon className="size-3 shrink-0" />
       </PopoverTrigger>
       <PopoverContent side="top" align="end" className="w-80 gap-0 p-0">
         <PopoverTitle className="border-b border-border p-2.5 text-xs font-medium">
-          {m['jobs.title']({ count: jobs.length })}
+          {m['app.jobs.title']({ count: jobs.length })}
         </PopoverTitle>
         <div className="max-h-72 divide-y divide-border overflow-y-auto p-1">
           {jobs.map((job) => (
@@ -128,7 +132,7 @@ function JobActivity({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={m['action.cancel']()}
+                  aria-label={m['app.action.cancel']()}
                   onClick={() => {
                     cancelJob(job.id).catch(() => {});
                   }}

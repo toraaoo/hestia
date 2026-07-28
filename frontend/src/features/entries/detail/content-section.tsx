@@ -153,7 +153,7 @@ function ContentSectionView({
                 variant="outline"
                 onClick={() => setSelected(null)}
               >
-                {m['action.cancel']()}
+                {m['app.action.cancel']()}
               </Button>
               <Button
                 size="sm"
@@ -175,7 +175,7 @@ function ContentSectionView({
                     variant="outline"
                     onClick={() => setSelected(new Set())}
                   >
-                    {m['content.select']()}
+                    {m['app.action.select']()}
                   </Button>
                   <Button
                     size="sm"
@@ -225,12 +225,12 @@ function ContentSectionView({
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title={m['content.remove_selected_title']()}
-        description={m['content.remove_selected_description']({
+        title={m['content.remove.selected_title']()}
+        description={m['content.remove.selected_description']({
           count: selected?.size ?? 0,
         })}
         destructive
-        confirmLabel={m['action.remove']()}
+        confirmLabel={m['app.action.remove']()}
         onConfirm={() => {
           setConfirming(false);
           for (const item of items) {

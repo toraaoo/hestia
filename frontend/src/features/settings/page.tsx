@@ -73,7 +73,7 @@ export function SettingsPage() {
 
   return (
     <Page
-      title={m['nav.settings']()}
+      title={m['app.nav.settings']()}
       subtitle={m['settings.subtitle']()}
       loading={config.isPending || !prefs.ready}
       skeleton={
@@ -139,14 +139,14 @@ export function SettingsPage() {
               <Field>
                 <CheckboxRow
                   id="announcements-enabled"
-                  label={m['news.enabled_label']()}
+                  label={m['settings.news.enabled_label']()}
                   checked={entries.announcements?.enabled ?? true}
                   onChange={(checked) =>
                     commitConfig('announcements.enabled', checked)
                   }
                 />
                 <FieldDescription>
-                  {m['news.enabled_description']()}
+                  {m['settings.news.enabled_description']()}
                 </FieldDescription>
               </Field>
             </FieldGroup>
@@ -161,7 +161,7 @@ export function SettingsPage() {
                 <FieldLabel htmlFor="default-memory">
                   {m['settings.default_memory']()} —{' '}
                   {defaultMemory || memoryDraft !== null
-                    ? m['wizard.gb']({ value: memoryValue })
+                    ? m['entry.create.gb']({ value: memoryValue })
                     : m['settings.no_default']()}
                 </FieldLabel>
                 <Slider
@@ -238,20 +238,18 @@ export function SettingsPage() {
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              aria-label={m['settings.uninstall_runtime']()}
+                              aria-label={m['settings.java.uninstall']()}
                               disabled={rt.inUse || uninstall.isPending}
                             >
                               <TrashIcon className="size-4" />
                             </Button>
                           }
-                          title={m['settings.uninstall_runtime_title']()}
-                          description={m[
-                            'settings.uninstall_runtime_description'
-                          ]({
-                            name: `${rt.vendor} ${rt.major}`,
-                          })}
+                          title={m['settings.java.uninstall_title']()}
+                          description={m['settings.java.uninstall_description'](
+                            { name: `${rt.vendor} ${rt.major}` },
+                          )}
                           destructive
-                          confirmLabel={m['action.uninstall']()}
+                          confirmLabel={m['app.action.uninstall']()}
                           onConfirm={() => uninstall.mutate(rt.major)}
                         />
                       </div>
@@ -309,17 +307,17 @@ export function SettingsPage() {
                       disabled={clearCache.isPending || !cache.data?.entries}
                     >
                       <BroomIcon />
-                      {m['settings.clear_cache']()}
+                      {m['settings.cache.clear']()}
                     </Button>
                   }
-                  title={m['settings.clear_cache_title']()}
-                  description={m['settings.clear_cache_description']()}
-                  confirmLabel={m['settings.clear_cache']()}
+                  title={m['settings.cache.clear_title']()}
+                  description={m['settings.cache.clear_description']()}
+                  confirmLabel={m['settings.cache.clear']()}
                   onConfirm={() =>
                     clearCache.mutate(undefined, {
                       onSuccess: (usage) =>
                         toast.success(
-                          m['toast.cache_cleared']({
+                          m['app.toast.cache_cleared']({
                             size: bytes(usage.bytes),
                           }),
                         ),
@@ -332,11 +330,11 @@ export function SettingsPage() {
                 <FieldLabel className="flex-1 gap-2 font-normal">
                   <StatusDot tone={daemon.connected ? 'on' : 'off'} />
                   {daemon.connected
-                    ? m['daemon.connected_label']()
-                    : m['daemon.offline_label']()}
+                    ? m['app.daemon.connected_label']()
+                    : m['app.daemon.offline_label']()}
                   {daemon.status && (
                     <span className="font-mono text-muted-foreground">
-                      {m['daemon.version_uptime']({
+                      {m['app.daemon.version_uptime']({
                         version: daemon.status.version,
                         uptime: daemon.uptime ?? '0s',
                       })}
@@ -346,19 +344,19 @@ export function SettingsPage() {
                 {daemon.busy ? (
                   <Button variant="outline" size="sm" disabled>
                     {daemon.restart.isPending
-                      ? m['daemon.restarting']()
-                      : m['daemon.starting']()}
+                      ? m['app.daemon.restarting']()
+                      : m['app.daemon.starting']()}
                   </Button>
                 ) : daemon.connected ? (
                   <ConfirmDialog
                     trigger={
                       <Button variant="outline" size="sm">
-                        {m['daemon.restart']()}
+                        {m['app.daemon.restart']()}
                       </Button>
                     }
-                    title={m['daemon.restart_title']()}
-                    description={m['daemon.restart_description']()}
-                    confirmLabel={m['action.restart']()}
+                    title={m['app.daemon.restart_title']()}
+                    description={m['app.daemon.restart_description']()}
+                    confirmLabel={m['app.action.restart']()}
                     onConfirm={() => daemon.restart.mutate()}
                   />
                 ) : (
@@ -367,7 +365,7 @@ export function SettingsPage() {
                     size="sm"
                     onClick={() => daemon.start.mutate()}
                   >
-                    {m['daemon.start']()}
+                    {m['app.daemon.start']()}
                   </Button>
                 )}
               </Field>

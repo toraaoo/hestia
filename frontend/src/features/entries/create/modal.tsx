@@ -118,13 +118,13 @@ export function CreateEntryModal({
           const created = await createServer.mutateAsync(
             serverParams(value, memoryEntries),
           );
-          toast.success(m['toast.created']({ name: created.server.name }));
+          toast.success(m['app.toast.created']({ name: created.server.name }));
           toastWarnings(created.warnings);
         } else {
           const instance = await createInstance.mutateAsync(
             instanceParams(value, memoryEntries),
           );
-          toast.success(m['toast.created']({ name: instance.name }));
+          toast.success(m['app.toast.created']({ name: instance.name }));
         }
         onOpenChange(false);
       } catch {
@@ -154,7 +154,7 @@ export function CreateEntryModal({
           variant="outline"
           onClick={() => onOpenChange(false)}
         >
-          {m['action.cancel']()}
+          {m['app.action.cancel']()}
         </Button>
       ) : (
         <Button
@@ -164,7 +164,7 @@ export function CreateEntryModal({
           data-icon="inline-start"
         >
           <CaretLeftIcon />
-          {m['action.back']()}
+          {m['app.action.back']()}
         </Button>
       )}
       {step === 'details' ? (
@@ -173,8 +173,8 @@ export function CreateEntryModal({
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
           {kind === 'server'
-            ? m['wizard.create_server']()
-            : m['wizard.create_instance']()}
+            ? m['entry.create.server_title']()
+            : m['entry.create.instance_title']()}
         </Button>
       ) : (
         <Button
@@ -182,7 +182,7 @@ export function CreateEntryModal({
           data-icon="inline-end"
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
-          {m['action.next']()}
+          {m['app.action.next']()}
           <CaretRightIcon />
         </Button>
       )}
@@ -198,13 +198,13 @@ export function CreateEntryModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Icon className="size-4.5 text-muted-foreground" />
-            {kind === 'server' ? m['servers.new']() : m['instances.new']()}
+            {kind === 'server' ? m['server.new']() : m['instance.new']()}
           </DialogTitle>
           <DialogDescription>
             {creating
               ? kind === 'server'
-                ? m['wizard.provisioning_server']()
-                : m['wizard.provisioning_instance']()
+                ? m['entry.create.provisioning_server']()
+                : m['entry.create.provisioning_instance']()
               : STEP_HINTS[step](kind)}
           </DialogDescription>
         </DialogHeader>
@@ -241,8 +241,8 @@ export function CreateEntryModal({
                       {flavors.length === 0 && (
                         <p className="px-1 py-6 text-center text-xs text-muted-foreground">
                           {flavorsQuery.isPending
-                            ? m['common.loading']()
-                            : m['wizard.no_versions_match']()}
+                            ? m['app.status.loading']()
+                            : m['entry.create.no_versions_match']()}
                         </p>
                       )}
                     </div>

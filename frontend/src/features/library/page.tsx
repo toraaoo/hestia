@@ -118,7 +118,7 @@ export function LibraryPage({
 
   return (
     <Page
-      title={m['nav.library']()}
+      title={m['app.nav.library']()}
       subtitle={m['library.subtitle']()}
       loading={loading}
       skeleton={
@@ -128,7 +128,7 @@ export function LibraryPage({
         </div>
       }
       search
-      searchPlaceholder={m['search.library']()}
+      searchPlaceholder={m['app.search.library']()}
       actions={
         <>
           <ViewToggle view={view} onView={onViewChange} />
@@ -147,11 +147,11 @@ export function LibraryPage({
                 onClick={() => openNew('instance')}
               >
                 <InstanceIcon />
-                {m['instances.new']()}
+                {m['instance.new']()}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => openNew('server')}>
                 <ServerIcon />
-                {m['servers.new']()}
+                {m['server.new']()}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -160,7 +160,7 @@ export function LibraryPage({
     >
       <div className="flex flex-col gap-6">
         <Section
-          title={m['nav.instances']()}
+          title={m['app.nav.instances']()}
           count={signedIn ? inst.length : undefined}
           action={
             signedIn ? (
@@ -168,7 +168,7 @@ export function LibraryPage({
                 <FilterMenu
                   groups={[
                     {
-                      label: m['label.flavor'](),
+                      label: m['app.label.flavor'](),
                       flavors: instanceFlavors,
                       value: instanceFlavor,
                       onChange: onInstanceFlavorChange,
@@ -189,7 +189,7 @@ export function LibraryPage({
             <EntryCollection
               cards={inst}
               view={view}
-              empty={m['instances.none_match']()}
+              empty={m['instance.none_match']()}
             />
           ) : (
             <InstancesSignInPrompt />
@@ -204,7 +204,7 @@ export function LibraryPage({
               <FilterMenu
                 groups={[
                   {
-                    label: m['label.flavor'](),
+                    label: m['app.label.flavor'](),
                     flavors: serverFlavors,
                     value: serverFlavor,
                     onChange: onServerFlavorChange,
@@ -223,7 +223,7 @@ export function LibraryPage({
           <EntryCollection
             cards={srv}
             view={view}
-            empty={m['servers.none_match']()}
+            empty={m['server.none_match']()}
           />
         </Section>
       </div>
@@ -243,9 +243,9 @@ function InstancesSignInPrompt() {
   return (
     <div className="flex flex-col items-center gap-4 border border-dashed border-border px-4 py-10 text-center">
       <div className="space-y-1">
-        <p className="text-sm font-medium">{m['instances.locked_title']()}</p>
+        <p className="text-sm font-medium">{m['account.sign_in_to_play']()}</p>
         <p className="text-xs text-muted-foreground">
-          {m['instances.sign_in_hint']()}
+          {m['instance.sign_in_hint']()}
         </p>
       </div>
       <Button

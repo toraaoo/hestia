@@ -2,7 +2,7 @@
  * Localizes a daemon error. The structured `ErrorInfo` is rendered
  * **generically**: `error.kind.<kind>` is the message template and the variant's
  * fields are its interpolation params, with token-enum fields (server, memory,
- * adoptium, …) resolved through the shared `error.token.*` table. A coarse
+ * adoptium, …) resolved through the shared `TOKEN_TABLES`. A coarse
  * `error.code.*` message is the fallback, then the raw message.
  *
  * There is deliberately no per-variant `switch`: adding an `ErrorInfo` variant
@@ -20,7 +20,11 @@ const msg = m as unknown as Record<
   (params?: Record<string, unknown>) => string
 >;
 
-// Fields whose value is a token enum resolved through `error.token.*`; every
+// Tables a token value is resolved against, in order. `domain.*` holds the
+// vocabulary the UI renders elsewhere too, so an entry type is worded once.
+const TOKEN_TABLES = ['domain.entry_type.', 'error.token.'];
+
+// Fields whose value is a token enum resolved through the token tables; every
 // other field interpolates raw. A value with no token entry falls back to
 // itself, so listing a free-text field here would be harmless.
 const TOKEN_FIELDS = new Set([
@@ -37,9 +41,12 @@ const TOKEN_FIELDS = new Set([
 ]);
 
 function token(value: unknown): string {
-  return typeof value === 'string'
-    ? (msg[`error.token.${value}`]?.() ?? value)
-    : String(value);
+  if (typeof value !== 'string') return String(value);
+  for (const table of TOKEN_TABLES) {
+    const hit = msg[`${table}${value}`];
+    if (hit) return hit();
+  }
+  return value;
 }
 
 /** The localized message for a structured daemon error. */

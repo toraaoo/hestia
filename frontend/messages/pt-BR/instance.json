@@ -1,0 +1,21 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "instance": {
+    "launch": {
+      "preparing": "Preparando os arquivos para a primeira execução…",
+      "title": "Iniciando {name}"
+    },
+    "logs_empty": "Inicie esta instância para transmitir o log aqui.",
+    "missing": "Essa instância não existe mais.",
+    "new": "Nova instância",
+    "no_worlds": "Nenhum mundo salvo ainda.",
+    "none_match": "Nenhuma instância corresponde à sua pesquisa.",
+    "sign_in_hint": "Entre com uma conta Microsoft para criar e jogar instâncias.",
+    "subtitle": "Mundos que você joga",
+    "world": {
+      "cheats": "Comandos",
+      "hardcore": "Hardcore",
+      "unreadable": "Não foi possível ler o level.dat deste mundo"
+    }
+  }
+}

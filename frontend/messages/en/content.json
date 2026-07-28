@@ -1,0 +1,87 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "content": {
+    "add": "Add content",
+    "add_to_title": "Add content to {name}",
+    "browse": {
+      "by_author": "by {name}",
+      "downloads": "{count} downloads",
+      "followers": "{count} followers",
+      "loading_more": "Loading more…",
+      "nothing_matches": "Nothing matches your search.",
+      "project_missing": "That project could not be found.",
+      "subtitle": "Discover mods, packs and shaders on Modrinth"
+    },
+    "change_version": {
+      "action": "Change version…",
+      "description": "Pick any published version; the swap applies at the next launch.",
+      "title": "Change version — {name}"
+    },
+    "check_updates": "Check for updates",
+    "checking_updates": "Checking…",
+    "choose_type": "Type not recognized — choose one.",
+    "current_version": "current",
+    "dependencies": "Dependencies ({count})",
+    "disabled": "Disabled",
+    "hint": {
+      "content": "Choose the content to install.",
+      "review": "Review and install.",
+      "target": "Choose where this content is installed.",
+      "worlds": "Choose the worlds to add this datapack to."
+    },
+    "import_file": "Import a local file",
+    "import_file_hint": "Installs as-is — no updates or dependency resolution.",
+    "install_title": "Install {name}",
+    "install_to": "Installs to {dir}",
+    "installed": "Installed",
+    "installing": "Installing…",
+    "kind_not_taken": "Not accepted here",
+    "loaded_in_world": "Loaded in {world}",
+    "loaded_in_worlds": "{loaded}/{total} worlds",
+    "modpack": {
+      "from_file": "From a file",
+      "install_into": "Install into {name}",
+      "kept": "Kept {count} file(s) you had edited.",
+      "name_placeholder": "Defaults to the pack's own name",
+      "none": "Not built from a modpack.",
+      "pack_files": "Pack files",
+      "remove": {
+        "action": "Remove pack",
+        "body": "Its mods and the game-directory files it wrote are removed. Files you have edited are kept, and the {entry} itself stays.",
+        "title": "Remove {name}?"
+      },
+      "removed": "Removed {files} file(s) and {overrides} pack file(s).",
+      "target": {
+        "existing": "An existing entry",
+        "label": "Where to install"
+      },
+      "title": "Modpack",
+      "update": "Update pack"
+    },
+    "no_target_for_kind": "No server or instance can take a {kind}.",
+    "no_versions": "No versions.",
+    "no_worlds_datapack": "Create a world in-game before adding datapacks.",
+    "no_worlds_in_instance": "This instance has no worlds yet.",
+    "none_installed": "No content installed yet. Add some from Browse.",
+    "none_of_kind": "No {kind} installed.",
+    "none_selected": "none selected",
+    "pinned_version": "Pinned version",
+    "profile_no_projects": "A profile takes projects, not files.",
+    "remove": {
+      "description": "{name} will be removed. Its files are deleted; the change applies at the next start.",
+      "from_world_description": "{name} will be removed from {world}. Other worlds keep it; the change applies at the next launch.",
+      "from_world_title": "Remove from this world?",
+      "selected_description": "{count} item(s) will be removed. Their files are deleted; the change applies at the next start.",
+      "selected_title": "Remove selected content?",
+      "title": "Remove content?"
+    },
+    "remove_count": "Remove ({count})",
+    "resolving_link": "Reading the link…",
+    "select_version": "Select version",
+    "selected_count": "{count} selected",
+    "stop_to_install": "Stop to install",
+    "untracked_note": "{count} untracked file(s) in the game dir: {files}",
+    "update_to_latest": "Update to latest",
+    "world_datapacks": "world datapacks"
+  }
+}

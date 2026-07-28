@@ -32,12 +32,14 @@ export interface EntryCardModel {
 
 function statusOf(entry: EntryCardModel) {
   if (!entry.ready)
-    return { tone: 'warn' as const, label: m['status.preparing']() };
+    return { tone: 'warn' as const, label: m['app.status.preparing']() };
   if (entry.running)
     return {
       tone: 'on' as const,
       label:
-        entry.kind === 'server' ? m['status.online']() : m['status.running'](),
+        entry.kind === 'server'
+          ? m['app.status.online']()
+          : m['app.status.running'](),
     };
   return null;
 }
@@ -69,7 +71,7 @@ function PinToggle({ entry }: { entry: EntryCardModel }) {
   const pinned = isPinned(pin);
   if (!ready) return null;
 
-  const label = pinned ? m['label.unpin']() : m['label.pin']();
+  const label = pinned ? m['app.label.unpin']() : m['app.label.pin']();
   return (
     <button
       type="button"
@@ -115,16 +117,16 @@ function ActionButton({
             }}
           >
             <PowerIcon weight="bold" />
-            {m['action.stop']()}
+            {m['app.action.stop']()}
           </Button>
         }
-        title={m['entry.stop_title']({ name: entry.name })}
+        title={m['entry.stop.title']({ name: entry.name })}
         description={
           entry.kind === 'server'
-            ? m['entry.stop_server_description']()
-            : m['entry.stop_instance_description']()
+            ? m['entry.stop.server_description']()
+            : m['entry.stop.instance_description']()
         }
-        confirmLabel={m['action.stop']()}
+        confirmLabel={m['app.action.stop']()}
         onConfirm={() => entry.onStop?.()}
       />
     );
@@ -142,7 +144,9 @@ function ActionButton({
       className="bg-ember text-ember-foreground hover:bg-ember/90"
     >
       {entry.busy ? <Spinner /> : <PlayIcon weight="fill" />}
-      {entry.kind === 'server' ? m['action.start']() : m['action.play']()}
+      {entry.kind === 'server'
+        ? m['app.action.start']()
+        : m['app.action.play']()}
     </Button>
   );
 }

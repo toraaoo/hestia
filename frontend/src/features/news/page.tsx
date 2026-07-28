@@ -22,9 +22,9 @@ import {
 } from '@/queries/announce';
 
 export function severityLabel(severity: Severity): string {
-  if (severity === 'critical') return m['news.severity_critical']();
-  if (severity === 'warning') return m['news.severity_warning']();
-  return m['news.severity_info']();
+  if (severity === 'critical') return m['domain.severity.critical']();
+  if (severity === 'warning') return m['domain.severity.warning']();
+  return m['domain.severity.info']();
 }
 
 /** Severity drives the accent; `info` stays neutral so news is not an alarm. */

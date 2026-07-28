@@ -43,7 +43,7 @@ export function Page({
         <div className="ml-auto flex items-center gap-2">
           {search && (
             <PageSearch
-              placeholder={searchPlaceholder ?? m['search.placeholder']()}
+              placeholder={searchPlaceholder ?? m['app.search.placeholder']()}
             />
           )}
           {actions}

@@ -64,19 +64,19 @@ export function InstancesPage({
 
   return (
     <Page
-      title={m['nav.instances']()}
-      subtitle={m['instances.subtitle']()}
+      title={m['app.nav.instances']()}
+      subtitle={m['instance.subtitle']()}
       loading={!ready || (signedIn && instances.isPending)}
       skeleton={<EntryGridSkeleton />}
       search={signedIn}
-      searchPlaceholder={m['search.instances']()}
+      searchPlaceholder={m['app.search.instances']()}
       actions={
         signedIn ? (
           <>
             <FilterMenu
               groups={[
                 {
-                  label: m['label.flavor'](),
+                  label: m['app.label.flavor'](),
                   flavors,
                   value: flavor,
                   onChange: onFlavorChange,
@@ -90,7 +90,7 @@ export function InstancesPage({
               onClick={() => setCreating(true)}
             >
               <PlusIcon weight="bold" />
-              {m['instances.new']()}
+              {m['instance.new']()}
             </Button>
           </>
         ) : undefined
@@ -101,7 +101,7 @@ export function InstancesPage({
           <EntryCollection
             cards={filtered}
             view={view}
-            empty={m['instances.none_match']()}
+            empty={m['instance.none_match']()}
           />
           <CreateEntryModal
             kind="instance"
@@ -111,8 +111,8 @@ export function InstancesPage({
         </>
       ) : (
         <SignInGate
-          title={m['instances.locked_title']()}
-          hint={m['instances.sign_in_hint']()}
+          title={m['account.sign_in_to_play']()}
+          hint={m['instance.sign_in_hint']()}
         />
       )}
     </Page>

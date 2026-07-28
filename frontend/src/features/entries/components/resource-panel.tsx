@@ -63,8 +63,8 @@ function useResourceSeries(running: boolean, live: Sample[]): Sample[] {
 
 const chartConfig = () =>
   ({
-    cpu: { label: m['label.cpu'](), color: 'var(--color-ember)' },
-    mem: { label: m['label.memory'](), color: 'var(--chart-2)' },
+    cpu: { label: m['app.label.cpu'](), color: 'var(--color-ember)' },
+    mem: { label: m['app.label.memory'](), color: 'var(--chart-2)' },
   }) satisfies ChartConfig;
 
 function Sparkline({
@@ -133,17 +133,22 @@ function MetricCard({
 const diskParts = [
   {
     id: 'worlds',
-    label: m['label.worlds'],
+    label: m['app.label.worlds'],
     frac: 0.55,
     color: 'var(--color-ember)',
   },
   {
     id: 'content',
-    label: m['label.content'],
+    label: m['app.label.content'],
     frac: 0.3,
     color: 'var(--chart-2)',
   },
-  { id: 'other', label: m['label.other'], frac: 0.15, color: 'var(--chart-4)' },
+  {
+    id: 'other',
+    label: m['app.label.other'],
+    frac: 0.15,
+    color: 'var(--chart-4)',
+  },
 ];
 
 /**
@@ -155,7 +160,7 @@ function DiskStrip({ diskBytes }: { diskBytes: number }) {
     <div className="flex flex-col gap-2 bg-card px-4 py-3 ring-1 ring-foreground/10">
       <div className="flex items-baseline justify-between text-xs">
         <span className="tracking-wide text-muted-foreground uppercase">
-          {m['label.disk']()}
+          {m['app.label.disk']()}
         </span>
         <span className="tabular-nums">{bytes(diskBytes)}</span>
       </div>
@@ -209,17 +214,17 @@ export function ResourceCards({ live }: { live: LiveResources }) {
     <div className="flex flex-1 flex-col gap-3">
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          {m['resources.system']()}
+          {m['app.label.system_resources']()}
         </span>
         <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <StatusDot tone={running ? 'on' : 'off'} />
-          {running ? m['status.live']() : m['status.idle']()}
+          {running ? m['app.status.live']() : m['app.status.idle']()}
         </span>
       </div>
 
       <div className="grid flex-1 gap-3 sm:grid-cols-2">
         <MetricCard
-          label={m['label.cpu']()}
+          label={m['app.label.cpu']()}
           value={running ? `${Math.round(now.cpu)}%` : '—'}
         >
           <Sparkline
@@ -231,7 +236,7 @@ export function ResourceCards({ live }: { live: LiveResources }) {
         </MetricCard>
 
         <MetricCard
-          label={m['label.memory']()}
+          label={m['app.label.memory']()}
           value={
             running ? (
               <>

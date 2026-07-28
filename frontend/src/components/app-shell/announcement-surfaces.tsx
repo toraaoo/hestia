@@ -109,7 +109,7 @@ export function AnnouncementBanner() {
         variant="ghost"
         size="icon"
         className="size-6 shrink-0"
-        aria-label={m['action.close']()}
+        aria-label={m['app.action.close']()}
         onClick={() => dismiss.mutate([current.id])}
       >
         <XIcon className="size-3.5" />

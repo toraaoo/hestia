@@ -1,0 +1,73 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "entry": {
+    "create": {
+      "eula": {
+        "after": ". A server won't start until you do.",
+        "before": "I accept the",
+        "link": "Minecraft EULA"
+      },
+      "filter_versions": "Filter versions",
+      "gb": "{value} GB",
+      "hint": {
+        "details_instance": "Name your instance and set its resources.",
+        "details_server": "Name your server and set its resources.",
+        "flavor_instance": "Pick the distribution your instance runs.",
+        "flavor_server": "Pick the distribution your server runs.",
+        "version": "Choose the Minecraft version."
+      },
+      "instance_title": "Create instance",
+      "name_hint": "Leave blank to use the flavor and version.",
+      "no_versions_match": "No versions match.",
+      "properties": {
+        "difficulty": "Difficulty",
+        "gamemode": "Gamemode",
+        "hardcore": "Hardcore",
+        "max_players": "Max players",
+        "motd": "Message of the day",
+        "online_mode": "Online mode",
+        "port": "Port",
+        "port_auto": "auto",
+        "port_hint": "Blank picks the lowest free.",
+        "title": "Server properties"
+      },
+      "provisioning_instance": "Provisioning your instance…",
+      "provisioning_server": "Provisioning your server…",
+      "server_title": "Create server",
+      "show_snapshots": "Show snapshots",
+      "snapshot": "snapshot"
+    },
+    "icon": {
+      "change": "Change icon",
+      "reset": "Reset icon"
+    },
+    "overview_summary": "A {flavor} {version} instance with {mods} mods across {worlds} worlds.",
+    "quick_actions": "Quick actions",
+    "sessions_running": "{count} running",
+    "settings": {
+      "allocated_memory": "Allocated memory",
+      "allow_downgrade": "Allow downgrade (worlds do not downgrade)",
+      "backup_schedule": "Backup schedule",
+      "change_version": "Change version",
+      "every_interval": "Every {interval}",
+      "inherits_default": "default",
+      "instance_name": "Instance name",
+      "java_arguments": "Java arguments",
+      "keep_backups": "Keep backups",
+      "remove": {
+        "description": "{name} and all its data — worlds, backups, and installed content — are permanently deleted. This cannot be undone.",
+        "instance": "Remove instance",
+        "instance_title": "Remove instance?",
+        "server": "Remove server",
+        "server_title": "Remove server?"
+      },
+      "server_name": "Server name"
+    },
+    "stop": {
+      "instance_description": "The running game session is closed. Unsaved progress may be lost.",
+      "server_description": "The server shuts down and any connected players are disconnected.",
+      "sessions_description": "All {count} running sessions are closed. Unsaved progress may be lost.",
+      "title": "Stop {name}?"
+    }
+  }
+}

@@ -71,7 +71,7 @@ export function PlayBar() {
               </span>
               <span className="min-w-0 flex-1 leading-tight">
                 <span className="block text-[11px] tracking-wide text-muted-foreground uppercase">
-                  {m['playbar.quick_play']()}
+                  {m['app.playbar.quick_play']()}
                 </span>
                 <span className="block truncate text-base font-medium">
                   {sel?.name ?? '—'}
@@ -84,7 +84,7 @@ export function PlayBar() {
         <DropdownMenuContent side="top" align="start" className="w-56">
           <DropdownMenuGroup>
             <DropdownMenuLabel>
-              {m['playbar.all_instances']()}
+              {m['app.playbar.all_instances']()}
             </DropdownMenuLabel>
             {list.map((i) => (
               <InstanceItem
@@ -117,7 +117,7 @@ export function PlayBar() {
           nativeButton={false}
           render={<Link to="/instances/$id" params={{ id: sel.id }} />}
         >
-          {m['action.manage']()}
+          {m['app.action.manage']()}
         </Button>
       )}
 
@@ -131,24 +131,24 @@ export function PlayBar() {
               disabled={busy}
             >
               <PowerIcon weight="bold" />
-              {m['action.stop']()}
+              {m['app.action.stop']()}
             </Button>
           }
-          title={m['entry.stop_title']({ name: sel?.name ?? '' })}
-          description={m['entry.stop_instance_description']()}
-          confirmLabel={m['action.stop']()}
+          title={m['entry.stop.title']({ name: sel?.name ?? '' })}
+          description={m['entry.stop.instance_description']()}
+          confirmLabel={m['app.action.stop']()}
           onConfirm={() => sel && stop.mutate(sel.id)}
         />
       ) : (
         <Button
           data-icon="inline-start"
           disabled={!signedIn || !sel || busy}
-          title={signedIn ? undefined : m['playbar.sign_in_required']()}
+          title={signedIn ? undefined : m['account.sign_in_to_play']()}
           onClick={() => sel && launch(sel)}
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
           {busy ? <Spinner /> : <PlayIcon weight="fill" />}
-          {m['action.play']()}
+          {m['app.action.play']()}
         </Button>
       )}
     </div>

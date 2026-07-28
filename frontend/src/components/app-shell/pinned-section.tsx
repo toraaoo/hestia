@@ -145,15 +145,15 @@ export function PinnedSection({ pathname }: { pathname: string }) {
     <div className="border-t border-border p-2">
       <div className="flex items-center justify-between px-3 pt-1 pb-1.5">
         <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-          {m['label.pinned']()}
+          {m['app.label.pinned']()}
         </span>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
               <button
                 type="button"
-                aria-label={m['label.pin_entries']()}
-                title={m['label.pin_entries']()}
+                aria-label={m['app.label.pin_entries']()}
+                title={m['app.label.pin_entries']()}
                 disabled={
                   !ready ||
                   instances.isPending ||
@@ -169,7 +169,9 @@ export function PinnedSection({ pathname }: { pathname: string }) {
           <DropdownMenuContent align="end" className="w-52">
             {instanceList.length > 0 && (
               <DropdownMenuGroup>
-                <DropdownMenuLabel>{m['nav.instances']()}</DropdownMenuLabel>
+                <DropdownMenuLabel>
+                  {m['app.nav.instances']()}
+                </DropdownMenuLabel>
                 {instanceList.map((instance) => (
                   <DropdownMenuCheckboxItem
                     key={instance.id}
@@ -185,7 +187,7 @@ export function PinnedSection({ pathname }: { pathname: string }) {
             )}
             {serverList.length > 0 && (
               <DropdownMenuGroup>
-                <DropdownMenuLabel>{m['nav.servers']()}</DropdownMenuLabel>
+                <DropdownMenuLabel>{m['app.nav.servers']()}</DropdownMenuLabel>
                 {serverList.map((server) => (
                   <DropdownMenuCheckboxItem
                     key={server.id}
@@ -204,7 +206,7 @@ export function PinnedSection({ pathname }: { pathname: string }) {
       </div>
       {pinned.length === 0 ? (
         <p className="px-3 py-1.5 text-[11px] text-muted-foreground/70">
-          {m['label.nothing_pinned']()}
+          {m['app.label.nothing_pinned']()}
         </p>
       ) : (
         <div className="space-y-0.5">
@@ -329,8 +331,8 @@ function PinnedLinkContent({
       </span>
       <button
         type="button"
-        aria-label={m['label.unpin']()}
-        title={m['label.unpin']()}
+        aria-label={m['app.label.unpin']()}
+        title={m['app.label.unpin']()}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -349,7 +351,7 @@ function ServerPinPlayers({ id }: { id: string }) {
   const ping = useQuery(serverQueries.ping(id));
   if (!ping.data) return null;
   return (
-    <span className="font-mono text-[10px]" title={m['label.players']()}>
+    <span className="font-mono text-[10px]" title={m['app.label.players']()}>
       {ping.data.playersOnline}/{ping.data.playersMax}
     </span>
   );

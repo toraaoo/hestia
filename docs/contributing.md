@@ -399,6 +399,36 @@ line in `frontend/src/api/index.ts` — nothing in the Rust shell changes.
 
 ---
 
+## Add a user-facing string
+
+Every string the desktop renders is a message (paraglide/inlang), reached as
+`m['<root>.<path>']()`. Messages live in `frontend/messages/{locale}/<root>.json`,
+one file per root, and there are four roots — put the string where it is
+*rendered*, not where it happens to be defined:
+
+| Root                   | What goes in it                                                                     |
+|------------------------|-------------------------------------------------------------------------------------|
+| `app.*`                | shell chrome and shared vocabulary — `nav`, `window`, `action`, `label`, `status`, `toast`, `search`, `time`, `jobs`, `validation`, `daemon` |
+| `<feature>.*`          | one root per `frontend/src/features/` directory — `library`, `entry`, `server`, `instance`, `content`, `profile`, `skin`, `settings`, `news`, `account` |
+| `domain.*`             | vocabulary mirroring a `proto` enum — content kinds, flavors, gamemodes, difficulties, provision phases, entry types |
+| `error.*` / `warning.*`| the daemon's own `ErrorInfo`/`WarningInfo` vocabulary, keyed by variant (`kind`, `code`, `token`, `hint`) |
+
+`entry.*` is what a server and an instance share (the create wizard, per-entry
+settings, the stop dialogs); a string only one side renders goes in `server.*` or
+`instance.*`. Nest with objects rather than underscores — `entry.settings.remove.title`,
+not `entry_settings.remove_title` — since paraglide flattens a dotted key to
+underscores and the two spellings compile to one identifier.
+
+Add the key to **every** locale, and run `bun run test`: the guard
+(`frontend/tests/messages.test.ts`) fails a locale that has fallen behind, a
+translation whose `{placeholders}` differ, a referenced key that does not exist,
+and a defined key with no call site. A key reached dynamically
+(``m[`error.kind.${kind}`]``) has no literal call site, so its table must be
+listed in that test's `DYNAMIC_PREFIXES` — otherwise the whole table reads as
+dead.
+
+---
+
 ## Build & run
 
 The core loop needs no webview or frontend deps:

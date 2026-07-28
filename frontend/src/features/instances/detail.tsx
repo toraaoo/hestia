@@ -120,7 +120,7 @@ export function InstanceDetailPage({
   if (!instance) {
     return (
       <div className="p-6">
-        <Empty>{m['instances.missing']()}</Empty>
+        <Empty>{m['instance.missing']()}</Empty>
       </div>
     );
   }
@@ -147,7 +147,7 @@ export function InstanceDetailPage({
   return (
     <div className="flex h-full flex-col">
       <DetailHero
-        parentLabel={m['nav.library']()}
+        parentLabel={m['app.nav.library']()}
         parentTo="/instances"
         icon={entryIcon('instance')}
         iconUrl={instance.iconUrl}
@@ -174,7 +174,7 @@ export function InstanceDetailPage({
             <Button
               variant="outline"
               size="icon"
-              aria-label={m['detail.open_folder']()}
+              aria-label={m['app.action.open_folder']()}
               disabled={!info.data}
               onClick={openFolder}
             >
@@ -189,16 +189,16 @@ export function InstanceDetailPage({
                     disabled={stop.isPending}
                   >
                     <PowerIcon weight="bold" />
-                    {m['action.stop']()}
+                    {m['app.action.stop']()}
                   </Button>
                 }
-                title={m['entry.stop_title']({ name: instance.name })}
+                title={m['entry.stop.title']({ name: instance.name })}
                 description={
                   sessions > 1
-                    ? m['entry.stop_sessions_description']({ count: sessions })
-                    : m['entry.stop_instance_description']()
+                    ? m['entry.stop.sessions_description']({ count: sessions })
+                    : m['entry.stop.instance_description']()
                 }
-                confirmLabel={m['action.stop']()}
+                confirmLabel={m['app.action.stop']()}
                 onConfirm={() => stop.mutate({})}
               />
             ) : (
@@ -209,7 +209,7 @@ export function InstanceDetailPage({
                 onClick={() => launch(instance)}
               >
                 {isLaunching(id) ? <Spinner /> : <PlayIcon weight="fill" />}
-                {m['action.play']()}
+                {m['app.action.play']()}
               </Button>
             )}
           </>
@@ -222,21 +222,25 @@ export function InstanceDetailPage({
         className="min-h-0 flex-1 gap-0 p-0"
       >
         <TabsList variant="line" className="h-auto gap-6 px-5">
-          <TabsTrigger value="overview">{m['tab.overview']()}</TabsTrigger>
+          <TabsTrigger value="overview">
+            {m['app.label.overview']()}
+          </TabsTrigger>
           <TabsTrigger value="content">
-            {m['tab.content']()}
+            {m['app.label.content']()}
             <TabCount n={contentCount} />
           </TabsTrigger>
           <TabsTrigger value="profiles">
-            {m['profiles.tab']()}
+            {m['app.nav.profiles']()}
             <TabCount n={profiles.data?.profiles.length ?? 0} />
           </TabsTrigger>
           <TabsTrigger value="worlds">
-            {m['tab.worlds']()}
+            {m['app.label.worlds']()}
             <TabCount n={worldList.length} />
           </TabsTrigger>
-          <TabsTrigger value="logs">{m['tab.logs']()}</TabsTrigger>
-          <TabsTrigger value="settings">{m['tab.settings']()}</TabsTrigger>
+          <TabsTrigger value="logs">{m['app.label.logs']()}</TabsTrigger>
+          <TabsTrigger value="settings">
+            {m['app.label.settings']()}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" keepMounted className="flex flex-col p-5">
@@ -251,34 +255,43 @@ export function InstanceDetailPage({
                 })}
               </p>
               <div className="grid grid-cols-3 gap-3">
-                <StatCard value={contentCount} label={m['label.content']()} />
+                <StatCard
+                  value={contentCount}
+                  label={m['app.label.content']()}
+                />
                 <StatCard
                   value={worldList.length}
-                  label={m['label.worlds']()}
+                  label={m['app.label.worlds']()}
                 />
                 <StatCard
                   value={memoryLimitGb ? `${memoryLimitGb}G` : '—'}
-                  label={m['label.memory']()}
+                  label={m['app.label.memory']()}
                 />
               </div>
               <ResourceCards live={live} />
             </div>
 
             <div className="space-y-4">
-              <SideCard title={m['label.details']()}>
+              <SideCard title={m['app.label.details']()}>
                 <div className="divide-y divide-border">
-                  <Stat label={m['label.loader']()} value={instance.flavor} />
                   <Stat
-                    label={m['label.version']()}
+                    label={m['app.label.loader']()}
+                    value={instance.flavor}
+                  />
+                  <Stat
+                    label={m['app.label.version']()}
                     value={instance.gameVersion}
                   />
-                  <Stat label={m['label.java']()} value={instance.javaMajor} />
                   <Stat
-                    label={m['label.created']()}
+                    label={m['app.label.java']()}
+                    value={instance.javaMajor}
+                  />
+                  <Stat
+                    label={m['app.label.created']()}
                     value={agoLabel(instance.createdUnix)}
                   />
                   <Stat
-                    label={m['label.last_played']()}
+                    label={m['app.label.last_played']()}
                     value={
                       info.data?.lastPlayedUnix
                         ? agoLabel(info.data.lastPlayedUnix)
@@ -286,7 +299,7 @@ export function InstanceDetailPage({
                     }
                   />
                   <Stat
-                    label={m['label.playtime']()}
+                    label={m['app.label.playtime']()}
                     value={
                       info.data?.playtimeSeconds
                         ? uptime(info.data.playtimeSeconds)
@@ -294,7 +307,7 @@ export function InstanceDetailPage({
                     }
                   />
                   <Stat
-                    label={m['label.disk']()}
+                    label={m['app.label.disk']()}
                     value={
                       info.data?.diskBytes != null
                         ? bytes(info.data.diskBytes)
@@ -309,7 +322,7 @@ export function InstanceDetailPage({
                 name={instance.name}
                 running={!!live}
               />
-              <SideCard title={m['detail.quick_actions']()}>
+              <SideCard title={m['entry.quick_actions']()}>
                 <div className="flex flex-col gap-1">
                   <Button
                     variant="ghost"
@@ -320,7 +333,7 @@ export function InstanceDetailPage({
                     onClick={openFolder}
                   >
                     <FolderOpenIcon />
-                    {m['detail.open_folder']()}
+                    {m['app.action.open_folder']()}
                   </Button>
                   <Button
                     variant="ghost"
@@ -330,7 +343,7 @@ export function InstanceDetailPage({
                     disabled
                   >
                     <CopyIcon />
-                    {m['detail.duplicate']()}
+                    {m['app.action.duplicate']()}
                   </Button>
                   <Button
                     variant="ghost"
@@ -340,7 +353,7 @@ export function InstanceDetailPage({
                     disabled
                   >
                     <UploadSimpleIcon />
-                    {m['detail.export']()}
+                    {m['app.action.export']()}
                   </Button>
                 </div>
               </SideCard>
@@ -384,7 +397,7 @@ export function InstanceDetailPage({
               <Bone className="h-10" />
             </div>
           ) : worldList.length === 0 ? (
-            <Empty>{m['detail.no_worlds']()}</Empty>
+            <Empty>{m['instance.no_worlds']()}</Empty>
           ) : (
             <div className="divide-y divide-border border border-border">
               {worldList.map((world) => (

@@ -40,10 +40,10 @@ export function contentIcon(kind: ContentKind): Icon {
 }
 
 export const contentKindLabel: Record<ContentKind, () => string> = {
-  mod: m['kind.mod'],
-  resource_pack: m['kind.resourcepack'],
-  shader: m['kind.shader'],
-  data_pack: m['kind.datapack'],
-  modpack: m['kind.modpack'],
-  plugin: m['kind.plugin'],
+  mod: m['domain.kind.mod'],
+  resource_pack: m['domain.kind.resourcepack'],
+  shader: m['domain.kind.shader'],
+  data_pack: m['domain.kind.datapack'],
+  modpack: m['domain.kind.modpack'],
+  plugin: m['domain.kind.plugin'],
 };

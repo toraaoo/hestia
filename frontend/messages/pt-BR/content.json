@@ -1,0 +1,87 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "content": {
+    "add": "Adicionar conteúdo",
+    "add_to_title": "Adicionar conteúdo a {name}",
+    "browse": {
+      "by_author": "por {name}",
+      "downloads": "{count} downloads",
+      "followers": "{count} seguidores",
+      "loading_more": "Carregando mais…",
+      "nothing_matches": "Nada corresponde à sua pesquisa.",
+      "project_missing": "Esse projeto não foi encontrado.",
+      "subtitle": "Descubra mods, pacotes e shaders no Modrinth"
+    },
+    "change_version": {
+      "action": "Trocar versão…",
+      "description": "Escolha qualquer versão publicada; a troca é aplicada no próximo início.",
+      "title": "Trocar versão — {name}"
+    },
+    "check_updates": "Verificar atualizações",
+    "checking_updates": "Verificando…",
+    "choose_type": "Tipo não reconhecido — escolha um.",
+    "current_version": "atual",
+    "dependencies": "Dependências ({count})",
+    "disabled": "Desativado",
+    "hint": {
+      "content": "Escolha o conteúdo para instalar.",
+      "review": "Revise e instale.",
+      "target": "Escolha onde este conteúdo será instalado.",
+      "worlds": "Escolha os mundos que receberão este datapack."
+    },
+    "import_file": "Importar um arquivo local",
+    "import_file_hint": "Instala como está — sem atualizações nem resolução de dependências.",
+    "install_title": "Instalar {name}",
+    "install_to": "Instala em {dir}",
+    "installed": "Instalado",
+    "installing": "Instalando…",
+    "kind_not_taken": "Não aceito aqui",
+    "loaded_in_world": "Carregado em {world}",
+    "loaded_in_worlds": "{loaded}/{total} mundos",
+    "modpack": {
+      "from_file": "De um arquivo",
+      "install_into": "Instalar em {name}",
+      "kept": "Mantidos {count} arquivo(s) que você editou.",
+      "name_placeholder": "Usa o nome do próprio pacote",
+      "none": "Não foi criado a partir de um modpack.",
+      "pack_files": "Arquivos do pacote",
+      "remove": {
+        "action": "Remover pacote",
+        "body": "Seus mods e os arquivos que ele gravou no diretório do jogo são removidos. Arquivos que você editou são mantidos, e o {entry} em si permanece.",
+        "title": "Remover {name}?"
+      },
+      "removed": "Removidos {files} arquivo(s) e {overrides} arquivo(s) do pacote.",
+      "target": {
+        "existing": "Um item existente",
+        "label": "Onde instalar"
+      },
+      "title": "Modpack",
+      "update": "Atualizar pacote"
+    },
+    "no_target_for_kind": "Nenhum servidor ou instância pode receber um {kind}.",
+    "no_versions": "Nenhuma versão.",
+    "no_worlds_datapack": "Crie um mundo no jogo antes de adicionar datapacks.",
+    "no_worlds_in_instance": "Esta instância ainda não tem mundos.",
+    "none_installed": "Nenhum conteúdo instalado ainda. Adicione pelo Explorar.",
+    "none_of_kind": "Nenhum {kind} instalado.",
+    "none_selected": "nenhum selecionado",
+    "pinned_version": "Versão fixada",
+    "profile_no_projects": "Um perfil aceita projetos, não arquivos.",
+    "remove": {
+      "description": "{name} será removido. Seus arquivos serão excluídos; a mudança se aplica na próxima inicialização.",
+      "from_world_description": "{name} será removido de {world}. Os outros mundos o mantêm; a mudança vale no próximo início.",
+      "from_world_title": "Remover deste mundo?",
+      "selected_description": "{count} item(ns) serão removidos. Seus arquivos são excluídos; a mudança se aplica na próxima inicialização.",
+      "selected_title": "Remover o conteúdo selecionado?",
+      "title": "Remover conteúdo?"
+    },
+    "remove_count": "Remover ({count})",
+    "resolving_link": "Lendo o link…",
+    "select_version": "Selecionar versão",
+    "selected_count": "{count} selecionado(s)",
+    "stop_to_install": "Pare para instalar",
+    "untracked_note": "{count} arquivo(s) não rastreado(s) na pasta do jogo: {files}",
+    "update_to_latest": "Atualizar para a mais recente",
+    "world_datapacks": "datapacks do mundo"
+  }
+}

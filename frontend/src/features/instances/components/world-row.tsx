@@ -21,19 +21,19 @@ export function WorldRow({ world }: { world: WorldInfo }) {
           <span className="truncate text-sm">{world.name}</span>
           {world.hardcore && (
             <Badge variant="outline" className="shrink-0">
-              {m['worlds.hardcore']()}
+              {m['instance.world.hardcore']()}
             </Badge>
           )}
           {world.cheats && (
             <Badge variant="outline" className="shrink-0">
-              {m['worlds.cheats']()}
+              {m['instance.world.cheats']()}
             </Badge>
           )}
         </div>
         <div className="truncate font-mono text-[11px] text-muted-foreground">
           {world.read
-            ? `${world.folder} · ${msg[`worlds.mode_${world.gameMode}`]()} · ${msg[`worlds.difficulty_${world.difficulty}`]()}`
-            : m['worlds.unreadable']()}
+            ? `${world.folder} · ${msg[`domain.gamemode.${world.gameMode}`]()} · ${msg[`domain.difficulty.${world.difficulty}`]()}`
+            : m['instance.world.unreadable']()}
         </div>
       </div>
       <div className="shrink-0 text-right text-[11px] text-muted-foreground">

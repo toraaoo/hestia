@@ -87,7 +87,7 @@ export function InstanceSettingsTab({
     try {
       await setConfig.mutateAsync({ key: 'memory', value: memoryValue });
       await setConfig.mutateAsync({ key: 'jvm-args', value: jvmArgs });
-      toast.success(m['toast.saved']());
+      toast.success(m['app.toast.saved']());
     } catch (error) {
       toast.error(errorMessage(error));
     }
@@ -98,7 +98,7 @@ export function InstanceSettingsTab({
     if (!trimmed || trimmed === instance.name) return;
     rename.mutate(trimmed, {
       onSuccess: (updated) =>
-        toast.success(m['toast.renamed']({ name: updated.name })),
+        toast.success(m['app.toast.renamed']({ name: updated.name })),
     });
   };
 
@@ -107,7 +107,7 @@ export function InstanceSettingsTab({
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="instance-name">
-            {m['entry_settings.instance_name']()}
+            {m['entry.settings.instance_name']()}
           </FieldLabel>
           <div className="flex gap-2">
             <Input
@@ -121,17 +121,17 @@ export function InstanceSettingsTab({
               onClick={doRename}
               disabled={running || rename.isPending || name === instance.name}
             >
-              {m['action.apply']()}
+              {m['app.action.apply']()}
             </Button>
           </div>
         </Field>
 
         <Field>
           <FieldLabel>
-            {m['entry_settings.allocated_memory']()}
+            {m['entry.settings.allocated_memory']()}
             <span className="ml-2 font-mono text-muted-foreground">
-              {m['wizard.gb']({ value: memory })}
-              {inheritsMemory && ` (${m['entry_settings.inherits_default']()})`}
+              {m['entry.create.gb']({ value: memory })}
+              {inheritsMemory && ` (${m['entry.settings.inherits_default']()})`}
             </span>
           </FieldLabel>
           <Slider
@@ -146,7 +146,7 @@ export function InstanceSettingsTab({
 
         <Field>
           <FieldLabel htmlFor="jvm-args">
-            {m['entry_settings.java_arguments']()}
+            {m['entry.settings.java_arguments']()}
           </FieldLabel>
           <Input
             id="jvm-args"
@@ -159,7 +159,7 @@ export function InstanceSettingsTab({
 
         <div>
           <Button onClick={saveConfig} disabled={setConfig.isPending}>
-            {m['action.apply']()}
+            {m['app.action.apply']()}
           </Button>
         </div>
 
@@ -174,7 +174,7 @@ export function InstanceSettingsTab({
             onClick={() => setChanging(true)}
           >
             <ArrowsClockwiseIcon />
-            {m['entry_settings.change_version']()}
+            {m['entry.settings.change_version']()}
           </Button>
           <ConfirmDialog
             trigger={
@@ -185,19 +185,21 @@ export function InstanceSettingsTab({
                 disabled={running}
               >
                 <TrashIcon />
-                {m['entry_settings.remove_instance']()}
+                {m['entry.settings.remove.instance']()}
               </Button>
             }
-            title={m['entry_settings.remove_instance_title']()}
-            description={m['entry_settings.remove_description']({
+            title={m['entry.settings.remove.instance_title']()}
+            description={m['entry.settings.remove.description']({
               name: instance.name,
             })}
             destructive
-            confirmLabel={m['entry_settings.remove_instance']()}
+            confirmLabel={m['entry.settings.remove.instance']()}
             onConfirm={() =>
               remove.mutate(undefined, {
                 onSuccess: () => {
-                  toast.success(m['toast.removed']({ name: instance.name }));
+                  toast.success(
+                    m['app.toast.removed']({ name: instance.name }),
+                  );
                   navigate({ to: '/instances' });
                 },
               })
@@ -247,7 +249,7 @@ function ChangeVersionDialog({
     if (!version) return;
     try {
       await update.mutateAsync({ version, allowDowngrade: downgrade });
-      toast.success(m['toast.updated']({ name: instance.name }));
+      toast.success(m['app.toast.updated']({ name: instance.name }));
       onOpenChange(false);
     } catch (error) {
       toast.error(errorMessage(error));
@@ -258,7 +260,7 @@ function ChangeVersionDialog({
     <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{m['entry_settings.change_version']()}</DialogTitle>
+          <DialogTitle>{m['entry.settings.change_version']()}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           <Select
@@ -267,7 +269,7 @@ function ChangeVersionDialog({
             disabled={pending}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder={m['label.version']()} />
+              <SelectValue placeholder={m['app.label.version']()} />
             </SelectTrigger>
             <SelectContent>
               {options.map((v) => (
@@ -287,7 +289,7 @@ function ChangeVersionDialog({
               onCheckedChange={(c) => setDowngrade(c === true)}
               disabled={pending}
             />
-            {m['entry_settings.allow_downgrade']()}
+            {m['entry.settings.allow_downgrade']()}
           </label>
         </div>
         <DialogFooter>
@@ -296,12 +298,12 @@ function ChangeVersionDialog({
             onClick={() => onOpenChange(false)}
             disabled={pending}
           >
-            {m['action.cancel']()}
+            {m['app.action.cancel']()}
           </Button>
           <Button onClick={apply} disabled={!version || pending}>
             {pending
-              ? m['status.preparing']()
-              : m['entry_settings.change_version']()}
+              ? m['app.status.preparing']()
+              : m['entry.settings.change_version']()}
           </Button>
         </DialogFooter>
       </DialogContent>

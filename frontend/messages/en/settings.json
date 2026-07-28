@@ -1,0 +1,79 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "settings": {
+    "cache": {
+      "clear": "Clear cache",
+      "clear_description": "Frees the cached downloads. Files are re-fetched from the network the next time they're needed.",
+      "clear_title": "Clear download cache?"
+    },
+    "data_dir": "Data directory",
+    "data_dir_hint": "Where instances and servers live.",
+    "default_jvm_args": "Default JVM arguments",
+    "default_memory": "Default allocated memory",
+    "default_memory_hint": "Instances and servers can override this individually.",
+    "download_cache": "Download cache",
+    "general": "General",
+    "in_use": "In use",
+    "install_prompt": "Install:",
+    "installed_runtimes": "Installed runtimes",
+    "java": {
+      "uninstall": "Uninstall runtime",
+      "uninstall_title": "Uninstall runtime?",
+      "uninstall_description": "{name} will be removed. Entries that need it reinstall it on the next start."
+    },
+    "java_performance": "Java & performance",
+    "keep_open": "Keep the launcher open while a game runs",
+    "language": "Language",
+    "modpack": {
+      "default_excludes": "Correct a pack's server declarations",
+      "default_excludes_hint": "Off, a pack is trusted exactly as published — client mods included.",
+      "exclude": "Never install",
+      "force_include": "Always install",
+      "hint": "Packs routinely declare client-only mods as server-compatible. Hestia holds those back when installing a pack on a server.",
+      "mod_placeholder": "mod name",
+      "overrides_exclusions": "Skip pack files",
+      "overrides_exclusions_hint": "Config and world files the pack ships that should not be written. ? one character, * a run within one folder, ** a run across folders.",
+      "pattern_placeholder": "config/**",
+      "title": "Modpacks"
+    },
+    "news": {
+      "enabled_description": "Hestia checks its announcement feed every few hours. Turn this off and it makes no such request.",
+      "enabled_label": "Show news and notices"
+    },
+    "no_default": "No default set",
+    "start_at_login": "Start Hestia at login",
+    "storage_daemon": "Storage & daemon",
+    "subtitle": "Launcher, runtimes and daemon",
+    "sync": {
+      "add_file_placeholder": "options.txt",
+      "add_folder_placeholder": "saves",
+      "adopt": {
+        "action": "Adopt",
+        "description": "Moves the instance’s existing folder contents into the shared store and links them. The instance must be stopped.",
+        "done": "Adopted: {targets}"
+      },
+      "description": "Files are copied and merged at each launch; folders are linked into one shared store.",
+      "enabled_description": "Off, every instance keeps its own settings, configs and worlds. Folders already shared stay shared.",
+      "enabled_label": "Share settings between instances",
+      "files": "Copied files",
+      "folders": "Linked folders",
+      "no_folder_targets": "No folder targets configured.",
+      "section": "Shared between instances",
+      "status_title": "Instance link status"
+    },
+    "update": {
+      "available": "Version {version} is available",
+      "check": "Check for updates",
+      "check_failed": "Couldn't check for updates",
+      "checking": "Checking…",
+      "current": "Version {version}",
+      "failed": "Update failed",
+      "install": "Update and restart",
+      "installing": "Updating…",
+      "notes": "What's new",
+      "title": "Updates",
+      "up_to_date": "Hestia is up to date",
+      "whats_new": "What's new in {version}"
+    }
+  }
+}

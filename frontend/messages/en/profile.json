@@ -1,0 +1,57 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "profile": {
+    "active": "Active",
+    "apply": {
+      "action": "Apply global profile",
+      "description": "References not yet installed are resolved for {version} and installed, tagged with the profile. Nothing is ever removed by an apply.",
+      "title": "Apply a global profile"
+    },
+    "capture": {
+      "action": "Capture settings",
+      "badge": "Captured settings",
+      "description": "Snapshots options.txt and config/ from the shared store. Launches under this profile then keep their own settings; worlds stay shared.",
+      "title": "Capture settings for {name}?"
+    },
+    "create": {
+      "description": "A profile is a named selection over this instance's installed content — nothing is copied.",
+      "name_label": "Profile name",
+      "seed_hint": "Off starts an empty selection.",
+      "seed_label": "Start with everything installed",
+      "title": "Create profile"
+    },
+    "empty": "No profiles yet. A profile picks which installed content mirrors into the game at launch.",
+    "global": {
+      "description": "Reusable content lists applied into any instance — each reference resolves against that instance's version and loader.",
+      "empty": "No global profiles yet. Build a reference list once, apply it to any instance.",
+      "entries_count": "{count} references",
+      "new": "New global profile",
+      "no_entries": "No references yet.",
+      "title": "Global profiles"
+    },
+    "members": {
+      "action": "Edit selection",
+      "count": "{count} of {total} items",
+      "description": "Members mirror into the game at launch; deselected items are removed from the game folder (their files stay managed, and untracked files are never touched).",
+      "empty": "Nothing installed to select — add mods, resource packs, or shaders first.",
+      "title": "Select content — {name}"
+    },
+    "missing": "This profile does not exist.",
+    "new": "New profile",
+    "none_active": "No profile active — everything installed mirrors at launch.",
+    "none_match": "No profiles match.",
+    "origin_badge": "profile: {name}",
+    "release": {
+      "action": "Release settings",
+      "description": "The profile's settings store is deleted and the profile follows the shared settings again.",
+      "title": "Release captured settings?"
+    },
+    "remove": {
+      "description": "The selection is deleted; the installed content itself stays.",
+      "title": "Remove {name}?"
+    },
+    "rename_title": "Rename profile",
+    "search_placeholder": "Search profiles",
+    "use": "Use at next launch"
+  }
+}

@@ -29,7 +29,7 @@ export function KindChips({
         className={chipClass(!kind)}
         onClick={() => onKindChange(undefined)}
       >
-        {m['label.all']()}
+        {m['app.label.all']()}
       </button>
       {kinds.map((k) => (
         <button

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "account": {
+    "add": "Adicionar conta",
+    "expired": "Expirada",
+    "microsoft": "Conta Microsoft",
+    "not_signed_in": "Não conectado",
+    "reauth": "Entrar novamente",
+    "reauth_required": "Sessão expirada",
+    "sign_in": "Entrar",
+    "sign_in_failed": "Falha ao entrar",
+    "sign_in_to_play": "Entre para jogar",
+    "sign_out": "Sair",
+    "sign_out_description": "Você precisará entrar com a Microsoft novamente para jogar com esta conta.",
+    "sign_out_title": "Sair de {name}?",
+    "signed_in_as": "Conectado como {name}",
+    "signing_in": "Entrando…",
+    "switch_to": "Trocar para {name}"
+  }
+}

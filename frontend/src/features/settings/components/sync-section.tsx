@@ -21,9 +21,9 @@ import { configMutations } from '@/queries/config';
 import { syncMutations, syncQueries } from '@/queries/sync';
 
 const stateLabel: Record<LinkState, () => string> = {
-  linked: () => m['sync.state_linked'](),
-  pending: () => m['sync.state_pending'](),
-  cannot_link: () => m['sync.state_cannot_link'](),
+  linked: () => m['domain.sync_state.linked'](),
+  pending: () => m['domain.sync_state.pending'](),
+  cannot_link: () => m['domain.sync_state.cannot_link'](),
 };
 
 /**
@@ -44,21 +44,23 @@ export function SyncSection() {
 
   return (
     <FieldSet>
-      <FieldLegend>{m['sync.section']()}</FieldLegend>
+      <FieldLegend>{m['settings.sync.section']()}</FieldLegend>
       <FieldGroup>
-        <FieldDescription>{m['sync.description']()}</FieldDescription>
+        <FieldDescription>{m['settings.sync.description']()}</FieldDescription>
 
         <Field>
           <CheckboxRow
             id="sync-enabled"
-            label={m['sync.enabled_label']()}
+            label={m['settings.sync.enabled_label']()}
             checked={enabled}
             disabled={config.isPending || setConfig.isPending}
             onChange={(checked) =>
               setConfig.mutate({ key: 'sync.enabled', value: checked })
             }
           />
-          <FieldDescription>{m['sync.enabled_description']()}</FieldDescription>
+          <FieldDescription>
+            {m['settings.sync.enabled_description']()}
+          </FieldDescription>
         </Field>
 
         {!enabled ? null : config.isPending ? (
@@ -69,15 +71,15 @@ export function SyncSection() {
         ) : (
           <>
             <TargetList
-              label={m['sync.files']()}
-              placeholder={m['sync.add_file_placeholder']()}
+              label={m['settings.sync.files']()}
+              placeholder={m['settings.sync.add_file_placeholder']()}
               values={targets.files}
               pending={setTargets.isPending}
               onChange={(files) => commit({ ...targets, files })}
             />
             <TargetList
-              label={m['sync.folders']()}
-              placeholder={m['sync.add_folder_placeholder']()}
+              label={m['settings.sync.folders']()}
+              placeholder={m['settings.sync.add_folder_placeholder']()}
               values={targets.folders}
               pending={setTargets.isPending}
               onChange={(folders) => commit({ ...targets, folders })}
@@ -87,12 +89,12 @@ export function SyncSection() {
 
         {enabled && (
           <Field>
-            <FieldLabel>{m['sync.status_title']()}</FieldLabel>
+            <FieldLabel>{m['settings.sync.status_title']()}</FieldLabel>
             {status.isPending ? (
               <Bone className="h-10" />
             ) : targets.folders.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                {m['sync.no_folder_targets']()}
+                {m['settings.sync.no_folder_targets']()}
               </p>
             ) : (
               <div className="divide-y divide-border border border-border">
@@ -136,16 +138,18 @@ function AdoptButton({ id, name }: { id: string; name: string }) {
     <ConfirmDialog
       trigger={
         <Button variant="outline" size="xs" disabled={adopt.isPending}>
-          {m['sync.adopt']()}
+          {m['settings.sync.adopt.action']()}
         </Button>
       }
-      title={`${m['sync.adopt']()} — ${name}`}
-      description={m['sync.adopt_description']()}
-      confirmLabel={m['sync.adopt']()}
+      title={`${m['settings.sync.adopt.action']()} — ${name}`}
+      description={m['settings.sync.adopt.description']()}
+      confirmLabel={m['settings.sync.adopt.action']()}
       onConfirm={() =>
         adopt.mutate(undefined, {
           onSuccess: (adopted) =>
-            toast.success(m['sync.adopted']({ targets: adopted.join(', ') })),
+            toast.success(
+              m['settings.sync.adopt.done']({ targets: adopted.join(', ') }),
+            ),
         })
       }
     />

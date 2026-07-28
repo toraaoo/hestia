@@ -15,11 +15,11 @@ import { serverMutations, serverQueries } from '@/queries/server';
 function kindLabel(kind: BackupKind): string {
   switch (kind) {
     case 'manual':
-      return m['backup.kind_manual']();
+      return m['domain.backup_kind.manual']();
     case 'scheduled':
-      return m['backup.kind_scheduled']();
+      return m['domain.backup_kind.scheduled']();
     case 'update':
-      return m['backup.kind_update']();
+      return m['domain.backup_kind.update']();
   }
 }
 
@@ -47,11 +47,11 @@ export function ServerBackupsTab({
       <div className="mb-5 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
           {interval
-            ? m['backup.schedule_status']({
+            ? m['server.backup.schedule_status']({
                 interval,
                 retention: Number(retention ?? 0),
               })
-            : m['backup.off_short']()}
+            : m['server.backup.off_short']()}
         </span>
         <Button
           size="sm"
@@ -60,17 +60,17 @@ export function ServerBackupsTab({
           disabled={create.isPending}
           onClick={() =>
             create.mutate(undefined, {
-              onSuccess: () => toast.success(m['toast.saved']()),
+              onSuccess: () => toast.success(m['app.toast.saved']()),
             })
           }
         >
           <PlusIcon weight="bold" />
-          {m['backup.create']()}
+          {m['server.backup.create']()}
         </Button>
       </div>
 
       {list.length === 0 ? (
-        <Empty>{m['backup.none']()}</Empty>
+        <Empty>{m['server.backup.none']()}</Empty>
       ) : (
         <div className="divide-y divide-border border border-border">
           {list.map((backup: BackupInfo) => (
@@ -98,17 +98,17 @@ export function ServerBackupsTab({
                     size="sm"
                     disabled={running || restore.isPending}
                   >
-                    {m['action.restore']()}
+                    {m['app.action.restore']()}
                   </Button>
                 }
-                title={m['backup.restore_title']()}
-                description={m['backup.restore_description']({
+                title={m['server.backup.restore.title']()}
+                description={m['server.backup.restore.description']({
                   when: agoLabel(backup.createdUnix),
                 })}
-                confirmLabel={m['action.restore']()}
+                confirmLabel={m['app.action.restore']()}
                 onConfirm={() =>
                   restore.mutate(backup.id, {
-                    onSuccess: () => toast.success(m['toast.saved']()),
+                    onSuccess: () => toast.success(m['app.toast.saved']()),
                   })
                 }
               />
@@ -117,17 +117,17 @@ export function ServerBackupsTab({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={m['backup.delete_aria']()}
+                    aria-label={m['server.backup.delete.aria']()}
                   >
                     <TrashIcon className="size-4" />
                   </Button>
                 }
-                title={m['backup.delete_title']()}
-                description={m['backup.delete_description']({
+                title={m['server.backup.delete.title']()}
+                description={m['server.backup.delete.description']({
                   when: agoLabel(backup.createdUnix),
                 })}
                 destructive
-                confirmLabel={m['action.delete']()}
+                confirmLabel={m['app.action.delete']()}
                 onConfirm={() => remove.mutate(backup.id)}
               />
             </div>

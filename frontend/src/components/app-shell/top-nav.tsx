@@ -25,14 +25,14 @@ export function TopNav() {
         <span className="mr-1 text-sm font-semibold">Hestia</span>
         <div className="mx-1 h-4 w-px bg-border" />
         <HistoryButton
-          label={m['nav.back']()}
+          label={m['app.nav.back']()}
           disabled={!canGoBack}
           onClick={() => router.history.back()}
         >
           <CaretLeftIcon weight="bold" className="size-4" />
         </HistoryButton>
         <HistoryButton
-          label={m['nav.forward']()}
+          label={m['app.nav.forward']()}
           onClick={() => router.history.forward()}
         >
           <CaretRightIcon weight="bold" className="size-4" />

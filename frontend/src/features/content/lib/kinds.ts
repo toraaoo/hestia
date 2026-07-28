@@ -13,12 +13,15 @@ export const kindInfo: Record<
   ContentKind,
   { slug: KindSlug; label: () => string }
 > = {
-  mod: { slug: 'mods', label: m['kind.mods'] },
-  modpack: { slug: 'modpacks', label: m['kind.modpacks'] },
-  resource_pack: { slug: 'resourcepacks', label: m['kind.resourcepacks'] },
-  shader: { slug: 'shaders', label: m['kind.shaders'] },
-  data_pack: { slug: 'datapacks', label: m['kind.datapacks'] },
-  plugin: { slug: 'plugins', label: m['kind.plugins'] },
+  mod: { slug: 'mods', label: m['domain.kind.mods'] },
+  modpack: { slug: 'modpacks', label: m['domain.kind.modpacks'] },
+  resource_pack: {
+    slug: 'resourcepacks',
+    label: m['domain.kind.resourcepacks'],
+  },
+  shader: { slug: 'shaders', label: m['domain.kind.shaders'] },
+  data_pack: { slug: 'datapacks', label: m['domain.kind.datapacks'] },
+  plugin: { slug: 'plugins', label: m['domain.kind.plugins'] },
 };
 
 /**

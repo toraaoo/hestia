@@ -20,10 +20,10 @@ export function OfflineOverlay() {
         <PlugsIcon className="size-10 text-muted-foreground" weight="duotone" />
         <div className="space-y-2">
           <h2 className="text-xl font-semibold">
-            {m['daemon.offline_title']()}
+            {m['app.daemon.offline_title']()}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {m['daemon.offline_body']()}
+            {m['app.daemon.offline_body']()}
           </p>
         </div>
         <Button
@@ -33,7 +33,7 @@ export function OfflineOverlay() {
           data-icon="inline-start"
         >
           {daemon.busy && <Spinner className="size-4" />}
-          {daemon.busy ? m['daemon.starting']() : m['daemon.start']()}
+          {daemon.busy ? m['app.daemon.starting']() : m['app.daemon.start']()}
         </Button>
       </div>
     </div>

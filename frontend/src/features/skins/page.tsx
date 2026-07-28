@@ -125,11 +125,11 @@ export function SkinsPage() {
 
   const body = !signedIn ? (
     <SignInGate
-      title={m['skins.locked_title']()}
-      hint={m['skins.sign_in_hint']()}
+      title={m['skin.locked_title']()}
+      hint={m['skin.sign_in_hint']()}
     />
   ) : list.isError && !list.data ? (
-    <Empty>{m['skins.load_failed']()}</Empty>
+    <Empty>{m['skin.load_failed']()}</Empty>
   ) : (
     <div className="flex items-start gap-6">
       {selected && (
@@ -145,10 +145,10 @@ export function SkinsPage() {
       )}
 
       <div className="min-w-0 flex-1 space-y-8">
-        <Section title={m['skins.your_skins']()} count={saved.length}>
+        <Section title={m['skin.your_skins']()} count={saved.length}>
           {saved.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              {m['skins.none_yet']()}
+              {m['skin.none_yet']()}
             </p>
           ) : (
             <SkinGrid>
@@ -174,7 +174,7 @@ export function SkinsPage() {
           )}
         </Section>
 
-        <Section title={m['skins.default_skins']()} count={defaults.length}>
+        <Section title={m['skin.default_skins']()} count={defaults.length}>
           <SkinGrid>
             {defaults.map((skin) => (
               <SkinCard
@@ -189,15 +189,15 @@ export function SkinsPage() {
           </SkinGrid>
         </Section>
 
-        <Section title={m['skins.capes']()} count={capes.length}>
+        <Section title={m['skin.capes']()} count={capes.length}>
           {capes.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              {m['skins.no_capes']()}
+              {m['skin.no_capes']()}
             </p>
           ) : (
             <CapeGrid>
               <CapeCard
-                label={m['skins.no_cape']()}
+                label={m['skin.no_cape']()}
                 equipped={equippedCape == null}
                 onEquip={() => clearCape.mutate(undefined)}
               />
@@ -219,8 +219,8 @@ export function SkinsPage() {
 
   return (
     <Page
-      title={m['nav.skins']()}
-      subtitle={m['skins.subtitle']()}
+      title={m['app.nav.skins']()}
+      subtitle={m['skin.subtitle']()}
       skeleton={<SkinsPageSkeleton />}
       loading={accountsPending || (signedIn && list.isPending)}
       actions={
@@ -243,7 +243,7 @@ export function SkinsPage() {
             onClick={() => fileRef.current?.click()}
           >
             <PlusIcon weight="bold" />
-            {m['skins.add']()}
+            {m['skin.add']()}
           </Button>
         </>
       }
@@ -266,15 +266,15 @@ export function SkinsPage() {
       <ConfirmDialog
         open={pendingRemove !== null}
         onOpenChange={(open) => !open && setPendingRemove(null)}
-        title={m['skins.delete_title']()}
+        title={m['skin.delete_title']()}
         description={
           pendingRemove &&
-          m['skins.delete_description']({
+          m['skin.delete_description']({
             name: skinDisplayName(pendingRemove),
           })
         }
         destructive
-        confirmLabel={m['action.delete']()}
+        confirmLabel={m['app.action.delete']()}
         onConfirm={() => {
           if (pendingRemove) removeSkin.mutate({ key: pendingRemove.key });
           setPendingRemove(null);

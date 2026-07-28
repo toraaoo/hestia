@@ -32,20 +32,22 @@ export function UpdateSection() {
 
   return (
     <FieldSet>
-      <FieldLegend>{m['update.title']()}</FieldLegend>
+      <FieldLegend>{m['settings.update.title']()}</FieldLegend>
       <FieldGroup>
         <Field orientation="horizontal">
           <div className="min-w-0">
             <FieldLabel className="font-normal">
-              {m['update.current']({ version })}
+              {m['settings.update.current']({ version })}
             </FieldLabel>
             {asked && !check.isFetching && (
               <FieldDescription>
                 {check.isError
-                  ? m['update.check_failed']()
+                  ? m['settings.update.check_failed']()
                   : update
-                    ? m['update.available']({ version: update.version })
-                    : m['update.up_to_date']()}
+                    ? m['settings.update.available']({
+                        version: update.version,
+                      })
+                    : m['settings.update.up_to_date']()}
               </FieldDescription>
             )}
           </div>
@@ -62,7 +64,9 @@ export function UpdateSection() {
               <ArrowClockwiseIcon
                 className={cn('size-4', check.isFetching && 'animate-spin')}
               />
-              {check.isFetching ? m['update.checking']() : m['update.check']()}
+              {check.isFetching
+                ? m['settings.update.checking']()
+                : m['settings.update.check']()}
             </Button>
             {update && (
               <Button
@@ -72,7 +76,7 @@ export function UpdateSection() {
                     // Success never resolves here — the app restarts into the
                     // new build — so only the failure path needs reporting.
                     onError: (e) =>
-                      toast.error(m['update.failed'](), {
+                      toast.error(m['settings.update.failed'](), {
                         description: String(e),
                       }),
                   })
@@ -81,8 +85,8 @@ export function UpdateSection() {
               >
                 <DownloadSimpleIcon className="size-4" />
                 {install.isPending
-                  ? m['update.installing']()
-                  : m['update.install']()}
+                  ? m['settings.update.installing']()
+                  : m['settings.update.install']()}
               </Button>
             )}
           </div>
@@ -90,7 +94,7 @@ export function UpdateSection() {
         {update?.notes && (
           <Field>
             <FieldLabel className="font-normal">
-              {m['update.notes']()}
+              {m['settings.update.notes']()}
             </FieldLabel>
             <Markdown>{update.notes}</Markdown>
           </Field>

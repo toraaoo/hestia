@@ -1,0 +1,28 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "server": {
+    "backup": {
+      "create": "Criar backup",
+      "delete": {
+        "aria": "Excluir backup",
+        "description": "O arquivo de {when} será excluído permanentemente.",
+        "title": "Excluir backup?"
+      },
+      "none": "Nenhum backup ainda. Crie um para arquivar este mundo.",
+      "off_short": "Backups agendados desativados",
+      "restore": {
+        "description": "Isto sobrescreve os dados atuais do jogo com o arquivo de {when}. Os dados atuais são salvos em backup primeiro.",
+        "title": "Restaurar backup?"
+      },
+      "schedule_status": "Agendado a cada {interval}, mantendo {retention}"
+    },
+    "console": {
+      "empty": "Inicie o servidor para abrir o console.",
+      "placeholder": "Digite um comando do servidor, ex.: say olá"
+    },
+    "missing": "Esse servidor não existe mais.",
+    "new": "Novo servidor",
+    "none_match": "Nenhum servidor corresponde à sua pesquisa.",
+    "subtitle": "Mundos que você hospeda"
+  }
+}

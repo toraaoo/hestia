@@ -23,38 +23,48 @@ export interface NavItem {
 }
 
 export const nav: NavItem[] = [
-  { to: '/', label: m['nav.library'], icon: PackageIcon, match: ['/'] },
+  { to: '/', label: m['app.nav.library'], icon: PackageIcon, match: ['/'] },
   {
     to: '/browse',
-    label: m['nav.browse'],
+    label: m['app.nav.browse'],
     icon: StorefrontIcon,
     match: ['/browse'],
   },
   {
     to: '/instances',
-    label: m['nav.instances'],
+    label: m['app.nav.instances'],
     icon: CubeIcon,
     match: ['/instances'],
   },
   {
     to: '/servers',
-    label: m['nav.servers'],
+    label: m['app.nav.servers'],
     icon: HardDrivesIcon,
     match: ['/servers'],
   },
   {
     to: '/profiles',
-    label: m['profiles.nav'],
+    label: m['app.nav.profiles'],
     icon: StackIcon,
     match: ['/profiles'],
   },
-  { to: '/skins', label: m['nav.skins'], icon: TShirtIcon, match: ['/skins'] },
-  { to: '/news', label: m['news.nav'], icon: NewspaperIcon, match: ['/news'] },
+  {
+    to: '/skins',
+    label: m['app.nav.skins'],
+    icon: TShirtIcon,
+    match: ['/skins'],
+  },
+  {
+    to: '/news',
+    label: m['app.nav.news'],
+    icon: NewspaperIcon,
+    match: ['/news'],
+  },
 ];
 
 export const settingsItem: NavItem = {
   to: '/settings',
-  label: m['nav.settings'],
+  label: m['app.nav.settings'],
   icon: GearSixIcon,
   match: ['/settings'],
 };

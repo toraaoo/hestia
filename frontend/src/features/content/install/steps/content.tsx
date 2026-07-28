@@ -77,7 +77,7 @@ export function ContentStep({
           <FilterBar
             search={search}
             onSearch={setSearch}
-            placeholder={m['search.content_or_link']()}
+            placeholder={m['app.search.content_or_link']()}
             chips={kinds.map((k) => ({
               label: kindInfo[k].label(),
               active: activeKind === k,
@@ -111,7 +111,7 @@ export function ContentStep({
         </p>
       ) : hits.length === 0 ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-          {m['browse.nothing_matches']()}
+          {m['content.browse.nothing_matches']()}
         </p>
       ) : (
         <div className="grid gap-2 p-0.5">
@@ -123,7 +123,7 @@ export function ContentStep({
                 icon={contentIcon(p.kind)}
                 imageUrl={p.iconUrl}
                 title={p.title}
-                subtitle={`${contentKindLabel[p.kind]()} · ${m['browse.by_author']({ name: p.author })}`}
+                subtitle={`${contentKindLabel[p.kind]()} · ${m['content.browse.by_author']({ name: p.author })}`}
                 badge={installed ? m['content.installed']() : undefined}
                 disabled={installed}
                 selected={pickedRefs.has(projectRef(p))}
@@ -175,7 +175,7 @@ function LinkResult({
         icon={contentIcon(project.kind)}
         imageUrl={project.iconUrl}
         title={project.title}
-        subtitle={`${contentKindLabel[project.kind]()} · ${m['browse.by_author']({ name: project.author })}`}
+        subtitle={`${contentKindLabel[project.kind]()} · ${m['content.browse.by_author']({ name: project.author })}`}
         badge={
           taken
             ? already

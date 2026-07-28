@@ -20,12 +20,12 @@ import { m } from '@/paraglide/messages.js';
 
 export function skinDisplayName(skin: Skin): string {
   if (skin.name) return skin.name;
-  if (skin.source === 'external') return m['skins.current']();
-  return m['skins.unnamed']();
+  if (skin.source === 'external') return m['skin.current']();
+  return m['skin.unnamed']();
 }
 
 export function skinVariantLabel(skin: Skin): string {
-  return skin.variant === 'slim' ? m['skins.slim']() : m['skins.wide']();
+  return skin.variant === 'slim' ? m['skin.slim']() : m['skin.wide']();
 }
 
 export function SkinGrid({ children }: { children: React.ReactNode }) {
@@ -93,7 +93,7 @@ export function SkinCard({
             <Button
               variant="secondary"
               size="icon-sm"
-              aria-label={m['skins.actions']()}
+              aria-label={m['skin.actions']()}
               className="absolute top-1.5 right-1.5 bg-background/80 opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
             >
               <DotsThreeIcon weight="bold" className="size-3.5" />
@@ -103,19 +103,19 @@ export function SkinCard({
         <DropdownMenuContent align="start">
           <DropdownMenuItem disabled={equipped} onClick={onEquip}>
             <CheckIcon />
-            {equipped ? m['skins.equipped']() : m['action.equip']()}
+            {equipped ? m['skin.equipped']() : m['app.action.equip']()}
           </DropdownMenuItem>
           {onEdit && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onEdit}>
                 <PencilSimpleIcon />
-                {m['action.edit']()}
+                {m['app.action.edit']()}
               </DropdownMenuItem>
               {onRemove && (
                 <DropdownMenuItem variant="destructive" onClick={onRemove}>
                   <TrashIcon />
-                  {m['action.delete']()}
+                  {m['app.action.delete']()}
                 </DropdownMenuItem>
               )}
             </>

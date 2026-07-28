@@ -77,7 +77,7 @@ export function VersionStep({
       <SearchInput
         value={search}
         onChange={onSearch}
-        placeholder={m['wizard.filter_versions']()}
+        placeholder={m['entry.create.filter_versions']()}
       />
 
       <label
@@ -89,7 +89,7 @@ export function VersionStep({
           checked={showSnapshots}
           onCheckedChange={(c) => onShowSnapshots(c === true)}
         />
-        {m['wizard.show_snapshots']()}
+        {m['entry.create.show_snapshots']()}
       </label>
 
       <form.AppField name="version.version">
@@ -102,8 +102,8 @@ export function VersionStep({
                 {list.length === 0 ? (
                   <p className="px-3 py-6 text-center text-xs text-muted-foreground">
                     {versionsQuery.isPending
-                      ? m['common.loading']()
-                      : m['wizard.no_versions_match']()}
+                      ? m['app.status.loading']()
+                      : m['entry.create.no_versions_match']()}
                   </p>
                 ) : (
                   list.map((v) => (
@@ -134,7 +134,7 @@ export function VersionStep({
           {(field: WizardForm) => (
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
-                {m['label.loader']()}
+                {m['app.label.loader']()}
               </span>
               <field.SelectField
                 options={loaders.map((l: string) => ({ value: l, label: l }))}

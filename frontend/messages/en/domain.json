@@ -1,0 +1,84 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "domain": {
+    "backup_kind": {
+      "manual": "manual",
+      "scheduled": "scheduled",
+      "update": "update"
+    },
+    "difficulty": {
+      "easy": "Easy",
+      "hard": "Hard",
+      "normal": "Normal",
+      "peaceful": "Peaceful"
+    },
+    "entry_type": {
+      "instance": "instance",
+      "profile": "profile",
+      "server": "server"
+    },
+    "flavor": {
+      "bukkit": {
+        "summary": "The plugin server Spigot is built on, without its speed-ups. Pick Spigot unless you need this exactly."
+      },
+      "fabric": {
+        "summary": "A light, fast-moving mod loader. Usually the first to support a new Minecraft version."
+      },
+      "folia": {
+        "summary": "Paper spread across CPU cores, for very large worlds. Only plugins made for Folia will work."
+      },
+      "neoforge": {
+        "summary": "Mod loader for big, content-heavy modpacks. The first launch prepares the game files, so it takes a few minutes."
+      },
+      "paper": {
+        "summary": "A faster server that runs Bukkit plugins, tuned by the Paper team for each version."
+      },
+      "requires": "Needs {name} installed on this computer:",
+      "spigot": {
+        "summary": "The classic plugin server, with the largest plugin library. Nobody may hand it out ready-made, so Hestia builds it here the first time — allow a few minutes."
+      },
+      "vanilla": {
+        "summary": "Mojang's game, unchanged. Takes datapacks only — no mods or plugins."
+      }
+    },
+    "gamemode": {
+      "adventure": "Adventure",
+      "creative": "Creative",
+      "spectator": "Spectator",
+      "survival": "Survival"
+    },
+    "kind": {
+      "datapack": "Datapack",
+      "datapacks": "Datapacks",
+      "mod": "Mod",
+      "modpack": "Modpack",
+      "modpacks": "Modpacks",
+      "mods": "Mods",
+      "plugin": "Plugin",
+      "plugins": "Plugins",
+      "resourcepack": "Resource pack",
+      "resourcepacks": "Resource packs",
+      "shader": "Shader",
+      "shaders": "Shaders"
+    },
+    "phase": {
+      "backing_up": "Backing up",
+      "downloading": "Downloading {name}",
+      "downloading_server": "Downloading server",
+      "installing_java": "Installing Java runtime",
+      "mirroring": "Mirroring into data/",
+      "resolving_profile": "Resolving profile",
+      "writing_pack_files": "Writing pack files"
+    },
+    "severity": {
+      "critical": "Important",
+      "info": "News",
+      "warning": "Notice"
+    },
+    "sync_state": {
+      "cannot_link": "clashes with the store",
+      "linked": "linked",
+      "pending": "shares at next launch"
+    }
+  }
+}

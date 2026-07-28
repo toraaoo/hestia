@@ -60,7 +60,7 @@ export function WhatsNewDialog() {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {m['update.whats_new']({ version: version ?? '' })}
+            {m['settings.update.whats_new']({ version: version ?? '' })}
           </AlertDialogTitle>
           <AlertDialogDescription>
             <Markdown>{notes.data}</Markdown>

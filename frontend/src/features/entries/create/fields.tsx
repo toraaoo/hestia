@@ -14,16 +14,16 @@ export const STEPS: Step[] = ['flavor', 'version', 'details'];
 export type WizardForm = any;
 
 export const GAMEMODES: Array<{ value: string; label: () => string }> = [
-  { value: 'survival', label: m['gamemode.survival'] },
-  { value: 'creative', label: m['gamemode.creative'] },
-  { value: 'adventure', label: m['gamemode.adventure'] },
-  { value: 'spectator', label: m['gamemode.spectator'] },
+  { value: 'survival', label: m['domain.gamemode.survival'] },
+  { value: 'creative', label: m['domain.gamemode.creative'] },
+  { value: 'adventure', label: m['domain.gamemode.adventure'] },
+  { value: 'spectator', label: m['domain.gamemode.spectator'] },
 ];
 export const DIFFICULTIES: Array<{ value: string; label: () => string }> = [
-  { value: 'peaceful', label: m['difficulty.peaceful'] },
-  { value: 'easy', label: m['difficulty.easy'] },
-  { value: 'normal', label: m['difficulty.normal'] },
-  { value: 'hard', label: m['difficulty.hard'] },
+  { value: 'peaceful', label: m['domain.difficulty.peaceful'] },
+  { value: 'easy', label: m['domain.difficulty.easy'] },
+  { value: 'normal', label: m['domain.difficulty.normal'] },
+  { value: 'hard', label: m['domain.difficulty.hard'] },
 ];
 
 export const options = (items: Array<{ value: string; label: () => string }>) =>
@@ -32,13 +32,13 @@ export const options = (items: Array<{ value: string; label: () => string }>) =>
 export const STEP_HINTS: Record<Step, (kind: Kind) => string> = {
   flavor: (kind) =>
     kind === 'server'
-      ? m['wizard.hint_flavor_server']()
-      : m['wizard.hint_flavor_instance'](),
-  version: () => m['wizard.hint_version'](),
+      ? m['entry.create.hint.flavor_server']()
+      : m['entry.create.hint.flavor_instance'](),
+  version: () => m['entry.create.hint.version'](),
   details: (kind) =>
     kind === 'server'
-      ? m['wizard.hint_details_server']()
-      : m['wizard.hint_details_instance'](),
+      ? m['entry.create.hint.details_server']()
+      : m['entry.create.hint.details_instance'](),
 };
 
 export function StepForm({
@@ -139,7 +139,7 @@ export function FlavorOption({
       )}
       {(flavor.requires ?? []).map((requirement) => (
         <span key={requirement.name} className="text-xs text-amber">
-          {m['flavor.requires']({ name: requirement.name })}{' '}
+          {m['domain.flavor.requires']({ name: requirement.name })}{' '}
           <a
             href={requirement.url}
             target="_blank"
@@ -185,7 +185,7 @@ export function VersionRow({
       <span className="flex-1 font-mono text-xs">{id}</span>
       {snapshot && (
         <Badge variant="outline" className="text-[10px]">
-          {m['wizard.snapshot']()}
+          {m['entry.create.snapshot']()}
         </Badge>
       )}
     </button>
@@ -199,5 +199,7 @@ export function VersionRow({
  */
 export function flavorSummary(flavor: Flavor): string {
   const messages = m as unknown as Record<string, (() => string) | undefined>;
-  return messages[`flavor.${flavor.id}_summary`]?.() ?? flavor.summary ?? '';
+  return (
+    messages[`domain.flavor.${flavor.id}.summary`]?.() ?? flavor.summary ?? ''
+  );
 }

@@ -55,11 +55,13 @@ export function WindowControls() {
 
   return (
     <div className="flex h-full">
-      <ControlButton label={m['window.minimize']()} onClick={minimize}>
+      <ControlButton label={m['app.window.minimize']()} onClick={minimize}>
         <MinusIcon weight="bold" className="size-3.5" />
       </ControlButton>
       <ControlButton
-        label={maximized ? m['window.restore']() : m['window.maximize']()}
+        label={
+          maximized ? m['app.window.restore']() : m['app.window.maximize']()
+        }
         onClick={toggleMaximize}
       >
         {maximized ? (
@@ -68,7 +70,7 @@ export function WindowControls() {
           <CornersOutIcon weight="bold" className="size-3.5" />
         )}
       </ControlButton>
-      <ControlButton label={m['window.close']()} onClick={close} danger>
+      <ControlButton label={m['app.window.close']()} onClick={close} danger>
         <XIcon weight="bold" className="size-3.5" />
       </ControlButton>
     </div>

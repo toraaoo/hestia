@@ -102,7 +102,7 @@ export function ServerSettingsTab({
         key: 'backup-retention',
         value: retention,
       });
-      toast.success(m['toast.saved']());
+      toast.success(m['app.toast.saved']());
     } catch (error) {
       toast.error(errorMessage(error));
     }
@@ -113,7 +113,7 @@ export function ServerSettingsTab({
     if (!trimmed || trimmed === server.name) return;
     rename.mutate(trimmed, {
       onSuccess: (updated) =>
-        toast.success(m['toast.renamed']({ name: updated.name })),
+        toast.success(m['app.toast.renamed']({ name: updated.name })),
     });
   };
 
@@ -122,7 +122,7 @@ export function ServerSettingsTab({
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="server-name">
-            {m['entry_settings.server_name']()}
+            {m['entry.settings.server_name']()}
           </FieldLabel>
           <div className="flex gap-2">
             <Input
@@ -136,17 +136,17 @@ export function ServerSettingsTab({
               onClick={doRename}
               disabled={running || rename.isPending || name === server.name}
             >
-              {m['action.apply']()}
+              {m['app.action.apply']()}
             </Button>
           </div>
         </Field>
 
         <Field>
           <FieldLabel>
-            {m['entry_settings.allocated_memory']()}
+            {m['entry.settings.allocated_memory']()}
             <span className="ml-2 font-mono text-muted-foreground">
-              {m['wizard.gb']({ value: memory })}
-              {inheritsMemory && ` (${m['entry_settings.inherits_default']()})`}
+              {m['entry.create.gb']({ value: memory })}
+              {inheritsMemory && ` (${m['entry.settings.inherits_default']()})`}
             </span>
           </FieldLabel>
           <Slider
@@ -161,7 +161,7 @@ export function ServerSettingsTab({
 
         <Field>
           <FieldLabel htmlFor="jvm-args">
-            {m['entry_settings.java_arguments']()}
+            {m['entry.settings.java_arguments']()}
           </FieldLabel>
           <Input
             id="jvm-args"
@@ -175,7 +175,7 @@ export function ServerSettingsTab({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="backup-interval">
-              {m['entry_settings.backup_schedule']()}
+              {m['entry.settings.backup_schedule']()}
             </FieldLabel>
             <Select
               value={interval}
@@ -188,8 +188,8 @@ export function ServerSettingsTab({
                 {INTERVALS.map((iv) => (
                   <SelectItem key={iv} value={iv}>
                     {iv === 'off'
-                      ? m['label.off']()
-                      : m['entry_settings.every_interval']({ interval: iv })}
+                      ? m['app.label.off']()
+                      : m['entry.settings.every_interval']({ interval: iv })}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -197,7 +197,7 @@ export function ServerSettingsTab({
           </Field>
           <Field>
             <FieldLabel htmlFor="backup-retention">
-              {m['entry_settings.keep_backups']()}
+              {m['entry.settings.keep_backups']()}
             </FieldLabel>
             <Input
               id="backup-retention"
@@ -211,7 +211,7 @@ export function ServerSettingsTab({
 
         <div>
           <Button onClick={saveConfig} disabled={setConfig.isPending}>
-            {m['action.apply']()}
+            {m['app.action.apply']()}
           </Button>
         </div>
 
@@ -226,7 +226,7 @@ export function ServerSettingsTab({
             onClick={() => setChanging(true)}
           >
             <ArrowsClockwiseIcon />
-            {m['entry_settings.change_version']()}
+            {m['entry.settings.change_version']()}
           </Button>
           <ConfirmDialog
             trigger={
@@ -237,19 +237,19 @@ export function ServerSettingsTab({
                 disabled={running}
               >
                 <TrashIcon />
-                {m['entry_settings.remove_server']()}
+                {m['entry.settings.remove.server']()}
               </Button>
             }
-            title={m['entry_settings.remove_server_title']()}
-            description={m['entry_settings.remove_description']({
+            title={m['entry.settings.remove.server_title']()}
+            description={m['entry.settings.remove.description']({
               name: server.name,
             })}
             destructive
-            confirmLabel={m['entry_settings.remove_server']()}
+            confirmLabel={m['entry.settings.remove.server']()}
             onConfirm={() =>
               remove.mutate(undefined, {
                 onSuccess: () => {
-                  toast.success(m['toast.removed']({ name: server.name }));
+                  toast.success(m['app.toast.removed']({ name: server.name }));
                   navigate({ to: '/servers' });
                 },
               })
@@ -302,7 +302,7 @@ function ChangeVersionDialog({
         version,
         allowDowngrade: downgrade,
       });
-      toast.success(m['toast.updated']({ name: server.name }));
+      toast.success(m['app.toast.updated']({ name: server.name }));
       onOpenChange(false);
     } catch (error) {
       toast.error(errorMessage(error));
@@ -313,7 +313,7 @@ function ChangeVersionDialog({
     <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{m['entry_settings.change_version']()}</DialogTitle>
+          <DialogTitle>{m['entry.settings.change_version']()}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           <Select
@@ -322,7 +322,7 @@ function ChangeVersionDialog({
             disabled={pending}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder={m['label.version']()} />
+              <SelectValue placeholder={m['app.label.version']()} />
             </SelectTrigger>
             <SelectContent>
               {options.map((v) => (
@@ -342,7 +342,7 @@ function ChangeVersionDialog({
               onCheckedChange={(c) => setDowngrade(c === true)}
               disabled={pending}
             />
-            {m['entry_settings.allow_downgrade']()}
+            {m['entry.settings.allow_downgrade']()}
           </label>
         </div>
         <DialogFooter>
@@ -351,12 +351,12 @@ function ChangeVersionDialog({
             onClick={() => onOpenChange(false)}
             disabled={pending}
           >
-            {m['action.cancel']()}
+            {m['app.action.cancel']()}
           </Button>
           <Button onClick={apply} disabled={!version || pending}>
             {pending
-              ? m['status.preparing']()
-              : m['entry_settings.change_version']()}
+              ? m['app.status.preparing']()
+              : m['entry.settings.change_version']()}
           </Button>
         </DialogFooter>
       </DialogContent>

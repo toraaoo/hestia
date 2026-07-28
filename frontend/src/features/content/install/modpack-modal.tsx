@@ -95,7 +95,9 @@ export function ModpackInstallModal({
             : { mode: 'create', name: name.trim() },
         eula,
       });
-      toast.success(m['modpack.install_into']({ name: result.entryName }));
+      toast.success(
+        m['content.modpack.install_into']({ name: result.entryName }),
+      );
       onOpenChange(false);
     } catch (error) {
       toast.error(errorMessage(error));
@@ -109,7 +111,9 @@ export function ModpackInstallModal({
           <DialogTitle>
             {m['content.install_title']({ name: project.title })}
           </DialogTitle>
-          <DialogDescription>{m['modpack.target']()}</DialogDescription>
+          <DialogDescription>
+            {m['content.modpack.target.label']()}
+          </DialogDescription>
         </DialogHeader>
 
         {install.progress ? (
@@ -117,20 +121,18 @@ export function ModpackInstallModal({
         ) : (
           <div className="space-y-4">
             <Field>
-              <FieldLabel>{m['modpack.target']()}</FieldLabel>
+              <FieldLabel>{m['content.modpack.target.label']()}</FieldLabel>
               <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="instance">
-                    {m['modpack.target_new_instance']()}
+                    {m['instance.new']()}
                   </SelectItem>
-                  <SelectItem value="server">
-                    {m['modpack.target_new_server']()}
-                  </SelectItem>
+                  <SelectItem value="server">{m['server.new']()}</SelectItem>
                   <SelectItem value="existing">
-                    {m['modpack.target_existing']()}
+                    {m['content.modpack.target.existing']()}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -138,7 +140,9 @@ export function ModpackInstallModal({
 
             {mode === 'existing' ? (
               <Field>
-                <FieldLabel>{m['modpack.target_existing']()}</FieldLabel>
+                <FieldLabel>
+                  {m['content.modpack.target.existing']()}
+                </FieldLabel>
                 <Select
                   value={entry}
                   onValueChange={(value) => setEntry(value ?? '')}
@@ -157,11 +161,11 @@ export function ModpackInstallModal({
               </Field>
             ) : (
               <Field>
-                <FieldLabel>{m['modpack.name']()}</FieldLabel>
+                <FieldLabel>{m['app.label.name']()}</FieldLabel>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={m['modpack.name_placeholder']()}
+                  placeholder={m['content.modpack.name_placeholder']()}
                 />
               </Field>
             )}
@@ -176,7 +180,7 @@ export function ModpackInstallModal({
                   checked={eula}
                   onCheckedChange={(v) => setEula(v === true)}
                 />
-                <span>{m['error.eula']()}</span>
+                <span>{m['app.validation.eula']()}</span>
               </label>
             )}
           </div>
@@ -188,10 +192,10 @@ export function ModpackInstallModal({
             onClick={() => onOpenChange(false)}
             disabled={install.isPending}
           >
-            {m['action.cancel']()}
+            {m['app.action.cancel']()}
           </Button>
           <Button onClick={run} disabled={!ready || install.isPending}>
-            {m['action.install']()}
+            {m['app.action.install']()}
           </Button>
         </DialogFooter>
       </DialogContent>

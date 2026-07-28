@@ -1,0 +1,9 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "library": {
+    "manage_all": "Manage all",
+    "new": "New",
+    "subtitle": "Instances you play and servers you host",
+    "your_servers": "Your servers"
+  }
+}

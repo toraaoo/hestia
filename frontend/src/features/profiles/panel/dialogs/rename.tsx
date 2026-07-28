@@ -45,10 +45,10 @@ export function RenameProfileDialog({
     <Dialog open={name !== null} onOpenChange={close}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>{m['profiles.rename_title']()}</DialogTitle>
+          <DialogTitle>{m['profile.rename_title']()}</DialogTitle>
         </DialogHeader>
         <Field>
-          <FieldLabel>{m['profiles.name_label']()}</FieldLabel>
+          <FieldLabel>{m['profile.create.name_label']()}</FieldLabel>
           <Input
             value={value}
             placeholder={name ?? ''}
@@ -58,7 +58,7 @@ export function RenameProfileDialog({
         </Field>
         <DialogFooter>
           <Button variant="outline" onClick={() => close(false)}>
-            {m['action.cancel']()}
+            {m['app.action.cancel']()}
           </Button>
           <Button
             disabled={invalid || pending}
@@ -66,7 +66,7 @@ export function RenameProfileDialog({
               if (name) onRename(name, trimmed);
             }}
           >
-            {m['profiles.rename']()}
+            {m['app.action.rename']()}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -56,14 +56,14 @@ export function ConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel size="sm">
-            {cancelLabel ?? m['action.cancel']()}
+            {cancelLabel ?? m['app.action.cancel']()}
           </AlertDialogCancel>
           <AlertDialogAction
             size="sm"
             variant={destructive ? 'destructive' : 'default'}
             onClick={onConfirm}
           >
-            {confirmLabel ?? m['action.confirm']()}
+            {confirmLabel ?? m['app.action.confirm']()}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

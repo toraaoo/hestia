@@ -66,12 +66,12 @@ export function ProfilesPanel({
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <p className="text-sm text-muted-foreground">
           {active
-            ? m['profiles.members_count']({
+            ? m['profile.members.count']({
                 count:
                   profiles.find((p) => p.name === active)?.members.length ?? 0,
                 total: pool.length,
               })
-            : m['profiles.none_active']()}
+            : m['profile.none_active']()}
         </p>
         <div className="ml-auto flex items-center gap-2">
           <Button
@@ -82,7 +82,7 @@ export function ProfilesPanel({
             onClick={() => setApplying(true)}
           >
             <DownloadSimpleIcon weight="bold" />
-            {m['profiles.apply_global']()}
+            {m['profile.apply.action']()}
           </Button>
           <Button
             size="sm"
@@ -91,13 +91,13 @@ export function ProfilesPanel({
             onClick={() => setCreating(true)}
           >
             <PlusIcon weight="bold" />
-            {m['profiles.new']()}
+            {m['profile.new']()}
           </Button>
         </div>
       </div>
 
       {profiles.length === 0 ? (
-        <Empty>{m['profiles.empty']()}</Empty>
+        <Empty>{m['profile.empty']()}</Empty>
       ) : (
         <div className="divide-y divide-border border border-border">
           {profiles.map((profile) => (

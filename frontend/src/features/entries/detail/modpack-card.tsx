@@ -38,8 +38,10 @@ export function ModpackCard({
   if (pack.isLoading) return null;
   if (!pack.data) {
     return (
-      <SideCard title={m['modpack.title']()}>
-        <p className="text-xs text-muted-foreground">{m['modpack.none']()}</p>
+      <SideCard title={m['content.modpack.title']()}>
+        <p className="text-xs text-muted-foreground">
+          {m['content.modpack.none']()}
+        </p>
       </SideCard>
     );
   }
@@ -54,7 +56,7 @@ export function ModpackCard({
   const busy = update.isPending || remove.isPending;
 
   return (
-    <SideCard title={m['modpack.title']()}>
+    <SideCard title={m['content.modpack.title']()}>
       <div className="space-y-3">
         <div className="flex items-start gap-2.5">
           {installed.iconUrl ? (
@@ -69,20 +71,20 @@ export function ModpackCard({
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{installed.name}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {installed.versionNumber || m['modpack.from_file']()}
+              {installed.versionNumber || m['content.modpack.from_file']()}
             </p>
           </div>
         </div>
 
         <div className="divide-y divide-border">
-          <Stat label={m['modpack.game']()} value={installed.gameVersion} />
-          <Stat label={m['modpack.loader']()} value={loader} />
+          <Stat label={m['app.label.game']()} value={installed.gameVersion} />
+          <Stat label={m['app.label.loader']()} value={loader} />
           <Stat
-            label={m['modpack.content_count']()}
+            label={m['domain.kind.mods']()}
             value={installed.files.length}
           />
           <Stat
-            label={m['modpack.pack_files']()}
+            label={m['content.modpack.pack_files']()}
             value={installed.overrides.length}
           />
         </div>
@@ -104,7 +106,7 @@ export function ModpackCard({
                   .catch((error) => toast.error(errorMessage(error)))
               }
             >
-              {m['modpack.update']()}
+              {m['content.modpack.update']()}
             </Button>
           )}
           <Button
@@ -113,7 +115,7 @@ export function ModpackCard({
             disabled={busy || running}
             onClick={() => setConfirmRemove(true)}
           >
-            {m['modpack.remove']()}
+            {m['content.modpack.remove.action']()}
           </Button>
         </div>
       </div>
@@ -121,22 +123,24 @@ export function ModpackCard({
       <ConfirmDialog
         open={confirmRemove}
         onOpenChange={setConfirmRemove}
-        title={m['modpack.remove_title']({ name: installed.name })}
-        description={m['modpack.remove_body']({ entry: name })}
-        confirmLabel={m['modpack.remove']()}
+        title={m['content.modpack.remove.title']({ name: installed.name })}
+        description={m['content.modpack.remove.body']({ entry: name })}
+        confirmLabel={m['content.modpack.remove.action']()}
         destructive
         onConfirm={() =>
           remove
             .mutateAsync()
             .then((result) => {
               toast.success(
-                m['modpack.removed']({
+                m['content.modpack.removed']({
                   files: result.removedFiles,
                   overrides: result.removedOverrides,
                 }),
               );
               if (result.kept.length)
-                toast.info(m['modpack.kept']({ count: result.kept.length }));
+                toast.info(
+                  m['content.modpack.kept']({ count: result.kept.length }),
+                );
             })
             .catch((error) => toast.error(errorMessage(error)))
         }
