@@ -788,6 +788,7 @@
 		"installing": "Updating…",
 		"failed": "Update failed",
 		"check_failed": "Couldn't check for updates",
-		"notes": "What's new"
+		"notes": "What's new",
+		"whats_new": "What's new in {version}"
 	}
 }

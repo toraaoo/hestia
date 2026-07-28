@@ -11,6 +11,7 @@ import { SearchProvider } from '@/components/app-shell/search-context';
 import { Sidebar } from '@/components/app-shell/sidebar';
 import { StatusBar } from '@/components/app-shell/status-bar';
 import { TopNav } from '@/components/app-shell/top-nav';
+import { WhatsNewDialog } from '@/components/app-shell/whats-new-dialog';
 import { LaunchModalProvider } from '@/features/instances/launch-modal';
 
 export function AppLayout() {
@@ -38,6 +39,7 @@ export function AppLayout() {
         <FirstRunOverlay />
         <OfflineOverlay />
         <CriticalAnnouncementDialog />
+        <WhatsNewDialog />
       </LaunchModalProvider>
     </SearchProvider>
   );

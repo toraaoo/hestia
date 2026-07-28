@@ -157,5 +157,6 @@ export const keys = {
   update: {
     all: ['update'] as const,
     check: () => [...keys.update.all, 'check'] as const,
+    changelog: () => [...keys.update.all, 'changelog'] as const,
   },
 };

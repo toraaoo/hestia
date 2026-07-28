@@ -61,7 +61,8 @@ pub fn run() {
             commands::diagnostics::crash_read,
             commands::diagnostics::crash_clear,
             commands::update::update_check,
-            commands::update::update_install
+            commands::update::update_install,
+            commands::update::changelog
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

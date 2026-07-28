@@ -8,6 +8,19 @@ pub struct UpdateInfo {
     notes: Option<String>,
 }
 
+/// This build's own release notes, compiled in from `CHANGELOG.md`. Empty when
+/// the changelog has no section for it (a development build between releases).
+///
+/// Deliberately local: the shell shows these on the first run *after* an
+/// update, which is precisely when the network may be unreliable, and a build's
+/// own notes cannot be stale or spoofed if they ship inside it.
+#[tauri::command]
+pub fn changelog() -> String {
+    common::changelog::for_version(common::app::VERSION)
+        .unwrap_or_default()
+        .to_string()
+}
+
 /// Ask the release endpoint whether a newer version exists.
 #[tauri::command]
 pub async fn update_check(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {

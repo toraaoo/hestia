@@ -24,6 +24,14 @@ export const updateQueries = {
     }),
 };
 
+export const changelogQuery = () =>
+  queryOptions({
+    queryKey: keys.update.changelog(),
+    queryFn: () => api.changelog(),
+    // Compiled into the binary — it cannot change while the app is running.
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
 export const updateMutations = {
   install: () =>
     mutation<void, void>({

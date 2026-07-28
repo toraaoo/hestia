@@ -27,3 +27,12 @@ export function check(): Promise<DesktopUpdate | null> {
 export function install(): Promise<void> {
   return invokeCommand('update_install');
 }
+
+/**
+ * This build's own release notes, compiled into the binary. Empty when the
+ * changelog has no section for it. Local by design — the first run after an
+ * update is exactly when the network may be the thing that went wrong.
+ */
+export function changelog(): Promise<string> {
+  return invokeCommand('changelog');
+}
