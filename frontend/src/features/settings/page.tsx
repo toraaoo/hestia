@@ -22,6 +22,7 @@ import { StatusDot } from '@/components/ui/status-dot';
 import {
   CheckboxRow,
   LanguageField,
+  SourcesField,
 } from '@/features/settings/components/fields';
 import { SyncSection } from '@/features/settings/components/sync-section';
 import { bytes, memGb } from '@/lib/format';
@@ -38,6 +39,7 @@ interface ConfigEntries {
   home?: string;
   autostart?: boolean;
   defaults?: { memory?: string; 'jvm-args'?: string };
+  content?: { 'curseforge-key'?: string };
 }
 
 export function SettingsPage() {
@@ -257,6 +259,18 @@ export function SettingsPage() {
                   })}
                 </div>
               </Field>
+            </FieldGroup>
+          </FieldSet>
+
+          <FieldSet>
+            <FieldLegend>{m['settings.content_sources']()}</FieldLegend>
+            <FieldGroup>
+              <SourcesField
+                curseforgeKey={entries.content?.['curseforge-key'] ?? ''}
+                onCommit={(value) =>
+                  commitConfig('content.curseforge-key', value)
+                }
+              />
             </FieldGroup>
           </FieldSet>
 

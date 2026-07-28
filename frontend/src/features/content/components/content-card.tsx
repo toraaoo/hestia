@@ -15,6 +15,14 @@ import { m } from '@/paraglide/messages.js';
 export const projectRef = (p: Pick<ContentProject, 'slug' | 'id'>) =>
   p.slug || p.id;
 
+/**
+ * A project's identity for selection state and React keys. A slug is unique
+ * only within its own platform, so the source is part of the key while
+ * `projectRef` stays what the daemon is asked for.
+ */
+export const projectKey = (p: Pick<ContentProject, 'source' | 'slug' | 'id'>) =>
+  `${p.source}:${projectRef(p)}`;
+
 export function ContentCard({
   project,
   pinnedVersion,
@@ -30,7 +38,10 @@ export function ContentCard({
       <Link
         to="/browse/$kind/$id"
         params={{ kind: kindInfo[project.kind].slug, id: projectRef(project) }}
-        search={pinnedVersion ? { version: pinnedVersion } : {}}
+        search={{
+          source: project.source,
+          ...(pinnedVersion ? { version: pinnedVersion } : {}),
+        }}
         className="group block outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         <Card size="sm" className="transition-colors group-hover:bg-muted/40">

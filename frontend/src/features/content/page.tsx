@@ -8,6 +8,10 @@ import { chipClass } from '@/components/chip';
 import { Page } from '@/components/page';
 import { Bone, CardGridSkeleton } from '@/components/skeleton';
 import { ContentCard } from '@/features/content/components/content-card';
+import {
+  SourceChips,
+  useContentSources,
+} from '@/features/content/components/sources';
 import { contentKinds, kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
@@ -15,9 +19,20 @@ import { contentQueries, isContentUrl } from '@/queries/content';
 /** Merge/sort key so the same project from one source is never listed twice. */
 const projectKey = (p: ContentProject) => `${p.source}:${p.id}`;
 
-export function BrowsePage({ kind }: { kind?: ContentKind }) {
+export function BrowsePage({
+  kind,
+  source = '',
+  onSourceChange,
+}: {
+  kind?: ContentKind;
+  source?: string;
+  onSourceChange?: (source: string) => void;
+}) {
   const { query } = useSearch();
   const q = query.trim();
+  const sources = useContentSources(kind, source);
+  // The default source is the absence of the param, not an empty one.
+  const sourceParam = source ? { source } : {};
 
   const url = isContentUrl(q) ? q : '';
   const link = useQuery(contentQueries.url(url));
@@ -26,7 +41,7 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
   // since a source's search is scoped to a single project type.
   const kinds = kind ? [kind] : contentKinds;
   const search = useInfiniteQuery({
-    ...contentQueries.searchPaged(kinds, q),
+    ...contentQueries.searchPaged(kinds, q, sources.active),
     enabled: !url,
   });
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = search;
@@ -76,20 +91,28 @@ export function BrowsePage({ kind }: { kind?: ContentKind }) {
         </div>
       }
     >
-      <div className="mb-5 flex flex-wrap gap-1.5">
-        <Link to="/browse" className={chipClass(!kind)}>
-          {m['label.all']()}
-        </Link>
-        {contentKinds.map((k) => (
-          <Link
-            key={k}
-            to="/browse/$kind"
-            params={{ kind: kindInfo[k].slug }}
-            className={chipClass(kind === k)}
-          >
-            {kindInfo[k].label()}
+      <div className="mb-5 flex flex-col gap-2.5">
+        <div className="flex flex-wrap gap-1.5">
+          <Link to="/browse" search={sourceParam} className={chipClass(!kind)}>
+            {m['label.all']()}
           </Link>
-        ))}
+          {contentKinds.map((k) => (
+            <Link
+              key={k}
+              to="/browse/$kind"
+              params={{ kind: kindInfo[k].slug }}
+              search={sourceParam}
+              className={chipClass(kind === k)}
+            >
+              {kindInfo[k].label()}
+            </Link>
+          ))}
+        </div>
+        <SourceChips
+          list={sources.list}
+          active={sources.active}
+          onChange={(next) => onSourceChange?.(next)}
+        />
       </div>
 
       {url ? (

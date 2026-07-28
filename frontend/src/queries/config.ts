@@ -22,6 +22,8 @@ export const configMutations = {
     mutation<void, { key: string; value: unknown }>({
       mutationKey: [...keys.config.all, 'set'],
       mutationFn: ({ key, value }) => api.set(key, value),
-      invalidates: () => [keys.config.all],
+      // A content source's API key is a setting, and setting it changes which
+      // sources answer — so the browse cache goes with the config cache.
+      invalidates: () => [keys.config.all, keys.content.all],
     }),
 };

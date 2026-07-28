@@ -1,7 +1,8 @@
 /**
  * `content.*` browse — discovery on a source platform (queries only;
  * installing into an entry lives on the server/instance hooks). An empty
- * `source` selects the default source.
+ * `source` selects the default source; `sources()` answers only the ones that
+ * can serve, so a platform whose API key is unset never appears.
  */
 import {
   infiniteQueryOptions,
@@ -48,9 +49,9 @@ export const contentQueries = {
   // "All" fans out over every kind, each with its own offset (`null` once
   // exhausted) so a short kind stops being queried while a long one keeps
   // paging; the grid merges the per-kind hits.
-  searchPaged: (kinds: ContentKind[], query: string) =>
+  searchPaged: (kinds: ContentKind[], query: string, source = '') =>
     infiniteQueryOptions({
-      queryKey: keys.content.searchPaged(kinds, query),
+      queryKey: keys.content.searchPaged(kinds, query, source),
       queryFn: ({ pageParam }) =>
         Promise.all(
           kinds.map((kind) => {
@@ -62,7 +63,13 @@ export const contentQueries = {
                 limit: SEARCH_PAGE,
                 total: 0,
               });
-            return api.search({ kind, query, limit: SEARCH_PAGE, offset });
+            return api.search({
+              kind,
+              query,
+              source,
+              limit: SEARCH_PAGE,
+              offset,
+            });
           }),
         ),
       initialPageParam: Object.fromEntries(

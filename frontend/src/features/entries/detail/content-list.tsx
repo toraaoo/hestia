@@ -195,6 +195,7 @@ function ContentRow({
                 kind: kindInfo[item.kind].slug,
                 id: item.slug || item.projectId,
               }}
+              search={{ source: item.source }}
               className="group/item flex min-w-0 flex-1 items-center gap-3 outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               {body}

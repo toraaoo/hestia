@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { chipClass } from '@/components/chip';
 import { SearchInput } from '@/components/search-input';
 import { cn } from '@/lib/utils';
@@ -8,6 +10,7 @@ export function FilterBar({
   onSearch,
   placeholder,
   chips,
+  after,
 }: {
   search: string;
   onSearch: (v: string) => void;
@@ -18,6 +21,8 @@ export function FilterBar({
     disabled?: boolean;
     onClick: () => void;
   }[];
+  /** A second filter row under the chips (the source picker). */
+  after?: ReactNode;
 }) {
   return (
     <div className="mb-3 flex flex-col gap-2.5">
@@ -44,6 +49,7 @@ export function FilterBar({
           ))}
         </div>
       )}
+      {after}
     </div>
   );
 }

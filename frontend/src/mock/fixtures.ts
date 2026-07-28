@@ -108,7 +108,25 @@ export const channels: Record<string, Handler> = {
   'config.set': ok,
 
   'content.sources': () => ({
-    sources: [{ id: 'modrinth', name: 'Modrinth' }],
+    sources: [
+      {
+        id: 'modrinth',
+        name: 'Modrinth',
+        kinds: [
+          'mod',
+          'modpack',
+          'resource_pack',
+          'shader',
+          'data_pack',
+          'plugin',
+        ],
+      },
+      {
+        id: 'curseforge',
+        name: 'CurseForge',
+        kinds: ['mod', 'resource_pack', 'modpack', 'shader', 'data_pack'],
+      },
+    ],
   }),
   'content.search': () => ({ hits: [], offset: 0, limit: 20, total: 0 }),
   'content.versions': () => ({ versions: [] }),

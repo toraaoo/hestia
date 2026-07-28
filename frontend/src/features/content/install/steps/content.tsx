@@ -12,8 +12,12 @@ import {
 } from '@/api';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { PickerPanel } from '@/components/picker-panel';
-import { projectRef } from '@/features/content/components/content-card';
+import { projectKey } from '@/features/content/components/content-card';
 import { PickRow } from '@/features/content/components/pick-row';
+import {
+  SourceChips,
+  useContentSources,
+} from '@/features/content/components/sources';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
@@ -31,6 +35,8 @@ export function ContentStep({
   target,
   kind,
   onKindChange,
+  source,
+  onSourceChange,
   picked,
   onToggle,
   onAddFiles,
@@ -38,6 +44,8 @@ export function ContentStep({
   target: Target;
   kind: ContentKind | null;
   onKindChange: (kind: ContentKind | null) => void;
+  source: string;
+  onSourceChange: (source: string) => void;
   picked: ContentProject[];
   onToggle: (p: ContentProject, versionId?: string) => void;
   onAddFiles: (files: PickedFile[]) => void;
@@ -52,8 +60,9 @@ export function ContentStep({
   const noWorlds = target.type === 'instance' && worlds.data?.length === 0;
   const datapackBlocked = (k: ContentKind) => k === 'data_pack' && noWorlds;
   const activeKind = kind ?? kinds[0];
-  const pickedRefs = new Set(picked.map(projectRef));
+  const pickedKeys = new Set(picked.map(projectKey));
   const installedRefs = useInstalledRefs(target, activeKind);
+  const sources = useContentSources(activeKind, source);
 
   const url = isContentUrl(search) ? search.trim() : '';
   const link = useQuery(contentQueries.url(url));
@@ -62,6 +71,7 @@ export function ContentStep({
     ...contentQueries.search({
       kind: activeKind,
       query: search.trim(),
+      source: sources.active,
       loader: activeKind === 'mod' ? target.flavor : undefined,
       gameVersion: target.gameVersion || undefined,
       limit: 30,
@@ -84,6 +94,13 @@ export function ContentStep({
               disabled: datapackBlocked(k),
               onClick: () => onKindChange(k),
             }))}
+            after={
+              <SourceChips
+                list={sources.list}
+                active={sources.active}
+                onChange={onSourceChange}
+              />
+            }
           />
 
           {/* A global profile stores project references, never files. */}
@@ -102,7 +119,7 @@ export function ContentStep({
           query={link}
           accepts={kinds}
           installed={installedRefs}
-          picked={pickedRefs}
+          picked={pickedKeys}
           onToggle={onToggle}
         />
       ) : results.isPending ? (
@@ -119,14 +136,14 @@ export function ContentStep({
             const installed = installedRefs.has(`${p.source}:${p.id}`);
             return (
               <PickRow
-                key={`${p.source}:${p.id}`}
+                key={projectKey(p)}
                 icon={contentIcon(p.kind)}
                 imageUrl={p.iconUrl}
                 title={p.title}
                 subtitle={`${contentKindLabel[p.kind]()} · ${m['browse.by_author']({ name: p.author })}`}
                 badge={installed ? m['content.installed']() : undefined}
                 disabled={installed}
-                selected={pickedRefs.has(projectRef(p))}
+                selected={pickedKeys.has(projectKey(p))}
                 onSelect={() => onToggle(p)}
               />
             );
@@ -186,7 +203,7 @@ function LinkResult({
             : m['content.kind_not_taken']()
         }
         disabled={already || !taken}
-        selected={picked.has(projectRef(project))}
+        selected={picked.has(projectKey(project))}
         onSelect={() => onToggle(project, versionId)}
       />
     </div>

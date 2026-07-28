@@ -33,3 +33,15 @@ export const contentKinds = Object.keys(kindInfo) as ContentKind[];
 
 export const kindBySlug = (slug: string): ContentKind | undefined =>
   contentKinds.find((kind) => kindInfo[kind].slug === slug);
+
+/**
+ * The `?source=` param every browse route carries, so which platform is being
+ * looked at survives navigation and a reload. Empty means the daemon's default
+ * source; an id it does not serve falls back to that (`useContentSources`).
+ */
+export const sourceSearch = (
+  search: Record<string, unknown>,
+): { source?: string } =>
+  typeof search.source === 'string' && search.source
+    ? { source: search.source }
+    : {};

@@ -22,7 +22,10 @@ import {
   ProgressLabel,
   ProgressValue,
 } from '@/components/ui/progress';
-import { projectRef } from '@/features/content/components/content-card';
+import {
+  projectKey,
+  projectRef,
+} from '@/features/content/components/content-card';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations } from '@/queries/instance';
 import { useJobMutation } from '@/queries/jobs';
@@ -72,6 +75,7 @@ export function ContentInstallModal({
     picked,
     files,
     kindFilter,
+    source,
     versionIds,
     worlds,
     installing,
@@ -100,7 +104,7 @@ export function ContentInstallModal({
   const toggleProject = (p: ContentProject, versionId?: string) => {
     dispatch({ type: 'toggleProject', project: p });
     if (versionId) {
-      dispatch({ type: 'version', ref: projectRef(p), id: versionId });
+      dispatch({ type: 'version', ref: projectKey(p), id: versionId });
     }
   };
 
@@ -161,22 +165,29 @@ export function ContentInstallModal({
     dispatch({ type: 'installStart' });
     try {
       if (isProfile) {
-        await editProfile.mutateAsync({
-          name: target.name,
-          add: picked.map(projectRef),
-        });
+        // A profile reference resolves against one source per call, so a
+        // mixed selection is one call per source it came from.
+        for (const source of new Set(picked.map((p) => p.source))) {
+          await editProfile.mutateAsync({
+            name: target.name,
+            source,
+            add: picked.filter((p) => p.source === source).map(projectRef),
+          });
+        }
       } else {
         const add = target.type === 'server' ? addServer : addInstance;
         // The wire spec is per-kind, so a mixed selection installs as one
         // batch per kind; failures aggregate across batches.
         const failures: string[] = [];
         for (const k of selectedKinds) {
+          // Each project names its own source, so one batch may mix platforms.
           const items = [
             ...picked
               .filter((p) => p.kind === k)
               .map((p) => ({
                 project: projectRef(p),
-                version: versionIds[projectRef(p)] ?? '',
+                source: p.source,
+                version: versionIds[projectKey(p)] ?? '',
               })),
             ...files.filter((f) => f.kind === k).map((f) => ({ path: f.path })),
           ];
@@ -247,6 +258,10 @@ export function ContentInstallModal({
                     kind={kindFilter}
                     onKindChange={(kind) =>
                       dispatch({ type: 'kindFilter', kind })
+                    }
+                    source={source}
+                    onSourceChange={(next) =>
+                      dispatch({ type: 'source', source: next })
                     }
                     picked={picked}
                     onToggle={toggleProject}

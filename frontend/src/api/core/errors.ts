@@ -29,6 +29,7 @@ const TOKEN_FIELDS = new Set([
   'entry',
   'scope',
   'service',
+  'source',
   'operation',
   'what',
   'actual',

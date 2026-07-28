@@ -9,8 +9,9 @@ import { cn } from '@/lib/utils';
 /**
  * Renders untrusted Markdown (a content project's description body) with
  * `react-markdown` — remark/rehype under the hood, GFM tables/strikethrough via
- * `remark-gfm`. Modrinth bodies mix raw HTML into their Markdown, so `rehype-raw`
- * parses it into real elements instead of leaving the tags as literal text;
+ * `remark-gfm`. Modrinth bodies mix raw HTML into their Markdown and CurseForge
+ * descriptions are HTML outright, so `rehype-raw` parses it into real elements
+ * instead of leaving the tags as literal text;
  * `rehype-sanitize` runs immediately after (never omit it) to strip scripts and
  * event handlers, so a hostile body still cannot inject script. Links open in the
  * system browser rather than navigating the webview.

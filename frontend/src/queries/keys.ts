@@ -131,8 +131,8 @@ export const keys = {
     sources: () => [...keys.content.all, 'sources'] as const,
     search: (query: Partial<SearchQuery>) =>
       [...keys.content.all, 'search', query] as const,
-    searchPaged: (kinds: ContentKind[], query: string) =>
-      [...keys.content.all, 'search', 'paged', kinds, query] as const,
+    searchPaged: (kinds: ContentKind[], query: string, source: string) =>
+      [...keys.content.all, 'search', 'paged', source, kinds, query] as const,
     project: (source: string, project: string) =>
       [...keys.content.all, 'project', source, project] as const,
     url: (url: string) => [...keys.content.all, 'url', url] as const,

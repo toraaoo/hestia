@@ -312,7 +312,7 @@ impl ContentProvider for CurseForge {
         if url.is_empty() {
             bail!(ErrorInfo::ContentDownloadBlocked {
                 title: name,
-                source: NAME.to_string(),
+                source: ID.to_string(),
             });
         }
 

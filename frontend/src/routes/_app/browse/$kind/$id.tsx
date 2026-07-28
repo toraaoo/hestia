@@ -1,12 +1,13 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { ProjectDetailPage, type ProjectTab } from '@/features/content/detail';
-import { kindBySlug } from '@/features/content/lib/kinds';
+import { kindBySlug, sourceSearch } from '@/features/content/lib/kinds';
 
 export const Route = createFileRoute('/_app/browse/$kind/$id')({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { tab?: ProjectTab; version?: string } => ({
+  ): { tab?: ProjectTab; source?: string; version?: string } => ({
     tab: search.tab === 'versions' ? 'versions' : undefined,
+    ...sourceSearch(search),
     version: typeof search.version === 'string' ? search.version : undefined,
   }),
   beforeLoad: ({ params }) => {
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/_app/browse/$kind/$id')({
 
 function RouteComponent() {
   const { kind, id } = Route.useParams();
-  const { tab = 'description', version } = Route.useSearch();
+  const { tab = 'description', source = '', version } = Route.useSearch();
   const navigate = Route.useNavigate();
 
   const resolvedKind = kindBySlug(kind);
@@ -27,11 +28,15 @@ function RouteComponent() {
     <ProjectDetailPage
       kind={resolvedKind}
       id={id}
+      source={source}
       pinnedVersion={version}
       tab={tab}
       onTabChange={(next) =>
         navigate({
-          search: next === 'description' ? { version } : { version, tab: next },
+          search:
+            next === 'description'
+              ? { source, version }
+              : { source, version, tab: next },
           replace: true,
         })
       }

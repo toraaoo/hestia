@@ -7,14 +7,16 @@
       "version": "",
       "url": "",
       "path": "",
-      "filename": ""
+      "filename": "",
+      "source": ""
     },
     {
       "project": "lithium",
       "version": "mc1.21.1-0.13.0",
       "url": "",
       "path": "",
-      "filename": ""
+      "filename": "",
+      "source": ""
     }
   ],
   "worlds": []

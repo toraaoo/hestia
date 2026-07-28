@@ -1,8 +1,9 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { kindBySlug } from '@/features/content/lib/kinds';
+import { kindBySlug, sourceSearch } from '@/features/content/lib/kinds';
 import { BrowsePage } from '@/features/content/page';
 
 export const Route = createFileRoute('/_app/browse/$kind/')({
+  validateSearch: sourceSearch,
   beforeLoad: ({ params }) => {
     if (!kindBySlug(params.kind)) throw redirect({ to: '/browse' });
   },
@@ -11,5 +12,13 @@ export const Route = createFileRoute('/_app/browse/$kind/')({
 
 function RouteComponent() {
   const { kind } = Route.useParams();
-  return <BrowsePage kind={kindBySlug(kind)} />;
+  const { source } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  return (
+    <BrowsePage
+      kind={kindBySlug(kind)}
+      source={source}
+      onSourceChange={(next) => navigate({ search: { source: next } })}
+    />
+  );
 }

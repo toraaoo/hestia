@@ -97,7 +97,6 @@
   "library": "Pesquisar na biblioteca",
   "instances": "Pesquisar instâncias",
   "servers": "Pesquisar servidores",
-  "modrinth": "Pesquisar no Modrinth",
   "content_or_link": "Pesquise ou cole o link de um projeto",
   "targets": "Pesquisar servidores e instâncias"
  },
@@ -354,6 +353,8 @@
    "internal": "{detail}",
    "unsupported_content_url": "'{url}' não é uma URL de projeto em uma fonte de conteúdo suportada.",
    "content_kind_mismatch": "'{title}' é conteúdo do tipo {actual}, não {expected}.",
+   "content_source_unavailable": "{source} precisa de uma chave de API para ser usada — adicione uma nas Configurações.",
+   "content_download_blocked": "'{title}' não pode ser baixado pela API do {source}. Baixe o arquivo na página do projeto e importe-o.",
    "content_kind_rejected": "{entry} {flavor} não aceita conteúdo do tipo {requested} — aceita {accepts}.",
    "incompatible_version": "Este app e o daemon estão em versões diferentes (protocolo {got} vs {want}). Atualize o Hestia.",
    "modpack_loader_unsupported": "Este modpack precisa do loader {loader}, que o Hestia não possui.",
@@ -403,6 +404,7 @@
    "fabric": "Fabric",
    "paper": "PaperMC",
    "modrinth": "Modrinth",
+   "curseforge": "CurseForge",
    "microsoft": "Microsoft",
    "xbox": "Xbox",
    "create": "criar",
@@ -445,7 +447,7 @@
   "plugin": "Plugin"
  },
  "browse": {
-  "subtitle": "Descubra mods, pacotes e shaders no Modrinth",
+  "subtitle": "Descubra mods, pacotes e shaders",
   "nothing_matches": "Nada corresponde à sua pesquisa.",
   "by_author": "por {name}",
   "downloads": "{count} downloads",
@@ -570,7 +572,12 @@
   "clear_cache_description": "Libera os downloads em cache. Os arquivos são baixados novamente da rede na próxima vez que forem necessários.",
   "shared_config": "Configuração compartilhada",
   "shared_config_hint": "Arquivos sincronizados entre entradas.",
-  "no_default": "Nenhum padrão definido"
+  "no_default": "Nenhum padrão definido",
+  "content_sources": "Fontes de conteúdo",
+  "curseforge_key": "Chave de API do CurseForge",
+  "curseforge_key_hint": "O CurseForge só responde a requisições com uma chave, então ele é oferecido como fonte assim que você definir uma. Obtenha a sua em console.curseforge.com.",
+  "source_ready": "Pronta",
+  "source_needs_key": "Precisa de chave"
  },
  "skins": {
   "subtitle": "Seu personagem do Minecraft",

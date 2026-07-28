@@ -3,4 +3,4 @@
 /**
  * An upstream service the daemon depends on.
  */
-export type Service = "adoptium" | "mojang" | "fabric" | "paper" | "modrinth" | "microsoft" | "xbox";
+export type Service = "adoptium" | "mojang" | "fabric" | "paper" | "modrinth" | "curse_forge" | "microsoft" | "xbox";

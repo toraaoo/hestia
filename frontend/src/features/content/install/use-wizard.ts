@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from 'react';
 
 import type { ContentKind, ContentProject } from '@/api';
-import { projectRef } from '@/features/content/components/content-card';
+import { projectKey } from '@/features/content/components/content-card';
 import type { PickedFile } from './targets';
 
 export interface WizardInit {
@@ -17,6 +17,8 @@ export interface WizardState {
   picked: ContentProject[];
   files: PickedFile[];
   kindFilter: ContentKind | null;
+  /** Which source the picker browses; empty is the daemon's default. */
+  source: string;
   versionIds: Record<string, string>;
   worlds: string[];
   installing: boolean;
@@ -32,6 +34,7 @@ export type WizardAction =
   | { type: 'setFileKind'; path: string; kind: ContentKind }
   | { type: 'removeFile'; path: string }
   | { type: 'kindFilter'; kind: ContentKind | null }
+  | { type: 'source'; source: string }
   | { type: 'version'; ref: string; id: string }
   | { type: 'toggleWorld'; world: string; on: boolean }
   | { type: 'installStart' }
@@ -44,9 +47,10 @@ function initial(init: WizardInit): WizardState {
     picked: init.project ? [init.project] : [],
     files: [],
     kindFilter: null,
+    source: init.project?.source ?? '',
     versionIds:
       init.project && init.versionId
-        ? { [projectRef(init.project)]: init.versionId }
+        ? { [projectKey(init.project)]: init.versionId }
         : {},
     worlds: [],
     installing: false,
@@ -63,13 +67,13 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
     case 'target':
       return { ...state, targetId: action.id, worlds: [] };
     case 'toggleProject': {
-      const ref = projectRef(action.project);
-      const has = state.picked.some((p) => projectRef(p) === ref);
-      const { [ref]: _dropped, ...versionIds } = state.versionIds;
+      const key = projectKey(action.project);
+      const has = state.picked.some((p) => projectKey(p) === key);
+      const { [key]: _dropped, ...versionIds } = state.versionIds;
       return {
         ...state,
         picked: has
-          ? state.picked.filter((p) => projectRef(p) !== ref)
+          ? state.picked.filter((p) => projectKey(p) !== key)
           : [...state.picked, action.project],
         versionIds,
       };
@@ -98,6 +102,8 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
       };
     case 'kindFilter':
       return { ...state, kindFilter: action.kind };
+    case 'source':
+      return { ...state, source: action.source };
     case 'version': {
       const { [action.ref]: _dropped, ...rest } = state.versionIds;
       return {

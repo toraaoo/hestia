@@ -98,7 +98,6 @@
   "library": "Search library",
   "instances": "Search instances",
   "servers": "Search servers",
-  "modrinth": "Search Modrinth",
   "content_or_link": "Search, or paste a project link",
   "targets": "Search servers and instances"
  },
@@ -355,6 +354,8 @@
    "internal": "{detail}",
    "unsupported_content_url": "'{url}' is not a project URL on a supported content source.",
    "content_kind_mismatch": "'{title}' is {actual} content, not {expected}.",
+   "content_source_unavailable": "{source} needs an API key before it can be used — add one in Settings.",
+   "content_download_blocked": "'{title}' cannot be downloaded through the {source} API. Download the file from its project page and import it.",
    "content_kind_rejected": "A {flavor} {entry} cannot take {requested} content — it takes {accepts}.",
    "incompatible_version": "This app and the daemon are on different versions (protocol {got} vs {want}). Update Hestia.",
    "modpack_loader_unsupported": "This modpack needs the {loader} loader, which Hestia does not have.",
@@ -404,6 +405,7 @@
    "fabric": "Fabric",
    "paper": "PaperMC",
    "modrinth": "Modrinth",
+   "curseforge": "CurseForge",
    "microsoft": "Microsoft",
    "xbox": "Xbox",
    "create": "create",
@@ -446,7 +448,7 @@
   "plugin": "Plugin"
  },
  "browse": {
-  "subtitle": "Discover mods, packs and shaders on Modrinth",
+  "subtitle": "Discover mods, packs and shaders",
   "nothing_matches": "Nothing matches your search.",
   "by_author": "by {name}",
   "downloads": "{count} downloads",
@@ -579,7 +581,12 @@
   "clear_cache_description": "Frees the cached downloads. Files are re-fetched from the network the next time they're needed.",
   "shared_config": "Shared config",
   "shared_config_hint": "Files synced across entries.",
-  "no_default": "No default set"
+  "no_default": "No default set",
+  "content_sources": "Content sources",
+  "curseforge_key": "CurseForge API key",
+  "curseforge_key_hint": "CurseForge only answers requests carrying a key, so it is offered as a source once you set one. Get yours from console.curseforge.com.",
+  "source_ready": "Ready",
+  "source_needs_key": "Needs a key"
  },
  "skins": {
   "subtitle": "Your Minecraft character",

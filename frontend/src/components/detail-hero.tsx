@@ -8,6 +8,7 @@ export function DetailHero({
   parentLabel,
   parentTo,
   parentParams,
+  parentSearch,
   icon: Icon,
   iconUrl,
   iconAction,
@@ -18,6 +19,7 @@ export function DetailHero({
   parentLabel: string;
   parentTo: LinkProps['to'];
   parentParams?: LinkProps['params'];
+  parentSearch?: LinkProps['search'];
   icon: Icon;
   /** A remote icon (a content project's) shown in place of the glyph. */
   iconUrl?: string;
@@ -33,6 +35,7 @@ export function DetailHero({
         <Link
           to={parentTo}
           params={parentParams}
+          search={parentSearch}
           className="hover:text-foreground"
         >
           {parentLabel}

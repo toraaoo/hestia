@@ -10,6 +10,7 @@ import { Markdown } from '@/components/markdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SourceBadge } from '@/features/content/components/sources';
 import {
   ContentInstallModal,
   ModpackInstallModal,
@@ -24,18 +25,20 @@ export type ProjectTab = 'description' | 'versions';
 export function ProjectDetailPage({
   kind,
   id,
+  source = '',
   pinnedVersion,
   tab,
   onTabChange,
 }: {
   kind: ContentKind;
   id: string;
+  source?: string;
   pinnedVersion?: string;
   tab: ProjectTab;
   onTabChange: (tab: ProjectTab) => void;
 }) {
-  const project = useQuery(contentQueries.project(id));
-  const versions = useQuery(contentQueries.versions({ project: id }));
+  const project = useQuery(contentQueries.project(id, source));
+  const versions = useQuery(contentQueries.versions({ project: id, source }));
   const [installOpen, setInstallOpen] = useState(false);
 
   if (project.isPending) {
@@ -58,12 +61,14 @@ export function ProjectDetailPage({
         parentLabel={parent.label()}
         parentTo="/browse/$kind"
         parentParams={{ kind: parent.slug }}
+        parentSearch={{ source: p.source }}
         icon={contentIcon(p.kind)}
         iconUrl={p.iconUrl || undefined}
         name={p.title}
         badges={
           <>
             <Badge variant="secondary">{contentKindLabel[p.kind]()}</Badge>
+            <SourceBadge source={p.source} />
             <span className="text-xs text-muted-foreground">
               {m['browse.by_author']({ name: p.author })}
             </span>

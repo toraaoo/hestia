@@ -1,7 +1,8 @@
 /**
- * The `content.*` browse channels — discovery on a source platform
- * (Modrinth). Installing into an entry lives on `server.content` /
- * `instance.content`. An empty `source` selects the default source.
+ * The `content.*` browse channels — discovery on a source platform (Modrinth,
+ * CurseForge). Installing into an entry lives on `server.content` /
+ * `instance.content`. An empty `source` selects the default source; `sources()`
+ * answers only those that can serve, so one missing its API key never appears.
  */
 import { call } from './core/ipc';
 import type {

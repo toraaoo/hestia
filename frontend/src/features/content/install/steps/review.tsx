@@ -13,7 +13,11 @@ import {
   ComboboxItem,
   ComboboxList,
 } from '@/components/ui/combobox';
-import { projectRef } from '@/features/content/components/content-card';
+import {
+  projectKey,
+  projectRef,
+} from '@/features/content/components/content-card';
+import { SourceBadge } from '@/features/content/components/sources';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -62,12 +66,12 @@ export function ReviewStep({
       <div className="divide-y divide-border border border-border">
         {picked.map((p) => (
           <ReviewItemRow
-            key={projectRef(p)}
+            key={projectKey(p)}
             target={target}
             project={p}
             isProfile={isProfile}
-            versionId={versionIds[projectRef(p)] ?? ''}
-            onVersion={(id) => onVersion(projectRef(p), id)}
+            versionId={versionIds[projectKey(p)] ?? ''}
+            onVersion={(id) => onVersion(projectKey(p), id)}
             onRemove={() => onRemoveProject(p)}
           />
         ))}
@@ -222,6 +226,7 @@ function ReviewItemRow({
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <SourceBadge source={project.source} />
         {!isProfile && (
           <>
             {resolved && !versionId && (

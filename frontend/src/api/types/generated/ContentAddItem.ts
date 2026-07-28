@@ -3,6 +3,8 @@
 /**
  * One thing to install: exactly one of `project` (a platform project,
  * optionally pinned by `version`), `url` (a project/version page URL on a
- * supported source), or `path` (a daemon-local file to import).
+ * supported source), or `path` (a daemon-local file to import). `source`
+ * overrides the batch's for this item, so one batch may mix platforms; a URL
+ * always names its own source.
  */
-export type ContentAddItem = { project: string, version: string, url: string, path: string, filename: string, };
+export type ContentAddItem = { project: string, version: string, url: string, path: string, filename: string, source: string, };
