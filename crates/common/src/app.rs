@@ -24,7 +24,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// `crates/common/tests/updater.rs` fails the build when the two disagree.
 pub const UPDATE_ENDPOINT: &str =
     "https://github.com/toraaoo/hestia/releases/latest/download/latest.json";
-pub const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNENjExOURFRjg3QjFGMjUKUldRbEgzdjQzaGxoUFc4SzZjQ3N1V3VIRWQxSnJ4eWNXZHdUcis3ZFlQdGZDcGZDYk1ZcWMreDUK";
+pub const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJDNjM3NzcxQUEwRTdDQUQKUldTdGZBNnFjWGRqTERoaEIzaXFJcU1ZdU1YdXBVUk16cFdGVFQzYmZtT3ZVRC9mbjdYU0dOQlkK";
 /// The agent every outbound HTTP request identifies itself with.
 ///
 /// PaperMC and Modrinth both *ask* for a contact URL or address alongside the
