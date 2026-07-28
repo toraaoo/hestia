@@ -30,8 +30,9 @@ it's just as comfortable from a terminal as from a window.
 > `saves`/`config`/`screenshots` linked into one store (symlinks; junctions
 > on Windows), with `sync status` link states and a per-instance `sync
 > adopt` migration for pre-existing folders. **Content** —
-> mods, resourcepacks, shaders, datapacks — is discovered on Modrinth (search,
-> browse, resolve versions) and installed into a server (mods, datapacks) or
+> mods, plugins, resourcepacks, shaders, datapacks — is discovered on Modrinth
+> (search, browse, resolve versions) and installed into a server (mods or
+> plugins, whichever its flavor loads, plus datapacks) or
 > instance (mods/resourcepacks/shaders/datapacks) from a project, a Modrinth
 > page URL, or a local file, with required dependencies pulled in and a `data/`
 > mirror that survives backup/restore (datapacks install straight into their
@@ -45,7 +46,10 @@ it's just as comfortable from a terminal as from a window.
 > into an instance in one shot — each reference resolved against that
 > instance's version/loader and installed as ordinary origin-tagged content
 > (all a daemon/desktop surface, no CLI verbs). Vanilla and Fabric are the
-> shipped flavors, Modrinth the shipped content source. A **system tray**
+> shipped flavors for both sides; **Paper** and **Folia** are shipped for
+> servers, which take **plugins** rather than mods and start on the JVM flags
+> PaperMC recommends for that version. Modrinth is the shipped content source.
+> A **system tray**
 > accompanies every serving daemon — open the app, status, start/restart, a
 > start-at-login toggle, quit; a left-click (or the Open item) launches the
 > desktop shell. The **desktop shell** talks to the daemon through a generic

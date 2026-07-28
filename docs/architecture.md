@@ -332,12 +332,17 @@ The subsystems behind the aggregate:
   behind. The async wrapper and `java.install.*` progress events live in the
   daemon's `JavaInstallManager`.
 - **`minecraft`** (`Minecraft`) — the server and instance (client) provider
-  registries. A *flavor* is a distribution (`vanilla`, `fabric`); a provider lists
-  the game *versions* it supports and *resolves* a request into a launch profile —
+  registries. A *flavor* is a distribution (`vanilla`, `fabric`, and the
+  server-only `paper` and `folia`); a provider lists
+  the game *versions* it supports, states what content its loader takes
+  (`loads`), and *resolves* a request into a launch profile —
   the full descriptor (`ServerProfile` / `InstanceProfile`: primary artifact,
   libraries, asset index, java major, main class, args) the launch pipeline
-  consumes. Stateless (every result is fetched upstream), so it needs no data
-  directory. Manifest parsing lives in `minecraft/meta/` (`mojang`, `fabric`).
+  consumes. The two registries are separate, so a flavor can serve one side
+  only: Paper and Folia have no client and appear in `server.flavors` alone.
+  Stateless (every result is fetched upstream), so it needs no data
+  directory. Manifest parsing lives in `minecraft/meta/` (`mojang`, `fabric`,
+  `paper`).
   Two further modules are the launch pipeline over the profiles:
     - **`minecraft/materialize`** — idempotently ensures profile pieces on disk
       (skip-if-present): single jars, Maven-layout libraries under the shared
@@ -382,7 +387,8 @@ The subsystems behind the aggregate:
   filtered by the entry's game version and, for mods, its loader) and resolves
   required dependencies breadth-first; a direct URL or a local file import
   records `source: "file"`/a platform id with no version to update against.
-  Servers take mods and datapacks; instances take mods, resourcepacks, shaders,
+  A server takes whatever its flavor loads — mods on fabric, plugins on
+  paper/folia — plus datapacks; instances take mods, resourcepacks, shaders,
   and datapacks. `Engine` composes the flows
   (`add_server_content`/`add_instance_content`, list/remove/update) and a
   `sync` pass re-mirrors any missing managed file at every start/launch (below).
@@ -479,6 +485,77 @@ The subsystems behind the aggregate:
   restore runs per server at a time.
   Servers are fully provisioned at create so `start` is an immediate spawn;
   instances are records at create and pay at launch.
+
+> **A Paper build is a loader version, and Mojang orders the catalogue.**
+> Paper and Folia are one self-contained jar per build, so a profile is the
+> vanilla shape with the jar swapped — the interesting parts are what the
+> PaperMC API does *not* say. It publishes many builds per game version, and a
+> server operator routinely needs a specific one (pinning a known-good build,
+> or taking an experimental one deliberately), which is exactly what
+> `loader_version` already means for Fabric's loader builds — so a build number
+> goes there rather than growing a parallel concept. Unpinned resolves to the
+> newest `STABLE` build, falling back to the newest of any channel: a freshly
+> released game version whose builds are all experimental would otherwise be
+> uninstallable until PaperMC promoted one.
+>
+> Ordering and stability come from **Mojang's manifest**, not PaperMC's. Fill
+> groups versions under a JSON object keyed by version group, and a parsed
+> object sorts its keys as strings — which puts `1.9` after `1.21` and would
+> silently invert `downgrade_between`, the one place ordering is load-bearing.
+> The manifest is already the ordering ground truth every other flavor is
+> judged against, and it carries release/snapshot besides, which PaperMC never
+> states. A version Mojang does not list keeps its place at the end of the list
+> as a snapshot, so an April Fools' build is still creatable rather than
+> vanishing from the catalogue.
+>
+> The API itself moved: Fill v2 (`api.papermc.io`) stopped receiving builds at
+> the end of 2025 and was disabled on 1 July 2026, and v3 refuses a request
+> whose user agent does not identify its caller — so `common::app::user_agent`
+> now builds one identity for every outbound request rather than paper alone.
+
+> **What an entry takes is a property of its flavor, and the flavor says so.**
+> Two guards used to hard-code the answer: one refused anything but mods and
+> datapacks on a server, the other refused mods on vanilla *by name*. Paper
+> breaks both — it loads plugins, which are neither. The rule is now composed
+> from two independent facts: what the **flavor's** loader consumes (a
+> `ContentKind` on `ServerProvider`/`InstanceProvider` — mods for a modloader,
+> plugins for a server platform, nothing for vanilla) and what the **side**
+> reads for itself (a client its resourcepacks and shaders; either side the
+> datapacks that are world data rather than loader content). Adding a flavor
+> stays one impl plus one registry line, with no edit to the content flows —
+> which is what the old tables cost every time.
+>
+> A refusal carries the accepted set (`ContentKindRejected`) instead of a
+> sentence, because a sentence goes stale the moment a flavor is added; the two
+> `Unsupported` variants that spelled it out are gone. And the *front-end* gets
+> the set on the wire — `ServerInfo`/`InstanceInfo` carry `accepts` — rather
+> than keeping its own copy. It had one (`ACCEPTS` per entry type plus a
+> `flavor === 'fabric'` test), it was already wrong for neoforge, and that is
+> precisely the drift the no-drift seam exists to prevent.
+>
+> Plugins otherwise reuse the managed-dir model unchanged: `<entry>/plugins/`
+> mirrored into `data/plugins/`, provenance in `content.json`, `plugins/` added
+> to the backup exclude set so a restore heals it. **Folia is filtered strictly
+> as `folia`**, never widened to `paper`: a plugin that never claimed Folia
+> support breaks on its regionised scheduler, and the catalogue is the only
+> place that is knowable. Verified against a paper-only plugin, which installs
+> on Paper and is refused on Folia at the same game version.
+
+> **A flavor may recommend JVM flags; the user still outranks it.** PaperMC
+> publishes a tuned G1GC set per version, and running a Paper server without it
+> is measurably worse — so `ServerProfile` carries `jvm_args` and they become
+> the last fallback beneath the entry's own `jvm-args` and the launcher-wide
+> `defaults.jvm-args`. No new mechanism was needed: `or_defaults` already fills
+> only what a layer left unset, so the flavor chains onto the existing call.
+> Memory is deliberately excluded — how much RAM to give a server is the user's
+> call, not a catalogue's.
+>
+> The cost is flags the user never typed, which `config get jvm-args` would
+> honestly report as unset while the server ran with eighteen of them. That is
+> the hidden-behaviour failure this codebase already rejects elsewhere, so
+> `server info` names the effective flags **and which layer supplied them**
+> (`JvmArgsSource`). A front-end must not have to guess why a process has flags
+> nobody set.
 
 > **Content is normalized behind one trait, following Prism's `ResourceAPI`.**
 > Prism Launcher drives Modrinth and CurseForge through a strategy-pattern
@@ -1622,7 +1699,8 @@ skin and cape management for signed-in accounts (a preserved local skin
 library, the vanilla defaults, upload/equip/reset and cape selection over the
 Mojang profile API — daemon and desktop layers only, no CLI);
 the daemon's process supervisor; the Minecraft provider layer (flavors, versions,
-and profile resolution for vanilla and fabric, servers and instances); server
+and profile resolution — vanilla and fabric on both sides, paper and folia for
+servers only); server
 management (create = fully provisioned: profile + java + jar + EULA, each
 server on its own claimed port; start/stop/status/logs over the supervisor;
 a console over rcon — one-shot `command`, followed logs, interactive
@@ -1641,7 +1719,8 @@ first); backups for both (on-demand archive/restore with live progress — a
 running server is archived under the RCON save-off dance — plus per-server
 scheduled backups with retention pruning); the content provider layer
 (Modrinth search/project/versions/modpack resolution) with per-entry
-install/management — mods and datapacks on servers, mods/resourcepacks/shaders/
+install/management — mods or plugins on a server depending on its flavor, plus
+datapacks; mods/resourcepacks/shaders/
 datapacks on instances, from a platform project, a source page URL, or a local
 file, with required dependencies resolved and a `data/` mirror that heals across
 backups (datapacks install into their world, which the world backup already
@@ -1689,7 +1768,10 @@ typed API/hooks layer are in place; pages are not).
   session config in `minecraft/log4j.rs`, the config reconciliation, folder
   linking/adopt, and `options.txt` merge in `sync/`, the Modrinth mapping and `.mrpack`/URL
   parsing in `content/modrinth.rs`, and content version-pick / reference-matching
-  in `content/install.rs`.
+  in `content/install.rs`. The per-flavor accepted-kind composition is pinned in
+  `engine/flows/content.rs` and the JVM-args precedence in
+  `engine/flows/server.rs`; PaperMC build parsing is unit-tested in
+  `minecraft/meta/paper.rs`.
 - `crates/daemon/tests/e2e.rs` — a client-to-daemon round trip over a real
   socket; the session-key prefix invariant is unit-tested in `runtime/mod.rs`.
 

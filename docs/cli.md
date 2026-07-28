@@ -115,10 +115,22 @@ hestia server smp restart        # stop, then start again
 hestia server smp rename cozy    # rename (stopped): rewrites the display name;
                                  #   the id, directory, ports and data stay put
 hestia server smp remove         # delete the server (its jar, world and all)
-hestia server smp mod add <slug> # servers take mods (fabric/plugin flavors)
+hestia server smp mod add <slug> # a modloader server (fabric) takes mods
+hestia server smp plugin add <slug>     # a paper/folia server takes plugins
 hestia server smp datapack add <slug>   # datapacks install into the server's world
 hestia server smp datapack add --file ./pack.zip   # any kind imports a local file
 ```
+
+What a server takes depends on its flavor: mods on `fabric`, plugins on
+`paper`/`folia`, datapacks on any of them, and nothing else on `vanilla`.
+Asking for the wrong kind is refused naming what that server does take.
+
+`paper` and `folia` publish many builds per game version, so a build number is
+the flavor's *loader version* — `hestia server versions paper` lists the game
+versions and `--loader-version <build>` pins one; omitted, create takes the
+newest stable build. Both start with the JVM flags PaperMC recommends for that
+version unless the entry or `defaults.jvm-args` sets its own; `server <name>
+info` reports the effective flags and where they came from.
 
 ## Instances
 
@@ -273,7 +285,8 @@ hestia search sodium             # with a query: prints results (alias for
                                  #   `mod search`)
 hestia mod search sodium -l fabric -g 1.21.1   # filter by loader / version
 hestia modpack search "create"   # browse other kinds: modpack, resourcepack,
-hestia resourcepack search faithful            #   shader, datapack
+hestia resourcepack search faithful            #   shader, datapack, plugin
+hestia plugin search luckperms   # server plugins (paper/folia/bukkit/spigot)
 hestia mod info sodium           # a project's details (downloads, sides, …)
 hestia mod versions sodium -l fabric -g 1.21.1  # downloadable versions
 hestia sources                   # the available content sources
