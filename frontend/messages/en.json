@@ -251,6 +251,7 @@
  "flavor": {
   "vanilla_summary": "Mojang's game, unmodified.",
   "fabric_summary": "Lightweight loader for mods, resource packs and datapacks.",
+  "neoforge_summary": "Mod loader for large, content-heavy modpacks. First launch builds the game jar, so it takes a few minutes.",
   "paper_summary": "High-performance server that runs Bukkit plugins.",
   "folia_summary": "Paper with regionised multithreading, for very large worlds. Only Folia-ready plugins work."
  },

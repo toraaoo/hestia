@@ -250,6 +250,7 @@
  "flavor": {
   "vanilla_summary": "O jogo da Mojang, sem modificações.",
   "fabric_summary": "Loader leve para mods, pacotes de recursos e datapacks.",
+  "neoforge_summary": "Loader de mods para modpacks grandes. A primeira execução monta o jar do jogo, então leva alguns minutos.",
   "paper_summary": "Servidor de alto desempenho que roda plugins do Bukkit.",
   "folia_summary": "Paper com multithreading regionalizado, para mundos muito grandes. Apenas plugins compatíveis com Folia funcionam."
  },
