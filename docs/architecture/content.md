@@ -1,0 +1,240 @@
+# Content & modpacks
+
+*[← Architecture](../architecture.md)*
+
+Content is everything you add to an entry that Mojang did not ship: mods,
+plugins, resourcepacks, shaders, datapacks — and modpacks, which are all of the
+above bundled with a loader and a version.
+
+Three layers, deliberately separate:
+
+```mermaid
+flowchart TD
+    SRC["<b>sources</b> — content/<br/>search · project · versions · resolve<br/><i>Modrinth today; the trait is the seam</i>"]
+    INST["<b>install</b> — content/install/<br/>managed dir + content.json provenance + data/ mirror"]
+    PACK["<b>modpacks</b> — content/mrpack · modpack<br/>the archive format, and which files a pack owns"]
+    SEL["<b>selection</b> — per-instance profiles, global profiles<br/>which of the installed pool is active"]
+
+    SRC --> INST
+    PACK --> INST
+    INST --> SEL
+```
+
+## Sources
+
+`ContentProvider` is the trait: search with pagination, project detail, version
+resolution filtered by loader and game version, modpack resolution, and URL
+recognition. `modrinth` is the shipped source; CurseForge would be a new impl
+plus one line in `Content::new`, the same shape as the flavor registry.
+
+Every platform response is mapped into the normalized `proto::content` types at
+this boundary, so a front-end never sees a platform's raw shape
+([0010](../decisions/0010-one-content-provider-trait.md)).
+
+A provider also recognises its own site's project and version page URLs, so a
+pasted `modrinth.com/mod/…` link installs exactly like a slug.
+
+## What an entry accepts
+
+Not a table anywhere — composed from two independent facts: what the **flavor's**
+loader consumes, and what the **side** reads for itself.
+
+| | mods | plugins | resourcepacks | shaders | datapacks |
+|---|:--:|:--:|:--:|:--:|:--:|
+| server on a modloader (fabric, neoforge) | ✓ | | | | ✓ |
+| server on a platform (paper, folia, spigot, bukkit) | | ✓ | | | ✓ |
+| vanilla server | | | | | ✓ |
+| instance on a modloader | ✓ | | ✓ | ✓ | ✓ |
+| vanilla instance | | | ✓ | ✓ | ✓ |
+
+A refusal carries the accepted set rather than a sentence, and `ServerInfo` /
+`InstanceInfo` carry `accepts` on the wire so no front-end keeps its own copy
+([0008](../decisions/0008-flavor-declares-accepted-content.md)).
+
+## The install model
+
+Content is written to a **managed directory in the entry root** — Hestia's
+namespace — with its provenance in `content.json`, then hardlinked (or copied)
+into the game directory.
+
+```mermaid
+flowchart LR
+    SRCF["source / URL / local file"] --> MANAGED["&lt;entry&gt;/mods/sodium.jar<br/><b>source of truth</b>"]
+    MANAGED --> IDX["content.json<br/>kind · source · project · version · sha1 · enabled · origin"]
+    MANAGED -->|"hardlink, else copy"| MIRROR["data/mods/sodium.jar<br/><i>what the game loads</i>"]
+    MIRROR -.->|"backup restore swaps data/"| GONE["mirror lost"]
+    GONE -.->|"reconcile at next start"| MIRROR
+```
+
+The managed copy — not the one in `data/` — is the source of truth, which pays
+off three ways:
+
+1. **Restore heals itself.** A backup restore swaps `data/`, but the managed dirs
+   live outside it and are on the backup exclude list, so a reconcile pass
+   re-mirrors them at the next start. Archives stay world-focused.
+2. **Provenance survives**, so `update` knows each item's project and current
+   version.
+3. **A hand-dropped jar is surfaced as untracked**, never silently adopted.
+
+([0013](../decisions/0013-managed-dir-of-record.md))
+
+Managed directory names are the game's own load-dir names (`mods/`, `plugins/`,
+`resourcepacks/`, `shaderpacks/`), so the mirror is symmetric.
+
+### Resolution and dependencies
+
+A platform install picks the newest compatible version — filtered by the entry's
+game version and, for mods, its loader — and resolves required dependencies
+breadth-first. A direct URL or local file import records `source: "file"` with no
+version to update against: it installs, it is simply not updatable.
+
+### Beyond add and remove
+
+| Operation | Behaviour |
+|---|---|
+| `enable` | flips a flag in `content.json`. Enforced at the single point it needs — the launch-time mirror keeps a disabled item out of `data/`, so it can never be resurrected by a restore. A datapack has no mirror, so it uses the standard `.disabled` rename inside its world |
+| `check_updates` | a *separate* on-demand call, not baked into `list`, so `list` stays fast and offline |
+| `set_version` | re-pins one item to a chosen published version — the update path with an explicit pin instead of "newest" |
+
+All of them refuse a running or busy entry: open jars lock on Windows, and
+changes only take effect at the next start anyway
+([0014](../decisions/0014-enable-update-check-and-pin.md)).
+
+### Local files are inspected, not trusted
+
+`content.inspect(path)` reads the archive's central directory and classifies it,
+returning the detected kind, validity and a reason. Detection is
+**loader-agnostic** — a mod is any loader's manifest (`fabric.mod.json`,
+`quilt.mod.json`, `META-INF/mods.toml`, `neoforge.mods.toml`, …) — and a datapack
+is told from a resourcepack by the `data/` vs `assets/` tree under a shared
+`pack.mcmeta`.
+
+The detected kind is a **suggestion, not a verdict**: `content.add` hard-rejects
+only what genuinely cannot be single-file content (an unreadable archive, or a
+modpack) and otherwise honours the requested kind, so a review-step override
+installs where you asked
+([0015](../decisions/0015-local-imports-are-inspected.md)).
+
+## Datapacks are the exception
+
+A datapack loads from *inside a world*, not a flat directory — and a world is
+already `data/`, which the backup archive captures. So a datapack has no managed
+copy and no mirror: it installs straight into its world's `datapacks/`.
+
+| | Server | Instance |
+|---|---|---|
+| Where | `data/<level-name>/datapacks/` | `data/saves/<world>/datapacks/` |
+| Which world | the one, from `server.properties` | named — repeatable `--world`, or an interactive multi-select |
+
+The index keys a datapack by world, so the same pack coexists across several
+worlds and a removal clears every copy unless narrowed. Sync skips datapacks
+entirely, and the client-side support flag is waived for them: a datapack runs on
+a world's server side, including a client's integrated server
+([0016](../decisions/0016-datapacks-are-world-of-record.md)).
+
+## Content profiles
+
+An instance's installed pool can be sliced into named **profiles**
+(`profiles.json`; absent means no profiles), keyed by filename — the one index
+field always present and unique.
+
+A profile is a **selection, not a copy**. The managed dirs stay the single source
+of truth; activating a profile changes only what the launch-time reconcile
+mirrors into `data/`:
+
+- members are mirrored;
+- tracked non-members have their `data/` copy removed (the managed copy stays);
+- untracked files are never touched;
+- **no profile active mirrors everything** — exactly the pre-profile behaviour,
+  so existing instances need no migration.
+
+Selectable kinds are mods, resourcepacks and shaders. Worlds, `servers.dat` and
+all other game data are shared across profiles *by construction*: every profile
+runs against the same single `data/`. The reserved name `none` overrides an
+active profile for one launch ([0017](../decisions/0017-content-profile-is-a-selection.md)).
+
+**Settings capture** is opt-in per profile. An uncaptured profile inherits the
+global `shared/` store; `capture` snapshots the settings-class sync targets into
+`<instance>/profiles/<name>/`, whose existence *is* the captured flag. Under
+linked sync the `config` folder repoints its link into the profile store, while
+`options.txt` keeps its per-scope copy-reconcile. `saves` and `screenshots`
+always stay global — capture forks *settings*, not game data
+([0019](../decisions/0019-profile-settings-capture.md)).
+
+### Global profiles
+
+A different thing with a similar name: a data-home-level `profiles/<name>.json`
+is a reusable "starter pack" of **project references** — `{source, project_id,
+slug}` — never jars, because jars are version- and loader-specific.
+
+`instance.profile.apply` resolves every reference against the *target* instance's
+game version and loader through the ordinary add-content path. Applied content
+becomes an ordinary pool item with an `origin` tag (`profile:<name>`), so the
+mirror, backup heal, untracked detection and update all work on it unchanged.
+
+Apply is one-shot and additive: a reference already in the pool is skipped, one
+with no compatible version is a per-item failure the batch continues past, and
+de-listed references are never removed. Removing a profile-tagged item locally is
+refused by name — the reference leaves the global profile instead
+([0018](../decisions/0018-global-profile-stores-references.md)).
+
+## Modpacks
+
+A pack installs into a new or existing server or instance from a project, a page
+URL, or a local `.mrpack`. `mrpack.rs` owns the *format* (the manifest and the
+`overrides/` trees), deliberately apart from the platform that serves it — a pack
+picked off disk has no source and is read the same way.
+
+A pack decomposes into three things Hestia already has, and each goes where it
+belongs:
+
+```mermaid
+flowchart TD
+    PACK["a .mrpack"]
+    PACK --> A["loader + game version"]
+    PACK --> B["index files under a managed load dir"]
+    PACK --> C["overrides/ and everything else"]
+
+    A --> A1["become the entry's flavor and version<br/><i>create --modpack and modpack install<br/>are one code path</i>"]
+    B --> B1["ordinary pool items tagged modpack:&lt;project&gt;<br/><i>individually listable, enableable, updatable</i>"]
+    C --> C1["written into data/, recorded in modpack.json<br/>with the sha1 each was written with"]
+```
+
+Only the third needed anything new, and for one reason: those files are configs
+and keymaps **you edit**. So an update replaces a file the pack still owns and
+leaves a tweaked one exactly as found, reporting which through
+`WarningInfo::ModpackOverridesKept`. A *first* install writes over whatever is on
+disk — nothing there is yours yet
+([0011](../decisions/0011-modpack-decomposes-into-existing-parts.md)).
+
+**A pack's mods are identified for free.** A pack index names each file by URL
+and hash alone, with no ids — but a platform's CDN URL carries both, so
+`parse_file_url` recovers them and one bulk call fills in every title and icon. A
+file the source does not serve records as `source: "file"`: installable, just not
+updatable.
+
+**A pack's `env.server` is a claim, not a fact.** Packs routinely declare
+client-only mods as server-required, so a *server* install filters them using
+`itzg/docker-minecraft-server`'s list, adopted verbatim. What is held back rides
+on the result as `WarningInfo::ModpackFilesExcluded`, naming each file. The
+correction is server-side only — applied to an instance it would strip out
+precisely the mods the pack was installed for
+([0012](../decisions/0012-pack-server-declarations-are-corrected.md)).
+
+**What a pack cannot do:** be installed into an entry whose flavor or game
+version differs from what it pins, or pin a loader with no Hestia flavor. An
+update *does* carry the game version with it — that is what updating a pack means
+— behind the same explicit downgrade gate as any version move.
+
+## Decisions
+
+- [0010 — Content is normalized behind one trait](../decisions/0010-one-content-provider-trait.md)
+- [0011 — A modpack is three things at once](../decisions/0011-modpack-decomposes-into-existing-parts.md)
+- [0012 — A pack's `env.server` is a claim, not a fact](../decisions/0012-pack-server-declarations-are-corrected.md)
+- [0013 — Installed content is managed-dir-of-record, mirrored into `data/`](../decisions/0013-managed-dir-of-record.md)
+- [0014 — Enable/disable, update-check and pin extend the same model](../decisions/0014-enable-update-check-and-pin.md)
+- [0015 — A local-file import is inspected, not trusted](../decisions/0015-local-imports-are-inspected.md)
+- [0016 — Datapacks are world-of-record](../decisions/0016-datapacks-are-world-of-record.md)
+- [0017 — A content profile is a selection, not a copy](../decisions/0017-content-profile-is-a-selection.md)
+- [0018 — A global profile stores project references, never jars](../decisions/0018-global-profile-stores-references.md)
+- [0019 — Settings capture is opt-in per profile](../decisions/0019-profile-settings-capture.md)
