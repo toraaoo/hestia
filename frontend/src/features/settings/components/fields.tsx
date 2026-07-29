@@ -41,7 +41,7 @@ export function LanguageField() {
             {(value: string) => LANGUAGE_NAMES[value] ?? value}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent align="start" alignItemWithTrigger={false}>
+        <SelectContent align="start">
           <SelectGroup>
             {locales.map((l) => (
               <SelectItem key={l} value={l}>

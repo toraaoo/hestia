@@ -208,7 +208,7 @@ export function SelectField({
         <SelectTrigger id={field.name} className={triggerClassName}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent align="start" alignItemWithTrigger={false}>
+        <SelectContent align="start">
           <SelectGroup>
             {options.map((o) => (
               <SelectItem key={o.value} value={o.value} className={o.className}>
