@@ -426,6 +426,8 @@ fn gauge_label(phase: ProvisionPhase) -> &'static str {
         ProvisionPhase::Libraries => "libraries",
         ProvisionPhase::Assets => "assets",
         ProvisionPhase::Overrides => "pack files",
+        ProvisionPhase::Archive => "files",
+        ProvisionPhase::Extract => "files",
         _ => "downloading",
     }
 }
@@ -441,6 +443,8 @@ fn provision_label(phase: ProvisionPhase) -> &'static str {
         ProvisionPhase::Assets => "assets…",
         ProvisionPhase::Content => "downloading…",
         ProvisionPhase::Overrides => "pack files…",
+        ProvisionPhase::Archive => "archiving…",
+        ProvisionPhase::Extract => "extracting…",
     }
 }
 
@@ -455,6 +459,8 @@ fn provision_noun(phase: ProvisionPhase) -> &'static str {
         ProvisionPhase::Assets => "assets",
         ProvisionPhase::Content => "content",
         ProvisionPhase::Overrides => "pack files",
+        ProvisionPhase::Archive => "files",
+        ProvisionPhase::Extract => "files",
     }
 }
 

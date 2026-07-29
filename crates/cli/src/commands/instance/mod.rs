@@ -11,7 +11,10 @@ mod config;
 mod create;
 mod entry;
 pub(crate) mod lifecycle;
+mod transfer;
 mod update;
+
+use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -58,6 +61,17 @@ pub enum InstanceCmd {
             help = "Build from a modpack (slug, URL, or .mrpack path)"
         )]
         modpack: Option<String>,
+    },
+    /// Import an instance from an archive (hestia, .mrpack, or Prism/MultiMC)
+    Import {
+        /// Path to the archive; its format is detected from what is inside it
+        path: PathBuf,
+        #[arg(
+            short,
+            long,
+            help = "Name the new instance (defaults to the archive's)"
+        )]
+        name: Option<String>,
     },
     /// Managed instances and their state
     #[command(visible_alias = "ls")]
@@ -188,6 +202,26 @@ enum InstanceAction {
         )]
         downgrade: bool,
     },
+    /// Write the instance out as one archive (must be stopped)
+    Export {
+        #[arg(
+            short,
+            long,
+            help = "Archive format: hestia (full fidelity) or mrpack (portable)"
+        )]
+        format: Option<String>,
+        #[arg(
+            short,
+            long,
+            help = "Where to write it — a file or a directory (default: the data home's exports/)"
+        )]
+        output: Option<PathBuf>,
+        #[arg(
+            long,
+            help = "Leave an entry-relative path out (e.g. data/saves); repeatable"
+        )]
+        exclude: Vec<String>,
+    },
     /// Rename the instance (moves its directory; must be stopped)
     Rename {
         /// The new display name
@@ -253,6 +287,7 @@ pub async fn run(cmd: InstanceCmd) -> Result<()> {
                     memory,
                     modpack: None,
                 } => create::run(&client, flavor, version, loader, name, memory).await,
+                InstanceCmd::Import { path, name } => transfer::import(&client, path, name).await,
                 InstanceCmd::List => entry::list(&client).await,
                 InstanceCmd::Versions { flavor, all } => versions(&client, flavor, all).await,
                 InstanceCmd::Flavors => flavors(&client).await,
@@ -340,6 +375,11 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             loader,
             downgrade,
         } => update::run(client, name, version, loader, downgrade).await,
+        InstanceAction::Export {
+            format,
+            output,
+            exclude,
+        } => transfer::export(client, name, format, output, exclude).await,
         InstanceAction::Rename { new_name } => lifecycle::rename(client, &name, &new_name).await,
         InstanceAction::Sync {
             cmd: SyncAction::Adopt { targets },
