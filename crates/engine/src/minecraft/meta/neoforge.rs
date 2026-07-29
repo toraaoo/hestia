@@ -61,28 +61,43 @@ pub async fn versions() -> Result<Vec<String>> {
 /// - `<year>.<release>.<hotfix>.<build>` — `26.1.2.84` is for 26.1.2, and a zero
 ///   hotfix again drops: `26.2.0.35-beta` is for 26.2.
 ///
-/// This is theseus's rule, and it reproduces Modrinth's published manifest
-/// exactly across all 1629 currently-published versions. It also reproduces one
-/// of its artifacts: an April Fools' build (`0.25w14craftmine.5-beta`) maps to a
-/// game version that does not exist. Callers filter the result against Mojang's
-/// manifest, which drops it — a mapping that names no real version is a failed
-/// derivation, not a version to offer.
+/// A build that carries **semver build metadata** names the prerelease it was
+/// built against there, and that wins over the fields above:
+/// `26.1.0.0-alpha.15+pre-3` is for `26.1-pre-3`, not for 26.1. Reading it is
+/// what keeps a snapshot build out of the release's catalogue — merged over the
+/// release's own `version.json` it would run against a base jar it was never
+/// built for, and it would outrank every `-beta` build the release does have.
+/// This is a deliberate divergence from Modrinth's published manifest, which
+/// files all 15 of these under the release.
+///
+/// The field arithmetic is otherwise theseus's rule, artifacts included: an
+/// April Fools' build (`0.25w14craftmine.5-beta`) maps to a game version that
+/// does not exist. Callers filter the result against Mojang's manifest, which
+/// drops it — a mapping that names no real version is a failed derivation, not
+/// a version to offer.
 pub fn game_version(version: &str) -> Option<String> {
-    let mut parts = version.split('.');
+    let (core, prerelease) = match version.split_once('+') {
+        Some((core, metadata)) => (core, Some(metadata)),
+        None => (version, None),
+    };
+    let mut parts = core.split('.');
     let major: u32 = parts.next()?.parse().ok()?;
     let minor = parts.next()?;
-    if major >= 26 {
+    let release = if major >= 26 {
         let hotfix = parts.next()?;
-        return Some(if hotfix == "0" {
+        if hotfix == "0" {
             format!("{major}.{minor}")
         } else {
             format!("{major}.{minor}.{hotfix}")
-        });
-    }
-    Some(if minor == "0" {
+        }
+    } else if minor == "0" {
         format!("1.{major}")
     } else {
         format!("1.{major}.{minor}")
+    };
+    Some(match prerelease {
+        Some(prerelease) => format!("{release}-{prerelease}"),
+        None => release,
     })
 }
 
@@ -170,6 +185,19 @@ mod tests {
             "a zero hotfix drops, as a zero patch does"
         );
         assert_eq!(game_version("26.1.0.5-beta").as_deref(), Some("26.1"));
+    }
+
+    #[test]
+    fn build_metadata_names_the_prerelease_a_build_targets() {
+        assert_eq!(
+            game_version("26.1.0.0-alpha.14+snapshot-11").as_deref(),
+            Some("26.1-snapshot-11"),
+            "an alpha belongs to the snapshot it was built against, not to 26.1"
+        );
+        assert_eq!(
+            game_version("26.1.0.0-alpha.15+pre-3").as_deref(),
+            Some("26.1-pre-3")
+        );
     }
 
     #[test]

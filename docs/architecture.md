@@ -549,10 +549,41 @@ The subsystems behind the aggregate:
 > version plus a build number, under two schemes split by Minecraft's move to
 > calendar versioning (`21.1.244` → 1.21.1; `26.2.0.35-beta` → 26.2, a zero
 > patch or hotfix dropping). The rule reproduces Modrinth's published manifest
-> exactly across all 1629 published versions — artifacts included, since an
+> across all published versions — artifacts included, since an
 > April Fools' build maps to a version that does not exist. Filtering the result
 > against Mojang's manifest drops it: a mapping naming no real version is a
 > failed derivation, not a version to offer.
+>
+> **Semver build metadata outranks that arithmetic, which is where Modrinth is
+> followed no further.** NeoForge builds against a snapshot during a release
+> cycle and says so in the metadata field — `26.1.0.0-alpha.15+pre-3` is for
+> `26.1-pre-3` — while its leading fields still spell the release. Reading only
+> the fields filed all fifteen of those under 26.1, as Modrinth's manifest does,
+> and two failures followed. They were merged over the *release's*
+> `version.json`, so a resolve handed the loader a base jar it was never built
+> against. And they outranked the release line's own builds: "newest stable"
+> was implemented as the newest without `-beta`, which an `-alpha` trivially
+> satisfies, so an unpinned create on 26.1 skipped all nineteen betas for
+> `alpha.15+pre-3`. Stability is now read as semver reads it — any prerelease
+> identifier, so a future `-rc` needs no edit — and the metadata names the
+> version a build targets. The snapshots those alphas belong to are real Mojang
+> ids, so they join the catalogue as snapshot versions rather than being
+> discarded; before this they were the reason NeoForge's catalogue was 21
+> entries of which *every one* was a release, and a front-end's
+> include-snapshots toggle had nothing to reveal.
+>
+> **NeoForge alone has no stability preference — its `-beta` describes the game
+> version, not the build.** Every other flavor resolves to its newest stable
+> build; NeoForge resolves to its newest build, full stop. This follows
+> modrinth/code, where daedalus marks *every* NeoForge build `stable: false` and
+> the create flow's stable/latest/other selector is therefore permanently
+> disabled for it. The rule it replaced was hestia's own and looked reasonable —
+> prefer a build with no prerelease identifier — but NeoForge leaves an entire
+> line on `-beta` for its lifetime (26.2: 34 builds, not one release), so a
+> preference either changes nothing or pins the entry to a months-old build on
+> the versions where it does bite. Across the live catalogue the two rules agree
+> everywhere today; the simpler one is kept because the suffix is not the signal
+> it looks like.
 >
 > A **server** has no launchable jar at all. Its install generates an argument
 > file naming the module path, system properties and launch target — far past

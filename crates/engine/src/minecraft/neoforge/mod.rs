@@ -59,26 +59,26 @@ async fn builds(game: &str) -> Result<Vec<String>> {
     Ok(builds)
 }
 
-/// The build a resolve uses: the pinned one, else the newest stable build,
-/// falling back to the newest of any kind. NeoForge marks a prerelease with a
-/// `-beta` suffix and nothing else, so that suffix is the only stability signal
-/// there is.
+/// The build a resolve uses: the pinned one, else simply the newest.
+///
+/// NeoForge is the one flavor with no stability preference, following
+/// modrinth/code: daedalus marks *every* NeoForge build unstable, so the
+/// launcher's stable/latest choice is permanently disabled for it and always
+/// resolves latest. Preferring a release build over a newer `-beta` would also
+/// mean pinning many game versions to a months-old build — NeoForge leaves a
+/// whole line on `-beta` for its lifetime (26.2 has 34 builds and no release),
+/// so the suffix tracks the game version's own maturity more than the build's.
 async fn resolve_loader(request: &ResolveRequest) -> Result<String> {
     if let Some(pinned) = &request.loader_version {
         return Ok(pinned.clone());
     }
     let builds = builds(&request.version).await?;
-    builds
-        .iter()
-        .find(|v| !v.contains("-beta"))
-        .or_else(|| builds.first())
-        .cloned()
-        .with_context(|| {
-            format!(
-                "no neoforge build is published for Minecraft {}",
-                request.version
-            )
-        })
+    builds.first().cloned().with_context(|| {
+        format!(
+            "no neoforge build is published for Minecraft {}",
+            request.version
+        )
+    })
 }
 
 /// Where a version's installer jar is kept once fetched. It is not a launch
