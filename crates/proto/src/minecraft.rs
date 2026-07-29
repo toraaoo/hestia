@@ -226,6 +226,10 @@ pub enum ProvisionPhase {
     Content,
     /// Writing a modpack's own game-directory files (its `overrides/`).
     Overrides,
+    /// Writing an instance's files into an export archive.
+    Archive,
+    /// Reading an imported archive's files back onto disk.
+    Extract,
 }
 
 /// Progress for a provisioning job. `current`/`total` are bytes for a
