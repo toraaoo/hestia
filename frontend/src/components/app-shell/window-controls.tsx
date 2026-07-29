@@ -96,7 +96,7 @@ function ControlButton({
       className={cn(
         'flex h-full w-12 items-center justify-center text-muted-foreground transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring',
         danger
-          ? 'hover:bg-destructive hover:text-white'
+          ? 'hover:bg-red-600 hover:text-white'
           : 'hover:bg-muted hover:text-foreground',
       )}
     >
