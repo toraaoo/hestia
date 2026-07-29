@@ -1,0 +1,70 @@
+//! Instance import and export.
+//!
+//! Export is guarded exactly as a backup is — stopped, and racing no content,
+//! pack or transfer job — because it reads the same tree those write. Import
+//! guards nothing: it creates the entry it fills, so there is no entry yet for
+//! anything to race.
+
+use proto::error::{ErrorInfo, Field};
+use proto::transfer::{InstanceExport, InstanceImport, InstanceImportInspect, TransferJobResult};
+
+use super::guards::{
+    ensure_no_backup, ensure_no_content, ensure_no_modpack, ensure_stopped, find_instance,
+};
+use crate::runtime::{instance_process_id, Channels, TransferJob};
+
+pub(super) fn register(on: &mut Channels<'_>) {
+    on.handle::<InstanceExport, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        let key = instance_process_id(&record.id);
+        ensure_stopped(&ctx, &key, "instance", &record.name)?;
+        ensure_no_content(&ctx, &key, &record.name)?;
+        ensure_no_modpack(&ctx, &key, &record.name)?;
+        ensure_no_backup(&ctx, &key, &record.name)?;
+        let started = ctx.runtime.transfers().start(
+            TransferJob::Export {
+                instance_id: record.id,
+                format: p.format,
+                destination: p.destination,
+                exclude: p.exclude,
+            },
+            p.id,
+        );
+        started
+            .map(|id| TransferJobResult { id })
+            .ok_or_else(|| ErrorInfo::Busy {
+                detail: format!("'{}' is already being exported", record.name),
+            })
+    });
+
+    on.handle::<InstanceImport, _, _>(|p, ctx| async move {
+        require_path(&p.path)?;
+        let started = ctx.runtime.transfers().start(
+            TransferJob::Import {
+                path: p.path,
+                name: p.name,
+            },
+            p.id,
+        );
+        started
+            .map(|id| TransferJobResult { id })
+            .ok_or_else(|| ErrorInfo::Busy {
+                detail: "that import is already running".to_string(),
+            })
+    });
+
+    on.handle::<InstanceImportInspect, _, _>(|p, ctx| async move {
+        require_path(&p.path)?;
+        ctx.runtime
+            .engine()
+            .inspect_archive(&p.path)
+            .map_err(crate::runtime::engine_error)
+    });
+}
+
+fn require_path(path: &str) -> Result<(), ErrorInfo> {
+    match path.trim().is_empty() {
+        true => Err(ErrorInfo::FieldRequired { field: Field::Path }),
+        false => Ok(()),
+    }
+}

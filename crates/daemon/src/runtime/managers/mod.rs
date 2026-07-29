@@ -10,6 +10,7 @@ mod java;
 mod job;
 mod modpack;
 mod server;
+mod transfer;
 mod update;
 
 pub use backup::{BackupJob, BackupManager};
@@ -21,4 +22,5 @@ pub(crate) use job::topic_event;
 pub use job::Cancellations;
 pub use modpack::{ModpackJob, ModpackManager};
 pub use server::{ServerCreateManager, ServerUpdateManager};
+pub use transfer::{TransferJob, TransferManager};
 pub use update::UpdateManager;

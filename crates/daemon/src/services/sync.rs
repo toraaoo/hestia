@@ -10,7 +10,7 @@ use proto::sync::{
 };
 use proto::Empty;
 
-use super::guards::{ensure_no_content, find_instance};
+use super::guards::{ensure_no_content, ensure_no_transfer, find_instance};
 use crate::runtime::{instance_process_id, Channels};
 
 fn config(engine: &engine::Engine) -> SyncConfig {
@@ -53,6 +53,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             });
         }
         ensure_no_content(&ctx, &instance_process_id(&record.id), &record.name)?;
+        ensure_no_transfer(&ctx, &instance_process_id(&record.id), &record.name)?;
         let adopted = ctx
             .runtime
             .engine()

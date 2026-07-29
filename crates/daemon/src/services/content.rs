@@ -13,8 +13,8 @@ use proto::error::{ErrorInfo, Field};
 use proto::Empty;
 
 use super::guards::{
-    ensure_no_backup, ensure_no_content, ensure_no_update, ensure_stopped, find_instance,
-    find_server, require_content_items,
+    ensure_no_backup, ensure_no_content, ensure_no_transfer, ensure_no_update, ensure_stopped,
+    find_instance, find_server, require_content_items,
 };
 use crate::runtime::{instance_process_id, server_process_id, Channels, ContentJob};
 
@@ -247,6 +247,7 @@ fn register_instance(on: &mut Channels<'_>) {
         let record = find_instance(&ctx, &p.instance)?;
         let process_id = instance_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
+        ensure_no_transfer(&ctx, &process_id, &record.name)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::InstanceAdd {
                 instance_id: record.id,
@@ -279,6 +280,7 @@ fn register_instance(on: &mut Channels<'_>) {
         let process_id = instance_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
         ensure_no_content(&ctx, &process_id, &record.name)?;
+        ensure_no_transfer(&ctx, &process_id, &record.name)?;
         match ctx
             .runtime
             .engine()
@@ -319,6 +321,7 @@ fn register_instance(on: &mut Channels<'_>) {
         let process_id = instance_process_id(&record.id);
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
         ensure_no_content(&ctx, &process_id, &record.name)?;
+        ensure_no_transfer(&ctx, &process_id, &record.name)?;
         match ctx
             .runtime
             .engine()
