@@ -1,6 +1,6 @@
 //! Server backups: create and restore are jobs over the `BackupManager`, list
 //! and remove answer inline. Backups are a server feature — instances have
-//! none (import/export is the intended replacement, not yet built).
+//! none — `instance.export` is what they have instead.
 
 use proto::backup::{
     BackupJobResult, BackupListResult, ServerBackupCreate, ServerBackupList, ServerBackupRemove,

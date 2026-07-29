@@ -78,9 +78,10 @@ impl Engine {
 
     /// Move an instance to another version of its flavor. A downgrade must be
     /// allowed explicitly — Minecraft cannot load saves written by a newer
-    /// version, and **nothing is backed up first** (instances have no backup
-    /// story until import/export lands). Only the record changes; files
-    /// materialise at the next launch.
+    /// version, and **nothing is backed up first**: an instance is kept by
+    /// exporting it, which is a deliberate act rather than something an update
+    /// does for you. Only the record changes; files materialise at the next
+    /// launch.
     pub async fn update_instance(
         &self,
         reference: &str,

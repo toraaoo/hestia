@@ -158,8 +158,8 @@ hestia instance modded launch --new-session   # launch another session while one
                                  #   is already running (default refuses — see
                                  #   "Multiple sessions" below)
 hestia instance modded update 1.21.4  # move to another version (saves stay,
-                                 #   but nothing is backed up — instances
-                                 #   have no backups; files download at the
+                                 #   but nothing is backed up — export first
+                                 #   if you want a copy; files download at the
                                  #   next launch; a downgrade asks for a
                                  #   confirm)
 hestia instance modded config set jvm-args "-XX:+UseG1GC"  # memory / jvm-args
@@ -176,8 +176,51 @@ hestia instance modded stop      # kill every session (--session <h> targets one
 hestia instance modded restart   # stop, then launch again (--session <h> for one)
 hestia instance modded rename mp # rename (stopped): rewrites the display name;
                                  #   the id, directory and saves stay put
+hestia instance modded export    # write it out as one archive (stopped)
+hestia instance import <file>    # bring one back — any supported archive
 hestia instance modded remove    # delete the instance (its saves and all)
 ```
+
+### Import & export
+
+An instance travels as **one file**. This is what instances have instead of backups: a server is archived in place on a
+schedule, an instance is written out on purpose.
+
+```bash
+hestia instance modded export                    # → <data home>/exports/<slug>-<stamp>.hestia
+hestia instance modded export -o ~/share         # a directory: the name is generated inside it
+hestia instance modded export -o ~/cozy.hestia   # or name the file yourself
+hestia instance modded export --format mrpack -o ~/cozy.mrpack
+hestia instance modded export --exclude data/saves   # leave a path out (repeatable)
+```
+
+Two formats out:
+
+| `--format` | Carries | Use it for |
+|---|---|---|
+| `hestia` (default) | the whole instance — pool, configs, worlds, and a resolved record | keeping a copy, or moving it to another machine; imports back **offline**, exactly as it was |
+| `mrpack` | mods as links to where they came from, everything else in `overrides/` | sharing with someone on another launcher |
+
+An `.mrpack` can only reference content hestia knows the origin of. A mod installed from a local file has no download to
+point at, so it is embedded in the archive instead and the export says so — it still installs, it is just no longer a
+pack Modrinth would publish.
+
+Import takes a file and works out the rest:
+
+```bash
+hestia instance import ~/cozy.hestia             # a hestia archive
+hestia instance import ~/Downloads/pack.mrpack   # a Modrinth pack
+hestia instance import ~/prism-export.zip        # a Prism/MultiMC instance
+hestia instance import ~/cozy.hestia -n "Copy"   # name it something else
+```
+
+The format is detected from what is **inside** the file, not its extension — all three are zips, and people rename them.
+The command prints what it found before it starts. A Prism/MultiMC instance brings its game directory, its memory and
+JVM settings, and its mods (which arrive with no source, so they cannot be updated in place until you reinstall them);
+an archive pinning a loader hestia has no flavor for is refused by name rather than silently installed as vanilla.
+
+An export needs the instance **stopped**, and refuses while a content or modpack job is touching it. Paths are resolved
+against your shell's working directory, then sent as absolute — the daemon is a separate process and does not share it.
 
 ### Multiple sessions
 
@@ -377,9 +420,9 @@ Paths are **game-relative** (relative to `data/`). `..` escapes and the launcher
 are rejected — the content system already shares content. `saves` can only be shared as a folder (linked), never copied.
 
 Two things to know about shared worlds: opening the same world from two instances at once is only guarded by Minecraft's
-own `session.lock`, and instances on different versions or loaders writing one world can corrupt it. And until instance
-import/export lands, instance data — the shared worlds store included — has **no backup story**; keep your own copies of
-worlds you care about.
+own `session.lock`, and instances on different versions or loaders writing one world can corrupt it. Instance data is
+kept by exporting it (`hestia instance <name> export`) rather than by a backup schedule — a shared world lives in the
+store, so an export of any instance that links it carries a copy.
 
 ## Configuration
 

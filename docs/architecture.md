@@ -176,6 +176,7 @@ obvious unit to reclaim ([0057](decisions/0057-meta-root-for-materialised-files.
 | [Minecraft providers](architecture/minecraft.md) | flavors, version catalogues, profile resolution, materialize, launch plans, RCON |
 | [Servers & instances](architecture/entries.md) | entry stores, directory layout, provisioning, ports, backups, sync, worlds |
 | [Content & modpacks](architecture/content.md) | content sources, the managed-dir install model, datapacks, content profiles, modpacks |
+| [Import & export](architecture/transfer.md) | archive formats, detection, what an archive carries, importing another launcher's instance |
 | [Accounts & skins](architecture/accounts.md) | Microsoft sign-in, token rotation, the skin library |
 | [Front-ends](architecture/frontends.md) | CLI grammar and presentation, the desktop bridge and query layer, the tray |
 
@@ -194,7 +195,8 @@ server management with an RCON console · instance management with concurrent
 sessions · in-place version updates both ways · server backups, on demand and
 scheduled · content install and management from Modrinth, a URL or a local file ·
 modpacks into a new or existing entry · per-instance content profiles and global
-profiles · shared instance settings and worlds (`sync`) · signed announcements ·
+profiles · instance import and export (hestia, `.mrpack`, Prism/MultiMC) ·
+shared instance settings and worlds (`sync`) · signed announcements ·
 self-update · the CLI over all of it · the desktop shell and its pages · the
 system tray.
 
@@ -204,7 +206,6 @@ system tray.
 |---|---|
 | natives-classifier extraction for pre-1.19 clients | old versions launch without their LWJGL natives |
 | the legacy (virtual) asset layout | very old versions have no assets materialized |
-| instance import/export | instance data has **no backup story at all** — this is the intended replacement for instance backups, which is why they do not exist |
 
 ## Conventions that hold everywhere
 
@@ -253,9 +254,9 @@ system tray.
 |---|---|
 | `crates/proto/tests/` | `wire` and `golden` — the envelope and contract encodings, so a wire change is caught |
 | `crates/engine/tests/` | `store` (config/cache/java/server/instance persistence), `auth_oracle` (the sign-in state machine), `process` (tree termination) |
-| `crates/engine/src/**` | unit tests beside the code: launch-plan assembly, the Log4Shell-safe session config, sync reconciliation and folder linking, Modrinth mapping and `.mrpack`/URL parsing, version picking, per-flavor accepted kinds, JVM-args precedence, PaperMC and SpigotMC catalogue parsing |
+| `crates/engine/src/**` | unit tests beside the code: archive detection and round trips, the Prism component mapping, the export ignore rules, launch-plan assembly, the Log4Shell-safe session config, sync reconciliation and folder linking, Modrinth mapping and `.mrpack`/URL parsing, version picking, per-flavor accepted kinds, JVM-args precedence, PaperMC and SpigotMC catalogue parsing |
 | `crates/daemon/tests/e2e.rs` | a client-to-daemon round trip over a real socket |
-| `frontend/tests/` | the message catalogue: locale coverage, placeholder parity, no dead or missing keys |
+| `frontend/tests/` | the message catalogue (locale coverage, placeholder parity, no dead or missing keys) and the export dialog's tree/exclusion conversions |
 
 ```bash
 cargo build -p cli -p daemon                              # the fast core

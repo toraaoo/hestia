@@ -165,6 +165,13 @@ pub fn instances(&self) -> &Instances { &self.instances }
 A stateless helper (like `minecraft`) needs no data dir and can be constructed without a path; a stateless *free*
 function needs no aggregate member at all.
 
+A subsystem with an **open set of implementations** — a content platform, an
+archive format — gets a trait plus a registry list, so adding one is a module
+beside the others and a line in that list ([0010](decisions/0010-one-content-provider-trait.md),
+[0061](decisions/0061-an-archive-format-is-a-module.md)). Keep what needs the
+aggregate out of the implementations: express it as data the flow matches on,
+and the flow stops growing a branch per implementation.
+
 **3. A flow that spans subsystems** — provisioning, launching, backups, content — is *not* a method on the aggregate. It
 goes in `engine/flows/<concern>.rs` as an
 `impl Engine` block (Rust lets an inherent impl span modules in a crate), so the aggregate stays wiring and callers

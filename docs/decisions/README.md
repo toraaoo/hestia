@@ -88,6 +88,10 @@ the alternative you rejected — that is usually the part nobody can recover lat
 
 - **0020** — [Skins follow Modrinth's shape, minus its couplings — and skip the CLI](0020-skins-follow-modrinth-minus-couplings.md)
 
+### [Import & export](../architecture/transfer.md)
+
+- **0061** — [An archive format is a module, not a branch — and the launcher matches on the recipe](0061-an-archive-format-is-a-module.md)
+
 ### [Front-ends](../architecture/frontends.md)
 
 - **0043** — [Entry-first, with verb-first shortcuts for the hot path](0043-entry-first-cli-grammar.md)

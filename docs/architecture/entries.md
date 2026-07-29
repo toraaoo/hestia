@@ -12,7 +12,7 @@ server differs from a game client.
 | Provisioned | fully, at create | at each launch |
 | Sessions | one (a world has one authoritative writer) | many, opt-in |
 | Console | RCON | none |
-| Backups | archive/restore + schedule | none yet — import/export is the plan |
+| Backups | archive/restore + schedule | none — [import/export](transfer.md) instead |
 | Shared settings (`sync`) | no, deliberately | yes |
 | Content profiles | no | yes |
 | Ports | claimed and reconciled | n/a |
@@ -221,9 +221,10 @@ Retention prunes only `scheduled` archives, so a deliberate manual or pre-update
 backup is never auto-deleted. One backup *or* restore runs per server at a time
 ([0024](../decisions/0024-backups-follow-docker-mc-backup.md)).
 
-**Instances have no backups.** Import/export is the intended replacement and is
-not built yet, so instance data currently has no backup story at all — including
-the shared worlds store.
+**Instances have no backups** — [import/export](transfer.md) is what they have
+instead. A server is infrastructure that has to be recoverable in place, so it
+is archived on a schedule; an instance is something you play, share and move
+between machines, so it travels as one file you write on purpose.
 
 ## Sync — shared settings across instances
 

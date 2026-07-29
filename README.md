@@ -30,16 +30,19 @@ it's just as comfortable from a terminal as from a window.
 > instances.
 >
 > **Data.** Server backups on demand and on a schedule, with retention pruning.
-> Instance settings and worlds are shared across instances (`sync`) — files
-> merged, folders linked into one store — switchable off wholesale.
+> An instance travels as one file instead: export it whole, or as a `.mrpack`
+> other launchers read, and import back a hestia archive, a `.mrpack`, or a
+> Prism/MultiMC instance. Instance settings and worlds are shared across
+> instances (`sync`) — files merged, folders linked into one store — switchable
+> off wholesale.
 >
 > **Around it.** Microsoft sign-in with skin and cape management, a process
 > supervisor whose workloads survive daemon restarts, signed announcements,
 > self-update, a system tray, the full CLI, and the desktop shell with its
 > library, entry, browse, skins, news and settings pages.
 >
-> **Not built yet:** instance import/export (so instance data has no backup
-> story), natives extraction for pre-1.19 clients, and the legacy asset layout.
+> **Not built yet:** natives extraction for pre-1.19 clients, and the legacy
+> asset layout.
 
 ## Front-ends
 
