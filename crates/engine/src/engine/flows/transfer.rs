@@ -18,7 +18,7 @@ use anyhow::{Context, Result};
 use proto::content::ContentFailure;
 use proto::error::{EntryKind, ErrorInfo, Field, Reason};
 use proto::modpack::{ModpackRef, ModpackTarget};
-use proto::transfer::{ArchiveInfo, ExportFormat, ImportFormat};
+use proto::transfer::{ArchiveEntry, ArchiveInfo, ExportFormat, ImportFormat};
 use proto::warning::WarningInfo;
 
 use crate::cancel::Job;
@@ -26,7 +26,7 @@ use crate::engine::Engine;
 use crate::instances::InstanceRecord;
 use crate::registry;
 use crate::transfer::archive::{self, Reader};
-use crate::transfer::{self, hestia, Blueprint, Descriptor, Recipe, Source, Target};
+use crate::transfer::{self, contents, hestia, Blueprint, Descriptor, Recipe, Source, Target};
 
 /// Where an export with no destination lands, under the data home.
 const EXPORTS: &str = "exports";
@@ -91,6 +91,16 @@ impl Engine {
             files: written.files,
             warnings,
         })
+    }
+
+    /// What an export of this instance would carry, as a tree — what a caller
+    /// picks its `exclude` paths out of.
+    pub fn export_contents(&self, reference: &str) -> Result<Vec<ArchiveEntry>> {
+        let record = self.instance_record(reference)?;
+        Ok(contents::list(
+            &self.instances.instance_dir(&record),
+            &self.instances.data_dir(&record),
+        ))
     }
 
     /// What an archive is, without importing it — so a front-end can name the

@@ -152,11 +152,47 @@ pub struct ArchiveRef {
     pub path: String,
 }
 
+/// One node of what an export *would* carry, so a caller can leave part of it
+/// out knowingly. Derived from the same file plan the export writes, so the two
+/// cannot disagree about what an instance's files are.
+///
+/// The tree stops a few levels down (deep enough to name a single world, not so
+/// deep that a config tree becomes thousands of nodes): a directory at the
+/// bottom is a leaf carrying the total of everything inside it.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct ArchiveEntry {
+    /// Entry-relative path — what `InstanceExportParams::exclude` takes.
+    pub path: String,
+    /// The last segment, for display.
+    pub name: String,
+    pub directory: bool,
+    /// Bytes this node contributes to the archive; for a directory, everything
+    /// under it that the export would carry.
+    pub size_bytes: u64,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct ExportContentsResult {
+    /// Sorted by path, so a caller can build the tree in one pass.
+    pub entries: Vec<ArchiveEntry>,
+}
+
 pub struct InstanceExport;
 impl Contract for InstanceExport {
     const CHANNEL: &'static str = "instance.export";
     type Params = InstanceExportParams;
     type Result = TransferJobResult;
+}
+
+pub struct InstanceExportContents;
+impl Contract for InstanceExportContents {
+    const CHANNEL: &'static str = "instance.export.contents";
+    type Params = crate::instance::InstanceRef;
+    type Result = ExportContentsResult;
 }
 
 pub struct InstanceImport;

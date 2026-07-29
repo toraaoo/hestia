@@ -31,6 +31,7 @@
 //! instance's files actually are.
 
 pub(crate) mod archive;
+pub(crate) mod contents;
 pub(crate) mod exclude;
 pub(crate) mod hestia;
 pub(crate) mod mrpack;

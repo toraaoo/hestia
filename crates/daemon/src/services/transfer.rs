@@ -6,7 +6,10 @@
 //! anything to race.
 
 use proto::error::{ErrorInfo, Field};
-use proto::transfer::{InstanceExport, InstanceImport, InstanceImportInspect, TransferJobResult};
+use proto::transfer::{
+    ExportContentsResult, InstanceExport, InstanceExportContents, InstanceImport,
+    InstanceImportInspect, TransferJobResult,
+};
 
 use super::guards::{
     ensure_no_backup, ensure_no_content, ensure_no_modpack, ensure_stopped, find_instance,
@@ -35,6 +38,16 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .ok_or_else(|| ErrorInfo::Busy {
                 detail: format!("'{}' is already being exported", record.name),
             })
+    });
+
+    on.handle::<InstanceExportContents, _, _>(|p, ctx| async move {
+        let record = find_instance(&ctx, &p.instance)?;
+        let entries = ctx
+            .runtime
+            .engine()
+            .export_contents(&record.id)
+            .map_err(crate::runtime::engine_error)?;
+        Ok(ExportContentsResult { entries })
     });
 
     on.handle::<InstanceImport, _, _>(|p, ctx| async move {

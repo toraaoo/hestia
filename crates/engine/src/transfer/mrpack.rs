@@ -91,7 +91,7 @@ pub(crate) fn export(
     job: &Job<'_>,
 ) -> Result<(Written, Vec<WarningInfo>)> {
     let rules = Rules::new(source.entry_dir, source.data_dir, source.exclude);
-    let (files, embedded) = partition_pool(source.entry_dir)?;
+    let (files, embedded) = partition_pool(source.entry_dir, &rules)?;
 
     let mut members = archive::plan(source.data_dir, "overrides/", &|relative| {
         rules.keeps_in_data(relative)
@@ -116,8 +116,13 @@ pub(crate) fn export(
 }
 
 /// Split the content pool into what the index can reference and what has to
-/// travel inside the archive.
-fn partition_pool(entry_dir: &Path) -> Result<(Vec<serde_json::Value>, Vec<Member>)> {
+/// travel inside the archive. A pool item the caller excluded is in neither:
+/// an exclusion names an entry-relative path, and it has to mean the same
+/// thing whichever format is being written.
+fn partition_pool(
+    entry_dir: &Path,
+    rules: &Rules,
+) -> Result<(Vec<serde_json::Value>, Vec<Member>)> {
     let mut files = Vec::new();
     let mut embedded = Vec::new();
     for item in &install::load(entry_dir) {
@@ -133,6 +138,9 @@ fn partition_pool(entry_dir: &Path) -> Result<(Vec<serde_json::Value>, Vec<Membe
             continue;
         }
         let path = format!("{}/{}", install::kind_dir(item.kind)?, item.filename);
+        if !rules.keeps(&path) {
+            continue;
+        }
         match index_entry(item, &managed, &path)? {
             Some(entry) => files.push(entry),
             None => embedded.push(Member {
