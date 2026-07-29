@@ -33,6 +33,15 @@ impl Hasher {
     }
 }
 
+impl Hasher {
+    /// Lower-case hex of any digest — shared with the callers that hash with a
+    /// algorithm the wire vocabulary does not carry (an `.mrpack` index names
+    /// its files by SHA-512).
+    pub(crate) fn hex(bytes: &[u8]) -> String {
+        hex(bytes)
+    }
+}
+
 fn hex(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {

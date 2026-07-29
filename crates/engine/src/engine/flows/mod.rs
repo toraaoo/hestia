@@ -14,6 +14,9 @@ mod profiles;
 mod server;
 mod skins;
 mod sync;
+mod transfer;
+
+pub use transfer::{ExportOutcome, ImportOutcome};
 
 use std::path::{Path, PathBuf};
 

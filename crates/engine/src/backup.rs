@@ -488,7 +488,11 @@ pub fn prune(entry_dir: &Path, kind: BackupKind, keep: usize) -> Result<Vec<Back
 /// (unlikely) same-second collision.
 fn allocate_id(entry_dir: &Path, kind: BackupKind) -> String {
     let taken: HashSet<String> = list(entry_dir).into_iter().map(|b| b.id).collect();
-    let base = format!("{}-{}", utc_stamp(now_unix()), kind.as_str());
+    let base = format!(
+        "{}-{}",
+        crate::registry::utc_stamp(now_unix()),
+        kind.as_str()
+    );
     if !taken.contains(&base) {
         return base;
     }
@@ -511,42 +515,9 @@ fn now_unix() -> i64 {
         .unwrap_or(0)
 }
 
-/// `YYYYMMDD-HHMMSS` in UTC (Howard Hinnant's civil-from-days algorithm; no
-/// date-time dependency for one format).
-fn utc_stamp(unix: i64) -> String {
-    let days = unix.div_euclid(86400);
-    let secs = unix.rem_euclid(86400);
-    let (year, month, day) = civil_from_days(days);
-    format!(
-        "{year:04}{month:02}{day:02}-{:02}{:02}{:02}",
-        secs / 3600,
-        (secs % 3600) / 60,
-        secs % 60
-    )
-}
-
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = (doy - (153 * mp + 2) / 5 + 1) as u32;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    let year = yoe + era * 400 + i64::from(month <= 2);
-    (year, month, day)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn stamps_are_utc_civil_dates() {
-        assert_eq!(utc_stamp(0), "19700101-000000");
-        assert_eq!(utc_stamp(1_751_852_045), "20250707-013405");
-    }
 
     #[test]
     fn intervals_parse_with_units() {
