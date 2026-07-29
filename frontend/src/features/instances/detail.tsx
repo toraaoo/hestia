@@ -342,16 +342,6 @@ export function InstanceDetailPage({
                     size="sm"
                     className="justify-start"
                     data-icon="inline-start"
-                    disabled
-                  >
-                    <CopyIcon />
-                    {m['app.action.duplicate']()}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start"
-                    data-icon="inline-start"
                     onClick={() => setExporting(true)}
                   >
                     <UploadSimpleIcon />
