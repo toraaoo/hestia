@@ -10,6 +10,14 @@ export function openPath(path: string): Promise<void> {
   return invokeCommand('plugin:opener|open_path', { path });
 }
 
+/**
+ * The instance archive the app was launched with (double-clicking a `.hestia`
+ * file), cleared as it is read. Null on an ordinary start.
+ */
+export function pendingArchive(): Promise<string | null> {
+  return invokeCommand('pending_archive');
+}
+
 /** Open a URL in the user's default browser (markdown links, project pages). */
 export function openUrl(url: string): Promise<void> {
   return invokeCommand('plugin:opener|open_url', { url });

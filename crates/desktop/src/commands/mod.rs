@@ -4,5 +4,6 @@
 pub mod auth;
 pub mod diagnostics;
 pub mod icons;
+pub mod open;
 pub mod prefs;
 pub mod update;

@@ -26,12 +26,18 @@ pub fn run() {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
+            // Opening a `.hestia` file while a window is up is the common
+            // case: the shell launches us again, and the path comes here.
+            if let Some(path) = commands::open::archive_from(&argv) {
+                commands::open::deliver(app, path);
+            }
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(Bridge::default())
+        .manage(commands::open::PendingArchive::default())
         .setup(|app| {
             if is_quit_signal(&std::env::args().collect::<Vec<_>>()) {
                 app.handle().exit(0);
@@ -39,6 +45,12 @@ pub fn run() {
             }
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
+            }
+            // A file the app was *launched* with arrives before the webview
+            // can listen, so it waits until the webview asks for it.
+            if let Some(path) = commands::open::archive_from(&std::env::args().collect::<Vec<_>>())
+            {
+                app.state::<commands::open::PendingArchive>().set(path);
             }
             tracing::info!(version = common::app::VERSION_LABEL, "desktop shell ready");
             bridge::start(app.handle().clone());
@@ -55,6 +67,7 @@ pub fn run() {
             commands::icons::icons_list,
             commands::icons::icon_set,
             commands::icons::icon_remove,
+            commands::open::pending_archive,
             commands::diagnostics::log_write,
             commands::diagnostics::crash_report,
             commands::diagnostics::crash_list,

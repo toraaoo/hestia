@@ -1,7 +1,7 @@
 import { FileArrowUpIcon, PlusIcon, SignInIcon } from '@phosphor-icons/react';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearch } from '@/components/app-shell/search-context';
 import { entryIcon } from '@/components/icons';
 import { Page, Section } from '@/components/page';
@@ -28,6 +28,7 @@ import { EntryGridSkeleton } from '@/features/entries/components/skeleton';
 import { CreateEntryModal } from '@/features/entries/create';
 import { ImportInstanceModal } from '@/features/instances/import-modal';
 import { useLaunchModal } from '@/features/instances/launch-modal';
+import { useOpenedArchive } from '@/features/instances/opened-archive';
 import { useArchiveDrop } from '@/features/instances/use-archive-drop';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
@@ -69,11 +70,18 @@ export function LibraryPage({
   const [dropped, setDropped] = useState('');
   // A dropped archive opens the import dialog on it; signing in is what an
   // instance needs, so a drop before that would create something unusable.
-  const dropTarget = useArchiveDrop((path) => {
-    if (!signedIn) return;
-    setDropped(path);
-    setImporting(true);
-  });
+  const openImport = useCallback(
+    (path: string) => {
+      if (!signedIn) return;
+      setDropped(path);
+      setImporting(true);
+    },
+    [signedIn],
+  );
+  const dropTarget = useArchiveDrop(openImport);
+  // A `.hestia` file opened from the file manager lands here too — the shell
+  // hands it over, and this is the page that can answer it.
+  useOpenedArchive(openImport);
   const openNew = (kind: 'server' | 'instance') => {
     setNewKind(kind);
     setCreating(true);

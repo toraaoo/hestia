@@ -54,6 +54,15 @@
     "publisher": "toraaoo",
     "homepage": "https://github.com/toraaoo/hestia",
     "copyright": "Copyright © 2026 toraaoo",
+    "fileAssociations": [
+      {
+        "ext": ["hestia"],
+        "name": "Hestia instance archive",
+        "description": "Hestia instance archive",
+        "mimeType": "application/vnd.hestia.instance+zip",
+        "role": "Editor"
+      }
+    ],
     "externalBin": [
       "binaries/hestiad",
       "binaries/tray",
