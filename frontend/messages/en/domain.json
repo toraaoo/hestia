@@ -17,6 +17,10 @@
       "profile": "profile",
       "server": "server"
     },
+    "export_format": {
+      "hestia": "hestia archive",
+      "mrpack": "Modrinth pack (.mrpack)"
+    },
     "flavor": {
       "bukkit": {
         "summary": "The plugin server Spigot is built on, without its speed-ups. Pick Spigot unless you need this exactly."
@@ -47,6 +51,11 @@
       "spectator": "Spectator",
       "survival": "Survival"
     },
+    "import_format": {
+      "hestia": "hestia archive",
+      "mrpack": "Modrinth pack",
+      "prism": "Prism / MultiMC"
+    },
     "kind": {
       "datapack": "Datapack",
       "datapacks": "Datapacks",
@@ -62,9 +71,11 @@
       "shaders": "Shaders"
     },
     "phase": {
+      "archiving": "Writing the archive",
       "backing_up": "Backing up",
       "downloading": "Downloading {name}",
       "downloading_server": "Downloading server",
+      "extracting": "Reading the archive",
       "installing_java": "Installing Java runtime",
       "mirroring": "Mirroring into data/",
       "resolving_profile": "Resolving profile",

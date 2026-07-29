@@ -20,5 +20,6 @@ export type * from "./profile";
 export type * from "./server";
 export type * from "./skins";
 export type * from "./sync";
+export type * from "./transfer";
 export type * from "./update";
 export type * from "./warning";

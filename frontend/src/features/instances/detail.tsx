@@ -38,6 +38,7 @@ import {
   StatCard,
 } from '@/features/entries/detail';
 import { WorldRow } from '@/features/instances/components/world-row';
+import { ExportInstanceModal } from '@/features/instances/export-modal';
 import { useLaunchModal } from '@/features/instances/launch-modal';
 import { InstanceLogsTab } from '@/features/instances/tabs/logs';
 import { InstanceSettingsTab } from '@/features/instances/tabs/settings';
@@ -82,6 +83,7 @@ export function InstanceDetailPage({
   const worlds = useQuery(instanceQueries.worlds(id));
   const profiles = useQuery(instanceQueries.profiles(id));
   const [addingContent, setAddingContent] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const { launch, isLaunching } = useLaunchModal();
   const stop = useMutation(instanceMutations.stop(id));
   const instance = query.data;
@@ -350,7 +352,7 @@ export function InstanceDetailPage({
                     size="sm"
                     className="justify-start"
                     data-icon="inline-start"
-                    disabled
+                    onClick={() => setExporting(true)}
                   >
                     <UploadSimpleIcon />
                     {m['app.action.export']()}
@@ -424,6 +426,12 @@ export function InstanceDetailPage({
         entry={instanceTarget(instance)}
         open={addingContent}
         onOpenChange={setAddingContent}
+      />
+      <ExportInstanceModal
+        id={id}
+        name={instance.name}
+        open={exporting}
+        onOpenChange={setExporting}
       />
     </div>
   );

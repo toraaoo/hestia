@@ -57,6 +57,8 @@ export * as server from './server';
 export * as skins from './skins';
 export * as sync from './sync';
 export * as system from './system';
+export type { ExportInput } from './transfer';
+export * as transfer from './transfer';
 export type * from './types';
 export * as update from './update';
 export { downgradeBetween } from './version';

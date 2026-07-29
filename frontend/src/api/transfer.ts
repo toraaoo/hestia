@@ -1,0 +1,97 @@
+/**
+ * The instance import/export channels — moving an instance out of the launcher
+ * as one file, and bringing one back.
+ *
+ * Both are jobs: an archive is an arbitrary number of files, and an import may
+ * download every mod a pack names. `inspect` is the cheap read that says what a
+ * file *is* before any of that starts, and `contents` is the tree an export's
+ * exclusions are picked out of.
+ */
+
+import { call } from './core/ipc';
+import { jobId, runJob } from './core/jobs';
+import type { ProvisionProgress } from './types/minecraft';
+import type {
+  ArchiveEntry,
+  ArchiveInfo,
+  ExportDoneEvent,
+  ExportFormat,
+  ImportDoneEvent,
+} from './types/transfer';
+
+const exportTopics = {
+  progress: 'instance.export.progress',
+  done: 'instance.export.done',
+  error: 'instance.export.error',
+} as const;
+
+const importTopics = {
+  progress: 'instance.import.progress',
+  done: 'instance.import.done',
+  error: 'instance.import.error',
+} as const;
+
+/** What an export of this instance would carry, sorted by path. */
+export async function contents(instance: string): Promise<ArchiveEntry[]> {
+  const result = await call<{ entries: ArchiveEntry[] }>(
+    'instance.export.contents',
+    { instance },
+  );
+  return result.entries;
+}
+
+/** What an archive is, without importing it. The path must be absolute. */
+export function inspect(path: string): Promise<ArchiveInfo> {
+  return call('instance.import.inspect', { path });
+}
+
+export interface ExportInput {
+  format: ExportFormat;
+  /**
+   * An absolute file path, an absolute directory (a name is generated inside
+   * it), or empty for the daemon's own `exports/`. The daemon refuses a
+   * relative path — it does not share the window's working directory.
+   */
+  destination?: string;
+  /** Entry-relative paths to leave out, from {@link contents}. */
+  exclude?: string[];
+}
+
+export function exportInstance(
+  instance: string,
+  input: ExportInput,
+  onProgress?: (progress: ProvisionProgress) => void,
+): Promise<ExportDoneEvent> {
+  const id = jobId('instance-export');
+  return runJob<ExportDoneEvent>({
+    id,
+    topics: exportTopics,
+    onProgress,
+    start: () =>
+      call('instance.export', {
+        instance,
+        format: input.format,
+        destination: input.destination ?? '',
+        exclude: input.exclude ?? [],
+        id,
+      }),
+  });
+}
+
+/**
+ * Import an archive as a new instance. The format is detected from the file, so
+ * this takes a path and, optionally, a name to override the archive's own.
+ */
+export function importInstance(
+  path: string,
+  name = '',
+  onProgress?: (progress: ProvisionProgress) => void,
+): Promise<ImportDoneEvent> {
+  const id = jobId('instance-import');
+  return runJob<ImportDoneEvent>({
+    id,
+    topics: importTopics,
+    onProgress,
+    start: () => call('instance.import', { path, name, id }),
+  });
+}

@@ -17,6 +17,10 @@
       "profile": "perfil",
       "server": "servidor"
     },
+    "export_format": {
+      "hestia": "arquivo hestia",
+      "mrpack": "pacote Modrinth (.mrpack)"
+    },
     "flavor": {
       "bukkit": {
         "summary": "O servidor de plugins em que o Spigot se baseia, sem as melhorias dele. Escolha o Spigot a menos que precise exatamente deste."
@@ -47,6 +51,11 @@
       "spectator": "Espectador",
       "survival": "Sobrevivência"
     },
+    "import_format": {
+      "hestia": "arquivo hestia",
+      "mrpack": "pacote Modrinth",
+      "prism": "Prism / MultiMC"
+    },
     "kind": {
       "datapack": "Datapack",
       "datapacks": "Datapacks",
@@ -62,9 +71,11 @@
       "shaders": "Shaders"
     },
     "phase": {
+      "archiving": "Gravando o arquivo",
       "backing_up": "Fazendo backup",
       "downloading": "Baixando {name}",
       "downloading_server": "Baixando servidor",
+      "extracting": "Lendo o arquivo",
       "installing_java": "Instalando runtime Java",
       "mirroring": "Espelhando em data/",
       "resolving_profile": "Resolvendo perfil",

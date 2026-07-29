@@ -56,4 +56,5 @@ export * from './profile';
 export * from './server';
 export * from './skins';
 export * from './sync';
+export * from './transfer';
 export * from './update';

@@ -1,4 +1,8 @@
-import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
+import {
+  CaretLeftIcon,
+  CaretRightIcon,
+  FileArrowUpIcon,
+} from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -55,10 +59,13 @@ export function CreateEntryModal({
   kind,
   open,
   onOpenChange,
+  onImport,
 }: {
   kind: Kind;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Leave the wizard for the import dialog — an instance can also arrive whole. */
+  onImport?: () => void;
 }) {
   const [step, setStep] = useState<Step>('flavor');
   const [search, setSearch] = useState('');
@@ -238,6 +245,26 @@ export function CreateEntryModal({
                           }}
                         />
                       ))}
+                      {kind === 'instance' && onImport && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onOpenChange(false);
+                            onImport();
+                          }}
+                          className="flex items-center gap-3 border border-border border-dashed px-3 py-2.5 text-left outline-none hover:bg-accent/50 focus-visible:ring-1 focus-visible:ring-ring"
+                        >
+                          <FileArrowUpIcon className="size-4 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0">
+                            <span className="block font-medium text-sm">
+                              {m['instance.import.action']()}
+                            </span>
+                            <span className="block text-muted-foreground text-xs">
+                              {m['instance.import.formats']()}
+                            </span>
+                          </span>
+                        </button>
+                      )}
                       {flavors.length === 0 && (
                         <p className="px-1 py-6 text-center text-xs text-muted-foreground">
                           {flavorsQuery.isPending

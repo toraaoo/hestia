@@ -18,6 +18,8 @@ const COUNT_PHASES: ProvisionPhase[] = [
   'assets',
   'backup',
   'overrides',
+  'archive',
+  'extract',
 ];
 
 /** Map a live provisioning phase to a human label; falls back to the raw id. */
@@ -39,6 +41,10 @@ export function phaseLabel(phase: ProvisionPhase): string {
       return m['domain.phase.mirroring']();
     case 'overrides':
       return m['domain.phase.writing_pack_files']();
+    case 'archive':
+      return m['domain.phase.archiving']();
+    case 'extract':
+      return m['domain.phase.extracting']();
     default:
       return phase;
   }

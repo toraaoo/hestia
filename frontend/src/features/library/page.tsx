@@ -1,4 +1,4 @@
-import { PlusIcon, SignInIcon } from '@phosphor-icons/react';
+import { FileArrowUpIcon, PlusIcon, SignInIcon } from '@phosphor-icons/react';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
@@ -10,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -25,7 +26,9 @@ import {
 import type { EntryCardModel } from '@/features/entries/components/entry-card';
 import { EntryGridSkeleton } from '@/features/entries/components/skeleton';
 import { CreateEntryModal } from '@/features/entries/create';
+import { ImportInstanceModal } from '@/features/instances/import-modal';
 import { useLaunchModal } from '@/features/instances/launch-modal';
+import { useArchiveDrop } from '@/features/instances/use-archive-drop';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
 import { instanceMutations, useInstances } from '@/queries/instance';
@@ -62,6 +65,15 @@ export function LibraryPage({
 
   const [newKind, setNewKind] = useState<'server' | 'instance'>('instance');
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [dropped, setDropped] = useState('');
+  // A dropped archive opens the import dialog on it; signing in is what an
+  // instance needs, so a drop before that would create something unusable.
+  const dropTarget = useArchiveDrop((path) => {
+    if (!signedIn) return;
+    setDropped(path);
+    setImporting(true);
+  });
   const openNew = (kind: 'server' | 'instance') => {
     setNewKind(kind);
     setCreating(true);
@@ -153,6 +165,17 @@ export function LibraryPage({
                 <ServerIcon />
                 {m['server.new']()}
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={!signedIn}
+                onClick={() => {
+                  setDropped('');
+                  setImporting(true);
+                }}
+              >
+                <FileArrowUpIcon />
+                {m['instance.import.action']()}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </>
@@ -232,7 +255,24 @@ export function LibraryPage({
         kind={newKind}
         open={creating}
         onOpenChange={setCreating}
+        onImport={() => {
+          setDropped('');
+          setImporting(true);
+        }}
       />
+      <ImportInstanceModal
+        open={importing}
+        onOpenChange={setImporting}
+        initialPath={dropped}
+      />
+      {dropTarget && signedIn && (
+        <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-xs">
+          <div className="flex flex-col items-center gap-3 border-2 border-dashed border-primary px-10 py-8">
+            <FileArrowUpIcon className="size-8 text-primary" />
+            <p className="font-medium text-sm">{m['instance.import.drop']()}</p>
+          </div>
+        </div>
+      )}
     </Page>
   );
 }
