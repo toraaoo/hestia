@@ -33,9 +33,7 @@
   "plugins": {
     "opener": {
       "requireLiteralLeadingDot": false
-    }
-  },
-  "plugins": {
+    },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJDNjM3NzcxQUEwRTdDQUQKUldTdGZBNnFjWGRqTERoaEIzaXFJcU1ZdU1YdXBVUk16cFdGVFQzYmZtT3ZVRC9mbjdYU0dOQlkK",
       "endpoints": [
