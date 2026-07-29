@@ -156,7 +156,7 @@ function KindPicker({
           type="button"
           onClick={() => onChange(k)}
           className={cn(
-            'border px-2 py-0.5 text-[11px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
+            'h-8 border px-2 text-[11px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
             value === k
               ? 'border-ember bg-ember/10 text-foreground'
               : 'border-border text-muted-foreground hover:bg-muted/60',
@@ -175,7 +175,7 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label={m['app.action.remove']()}
-      className="flex size-6 shrink-0 items-center justify-center border border-border text-muted-foreground outline-none transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-1 focus-visible:ring-ring"
+      className="flex size-8 shrink-0 items-center justify-center border border-border text-muted-foreground outline-none transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-1 focus-visible:ring-ring"
     >
       <XIcon weight="bold" className="size-3.5" />
     </button>
@@ -318,7 +318,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="truncate text-right">{value}</span>
+      <span className="truncate text-right text-xs">{value}</span>
     </div>
   );
 }
