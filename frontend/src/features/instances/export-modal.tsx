@@ -136,7 +136,7 @@ export function ExportInstanceModal({
         </DialogHeader>
 
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-sm">
+          <span className="text-muted-foreground text-xs">
             {m['instance.export.format']()}
           </span>
           <Select
@@ -156,7 +156,7 @@ export function ExportInstanceModal({
           </Select>
         </div>
 
-        <div className="max-h-72 overflow-y-auto rounded-md border">
+        <div className="max-h-72 overflow-y-auto border">
           {contents.isPending ? (
             <div className="flex flex-col gap-2 p-3">
               <Bone className="h-4 w-2/3" />
@@ -191,7 +191,7 @@ export function ExportInstanceModal({
         </div>
 
         <DialogFooter className="sm:justify-between">
-          <span className="text-muted-foreground text-sm">
+          <span className="text-muted-foreground text-xs">
             {m['instance.export.selected']({
               selected: bytes(selected),
               total: bytes(total),
@@ -238,7 +238,7 @@ function Row({
   return (
     <li>
       <div
-        className="flex items-center gap-2 rounded-sm px-2 py-1 hover:bg-accent/50"
+        className="flex items-center gap-2 px-2 py-1 hover:bg-accent/50"
         style={{ paddingLeft: `${depth * 1.25 + 0.5}rem` }}
       >
         {hasChildren ? (
@@ -259,7 +259,7 @@ function Row({
           checked={!out}
           onCheckedChange={(checked) => onToggle(node.path, checked === true)}
         />
-        <span className="min-w-0 flex-1 truncate text-sm">
+        <span className="min-w-0 flex-1 truncate text-xs">
           {node.name}
           {node.directory ? '/' : ''}
         </span>
