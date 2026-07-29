@@ -6,8 +6,8 @@ mod session;
 mod spawn;
 
 pub use facades::{
-    Accounts, Announce, App, Cache, Config, Content, Daemon, Instance, Java, Modpack, Process,
-    ProcessEvent, Profiles, Server, Skins, Sync, Update,
+    Accounts, Announce, App, Cache, Config, Content, Daemon, Exported, Imported, Instance, Java,
+    Modpack, Process, ProcessEvent, Profiles, Server, Skins, Sync, Transfer, Update,
 };
 pub use ipc::errors::{self, IpcError};
 pub use session::{job_id, Session};
@@ -179,6 +179,12 @@ impl Client {
 
     pub fn sync(&self) -> Sync<'_> {
         Sync {
+            session: &self.session,
+        }
+    }
+
+    pub fn transfer(&self) -> Transfer<'_> {
+        Transfer {
             session: &self.session,
         }
     }
