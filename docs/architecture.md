@@ -572,6 +572,24 @@ The subsystems behind the aggregate:
 > entries of which *every one* was a release, and a front-end's
 > include-snapshots toggle had nothing to reveal.
 >
+> **The 1.20.1 line is a second catalogue source, not a parsing case.** NeoForge
+> forked from Forge at 1.20.1 and still publishes that line under the artifact it
+> forked into — `net/neoforged/forge`, versioned Forge's way (`1.20.1-47.1.106`),
+> with its own installer filename and its own args-file directory. So `versions`
+> reads two `maven-metadata.xml` documents and concatenates them, exactly as
+> daedalus's `fetch_neo` does, and each build answers which artifact it belongs
+> to from its own string: the legacy line leads with the game version, which
+> neither modern scheme ever does. Every path a build needs — installer URL,
+> group, server args file — derives from that one answer, so there is no second
+> code path, only a second constant. The installer format is identical (spec 1,
+> the same data table, the same ten processors, the `PATCHED` coordinate read
+> from the profile rather than assumed), which is what makes the existing chain
+> handle it unchanged. Two published versions whose installer 404s are refused by
+> name, the same two daedalus carries. The loader version stays the **raw**
+> string rather than Modrinth's stripped `47.1.106`: their manifest can afford
+> the display form because it keeps `raw` in a second field, where hestia's
+> profile has one, and the raw string is the one that reconstructs every path.
+>
 > **NeoForge alone has no stability preference — its `-beta` describes the game
 > version, not the build.** Every other flavor resolves to its newest stable
 > build; NeoForge resolves to its newest build, full stop. This follows

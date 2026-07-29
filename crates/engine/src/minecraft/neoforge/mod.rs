@@ -8,7 +8,8 @@
 //! `install` hook where every other flavor only names downloads.
 //!
 //! The catalogue needs no service either: a NeoForge version *is* its game
-//! version plus a build number, so both lists come from one `maven-metadata.xml`.
+//! version plus a build number, so both lists come from the `maven-metadata.xml`
+//! of the two artifacts NeoForge publishes under.
 
 pub(crate) mod processors;
 
@@ -166,7 +167,10 @@ pub(crate) fn server_args_file(loader: &str) -> String {
     } else {
         "unix_args.txt"
     };
-    format!("libraries/net/neoforged/neoforge/{loader}/{name}")
+    format!(
+        "libraries/net/neoforged/{}/{loader}/{name}",
+        neoforge::artifact(loader)
+    )
 }
 
 pub struct NeoForgeServer;

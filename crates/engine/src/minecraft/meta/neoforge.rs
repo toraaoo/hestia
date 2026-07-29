@@ -24,8 +24,45 @@ use super::fetch_text;
 
 const MAVEN: &str = "https://maven.neoforged.net/releases";
 const GROUP_PATH: &str = "net/neoforged/neoforge";
+/// The 1.20.1 line NeoForge inherited from Forge when it forked, still
+/// published under the artifact it forked into and versioned Forge's way
+/// (`1.20.1-47.1.106`). It is a separate maven artifact rather than a spelling
+/// of the modern one, so it is a second catalogue source — which is how
+/// Modrinth's daedalus reaches it too.
+const LEGACY_GROUP_PATH: &str = "net/neoforged/forge";
 
-/// Every published NeoForge version, oldest first (maven's own order).
+/// Published versions whose installer 404s, so they cannot be installed at all.
+/// The same two daedalus carries.
+const UNINSTALLABLE: &[&str] = &["1.20.1-47.1.7", "47.1.82"];
+
+/// Whether a version belongs to the legacy 1.20.1 line. Its versions lead with
+/// the game version, which the modern schemes never do — they lead with the
+/// Minecraft minor (`21.1.244`) or the year (`26.2.0.37-beta`).
+fn is_legacy(version: &str) -> bool {
+    version.starts_with("1.")
+}
+
+/// Every published NeoForge version across both artifacts, oldest first
+/// (maven's own order). The two lines share no game version, so the order
+/// between them carries no meaning.
+pub async fn versions() -> Result<Vec<String>> {
+    let (legacy, modern) = futures_util::future::try_join(
+        artifact_versions(LEGACY_GROUP_PATH),
+        artifact_versions(GROUP_PATH),
+    )
+    .await?;
+    let versions: Vec<String> = legacy
+        .into_iter()
+        .chain(modern)
+        .filter(|version| !UNINSTALLABLE.contains(&version.as_str()))
+        .collect();
+    if versions.is_empty() {
+        bail!("neoforge maven-metadata lists no versions");
+    }
+    Ok(versions)
+}
+
+/// One artifact's published versions.
 ///
 /// Parsed out of `maven-metadata.xml` by scanning `<version>` tags rather than
 /// through an XML crate: this is the one XML document in the whole tree, its
@@ -33,19 +70,15 @@ const GROUP_PATH: &str = "net/neoforged/neoforge";
 /// would not earn its place. The repository's own JSON API was the alternative
 /// and was rejected — it is a detail of the server software NeoForged happens to
 /// run, where `maven-metadata.xml` is guaranteed by the format itself.
-pub async fn versions() -> Result<Vec<String>> {
-    let body = fetch_text(&format!("{MAVEN}/{GROUP_PATH}/maven-metadata.xml")).await?;
-    let versions: Vec<String> = body
+async fn artifact_versions(group: &str) -> Result<Vec<String>> {
+    let body = fetch_text(&format!("{MAVEN}/{group}/maven-metadata.xml")).await?;
+    Ok(body
         .split("<version>")
         .skip(1)
         .filter_map(|rest| rest.split_once("</version>"))
         .map(|(version, _)| version.trim().to_string())
         .filter(|version| !version.is_empty())
-        .collect();
-    if versions.is_empty() {
-        bail!("neoforge maven-metadata lists no versions");
-    }
-    Ok(versions)
+        .collect())
 }
 
 /// The Minecraft version a NeoForge version targets, or `None` when the version
@@ -76,6 +109,9 @@ pub async fn versions() -> Result<Vec<String>> {
 /// drops it — a mapping that names no real version is a failed derivation, not
 /// a version to offer.
 pub fn game_version(version: &str) -> Option<String> {
+    if is_legacy(version) {
+        return version.split_once('-').map(|(game, _)| game.to_string());
+    }
     let (core, prerelease) = match version.split_once('+') {
         Some((core, metadata)) => (core, Some(metadata)),
         None => (version, None),
@@ -101,8 +137,28 @@ pub fn game_version(version: &str) -> Option<String> {
     })
 }
 
+/// The maven artifact a version is published under — `forge` for the legacy
+/// 1.20.1 line, `neoforge` for everything since. It names the installer, the
+/// group path, and the directory the install writes a server's argument file
+/// into, so every path a build needs derives from this one answer.
+pub fn artifact(version: &str) -> &'static str {
+    if is_legacy(version) {
+        "forge"
+    } else {
+        "neoforge"
+    }
+}
+
 pub fn installer_url(version: &str) -> String {
-    format!("{MAVEN}/{GROUP_PATH}/{version}/neoforge-{version}-installer.jar")
+    let group = if is_legacy(version) {
+        LEGACY_GROUP_PATH
+    } else {
+        GROUP_PATH
+    };
+    format!(
+        "{MAVEN}/{group}/{version}/{}-{version}-installer.jar",
+        artifact(version)
+    )
 }
 
 /// The three things an installer carries that the launcher needs. Read once and
@@ -197,6 +253,31 @@ mod tests {
         assert_eq!(
             game_version("26.1.0.0-alpha.15+pre-3").as_deref(),
             Some("26.1-pre-3")
+        );
+    }
+
+    #[test]
+    fn the_legacy_line_leads_with_the_game_version_it_is_for() {
+        assert_eq!(game_version("1.20.1-47.1.106").as_deref(), Some("1.20.1"));
+        assert!(is_legacy("1.20.1-47.1.106"));
+        assert!(
+            !is_legacy("21.1.244"),
+            "the modern line leads with the minor"
+        );
+        assert!(!is_legacy("26.2.0.37-beta"), "nor does the calendar line");
+    }
+
+    #[test]
+    fn each_line_names_its_own_maven_artifact() {
+        assert_eq!(artifact("1.20.1-47.1.106"), "forge");
+        assert_eq!(artifact("21.1.244"), "neoforge");
+        assert_eq!(
+            installer_url("1.20.1-47.1.106"),
+            "https://maven.neoforged.net/releases/net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-installer.jar"
+        );
+        assert_eq!(
+            installer_url("21.1.244"),
+            "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.1.244/neoforge-21.1.244-installer.jar"
         );
     }
 
