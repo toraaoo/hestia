@@ -57,12 +57,12 @@ export function WhatsNewDialog() {
 
   return (
     <AlertDialog open>
-      <AlertDialogContent>
+      <AlertDialogContent className="sm:max-w-2xl">
         <AlertDialogHeader>
           <AlertDialogTitle>
             {m['settings.update.whats_new']({ version: version ?? '' })}
           </AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogDescription render={<div />}>
             <Markdown>{notes.data}</Markdown>
           </AlertDialogDescription>
         </AlertDialogHeader>
