@@ -15,7 +15,7 @@ import { PickerPanel } from '@/components/picker-panel';
 import { projectKey } from '@/features/content/components/content-card';
 import { PickRow } from '@/features/content/components/pick-row';
 import {
-  SourceChips,
+  SourceSelect,
   useSourceOptions,
 } from '@/features/content/components/sources';
 import { kindInfo } from '@/features/content/lib/kinds';
@@ -94,11 +94,12 @@ export function ContentStep({
               disabled: datapackBlocked(k),
               onClick: () => onKindChange(k),
             }))}
-            after={
-              <SourceChips
+            trailing={
+              <SourceSelect
                 list={sources.list}
                 active={sources.active}
                 onChange={onSourceChange}
+                className="w-32"
               />
             }
           />

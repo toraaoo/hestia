@@ -9,7 +9,7 @@ import { Page } from '@/components/page';
 import { Bone, CardGridSkeleton } from '@/components/skeleton';
 import { ContentCard } from '@/features/content/components/content-card';
 import {
-  SourceChips,
+  SourceSelect,
   useSourceOptions,
 } from '@/features/content/components/sources';
 import { contentKinds, kindInfo } from '@/features/content/lib/kinds';
@@ -76,6 +76,14 @@ export function BrowsePage({
       subtitle={m['content.browse.subtitle']()}
       search
       searchPlaceholder={m['app.search.content_or_link']()}
+      actions={
+        <SourceSelect
+          list={sources.list}
+          active={sources.active}
+          onChange={(next) => onSourceChange?.(next)}
+          className="w-32"
+        />
+      }
       skeleton={
         <div>
           <div className="mb-5 flex flex-wrap gap-1.5">
@@ -91,28 +99,21 @@ export function BrowsePage({
         </div>
       }
     >
-      <div className="mb-5 flex flex-col gap-2.5">
-        <div className="flex flex-wrap gap-1.5">
-          <Link to="/browse" search={sourceParam} className={chipClass(!kind)}>
-            {m['app.label.all']()}
+      <div className="mb-5 flex flex-wrap gap-1.5">
+        <Link to="/browse" search={sourceParam} className={chipClass(!kind)}>
+          {m['app.label.all']()}
+        </Link>
+        {contentKinds.map((k) => (
+          <Link
+            key={k}
+            to="/browse/$kind"
+            params={{ kind: kindInfo[k].slug }}
+            search={sourceParam}
+            className={chipClass(kind === k)}
+          >
+            {kindInfo[k].label()}
           </Link>
-          {contentKinds.map((k) => (
-            <Link
-              key={k}
-              to="/browse/$kind"
-              params={{ kind: kindInfo[k].slug }}
-              search={sourceParam}
-              className={chipClass(kind === k)}
-            >
-              {kindInfo[k].label()}
-            </Link>
-          ))}
-        </div>
-        <SourceChips
-          list={sources.list}
-          active={sources.active}
-          onChange={(next) => onSourceChange?.(next)}
-        />
+        ))}
       </div>
 
       {url ? (

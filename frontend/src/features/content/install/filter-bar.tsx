@@ -10,7 +10,7 @@ export function FilterBar({
   onSearch,
   placeholder,
   chips,
-  after,
+  trailing,
 }: {
   search: string;
   onSearch: (v: string) => void;
@@ -21,16 +21,20 @@ export function FilterBar({
     disabled?: boolean;
     onClick: () => void;
   }[];
-  /** A second filter row under the chips (the source picker). */
-  after?: ReactNode;
+  /** A filter control beside the search field (the source picker). */
+  trailing?: ReactNode;
 }) {
   return (
     <div className="mb-3 flex flex-col gap-2.5">
-      <SearchInput
-        value={search}
-        onChange={onSearch}
-        placeholder={placeholder}
-      />
+      <div className="flex items-center gap-2">
+        <SearchInput
+          value={search}
+          onChange={onSearch}
+          placeholder={placeholder}
+          className="min-w-0 flex-1"
+        />
+        {trailing}
+      </div>
       {chips && chips.length > 1 && (
         <div className="flex flex-wrap gap-1.5">
           {chips.map((c) => (
@@ -49,7 +53,6 @@ export function FilterBar({
           ))}
         </div>
       )}
-      {after}
     </div>
   );
 }

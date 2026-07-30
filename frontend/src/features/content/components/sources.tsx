@@ -1,6 +1,13 @@
 import type { ContentKind, ContentSource } from '@/api';
-import { chipClass } from '@/components/chip';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { m } from '@/paraglide/messages.js';
 import { useContentSources } from '@/queries/content';
 
 /**
@@ -19,31 +26,42 @@ export function useSourceOptions(kind: ContentKind | undefined, value: string) {
   return { list, active };
 }
 
-/** One chip per source; absent when there is nothing to choose between. */
-export function SourceChips({
+/** The source picker; absent when there is nothing to choose between. */
+export function SourceSelect({
   list,
   active,
   onChange,
+  className,
 }: {
   list: ContentSource[];
   active: string;
   onChange: (source: string) => void;
+  className?: string;
 }) {
   if (list.length < 2) return null;
   const selected = active || list[0].id;
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {list.map((source) => (
-        <button
-          key={source.id}
-          type="button"
-          className={chipClass(selected === source.id)}
-          onClick={() => onChange(source.id)}
-        >
-          {source.name}
-        </button>
-      ))}
-    </div>
+    <Select
+      value={selected}
+      onValueChange={(next) => {
+        // Base UI can emit null on clear; never search a source of none.
+        if (next) onChange(next);
+      }}
+    >
+      <SelectTrigger
+        aria-label={m['content.browse.source']()}
+        className={className}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent align="start">
+        {list.map((source) => (
+          <SelectItem key={source.id} value={source.id}>
+            {source.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
