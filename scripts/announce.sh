@@ -3,16 +3,17 @@
 #
 #   scripts/announce.sh                 # compile + preview the payload
 #   scripts/announce.sh --envelope      # wrap unsigned, for a local daemon
+#   scripts/announce.sh --serve [port]  # serve the unsigned envelope on 127.0.0.1
 #   scripts/announce.sh --sign          # wrap signed (CI; needs the private key)
 #
 # The signed envelope is what the daemon fetches: `{signature, payload}` where
 # payload is the exact JSON text the signature covers. Verify, then parse — so
 # the payload travels as text and is never reserialized.
 #
-# Local preview: point a debug build at the unsigned output with
-#   HESTIA_ANNOUNCE_ENDPOINT=http://127.0.0.1:8000/announcements.json
-# It will be *refused* (no key verifies it) — which is the point of the check;
-# use --sign with a throwaway key to exercise the rendering path.
+# Local preview is --serve plus HESTIA_ANNOUNCE_ENDPOINT on the *daemon*: a
+# debug build reading an overridden endpoint waives the signature check, so an
+# unsigned envelope renders (see engine/src/announce/mod.rs::endpoint). Nothing
+# unsigned is ever cached, and a release build has no path to the waiver.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -20,7 +21,7 @@ mode="${1:-preview}"
 repo="${GITHUB_REPOSITORY:-toraaoo/hestia}"
 base_url="https://github.com/${repo}/releases/download/announcements"
 
-payload="$(python3 scripts/announce.py news "$base_url")"
+payload="$(python scripts/announce.py news "$base_url")"
 
 case "$mode" in
   preview)
@@ -28,6 +29,31 @@ case "$mode" in
     ;;
   --envelope)
     jq -n --arg p "$payload" '{signature: "", payload: $p}'
+    ;;
+  --serve)
+    port="${2:-8787}"
+    # A build-dir path rather than a mktemp one, so this can `exec` below: a
+    # temp dir would need an EXIT trap, and a trap cannot survive exec.
+    dir="target/announce"
+    rm -rf "$dir"
+    mkdir -p "$dir"
+    jq -n --arg p "$payload" '{signature: "", payload: $p}' > "$dir/announcements.json"
+    # Images are referenced relatively in source and absolutely in the compiled
+    # feed, so they have to be reachable under the same base as the document.
+    if [ -d news/images ]; then cp -r news/images/. "$dir/"; fi
+    cat >&2 <<EOF
+
+serving the unsigned feed on http://127.0.0.1:$port/announcements.json
+
+point a *debug* daemon at it, in another terminal:
+
+  HESTIA_ANNOUNCE_ENDPOINT=http://127.0.0.1:$port/announcements.json scripts/dev.sh
+  hestia daemon start && hestia news refresh
+
+EOF
+    # exec so the server *is* this pid: dev.sh/run.sh kill what they spawned,
+    # and a wrapper process would leave the server orphaned behind it.
+    exec python -m http.server "$port" --bind 127.0.0.1 --directory "$dir"
     ;;
   --sign)
     : "${ANNOUNCE_SIGNING_KEY:?ANNOUNCE_SIGNING_KEY is not set}"
@@ -50,7 +76,7 @@ case "$mode" in
     jq -n --arg s "$signature" --arg p "$payload" '{signature: $s, payload: $p}'
     ;;
   *)
-    echo "unknown mode: $mode (preview | --envelope | --sign)" >&2
+    echo "unknown mode: $mode (preview | --envelope | --serve | --sign)" >&2
     exit 2
     ;;
 esac
