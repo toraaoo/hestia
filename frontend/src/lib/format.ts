@@ -25,9 +25,20 @@ export function bytes(n: number): string {
   return `${value.toFixed(value < 10 && unit > 0 ? 1 : 0)} ${units[unit]}`;
 }
 
-/** Gigabytes parsed from a memory setting like `4G` (defaults to 4). */
+const MEMORY_UNIT_GB: Record<string, number> = { k: 1024 ** 2, m: 1024, g: 1 };
+
+/**
+ * Gigabytes parsed from a memory setting like `4G` or `8192M` (defaults to 4).
+ * The daemon's vocabulary is a number plus a unit, so the unit has to be read —
+ * dropping it reads a megabyte value as that many gigabytes. Rounded to a whole
+ * gigabyte because that is the granularity every surface here offers, and a
+ * fractional value would be written back as one the daemon rejects.
+ */
 export function memGb(memory: string): number {
-  return Number.parseInt(memory, 10) || 4;
+  const match = /^\s*(\d+)\s*([kmg])\s*$/i.exec(memory);
+  if (!match) return 4;
+  const gb = Number(match[1]) / MEMORY_UNIT_GB[match[2].toLowerCase()];
+  return Math.max(1, Math.round(gb));
 }
 
 /** A running duration in seconds as a compact `1d 3h` / `12m 5s` label. */

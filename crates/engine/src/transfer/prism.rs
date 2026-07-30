@@ -323,7 +323,7 @@ mod tests {
             jvm_args: Some("-XX:+UseG1GC".to_string()),
         };
         let jvm = jvm_settings(&instance);
-        assert_eq!(jvm.get(MEMORY_KEY).unwrap().as_deref(), Some("6144M"));
+        assert_eq!(jvm.get(MEMORY_KEY).unwrap().as_deref(), Some("6G"));
         assert_eq!(
             jvm.get(JVM_ARGS_KEY).unwrap().as_deref(),
             Some("-XX:+UseG1GC")

@@ -106,7 +106,9 @@ impl JavaSettings {
 }
 
 /// Validate and normalise a memory value: digits followed by one unit char
-/// (k/m/g, case-insensitive), the number nonzero, the unit upper-cased.
+/// (k/m/g, case-insensitive), the number nonzero, the unit upper-cased and
+/// carried as far up the ladder as it divides exactly — an import that speaks
+/// megabytes (Prism's `MaxMemAlloc=8192`) stores the `8G` the user chose.
 pub(crate) fn normalize_memory(value: &str) -> Result<String> {
     let trimmed = value.trim();
     let unit = trimmed
@@ -127,7 +129,25 @@ pub(crate) fn normalize_memory(value: &str) -> Result<String> {
             reason: proto::error::Reason::MemoryFormat
         });
     }
-    Ok(format!("{digits}{}", unit.to_ascii_uppercase()))
+    Ok(promote(digits, unit.to_ascii_uppercase()))
+}
+
+/// Carry an amount up the unit ladder while it divides exactly. A number too
+/// large for `u64` is left as written — the JVM is the one that rejects it.
+fn promote(digits: &str, unit: char) -> String {
+    const LADDER: [char; 3] = ['K', 'M', 'G'];
+    let Ok(mut amount) = digits.parse::<u64>() else {
+        return format!("{digits}{unit}");
+    };
+    let mut at = LADDER
+        .iter()
+        .position(|u| *u == unit)
+        .unwrap_or(LADDER.len());
+    while at + 1 < LADDER.len() && amount % 1024 == 0 {
+        amount /= 1024;
+        at += 1;
+    }
+    format!("{amount}{}", LADDER.get(at).copied().unwrap_or(unit))
 }
 
 /// Split JVM args on whitespace; every token must start with `-`.
@@ -727,7 +747,12 @@ mod tests {
         assert_eq!(s.memory.as_deref(), Some("4G"));
         assert_eq!(s.flags(), ["-Xms4G", "-Xmx4G"]);
         assert!(s.set(MEMORY_KEY, "2048M").unwrap());
-        assert_eq!(s.memory.as_deref(), Some("2048M"));
+        assert_eq!(s.memory.as_deref(), Some("2G"));
+        // Only an exact multiple is promoted; the rest keeps its own unit.
+        assert!(s.set(MEMORY_KEY, "6656M").unwrap());
+        assert_eq!(s.memory.as_deref(), Some("6656M"));
+        assert!(s.set(MEMORY_KEY, "1048576k").unwrap());
+        assert_eq!(s.memory.as_deref(), Some("1G"));
         // Empty clears.
         assert!(s.set(MEMORY_KEY, "").unwrap());
         assert_eq!(s.memory, None);
