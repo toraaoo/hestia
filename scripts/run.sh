@@ -50,9 +50,14 @@ case "$target" in
   daemon)  cargo build $profile -p tray
            cargo run $profile -p daemon -- "$@" ;;
   desktop)
+    cleanup_desktop() {
+      if [ "$news" = 1 ]; then
+        stop_local_feed
+      fi
+    }
+    trap cleanup_desktop EXIT
+
     if [ -n "$profile" ]; then
-      # A real release run needs the prod frontend (Tauri builds it) and the
-      # staged sidecars; launch the built binary rather than the Vite dev server.
       scripts/sidecars.sh --ensure
       (cd crates/desktop && cargo tauri build --no-bundle)
       exec ./target/release/hestia-desktop
