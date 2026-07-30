@@ -367,14 +367,16 @@ mod tests {
 
     #[test]
     fn a_named_file_is_taken_as_given() {
+        let dest = std::env::temp_dir().join("share/cozy.mrpack");
+        let dest_str = dest.to_str().unwrap().to_string();
         let path = export_destination(
-            "/tmp/share/cozy.mrpack",
+            &dest_str,
             Path::new("/exports"),
             &record("Cozy"),
             ExportFormat::Mrpack,
         )
         .unwrap();
-        assert_eq!(path, PathBuf::from("/tmp/share/cozy.mrpack"));
+        assert_eq!(path, dest);
     }
 
     #[test]
