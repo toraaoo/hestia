@@ -220,7 +220,7 @@ export function CreateEntryModal({
           <ProvisionProgressView
             progress={progress}
             indeterminate={kind === 'instance'}
-            className="min-h-[18rem] justify-center px-1"
+            className="min-h-72"
           />
         ) : step === 'flavor' ? (
           <form.FormGroup

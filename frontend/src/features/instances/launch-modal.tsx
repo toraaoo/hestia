@@ -119,7 +119,7 @@ export function LaunchModalProvider({
           </DialogHeader>
           <ProvisionProgressView
             progress={mutation.progress}
-            className="min-h-[18rem] justify-center px-1"
+            className="min-h-72"
           />
         </DialogContent>
       </Dialog>

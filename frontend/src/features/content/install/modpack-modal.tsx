@@ -117,7 +117,10 @@ export function ModpackInstallModal({
         </DialogHeader>
 
         {install.progress ? (
-          <ProvisionProgressView progress={install.progress} />
+          <ProvisionProgressView
+            progress={install.progress}
+            className="min-h-72"
+          />
         ) : (
           <div className="space-y-4">
             <Field>

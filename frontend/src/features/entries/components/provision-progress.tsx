@@ -142,7 +142,7 @@ export function ProvisionProgressView({
 
   if (!measurable) {
     return (
-      <div className={cn('flex flex-col gap-2', className)}>
+      <div className={cn('flex flex-col justify-center gap-2', className)}>
         <span className="text-xs">{label}</span>
         <div className="relative h-1 w-full overflow-hidden bg-muted">
           <div className="progress-sweep absolute inset-y-0 left-0 bg-primary" />
@@ -158,7 +158,7 @@ export function ProvisionProgressView({
 
   const detail = progress ? detailLine(progress, rate) : '';
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
+    <div className={cn('flex flex-col justify-center gap-2', className)}>
       <Progress value={progress ? Math.round(overallRatio(progress) * 100) : 0}>
         <ProgressLabel>{label}</ProgressLabel>
         <ProgressValue />

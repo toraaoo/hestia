@@ -66,12 +66,11 @@ export function ApplyGlobalDialog({
           </DialogDescription>
         </DialogHeader>
         {apply.isPending ? (
-          <div className="flex min-h-24 flex-col justify-center px-1">
-            <ProvisionProgressView
-              progress={progress ?? null}
-              fallbackLabel={m['profile.apply.action']()}
-            />
-          </div>
+          <ProvisionProgressView
+            progress={progress ?? null}
+            fallbackLabel={m['profile.apply.action']()}
+            className="min-h-24"
+          />
         ) : list.length === 0 ? (
           <Empty>{m['profile.global.empty']()}</Empty>
         ) : (
