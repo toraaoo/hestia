@@ -254,7 +254,7 @@ system tray.
 |---|---|
 | `crates/proto/tests/` | `wire` and `golden` — the envelope and contract encodings, so a wire change is caught |
 | `crates/engine/tests/` | `store` (config/cache/java/server/instance persistence), `auth_oracle` (the sign-in state machine), `process` (tree termination) |
-| `crates/engine/src/**` | unit tests beside the code: archive detection and round trips, the Prism component mapping, the export ignore rules, launch-plan assembly, the Log4Shell-safe session config, sync reconciliation and folder linking, Modrinth mapping and `.mrpack`/URL parsing, version picking, per-flavor accepted kinds, JVM-args precedence, PaperMC and SpigotMC catalogue parsing |
+| `crates/engine/src/**` | unit tests beside the code: archive detection and round trips, the Prism component mapping, the export ignore rules, launch-plan assembly, the Log4Shell-safe session config, sync reconciliation and folder linking, Modrinth and CurseForge mapping, pack-format detection and `.mrpack`/URL parsing, version picking, per-flavor accepted kinds, JVM-args precedence, PaperMC and SpigotMC catalogue parsing |
 | `crates/daemon/tests/e2e.rs` | a client-to-daemon round trip over a real socket |
 | `frontend/tests/` | the message catalogue (locale coverage, placeholder parity, no dead or missing keys) and the export dialog's tree/exclusion conversions |
 
@@ -263,6 +263,23 @@ cargo build -p cli -p daemon                              # the fast core
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
+
+The frontend carries its own chain. `src/paraglide/` is generated and untracked,
+and the app imports from it, so the messages compile before anything that
+resolves those imports:
+
+```bash
+cd frontend
+bun install
+bun run generate:messages   # src/paraglide/ — required before typecheck/build
+bun run check               # biome: lint + format
+bun run typecheck           # tsc --noEmit
+bun run test                # vitest
+bun run build
+```
+
+CI (`.github/workflows/ci.yml`) runs both sides: `check` (fmt, clippy, test on
+Linux and Windows), `frontend` (the chain above), and `deny`.
 
 ## Recording a decision
 

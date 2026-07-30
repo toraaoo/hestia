@@ -192,8 +192,11 @@ are not willing to distribute.
 
 ## CI
 
-- [`ci.yml`](../.github/workflows/ci.yml) — `fmt` + `clippy` + `test` on Linux and Windows, plus `cargo-deny`. The Linux
-  job installs the WebKitGTK dev packages so the `desktop` crate compiles.
+- [`ci.yml`](../.github/workflows/ci.yml) — three jobs. `check` runs `fmt` + `clippy` + `test` on Linux and Windows,
+  excluding the `desktop` crate so no webview is needed; the Linux job installs the GTK and appindicator dev packages
+  the `tray` crate links. `frontend` runs the Bun chain — `generate:messages` (`src/paraglide/` is generated and
+  untracked, so it precedes anything resolving those imports), then `check` (biome), `typecheck` (tsc), `test` (vitest)
+  and `build`. `deny` runs `cargo-deny`.
 - [`release.yml`](../.github/workflows/release.yml) — on a `v*` tag, runs
   `scripts/package.sh all` on a Linux and a Windows runner and attaches every artifact to the GitHub Release. A manual
   `workflow_dispatch` is a dry run: it builds and uploads workflow artifacts but does not touch a Release.

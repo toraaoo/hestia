@@ -437,6 +437,24 @@ and the Bun-built frontend:
 scripts/dev.sh --desktop        # Tauri shell with frontend HMR
 ```
 
+The frontend's own checks — the same ones CI's `frontend` job runs, in this order:
+
+```bash
+cd frontend
+bun run generate:messages   # src/paraglide/ is generated and untracked
+bun run check               # biome: lint + format
+bun run typecheck           # tsc --noEmit
+bun run test                # vitest
+bun run build
+```
+
+`generate:messages` comes first because the app imports from `src/paraglide/`,
+which is compiled from `messages/` and never committed — a fresh checkout has no
+such directory, so a typecheck or build before it fails on unresolved imports.
+(`vite dev`/`vite build` run the same compile through the paraglide plugin;
+the script is what makes it available on its own.) `generate:routes` regenerates
+`routeTree.gen.ts`, which *is* committed — run it after adding a route.
+
 See [packaging.md](packaging.md) for installers and sidecar bundling.
 
 ## Recording a decision
