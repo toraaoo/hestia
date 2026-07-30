@@ -32,6 +32,24 @@ export const filterContent = (
 export const rowKey = (i: InstalledContent) => `${i.kind}:${i.filename}`;
 
 /**
+ * Who put an item in the pool. The index tags provenance as `<scope>:<key>`,
+ * where the key is an identity and not a label — a profile's name, but a
+ * modpack's project id — so a reader resolves it before showing it.
+ */
+export interface ContentOrigin {
+  scope: 'profile' | 'modpack';
+  key: string;
+}
+
+export const parseOrigin = (origin: string): ContentOrigin | null => {
+  const sep = origin.indexOf(':');
+  const scope = sep < 0 ? '' : origin.slice(0, sep);
+  return scope === 'profile' || scope === 'modpack'
+    ? { scope, key: origin.slice(sep + 1) }
+    : null;
+};
+
+/**
  * The index stores a world data-relative (`saves/My World`) while the wire's
  * `worlds` scope names it bare — one conversion, here.
  */

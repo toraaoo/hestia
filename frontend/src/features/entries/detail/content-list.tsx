@@ -2,7 +2,9 @@ import {
   ArrowsClockwiseIcon,
   DotsThreeIcon,
   GlobeIcon,
+  PackageIcon,
   ProhibitIcon,
+  StackIcon,
   SwapIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
@@ -39,6 +41,7 @@ import {
   type EntryTarget,
   kindLoader,
   packWorlds,
+  parseOrigin,
   type RowHandlers,
   rowKey,
   worldEnabled,
@@ -50,6 +53,7 @@ export function ContentListResult({
   updatable,
   handlers,
   entryWorlds,
+  packName,
   selected,
   onToggleSelect,
 }: {
@@ -59,6 +63,8 @@ export function ContentListResult({
   handlers: RowHandlers;
   /** The instance's save worlds, for a datapack that names none of its own. */
   entryWorlds: string[];
+  /** The name of the pack the entry runs, empty when it runs none. */
+  packName: string;
   selected: Set<string> | null;
   onToggleSelect: (key: string) => void;
 }) {
@@ -83,6 +89,7 @@ export function ContentListResult({
                 ? packWorlds(c, entryWorlds)
                 : []
             }
+            packName={packName}
             onChangeVersion={() => setChanging(c)}
             checked={selected ? selected.has(rowKey(c)) : undefined}
             onToggle={() => onToggleSelect(rowKey(c))}
@@ -100,11 +107,48 @@ export function ContentListResult({
   );
 }
 
+/**
+ * Where a row came from, when it was not installed by hand. The tag names a
+ * profile by name but a modpack by project id, so the pack the entry runs
+ * supplies the readable name.
+ */
+function OriginBadge({
+  origin,
+  packName,
+}: {
+  origin: string;
+  packName: string;
+}) {
+  const parsed = parseOrigin(origin);
+  if (!parsed) return null;
+
+  const pack = parsed.scope === 'modpack';
+  const Icon = pack ? PackageIcon : StackIcon;
+  const name = pack ? packName : parsed.key;
+  return (
+    <Badge
+      variant="secondary"
+      className="shrink-0 text-muted-foreground"
+      title={
+        name
+          ? pack
+            ? m['content.modpack.origin_badge']({ name })
+            : m['profile.origin_badge']({ name })
+          : undefined
+      }
+    >
+      <Icon />
+      {name || m['content.modpack.title']()}
+    </Badge>
+  );
+}
+
 function ContentRow({
   item,
   updatable,
   handlers,
   worlds,
+  packName,
   onChangeVersion,
   checked,
   onToggle,
@@ -114,6 +158,8 @@ function ContentRow({
   handlers: RowHandlers;
   /** The worlds this row can scope to; empty for everything but a datapack. */
   worlds: string[];
+  /** The name of the pack the entry runs, for a row a pack installed. */
+  packName: string;
   onChangeVersion: () => void;
   /** Set while the batch-select mode is active; undefined otherwise. */
   checked?: boolean;
@@ -154,11 +200,7 @@ function ContentRow({
               {m['content.disabled']()}
             </Badge>
           )}
-          {item.origin && (
-            <Badge variant="outline" className="shrink-0 font-mono">
-              {m['profile.origin_badge']({ name: item.origin })}
-            </Badge>
-          )}
+          <OriginBadge origin={item.origin} packName={packName} />
         </div>
         <div className="truncate font-mono text-[11px] text-muted-foreground">
           {contentKindLabel[item.kind]()} · {item.source} · {item.versionNumber}

@@ -13,6 +13,7 @@ import { kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
 import { useJobMutation } from '@/queries/jobs';
+import { modpackQueries } from '@/queries/modpack';
 import { serverMutations, serverQueries } from '@/queries/server';
 
 import {
@@ -58,6 +59,9 @@ export function ContentSection({
     ...instanceQueries.worlds(id),
     enabled: !isServer && kinds.includes('data_pack'),
   });
+  // A pack tags its installs by project id, so its own record is what turns
+  // that tag into a name the row can show.
+  const pack = useQuery(modpackQueries.status(entry.kind, id));
 
   const enable = useMutation(content.enable(id));
   const remove = useMutation(content.remove(id));
@@ -100,6 +104,7 @@ export function ContentSection({
       updates={updates}
       handlers={handlers}
       entryWorlds={(worlds.data ?? []).map((world) => world.folder)}
+      packName={pack.data?.name ?? ''}
     />
   );
 }
@@ -114,11 +119,13 @@ function ContentSectionView({
   updates,
   handlers,
   entryWorlds,
+  packName,
 }: SectionProps & {
   lists: ListResult[];
   updates: UpdatesResult[];
   handlers: RowHandlers;
   entryWorlds: string[];
+  packName: string;
 }) {
   const items = lists.flatMap((q) => q.data?.items ?? []);
   const untracked = lists.flatMap((q) => q.data?.untracked ?? []);
@@ -233,6 +240,7 @@ function ContentSectionView({
           updatable={updatable}
           handlers={handlers}
           entryWorlds={entryWorlds}
+          packName={packName}
           selected={selected}
           onToggleSelect={(key) =>
             setSelected((prev) => {

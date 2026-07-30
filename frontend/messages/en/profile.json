@@ -40,7 +40,7 @@
     "new": "New profile",
     "none_active": "No profile active — everything installed mirrors at launch.",
     "none_match": "No profiles match.",
-    "origin_badge": "profile: {name}",
+    "origin_badge": "Installed by the profile {name}",
     "release": {
       "action": "Release settings",
       "description": "The profile's settings store is deleted and the profile follows the shared settings again.",

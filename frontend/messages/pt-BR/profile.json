@@ -40,7 +40,7 @@
     "new": "Novo perfil",
     "none_active": "Nenhum perfil ativo — tudo que está instalado é espelhado ao iniciar.",
     "none_match": "Nenhum perfil corresponde.",
-    "origin_badge": "perfil: {name}",
+    "origin_badge": "Instalado pelo perfil {name}",
     "release": {
       "action": "Liberar configurações",
       "description": "O armazenamento de configurações do perfil é apagado e o perfil volta a seguir as configurações compartilhadas.",
