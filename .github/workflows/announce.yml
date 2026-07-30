@@ -8,6 +8,8 @@ name: announce
 # push to the default branch, while installers are signed only from a release
 # tag. Sharing one key would put the installer-signing secret within reach of
 # anything that can land a commit here.
+# A pull request runs the same job with every publishing step gated off, so a
+# malformed entry fails review rather than the push that publishes it.
 on:
   push:
     branches: [main]
@@ -16,10 +18,18 @@ on:
       - "scripts/announce.py"
       - "scripts/announce.sh"
       - ".github/workflows/announce.yml"
+  pull_request:
+    paths:
+      - "news/**"
+      - "scripts/announce.py"
+      - "scripts/announce.sh"
+      - ".github/workflows/announce.yml"
   workflow_dispatch: {}
 
+# Keyed by ref, not just the workflow: one group would let a pull request's
+# dry run cancel the push that is mid-publish.
 concurrency:
-  group: announce
+  group: announce-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -33,8 +43,9 @@ jobs:
       - name: Install minisign
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends minisign
 
-      # A dispatch with no key is a dry run: it proves the feed compiles without
-      # publishing anything, which is the useful half of the check.
+      # A pull request or a keyless dispatch is a dry run: it proves the feed
+      # compiles without publishing anything, which is the useful half of the
+      # check. Every step below is gated on the push.
       - name: Compile the feed
         run: scripts/announce.sh > /dev/null
 
