@@ -120,6 +120,8 @@ The [`scripts/`](scripts/) helpers wrap all of this: `scripts/build.sh cli`,
 (Tauri installers + portable archive — see [docs/packaging.md](docs/packaging.md)).
 For an interactive loop, `scripts/dev.sh` opens a subshell with `hestia`/`hestiad`
 on `PATH` (or `scripts/dev.sh --desktop` for the Tauri shell with frontend HMR).
+A debug run also serves `news/` as the announcement feed and points the daemon at
+it, so an unpublished entry can be seen — `--no-news` skips that.
 
 ## Quick start
 

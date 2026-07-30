@@ -5,7 +5,57 @@ it: CI compiles every file here into a single signed document and replaces the
 asset on the standing `announcements` release tag, which the launcher polls.
 
 Nothing here is fetched directly — the launcher only ever reads the compiled
-`announcements.json`. Preview locally with `scripts/announce.sh`.
+`announcements.json`.
+
+## Running it locally
+
+A debug run of either runner serves this directory as the feed and points the
+daemon it starts at it — no flag needed:
+
+```bash
+scripts/dev.sh                   # subshell with hestia/hestiad on PATH
+scripts/run.sh daemon serve
+```
+
+Then, from that subshell:
+
+```bash
+hestia daemon start
+hestia news refresh              # don't wait for the 6-hourly poll
+hestia news show <id>
+```
+
+`--no-news` skips it, and `HESTIA_NEWS_PORT` moves it off 8787. To drive the
+feed by hand instead — or to just check that an entry compiles:
+
+```bash
+scripts/announce.sh              # compile + print the payload
+scripts/announce.sh --serve      # 127.0.0.1:8787/announcements.json
+HESTIA_ANNOUNCE_ENDPOINT=http://127.0.0.1:8787/announcements.json hestiad serve
+```
+
+Two things decide whether anything shows up:
+
+- **The endpoint override is read by the daemon, not the CLI** — the daemon is
+  what fetches. Export it before `hestia daemon start` so the spawned process
+  inherits it. It also only exists in a **debug** build; a release binary has no
+  code path to it, which is why a `--release` run never serves one.
+- **Announcements are switchable.** If the list is empty, check
+  `hestia config get announcements.enabled`.
+
+Serving the feed never fails a run: a `news/` that does not compile, or a port
+already taken by something else, is reported and skipped, leaving the daemon on
+the published feed.
+
+A served feed is unsigned, and the override waives the signature check
+deliberately — requiring one would mean keeping a throwaway keypair just to see
+a card render. The waiver is logged at WARN and an unchecked feed is never
+cached, so it cannot outlive the daemon that read it.
+
+Publishing is a commit, not a script: CI signs the feed and replaces the release
+asset on any push to `main` touching `news/`, and compiles it on a pull request
+so a malformed entry fails review instead. `scripts/announce.sh --sign` is what
+that workflow runs; it needs the private key.
 
 ## Format
 
