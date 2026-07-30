@@ -90,6 +90,12 @@ export const keys = {
       [...keys.servers.content(id), 'updates', kind] as const,
     modpack: (id: string) => [...keys.servers.detail(id), 'modpack'] as const,
   },
+  // An archive is identified by its path, not by any entry — an inspect
+  // happens before there is an instance to key against.
+  transfer: {
+    all: ['transfer'] as const,
+    archive: (path: string) => ['transfer', 'archive', path] as const,
+  },
   instances: {
     all: ['instances'] as const,
     list: () => [...keys.instances.all, 'list'] as const,
@@ -119,6 +125,8 @@ export const keys = {
     contentUpdates: (id: string, kind: ContentKind) =>
       [...keys.instances.content(id), 'updates', kind] as const,
     modpack: (id: string) => [...keys.instances.detail(id), 'modpack'] as const,
+    exportContents: (id: string) =>
+      [...keys.instances.detail(id), 'export-contents'] as const,
     profiles: (id: string) =>
       [...keys.instances.detail(id), 'profiles'] as const,
   },
@@ -149,5 +157,14 @@ export const keys = {
     all: ['sync'] as const,
     config: () => [...keys.sync.all, 'config'] as const,
     status: () => [...keys.sync.all, 'status'] as const,
+  },
+  announce: {
+    all: ['announce'] as const,
+    list: () => [...keys.announce.all, 'list'] as const,
+  },
+  update: {
+    all: ['update'] as const,
+    check: () => [...keys.update.all, 'check'] as const,
+    changelog: () => [...keys.update.all, 'changelog'] as const,
   },
 };

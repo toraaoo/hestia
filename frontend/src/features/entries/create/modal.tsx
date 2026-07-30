@@ -1,4 +1,8 @@
-import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
+import {
+  CaretLeftIcon,
+  CaretRightIcon,
+  FileArrowUpIcon,
+} from '@phosphor-icons/react';
 import { revalidateLogic } from '@tanstack/react-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -36,7 +40,6 @@ import { serverMutations, serverQueries } from '@/queries/server';
 
 import {
   FlavorOption,
-  flavorSummary,
   type Kind,
   STEP_HINTS,
   STEPS,
@@ -56,10 +59,13 @@ export function CreateEntryModal({
   kind,
   open,
   onOpenChange,
+  onImport,
 }: {
   kind: Kind;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Leave the wizard for the import dialog — an instance can also arrive whole. */
+  onImport?: () => void;
 }) {
   const [step, setStep] = useState<Step>('flavor');
   const [search, setSearch] = useState('');
@@ -119,13 +125,13 @@ export function CreateEntryModal({
           const created = await createServer.mutateAsync(
             serverParams(value, memoryEntries),
           );
-          toast.success(m['toast.created']({ name: created.server.name }));
+          toast.success(m['app.toast.created']({ name: created.server.name }));
           toastWarnings(created.warnings);
         } else {
           const instance = await createInstance.mutateAsync(
             instanceParams(value, memoryEntries),
           );
-          toast.success(m['toast.created']({ name: instance.name }));
+          toast.success(m['app.toast.created']({ name: instance.name }));
         }
         onOpenChange(false);
       } catch {
@@ -155,7 +161,7 @@ export function CreateEntryModal({
           variant="outline"
           onClick={() => onOpenChange(false)}
         >
-          {m['action.cancel']()}
+          {m['app.action.cancel']()}
         </Button>
       ) : (
         <Button
@@ -165,7 +171,7 @@ export function CreateEntryModal({
           data-icon="inline-start"
         >
           <CaretLeftIcon />
-          {m['action.back']()}
+          {m['app.action.back']()}
         </Button>
       )}
       {step === 'details' ? (
@@ -174,8 +180,8 @@ export function CreateEntryModal({
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
           {kind === 'server'
-            ? m['wizard.create_server']()
-            : m['wizard.create_instance']()}
+            ? m['entry.create.server_title']()
+            : m['entry.create.instance_title']()}
         </Button>
       ) : (
         <Button
@@ -183,7 +189,7 @@ export function CreateEntryModal({
           data-icon="inline-end"
           className="bg-ember text-ember-foreground hover:bg-ember/90"
         >
-          {m['action.next']()}
+          {m['app.action.next']()}
           <CaretRightIcon />
         </Button>
       )}
@@ -199,13 +205,13 @@ export function CreateEntryModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Icon className="size-4.5 text-muted-foreground" />
-            {kind === 'server' ? m['servers.new']() : m['instances.new']()}
+            {kind === 'server' ? m['server.new']() : m['instance.new']()}
           </DialogTitle>
           <DialogDescription>
             {creating
               ? kind === 'server'
-                ? m['wizard.provisioning_server']()
-                : m['wizard.provisioning_instance']()
+                ? m['entry.create.provisioning_server']()
+                : m['entry.create.provisioning_instance']()
               : STEP_HINTS[step](kind)}
           </DialogDescription>
         </DialogHeader>
@@ -230,8 +236,7 @@ export function CreateEntryModal({
                       {flavors.map((f) => (
                         <FlavorOption
                           key={f.id}
-                          name={f.name}
-                          summary={flavorSummary(f.id)}
+                          flavor={f}
                           selected={field.state.value === f.id}
                           onSelect={() => {
                             field.handleChange(f.id);
@@ -240,11 +245,31 @@ export function CreateEntryModal({
                           }}
                         />
                       ))}
+                      {kind === 'instance' && onImport && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onOpenChange(false);
+                            onImport();
+                          }}
+                          className="flex items-center gap-3 border border-border border-dashed px-3 py-2.5 text-left outline-none hover:bg-accent/50 focus-visible:ring-1 focus-visible:ring-ring"
+                        >
+                          <FileArrowUpIcon className="size-4 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0">
+                            <span className="block font-medium text-sm">
+                              {m['instance.import.action']()}
+                            </span>
+                            <span className="block text-muted-foreground text-xs">
+                              {m['instance.import.formats']()}
+                            </span>
+                          </span>
+                        </button>
+                      )}
                       {flavors.length === 0 && (
                         <p className="px-1 py-6 text-center text-xs text-muted-foreground">
                           {flavorsQuery.isPending
-                            ? m['common.loading']()
-                            : m['wizard.no_versions_match']()}
+                            ? m['app.status.loading']()
+                            : m['entry.create.no_versions_match']()}
                         </p>
                       )}
                     </div>

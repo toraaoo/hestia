@@ -21,6 +21,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use proto::minecraft::{ProvisionPhase, ProvisionProgress};
+
+use crate::process::{self, ProcessSupervisor, Task};
 use serde_json::Value;
 
 use super::super::materialize::OnProgress;
@@ -57,6 +59,7 @@ pub struct Install<'a> {
     pub minecraft_jar: &'a Path,
     pub side: Side,
     pub java: &'a Path,
+    pub processes: &'a ProcessSupervisor,
 }
 
 impl Install<'_> {
@@ -130,21 +133,30 @@ pub async fn run(
         });
 
         tracing::debug!(processor = jar, %main_class, "running neoforge processor");
-        let status = tokio::process::Command::new(ctx.java)
-            .arg("-cp")
-            .arg(classpath.join(CLASSPATH_SEPARATOR))
-            .arg(&main_class)
-            .args(&args)
-            .current_dir(ctx.root)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .kill_on_drop(true)
-            .status()
+        let mut command = vec![
+            "-cp".to_string(),
+            classpath.join(CLASSPATH_SEPARATOR),
+            main_class,
+        ];
+        command.extend(args);
+        let outcome = ctx
+            .processes
+            .run(
+                Task {
+                    id: format!("install-neoforge-{}-{index}", ctx.side.as_str()),
+                    program: ctx.java,
+                    args: command,
+                    cwd: ctx.root.to_path_buf(),
+                    phase: ProvisionPhase::Libraries,
+                    narrates: process::silent,
+                    deadline: None,
+                },
+                on_progress,
+            )
             .await
             .with_context(|| format!("cannot run neoforge processor {jar}"))?;
-        if !status.success() {
-            bail!("neoforge processor {jar} failed ({status})");
+        if !outcome.succeeded() {
+            bail!("neoforge processor {jar} failed");
         }
     }
     on_progress.report(&ProvisionProgress {

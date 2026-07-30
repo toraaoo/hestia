@@ -7,7 +7,7 @@
 
 mod browse;
 mod entry;
-mod format;
+pub mod format;
 mod manage;
 mod session;
 

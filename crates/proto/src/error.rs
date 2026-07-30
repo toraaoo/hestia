@@ -138,6 +138,7 @@ pub enum Reason {
     MinPlayers,
     MinBackups,
     JavaMajor,
+    AbsolutePath,
 }
 
 impl fmt::Display for Reason {
@@ -154,6 +155,10 @@ impl fmt::Display for Reason {
             Reason::MinPlayers => "at least one player is required",
             Reason::MinBackups => "keep at least one backup",
             Reason::JavaMajor => "not a valid java major version",
+            Reason::AbsolutePath => {
+                "the path must be absolute — the daemon is a separate process and does not share \
+                 your working directory"
+            }
         })
     }
 }
@@ -333,6 +338,14 @@ pub enum ErrorInfo {
         requested: ContentKind,
         accepts: Vec<ContentKind>,
     },
+    /// A flavor needs something installed that Hestia cannot install itself
+    /// (Spigot and CraftBukkit are compiled on the machine, which needs Git).
+    /// Carries where to get it, so no front-end has to know.
+    MissingRequirement {
+        flavor: String,
+        name: String,
+        url: String,
+    },
     InvalidTexture {
         detail: String,
     },
@@ -464,6 +477,27 @@ pub enum ErrorInfo {
     },
     UnsupportedContentUrl {
         url: String,
+    },
+
+    // --- import / export ---
+    /// The archive carries no marker file for any format hestia imports. Named
+    /// by filename rather than full path: the caller chose the file and the
+    /// path is theirs, but the name is what identifies it in a message.
+    ArchiveUnrecognised {
+        filename: String,
+    },
+    /// The archive is one of the formats hestia reads, but its content is
+    /// broken — a missing manifest, a malformed one, or a member path that
+    /// would escape the instance directory.
+    ArchiveInvalid {
+        format: String,
+        detail: String,
+    },
+    /// The archive pins a game version, loader, or component this launcher has
+    /// no flavor for.
+    ArchiveUnsupported {
+        format: String,
+        component: String,
     },
     ContentKindMismatch {
         title: String,
@@ -608,6 +642,11 @@ impl fmt::Display for ErrorInfo {
                     "a {flavor} {entry} cannot take {requested}s — it takes {taken}"
                 )
             }
+            MissingRequirement { flavor, name, url } => write!(
+                f,
+                "a {flavor} server is built on this computer, and that needs {name}, \
+                 which Hestia cannot install for you — get it from {url}, then try again"
+            ),
             InvalidTexture { detail } => write!(f, "{detail}"),
             EntryNotFound { entry, reference } => write!(f, "no {entry} matches '{reference}'"),
             ProcessNotFound { id } => write!(f, "no process '{id}'"),
@@ -674,6 +713,18 @@ impl fmt::Display for ErrorInfo {
                     "'{url}' is not a project URL on a supported content source"
                 )
             }
+            ArchiveUnrecognised { filename } => write!(
+                f,
+                "'{filename}' is not an instance hestia can import — it carries no hestia, \
+                 Modrinth or Prism instance manifest"
+            ),
+            ArchiveInvalid { format, detail } => {
+                write!(f, "this {format} archive could not be read: {detail}")
+            }
+            ArchiveUnsupported { format, component } => write!(
+                f,
+                "this {format} archive needs {component}, which hestia does not have"
+            ),
             ContentKindMismatch {
                 title,
                 actual,

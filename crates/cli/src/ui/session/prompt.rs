@@ -41,10 +41,10 @@ pub struct SelectScreen {
 }
 
 impl SelectScreen {
-    pub fn new(prompt: &str, items: &[String]) -> Self {
+    pub fn new(prompt: &str, items: &[String], details: &[String]) -> Self {
         SelectScreen {
             prompt: prompt.to_string(),
-            list: SelectList::new(items.to_vec()),
+            list: SelectList::new(items.to_vec()).with_details(details.to_vec()),
         }
     }
 }

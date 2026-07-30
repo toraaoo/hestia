@@ -156,7 +156,7 @@ function ContentRow({
           )}
           {item.origin && (
             <Badge variant="outline" className="shrink-0 font-mono">
-              {m['profiles.origin_badge']({ name: item.origin })}
+              {m['profile.origin_badge']({ name: item.origin })}
             </Badge>
           )}
         </div>
@@ -212,7 +212,7 @@ function ContentRow({
               onClick={() => handlers.onUpdate(item)}
             >
               <ArrowsClockwiseIcon weight="bold" />
-              {m['content.update']()}
+              {m['app.action.update']()}
             </Button>
           )}
           {worlds.length > 0 && (
@@ -229,7 +229,7 @@ function ContentRow({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={m['action.more']()}
+                  aria-label={m['app.action.more']()}
                 >
                   <DotsThreeIcon weight="bold" className="size-4" />
                 </Button>
@@ -246,7 +246,7 @@ function ContentRow({
                   )}
                   <DropdownMenuItem onClick={onChangeVersion}>
                     <SwapIcon />
-                    {m['content.change_version']()}
+                    {m['content.change_version.action']()}
                   </DropdownMenuItem>
                 </>
               )}
@@ -254,7 +254,9 @@ function ContentRow({
                 onClick={() => handlers.onEnable(item, !item.enabled)}
               >
                 <ProhibitIcon />
-                {item.enabled ? m['content.disable']() : m['content.enable']()}
+                {item.enabled
+                  ? m['app.action.disable']()
+                  : m['app.action.enable']()}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -262,7 +264,7 @@ function ContentRow({
                 onClick={() => setRemoving(true)}
               >
                 <TrashIcon />
-                {m['action.remove']()}
+                {m['app.action.remove']()}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -270,10 +272,10 @@ function ContentRow({
           <ConfirmDialog
             open={removing}
             onOpenChange={setRemoving}
-            title={m['content.remove_title']()}
-            description={m['content.remove_description']({ name: item.title })}
+            title={m['content.remove.title']()}
+            description={m['content.remove.description']({ name: item.title })}
             destructive
-            confirmLabel={m['action.remove']()}
+            confirmLabel={m['app.action.remove']()}
             onConfirm={() => {
               setRemoving(false);
               handlers.onRemove(item);
@@ -323,7 +325,7 @@ function WorldRows({
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label={m['action.remove']()}
+              aria-label={m['app.action.remove']()}
               className="opacity-0 transition-opacity group-hover/world:opacity-100 focus-visible:opacity-100"
               onClick={() => setRemoving(world)}
             >
@@ -341,13 +343,13 @@ function WorldRows({
       <ConfirmDialog
         open={removing !== null}
         onOpenChange={(open) => !open && setRemoving(null)}
-        title={m['content.remove_from_world_title']()}
-        description={m['content.remove_from_world_description']({
+        title={m['content.remove.from_world_title']()}
+        description={m['content.remove.from_world_description']({
           name: item.title,
           world: removing ?? '',
         })}
         destructive
-        confirmLabel={m['action.remove']()}
+        confirmLabel={m['app.action.remove']()}
         onConfirm={() => {
           const world = removing;
           setRemoving(null);

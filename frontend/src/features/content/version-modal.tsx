@@ -71,10 +71,10 @@ export function ChangeVersionModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {m['content.change_version_title']({ name: item?.title ?? '' })}
+            {m['content.change_version.title']({ name: item?.title ?? '' })}
           </DialogTitle>
           <DialogDescription>
-            {m['content.change_version_description']()}
+            {m['content.change_version.description']()}
           </DialogDescription>
         </DialogHeader>
 
@@ -82,7 +82,7 @@ export function ChangeVersionModal({
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder={m['wizard.filter_versions']()}
+            placeholder={m['entry.create.filter_versions']()}
           />
 
           <div className="max-h-64 divide-y divide-border overflow-y-auto border border-border">
@@ -92,7 +92,7 @@ export function ChangeVersionModal({
               </p>
             ) : shown.length === 0 ? (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                {m['wizard.no_versions_match']()}
+                {m['entry.create.no_versions_match']()}
               </p>
             ) : (
               shown.map((v) => {
@@ -148,7 +148,7 @@ export function ChangeVersionModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => close(false)}>
-            {m['action.cancel']()}
+            {m['app.action.cancel']()}
           </Button>
           <Button
             disabled={!picked || picked.versionNumber === item?.versionNumber}
@@ -157,7 +157,7 @@ export function ChangeVersionModal({
               close(false);
             }}
           >
-            {m['action.apply']()}
+            {m['app.action.apply']()}
           </Button>
         </DialogFooter>
       </DialogContent>

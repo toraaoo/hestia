@@ -9,7 +9,9 @@ use proto::profile::{
 };
 use proto::Empty;
 
-use super::guards::{ensure_no_backup, ensure_no_content, ensure_stopped, find_instance};
+use super::guards::{
+    ensure_no_backup, ensure_no_content, ensure_no_transfer, ensure_stopped, find_instance,
+};
 use crate::runtime::{instance_process_id, Channels, ContentJob};
 
 pub(super) fn register(on: &mut Channels<'_>) {
@@ -72,6 +74,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
         ensure_no_backup(&ctx, &process_id, &record.name)?;
         ensure_no_content(&ctx, &process_id, &record.name)?;
+        ensure_no_transfer(&ctx, &process_id, &record.name)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::ProfileApply {
                 instance_id: record.id,

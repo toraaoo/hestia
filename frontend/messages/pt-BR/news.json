@@ -1,0 +1,16 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "news": {
+    "acknowledge": "Entendi",
+    "checked": "Verificado {ago}",
+    "disabled_body": "Reative-as em Configurações para ver novidades e avisos.",
+    "empty_body": "Anúncios sobre o Hestia aparecem aqui.",
+    "mark_all_read": "Marcar tudo como lido",
+    "never_fetched": "O feed ainda não foi verificado.",
+    "read_more": "Ler mais",
+    "refresh": "Buscar novidades",
+    "refreshed": "Feed verificado",
+    "subtitle": "Anúncios para esta versão",
+    "title": "Novidades"
+  }
+}

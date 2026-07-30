@@ -22,7 +22,7 @@ use crate::runtime::{server_process_id, Channels, StartError};
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<ServerFlavors, _, _>(|_: Empty, ctx| async move {
         Ok(FlavorsResult {
-            flavors: ctx.runtime.engine().minecraft().server_flavors(),
+            flavors: ctx.runtime.engine().server_flavors().await,
         })
     });
 
@@ -216,10 +216,10 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 process_id: info.id,
                 pid: info.pid,
             }),
-            Err(StartError::EmptyProgram | StartError::InvalidId) => Err(ErrorInfo::Internal {
+            Err(StartError::EmptyProgram | StartError::InvalidId(_)) => Err(ErrorInfo::Internal {
                 detail: "invalid launch plan".into(),
             }),
-            Err(StartError::Spawn(e)) => Err(ErrorInfo::Internal {
+            Err(e @ StartError::Spawn { .. }) => Err(ErrorInfo::Internal {
                 detail: format!("cannot spawn the server: {e}"),
             }),
         }

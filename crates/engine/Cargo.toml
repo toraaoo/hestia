@@ -28,6 +28,17 @@ async-trait = { workspace = true }
 p256 = { version = "0.14.0", features = ["ecdsa"] }
 getrandom = "0.4"
 base64 = "0.22.1"
+minisign-verify = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 junction = { workspace = true }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_JobObjects", "Win32_System_Threading"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(unix)'.dev-dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile.workspace = true

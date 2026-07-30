@@ -41,14 +41,14 @@ export function MembersDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {m['profiles.members_title']({ name: profile?.name ?? '' })}
+            {m['profile.members.title']({ name: profile?.name ?? '' })}
           </DialogTitle>
           <DialogDescription>
-            {m['profiles.members_description']()}
+            {m['profile.members.description']()}
           </DialogDescription>
         </DialogHeader>
         {pool.length === 0 ? (
-          <Empty>{m['profiles.members_empty']()}</Empty>
+          <Empty>{m['profile.members.empty']()}</Empty>
         ) : (
           <div className="grid max-h-72 gap-2 overflow-y-auto p-1">
             {pool.map((item) => {
@@ -74,7 +74,7 @@ export function MembersDialog({
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => close(false)}>
-            {m['action.cancel']()}
+            {m['app.action.cancel']()}
           </Button>
           <Button
             disabled={pending}
@@ -82,7 +82,7 @@ export function MembersDialog({
               if (profile) onSave(profile.name, members);
             }}
           >
-            {m['action.apply']()}
+            {m['app.action.apply']()}
           </Button>
         </DialogFooter>
       </DialogContent>

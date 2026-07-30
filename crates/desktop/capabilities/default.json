@@ -20,6 +20,8 @@
     },
     "opener:allow-open-url",
     "dialog:default",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "updater:default",
+    "process:default"
   ]
 }

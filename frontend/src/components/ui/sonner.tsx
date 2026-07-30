@@ -32,6 +32,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }
       toastOptions={{
         style: { fontSize: 'var(--text-xs)' },
+        classNames: {
+          toast: 'rounded-none',
+          icon: 'rounded-none',
+          actionButton: '!rounded-none',
+          cancelButton: '!rounded-none',
+          closeButton: '!rounded-none',
+        },
       }}
       {...props}
     />

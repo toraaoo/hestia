@@ -18,27 +18,33 @@ const COUNT_PHASES: ProvisionPhase[] = [
   'assets',
   'backup',
   'overrides',
+  'archive',
+  'extract',
 ];
 
 /** Map a live provisioning phase to a human label; falls back to the raw id. */
 export function phaseLabel(phase: ProvisionPhase): string {
   switch (phase) {
     case 'resolving':
-      return m['phase.resolving_profile']();
+      return m['domain.phase.resolving_profile']();
     case 'backup':
-      return m['phase.backing_up']();
+      return m['domain.phase.backing_up']();
     case 'java':
-      return m['phase.installing_java']();
+      return m['domain.phase.installing_java']();
     case 'server':
-      return m['phase.downloading_server']();
+      return m['domain.phase.downloading_server']();
     case 'client':
     case 'libraries':
     case 'assets':
-      return m['phase.downloading']({ name: phase });
+      return m['domain.phase.downloading']({ name: phase });
     case 'content':
-      return m['phase.mirroring']();
+      return m['domain.phase.mirroring']();
     case 'overrides':
-      return m['phase.writing_pack_files']();
+      return m['domain.phase.writing_pack_files']();
+    case 'archive':
+      return m['domain.phase.archiving']();
+    case 'extract':
+      return m['domain.phase.extracting']();
     default:
       return phase;
   }
@@ -56,6 +62,11 @@ export function overallRatio(p: ProvisionProgress): number {
     return Math.min(1, ((p.item ?? 1) - 1 + unit) / p.items);
   }
   return unit;
+}
+
+/** Whether the step has an extent to fill; a bar pinned at 0% reads as stuck. */
+export function isMeasurable(p: ProvisionProgress): boolean {
+  return p.total > 0 || (p.items ?? 0) > 0;
 }
 
 /**
@@ -122,18 +133,25 @@ export function ProvisionProgressView({
   fallbackLabel?: string;
   className?: string;
 }) {
-  const rate = useRate(indeterminate ? null : progress);
+  const measurable =
+    !indeterminate && progress !== null && isMeasurable(progress);
+  const rate = useRate(measurable ? progress : null);
   const label = progress
     ? phaseLabel(progress.phase)
-    : (fallbackLabel ?? m['phase.resolving_profile']());
+    : (fallbackLabel ?? m['domain.phase.resolving_profile']());
 
-  if (indeterminate) {
+  if (!measurable) {
     return (
-      <div className={cn('flex flex-col gap-3', className)}>
+      <div className={cn('flex flex-col gap-2', className)}>
         <span className="text-xs">{label}</span>
         <div className="relative h-1 w-full overflow-hidden bg-muted">
           <div className="progress-sweep absolute inset-y-0 left-0 bg-primary" />
         </div>
+        {progress?.detail && (
+          <p className="truncate text-xs text-muted-foreground">
+            {progress.detail}
+          </p>
+        )}
       </div>
     );
   }

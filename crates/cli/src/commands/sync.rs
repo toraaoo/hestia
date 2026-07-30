@@ -40,10 +40,21 @@ pub async fn run(cmd: SyncCmd) -> Result<()> {
 async fn status() -> Result<()> {
     let client = super::connect().await?;
     let config = client.sync().get().await?;
-    ui::show(View::detail([(
-        "shared store",
-        config.shared_dir.display().to_string(),
-    )]))?;
+    ui::show(View::detail([
+        (
+            "sharing",
+            match config.enabled {
+                true => "on".to_string(),
+                false => "off (config set sync.enabled true)".to_string(),
+            },
+        ),
+        ("shared store", config.shared_dir.display().to_string()),
+    ]))?;
+    if !config.enabled {
+        return ui::show(View::note(
+            "instances keep their own settings while sharing is off",
+        ));
+    }
     render_targets(&config.targets)?;
     render_status(client.sync().status().await?)
 }
@@ -87,8 +98,8 @@ fn render_status(instances: Vec<InstanceSyncStatus>) -> Result<()> {
     ))?;
     for (name, target) in blocked {
         ui::show(View::note(format!(
-            "'{name}' has an existing '{target}' — move it into the store with \
-             `hestia instance {name} sync adopt {target}`"
+            "'{name}' keeps its own '{target}': files of the same name are already shared — \
+             rename or delete the clashing ones to share it"
         )))?;
     }
     Ok(())
@@ -97,8 +108,8 @@ fn render_status(instances: Vec<InstanceSyncStatus>) -> Result<()> {
 fn state_label(state: LinkState) -> &'static str {
     match state {
         LinkState::Linked => "linked",
-        LinkState::Pending => "links at next launch",
-        LinkState::CannotLink => "cannot link",
+        LinkState::Pending => "shares at next launch",
+        LinkState::CannotLink => "clashes with the store",
     }
 }
 

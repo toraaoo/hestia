@@ -23,7 +23,7 @@ use anyhow::{anyhow, bail, Result};
 use client::proto::warning::WarningInfo;
 
 pub use components::PickerItem;
-pub use progress::{InstallReporter, ProvisionReporter, Spinner};
+pub use progress::{DownloadReporter, InstallReporter, ProvisionReporter, Spinner};
 pub use session::console::ConsoleEvent;
 pub use session::monitor::MonitorSample;
 pub use view::View;
@@ -65,14 +65,23 @@ pub fn show_warnings(warnings: &[WarningInfo]) -> Result<()> {
 /// Prompt the user to pick one of `items`, returning its index. Requires an
 /// interactive terminal; errors otherwise so callers can ask for an argument.
 pub fn select(prompt: &str, items: &[String]) -> Result<usize> {
+    select_detailed(prompt, items, &[])
+}
+
+/// The same prompt with a dimmed second line per item — for a choice whose
+/// label cannot say enough on its own.
+pub fn select_detailed(prompt: &str, items: &[String], details: &[String]) -> Result<usize> {
     if items.is_empty() {
         bail!("nothing to select");
     }
     if !is_interactive() {
         bail!("no interactive terminal; pass the choice as an argument");
     }
-    session::run(session::prompt::SelectScreen::new(prompt, items), None)?
-        .ok_or_else(|| anyhow!("selection cancelled"))
+    session::run(
+        session::prompt::SelectScreen::new(prompt, items, details),
+        None,
+    )?
+    .ok_or_else(|| anyhow!("selection cancelled"))
 }
 
 /// Prompt the user to check any number of `items`, returning their indices.

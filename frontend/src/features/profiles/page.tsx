@@ -57,8 +57,8 @@ export function ProfilesPage({
 
   return (
     <Page
-      title={m['profiles.page_title']()}
-      subtitle={m['profiles.page_description']()}
+      title={m['profile.global.title']()}
+      subtitle={m['profile.global.description']()}
       loading={list.isPending}
       skeleton={
         <CardGridSkeleton
@@ -68,7 +68,7 @@ export function ProfilesPage({
         />
       }
       search
-      searchPlaceholder={m['profiles.search_placeholder']()}
+      searchPlaceholder={m['profile.search_placeholder']()}
       actions={
         <>
           <ViewToggle view={view} onView={onViewChange} />
@@ -78,7 +78,7 @@ export function ProfilesPage({
             onClick={() => setCreating(true)}
           >
             <PlusIcon weight="bold" />
-            {m['profiles.new_global']()}
+            {m['profile.global.new']()}
           </Button>
         </>
       }
@@ -86,8 +86,8 @@ export function ProfilesPage({
       {filtered.length === 0 ? (
         <Empty>
           {profiles.length === 0
-            ? m['profiles.global_empty']()
-            : m['profiles.none_match']()}
+            ? m['profile.global.empty']()
+            : m['profile.none_match']()}
         </Empty>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
@@ -129,7 +129,7 @@ function entrySummary(profile: GlobalProfile): string {
     profile.entries
       .slice(0, 3)
       .map((e) => e.slug || e.projectId)
-      .join(' · ') || m['profiles.no_entries']()
+      .join(' · ') || m['profile.global.no_entries']()
   );
 }
 
@@ -145,7 +145,9 @@ function ProfileCard({ profile }: { profile: GlobalProfile }) {
         <div className="relative flex h-24 items-center justify-center border-b border-border bg-muted/40">
           <StackIcon className="size-9 text-muted-foreground/40" />
           <span className="absolute top-2 left-2 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground backdrop-blur-xs">
-            {m['profiles.entries_count']({ count: profile.entries.length })}
+            {m['profile.global.entries_count']({
+              count: profile.entries.length,
+            })}
           </span>
         </div>
 
@@ -178,7 +180,7 @@ function ProfileRow({ profile }: { profile: GlobalProfile }) {
         </div>
       </div>
       <Badge variant="outline" className="shrink-0 font-mono">
-        {m['profiles.entries_count']({ count: profile.entries.length })}
+        {m['profile.global.entries_count']({ count: profile.entries.length })}
       </Badge>
       <CaretRightIcon className="size-4 shrink-0 text-muted-foreground" />
     </Link>
@@ -218,13 +220,13 @@ function CreateGlobalDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>{m['profiles.create_title']()}</DialogTitle>
+          <DialogTitle>{m['profile.create.title']()}</DialogTitle>
           <DialogDescription>
-            {m['profiles.page_description']()}
+            {m['profile.global.description']()}
           </DialogDescription>
         </DialogHeader>
         <Field>
-          <FieldLabel>{m['profiles.name_label']()}</FieldLabel>
+          <FieldLabel>{m['profile.create.name_label']()}</FieldLabel>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -236,10 +238,10 @@ function CreateGlobalDialog({
         </Field>
         <DialogFooter>
           <Button variant="outline" onClick={() => close(false)}>
-            {m['action.cancel']()}
+            {m['app.action.cancel']()}
           </Button>
           <Button disabled={invalid || pending} onClick={() => onCreate(slug)}>
-            {m['action.confirm']()}
+            {m['app.action.confirm']()}
           </Button>
         </DialogFooter>
       </DialogContent>

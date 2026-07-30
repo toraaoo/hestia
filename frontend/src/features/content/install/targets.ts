@@ -75,10 +75,10 @@ export const targetTakesKind = (t: Target, kind: ContentKind): boolean =>
 
 export const entryTypeLabel = (type: Target['type']): string =>
   type === 'server'
-    ? m['entry.type_server']()
+    ? m['domain.entry_type.server']()
     : type === 'profile'
-      ? m['entry.type_profile']()
-      : m['entry.type_instance']();
+      ? m['domain.entry_type.profile']()
+      : m['domain.entry_type.instance']();
 
 /**
  * A local file staged for import, carrying the daemon's inspection. `kind` is

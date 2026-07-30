@@ -11,6 +11,7 @@ export type { LoadersParams } from "./generated/LoadersParams";
 export type { LoadersResult } from "./generated/LoadersResult";
 export type { ProvisionPhase } from "./generated/ProvisionPhase";
 export type { ProvisionProgress } from "./generated/ProvisionProgress";
+export type { Requirement } from "./generated/Requirement";
 export type { ResolveParams } from "./generated/ResolveParams";
 export type { ServerProfile } from "./generated/ServerProfile";
 export type { VersionKind } from "./generated/VersionKind";

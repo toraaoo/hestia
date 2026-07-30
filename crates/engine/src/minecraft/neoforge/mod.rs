@@ -8,7 +8,8 @@
 //! `install` hook where every other flavor only names downloads.
 //!
 //! The catalogue needs no service either: a NeoForge version *is* its game
-//! version plus a build number, so both lists come from one `maven-metadata.xml`.
+//! version plus a build number, so both lists come from the `maven-metadata.xml`
+//! of the two artifacts NeoForge publishes under.
 
 pub(crate) mod processors;
 
@@ -26,6 +27,8 @@ use crate::download::Downloader;
 
 const ID: &str = "neoforge";
 const NAME: &str = "NeoForge";
+const SUMMARY: &str =
+    "Mod loader for big, content-heavy modpacks. The first launch prepares the game files, so it takes a few minutes.";
 
 /// The game versions NeoForge builds exist for, newest first and typed by
 /// Mojang's manifest — the same ground truth every other flavor is ordered by.
@@ -57,26 +60,26 @@ async fn builds(game: &str) -> Result<Vec<String>> {
     Ok(builds)
 }
 
-/// The build a resolve uses: the pinned one, else the newest stable build,
-/// falling back to the newest of any kind. NeoForge marks a prerelease with a
-/// `-beta` suffix and nothing else, so that suffix is the only stability signal
-/// there is.
+/// The build a resolve uses: the pinned one, else simply the newest.
+///
+/// NeoForge is the one flavor with no stability preference, following
+/// modrinth/code: daedalus marks *every* NeoForge build unstable, so the
+/// launcher's stable/latest choice is permanently disabled for it and always
+/// resolves latest. Preferring a release build over a newer `-beta` would also
+/// mean pinning many game versions to a months-old build — NeoForge leaves a
+/// whole line on `-beta` for its lifetime (26.2 has 34 builds and no release),
+/// so the suffix tracks the game version's own maturity more than the build's.
 async fn resolve_loader(request: &ResolveRequest) -> Result<String> {
     if let Some(pinned) = &request.loader_version {
         return Ok(pinned.clone());
     }
     let builds = builds(&request.version).await?;
-    builds
-        .iter()
-        .find(|v| !v.contains("-beta"))
-        .or_else(|| builds.first())
-        .cloned()
-        .with_context(|| {
-            format!(
-                "no neoforge build is published for Minecraft {}",
-                request.version
-            )
-        })
+    builds.first().cloned().with_context(|| {
+        format!(
+            "no neoforge build is published for Minecraft {}",
+            request.version
+        )
+    })
 }
 
 /// Where a version's installer jar is kept once fetched. It is not a launch
@@ -148,6 +151,7 @@ async fn run_install(
             minecraft_jar: request.minecraft_jar,
             side,
             java: request.java,
+            processes: request.processes,
         },
         on_progress,
     )
@@ -163,7 +167,10 @@ pub(crate) fn server_args_file(loader: &str) -> String {
     } else {
         "unix_args.txt"
     };
-    format!("libraries/net/neoforged/neoforge/{loader}/{name}")
+    format!(
+        "libraries/net/neoforged/{}/{loader}/{name}",
+        neoforge::artifact(loader)
+    )
 }
 
 pub struct NeoForgeServer;
@@ -175,6 +182,9 @@ impl ServerProvider for NeoForgeServer {
     }
     fn name(&self) -> &'static str {
         NAME
+    }
+    fn summary(&self) -> &'static str {
+        SUMMARY
     }
     fn loads(&self) -> Loads {
         Some(ContentKind::Mod)
@@ -221,6 +231,9 @@ impl InstanceProvider for NeoForgeInstance {
     }
     fn name(&self) -> &'static str {
         NAME
+    }
+    fn summary(&self) -> &'static str {
+        SUMMARY
     }
     fn loads(&self) -> Loads {
         Some(ContentKind::Mod)

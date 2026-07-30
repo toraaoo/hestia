@@ -13,12 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Progress,
-  ProgressLabel,
-  ProgressValue,
-} from '@/components/ui/progress';
 import { PickRow } from '@/features/content/components/pick-row';
+import { ProvisionProgressView } from '@/features/entries/components/provision-progress';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations } from '@/queries/instance';
 import { useJobMutation } from '@/queries/jobs';
@@ -41,10 +37,6 @@ export function ApplyGlobalDialog({
 
   const list = globals.data ?? [];
   const progress = apply.progress;
-  const percent =
-    progress && progress.total > 0
-      ? Math.round((progress.current / progress.total) * 100)
-      : 0;
 
   const close = (next: boolean) => {
     if (apply.isPending) return;
@@ -68,24 +60,20 @@ export function ApplyGlobalDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{m['profiles.apply_title']()}</DialogTitle>
+          <DialogTitle>{m['profile.apply.title']()}</DialogTitle>
           <DialogDescription>
-            {m['profiles.apply_description']({ version })}
+            {m['profile.apply.description']({ version })}
           </DialogDescription>
         </DialogHeader>
         {apply.isPending ? (
           <div className="flex min-h-24 flex-col justify-center px-1">
-            <Progress value={percent}>
-              <ProgressLabel>
-                {progress?.detail ||
-                  progress?.phase ||
-                  m['profiles.apply_global']()}
-              </ProgressLabel>
-              <ProgressValue />
-            </Progress>
+            <ProvisionProgressView
+              progress={progress ?? null}
+              fallbackLabel={m['profile.apply.action']()}
+            />
           </div>
         ) : list.length === 0 ? (
-          <Empty>{m['profiles.global_empty']()}</Empty>
+          <Empty>{m['profile.global.empty']()}</Empty>
         ) : (
           <div className="grid gap-2 p-1">
             {list.map((profile) => (
@@ -93,7 +81,7 @@ export function ApplyGlobalDialog({
                 key={profile.name}
                 icon={StackIcon}
                 title={profile.name}
-                subtitle={m['profiles.entries_count']({
+                subtitle={m['profile.global.entries_count']({
                   count: profile.entries.length,
                 })}
                 selected={picked === profile.name}
@@ -108,10 +96,10 @@ export function ApplyGlobalDialog({
             disabled={apply.isPending}
             onClick={() => close(false)}
           >
-            {m['action.cancel']()}
+            {m['app.action.cancel']()}
           </Button>
           <Button disabled={picked === null || apply.isPending} onClick={run}>
-            {m['action.apply']()}
+            {m['app.action.apply']()}
           </Button>
         </DialogFooter>
       </DialogContent>

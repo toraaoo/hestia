@@ -59,18 +59,18 @@ export function ServersPage({
 
   return (
     <Page
-      title={m['nav.servers']()}
-      subtitle={m['servers.subtitle']()}
+      title={m['app.nav.servers']()}
+      subtitle={m['server.subtitle']()}
       skeleton={<EntryGridSkeleton />}
       loading={servers.isPending}
       search
-      searchPlaceholder={m['search.servers']()}
+      searchPlaceholder={m['app.search.servers']()}
       actions={
         <>
           <FilterMenu
             groups={[
               {
-                label: m['label.flavor'](),
+                label: m['app.label.flavor'](),
                 flavors,
                 value: flavor,
                 onChange: onFlavorChange,
@@ -84,7 +84,7 @@ export function ServersPage({
             onClick={() => setCreating(true)}
           >
             <PlusIcon weight="bold" />
-            {m['servers.new']()}
+            {m['server.new']()}
           </Button>
         </>
       }
@@ -92,7 +92,7 @@ export function ServersPage({
       <EntryCollection
         cards={filtered}
         view={view}
-        empty={m['servers.none_match']()}
+        empty={m['server.none_match']()}
       />
       <CreateEntryModal
         kind="server"

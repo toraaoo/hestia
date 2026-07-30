@@ -1,16 +1,19 @@
-//! A scrollable highlight list: wrap-around stepping, arrow/vim keys, and an
-//! optional checkbox mode for multi-selection.
+//! A scrollable highlight list: wrap-around stepping, arrow/vim keys, an
+//! optional dimmed second line per row, and an optional checkbox mode for
+//! multi-selection.
 
 use std::collections::HashSet;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Text};
 use ratatui::widgets::{List, ListItem, ListState};
 use ratatui::Frame;
 
 pub struct SelectList {
     items: Vec<String>,
+    details: Vec<String>,
     state: ListState,
     checked: Option<HashSet<usize>>,
 }
@@ -23,9 +26,18 @@ impl SelectList {
         }
         SelectList {
             items,
+            details: Vec::new(),
             state,
             checked: None,
         }
+    }
+
+    /// Give each row a dimmed second line — a description the label alone
+    /// cannot carry without being clipped. Shorter than the items is fine; a
+    /// row with no detail stays one line.
+    pub fn with_details(mut self, details: Vec<String>) -> Self {
+        self.details = details;
+        self
     }
 
     pub fn with_checkboxes(mut self) -> Self {
@@ -81,14 +93,24 @@ impl SelectList {
 
     pub fn render(&mut self, frame: &mut Frame, area: Rect) {
         let checked = self.checked.as_ref();
+        let details = &self.details;
         let list = List::new(self.items.iter().enumerate().map(|(i, item)| {
-            let text = match checked {
+            let label = match checked {
                 Some(checked) => {
                     let mark = if checked.contains(&i) { "[x] " } else { "[ ] " };
                     format!("{mark}{item}")
                 }
                 None => item.clone(),
             };
+            let mut text = Text::from(label);
+            if let Some(detail) = details.get(i).filter(|d| !d.is_empty()) {
+                // Indented past the highlight symbol so the two lines read as
+                // one row rather than two entries.
+                text.push_line(Line::styled(
+                    format!("  {detail}"),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
             ListItem::new(text)
         }))
         .highlight_symbol("> ")

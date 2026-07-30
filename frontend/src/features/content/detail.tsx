@@ -47,7 +47,7 @@ export function ProjectDetailPage({
   if (!project.data || project.data.kind !== kind) {
     return (
       <div className="p-6">
-        <Empty>{m['browse.project_missing']()}</Empty>
+        <Empty>{m['content.browse.project_missing']()}</Empty>
       </div>
     );
   }
@@ -70,7 +70,7 @@ export function ProjectDetailPage({
             <Badge variant="secondary">{contentKindLabel[p.kind]()}</Badge>
             <SourceBadge source={p.source} />
             <span className="text-xs text-muted-foreground">
-              {m['browse.by_author']({ name: p.author })}
+              {m['content.browse.by_author']({ name: p.author })}
             </span>
           </>
         }
@@ -81,7 +81,7 @@ export function ProjectDetailPage({
             onClick={() => setInstallOpen(true)}
           >
             <PlusIcon weight="bold" />
-            {m['action.install']()}
+            {m['app.action.install']()}
           </Button>
         }
       />
@@ -93,9 +93,11 @@ export function ProjectDetailPage({
       >
         <TabsList variant="line" className="h-auto gap-6 px-5">
           <TabsTrigger value="description">
-            {m['tab.description']()}
+            {m['app.label.description']()}
           </TabsTrigger>
-          <TabsTrigger value="versions">{m['tab.versions']()}</TabsTrigger>
+          <TabsTrigger value="versions">
+            {m['app.label.versions']()}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="description" className="p-5">
@@ -106,18 +108,20 @@ export function ProjectDetailPage({
               <div className="divide-y divide-border border border-border p-3">
                 <div className="flex items-center gap-2 pb-2 text-xs text-muted-foreground">
                   <DownloadSimpleIcon className="size-4" />
-                  {m['browse.downloads']({ count: compact(p.downloads) })}
+                  {m['content.browse.downloads']({
+                    count: compact(p.downloads),
+                  })}
                 </div>
                 <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
                   <HeartIcon className="size-4" />
-                  {m['browse.followers']({ count: compact(p.follows) })}
+                  {m['content.browse.followers']({ count: compact(p.follows) })}
                 </div>
               </div>
 
               {p.categories.length > 0 && (
                 <div>
                   <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                    {m['label.categories']()}
+                    {m['app.label.categories']()}
                   </h3>
                   <div className="flex flex-wrap gap-1.5">
                     {p.categories.map((c) => (
@@ -165,7 +169,7 @@ export function ProjectDetailPage({
                     onClick={() => setInstallOpen(true)}
                   >
                     <PlusIcon weight="bold" />
-                    {m['action.install']()}
+                    {m['app.action.install']()}
                   </Button>
                 </div>
               ))}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "instance": {
+    "launch": {
+      "preparing": "Preparing files for the first launch…",
+      "title": "Launching {name}"
+    },
+    "logs_empty": "Launch this instance to stream its log here.",
+    "missing": "That instance no longer exists.",
+    "new": "New instance",
+    "no_worlds": "No saved worlds yet.",
+    "none_match": "No instances match your search.",
+    "sign_in_hint": "Sign in with a Microsoft account to create and play instances.",
+    "subtitle": "Worlds you play",
+    "world": {
+      "cheats": "Cheats",
+      "hardcore": "Hardcore",
+      "unreadable": "This world's level.dat could not be read"
+    },
+    "export": {
+      "title": "Export “{name}”",
+      "format": "Format",
+      "hint_hestia": "Everything this instance is — mods, configuration and worlds — so importing it back gives you exactly this.",
+      "hint_mrpack": "A pack other launchers can read. Its mods travel as links to where they came from, so anything installed from a file is embedded instead.",
+      "selected": "{selected} of {total}",
+      "empty": "This instance has no files to export yet.",
+      "done": "Exported “{name}”",
+      "summary": "{files} file(s), {size}"
+    },
+    "import": {
+      "action": "Import from file…",
+      "choose": "Choose a file…",
+      "description": "Pick an archive and hestia works out what it is.",
+      "done": "Imported “{name}”",
+      "drop": "Drop to import this instance",
+      "formats": "hestia archive, Modrinth pack, or a Prism/MultiMC instance",
+      "reading": "Reading the archive…",
+      "title": "Import an instance"
+    }
+  }
+}

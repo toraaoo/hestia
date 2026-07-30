@@ -12,13 +12,14 @@ mod paper;
 pub(crate) mod ping;
 mod provider;
 pub(crate) mod rcon;
+mod spigot;
 mod vanilla;
 pub(crate) mod world;
 
 use anyhow::{Context, Result};
 use proto::minecraft::{Flavor, GameVersion, InstanceProfile, ServerProfile};
 
-pub use provider::InstallRequest;
+pub use provider::{accepted_kinds, unmet, InstallRequest, Prerequisite, Side};
 use provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 /// The Java majors Minecraft launch profiles ever require: 8 (pre-1.17),
@@ -39,6 +40,8 @@ impl Default for Minecraft {
                 Box::new(fabric::FabricServer),
                 Box::new(paper::PaperServer),
                 Box::new(paper::FoliaServer),
+                Box::new(spigot::SpigotServer),
+                Box::new(spigot::BukkitServer),
                 Box::new(neoforge::NeoForgeServer),
             ],
             instances: vec![
@@ -58,15 +61,26 @@ impl Minecraft {
     pub fn server_flavors(&self) -> Vec<Flavor> {
         self.servers
             .iter()
-            .map(|p| flavor(p.id(), p.name()))
+            .map(|p| flavor(p.id(), p.name(), p.summary(), Side::Server, p.loads()))
             .collect()
     }
 
     pub fn instance_flavors(&self) -> Vec<Flavor> {
         self.instances
             .iter()
-            .map(|p| flavor(p.id(), p.name()))
+            .map(|p| flavor(p.id(), p.name(), p.summary(), Side::Client, p.loads()))
             .collect()
+    }
+
+    /// What a flavor needs on the machine. Whether it is *there* is a question
+    /// about this computer, not about the catalogue — `Engine::server_flavors`
+    /// answers that.
+    pub fn server_requires(&self, flavor: &str) -> &'static [Prerequisite] {
+        self.server(flavor).map(|p| p.requires()).unwrap_or(&[])
+    }
+
+    pub fn instance_requires(&self, flavor: &str) -> &'static [Prerequisite] {
+        self.instance(flavor).map(|p| p.requires()).unwrap_or(&[])
     }
 
     /// The content kind a server flavor's own loader consumes. An unregistered
@@ -170,9 +184,12 @@ impl Minecraft {
     }
 }
 
-fn flavor(id: &str, name: &str) -> Flavor {
+fn flavor(id: &str, name: &str, summary: &str, side: Side, loads: Loads) -> Flavor {
     Flavor {
         id: id.to_string(),
         name: name.to_string(),
+        summary: summary.to_string(),
+        accepts: accepted_kinds(side, loads),
+        requires: Vec::new(),
     }
 }

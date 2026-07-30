@@ -18,14 +18,16 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 /// Why a folder target stayed instance-local instead of being linked into the
-/// shared store — the empty-or-linked guard's two refusals.
+/// shared store. A folder holding only the instance's own files is adopted
+/// automatically, so both of these are cases where a move would have destroyed
+/// something.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum NotSharedReason {
-    /// The folder is a real directory with contents; linking would have merged
-    /// or replaced them, so it was left alone.
-    HasContents,
+    /// The store already holds files by the same names, so moving the folder's
+    /// own into it would overwrite them.
+    Collides,
     /// The folder is a symlink the user made, pointing somewhere that is not a
     /// hestia store. Only hestia's own links are ever touched.
     ForeignLink,
@@ -34,7 +36,7 @@ pub enum NotSharedReason {
 impl fmt::Display for NotSharedReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            NotSharedReason::HasContents => "the folder already has contents",
+            NotSharedReason::Collides => "files of the same name are already shared",
             NotSharedReason::ForeignLink => "the folder is a link you made",
         })
     }
@@ -64,9 +66,21 @@ pub enum WarningInfo {
     /// `count` alongside `paths` so the headline is one interpolation rather
     /// than a joined list a front-end would have to shorten itself.
     ModpackOverridesKept { count: u32, paths: Vec<String> },
-    /// The pack named files of a kind this entry's flavor cannot load, so they
-    /// were not installed — a client-shaped pack put on a server, typically.
-    ModpackFilesNotAccepted { count: u32, flavor: String },
+    /// The pack declared client-only mods as server-compatible, so they were
+    /// held back — a correction over the pack's own `env`, which packs get
+    /// wrong routinely. Named individually: which mod was dropped is exactly
+    /// what someone debugging a pack needs, and the list is short.
+    ModpackFilesExcluded { count: u32, files: Vec<String> },
+    /// Pool items an `.mrpack` export could not name as downloads — a local
+    /// import, or a file from a source the pack format cannot reference — so
+    /// they were embedded in the archive instead. The export is complete and
+    /// installs correctly; it is only no longer a pack Modrinth would accept
+    /// for publishing.
+    ExportFilesEmbedded { count: u32, files: Vec<String> },
+    /// Content an import took from the archive's own bytes rather than from a
+    /// source: it is installed and loads, but carries no provenance, so it can
+    /// never be updated in place.
+    ImportFilesUntracked { count: u32, files: Vec<String> },
 }
 
 impl WarningInfo {
@@ -81,12 +95,12 @@ impl WarningInfo {
                  `hestia server {name} update <version>` re-derives it"
             ),
             SyncTargetNotShared {
-                instance,
                 target,
-                reason: NotSharedReason::HasContents,
+                reason: NotSharedReason::Collides,
+                ..
             } => format!(
-                "`hestia instance {instance} sync adopt {target}` moves those contents into the \
-                 shared store and links the folder"
+                "rename or delete the clashing files under `data/{target}`, then launch again to \
+                 share it"
             ),
             SyncTargetNotShared { target, .. } => format!(
                 "remove or repoint the link at `data/{target}`, then launch again to share it"
@@ -98,10 +112,18 @@ impl WarningInfo {
                 "delete a file under `data/` to take the pack's version of it at the next update"
                     .to_string()
             }
-            ModpackFilesNotAccepted { .. } => {
-                "nothing to do — the pack ships them for the other side; install the pack on an \
-                 instance to get them"
+            ModpackFilesExcluded { .. } => {
+                "they would break a server; `config set modpack.force-include-files <name>` \
+                 installs one anyway, and `modpack.default-excludes false` trusts the pack"
                     .to_string()
+            }
+            ExportFilesEmbedded { .. } => {
+                "nothing to do unless you mean to publish the pack — reinstall those files from a \
+                 source first if you do"
+                    .to_string()
+            }
+            ImportFilesUntracked { .. } => {
+                "reinstall them from a source (`mod add <name>`) to make them updatable".to_string()
             }
         }
     }
@@ -126,9 +148,17 @@ impl fmt::Display for WarningInfo {
                 f,
                 "{count} file(s) you had edited were kept instead of the modpack's"
             ),
-            ModpackFilesNotAccepted { count, flavor } => write!(
+            ModpackFilesExcluded { count, .. } => write!(
                 f,
-                "{count} of the modpack's file(s) are not loaded by a {flavor} entry and were skipped"
+                "{count} client-only mod(s) the pack called server-compatible were not installed"
+            ),
+            ExportFilesEmbedded { count, .. } => write!(
+                f,
+                "{count} file(s) had no download to reference and were embedded in the archive"
+            ),
+            ImportFilesUntracked { count, .. } => write!(
+                f,
+                "{count} file(s) came from the archive itself, so they cannot be updated"
             ),
         }
     }

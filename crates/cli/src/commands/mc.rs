@@ -12,6 +12,7 @@ use client::proto::minecraft::{
 use client::proto::process::{ProcessInfo, ProcessState};
 use client::Client;
 
+use crate::commands::content::format::kind_plural;
 use crate::ui::{self, View};
 
 /// The shared `config` grammar for a server/instance: `get`/`set`/`list`,
@@ -235,8 +236,9 @@ pub fn pick_flavor(flavors: Vec<Flavor>, provided: Option<String>) -> Result<Str
         let ids: Vec<&str> = flavors.iter().map(|f| f.id.as_str()).collect();
         bail!("unknown flavor '{id}' (available: {})", ids.join(", "));
     }
-    let labels: Vec<String> = flavors.iter().map(|f| f.name.clone()).collect();
-    let index = ui::select("select a flavor", &labels)?;
+    let labels: Vec<String> = flavors.iter().map(flavor_label).collect();
+    let details: Vec<String> = flavors.iter().map(flavor_detail).collect();
+    let index = ui::select_detailed("select a flavor", &labels, &details)?;
     Ok(flavors[index].id.clone())
 }
 
@@ -284,15 +286,57 @@ pub fn confirm_downgrade(name: &str, data: &str, safety: &str, from: &str, to: &
 }
 
 /// The non-interactive form of the selector: the available flavors as a table.
+/// Every column comes off the wire, so a flavor the daemon ships needs nothing
+/// here to describe itself.
 pub fn show_flavors(flavors: &[Flavor]) -> Result<()> {
     if flavors.is_empty() {
         return ui::show(View::note("no flavors are available"));
     }
     let rows: Vec<Vec<String>> = flavors
         .iter()
-        .map(|f| vec![f.id.clone(), f.name.clone()])
+        .map(|f| {
+            vec![
+                f.id.clone(),
+                f.name.clone(),
+                accepts_label(f),
+                flavor_detail(f),
+            ]
+        })
         .collect();
-    ui::show(View::table("flavors", ["ID", "NAME"], rows))
+    ui::show(View::table(
+        "flavors",
+        ["ID", "NAME", "TAKES", "SUMMARY"],
+        rows,
+    ))
+}
+
+/// One selector line: the name and what it takes; the daemon's summary is the
+/// row's second line.
+pub fn flavor_label(flavor: &Flavor) -> String {
+    format!("{} ({})", flavor.name, accepts_label(flavor))
+}
+
+/// The summary, prefixed with anything this machine is missing — a flavor that
+/// cannot be used yet has to say so before it is picked, not after.
+pub fn flavor_detail(flavor: &Flavor) -> String {
+    let missing: Vec<String> = flavor
+        .requires
+        .iter()
+        .map(|r| format!("needs {} ({})", r.name, r.url))
+        .collect();
+    match missing.is_empty() {
+        true => flavor.summary.clone(),
+        false => format!("{} — {}", missing.join(", "), flavor.summary),
+    }
+}
+
+fn accepts_label(flavor: &Flavor) -> String {
+    flavor
+        .accepts
+        .iter()
+        .map(|kind| kind_plural(*kind))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Show a version table, releases only unless `all` includes snapshots and old

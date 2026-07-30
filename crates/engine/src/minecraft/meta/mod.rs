@@ -6,6 +6,7 @@ pub mod fabric;
 pub mod mojang;
 pub mod neoforge;
 pub mod paper;
+pub mod spigot;
 
 use anyhow::{bail, Context, Result};
 use serde_json::Value;

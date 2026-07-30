@@ -127,12 +127,12 @@ export function ContentInstallModal({
   const hint = installing
     ? m['content.installing']()
     : stepId === 'target'
-      ? m['content.hint_target']()
+      ? m['content.hint.target']()
       : stepId === 'content'
-        ? m['content.hint_content']()
+        ? m['content.hint.content']()
         : stepId === 'worlds'
-          ? m['content.hint_worlds']()
-          : m['content.hint_review']();
+          ? m['content.hint.worlds']()
+          : m['content.hint.review']();
 
   const canAdvance =
     stepId === 'target'
@@ -326,7 +326,7 @@ export function ContentInstallModal({
                   variant="outline"
                   onClick={() => onOpenChange(false)}
                 >
-                  {m['action.cancel']()}
+                  {m['app.action.cancel']()}
                 </Button>
               ) : (
                 <Button
@@ -338,7 +338,7 @@ export function ContentInstallModal({
                   }
                 >
                   <CaretLeftIcon />
-                  {m['action.back']()}
+                  {m['app.action.back']()}
                 </Button>
               )}
               {stepId === 'review' ? (
@@ -348,7 +348,7 @@ export function ContentInstallModal({
                   className="bg-ember text-ember-foreground hover:bg-ember/90"
                   onClick={install}
                 >
-                  {m['action.install']()}
+                  {m['app.action.install']()}
                 </Button>
               ) : (
                 <Button
@@ -358,7 +358,7 @@ export function ContentInstallModal({
                   className="bg-ember text-ember-foreground hover:bg-ember/90"
                   onClick={() => dispatch({ type: 'step', step: step + 1 })}
                 >
-                  {m['action.next']()}
+                  {m['app.action.next']()}
                   <CaretRightIcon />
                 </Button>
               )}

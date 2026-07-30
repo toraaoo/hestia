@@ -18,6 +18,7 @@ use crate::backup::BackupSettings;
 use crate::cache::Cache;
 use crate::minecraft::launch::{self, JavaSettings, LaunchPlan};
 use crate::minecraft::materialize::{self, OnProgress};
+use crate::process::{Outcome, ProcessSupervisor, Task};
 use crate::registry;
 
 const RECORD: &str = "server.json";
@@ -290,14 +291,7 @@ impl Servers {
             )
             .await?;
         }
-        materialize::ensure_artifact(
-            cache,
-            &record.profile.primary,
-            &data.join(&record.profile.primary.filename),
-            ProvisionPhase::Server,
-            on_progress,
-        )
-        .await?;
+        ensure_primary(cache, &record.profile, &data, on_progress).await?;
 
         std::fs::write(data.join("eula.txt"), "eula=true\n").context("cannot write eula.txt")?;
         tracing::info!(id = %record.id, "server files provisioned");
@@ -317,6 +311,7 @@ impl Servers {
         &self,
         record: &ServerRecord,
         java: &Path,
+        processes: &ProcessSupervisor,
         on_progress: OnProgress<'_>,
     ) {
         on_progress.report(&ProvisionProgress {
@@ -326,11 +321,18 @@ impl Servers {
             detail: "generating server.properties".into(),
             ..ProvisionProgress::default()
         });
-        self.derive_schema(record, java).await;
+        self.derive_schema(record, java, processes, on_progress)
+            .await;
     }
 
-    async fn derive_schema(&self, record: &ServerRecord, java: &Path) {
-        match self.generate_schema(record, java).await {
+    async fn derive_schema(
+        &self,
+        record: &ServerRecord,
+        java: &Path,
+        processes: &ProcessSupervisor,
+        job: OnProgress<'_>,
+    ) {
+        match self.generate_schema(record, java, processes, job).await {
             Ok(schema) if schema.is_empty() => {
                 tracing::warn!(id = %record.id, "the schema run wrote no server.properties");
             }
@@ -357,12 +359,16 @@ impl Servers {
         &self,
         record: &ServerRecord,
         java: &Path,
+        processes: &ProcessSupervisor,
+        job: OnProgress<'_>,
     ) -> Result<Vec<(String, String)>> {
         let scratch = self.server_dir(record).join(SCHEMA_RUN);
         let _ = std::fs::remove_dir_all(&scratch);
         std::fs::create_dir_all(&scratch)
             .with_context(|| format!("cannot create {}", scratch.display()))?;
-        let generated = self.run_schema_generation(record, java, &scratch).await;
+        let generated = self
+            .run_schema_generation(record, java, &scratch, processes, job)
+            .await;
         let pristine = scratch.join(PROPERTIES);
         let schema = read_properties(&pristine);
         if !schema.is_empty() {
@@ -379,6 +385,8 @@ impl Servers {
         record: &ServerRecord,
         java: &Path,
         scratch: &Path,
+        processes: &ProcessSupervisor,
+        job: OnProgress<'_>,
     ) -> Result<()> {
         let plan = launch::server_schema_plan(
             &record.profile,
@@ -387,23 +395,26 @@ impl Servers {
             scratch,
             &record.jvm,
         );
-        let mut child = tokio::process::Command::new(&plan.program)
-            .args(&plan.args)
-            .current_dir(&plan.cwd)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .kill_on_drop(true)
-            .spawn()
-            .with_context(|| format!("cannot run {}", plan.program.display()))?;
-        match tokio::time::timeout(GENERATE_TIMEOUT, child.wait()).await {
-            Ok(status) => {
-                let status = status.context("waiting for the schema run")?;
-                tracing::debug!(id = %record.id, %status, "server.properties schema run exited");
-            }
-            Err(_) => {
-                let _ = child.kill().await;
+        let outcome = processes
+            .run(
+                Task {
+                    id: format!("schema-{}", record.id),
+                    program: &plan.program,
+                    args: plan.args.clone(),
+                    cwd: plan.cwd.clone(),
+                    phase: ProvisionPhase::Server,
+                    narrates: crate::process::silent,
+                    deadline: Some(GENERATE_TIMEOUT),
+                },
+                job,
+            )
+            .await?;
+        match outcome {
+            Outcome::TimedOut => {
                 tracing::debug!(id = %record.id, "server.properties schema run timed out (no EULA gate?)");
+            }
+            Outcome::Exited(code) => {
+                tracing::debug!(id = %record.id, ?code, "server.properties schema run exited");
             }
         }
         Ok(())
@@ -443,14 +454,7 @@ impl Servers {
             )
             .await?;
         }
-        materialize::ensure_artifact(
-            cache,
-            &record.profile.primary,
-            &data.join(&record.profile.primary.filename),
-            ProvisionPhase::Server,
-            on_progress,
-        )
-        .await?;
+        ensure_primary(cache, &record.profile, &data, on_progress).await?;
 
         if previous_primary != record.profile.primary.filename {
             let _ = std::fs::remove_file(data.join(&previous_primary));
@@ -644,6 +648,31 @@ impl Servers {
     }
 }
 
+/// Fetch the server's launchable jar into its data directory.
+///
+/// A flavor that *builds* its jar (bukkit, spigot) names it with no URL: the
+/// profile still has to name it, since that is what the launch plan runs and
+/// what a backup carries over, but there is nothing to download and the
+/// flavor's `install` hook produces the file straight after.
+async fn ensure_primary(
+    cache: Option<&Cache>,
+    profile: &ServerProfile,
+    data: &Path,
+    on_progress: OnProgress<'_>,
+) -> Result<()> {
+    if profile.primary.url.is_empty() {
+        return Ok(());
+    }
+    materialize::ensure_artifact(
+        cache,
+        &profile.primary,
+        &data.join(&profile.primary.filename),
+        ProvisionPhase::Server,
+        on_progress,
+    )
+    .await
+}
+
 /// Parse `server.properties` into key/value pairs, skipping blank and comment
 /// lines. Values are kept verbatim; the split is on the first `=`.
 fn read_properties(path: &Path) -> Vec<(String, String)> {
@@ -823,9 +852,8 @@ mod tests {
 
     #[test]
     fn seeding_adds_new_keys_and_keeps_every_existing_value() {
-        let dir = std::env::temp_dir().join(format!("hestia-seed-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join(PROPERTIES);
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join(PROPERTIES);
 
         // A fresh server starts out as the whole schema.
         seed_properties(&path, &schema(&[("motd", "A Minecraft Server")])).unwrap();

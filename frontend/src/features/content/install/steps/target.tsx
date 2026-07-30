@@ -39,13 +39,13 @@ export function TargetStep({
         <FilterBar
           search={search}
           onSearch={setSearch}
-          placeholder={m['search.targets']()}
+          placeholder={m['app.search.targets']()}
         />
       }
     >
       {shown.length === 0 ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-          {m['browse.nothing_matches']()}
+          {m['content.browse.nothing_matches']()}
         </p>
       ) : (
         <div className="grid gap-2 p-0.5">

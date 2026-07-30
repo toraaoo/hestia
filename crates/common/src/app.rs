@@ -16,6 +16,67 @@ pub const DESKTOP_QUIT_ARG: &str = "--quit";
 pub const VENDOR: &str = "toraaoo";
 pub const CHANNEL: &str = "dev";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The release manifest every front-end checks for a newer version, and the
+/// minisign public key its artifacts are verified against. Both must match
+/// `plugins.updater` in `crates/desktop/tauri.conf.json` — the desktop shell
+/// reads them from there through `tauri-plugin-updater`, and
+/// `crates/common/tests/updater.rs` fails the build when the two disagree.
+pub const UPDATE_ENDPOINT: &str =
+    "https://github.com/toraaoo/hestia/releases/latest/download/latest.json";
+pub const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJDNjM3NzcxQUEwRTdDQUQKUldTdGZBNnFjWGRqTERoaEIzaXFJcU1ZdU1YdXBVUk16cFdGVFQzYmZtT3ZVRC9mbjdYU0dOQlkK";
+
+/// The rotation spare. A binary trusts only the keys compiled into it, so a
+/// successor must ship *before* it is ever needed — an empty slot here cannot
+/// be filled in retrospectively for copies already installed. Generate it in
+/// the same session as [`UPDATE_PUBKEY`], keep its private half offline and
+/// apart from the signing key, and start signing with it only once the builds
+/// that trust it are the ones in the field.
+///
+/// Only the daemon and CLI honour it ([`update_pubkeys`]); the desktop shell
+/// verifies through `tauri-plugin-updater`, whose config holds exactly one key.
+pub const UPDATE_PUBKEY_NEXT: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEQzQxRUVGQkU3M0UyRjkKUldUNTRuTys3eDdFelFCQXM2R21VbTN2RjljYTRpSGZOOURCclhxdGJuR0JNZlpwWEJCOHVaazQK";
+
+/// Every key a release artifact may be signed with, newest last. Empty slots
+/// are skipped, so an unrotated build simply trusts one key.
+pub fn update_pubkeys() -> impl Iterator<Item = &'static str> {
+    [UPDATE_PUBKEY, UPDATE_PUBKEY_NEXT]
+        .into_iter()
+        .filter(|key| !key.is_empty())
+}
+
+/// The announcement feed: the news and notices the launcher shows. A standing
+/// `announcements` release tag whose asset is replaced in place, so publishing
+/// is decoupled from cutting a version — `releases/latest/` would tie the two
+/// together and 404 on any release that omitted the asset.
+pub const ANNOUNCE_ENDPOINT: &str =
+    "https://github.com/toraaoo/hestia/releases/download/announcements/announcements.json";
+
+/// The announcement feed's own signing key — deliberately *not* [`UPDATE_PUBKEY`].
+///
+/// The feed is published by a workflow that runs on a push to the default
+/// branch, while installers are signed only from a release tag. Sharing one key
+/// would put the installer-signing secret within reach of anything that can land
+/// a commit, so the lower-stakes artifact gets its own trust root: a compromised
+/// announcement key can say things, never ship code.
+///
+/// Generated with `cargo tauri signer generate` (which writes the public half
+/// already base64-wrapped, so it is pasted here verbatim). **An empty key set
+/// fails closed** — the engine refuses an unverifiable feed rather than
+/// trusting it — so announcements do not appear until this is filled in.
+pub const ANNOUNCE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM5NTNFNDNFMDM2ODJBOEMKUldTTUttZ0RQdVJUT1RhdTBLTU9UMW4rbnkvQnpRdzN1K1JiNGhTVUxFWGZFdjFUeSs2bUI2UTQK";
+
+/// The announcement rotation spare, with the same rules as [`UPDATE_PUBKEY_NEXT`]:
+/// a binary trusts only what is compiled into it, so the successor must ship
+/// before it is needed.
+pub const ANNOUNCE_PUBKEY_NEXT: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg2QzZFMjFENTFDOUQ5MDYKUldRRzJjbFJIZUxHaGxaRXgzTjlTd0N4SDlaazN6QWhTWHJrZGhoby8wMTRQY05ZYisyaDlRYkMK";
+
+/// Every key the announcement feed may be signed with, newest last.
+pub fn announce_pubkeys() -> impl Iterator<Item = &'static str> {
+    [ANNOUNCE_PUBKEY, ANNOUNCE_PUBKEY_NEXT]
+        .into_iter()
+        .filter(|key| !key.is_empty())
+}
 /// The agent every outbound HTTP request identifies itself with.
 ///
 /// PaperMC and Modrinth both *ask* for a contact URL or address alongside the

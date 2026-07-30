@@ -25,9 +25,9 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
           <form.AppField name="details.name">
             {(field: WizardForm) => (
               <field.TextField
-                label={m['label.name']()}
+                label={m['app.label.name']()}
                 placeholder={`${flavor}-${version}`}
-                description={m['wizard.name_hint']()}
+                description={m['entry.create.name_hint']()}
               />
             )}
           </form.AppField>
@@ -37,8 +37,8 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
       <form.AppField name="details.memory">
         {(field: WizardForm) => (
           <field.SliderField
-            label={m['label.memory']()}
-            formatValue={(v: number) => m['wizard.gb']({ value: v })}
+            label={m['app.label.memory']()}
+            formatValue={(v: number) => m['entry.create.gb']({ value: v })}
             min={2}
             max={32}
             step={1}
@@ -48,11 +48,11 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
 
       {kind === 'server' && (
         <>
-          <SectionHeader>{m['wizard.server_properties']()}</SectionHeader>
+          <SectionHeader>{m['entry.create.properties.title']()}</SectionHeader>
 
           <form.AppField name="details.motd">
             {(field: WizardForm) => (
-              <field.TextField label={m['wizard.motd']()} />
+              <field.TextField label={m['entry.create.properties.motd']()} />
             )}
           </form.AppField>
 
@@ -67,7 +67,7 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
                 <form.AppField name="details.gamemode">
                   {(field: WizardForm) => (
                     <field.SelectField
-                      label={m['wizard.gamemode']()}
+                      label={m['entry.create.properties.gamemode']()}
                       options={options(GAMEMODES)}
                       triggerClassName="w-full"
                       disabled={hardcore}
@@ -77,7 +77,7 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
                 <form.AppField name="details.difficulty">
                   {(field: WizardForm) => (
                     <field.SelectField
-                      label={m['wizard.difficulty']()}
+                      label={m['entry.create.properties.difficulty']()}
                       options={options(DIFFICULTIES)}
                       triggerClassName="w-full"
                       disabled={hardcore}
@@ -92,7 +92,7 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
             <form.AppField name="details.maxPlayers">
               {(field: WizardForm) => (
                 <field.TextField
-                  label={m['wizard.max_players']()}
+                  label={m['entry.create.properties.max_players']()}
                   type="number"
                 />
               )}
@@ -100,10 +100,10 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
             <form.AppField name="details.port">
               {(field: WizardForm) => (
                 <field.TextField
-                  label={m['wizard.port']()}
+                  label={m['entry.create.properties.port']()}
                   type="number"
-                  placeholder={m['wizard.port_auto']()}
-                  description={m['wizard.port_hint']()}
+                  placeholder={m['entry.create.properties.port_auto']()}
+                  description={m['entry.create.properties.port_hint']()}
                 />
               )}
             </form.AppField>
@@ -114,7 +114,7 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
               {(field: WizardForm) => (
                 <PropToggle
                   id="prop-hardcore"
-                  label={m['wizard.hardcore']()}
+                  label={m['entry.create.properties.hardcore']()}
                   checked={field.state.value}
                   onChange={(checked) => {
                     field.handleChange(checked);
@@ -130,7 +130,7 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
               {(field: WizardForm) => (
                 <PropToggle
                   id="prop-online"
-                  label={m['wizard.online_mode']()}
+                  label={m['entry.create.properties.online_mode']()}
                   checked={field.state.value}
                   onChange={field.handleChange}
                 />
@@ -155,16 +155,16 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
                       onCheckedChange={(c) => field.handleChange(c === true)}
                     />
                     <span className="text-xs text-muted-foreground">
-                      {m['wizard.eula_before']()}{' '}
+                      {m['entry.create.eula.before']()}{' '}
                       <a
                         href="https://aka.ms/MinecraftEULA"
                         target="_blank"
                         rel="noreferrer"
                         className="text-foreground underline underline-offset-2"
                       >
-                        {m['wizard.eula_link']()}
+                        {m['entry.create.eula.link']()}
                       </a>
-                      {m['wizard.eula_after']()}
+                      {m['entry.create.eula.after']()}
                     </span>
                   </label>
                   {invalid && (

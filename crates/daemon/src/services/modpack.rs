@@ -13,8 +13,8 @@ use proto::modpack::{
 };
 
 use super::guards::{
-    ensure_no_backup, ensure_no_content, ensure_no_modpack, ensure_no_update, ensure_stopped,
-    find_instance, find_server,
+    ensure_no_backup, ensure_no_content, ensure_no_modpack, ensure_no_transfer, ensure_no_update,
+    ensure_stopped, find_instance, find_server,
 };
 use crate::runtime::{
     instance_process_id, server_process_id, Channels, HandlerContext, ModpackJob,
@@ -179,6 +179,7 @@ fn guard_instance(ctx: &HandlerContext, id: &str, name: &str) -> Result<(), Erro
     ensure_stopped(ctx, &process_id, "instance", name)?;
     ensure_no_backup(ctx, &process_id, name)?;
     ensure_no_content(ctx, &process_id, name)?;
+    ensure_no_transfer(ctx, &process_id, name)?;
     ensure_no_modpack(ctx, &process_id, name)
 }
 

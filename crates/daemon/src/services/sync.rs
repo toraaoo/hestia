@@ -10,24 +10,24 @@ use proto::sync::{
 };
 use proto::Empty;
 
-use super::guards::{ensure_no_content, find_instance};
+use super::guards::{ensure_no_content, ensure_no_transfer, find_instance};
 use crate::runtime::{instance_process_id, Channels};
 
-fn config(sync: &engine::Sync) -> SyncConfig {
+fn config(engine: &engine::Engine) -> SyncConfig {
     SyncConfig {
-        shared_dir: sync.dir(),
-        targets: sync.targets(),
+        enabled: engine.sync_enabled(),
+        shared_dir: engine.sync().dir(),
+        targets: engine.sync().targets(),
     }
 }
 
 pub(super) fn register(on: &mut Channels<'_>) {
-    on.handle::<SyncGet, _, _>(
-        |_: Empty, ctx| async move { Ok(config(ctx.runtime.engine().sync())) },
-    );
+    on.handle::<SyncGet, _, _>(|_: Empty, ctx| async move { Ok(config(ctx.runtime.engine())) });
 
     on.handle::<SyncSet, _, _>(|p: SyncSetParams, ctx| async move {
-        let sync = ctx.runtime.engine().sync();
-        let targets = sync
+        let engine = ctx.runtime.engine();
+        let targets = engine
+            .sync()
             .set_targets(p.targets)
             .map_err(crate::runtime::engine_error)?;
         tracing::info!(
@@ -35,7 +35,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             folders = targets.folders.len(),
             "sync targets updated"
         );
-        Ok(config(sync))
+        Ok(config(engine))
     });
 
     on.handle::<SyncStatus, _, _>(|_: Empty, ctx| async move {
@@ -53,6 +53,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             });
         }
         ensure_no_content(&ctx, &instance_process_id(&record.id), &record.name)?;
+        ensure_no_transfer(&ctx, &instance_process_id(&record.id), &record.name)?;
         let adopted = ctx
             .runtime
             .engine()

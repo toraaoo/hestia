@@ -46,7 +46,7 @@ export function serverToCard(
 ): EntryCardModel {
   const running = server.process?.state === 'running';
   const address = server.gamePort ? `:${server.gamePort}` : '';
-  const state = running ? m['status.online']() : m['status.stopped']();
+  const state = running ? m['app.status.online']() : m['app.status.stopped']();
   return {
     id: server.id,
     name: server.name,
@@ -56,7 +56,7 @@ export function serverToCard(
     running,
     ready: server.ready,
     subtitle: !server.ready
-      ? m['status.preparing_ellipsis']()
+      ? m['app.status.preparing_ellipsis']()
       : address
         ? `${address} · ${state}`
         : state,
@@ -85,8 +85,8 @@ export function instanceToCard(
       running > 0
         ? m['entry.sessions_running']({ count: running })
         : lastPlayedUnix
-          ? `${m['label.last_played']()} ${agoLabel(lastPlayedUnix)}`
-          : m['status.stopped'](),
+          ? `${m['app.label.last_played']()} ${agoLabel(lastPlayedUnix)}`
+          : m['app.status.stopped'](),
     busy: actions.busy,
     onStart: actions.onStart,
     onStop: actions.onStop,
@@ -131,7 +131,7 @@ export function FilterMenu({ groups }: { groups: FlavorGroup[] }) {
           <Button
             variant="ghost"
             size="icon"
-            aria-label={m['collection.filter_by_flavor']()}
+            aria-label={m['app.collection.filter_by_flavor']()}
             className={cn(filtered ? 'text-ember' : 'text-muted-foreground')}
           >
             <FunnelSimpleIcon weight={filtered ? 'bold' : 'regular'} />
@@ -149,7 +149,7 @@ export function FilterMenu({ groups }: { groups: FlavorGroup[] }) {
                 onValueChange={(value) => group.onChange(String(value))}
               >
                 <DropdownMenuRadioItem value="all">
-                  {m['label.all']()}
+                  {m['app.label.all']()}
                 </DropdownMenuRadioItem>
                 {group.flavors.map((f) => (
                   <DropdownMenuRadioItem
@@ -181,8 +181,8 @@ export function ViewToggle({
   const Icon = next === 'list' ? RowsIcon : SquaresFourIcon;
   const label =
     next === 'list'
-      ? m['collection.switch_to_list']()
-      : m['collection.switch_to_grid']();
+      ? m['app.collection.switch_to_list']()
+      : m['app.collection.switch_to_grid']();
   return (
     <Button
       variant="ghost"

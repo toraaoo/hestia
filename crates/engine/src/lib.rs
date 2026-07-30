@@ -4,6 +4,7 @@
 //! linking it.
 
 mod accounts;
+mod announce;
 mod backup;
 mod cache;
 mod cancel;
@@ -16,28 +17,38 @@ mod error;
 mod instances;
 mod java;
 mod minecraft;
+mod process;
 mod profiles;
 mod reclaim;
 mod registry;
 mod servers;
+mod signature;
 mod skins;
 mod sync;
+mod transfer;
+mod update;
 mod usage;
+mod version;
 
 pub use accounts::{Accounts, LoginChallenge, ReauthRequired};
+pub use announce::Refreshed;
 pub use backup::BackupSettings;
 pub use cache::{Cache, CacheEntry, CacheUsage};
 pub use cancel::{is_cancelled, Cancel, Job};
 pub use config::{Config, ConfigError, Settings};
 pub use content::Content;
 pub use download::Downloader;
-pub use engine::{Engine, ModpackOutcome, ServerCreateSpec, ServerUpdateSpec};
+pub use engine::{
+    Engine, ExportOutcome, ImportOutcome, ModpackOutcome, ServerCreateSpec, ServerUpdateSpec,
+};
 pub use error::error_info;
 pub use instances::{InstanceRecord, Instances};
 pub use java::{Java, JavaInstallOutcome};
 pub use minecraft::launch::{JavaSettings, LaunchPlan};
 pub use minecraft::{Minecraft, REQUIRED_JAVA_MAJORS};
+pub use process::{ExitObserver, ProcessEvents, ProcessSupervisor, StartError};
 pub use profiles::Profiles;
 pub use servers::{RconConfig, ServerPhase, ServerRecord, Servers};
 pub use skins::Skins;
 pub use sync::Sync;
+pub use update::Update;

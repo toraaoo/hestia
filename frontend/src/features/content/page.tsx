@@ -72,10 +72,10 @@ export function BrowsePage({
 
   return (
     <Page
-      title={m['nav.browse']()}
-      subtitle={m['browse.subtitle']()}
+      title={m['app.nav.browse']()}
+      subtitle={m['content.browse.subtitle']()}
       search
-      searchPlaceholder={m['search.content_or_link']()}
+      searchPlaceholder={m['app.search.content_or_link']()}
       skeleton={
         <div>
           <div className="mb-5 flex flex-wrap gap-1.5">
@@ -94,7 +94,7 @@ export function BrowsePage({
       <div className="mb-5 flex flex-col gap-2.5">
         <div className="flex flex-wrap gap-1.5">
           <Link to="/browse" search={sourceParam} className={chipClass(!kind)}>
-            {m['label.all']()}
+            {m['app.label.all']()}
           </Link>
           {contentKinds.map((k) => (
             <Link
@@ -142,7 +142,7 @@ export function BrowsePage({
         />
       ) : hits.length === 0 ? (
         <p className="border border-dashed border-border px-4 py-10 text-center text-xs text-muted-foreground">
-          {m['browse.nothing_matches']()}
+          {m['content.browse.nothing_matches']()}
         </p>
       ) : (
         <>
@@ -156,7 +156,7 @@ export function BrowsePage({
               ref={sentinelRef}
               className="mt-5 flex justify-center py-4 text-xs text-muted-foreground"
             >
-              {isFetchingNextPage ? m['browse.loading_more']() : null}
+              {isFetchingNextPage ? m['content.browse.loading_more']() : null}
             </div>
           )}
         </>

@@ -194,17 +194,17 @@ mod tests {
         encoder.finish().unwrap()
     }
 
-    fn temp_saves(tag: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("hestia-world-{tag}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
+    fn temp_saves(tag: &str) -> tempfile::TempDir {
+        tempfile::Builder::new()
+            .prefix(&format!("hestia-world-{tag}-"))
+            .tempdir()
+            .expect("temp dir")
     }
 
     #[test]
     fn a_world_is_described_from_its_level_dat() {
         let saves = temp_saves("described");
-        let world = saves.join("world-folder");
+        let world = saves.path().join("world-folder");
         std::fs::create_dir_all(&world).unwrap();
         std::fs::write(
             world.join(LEVEL_DAT),
@@ -213,7 +213,7 @@ mod tests {
         .unwrap();
         std::fs::write(world.join(ICON), b"not really a png").unwrap();
 
-        let info = describe(&saves, "world-folder");
+        let info = describe(saves.path(), "world-folder");
         assert!(info.read);
         assert_eq!(info.folder, "world-folder");
         assert_eq!(
@@ -230,7 +230,6 @@ mod tests {
             "the world's own thumbnail rides along"
         );
         assert!(info.size_bytes > 0);
-        std::fs::remove_dir_all(&saves).ok();
     }
 
     #[test]
@@ -239,32 +238,30 @@ mod tests {
         // A corrupt save, and one with no level.dat at all: neither may vanish
         // from a listing, and neither may claim values it does not have.
         for (folder, bytes) in [("corrupt", Some(&b"garbage"[..])), ("bare", None)] {
-            let dir = saves.join(folder);
+            let dir = saves.path().join(folder);
             std::fs::create_dir_all(&dir).unwrap();
             if let Some(bytes) = bytes {
                 std::fs::write(dir.join(LEVEL_DAT), bytes).unwrap();
             }
-            let info = describe(&saves, folder);
+            let info = describe(saves.path(), folder);
             assert!(!info.read, "{folder} cannot be read");
             assert_eq!(info.name, folder, "falls back to the folder name");
             assert_eq!(info.version, "");
             assert_eq!(info.last_played_unix, None);
         }
-        std::fs::remove_dir_all(&saves).ok();
     }
 
     #[test]
     fn plain_nbt_is_read_too() {
         let saves = temp_saves("plain");
-        let world = saves.join("unpacked");
+        let world = saves.path().join("unpacked");
         std::fs::create_dir_all(&world).unwrap();
         // A hand-unpacked save is not gzipped; read it rather than refuse it.
         std::fs::write(world.join(LEVEL_DAT), level_dat("Flat", 1, false)).unwrap();
 
-        let info = describe(&saves, "unpacked");
+        let info = describe(saves.path(), "unpacked");
         assert!(info.read);
         assert_eq!(info.name, "Flat");
         assert_eq!(info.game_mode, GameMode::Creative);
-        std::fs::remove_dir_all(&saves).ok();
     }
 }

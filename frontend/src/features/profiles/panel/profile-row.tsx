@@ -64,18 +64,18 @@ export function ProfileRow({
           <span className="truncate text-sm">{profile.name}</span>
           {active && (
             <Badge className="shrink-0 bg-ember text-ember-foreground">
-              {m['profiles.active']()}
+              {m['profile.active']()}
             </Badge>
           )}
           {profile.captured && (
             <Badge variant="secondary" className="shrink-0 gap-1">
               <CameraIcon className="size-3" />
-              {m['profiles.captured']()}
+              {m['profile.capture.badge']()}
             </Badge>
           )}
         </div>
         <div className="truncate font-mono text-[11px] text-muted-foreground">
-          {m['profiles.members_count']({
+          {m['profile.members.count']({
             count: profile.members.length,
             total: poolSize,
           })}
@@ -86,7 +86,7 @@ export function ProfileRow({
         variant={active ? 'secondary' : 'outline'}
         onClick={onUse}
       >
-        {active ? m['profiles.deactivate']() : m['profiles.use']()}
+        {active ? m['app.action.deactivate']() : m['profile.use']()}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -94,7 +94,7 @@ export function ProfileRow({
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label={m['action.more']()}
+              aria-label={m['app.action.more']()}
             >
               <DotsThreeIcon weight="bold" className="size-4" />
             </Button>
@@ -103,11 +103,11 @@ export function ProfileRow({
         <DropdownMenuContent align="end" className="w-52">
           <DropdownMenuItem onClick={onEditMembers}>
             <PencilSimpleIcon />
-            {m['profiles.edit_members']()}
+            {m['profile.members.action']()}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onRename}>
             <TextboxIcon />
-            {m['profiles.rename']()}
+            {m['app.action.rename']()}
           </DropdownMenuItem>
           {/* Capture/release move the profile's settings store — the daemon
               refuses them while a session could be writing through it. */}
@@ -119,8 +119,8 @@ export function ProfileRow({
           >
             {profile.captured ? <CameraSlashIcon /> : <CameraIcon />}
             {profile.captured
-              ? m['profiles.release']()
-              : m['profiles.capture']()}
+              ? m['profile.release.action']()
+              : m['profile.capture.action']()}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -128,7 +128,7 @@ export function ProfileRow({
             onClick={() => setConfirming('remove')}
           >
             <TrashIcon />
-            {m['action.remove']()}
+            {m['app.action.remove']()}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -136,10 +136,10 @@ export function ProfileRow({
       <ConfirmDialog
         open={confirming === 'remove'}
         onOpenChange={(open) => !open && setConfirming(null)}
-        title={m['profiles.remove_title']({ name: profile.name })}
-        description={m['profiles.remove_description']()}
+        title={m['profile.remove.title']({ name: profile.name })}
+        description={m['profile.remove.description']()}
         destructive
-        confirmLabel={m['action.remove']()}
+        confirmLabel={m['app.action.remove']()}
         onConfirm={() => {
           setConfirming(null);
           onRemove();
@@ -148,9 +148,9 @@ export function ProfileRow({
       <ConfirmDialog
         open={confirming === 'capture'}
         onOpenChange={(open) => !open && setConfirming(null)}
-        title={m['profiles.capture_title']({ name: profile.name })}
-        description={m['profiles.capture_description']()}
-        confirmLabel={m['profiles.capture']()}
+        title={m['profile.capture.title']({ name: profile.name })}
+        description={m['profile.capture.description']()}
+        confirmLabel={m['profile.capture.action']()}
         onConfirm={() => {
           setConfirming(null);
           onCapture();
@@ -159,10 +159,10 @@ export function ProfileRow({
       <ConfirmDialog
         open={confirming === 'release'}
         onOpenChange={(open) => !open && setConfirming(null)}
-        title={m['profiles.release_title']()}
-        description={m['profiles.release_description']()}
+        title={m['profile.release.title']()}
+        description={m['profile.release.description']()}
         destructive
-        confirmLabel={m['profiles.release']()}
+        confirmLabel={m['profile.release.action']()}
         onConfirm={() => {
           setConfirming(null);
           onRelease();

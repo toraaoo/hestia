@@ -1,0 +1,84 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "settings": {
+    "cache": {
+      "clear": "Limpar cache",
+      "clear_description": "Libera os downloads em cache. Os arquivos são baixados novamente da rede na próxima vez que forem necessários.",
+      "clear_title": "Limpar o cache de downloads?"
+    },
+    "content_sources": "Fontes de conteúdo",
+    "curseforge_key": "Chave de API do CurseForge",
+    "curseforge_key_hint": "O CurseForge só responde a requisições com uma chave, então ele é oferecido como fonte assim que você definir uma. Obtenha a sua em console.curseforge.com.",
+    "data_dir": "Diretório de dados",
+    "data_dir_hint": "Onde ficam instâncias e servidores.",
+    "default_jvm_args": "Argumentos JVM padrão",
+    "default_memory": "Memória alocada padrão",
+    "default_memory_hint": "Instâncias e servidores podem sobrescrever individualmente.",
+    "download_cache": "Cache de downloads",
+    "general": "Geral",
+    "in_use": "Em uso",
+    "install_prompt": "Instalar:",
+    "installed_runtimes": "Runtimes instalados",
+    "java": {
+      "uninstall": "Desinstalar runtime",
+      "uninstall_description": "{name} será removido. Entradas que precisam dele o reinstalam na próxima inicialização.",
+      "uninstall_title": "Desinstalar runtime?"
+    },
+    "java_performance": "Java e desempenho",
+    "keep_open": "Manter o launcher aberto enquanto um jogo roda",
+    "language": "Idioma",
+    "modpack": {
+      "default_excludes": "Corrigir as declarações de servidor do pacote",
+      "default_excludes_hint": "Desligado, o pacote é aceito exatamente como publicado — mods de cliente inclusos.",
+      "exclude": "Nunca instalar",
+      "force_include": "Sempre instalar",
+      "hint": "Pacotes costumam declarar mods exclusivos de cliente como compatíveis com servidor. O Hestia os retém ao instalar um pacote em um servidor.",
+      "mod_placeholder": "nome do mod",
+      "overrides_exclusions": "Ignorar arquivos do pacote",
+      "overrides_exclusions_hint": "Arquivos de configuração e de mundo que o pacote traz e não devem ser escritos. ? um caractere, * um trecho dentro de uma pasta, ** um trecho entre pastas.",
+      "pattern_placeholder": "config/**",
+      "title": "Modpacks"
+    },
+    "news": {
+      "enabled_description": "O Hestia verifica seu feed de anúncios a cada poucas horas. Desative e ele não fará essa requisição.",
+      "enabled_label": "Mostrar novidades e avisos"
+    },
+    "no_default": "Nenhum padrão definido",
+    "source_needs_key": "Precisa de chave",
+    "source_ready": "Pronta",
+    "start_at_login": "Iniciar o Hestia ao fazer login",
+    "storage_daemon": "Armazenamento e daemon",
+    "subtitle": "Launcher, runtimes e daemon",
+    "sync": {
+      "add_file_placeholder": "options.txt",
+      "add_folder_placeholder": "saves",
+      "adopt": {
+        "action": "Adotar",
+        "description": "Move o conteúdo existente das pastas da instância para o armazenamento compartilhado e as vincula. A instância precisa estar parada.",
+        "done": "Adotado: {targets}"
+      },
+      "description": "Arquivos são copiados e mesclados a cada inicialização; pastas são vinculadas a um armazenamento compartilhado.",
+      "enabled_description": "Desligado, cada instância mantém suas próprias configurações e mundos. Pastas já compartilhadas continuam assim.",
+      "enabled_label": "Compartilhar configurações entre instâncias",
+      "files": "Arquivos copiados",
+      "folders": "Pastas vinculadas",
+      "no_folder_targets": "Nenhuma pasta configurada.",
+      "section": "Compartilhado entre instâncias",
+      "status_title": "Estado dos vínculos por instância"
+    },
+    "update": {
+      "available": "A versão {version} está disponível",
+      "check": "Verificar atualizações",
+      "check_failed": "Não foi possível verificar atualizações",
+      "checking": "Verificando…",
+      "current": "Versão {version}",
+      "failed": "Falha na atualização",
+      "install": "Atualizar e reiniciar",
+      "installing": "Atualizando…",
+      "notes": "Novidades",
+      "title": "Atualizações",
+      "up_to_date": "O Hestia está atualizado",
+      "whats_new": "Novidades da versão {version}"
+    }
+  }
+}

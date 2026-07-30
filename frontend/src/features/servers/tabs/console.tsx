@@ -30,7 +30,7 @@ export function ServerConsoleTab({
   const entries = useConsoleHistory(id);
 
   if (!running && logs.lines.length === 0 && entries.length === 0) {
-    return <Empty className="h-full">{m['detail.console_empty']()}</Empty>;
+    return <Empty className="h-full">{m['server.console.empty']()}</Empty>;
   }
 
   const push = (entry: ConsoleEntry) => pushConsoleEntry(id, entry);
@@ -65,7 +65,10 @@ export function ServerConsoleTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <LogView rows={rows} emptyLabel={`${name} — ${m['status.online']()}`} />
+      <LogView
+        rows={rows}
+        emptyLabel={`${name} — ${m['app.status.online']()}`}
+      />
       <form
         className="flex gap-2"
         onSubmit={(e) => {
@@ -76,8 +79,8 @@ export function ServerConsoleTab({
         <Input
           placeholder={
             running
-              ? m['detail.console_placeholder']()
-              : m['detail.console_empty']()
+              ? m['server.console.placeholder']()
+              : m['server.console.empty']()
           }
           className="font-mono"
           value={line}

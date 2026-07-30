@@ -151,7 +151,7 @@ export function SkinModel({
         onClick={() => previewRef.current?.click()}
       />
       <span className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[11px] text-muted-foreground">
-        {m['skins.drag_to_rotate']()}
+        {m['skin.drag_to_rotate']()}
       </span>
     </div>
   );

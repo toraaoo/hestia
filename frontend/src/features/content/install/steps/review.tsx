@@ -52,10 +52,13 @@ export function ReviewStep({
   return (
     <div className="flex flex-col gap-4 p-1">
       <div className="divide-y divide-border border border-border">
-        <ReviewRow label={m['label.target']()} value={target?.name ?? '—'} />
+        <ReviewRow
+          label={m['app.label.target']()}
+          value={target?.name ?? '—'}
+        />
         {worlds && (
           <ReviewRow
-            label={m['label.worlds']()}
+            label={m['app.label.worlds']()}
             value={
               worlds.length ? worlds.join(', ') : m['content.none_selected']()
             }
@@ -157,7 +160,7 @@ function KindPicker({
           type="button"
           onClick={() => onChange(k)}
           className={cn(
-            'border px-2 py-0.5 text-[11px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
+            'h-8 border px-2 text-[11px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
             value === k
               ? 'border-ember bg-ember/10 text-foreground'
               : 'border-border text-muted-foreground hover:bg-muted/60',
@@ -175,8 +178,8 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      aria-label={m['action.remove']()}
-      className="flex size-6 shrink-0 items-center justify-center border border-border text-muted-foreground outline-none transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-1 focus-visible:ring-ring"
+      aria-label={m['app.action.remove']()}
+      className="flex size-8 shrink-0 items-center justify-center border border-border text-muted-foreground outline-none transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-1 focus-visible:ring-ring"
     >
       <XIcon weight="bold" className="size-3.5" />
     </button>
@@ -231,7 +234,7 @@ function ReviewItemRow({
           <>
             {resolved && !versionId && (
               <Badge variant="secondary" className="shrink-0">
-                {m['label.latest']()}
+                {m['app.label.latest']()}
               </Badge>
             )}
             {resolved && (
@@ -290,7 +293,7 @@ function VersionCombobox({
                     {v.versionNumber}
                     {v.id === latestId && (
                       <Badge variant="secondary" className="text-[10px]">
-                        {m['label.latest']()}
+                        {m['app.label.latest']()}
                       </Badge>
                     )}
                     {v.channel !== 'release' && (
@@ -320,7 +323,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="truncate text-right">{value}</span>
+      <span className="truncate text-right text-xs">{value}</span>
     </div>
   );
 }

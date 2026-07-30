@@ -188,6 +188,12 @@ pub fn server_plan(
 /// The same invocation, but with every artifact named relative to `artifacts`
 /// and run from `cwd` — how the schema-generation run boots the server in a
 /// throwaway directory instead of the game's own data dir.
+///
+/// A generated argument file is deliberately **not** used here: it names its
+/// libraries relative to the launch directory, so it only resolves from the data
+/// dir, and a loader that reads it gates on the EULA before writing any
+/// properties. The profile's primary artifact is the vanilla server jar for
+/// exactly this game version, which is what the key set describes.
 pub fn server_schema_plan(
     profile: &ServerProfile,
     java: &Path,
@@ -195,7 +201,11 @@ pub fn server_schema_plan(
     cwd: &Path,
     settings: &JavaSettings,
 ) -> LaunchPlan {
-    server_invocation(profile, java, artifacts, cwd, settings)
+    let profile = ServerProfile {
+        args_file: String::new(),
+        ..profile.clone()
+    };
+    server_invocation(&profile, java, artifacts, cwd, settings)
 }
 
 fn server_invocation(
@@ -411,6 +421,33 @@ mod tests {
             ],
             "the file is passed relative — it names its own libraries that way"
         );
+    }
+
+    #[test]
+    fn the_schema_run_ignores_the_args_file() {
+        let mut profile = ServerProfile {
+            args_file: "libraries/net/neoforged/neoforge/21.1.244/unix_args.txt".into(),
+            ..ServerProfile::default()
+        };
+        profile.primary.filename = "server.jar".into();
+        let plan = server_schema_plan(
+            &profile,
+            Path::new("/java"),
+            Path::new("/srv/data"),
+            Path::new("/srv/.schema"),
+            &JavaSettings::default(),
+        );
+        assert_eq!(
+            plan.args,
+            [
+                "-jar",
+                &join_str(Path::new("/srv/data"), "server.jar"),
+                "nogui"
+            ],
+            "the relative args file cannot resolve from the scratch dir, and its \
+             loader gates on the EULA before writing properties"
+        );
+        assert_eq!(plan.cwd, Path::new("/srv/.schema"));
     }
 
     #[test]

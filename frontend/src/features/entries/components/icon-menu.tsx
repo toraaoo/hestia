@@ -33,7 +33,7 @@ export function EntryIconMenu({ id }: { id: string }) {
         render={
           <button
             type="button"
-            aria-label={m['entry.change_icon']()}
+            aria-label={m['entry.icon.change']()}
             className="grid size-5 place-items-center bg-background/80 text-muted-foreground ring-1 ring-border backdrop-blur-xs outline-none hover:text-foreground focus-visible:ring-ring"
           >
             <PencilSimpleIcon className="size-3" />
@@ -43,14 +43,14 @@ export function EntryIconMenu({ id }: { id: string }) {
       <DropdownMenuContent align="start" className="w-44">
         <DropdownMenuItem onClick={change} disabled={set.isPending}>
           <ImageIcon />
-          {m['entry.change_icon']()}
+          {m['entry.icon.change']()}
         </DropdownMenuItem>
         <DropdownMenuItem
           disabled={!hasIcon || remove.isPending}
           onClick={() => remove.mutate(id)}
         >
           <TrashIcon />
-          {m['entry.reset_icon']()}
+          {m['entry.icon.reset']()}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

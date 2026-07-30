@@ -5,13 +5,13 @@ import { m } from '@/paraglide/messages.js';
 export function agoLabel(unix: number): string {
   const secs = Math.max(0, Date.now() / 1000 - unix);
   const mins = Math.round(secs / 60);
-  if (mins < 1) return m['ago.just_now']();
-  if (mins < 60) return m['ago.minutes']({ count: mins });
+  if (mins < 1) return m['app.time.just_now']();
+  if (mins < 60) return m['app.time.minutes']({ count: mins });
   const hours = Math.round(mins / 60);
-  if (hours < 24) return m['ago.hours']({ count: hours });
+  if (hours < 24) return m['app.time.hours']({ count: hours });
   const days = Math.floor(hours / 24);
-  if (days === 1) return m['ago.yesterday']();
-  return m['ago.days']({ count: days });
+  if (days === 1) return m['app.time.yesterday']();
+  return m['app.time.days']({ count: days });
 }
 
 export function bytes(n: number): string {

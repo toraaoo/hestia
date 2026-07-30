@@ -17,7 +17,8 @@ use super::super::content::entry::{content_target, EntryContent, EntrySide};
 use super::super::phase_progress;
 use super::{pack_display_name, FileIdentity};
 use crate::cancel::Job;
-use crate::content::{install, modpack, pack};
+use crate::config::ModpackSettings;
+use crate::content::{exclude, install, modpack, pack};
 use crate::engine::Engine;
 use crate::minecraft::materialize;
 use crate::registry;
@@ -41,32 +42,43 @@ impl Engine {
             EntrySide::Client => pack::Side::Client,
         };
         let accepts = self.accepted_kinds(ctx);
+        let settings = self.config().settings().modpack;
+        let inclusion = self.pack_inclusion(ctx, project, &settings);
         let mut warnings = Vec::new();
 
-        let wanted: Vec<&ModpackFile> = resolved.files.iter().filter(|f| side.wants(f)).collect();
         let mut managed = Vec::new();
         let mut loose = Vec::new();
-        let mut rejected = 0u32;
-        for file in wanted {
+        let mut excluded = Vec::new();
+        for file in &resolved.files {
+            let wanted = side.wants(file);
+            if !inclusion.includes(&file.path, wanted) {
+                // A file the pack never wanted here is simply the other side's;
+                // one it did want and we held back is worth saying.
+                if wanted {
+                    excluded.push(file.artifact.filename.clone());
+                }
+                continue;
+            }
             match managed_kind(&file.path) {
+                // A kind this flavor's loader cannot manage still belongs on
+                // disk where the pack put it: the pack said the side wants it,
+                // and hestia's own pool model is not a reason to drop a file.
                 Some(kind) if accepts.contains(&kind) => managed.push((kind, file)),
-                // A kind the flavor cannot load is not a failure — a
-                // client-shaped pack on a server ships plenty of them — but it
-                // is worth saying once, since the pack will not play as built.
-                Some(_) => rejected += 1,
-                None => loose.push(file),
+                _ => loose.push(file),
             }
         }
-        if rejected > 0 {
-            warnings.push(WarningInfo::ModpackFilesNotAccepted {
-                count: rejected,
-                flavor: ctx.flavor.clone(),
+        if !excluded.is_empty() {
+            excluded.sort();
+            warnings.push(WarningInfo::ModpackFilesExcluded {
+                count: excluded.len() as u32,
+                files: excluded,
             });
         }
 
+        let patterns = exclude::OverridePatterns::new(&settings.overrides_exclusions);
         let (items, failures) = self.fetch_pack_content(ctx, &managed, resolved, job).await;
         let mut overrides = self
-            .fetch_loose_files(ctx, &loose, previous.as_ref(), job)
+            .fetch_loose_files(ctx, &loose, previous.as_ref(), &patterns, job)
             .await;
         let mut kept: Vec<String> = Vec::new();
 
@@ -75,16 +87,25 @@ impl Engine {
             .as_ref()
             .map(|p| p.overrides.iter().map(|o| (o.path.as_str(), o)).collect())
             .unwrap_or_default();
+        // A first install has nothing of the user's to protect, so the pack's
+        // own files win outright, as docker-mc-server's do. Once a pack is
+        // installed, an edited file is the user's and the hash record is what
+        // tells the two apart.
+        let installing = previous.is_none();
         let data_dir = ctx.data_dir.clone();
         let written = archive.extract_overrides(side, &ctx.data_dir, job, |path| {
-            let writable = match owned.get(path) {
-                // Known to the previous pack: only overwrite what is still
-                // byte-for-byte what we wrote.
-                Some(previous) => modpack::ours(&data_dir, previous),
-                // Unknown: an existing file was not put there by a pack, so it
-                // is the user's (or the game's) and is not ours to replace.
-                None => !data_dir.join(path).exists(),
-            };
+            if patterns.excludes(path) {
+                return false;
+            }
+            let writable = installing
+                || match owned.get(path) {
+                    // Known to the previous pack: only overwrite what is still
+                    // byte-for-byte what we wrote.
+                    Some(previous) => modpack::ours(&data_dir, previous),
+                    // Unknown: an existing file was not put there by a pack, so
+                    // it is the user's and is not ours to replace.
+                    None => !data_dir.join(path).exists(),
+                };
             if !writable {
                 kept.push(path.to_string());
             }
@@ -136,6 +157,26 @@ impl Engine {
             "modpack installed"
         );
         Ok((pack, failures, warnings))
+    }
+
+    /// The corrections in force over this pack's own `env` declarations.
+    /// Server-side only: the shipped table names client mods, so applying it to
+    /// an instance would strip a modpack of exactly the mods it exists for.
+    fn pack_inclusion(
+        &self,
+        ctx: &EntryContent,
+        project: Option<&ContentProject>,
+        settings: &ModpackSettings,
+    ) -> exclude::Inclusion {
+        if ctx.side != EntrySide::Server {
+            return exclude::Inclusion::none();
+        }
+        exclude::Inclusion::new(
+            project.map(|p| p.slug.as_str()).unwrap_or_default(),
+            settings.default_excludes,
+            &settings.exclude_files,
+            &settings.force_include_files,
+        )
     }
 
     /// Download the pack's managed-kind files into the entry's managed
@@ -269,15 +310,20 @@ impl Engine {
         ctx: &EntryContent,
         files: &[&ModpackFile],
         previous: Option<&InstalledModpack>,
+        patterns: &exclude::OverridePatterns,
         job: &Job<'_>,
     ) -> Vec<ModpackOverride> {
         let owned: HashMap<&str, &ModpackOverride> = previous
             .map(|p| p.overrides.iter().map(|o| (o.path.as_str(), o)).collect())
             .unwrap_or_default();
+        let installing = previous.is_none();
         let mut out = Vec::new();
         for file in files {
             if job.check().is_err() {
                 break;
+            }
+            if patterns.excludes(&file.path) {
+                continue;
             }
             let target = match materialize::safe_join(&ctx.data_dir, &file.path) {
                 Ok(path) => path,
@@ -286,10 +332,11 @@ impl Engine {
                     continue;
                 }
             };
-            let writable = match owned.get(file.path.as_str()) {
-                Some(previous) => modpack::ours(&ctx.data_dir, previous),
-                None => !target.exists(),
-            };
+            let writable = installing
+                || match owned.get(file.path.as_str()) {
+                    Some(previous) => modpack::ours(&ctx.data_dir, previous),
+                    None => !target.exists(),
+                };
             if !writable {
                 continue;
             }

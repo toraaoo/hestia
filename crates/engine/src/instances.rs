@@ -17,10 +17,10 @@ use serde::{Deserialize, Serialize};
 use crate::minecraft::launch::{JavaSettings, JVM_ARGS_KEY, MEMORY_KEY};
 use crate::registry;
 
-const RECORD: &str = "instance.json";
-const DATA: &str = "data";
+pub(crate) const RECORD: &str = "instance.json";
+pub(crate) const DATA: &str = "data";
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct InstanceRecord {
     pub id: String,
@@ -84,6 +84,26 @@ impl Instances {
     }
 
     pub fn create(&self, name: &str, profile: InstanceProfile) -> Result<InstanceRecord> {
+        self.adopt(
+            name,
+            InstanceRecord {
+                id: String::new(),
+                name: name.to_string(),
+                created_unix: registry::now_unix(),
+                last_played_unix: None,
+                playtime_seconds: 0,
+                jvm: JavaSettings::default(),
+                profile,
+            },
+        )
+    }
+
+    /// Register a record that came from somewhere other than a fresh create —
+    /// an imported archive, which carries the instance's settings and how long
+    /// it has been played. The **id is always freshly allocated**: an id is this
+    /// launcher's internal key, and honouring one from a file would let an
+    /// archive collide with an existing entry (or with itself, imported twice).
+    pub fn adopt(&self, name: &str, record: InstanceRecord) -> Result<InstanceRecord> {
         if registry::name_taken(name, self.list().iter().map(|r| r.name.as_str())) {
             bail!(proto::error::ErrorInfo::AlreadyExists {
                 entry: proto::error::Nameable::Instance,
@@ -91,15 +111,10 @@ impl Instances {
             });
         }
         registry::slugify(name)?;
-        let id = registry::allocate_id(|id| self.get(id).is_some())?;
         let record = InstanceRecord {
-            id,
+            id: registry::allocate_id(|id| self.get(id).is_some())?,
             name: name.to_string(),
-            created_unix: registry::now_unix(),
-            last_played_unix: None,
-            playtime_seconds: 0,
-            jvm: JavaSettings::default(),
-            profile,
+            ..record
         };
         let dir = self.instance_dir(&record);
         std::fs::create_dir_all(&dir)

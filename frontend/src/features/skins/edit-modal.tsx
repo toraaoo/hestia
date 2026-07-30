@@ -77,12 +77,12 @@ export function EditSkinModal({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {adding ? m['skins.add']() : m['skins.edit']()}
+            {adding ? m['skin.add']() : m['skin.edit']()}
           </DialogTitle>
           <DialogDescription>
             {adding
-              ? m['skins.add_description']()
-              : m['skins.edit_description']()}
+              ? m['skin.add_description']()
+              : m['skin.edit_description']()}
           </DialogDescription>
         </DialogHeader>
 
@@ -107,25 +107,27 @@ export function EditSkinModal({
               />
             ) : (
               <span className="px-4 text-center text-xs text-muted-foreground">
-                {m['skins.upload_hint']()}
+                {m['skin.upload_hint']()}
               </span>
             )}
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col gap-4">
             <Field>
-              <FieldLabel htmlFor="skin-name">{m['label.name']()}</FieldLabel>
+              <FieldLabel htmlFor="skin-name">
+                {m['app.label.name']()}
+              </FieldLabel>
               <Input
                 id="skin-name"
                 value={name}
-                placeholder={m['skins.name_placeholder']()}
+                placeholder={m['skin.name_placeholder']()}
                 onChange={(e) => setName(e.target.value)}
               />
             </Field>
 
             {adding && (
               <Field>
-                <FieldLabel>{m['skins.texture']()}</FieldLabel>
+                <FieldLabel>{m['skin.texture']()}</FieldLabel>
                 <input
                   ref={fileRef}
                   type="file"
@@ -146,14 +148,14 @@ export function EditSkinModal({
                 >
                   <UploadSimpleIcon />
                   {texture
-                    ? m['skins.replace_texture']()
-                    : m['skins.upload_texture']()}
+                    ? m['skin.replace_texture']()
+                    : m['skin.upload_texture']()}
                 </Button>
               </Field>
             )}
 
             <Field>
-              <FieldLabel>{m['skins.arm_style']()}</FieldLabel>
+              <FieldLabel>{m['skin.arm_style']()}</FieldLabel>
               <ToggleGroup
                 variant="outline"
                 size="sm"
@@ -164,20 +166,20 @@ export function EditSkinModal({
                 }}
               >
                 <ToggleGroupItem value="classic">
-                  {m['skins.wide']()}
+                  {m['skin.wide']()}
                 </ToggleGroupItem>
                 <ToggleGroupItem value="slim">
-                  {m['skins.slim']()}
+                  {m['skin.slim']()}
                 </ToggleGroupItem>
               </ToggleGroup>
             </Field>
 
             {capes.length > 0 && (
               <Field>
-                <FieldLabel>{m['skins.cape']()}</FieldLabel>
+                <FieldLabel>{m['skin.cape']()}</FieldLabel>
                 <CapeGrid>
                   <CapeCard
-                    label={m['skins.no_cape']()}
+                    label={m['skin.no_cape']()}
                     equipped={capeId === undefined}
                     onEquip={() => setCapeId(undefined)}
                   />
@@ -202,7 +204,7 @@ export function EditSkinModal({
             disabled={saving}
             onClick={() => onOpenChange(false)}
           >
-            {m['action.cancel']()}
+            {m['app.action.cancel']()}
           </Button>
           <Button
             disabled={!canSave}
@@ -212,10 +214,10 @@ export function EditSkinModal({
             }
           >
             {saving
-              ? m['skins.saving']()
+              ? m['skin.saving']()
               : adding
-                ? m['skins.add']()
-                : m['skins.save']()}
+                ? m['skin.add']()
+                : m['app.action.save_skin']()}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -101,19 +101,18 @@ mod platform {
 mod tests {
     use super::*;
 
-    fn temp_dir(tag: &str) -> PathBuf {
-        let base =
-            std::env::temp_dir().join(format!("hestia-link-test-{}-{}", tag, std::process::id()));
-        let _ = fs::remove_dir_all(&base);
-        fs::create_dir_all(&base).unwrap();
-        base
+    fn temp_dir(tag: &str) -> tempfile::TempDir {
+        tempfile::Builder::new()
+            .prefix(&format!("hestia-link-{tag}-"))
+            .tempdir()
+            .expect("temp dir")
     }
 
     #[test]
     fn links_read_and_unlink() {
         let base = temp_dir("roundtrip");
-        let store = base.join("store");
-        let at = base.join("at");
+        let store = base.path().join("store");
+        let at = base.path().join("at");
         fs::create_dir_all(&store).unwrap();
         fs::write(store.join("marker.txt"), "x").unwrap();
 
@@ -125,48 +124,44 @@ mod tests {
         unlink_dir(&at).unwrap();
         assert!(!at.exists());
         assert!(store.join("marker.txt").exists(), "the store is untouched");
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn read_target_is_none_for_real_paths() {
         let base = temp_dir("real");
-        let dir = base.join("dir");
+        let dir = base.path().join("dir");
         fs::create_dir_all(&dir).unwrap();
-        let file = base.join("file.txt");
+        let file = base.path().join("file.txt");
         fs::write(&file, "x").unwrap();
 
         assert_eq!(read_target(&dir), None);
         assert_eq!(read_target(&file), None);
-        assert_eq!(read_target(&base.join("missing")), None);
-        fs::remove_dir_all(&base).ok();
+        assert_eq!(read_target(&base.path().join("missing")), None);
     }
 
     #[test]
     fn unlink_refuses_a_real_directory() {
         let base = temp_dir("refuse");
-        let dir = base.join("dir");
+        let dir = base.path().join("dir");
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("keep.txt"), "x").unwrap();
 
         assert!(unlink_dir(&dir).is_err());
         assert!(dir.join("keep.txt").exists());
-        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
     fn empty_dir_detection() {
         let base = temp_dir("empty");
-        let empty = base.join("empty");
+        let empty = base.path().join("empty");
         fs::create_dir_all(&empty).unwrap();
-        let full = base.join("full");
+        let full = base.path().join("full");
         fs::create_dir_all(&full).unwrap();
         fs::write(full.join("f"), "x").unwrap();
 
         assert!(is_empty_dir(&empty));
         assert!(!is_empty_dir(&full));
-        assert!(!is_empty_dir(&base.join("missing")));
-        fs::remove_dir_all(&base).ok();
+        assert!(!is_empty_dir(&base.path().join("missing")));
     }
 
     /// The one place a traversal bug destroys shared worlds: deleting a tree
@@ -175,10 +170,10 @@ mod tests {
     #[test]
     fn remove_dir_all_does_not_descend_through_a_link() {
         let base = temp_dir("noescape");
-        let store = base.join("store");
+        let store = base.path().join("store");
         fs::create_dir_all(store.join("world")).unwrap();
         fs::write(store.join("world").join("level.dat"), "x").unwrap();
-        let data = base.join("data");
+        let data = base.path().join("data");
         fs::create_dir_all(&data).unwrap();
         link_dir(&store, &data.join("saves")).unwrap();
 
@@ -188,6 +183,5 @@ mod tests {
             store.join("world").join("level.dat").exists(),
             "the shared store must survive deleting a linked tree"
         );
-        fs::remove_dir_all(&base).ok();
     }
 }

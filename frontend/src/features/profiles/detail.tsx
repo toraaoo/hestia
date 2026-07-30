@@ -71,7 +71,7 @@ export function ProfileDetailPage({
   if (!profile) {
     return (
       <div className="p-6">
-        <Empty>{m['profiles.missing']()}</Empty>
+        <Empty>{m['profile.missing']()}</Empty>
       </div>
     );
   }
@@ -93,13 +93,15 @@ export function ProfileDetailPage({
   return (
     <div className="flex min-h-full flex-col">
       <DetailHero
-        parentLabel={m['profiles.page_title']()}
+        parentLabel={m['profile.global.title']()}
         parentTo="/profiles"
         icon={StackIcon}
         name={profile.name}
         badges={
           <Badge variant="outline" className="font-mono">
-            {m['profiles.entries_count']({ count: profile.entries.length })}
+            {m['profile.global.entries_count']({
+              count: profile.entries.length,
+            })}
           </Badge>
         }
         actions={
@@ -107,13 +109,13 @@ export function ProfileDetailPage({
             trigger={
               <Button variant="outline" data-icon="inline-start">
                 <TrashIcon />
-                {m['action.remove']()}
+                {m['app.action.remove']()}
               </Button>
             }
-            title={m['profiles.remove_title']({ name: profile.name })}
-            description={m['profiles.remove_description']()}
+            title={m['profile.remove.title']({ name: profile.name })}
+            description={m['profile.remove.description']()}
             destructive
-            confirmLabel={m['action.remove']()}
+            confirmLabel={m['app.action.remove']()}
             onConfirm={() =>
               remove.mutate(profile.name, {
                 onSuccess: () => navigate({ to: '/profiles' }),
@@ -163,13 +165,13 @@ export function ProfileDetailPage({
                     <div className="truncate text-sm">{ref.name}</div>
                     <div className="truncate font-mono text-[11px] text-muted-foreground">
                       {contentKindLabel[ref.kind]()} · {ref.source} ·{' '}
-                      {m['label.latest']()}
+                      {m['app.label.latest']()}
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={m['action.remove']()}
+                    aria-label={m['app.action.remove']()}
                     disabled={edit.isPending}
                     onClick={() => removeReference(ref.ref)}
                   >

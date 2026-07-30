@@ -111,6 +111,25 @@ pub(super) fn ensure_no_modpack(
     Ok(())
 }
 
+/// Refuse operations that would race an instance export. An export reads the
+/// whole entry tree, so anything that rewrites it — a launch's content mirror,
+/// a content install, a remove — would put a state in the archive that never
+/// existed on disk. The entry's process id doubles as the transfer in-flight
+/// key. An *import* is never in the way: it creates the entry it fills, so
+/// there is nothing yet to race.
+pub(super) fn ensure_no_transfer(
+    ctx: &HandlerContext,
+    key: &str,
+    name: &str,
+) -> Result<(), ErrorInfo> {
+    if ctx.runtime.transfers().in_flight(key) {
+        return Err(ErrorInfo::Busy {
+            detail: format!("'{name}' is being exported"),
+        });
+    }
+    Ok(())
+}
+
 /// Refuse lifecycle changes (start, update, remove) while an archive is being
 /// written or restored — they would race the file tree it is reading. The
 /// entry's process id doubles as the backup in-flight key.

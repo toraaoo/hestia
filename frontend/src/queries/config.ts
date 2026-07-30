@@ -23,7 +23,8 @@ export const configMutations = {
       mutationKey: [...keys.config.all, 'set'],
       mutationFn: ({ key, value }) => api.set(key, value),
       // A content source's API key is a setting, and setting it changes which
-      // sources answer — so the browse cache goes with the config cache.
-      invalidates: () => [keys.config.all, keys.content.all],
+      // sources answer — so the browse cache goes with the config cache. And
+      // `sync.get` reports `sync.enabled` back, so a write can change that too.
+      invalidates: () => [keys.config.all, keys.content.all, keys.sync.all],
     }),
 };

@@ -96,12 +96,11 @@ pub(crate) fn origin(pack: &InstalledModpack) -> String {
 mod tests {
     use super::*;
 
-    fn temp(tag: &str) -> std::path::PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("hestia-modpack-test-{tag}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
+    fn temp(tag: &str) -> tempfile::TempDir {
+        tempfile::Builder::new()
+            .prefix(&format!("hestia-modpack-{tag}-"))
+            .tempdir()
+            .expect("temp dir")
     }
 
     fn wrote(data: &Path, path: &str, body: &str) -> ModpackOverride {
@@ -116,32 +115,32 @@ mod tests {
 
     #[test]
     fn an_untouched_file_is_ours_and_an_edited_one_is_not() {
-        let data = temp("ours");
-        let entry = wrote(&data, "config/cozy.toml", "pack default");
-        assert!(ours(&data, &entry));
+        let dir = temp("ours");
+        let data = dir.path();
+        let entry = wrote(data, "config/cozy.toml", "pack default");
+        assert!(ours(data, &entry));
 
         std::fs::write(data.join("config/cozy.toml"), "my tweak").unwrap();
-        assert!(!ours(&data, &entry), "a user edit is not ours to overwrite");
+        assert!(!ours(data, &entry), "a user edit is not ours to overwrite");
 
         std::fs::remove_file(data.join("config/cozy.toml")).unwrap();
-        assert!(ours(&data, &entry), "a missing file has nothing to lose");
-        std::fs::remove_dir_all(&data).ok();
+        assert!(ours(data, &entry), "a missing file has nothing to lose");
     }
 
     #[test]
     fn removal_skips_what_the_user_edited() {
-        let data = temp("remove");
-        let keep = wrote(&data, "config/mine.toml", "pack default");
-        let go = wrote(&data, "config/theirs.toml", "pack default");
+        let dir = temp("remove");
+        let data = dir.path();
+        let keep = wrote(data, "config/mine.toml", "pack default");
+        let go = wrote(data, "config/theirs.toml", "pack default");
         std::fs::write(data.join("config/mine.toml"), "edited").unwrap();
 
-        let (removed, kept) = remove_overrides(&data, &[keep, go]);
+        let (removed, kept) = remove_overrides(data, &[keep, go]);
 
         assert_eq!(removed, 1);
         assert_eq!(kept, vec!["config/mine.toml".to_string()]);
         assert!(data.join("config/mine.toml").is_file());
         assert!(!data.join("config/theirs.toml").exists());
-        std::fs::remove_dir_all(&data).ok();
     }
 
     #[test]

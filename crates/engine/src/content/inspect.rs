@@ -68,17 +68,19 @@ fn file_name(path: &Path) -> std::borrow::Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use std::io::Write;
-    use std::path::PathBuf;
 
     use zip::write::SimpleFileOptions;
     use zip::ZipWriter;
 
     use super::*;
 
-    fn archive(tag: &str, entries: &[&str]) -> PathBuf {
-        let path =
-            std::env::temp_dir().join(format!("hestia-inspect-{}-{}.zip", tag, std::process::id()));
-        let file = File::create(&path).unwrap();
+    fn archive(tag: &str, entries: &[&str]) -> tempfile::NamedTempFile {
+        let path = tempfile::Builder::new()
+            .prefix(&format!("hestia-inspect-{tag}-"))
+            .suffix(".zip")
+            .tempfile()
+            .expect("temp file");
+        let file = File::create(path.path()).unwrap();
         let mut zip = ZipWriter::new(file);
         for entry in entries {
             if entry.ends_with('/') {
@@ -96,8 +98,7 @@ mod tests {
 
     fn kind(tag: &str, entries: &[&str]) -> Option<ContentKind> {
         let path = archive(tag, entries);
-        let out = classify(&path).ok();
-        std::fs::remove_file(&path).ok();
+        let out = classify(path.path()).ok();
         match out {
             Some(Detected::Kind(k)) => Some(k),
             _ => None,
@@ -132,20 +133,20 @@ mod tests {
     #[test]
     fn unknown_archive_is_valid_but_unclassified() {
         let path = archive("unknown", &["random.txt"]);
-        assert!(matches!(classify(&path), Ok(Detected::Unknown)));
-        std::fs::remove_file(&path).ok();
+        assert!(matches!(classify(path.path()), Ok(Detected::Unknown)));
     }
 
     #[test]
     fn modpack_and_non_archive_are_rejected() {
         let pack = archive("modpack", &["modrinth.index.json"]);
-        assert!(classify(&pack).is_err());
-        std::fs::remove_file(&pack).ok();
+        assert!(classify(pack.path()).is_err());
 
-        let junk =
-            std::env::temp_dir().join(format!("hestia-inspect-junk-{}.jar", std::process::id()));
-        std::fs::write(&junk, b"not a zip").unwrap();
-        assert!(classify(&junk).is_err());
-        std::fs::remove_file(&junk).ok();
+        let junk = tempfile::Builder::new()
+            .prefix("hestia-inspect-junk-")
+            .suffix(".jar")
+            .tempfile()
+            .expect("temp file");
+        std::fs::write(junk.path(), b"not a zip").unwrap();
+        assert!(classify(junk.path()).is_err());
     }
 }

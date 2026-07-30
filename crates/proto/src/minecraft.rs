@@ -7,16 +7,43 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::content::ContentKind;
 use crate::download::Checksum;
 
 /// A distribution offered by a domain: the first level of the `available`
 /// selector (`vanilla`, `fabric`, …).
+///
+/// Everything a front-end needs to render the choice travels with it — the
+/// blurb explaining what it is and the content kinds an entry of it would
+/// accept — so shipping a flavor is a daemon-side change alone. A front-end
+/// that kept its own table of either would drift the moment one was added,
+/// which is the same no-drift rule `ServerInfo::accepts` follows.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct Flavor {
     pub id: String,
     pub name: String,
+    /// One line saying what this distribution is and what it costs to run,
+    /// authored beside the provider. English; a front-end with its own
+    /// translation for a known id may prefer it.
+    pub summary: String,
+    pub accepts: Vec<ContentKind>,
+    /// What this flavor needs installed that is **not** on this machine; empty
+    /// when it is ready to use. Resolved as the catalogue is built, so a
+    /// front-end warns before the user commits rather than after.
+    pub requires: Vec<Requirement>,
+}
+
+/// Something a flavor needs on the machine that Hestia cannot install itself —
+/// named as the user would recognise it, with where to get it. A front-end
+/// should never have to know what a given flavor depends on.
+#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct Requirement {
+    pub name: String,
+    pub url: String,
 }
 
 /// One key/value setting, shared by the server and instance `config` channels
@@ -199,6 +226,10 @@ pub enum ProvisionPhase {
     Content,
     /// Writing a modpack's own game-directory files (its `overrides/`).
     Overrides,
+    /// Writing an instance's files into an export archive.
+    Archive,
+    /// Reading an imported archive's files back onto disk.
+    Extract,
 }
 
 /// Progress for a provisioning job. `current`/`total` are bytes for a

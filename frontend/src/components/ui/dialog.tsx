@@ -69,7 +69,7 @@ function DialogContent({
             }
           >
             <XIcon />
-            <span className="sr-only">{m['action.close']()}</span>
+            <span className="sr-only">{m['app.action.close']()}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>
@@ -107,7 +107,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close render={<Button variant="outline" />}>
-          {m['action.close']()}
+          {m['app.action.close']()}
         </DialogPrimitive.Close>
       )}
     </div>

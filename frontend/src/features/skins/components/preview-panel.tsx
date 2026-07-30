@@ -33,7 +33,7 @@ export function PreviewPanel({
             variant="secondary"
             className="absolute top-2 left-2 z-10 bg-background/80 backdrop-blur-xs"
           >
-            {m['skins.previewing']()}
+            {m['skin.previewing']()}
           </Badge>
         )}
         <SkinModel
@@ -62,17 +62,15 @@ export function PreviewPanel({
               }}
             >
               <ToggleGroupItem value="classic">
-                {m['skins.wide']()}
+                {m['skin.wide']()}
               </ToggleGroupItem>
-              <ToggleGroupItem value="slim">
-                {m['skins.slim']()}
-              </ToggleGroupItem>
+              <ToggleGroupItem value="slim">{m['skin.slim']()}</ToggleGroupItem>
             </ToggleGroup>
           ) : (
             <Badge variant="secondary">{skinVariantLabel(skin)}</Badge>
           )}
           <Badge variant="outline">
-            {cape ? cape.name : m['skins.no_cape']()}
+            {cape ? cape.name : m['skin.no_cape']()}
           </Badge>
         </div>
 
@@ -85,11 +83,11 @@ export function PreviewPanel({
               onClick={onApply}
             >
               <CheckIcon weight="bold" />
-              {m['action.apply']()}
+              {m['app.action.apply']()}
             </Button>
           ) : (
             <p className="text-xs text-muted-foreground">
-              {m['skins.equipped_hint']()}
+              {m['skin.equipped_hint']()}
             </p>
           )}
         </div>

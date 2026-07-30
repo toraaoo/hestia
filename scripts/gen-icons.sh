@@ -37,11 +37,13 @@ magick -background none "$src" \
 
 # The tray sits on the panel's own background, so it takes the bare mark: no
 # plate, trimmed to the cube and re-padded so every platform scales it alike.
+# PNG32 + depth 8 is load-bearing: a Q16 ImageMagick writes 16-bit channels by
+# default, which tray_icon::Icon::from_rgba cannot take.
 echo "generating crates/tray/assets/icon.png"
 grep -v '<rect' "$src" > "$tmp/mark.svg"
 magick -background none "$tmp/mark.svg" -resize 1024x1024 \
   -trim +repage -resize 240x240 \
   -gravity center -background none -extent 256x256 \
-  crates/tray/assets/icon.png
+  -depth 8 PNG32:crates/tray/assets/icon.png
 
 echo "done — commit the regenerated icons"

@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import type { InstanceInfo } from '@/api';
 import {
@@ -45,19 +52,29 @@ export function LaunchModalProvider({
     null,
   );
 
-  const launch = (instance: InstanceInfo) => {
-    // The session is running either way; the warnings say what it runs against
-    // (an unshared saves folder, say), so they follow a backgrounded launch too.
-    mutation.mutate(instance.id, {
-      onSuccess: (done) => toastWarnings(done.warnings),
-    });
-    if (instance.lastPlayedUnix == null) {
-      setTarget({ id: instance.id, name: instance.name });
-    }
-  };
-
-  const isLaunching = (id: string) =>
-    mutation.isPending && mutation.variables === id;
+  // The provider re-renders on every progress tick of the job it owns, so the
+  // context value is memoized: a consumer re-renders when the launch state
+  // changes, not when a byte count does.
+  const { mutate, isPending, variables } = mutation;
+  const launch = useCallback(
+    (instance: InstanceInfo) => {
+      // The session is running either way; the warnings say what it runs
+      // against (an unshared saves folder, say), so they follow a backgrounded
+      // launch too.
+      mutate(instance.id, {
+        onSuccess: (done) => toastWarnings(done.warnings),
+      });
+      if (instance.lastPlayedUnix == null) {
+        setTarget({ id: instance.id, name: instance.name });
+      }
+    },
+    [mutate],
+  );
+  const isLaunching = useCallback(
+    (id: string) => isPending && variables === id,
+    [isPending, variables],
+  );
+  const value = useMemo(() => ({ launch, isLaunching }), [launch, isLaunching]);
 
   const job = mutation.job;
   const open = target != null;
@@ -83,7 +100,7 @@ export function LaunchModalProvider({
   };
 
   return (
-    <Ctx.Provider value={{ launch, isLaunching }}>
+    <Ctx.Provider value={value}>
       {children}
       <Dialog
         open={open}
@@ -94,9 +111,11 @@ export function LaunchModalProvider({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {m['launch.title']({ name: target?.name ?? '' })}
+              {m['instance.launch.title']({ name: target?.name ?? '' })}
             </DialogTitle>
-            <DialogDescription>{m['launch.preparing']()}</DialogDescription>
+            <DialogDescription>
+              {m['instance.launch.preparing']()}
+            </DialogDescription>
           </DialogHeader>
           <ProvisionProgressView
             progress={mutation.progress}

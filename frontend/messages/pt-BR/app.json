@@ -1,0 +1,168 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "app": {
+    "action": {
+      "apply": "Aplicar",
+      "back": "Voltar",
+      "cancel": "Cancelar",
+      "close": "Fechar",
+      "confirm": "Confirmar",
+      "deactivate": "Desativar",
+      "delete": "Excluir",
+      "disable": "Desativar",
+      "edit": "Editar",
+      "enable": "Ativar",
+      "equip": "Equipar",
+      "export": "Exportar",
+      "import": "Importar",
+      "install": "Instalar",
+      "manage": "Gerenciar",
+      "more": "Mais",
+      "next": "Avançar",
+      "open_folder": "Abrir pasta",
+      "play": "Jogar",
+      "remove": "Remover",
+      "rename": "Renomear",
+      "restart": "Reiniciar",
+      "restore": "Restaurar",
+      "save_skin": "Salvar skin",
+      "select": "Selecionar",
+      "start": "Iniciar",
+      "stop": "Parar",
+      "uninstall": "Desinstalar",
+      "update": "Atualizar"
+    },
+    "collection": {
+      "filter_by_flavor": "Filtrar por distribuição",
+      "switch_to_grid": "Mudar para visualização em grade",
+      "switch_to_list": "Mudar para visualização em lista"
+    },
+    "daemon": {
+      "connected": "hestiad conectado",
+      "connected_label": "Daemon conectado",
+      "offline": "daemon offline",
+      "offline_body": "O serviço em segundo plano do launcher parou. Servidores e instâncias iniciados por ele continuam rodando; inicie-o novamente para gerenciá-los.",
+      "offline_label": "Daemon offline",
+      "offline_title": "O Hestia não está em execução",
+      "restart": "Reiniciar daemon",
+      "restart_description": "O launcher desconecta brevemente durante a reinicialização. Servidores e instâncias em execução continuam rodando.",
+      "restart_title": "Reiniciar o daemon?",
+      "restarting": "Reiniciando…",
+      "start": "Iniciar daemon",
+      "starting": "Iniciando…",
+      "version_uptime": "v{version} · ativo há {uptime}"
+    },
+    "jobs": {
+      "failed": "A operação falhou.",
+      "more": "+{count} mais",
+      "title": "Tarefas em segundo plano ({count})"
+    },
+    "label": {
+      "address": "Endereço",
+      "all": "Todos",
+      "backups": "Backups",
+      "categories": "Categorias",
+      "console": "Console",
+      "content": "Conteúdo",
+      "cpu": "CPU",
+      "created": "Criado",
+      "description": "Descrição",
+      "details": "Detalhes",
+      "disk": "Disco",
+      "flavor": "Distribuição",
+      "game": "Jogo",
+      "java": "Java",
+      "last_played": "Jogado por último",
+      "latest": "mais recente",
+      "loader": "Loader",
+      "logs": "Logs",
+      "memory": "Memória",
+      "name": "Nome",
+      "nothing_pinned": "Nada fixado ainda",
+      "off": "Desativado",
+      "other": "Outros",
+      "overview": "Visão geral",
+      "pin": "Fixar na barra lateral",
+      "pin_entries": "Fixar uma instância ou servidor",
+      "pinned": "Fixados",
+      "players": "Jogadores",
+      "playtime": "Tempo jogado",
+      "settings": "Configurações",
+      "system_resources": "Recursos do sistema",
+      "target": "Destino",
+      "unpin": "Desafixar",
+      "version": "Versão",
+      "versions": "Versões",
+      "worlds": "Mundos"
+    },
+    "nav": {
+      "back": "Voltar",
+      "browse": "Explorar conteúdo",
+      "forward": "Avançar",
+      "instances": "Instâncias",
+      "library": "Biblioteca",
+      "news": "Novidades",
+      "profiles": "Perfis",
+      "servers": "Servidores",
+      "settings": "Configurações",
+      "skins": "Skins"
+    },
+    "playbar": {
+      "all_instances": "Todas as instâncias",
+      "quick_play": "Jogo rápido"
+    },
+    "search": {
+      "content_or_link": "Pesquise ou cole o link de um projeto",
+      "instances": "Pesquisar instâncias",
+      "library": "Pesquisar na biblioteca",
+      "placeholder": "Pesquisar",
+      "servers": "Pesquisar servidores",
+      "targets": "Pesquisar servidores e instâncias"
+    },
+    "status": {
+      "idle": "Ocioso",
+      "live": "Ao vivo",
+      "loading": "Carregando…",
+      "online": "Online",
+      "preparing": "Preparando",
+      "preparing_ellipsis": "Preparando…",
+      "running": "Em execução",
+      "stopped": "Parado"
+    },
+    "time": {
+      "days": "há {count} dias",
+      "hours": "há {count} h",
+      "just_now": "agora mesmo",
+      "minutes": "há {count} min",
+      "yesterday": "ontem"
+    },
+    "toast": {
+      "cache_cleared": "Cache limpo ({size} recuperado)",
+      "created": "{name} criado",
+      "removed": "{name} removido",
+      "renamed": "Renomeado para {name}",
+      "saved": "Salvo",
+      "updated": "{name} atualizado"
+    },
+    "validation": {
+      "choose_version": "Escolha uma versão para continuar.",
+      "eula": "Aceite o EULA para criar um servidor.",
+      "min_players": "Pelo menos um jogador.",
+      "pick_flavor": "Escolha uma distribuição para continuar.",
+      "port_number": "A porta deve ser um número.",
+      "port_range": "Porta fora do intervalo.",
+      "whole_number": "Digite um número inteiro."
+    },
+    "welcome": {
+      "body": "Entre com uma conta Microsoft para criar e jogar instâncias. Você pode navegar por servidores e configurações sem uma.",
+      "dismiss": "Talvez depois",
+      "title": "Bem-vindo ao Hestia"
+    },
+    "window": {
+      "close": "Fechar",
+      "maximize": "Maximizar",
+      "minimize": "Minimizar",
+      "restore": "Restaurar"
+    }
+  }
+}

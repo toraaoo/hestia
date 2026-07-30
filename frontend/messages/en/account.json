@@ -1,0 +1,20 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "account": {
+    "add": "Add account",
+    "expired": "Expired",
+    "microsoft": "Microsoft account",
+    "not_signed_in": "Not signed in",
+    "reauth": "Sign in again",
+    "reauth_required": "Sign-in expired",
+    "sign_in": "Sign in",
+    "sign_in_failed": "Sign-in failed",
+    "sign_in_to_play": "Sign in to play",
+    "sign_out": "Sign out",
+    "sign_out_description": "You'll need to sign in with Microsoft again to launch as this account.",
+    "sign_out_title": "Sign out {name}?",
+    "signed_in_as": "Signed in as {name}",
+    "signing_in": "Signing in…",
+    "switch_to": "Switch to {name}"
+  }
+}

@@ -6,7 +6,10 @@ import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ContentInstallModal } from '@/features/content/install';
+import {
+  ContentInstallModal,
+  ModpackInstallModal,
+} from '@/features/content/install';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { compact } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
@@ -64,7 +67,7 @@ export function ContentCard({
                   {project.title}
                 </span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">
-                  {m['browse.by_author']({ name: project.author })}
+                  {m['content.browse.by_author']({ name: project.author })}
                 </span>
                 <Badge variant="secondary" className="ml-auto shrink-0">
                   {contentKindLabel[project.kind]()}
@@ -98,7 +101,7 @@ export function ContentCard({
                   }}
                 >
                   <PlusIcon weight="bold" />
-                  {m['action.install']()}
+                  {m['app.action.install']()}
                 </Button>
               </div>
             </div>
@@ -106,12 +109,23 @@ export function ContentCard({
         </Card>
       </Link>
 
-      <ContentInstallModal
-        project={project}
-        pinnedVersion={pinnedVersion}
-        open={installing}
-        onOpenChange={setInstalling}
-      />
+      {/* A modpack builds an entry rather than going into one, so it gets its
+          own dialog instead of the shared content one. */}
+      {project.kind === 'modpack' ? (
+        <ModpackInstallModal
+          project={project}
+          pinnedVersion={pinnedVersion}
+          open={installing}
+          onOpenChange={setInstalling}
+        />
+      ) : (
+        <ContentInstallModal
+          project={project}
+          pinnedVersion={pinnedVersion}
+          open={installing}
+          onOpenChange={setInstalling}
+        />
+      )}
     </>
   );
 }

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "profile": {
+    "active": "Ativo",
+    "apply": {
+      "action": "Aplicar perfil global",
+      "description": "Referências ainda não instaladas são resolvidas para {version} e instaladas, marcadas com o perfil. Um apply nunca remove nada.",
+      "title": "Aplicar um perfil global"
+    },
+    "capture": {
+      "action": "Capturar configurações",
+      "badge": "Configurações capturadas",
+      "description": "Cria um snapshot de options.txt e config/ a partir do armazenamento compartilhado. Inícios sob este perfil passam a manter as próprias configurações; mundos continuam compartilhados.",
+      "title": "Capturar configurações de {name}?"
+    },
+    "create": {
+      "description": "Um perfil é uma seleção nomeada sobre o conteúdo instalado desta instância — nada é copiado.",
+      "name_label": "Nome do perfil",
+      "seed_hint": "Desligado começa com uma seleção vazia.",
+      "seed_label": "Começar com tudo instalado",
+      "title": "Criar perfil"
+    },
+    "empty": "Nenhum perfil ainda. Um perfil escolhe qual conteúdo instalado é espelhado no jogo ao iniciar.",
+    "global": {
+      "description": "Listas de conteúdo reutilizáveis aplicadas a qualquer instância — cada referência resolve contra a versão e o loader da instância.",
+      "empty": "Nenhum perfil global ainda. Monte uma lista de referências uma vez e aplique em qualquer instância.",
+      "entries_count": "{count} referências",
+      "new": "Novo perfil global",
+      "no_entries": "Nenhuma referência ainda.",
+      "title": "Perfis globais"
+    },
+    "members": {
+      "action": "Editar seleção",
+      "count": "{count} de {total} itens",
+      "description": "Membros são espelhados no jogo ao iniciar; itens desmarcados são removidos da pasta do jogo (os arquivos continuam gerenciados, e arquivos avulsos nunca são tocados).",
+      "empty": "Nada instalado para selecionar — adicione mods, resource packs ou shaders primeiro.",
+      "title": "Selecionar conteúdo — {name}"
+    },
+    "missing": "Este perfil não existe.",
+    "new": "Novo perfil",
+    "none_active": "Nenhum perfil ativo — tudo que está instalado é espelhado ao iniciar.",
+    "none_match": "Nenhum perfil corresponde.",
+    "origin_badge": "perfil: {name}",
+    "release": {
+      "action": "Liberar configurações",
+      "description": "O armazenamento de configurações do perfil é apagado e o perfil volta a seguir as configurações compartilhadas.",
+      "title": "Liberar configurações capturadas?"
+    },
+    "remove": {
+      "description": "A seleção é apagada; o conteúdo instalado permanece.",
+      "title": "Remover {name}?"
+    },
+    "rename_title": "Renomear perfil",
+    "search_placeholder": "Buscar perfis",
+    "use": "Usar no próximo início"
+  }
+}

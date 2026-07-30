@@ -5,68 +5,47 @@ A Minecraft launcher built in Rust.
 Alongside a desktop UI (Tauri), Hestia ships a first-class **CLI** front-end, so
 it's just as comfortable from a terminal as from a window.
 
-> **Status:** early development (`v0.0.1`), now a fully all-Rust workspace — the
-> C++ tree is gone. Hestia runs as a daemon (`hestiad`) with thin clients over a
-> local socket. In place today: the build/workspace, logging, a config store, the
-> CLI, Java runtime management (install/list/uninstall via the Adoptium API),
-> Microsoft account sign-in — with skin and cape management over the Mojang
-> profile API (a preserving local skin library plus the vanilla defaults;
-> desktop-only, no CLI surface) — a process supervisor whose workloads survive
-> daemon restarts (on-disk records + re-adoption), and full
-> Minecraft **server** and **instance** management — a server is fully
-> provisioned at create (jar + java runtime + EULA), runs on its own claimed
-> port under the supervisor, and has an RCON-backed console (interactive
-> attach, one-shot commands, followed logs); an instance materialises its
-> files (client jar, libraries,
-> assets) at launch and runs as the signed-in account. Both move between game
-> versions in place (`server|instance update`; downgrades warn — worlds and
-> saves do not downgrade; a server's data is backed up automatically first,
-> an instance's is not). Servers have **backups**: on-demand archive/restore
-> of the game data (a running server keeps running — world saving pauses
-> around the archive), plus scheduled backups with retention pruning.
-> Instances have none — import/export is the intended replacement and is
-> still to come. Instance settings and worlds are **shared** across
-> instances (`sync`): `options.txt` and `servers.dat` copied and merged,
-> `saves`/`config`/`screenshots` linked into one store (symlinks; junctions
-> on Windows), with `sync status` link states and a per-instance `sync
-> adopt` migration for pre-existing folders. **Content** —
-> mods, plugins, resourcepacks, shaders, datapacks — is discovered on Modrinth
-> and CurseForge (search, browse, resolve versions) and installed into a server
-> (mods or plugins, whichever its flavor loads, plus datapacks) or
-> instance (mods/resourcepacks/shaders/datapacks) from a project, a source
-> page URL, or a local file, with required dependencies pulled in and a `data/`
-> mirror that survives backup/restore (datapacks install straight into their
-> world, which the world backup already covers). An instance's installed pool
-> can be sliced into **content profiles** — named selections (mods,
-> resourcepacks, shaders) enforced by the launch-time mirror reconcile; no
-> profile active mirrors everything, and a per-launch override picks another.
-> A profile can also **capture** its own settings scope (`options.txt`,
-> `config/`) snapshotted from the shared store — worlds stay shared.
-> **Global profiles** are data-home-level project reference lists applied
-> into an instance in one shot — each reference resolved against that
-> instance's version/loader and installed as ordinary origin-tagged content
-> (all a daemon/desktop surface, no CLI verbs). A whole **modpack** installs
-> into a new or existing server or instance from a project, a page URL, or a
-> local `.mrpack` (a CurseForge pack from its source, which alone can resolve
-> the ids its manifest names): the pack's own loader and version build the
-> entry, its mods
-> join the pool as ordinary origin-tagged content (individually listable and
-> updatable), and its `overrides/` are written into the game directory under a
-> hash record, so updating the pack replaces the files it still owns and leaves
-> the ones you have edited. Vanilla and Fabric are the
-> shipped flavors for both sides, joined by **NeoForge** — whose game jar is
-> built locally from its installer, so a first launch or create takes a few
-> minutes. **Paper** and **Folia** are shipped for
-> servers, which take **plugins** rather than mods and start on the JVM flags
-> PaperMC recommends for that version. Modrinth and CurseForge are the shipped
-> content sources — CurseForge's API needs a key
-> (`config set content.curseforge-key`), and the source is not offered until
-> one is set. A **system tray**
-> accompanies every serving daemon — open the app, status, start/restart, a
-> start-at-login toggle, quit; a left-click (or the Open item) launches the
-> desktop shell. The **desktop shell** talks to the daemon through a generic
-> Tauri IPC bridge with a typed TS API layer (React Query hooks included).
-> Still to come: the desktop UI itself.
+> **Status:** early development (`v0.0.1`). Hestia runs as a daemon (`hestiad`)
+> with thin clients over a local socket, and the vertical slice is complete —
+> everything below works end to end.
+>
+> **Servers and instances.** A server is fully provisioned at create (jar, Java
+> runtime, EULA), claims its own port, and has an RCON-backed console. An
+> instance materialises its files at launch, runs as the signed-in account, and
+> can run several concurrent sessions. Both move between game versions in place;
+> downgrades warn, and a server's data is backed up first.
+>
+> **Flavors.** Vanilla, Fabric and NeoForge on both sides; Paper, Folia, Spigot
+> and CraftBukkit for servers. NeoForge builds its game jar locally from the
+> installer, and Spigot/CraftBukkit are compiled on your machine with SpigotMC's
+> BuildTools (needs `git`) — so a first create on those takes a few minutes.
+> Each flavor describes itself over the wire, including the content kinds it
+> takes.
+>
+> **Content.** Mods, plugins, resourcepacks, shaders and datapacks from Modrinth
+> or CurseForge, a page URL or a local file, with dependencies resolved.
+> CurseForge's API needs a key (`config set content.curseforge-key`), and the
+> source is not offered until one resolves. Whole modpacks install into a new or
+> existing entry, their mods joining the pool as ordinary updatable content — a
+> CurseForge pack from its source or page URL rather than from a file, since only
+> CurseForge resolves the ids its manifest names. An instance's pool can be
+> sliced into named content profiles, and reusable global profiles apply project
+> references across instances.
+>
+> **Data.** Server backups on demand and on a schedule, with retention pruning.
+> An instance travels as one file instead: export it whole, or as a `.mrpack`
+> other launchers read, and import back a hestia archive, a `.mrpack`, or a
+> Prism/MultiMC instance. Instance settings and worlds are shared across
+> instances (`sync`) — files merged, folders linked into one store — switchable
+> off wholesale.
+>
+> **Around it.** Microsoft sign-in with skin and cape management, a process
+> supervisor whose workloads survive daemon restarts, signed announcements,
+> self-update, a system tray, the full CLI, and the desktop shell with its
+> library, entry, browse, skins, news and settings pages.
+>
+> **Not built yet:** natives extraction for pre-1.19 clients, and the legacy
+> asset layout.
 
 ## Front-ends
 
@@ -74,9 +53,8 @@ Hestia is one daemon-backed core with several ways to drive it:
 
 - **CLI** (`hestia`) — scriptable command-line interface for automation and power
   users.
-- **Desktop** (`hestia-desktop`) — a Tauri shell hosting a web UI. Wired to the
-  daemon through a generic IPC bridge with a typed TS API layer; the UI itself
-  is not built yet.
+- **Desktop** (`hestia-desktop`) — a Tauri shell hosting the React UI, wired to
+  the daemon through a generic IPC bridge with a typed TS API and query layer.
 - **Tray** (`tray`) — a resident system-tray helper spawned alongside the
   daemon: status, quick actions (start/restart, autostart, quit).
 
@@ -96,13 +74,14 @@ hestia/
 │   ├── ipc/                   transport (unix socket / named pipe) + envelope (tokio)
 │   ├── common/                logging (tracing) + app identity + paths
 │   ├── client/                typed client SDK (facades over a Session)
-│   ├── engine/                config·cache·download·java·accounts·skins  (daemon-only)
+│   ├── engine/                config·cache·download·java·accounts·skins·minecraft·content·process (daemon-only)
 │   ├── cli/                   bin: hestia   (clap)
 │   ├── daemon/                bin: hestiad  (router, services, supervisor)
 │   ├── tray/                  bin: tray     (tray-icon + tao)
 │   └── desktop/               bin: hestia-desktop (Tauri v2 shell)
 ├── frontend/                  desktop UI (React + Vite + TS) — self-contained
-└── docs/                      architecture, contributing
+├── docs/                      architecture (per subsystem) + decisions
+└── news/                      published announcements
 ```
 
 ## Tech stack
@@ -182,11 +161,15 @@ pointer (`config set home`) → the platform default (`~/.hestia`, or
 ## Documentation
 
 - **[docs/cli.md](docs/cli.md)** — the complete `hestia` command reference.
-- **[docs/architecture.md](docs/architecture.md)** — the target graph and the
-  daemon/engine boundary.
+- **[docs/architecture.md](docs/architecture.md)** — how Hestia is put together:
+  the daemon/engine boundary, the crate graph, and a page per subsystem.
+- **[docs/decisions/](docs/decisions/README.md)** — why it is put together that
+  way: one entry per architectural choice, with what it replaced.
 - **[docs/contributing.md](docs/contributing.md)** — conventions and recipes.
+- **[docs/packaging.md](docs/packaging.md)** — installers and release artifacts.
 - **[docs/hooks.md](docs/hooks.md)** — the desktop UI's queries layer: hook
   usage for frontend development.
+- **[news/README.md](news/README.md)** — how to publish an announcement.
 
 ## License
 

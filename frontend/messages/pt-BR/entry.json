@@ -1,0 +1,73 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "entry": {
+    "create": {
+      "eula": {
+        "after": ". Um servidor não inicia até que você aceite.",
+        "before": "Eu aceito o",
+        "link": "EULA do Minecraft"
+      },
+      "filter_versions": "Filtrar versões",
+      "gb": "{value} GB",
+      "hint": {
+        "details_instance": "Dê um nome à sua instância e defina seus recursos.",
+        "details_server": "Dê um nome ao seu servidor e defina seus recursos.",
+        "flavor_instance": "Escolha a distribuição que sua instância executa.",
+        "flavor_server": "Escolha a distribuição que seu servidor executa.",
+        "version": "Escolha a versão do Minecraft."
+      },
+      "instance_title": "Criar instância",
+      "name_hint": "Deixe em branco para usar a distribuição e a versão.",
+      "no_versions_match": "Nenhuma versão corresponde.",
+      "properties": {
+        "difficulty": "Dificuldade",
+        "gamemode": "Modo de jogo",
+        "hardcore": "Hardcore",
+        "max_players": "Máximo de jogadores",
+        "motd": "Mensagem do dia",
+        "online_mode": "Modo online",
+        "port": "Porta",
+        "port_auto": "auto",
+        "port_hint": "Em branco escolhe a menor porta livre.",
+        "title": "Propriedades do servidor"
+      },
+      "provisioning_instance": "Provisionando sua instância…",
+      "provisioning_server": "Provisionando seu servidor…",
+      "server_title": "Criar servidor",
+      "show_snapshots": "Mostrar snapshots",
+      "snapshot": "snapshot"
+    },
+    "icon": {
+      "change": "Alterar ícone",
+      "reset": "Restaurar ícone"
+    },
+    "overview_summary": "Uma instância {flavor} {version} com {mods} mods em {worlds} mundos.",
+    "quick_actions": "Ações rápidas",
+    "sessions_running": "{count} em execução",
+    "settings": {
+      "allocated_memory": "Memória alocada",
+      "allow_downgrade": "Permitir downgrade (mundos não voltam de versão)",
+      "backup_schedule": "Agendamento de backup",
+      "change_version": "Mudar versão",
+      "every_interval": "A cada {interval}",
+      "inherits_default": "padrão",
+      "instance_name": "Nome da instância",
+      "java_arguments": "Argumentos Java",
+      "keep_backups": "Manter backups",
+      "remove": {
+        "description": "{name} e todos os seus dados — mundos, backups e conteúdo instalado — serão excluídos permanentemente. Isto não pode ser desfeito.",
+        "instance": "Remover instância",
+        "instance_title": "Remover instância?",
+        "server": "Remover servidor",
+        "server_title": "Remover servidor?"
+      },
+      "server_name": "Nome do servidor"
+    },
+    "stop": {
+      "instance_description": "A sessão de jogo em execução será fechada. Progresso não salvo pode ser perdido.",
+      "server_description": "O servidor será desligado e os jogadores conectados serão desconectados.",
+      "sessions_description": "Todas as {count} sessões em execução serão fechadas. Progresso não salvo pode ser perdido.",
+      "title": "Parar {name}?"
+    }
+  }
+}

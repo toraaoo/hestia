@@ -4,8 +4,8 @@
 //! the other provisioning jobs. Servers additionally back up on a schedule and
 //! before a version update — the schedule is configured through the server's
 //! `config` channels (`backup-interval` / `backup-retention`), not a channel
-//! of its own. Backups are a **server** feature: instances have none
-//! (import/export is the intended replacement, not yet built).
+//! of its own. Backups are a **server** feature: instances have none — an
+//! instance travels as one archive instead (`crate::transfer`).
 
 use serde::{Deserialize, Serialize};
 

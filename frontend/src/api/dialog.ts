@@ -4,7 +4,7 @@
  * which only the shell's native picker can produce — a browser file input hands
  * back a sandboxed `File`, never a path.
  */
-import { open } from '@tauri-apps/plugin-dialog';
+import { open, save } from '@tauri-apps/plugin-dialog';
 
 /** Single-file content is a jar or zip; a `.mrpack` is a modpack, not offered here. */
 const CONTENT_EXTENSIONS = ['jar', 'zip'];
@@ -33,4 +33,31 @@ export async function pickImage(): Promise<string | null> {
     ],
   });
   return typeof selection === 'string' ? selection : null;
+}
+
+/** The archive formats an instance import accepts, by extension. */
+const ARCHIVE_EXTENSIONS = ['hestia', 'mrpack', 'zip'];
+
+/** Pick one instance archive to import, or null when dismissed. */
+export async function pickInstanceArchive(): Promise<string | null> {
+  const selection = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: 'Instance archives', extensions: ARCHIVE_EXTENSIONS }],
+  });
+  return typeof selection === 'string' ? selection : null;
+}
+
+/**
+ * Ask where to write an export. Returns an absolute path, or null when
+ * dismissed — the daemon writes it, so only a real filesystem path will do.
+ */
+export function pickExportPath(
+  suggestedName: string,
+  extension: string,
+): Promise<string | null> {
+  return save({
+    defaultPath: suggestedName,
+    filters: [{ name: 'Archive', extensions: [extension] }],
+  });
 }

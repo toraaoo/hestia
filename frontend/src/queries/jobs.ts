@@ -56,10 +56,32 @@ const MAX_SETTLED = 50;
 const jobs = new Map<string, Job>();
 const listeners = new Set<() => void>();
 let snapshot: Job[] = [];
+let frame: number | null = null;
 
 function emit(): void {
+  if (frame !== null) {
+    cancelAnimationFrame(frame);
+    frame = null;
+  }
   snapshot = [...jobs.values()];
   for (const listener of listeners) listener();
+}
+
+/**
+ * Coalesce a burst to one paint. The store is read through
+ * `useSyncExternalStore`, so every emit re-renders each subscriber
+ * synchronously — and the daemon reports progress per file, which through an
+ * assets or libraries download is faster than React can commit. React reads
+ * that as a runaway update loop and throws ("Maximum update depth exceeded"),
+ * killing the UI mid-launch. A gauge cannot show more than a frame's worth
+ * anyway, so progress paints once per frame; every other change emits at once.
+ */
+function emitNextFrame(): void {
+  if (frame !== null) return;
+  frame = requestAnimationFrame(() => {
+    frame = null;
+    emit();
+  });
 }
 
 function subscribe(listener: () => void): () => void {
@@ -69,11 +91,12 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-function patch(id: string, changes: Partial<Job>): void {
+function patch(id: string, changes: Partial<Job>, coalesce = false): void {
   const job = jobs.get(id);
   if (!job) return;
   jobs.set(id, { ...job, ...changes });
-  emit();
+  if (coalesce) emitNextFrame();
+  else emit();
 }
 
 function pruneSettled(): void {
@@ -109,7 +132,7 @@ export function startJob<TData, TProgress>(
     id = jobId;
   });
   const started = run((progress) => {
-    if (jobs.get(id)?.status === 'running') patch(id, { progress });
+    if (jobs.get(id)?.status === 'running') patch(id, { progress }, true);
   });
 
   log.debug({ id, op: meta.kind, entry: meta.entry?.id }, 'job started');

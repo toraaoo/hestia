@@ -93,17 +93,17 @@ export function ServerDetailPage({
   if (!server) {
     return (
       <div className="p-6">
-        <Empty>{m['servers.missing']()}</Empty>
+        <Empty>{m['server.missing']()}</Empty>
       </div>
     );
   }
 
   const statusTone = !server.ready ? 'warn' : running ? 'on' : 'off';
   const statusLabel = !server.ready
-    ? m['status.preparing']()
+    ? m['app.status.preparing']()
     : running
-      ? m['status.online']()
-      : m['status.stopped']();
+      ? m['app.status.online']()
+      : m['app.status.stopped']();
 
   const live: LiveResources = {
     running,
@@ -118,7 +118,7 @@ export function ServerDetailPage({
   return (
     <div className="flex h-full flex-col">
       <DetailHero
-        parentLabel={m['nav.servers']()}
+        parentLabel={m['app.nav.servers']()}
         parentTo="/servers"
         icon={entryIcon('server')}
         iconUrl={server.iconUrl}
@@ -143,7 +143,7 @@ export function ServerDetailPage({
             <Button
               variant="outline"
               size="icon"
-              aria-label={m['detail.open_folder']()}
+              aria-label={m['app.action.open_folder']()}
               disabled={!info.data}
               onClick={() => {
                 if (info.data)
@@ -163,12 +163,12 @@ export function ServerDetailPage({
                     disabled={stop.isPending}
                   >
                     <PowerIcon weight="bold" />
-                    {m['action.stop']()}
+                    {m['app.action.stop']()}
                   </Button>
                 }
-                title={m['entry.stop_title']({ name: server.name })}
-                description={m['entry.stop_server_description']()}
-                confirmLabel={m['action.stop']()}
+                title={m['entry.stop.title']({ name: server.name })}
+                description={m['entry.stop.server_description']()}
+                confirmLabel={m['app.action.stop']()}
                 onConfirm={() => stop.mutate()}
               />
             ) : (
@@ -179,7 +179,7 @@ export function ServerDetailPage({
                 onClick={() => start.mutate()}
               >
                 <PlayIcon weight="fill" />
-                {m['action.start']()}
+                {m['app.action.start']()}
               </Button>
             )}
           </>
@@ -192,11 +192,15 @@ export function ServerDetailPage({
         className="min-h-0 flex-1 gap-0 p-0"
       >
         <TabsList variant="line" className="h-auto gap-6 px-5">
-          <TabsTrigger value="overview">{m['tab.overview']()}</TabsTrigger>
-          <TabsTrigger value="console">{m['tab.console']()}</TabsTrigger>
-          <TabsTrigger value="content">{m['tab.content']()}</TabsTrigger>
-          <TabsTrigger value="backups">{m['tab.backups']()}</TabsTrigger>
-          <TabsTrigger value="settings">{m['tab.settings']()}</TabsTrigger>
+          <TabsTrigger value="overview">
+            {m['app.label.overview']()}
+          </TabsTrigger>
+          <TabsTrigger value="console">{m['app.label.console']()}</TabsTrigger>
+          <TabsTrigger value="content">{m['app.label.content']()}</TabsTrigger>
+          <TabsTrigger value="backups">{m['app.label.backups']()}</TabsTrigger>
+          <TabsTrigger value="settings">
+            {m['app.label.settings']()}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" keepMounted className="flex flex-col p-5">
@@ -218,11 +222,11 @@ export function ServerDetailPage({
                       ? `${ping.data.playersOnline}/${ping.data.playersMax}`
                       : '—'
                   }
-                  label={m['label.players']()}
+                  label={m['app.label.players']()}
                 />
                 <StatCard
                   value={memoryLimitGb ? `${memoryLimitGb}G` : '—'}
-                  label={m['label.memory']()}
+                  label={m['app.label.memory']()}
                 />
                 <StatCard
                   value={
@@ -230,27 +234,30 @@ export function ServerDetailPage({
                       ? bytes(info.data.diskBytes)
                       : '—'
                   }
-                  label={m['label.disk']()}
+                  label={m['app.label.disk']()}
                 />
               </div>
               <ResourceCards live={live} />
             </div>
 
             <div className="space-y-4">
-              <SideCard title={m['label.details']()}>
+              <SideCard title={m['app.label.details']()}>
                 <div className="divide-y divide-border">
                   <Stat
-                    label={m['label.address']()}
+                    label={m['app.label.address']()}
                     value={`localhost:${server.gamePort ?? '—'}`}
                   />
-                  <Stat label={m['label.loader']()} value={server.flavor} />
+                  <Stat label={m['app.label.loader']()} value={server.flavor} />
                   <Stat
-                    label={m['label.version']()}
+                    label={m['app.label.version']()}
                     value={server.gameVersion}
                   />
-                  <Stat label={m['label.java']()} value={server.javaMajor} />
                   <Stat
-                    label={m['label.created']()}
+                    label={m['app.label.java']()}
+                    value={server.javaMajor}
+                  />
+                  <Stat
+                    label={m['app.label.created']()}
                     value={agoLabel(server.createdUnix)}
                   />
                 </div>

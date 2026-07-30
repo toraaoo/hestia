@@ -5,27 +5,27 @@ use engine::{Cache, Config, Instances, ServerPhase, Servers};
 use proto::download::{Checksum, HashAlgorithm};
 use proto::minecraft::{InstanceProfile, ServerProfile};
 
-fn temp_dir(tag: &str) -> std::path::PathBuf {
-    let base =
-        std::env::temp_dir().join(format!("hestia-engine-test-{}-{}", tag, std::process::id()));
-    let _ = std::fs::remove_dir_all(&base);
-    std::fs::create_dir_all(&base).unwrap();
-    base
+/// A directory that removes itself when the test ends, named after the test so
+/// a leftover under a debugger says which one left it.
+fn temp_dir(tag: &str) -> tempfile::TempDir {
+    tempfile::Builder::new()
+        .prefix(&format!("hestia-engine-{tag}-"))
+        .tempdir()
+        .expect("temp dir")
 }
 
 #[test]
 fn config_rejects_unknown_keys() {
     let dir = temp_dir("config");
-    let cfg = Config::new(dir.join("config"));
+    let cfg = Config::new(dir.path().join("config"));
     assert!(cfg.get("launcher.memory").is_err());
     assert!(cfg.set("launcher.memory", serde_json::json!(4096)).is_err());
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn config_jvm_defaults_validate_and_normalise() {
     let dir = temp_dir("config-defaults");
-    let cfg = Config::new(dir.join("config"));
+    let cfg = Config::new(dir.path().join("config"));
 
     cfg.set("defaults.memory", serde_json::json!("4g")).unwrap();
     assert_eq!(cfg.get("defaults.memory").unwrap(), serde_json::json!("4G"));
@@ -45,20 +45,19 @@ fn config_jvm_defaults_validate_and_normalise() {
     let defaults = cfg.settings().java_defaults();
     assert!(defaults.memory.is_none());
     assert!(defaults.jvm_args.is_empty());
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn cache_stores_and_lists_by_checksum() {
     let dir = temp_dir("cache");
-    let cache = Cache::new(dir.join("cache"));
+    let cache = Cache::new(dir.path().join("cache"));
 
     // sha256 of the empty input.
     let checksum = Checksum {
         algorithm: HashAlgorithm::Sha256,
         hex: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
     };
-    let blob = dir.join("blob.bin");
+    let blob = dir.path().join("blob.bin");
     std::fs::write(&blob, b"").unwrap();
 
     assert!(cache.lookup(&checksum).is_none());
@@ -75,13 +74,12 @@ fn cache_stores_and_lists_by_checksum() {
     let freed = cache.clear();
     assert_eq!(freed.entries, 1);
     assert!(cache.lookup(&checksum).is_none());
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn servers_store_round_trips_records() {
     let dir = temp_dir("servers");
-    let servers = Servers::new(dir.join("servers"));
+    let servers = Servers::new(dir.path().join("servers"));
     assert!(servers.list().is_empty());
 
     let profile = ServerProfile {
@@ -132,13 +130,12 @@ fn servers_store_round_trips_records() {
     assert!(servers.remove(&record.id).unwrap());
     assert!(!servers.remove(&record.id).unwrap());
     assert!(servers.list().is_empty());
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn recovery_discards_a_half_created_server_but_never_a_half_updated_one() {
     let dir = temp_dir("server-reconcile");
-    let servers = Servers::new(dir.join("servers"));
+    let servers = Servers::new(dir.path().join("servers"));
     let profile = ServerProfile {
         flavor: "vanilla".into(),
         game_version: "1.21.1".into(),
@@ -180,13 +177,12 @@ fn recovery_discards_a_half_created_server_but_never_a_half_updated_one() {
 
     // Recovery is idempotent: a second pass has nothing left to discard.
     assert!(servers.reconcile().is_empty());
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn server_rename_keeps_the_id_moves_the_directory() {
     let dir = temp_dir("server-rename");
-    let servers = Servers::new(dir.join("servers"));
+    let servers = Servers::new(dir.path().join("servers"));
     let profile = ServerProfile {
         flavor: "vanilla".into(),
         game_version: "1.21.1".into(),
@@ -212,13 +208,12 @@ fn server_rename_keeps_the_id_moves_the_directory() {
     assert!(servers.get("Old Name").is_none());
 
     assert!(servers.rename("missing", "Whatever").is_err());
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn instances_store_round_trips_records() {
     let dir = temp_dir("instances");
-    let instances = Instances::new(dir.join("instances"));
+    let instances = Instances::new(dir.path().join("instances"));
     assert!(instances.list().is_empty());
 
     let profile = InstanceProfile {
@@ -255,13 +250,12 @@ fn instances_store_round_trips_records() {
 
     assert!(instances.remove(&record.id).unwrap());
     assert!(instances.list().is_empty());
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn instance_rename_keeps_the_id_moves_the_directory() {
     let dir = temp_dir("instance-rename");
-    let instances = Instances::new(dir.join("instances"));
+    let instances = Instances::new(dir.path().join("instances"));
     let record = instances
         .create(
             "Old Pack",
@@ -295,13 +289,12 @@ fn instance_rename_keeps_the_id_moves_the_directory() {
         "JVM settings are untouched"
     );
     assert!(instances.rename("missing", "Whatever").is_err());
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn instance_update_swaps_profile_and_keeps_settings() {
     let dir = temp_dir("instance-update");
-    let instances = Instances::new(dir.join("instances"));
+    let instances = Instances::new(dir.path().join("instances"));
     let record = instances
         .create(
             "Modded",
@@ -344,13 +337,12 @@ fn instance_update_swaps_profile_and_keeps_settings() {
     assert!(instances
         .update("missing", InstanceProfile::default())
         .is_err());
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn server_config_covers_jvm_and_properties() {
     let dir = temp_dir("server-config");
-    let servers = Servers::new(dir.join("servers"));
+    let servers = Servers::new(dir.path().join("servers"));
     let record = servers
         .create("SMP", ServerProfile::default(), None)
         .unwrap();
@@ -432,14 +424,12 @@ fn server_config_covers_jvm_and_properties() {
     assert!(entries
         .iter()
         .any(|(k, v)| k == "retired-key" && v == "leftover"));
-
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn server_config_enforces_hardcore_invariant() {
     let dir = temp_dir("server-hardcore");
-    let servers = Servers::new(dir.join("servers"));
+    let servers = Servers::new(dir.path().join("servers"));
     let record = servers
         .create("HC", ServerProfile::default(), None)
         .unwrap();
@@ -481,14 +471,12 @@ fn server_config_enforces_hardcore_invariant() {
     servers.config_set(id, "hardcore", "false").unwrap();
     servers.config_set(id, "difficulty", "easy").unwrap();
     servers.config_set(id, "gamemode", "creative").unwrap();
-
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn instance_config_rejects_unknown_keys() {
     let dir = temp_dir("instance-config");
-    let instances = Instances::new(dir.join("instances"));
+    let instances = Instances::new(dir.path().join("instances"));
     let record = instances
         .create("Modded", InstanceProfile::default())
         .unwrap();
@@ -508,6 +496,4 @@ fn instance_config_rejects_unknown_keys() {
     // Non-JVM keys are rejected (no properties file for instances).
     assert!(instances.config_set(id, "motd", "hi").is_err());
     assert!(instances.config_get(id, "motd").is_err());
-
-    std::fs::remove_dir_all(&dir).ok();
 }

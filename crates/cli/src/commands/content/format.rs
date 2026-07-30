@@ -32,7 +32,7 @@ pub(super) fn channel_label(channel: ReleaseChannel) -> &'static str {
     }
 }
 
-pub(super) fn kind_plural(kind: ContentKind) -> &'static str {
+pub fn kind_plural(kind: ContentKind) -> &'static str {
     match kind {
         ContentKind::Mod => "mods",
         ContentKind::Modpack => "modpacks",

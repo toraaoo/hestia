@@ -4,6 +4,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { ErrorBoundary } from './components/error-boundary';
+import { watchOpenedArchives } from './features/instances/opened-archive';
 import { LocaleProvider } from './hooks/locale';
 import { installCrashHandlers } from './lib/crash';
 import { initDesktopShell } from './lib/desktop';
@@ -23,6 +24,7 @@ installCrashHandlers();
 log.info({ mode: import.meta.env.MODE }, 'ui starting');
 initDesktopShell();
 startInvalidation();
+watchOpenedArchives();
 startSessionTracking();
 const router = getRouter();
 

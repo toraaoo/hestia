@@ -7,25 +7,28 @@
 
 mod flows;
 
-pub use flows::ModpackOutcome;
+pub use flows::{ExportOutcome, ImportOutcome, ModpackOutcome};
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use proto::minecraft::ConfigEntry;
 
 use crate::accounts::Accounts;
+use crate::announce::Announce;
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::content::Content;
 use crate::instances::Instances;
 use crate::java::Java;
 use crate::minecraft::Minecraft;
+use crate::process::ProcessSupervisor;
 use crate::profiles::Profiles;
 use crate::servers::Servers;
 use crate::skins::Skins;
 use crate::sync::Sync;
+use crate::update::Update;
 
 /// Everything a server create needs from the caller — the engine-side input to
 /// `provision_server` (EULA assertion and job ids are daemon concerns).
@@ -62,6 +65,9 @@ pub struct Engine {
     skins: Skins,
     sync: Sync,
     profiles: Profiles,
+    update: Update,
+    announce: Announce,
+    processes: Arc<ProcessSupervisor>,
     // One backup or restore per entry at a time: two archives of the same
     // data would interleave the rcon save-off/save-on dance.
     backups_active: Mutex<HashSet<String>>,
@@ -82,6 +88,9 @@ impl Engine {
         let profiles = Profiles::new(data_home.join("profiles"));
         let content = Content::new();
         content.configure(&config.settings().content);
+        let update = Update::new(data_home.join("updates"));
+        let announce = Announce::new(data_home.join("announce"));
+        let processes = Arc::new(ProcessSupervisor::new(data_home.join("processes")));
         Engine {
             data_home: Mutex::new(data_home),
             config,
@@ -95,6 +104,9 @@ impl Engine {
             skins,
             sync,
             profiles,
+            update,
+            announce,
+            processes,
             backups_active: Mutex::new(HashSet::new()),
         }
     }
@@ -147,6 +159,9 @@ impl Engine {
         self.skins.reload(resolved.join("skins"));
         self.sync.reload(resolved.join("shared"));
         self.profiles.reload(resolved.join("profiles"));
+        self.update.reload(resolved.join("updates"));
+        self.announce.reload(resolved.join("announce"));
+        self.processes.reload(resolved.join("processes"));
         *self.data_home.lock().unwrap() = resolved.clone();
         tracing::info!(home = %resolved.display(), "engine data home changed");
         // The new home may carry half-finished state from whichever daemon last
@@ -205,6 +220,14 @@ impl Engine {
 
     pub fn sync(&self) -> &Sync {
         &self.sync
+    }
+
+    pub fn processes(&self) -> &Arc<ProcessSupervisor> {
+        &self.processes
+    }
+
+    pub fn update(&self) -> &Update {
+        &self.update
     }
 
     pub fn profiles(&self) -> &Profiles {

@@ -75,6 +75,13 @@ const TOPICS: Record<string, (payload: Record<string, unknown>) => QueryKey[]> =
     // A pack install can have *created* its entry, so neither list is known to
     // be current — and the CLI or another window may have run it.
     'modpack.done': () => [keys.servers.all, keys.instances.all],
+    // An import creates an instance; an export changes the data home's
+    // footprint when it lands in the daemon's own exports/.
+    'instance.import.done': () => [keys.instances.all],
+    'instance.export.done': () => [[FOOTPRINT]],
+    // The daemon's poll found different announcements; the badge and the news
+    // page are both driven by the one list query.
+    'announce.changed': () => [keys.announce.all],
   };
 
 /** The key prefixes a daemon topic outdates — exported for the regression test. */

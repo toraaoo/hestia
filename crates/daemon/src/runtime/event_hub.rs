@@ -70,3 +70,17 @@ impl EventHub {
         });
     }
 }
+
+/// The hub as the engine's supervisor sees it: a place to publish, with no
+/// knowledge of the socket behind it.
+impl engine::ProcessEvents for EventHub {
+    fn publish(&self, topic: &str, payload: Value) {
+        EventHub::publish(
+            self,
+            &Event {
+                topic: topic.to_string(),
+                payload,
+            },
+        );
+    }
+}

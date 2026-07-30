@@ -27,11 +27,16 @@ pub struct SyncTargets {
     pub folders: BTreeSet<String>,
 }
 
-/// The sync store location plus the current targets.
+/// The sync store location plus the current targets. `enabled` is the
+/// `sync.enabled` setting read back: an empty reconcile means something
+/// different when sharing is switched off than when nothing is targeted, and a
+/// front-end cannot tell those apart from the targets alone. It is *set*
+/// through `config.set`, like every other launcher-wide setting.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SyncConfig {
+    pub enabled: bool,
     pub shared_dir: PathBuf,
     pub targets: SyncTargets,
 }

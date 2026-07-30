@@ -1,10 +1,10 @@
 //! The daemon's long-lived collaborators in one place — the anti-churn seam a
 //! new subsystem hangs off, mirroring the engine's aggregate root.
 
+mod announce;
 mod event_hub;
 mod managers;
 mod metrics;
-mod process;
 pub mod router;
 mod scheduler;
 
@@ -20,15 +20,16 @@ use proto::server::ServerInfo;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Notify;
 
+pub use announce::spawn_announcement_poller;
 pub use engine::error_info as engine_error;
+pub use engine::{ExitObserver, ProcessSupervisor, StartError};
 pub use event_hub::EventHub;
 pub use managers::{
     BackupJob, BackupManager, Cancellations, ContentJob, ContentManager, DownloadManager,
     InstanceLaunchManager, JavaInstallManager, ModpackJob, ModpackManager, ServerCreateManager,
-    ServerUpdateManager,
+    ServerUpdateManager, TransferJob, TransferManager, UpdateManager,
 };
 pub use metrics::spawn_metrics_sampler;
-pub use process::{ExitObserver, ProcessSupervisor, StartError};
 pub use router::{error_response, Channels, Router};
 pub use scheduler::spawn_backup_scheduler;
 
@@ -101,6 +102,8 @@ pub struct Runtime {
     backups: BackupManager,
     content_jobs: ContentManager,
     modpack_jobs: ModpackManager,
+    transfers: TransferManager,
+    updates: UpdateManager,
     processes: Arc<ProcessSupervisor>,
     log_path: PathBuf,
     cancellations: Cancellations,
@@ -132,11 +135,8 @@ impl Runtime {
                 tracing::warn!(instance = %instance_id, error = %e, "failed to record playtime");
             }
         });
-        let processes = Arc::new(ProcessSupervisor::new(
-            hub.clone(),
-            engine.data_home().join("processes"),
-            Some(on_exit),
-        ));
+        let processes = engine.processes().clone();
+        processes.attach(hub.clone(), Some(on_exit));
         let server_creates =
             ServerCreateManager::new(engine.clone(), hub.clone(), cancellations.clone());
         let server_updates =
@@ -150,6 +150,8 @@ impl Runtime {
         let backups = BackupManager::new(engine.clone(), hub.clone(), cancellations.clone());
         let content_jobs = ContentManager::new(engine.clone(), hub.clone(), cancellations.clone());
         let modpack_jobs = ModpackManager::new(engine.clone(), hub.clone(), cancellations.clone());
+        let transfers = TransferManager::new(engine.clone(), hub.clone(), cancellations.clone());
+        let updates = UpdateManager::new(engine.clone(), hub.clone(), cancellations.clone());
         Runtime {
             engine,
             hub,
@@ -161,6 +163,8 @@ impl Runtime {
             backups,
             content_jobs,
             modpack_jobs,
+            transfers,
+            updates,
             cancellations,
             processes,
             log_path,
@@ -261,6 +265,14 @@ impl Runtime {
 
     pub fn modpack_jobs(&self) -> &ModpackManager {
         &self.modpack_jobs
+    }
+
+    pub fn transfers(&self) -> &TransferManager {
+        &self.transfers
+    }
+
+    pub fn updates(&self) -> &UpdateManager {
+        &self.updates
     }
 
     pub fn processes(&self) -> &ProcessSupervisor {

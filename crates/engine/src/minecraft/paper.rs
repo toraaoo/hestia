@@ -83,6 +83,9 @@ impl ServerProvider for PaperServer {
     fn name(&self) -> &'static str {
         "Paper"
     }
+    fn summary(&self) -> &'static str {
+        "A faster server that runs Bukkit plugins, tuned by the Paper team for each version."
+    }
     fn loads(&self) -> Loads {
         Some(ContentKind::Plugin)
     }
@@ -109,6 +112,9 @@ impl ServerProvider for FoliaServer {
     }
     fn name(&self) -> &'static str {
         "Folia"
+    }
+    fn summary(&self) -> &'static str {
+        "Paper spread across CPU cores, for very large worlds. Only plugins made for Folia will work."
     }
     /// Folia's plugins are filtered as `folia`, never widened to `paper`: a
     /// plugin that never claimed Folia support breaks on its regionised

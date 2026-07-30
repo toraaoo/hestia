@@ -1,0 +1,28 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "server": {
+    "backup": {
+      "create": "Create backup",
+      "delete": {
+        "aria": "Delete backup",
+        "description": "The archive from {when} will be permanently deleted.",
+        "title": "Delete backup?"
+      },
+      "none": "No backups yet. Create one to archive this world.",
+      "off_short": "Scheduled backups off",
+      "restore": {
+        "description": "This overwrites the current game data with the archive from {when}. The current data is backed up first.",
+        "title": "Restore backup?"
+      },
+      "schedule_status": "Scheduled every {interval}, keeping {retention}"
+    },
+    "console": {
+      "empty": "Start the server to open its console.",
+      "placeholder": "Enter a server command, e.g. say hello"
+    },
+    "missing": "That server no longer exists.",
+    "new": "New server",
+    "none_match": "No servers match your search.",
+    "subtitle": "Worlds you host"
+  }
+}

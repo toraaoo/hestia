@@ -6,6 +6,7 @@
 //! nothing without an API key.
 
 pub(crate) mod curseforge;
+pub(crate) mod exclude;
 pub(crate) mod inspect;
 pub(crate) mod install;
 pub(crate) mod modpack;

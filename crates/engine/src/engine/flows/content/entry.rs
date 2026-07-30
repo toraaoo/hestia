@@ -33,6 +33,13 @@ impl EntrySide {
             EntrySide::Client => "instance",
         }
     }
+
+    fn side(self) -> crate::minecraft::Side {
+        match self {
+            EntrySide::Server => crate::minecraft::Side::Server,
+            EntrySide::Client => crate::minecraft::Side::Client,
+        }
+    }
 }
 
 impl EntryContent {
@@ -88,17 +95,11 @@ impl Engine {
     }
 }
 
-/// The two facts composed: whatever the flavor's loader takes, plus what the
-/// side reads for itself — a client its own resourcepacks and shaders, either
-/// side the datapacks that are world data rather than loader content.
+/// The composition itself lives beside the provider trait that defines `Loads`,
+/// so the flavor catalogue (`{server,instance}.flavors`) and an existing entry's
+/// `accepts` cannot disagree about what a flavor takes.
 fn accepted_kinds(side: EntrySide, loads: Option<ContentKind>) -> Vec<ContentKind> {
-    let mut kinds: Vec<ContentKind> = loads.into_iter().collect();
-    if side == EntrySide::Client {
-        kinds.push(ContentKind::ResourcePack);
-        kinds.push(ContentKind::Shader);
-    }
-    kinds.push(ContentKind::DataPack);
-    kinds
+    crate::minecraft::accepted_kinds(side.side(), loads)
 }
 
 /// The loader filter a kind's version lookup needs: the entry's own loader for
@@ -194,33 +195,6 @@ mod tests {
             flavor: "fabric".to_string(),
             side: EntrySide::Client,
         }
-    }
-
-    #[test]
-    fn a_flavor_contributes_its_loader_kind_and_the_side_the_rest() {
-        assert_eq!(
-            accepted_kinds(EntrySide::Server, Some(ContentKind::Plugin)),
-            vec![ContentKind::Plugin, ContentKind::DataPack],
-            "a paper server takes plugins, never mods"
-        );
-        assert_eq!(
-            accepted_kinds(EntrySide::Server, Some(ContentKind::Mod)),
-            vec![ContentKind::Mod, ContentKind::DataPack]
-        );
-        assert_eq!(
-            accepted_kinds(EntrySide::Server, None),
-            vec![ContentKind::DataPack],
-            "vanilla loads nothing of its own, but a world still takes datapacks"
-        );
-        assert_eq!(
-            accepted_kinds(EntrySide::Client, None),
-            vec![
-                ContentKind::ResourcePack,
-                ContentKind::Shader,
-                ContentKind::DataPack
-            ],
-            "a client reads packs whatever its flavor loads"
-        );
     }
 
     #[test]

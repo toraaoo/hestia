@@ -47,14 +47,14 @@ export function CreateProfileDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>{m['profiles.create_title']()}</DialogTitle>
+          <DialogTitle>{m['profile.create.title']()}</DialogTitle>
           <DialogDescription>
-            {m['profiles.create_description']()}
+            {m['profile.create.description']()}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           <Field>
-            <FieldLabel>{m['profiles.name_label']()}</FieldLabel>
+            <FieldLabel>{m['profile.create.name_label']()}</FieldLabel>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -72,22 +72,22 @@ export function CreateProfileDialog({
               className="mt-0.5"
             />
             <span>
-              {m['profiles.seed_label']()}
+              {m['profile.create.seed_label']()}
               <span className="block text-[11px] text-muted-foreground">
-                {m['profiles.seed_hint']()}
+                {m['profile.create.seed_hint']()}
               </span>
             </span>
           </label>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => close(false)}>
-            {m['action.cancel']()}
+            {m['app.action.cancel']()}
           </Button>
           <Button
             disabled={invalid || pending}
             onClick={() => onCreate(trimmed, seed)}
           >
-            {m['action.confirm']()}
+            {m['app.action.confirm']()}
           </Button>
         </DialogFooter>
       </DialogContent>

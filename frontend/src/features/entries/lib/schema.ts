@@ -11,13 +11,13 @@ type Kind = 'server' | 'instance';
 
 export function flavorStepSchema() {
   return z.object({
-    flavor: z.string().min(1, m['error.pick_flavor']()),
+    flavor: z.string().min(1, m['app.validation.pick_flavor']()),
   });
 }
 
 export function versionStepSchema() {
   return z.object({
-    version: z.string().min(1, m['error.choose_version']()),
+    version: z.string().min(1, m['app.validation.choose_version']()),
     loaderVersion: z.string(),
   });
 }
@@ -31,17 +31,20 @@ export function detailsStepSchema(kind: Kind) {
     difficulty: z.string(),
     maxPlayers: z
       .string()
-      .regex(/^\d+$/, m['error.whole_number']())
-      .refine((v) => Number(v) >= 1, m['error.min_players']()),
+      .regex(/^\d+$/, m['app.validation.whole_number']())
+      .refine((v) => Number(v) >= 1, m['app.validation.min_players']()),
     port: z
       .string()
-      .regex(/^\d*$/, m['error.port_number']())
-      .refine((v) => v === '' || Number(v) <= 65535, m['error.port_range']()),
+      .regex(/^\d*$/, m['app.validation.port_number']())
+      .refine(
+        (v) => v === '' || Number(v) <= 65535,
+        m['app.validation.port_range'](),
+      ),
     hardcore: z.boolean(),
     onlineMode: z.boolean(),
     eula:
       kind === 'server'
-        ? z.literal(true, { error: m['error.eula']() })
+        ? z.literal(true, { error: m['app.validation.eula']() })
         : z.boolean(),
   });
 }

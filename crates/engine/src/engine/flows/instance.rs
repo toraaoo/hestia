@@ -1,14 +1,14 @@
 //! Instance creation, in-place version updates, and the launch preparation that
 //! materialises the client jar, libraries, and assets.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use proto::instance::{InstanceDetails, WorldInfo};
 use proto::minecraft::{ConfigEntry, ProvisionPhase};
 use proto::warning::WarningInfo;
 
-use super::{effective_name, guard_downgrade};
+use super::{effective_name, guard_downgrade, meta_dir};
 use crate::content::{install, profiles};
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
@@ -78,9 +78,10 @@ impl Engine {
 
     /// Move an instance to another version of its flavor. A downgrade must be
     /// allowed explicitly — Minecraft cannot load saves written by a newer
-    /// version, and **nothing is backed up first** (instances have no backup
-    /// story until import/export lands). Only the record changes; files
-    /// materialise at the next launch.
+    /// version, and **nothing is backed up first**: an instance is kept by
+    /// exporting it, which is a deliberate act rather than something an update
+    /// does for you. Only the record changes; files materialise at the next
+    /// launch.
     pub async fn update_instance(
         &self,
         reference: &str,
@@ -136,6 +137,14 @@ impl Engine {
             let _ = self.instances.remove(&record.id);
             return Err(e);
         }
+
+        let data_dir = self.instances.data_dir(&record);
+        if let Err(e) = std::fs::create_dir_all(&data_dir) {
+            tracing::warn!(id = %record.id, error = %e, "cannot create the game directory");
+        } else {
+            self.link_new_instance(&record.name, &data_dir);
+        }
+
         self.instances
             .get(&record.id)
             .with_context(|| format!("instance '{}' vanished after create", record.id))
@@ -209,9 +218,11 @@ impl Engine {
                     game_version: &record.profile.game_version,
                     loader_version: record.profile.loader_version.as_deref(),
                     root: &meta,
+                    meta: &meta,
                     minecraft_jar: &client_jar,
                     java: &java,
                     cache: Some(&self.cache),
+                    processes: self.processes(),
                 },
                 on_progress,
             )
@@ -237,7 +248,8 @@ impl Engine {
                 .as_ref()
                 .filter(|p| p.captured)
                 .map(|p| profiles::store_dir(&entry_dir, &p.name));
-            warnings = self.sync.apply(&record.name, &game_dir, store.as_deref());
+            warnings =
+                self.apply_instance_sync(&record.name, &entry_dir, &game_dir, store.as_deref());
             let selection: Option<std::collections::HashSet<String>> =
                 launch_profile.map(|p| p.members.into_iter().collect());
             let worlds = crate::instances::save_worlds(&game_dir);
@@ -313,11 +325,4 @@ pub struct PreparedLaunch {
     pub plan: LaunchPlan,
     pub log_file: PathBuf,
     pub warnings: Vec<WarningInfo>,
-}
-
-/// The root for launcher-managed shared game files (versions, libraries,
-/// assets, natives) — the Modrinth layout, keeping the data home itself to
-/// user-facing entries and launcher internals.
-fn meta_dir(home: &Path) -> PathBuf {
-    home.join("meta")
 }

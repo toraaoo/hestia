@@ -10,6 +10,7 @@ use super::provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 const ID: &str = "vanilla";
 const NAME: &str = "Vanilla";
+const SUMMARY: &str = "Mojang's game, unchanged. Takes datapacks only — no mods or plugins.";
 
 pub struct VanillaServer;
 
@@ -20,6 +21,9 @@ impl ServerProvider for VanillaServer {
     }
     fn name(&self) -> &'static str {
         NAME
+    }
+    fn summary(&self) -> &'static str {
+        SUMMARY
     }
 
     fn loads(&self) -> Loads {
@@ -55,6 +59,9 @@ impl InstanceProvider for VanillaInstance {
     }
     fn name(&self) -> &'static str {
         NAME
+    }
+    fn summary(&self) -> &'static str {
+        SUMMARY
     }
 
     fn loads(&self) -> Loads {

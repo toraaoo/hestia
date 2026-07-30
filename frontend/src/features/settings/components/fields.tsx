@@ -1,6 +1,10 @@
+import { PlusIcon, XIcon } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 
+import { chipClass } from '@/components/chip';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -13,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { type Locale, useLocale } from '@/hooks/locale';
+import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { locales } from '@/paraglide/runtime.js';
 import { contentQueries } from '@/queries/content';
@@ -39,7 +44,7 @@ export function LanguageField() {
             {(value: string) => LANGUAGE_NAMES[value] ?? value}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent align="start" alignItemWithTrigger={false}>
+        <SelectContent align="start">
           <SelectGroup>
             {locales.map((l) => (
               <SelectItem key={l} value={l}>
@@ -121,6 +126,70 @@ export function CheckboxRow({
       <FieldLabel htmlFor={id} className="font-normal">
         {label}
       </FieldLabel>
+    </Field>
+  );
+}
+
+/** An editable set of short strings as removable chips with an inline add. */
+export function TargetList({
+  label,
+  placeholder,
+  values,
+  pending,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  values: string[];
+  pending: boolean;
+  onChange: (values: string[]) => void;
+}) {
+  const [draft, setDraft] = useState('');
+
+  const add = () => {
+    const value = draft.trim();
+    if (!value || values.includes(value)) return;
+    onChange([...values, value]);
+    setDraft('');
+  };
+
+  return (
+    <Field>
+      <FieldLabel>{label}</FieldLabel>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {values.map((value) => (
+          <button
+            key={value}
+            type="button"
+            disabled={pending}
+            className={cn(chipClass(true), 'flex items-center gap-1')}
+            onClick={() => onChange(values.filter((v) => v !== value))}
+          >
+            <span className="font-mono">{value}</span>
+            <XIcon weight="bold" className="size-3 shrink-0" />
+          </button>
+        ))}
+        <div className="flex items-center gap-1">
+          <Input
+            value={draft}
+            placeholder={placeholder}
+            className="h-7 w-40 font-mono text-xs"
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') add();
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={m['content.add']()}
+            disabled={pending || draft.trim().length === 0}
+            onClick={add}
+          >
+            <PlusIcon weight="bold" className="size-3.5" />
+          </Button>
+        </div>
+      </div>
     </Field>
   );
 }

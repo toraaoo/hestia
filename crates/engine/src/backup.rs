@@ -488,7 +488,11 @@ pub fn prune(entry_dir: &Path, kind: BackupKind, keep: usize) -> Result<Vec<Back
 /// (unlikely) same-second collision.
 fn allocate_id(entry_dir: &Path, kind: BackupKind) -> String {
     let taken: HashSet<String> = list(entry_dir).into_iter().map(|b| b.id).collect();
-    let base = format!("{}-{}", utc_stamp(now_unix()), kind.as_str());
+    let base = format!(
+        "{}-{}",
+        crate::registry::utc_stamp(now_unix()),
+        kind.as_str()
+    );
     if !taken.contains(&base) {
         return base;
     }
@@ -511,42 +515,9 @@ fn now_unix() -> i64 {
         .unwrap_or(0)
 }
 
-/// `YYYYMMDD-HHMMSS` in UTC (Howard Hinnant's civil-from-days algorithm; no
-/// date-time dependency for one format).
-fn utc_stamp(unix: i64) -> String {
-    let days = unix.div_euclid(86400);
-    let secs = unix.rem_euclid(86400);
-    let (year, month, day) = civil_from_days(days);
-    format!(
-        "{year:04}{month:02}{day:02}-{:02}{:02}{:02}",
-        secs / 3600,
-        (secs % 3600) / 60,
-        secs % 60
-    )
-}
-
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = (doy - (153 * mp + 2) / 5 + 1) as u32;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    let year = yoe + era * 400 + i64::from(month <= 2);
-    (year, month, day)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn stamps_are_utc_civil_dates() {
-        assert_eq!(utc_stamp(0), "19700101-000000");
-        assert_eq!(utc_stamp(1_751_852_045), "20250707-013405");
-    }
 
     #[test]
     fn intervals_parse_with_units() {
@@ -560,11 +531,12 @@ mod tests {
         assert!(parse_interval("soon").is_err());
     }
 
-    fn temp_entry(tag: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("hestia-backup-test-{}-{}", tag, std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(dir.join("data")).unwrap();
+    fn temp_entry(tag: &str) -> tempfile::TempDir {
+        let dir = tempfile::Builder::new()
+            .prefix(&format!("hestia-backup-{tag}-"))
+            .tempdir()
+            .expect("temp dir");
+        std::fs::create_dir_all(dir.path().join("data")).unwrap();
         dir
     }
 
@@ -575,7 +547,8 @@ mod tests {
 
     #[test]
     fn create_restore_round_trips_and_preserves_excluded_paths() {
-        let entry = temp_entry("round-trip");
+        let entry_dir = temp_entry("round-trip");
+        let entry = entry_dir.path();
         let data = entry.join("data");
         let exclude = vec!["server.jar".to_string(), "logs".to_string()];
         write(&data.join("world/level.dat"), "one");
@@ -583,16 +556,16 @@ mod tests {
         write(&data.join("server.jar"), "current-jar");
         write(&data.join("logs/latest.log"), "log");
 
-        let backup = create(&entry, &data, BackupKind::Manual, &exclude, &|_, _| Ok(())).unwrap();
-        assert_eq!(list(&entry).len(), 1);
-        assert_eq!(list(&entry)[0].id, backup.id);
-        assert_eq!(list(&entry)[0].kind, BackupKind::Manual);
+        let backup = create(entry, &data, BackupKind::Manual, &exclude, &|_, _| Ok(())).unwrap();
+        assert_eq!(list(entry).len(), 1);
+        assert_eq!(list(entry)[0].id, backup.id);
+        assert_eq!(list(entry)[0].kind, BackupKind::Manual);
 
         write(&data.join("world/level.dat"), "two");
         write(&data.join("server.jar"), "newer-jar");
         std::fs::remove_file(data.join("server.properties")).unwrap();
 
-        let restored = restore(&entry, &data, &backup.id, &exclude, &|_, _| Ok(())).unwrap();
+        let restored = restore(entry, &data, &backup.id, &exclude, &|_, _| Ok(())).unwrap();
         assert_eq!(restored.id, backup.id);
         let content = |p: &str| std::fs::read_to_string(data.join(p)).unwrap();
         assert_eq!(content("world/level.dat"), "one");
@@ -601,21 +574,21 @@ mod tests {
         assert_eq!(content("server.jar"), "newer-jar");
         assert_eq!(content("logs/latest.log"), "log");
 
-        assert!(remove(&entry, &backup.id).unwrap());
-        assert!(list(&entry).is_empty());
-        std::fs::remove_dir_all(&entry).ok();
+        assert!(remove(entry, &backup.id).unwrap());
+        assert!(list(entry).is_empty());
     }
 
     #[test]
     fn create_omits_session_locks_at_every_depth() {
-        let entry = temp_entry("session-lock");
+        let entry_dir = temp_entry("session-lock");
+        let entry = entry_dir.path();
         let data = entry.join("data");
         write(&data.join("session.lock"), "root lock");
         write(&data.join("world/session.lock"), "world lock");
         write(&data.join("world/region/r.0.0.mca"), "world data");
 
-        let backup = create(&entry, &data, BackupKind::Manual, &[], &|_, _| Ok(())).unwrap();
-        let archive = backups_dir(&entry).join(format!("{}{EXTENSION}", backup.id));
+        let backup = create(entry, &data, BackupKind::Manual, &[], &|_, _| Ok(())).unwrap();
+        let archive = backups_dir(entry).join(format!("{}{EXTENSION}", backup.id));
         let file = File::open(archive).unwrap();
         let decoder = flate2::read::GzDecoder::new(file);
         let mut tar = tar::Archive::new(decoder);
@@ -631,22 +604,22 @@ mod tests {
         assert!(!paths
             .iter()
             .any(|path| path.file_name().is_some_and(|name| name == SESSION_LOCK)));
-        std::fs::remove_dir_all(&entry).ok();
     }
 
     #[test]
     fn an_interrupted_archive_leaves_no_part_behind() {
-        let entry = temp_entry("reclaim");
+        let entry_dir = temp_entry("reclaim");
+        let entry = entry_dir.path();
         let data = entry.join("data");
         write(&data.join("world/level.dat"), "x");
 
         // What a daemon killed mid-archive leaves: a `.part` that was never
         // renamed, so it is in no listing but still occupies the store.
-        let orphan = backups_dir(&entry).join("20260725-093946-manual.tar.gz.part");
+        let orphan = backups_dir(entry).join("20260725-093946-manual.tar.gz.part");
         write(&orphan, "half an archive");
-        assert!(list(&entry).is_empty(), "a .part is not a backup");
+        assert!(list(entry).is_empty(), "a .part is not a backup");
 
-        let freed = reclaim(&entry);
+        let freed = reclaim(entry);
         assert_eq!(freed.entries, 1);
         assert!(freed.bytes > 0);
         assert!(!orphan.exists(), "an abandoned .part is reclaimed");
@@ -654,42 +627,41 @@ mod tests {
         // And a fresh archive cleans up before writing, so the store is tidy
         // whether or not the daemon restarted in between.
         write(&orphan, "half an archive");
-        create(&entry, &data, BackupKind::Manual, &[], &|_, _| Ok(())).unwrap();
+        create(entry, &data, BackupKind::Manual, &[], &|_, _| Ok(())).unwrap();
         assert!(!orphan.exists());
-        assert_eq!(list(&entry).len(), 1);
-        std::fs::remove_dir_all(&entry).ok();
+        assert_eq!(list(entry).len(), 1);
     }
 
     #[test]
     fn prune_drops_only_old_backups_of_the_kind() {
-        let entry = temp_entry("prune");
+        let entry_dir = temp_entry("prune");
+        let entry = entry_dir.path();
         let data = entry.join("data");
         write(&data.join("world/level.dat"), "x");
 
-        let old = create(&entry, &data, BackupKind::Scheduled, &[], &|_, _| Ok(())).unwrap();
-        let mid = create(&entry, &data, BackupKind::Scheduled, &[], &|_, _| Ok(())).unwrap();
-        let new = create(&entry, &data, BackupKind::Scheduled, &[], &|_, _| Ok(())).unwrap();
-        let manual = create(&entry, &data, BackupKind::Manual, &[], &|_, _| Ok(())).unwrap();
+        let old = create(entry, &data, BackupKind::Scheduled, &[], &|_, _| Ok(())).unwrap();
+        let mid = create(entry, &data, BackupKind::Scheduled, &[], &|_, _| Ok(())).unwrap();
+        let new = create(entry, &data, BackupKind::Scheduled, &[], &|_, _| Ok(())).unwrap();
+        let manual = create(entry, &data, BackupKind::Manual, &[], &|_, _| Ok(())).unwrap();
 
-        let removed = prune(&entry, BackupKind::Scheduled, 1).unwrap();
+        let removed = prune(entry, BackupKind::Scheduled, 1).unwrap();
         let removed_ids: Vec<&str> = removed.iter().map(|b| b.id.as_str()).collect();
         assert_eq!(removed_ids, vec![mid.id.as_str(), old.id.as_str()]);
-        let mut kept: Vec<String> = list(&entry).into_iter().map(|b| b.id).collect();
+        let mut kept: Vec<String> = list(entry).into_iter().map(|b| b.id).collect();
         kept.sort();
         let mut expected = vec![manual.id.clone(), new.id.clone()];
         expected.sort();
         assert_eq!(kept, expected);
-        std::fs::remove_dir_all(&entry).ok();
     }
 
     #[test]
     fn missing_data_and_unknown_backups_are_errors() {
-        let entry = temp_entry("errors");
+        let entry_dir = temp_entry("errors");
+        let entry = entry_dir.path();
         let missing = entry.join("nope");
-        assert!(create(&entry, &missing, BackupKind::Manual, &[], &|_, _| Ok(())).is_err());
-        assert!(restore(&entry, &entry.join("data"), "ghost", &[], &|_, _| Ok(())).is_err());
-        assert!(!remove(&entry, "ghost").unwrap());
-        std::fs::remove_dir_all(&entry).ok();
+        assert!(create(entry, &missing, BackupKind::Manual, &[], &|_, _| Ok(())).is_err());
+        assert!(restore(entry, &entry.join("data"), "ghost", &[], &|_, _| Ok(())).is_err());
+        assert!(!remove(entry, "ghost").unwrap());
     }
 
     #[test]

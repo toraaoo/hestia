@@ -1,5 +1,7 @@
+import type { Flavor } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { kindInfo } from '@/features/content/lib/kinds';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
@@ -12,16 +14,16 @@ export const STEPS: Step[] = ['flavor', 'version', 'details'];
 export type WizardForm = any;
 
 export const GAMEMODES: Array<{ value: string; label: () => string }> = [
-  { value: 'survival', label: m['gamemode.survival'] },
-  { value: 'creative', label: m['gamemode.creative'] },
-  { value: 'adventure', label: m['gamemode.adventure'] },
-  { value: 'spectator', label: m['gamemode.spectator'] },
+  { value: 'survival', label: m['domain.gamemode.survival'] },
+  { value: 'creative', label: m['domain.gamemode.creative'] },
+  { value: 'adventure', label: m['domain.gamemode.adventure'] },
+  { value: 'spectator', label: m['domain.gamemode.spectator'] },
 ];
 export const DIFFICULTIES: Array<{ value: string; label: () => string }> = [
-  { value: 'peaceful', label: m['difficulty.peaceful'] },
-  { value: 'easy', label: m['difficulty.easy'] },
-  { value: 'normal', label: m['difficulty.normal'] },
-  { value: 'hard', label: m['difficulty.hard'] },
+  { value: 'peaceful', label: m['domain.difficulty.peaceful'] },
+  { value: 'easy', label: m['domain.difficulty.easy'] },
+  { value: 'normal', label: m['domain.difficulty.normal'] },
+  { value: 'hard', label: m['domain.difficulty.hard'] },
 ];
 
 export const options = (items: Array<{ value: string; label: () => string }>) =>
@@ -30,13 +32,13 @@ export const options = (items: Array<{ value: string; label: () => string }>) =>
 export const STEP_HINTS: Record<Step, (kind: Kind) => string> = {
   flavor: (kind) =>
     kind === 'server'
-      ? m['wizard.hint_flavor_server']()
-      : m['wizard.hint_flavor_instance'](),
-  version: () => m['wizard.hint_version'](),
+      ? m['entry.create.hint.flavor_server']()
+      : m['entry.create.hint.flavor_instance'](),
+  version: () => m['entry.create.hint.version'](),
   details: (kind) =>
     kind === 'server'
-      ? m['wizard.hint_details_server']()
-      : m['wizard.hint_details_instance'](),
+      ? m['entry.create.hint.details_server']()
+      : m['entry.create.hint.details_instance'](),
 };
 
 export function StepForm({
@@ -103,16 +105,15 @@ export function PropToggle({
 }
 
 export function FlavorOption({
-  name,
-  summary,
+  flavor,
   selected,
   onSelect,
 }: {
-  name: string;
-  summary: string;
+  flavor: Flavor;
   selected: boolean;
   onSelect: () => void;
 }) {
+  const summary = flavorSummary(flavor);
   return (
     <button
       type="button"
@@ -125,10 +126,31 @@ export function FlavorOption({
           : 'ring-border hover:bg-muted/60 hover:ring-foreground/20',
       )}
     >
-      <span className="text-sm font-medium">{name}</span>
+      <span className="flex w-full items-center gap-2">
+        <span className="flex-1 text-sm font-medium">{flavor.name}</span>
+        {(flavor.accepts ?? []).map((kind) => (
+          <Badge key={kind} variant="outline" className="text-[10px]">
+            {kindInfo[kind].label()}
+          </Badge>
+        ))}
+      </span>
       {summary && (
         <span className="text-xs text-muted-foreground">{summary}</span>
       )}
+      {(flavor.requires ?? []).map((requirement) => (
+        <span key={requirement.name} className="text-xs text-amber">
+          {m['domain.flavor.requires']({ name: requirement.name })}{' '}
+          <a
+            href={requirement.url}
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {requirement.url}
+          </a>
+        </span>
+      ))}
     </button>
   );
 }
@@ -163,7 +185,7 @@ export function VersionRow({
       <span className="flex-1 font-mono text-xs">{id}</span>
       {snapshot && (
         <Badge variant="outline" className="text-[10px]">
-          {m['wizard.snapshot']()}
+          {m['entry.create.snapshot']()}
         </Badge>
       )}
     </button>
@@ -171,11 +193,13 @@ export function VersionRow({
 }
 
 /**
- * The static per-flavor blurb, by id; empty for a flavor with no message. Keyed
- * dynamically so a flavor the daemon adds needs only its message, not a branch
- * here — the flavor list itself comes from `{server,instance}.flavors`.
+ * A flavor's blurb: the localised message for a known id, else the daemon's own
+ * summary. So a flavor the daemon ships renders immediately with nothing added
+ * here, and a locale that has translated it keeps its translation.
  */
-export function flavorSummary(id: string): string {
+export function flavorSummary(flavor: Flavor): string {
   const messages = m as unknown as Record<string, (() => string) | undefined>;
-  return messages[`flavor.${id}_summary`]?.() ?? '';
+  return (
+    messages[`domain.flavor.${flavor.id}.summary`]?.() ?? flavor.summary ?? ''
+  );
 }

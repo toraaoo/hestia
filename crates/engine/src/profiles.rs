@@ -126,19 +126,17 @@ fn write_entries(path: &std::path::Path, entries: &[ProfileEntry]) -> Result<()>
 mod tests {
     use super::*;
 
-    fn store(tag: &str) -> (Profiles, PathBuf) {
-        let dir = std::env::temp_dir().join(format!(
-            "hestia-global-profiles-{}-{}",
-            tag,
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&dir);
-        (Profiles::new(dir.clone()), dir)
+    fn store(tag: &str) -> (Profiles, tempfile::TempDir) {
+        let dir = tempfile::Builder::new()
+            .prefix(&format!("hestia-global-profiles-{tag}-"))
+            .tempdir()
+            .expect("temp dir");
+        (Profiles::new(dir.path().join("profiles")), dir)
     }
 
     #[test]
     fn create_edit_and_remove_round_trip() {
-        let (store, dir) = store("crud");
+        let (store, _dir) = store("crud");
         assert!(store.list().is_empty());
         store.create("My QoL").unwrap();
         assert!(
@@ -157,16 +155,14 @@ mod tests {
 
         store.remove("my-qol").unwrap();
         assert!(store.get("my-qol").is_err());
-        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn unknown_profiles_error() {
-        let (store, dir) = store("unknown");
+        let (store, _dir) = store("unknown");
         assert!(store.get("ghost").is_err());
         assert!(store.remove("ghost").is_err());
         assert!(store.save("ghost", &[]).is_err());
         assert!(store.create("!!!").is_err());
-        std::fs::remove_dir_all(&dir).ok();
     }
 }

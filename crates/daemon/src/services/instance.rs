@@ -17,13 +17,13 @@ use proto::minecraft::{ConfigEntry, FlavorsResult, LoadersResult, VersionsResult
 use proto::process::ProcessLogsResult;
 use proto::Empty;
 
-use super::guards::{ensure_no_content, ensure_stopped, find_instance};
+use super::guards::{ensure_no_content, ensure_no_transfer, ensure_stopped, find_instance};
 use crate::runtime::{instance_process_id, Channels};
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<InstanceFlavors, _, _>(|_: Empty, ctx| async move {
         Ok(FlavorsResult {
-            flavors: ctx.runtime.engine().minecraft().instance_flavors(),
+            flavors: ctx.runtime.engine().instance_flavors().await,
         })
     });
 
@@ -145,6 +145,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<InstanceRemove, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
+        ensure_no_transfer(&ctx, &instance_process_id(&record.id), &record.name)?;
         if ctx.runtime.instance_running(&record.id) {
             return Err(ErrorInfo::EntryRunning {
                 entry: EntryKind::Instance,
@@ -174,6 +175,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             });
         }
         ensure_no_content(&ctx, &process_id, &record.name)?;
+        ensure_no_transfer(&ctx, &process_id, &record.name)?;
         let renamed = ctx
             .runtime
             .engine()
@@ -186,6 +188,9 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<InstanceLaunch, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
+        // A launch re-mirrors the content pool into `data/`, which is exactly
+        // the tree an export is reading.
+        ensure_no_transfer(&ctx, &instance_process_id(&record.id), &record.name)?;
         // The account's tokens can no longer be refreshed: block up front so a
         // dead sign-in prompts re-login instead of failing mid-launch.
         if ctx.runtime.engine().accounts().needs_reauth(&p.account) {
@@ -334,6 +339,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         let record = find_instance(&ctx, &p.instance)?;
         if p.seed_from_pool {
             ensure_no_content(&ctx, &instance_process_id(&record.id), &record.name)?;
+            ensure_no_transfer(&ctx, &instance_process_id(&record.id), &record.name)?;
         }
         let profile = ctx
             .runtime
