@@ -1,12 +1,6 @@
 import type { ContentKind, ContentSource } from '@/api';
+import type { FilterGroup } from '@/components/filter-menu';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { m } from '@/paraglide/messages.js';
 import { useContentSources } from '@/queries/content';
 
@@ -26,43 +20,21 @@ export function useSourceOptions(kind: ContentKind | undefined, value: string) {
   return { list, active };
 }
 
-/** The source picker; absent when there is nothing to choose between. */
-export function SourceSelect({
-  list,
-  active,
-  onChange,
-  className,
-}: {
-  list: ContentSource[];
-  active: string;
-  onChange: (source: string) => void;
-  className?: string;
-}) {
-  if (list.length < 2) return null;
-  const selected = active || list[0].id;
-  return (
-    <Select
-      value={selected}
-      onValueChange={(next) => {
-        // Base UI can emit null on clear; never search a source of none.
-        if (next) onChange(next);
-      }}
-    >
-      <SelectTrigger
-        aria-label={m['content.browse.source']()}
-        className={className}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent align="start">
-        {list.map((source) => (
-          <SelectItem key={source.id} value={source.id}>
-            {source.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
+/** The source dimension; absent when there is nothing to choose between. */
+export function sourceGroup(
+  list: ContentSource[],
+  active: string,
+  onChange: (source: string) => void,
+): FilterGroup | undefined {
+  if (list.length < 2) return undefined;
+  const [first] = list;
+  return {
+    label: m['content.browse.source'](),
+    value: active || first.id,
+    neutral: first.id,
+    options: list.map((s) => ({ value: s.id, label: s.name })),
+    onChange,
+  };
 }
 
 /** Which platform a project came from — only worth saying with more than one. */

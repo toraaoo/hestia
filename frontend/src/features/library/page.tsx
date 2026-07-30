@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useCallback, useMemo, useState } from 'react';
 import { useSearch } from '@/components/app-shell/search-context';
+import { FilterMenu } from '@/components/filter-menu';
 import { entryIcon } from '@/components/icons';
 import { Page, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -15,8 +16,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   EntryCollection,
-  FilterMenu,
   filterCards,
+  flavorGroup,
   flavorsOf,
   instanceToCard,
   serverToCard,
@@ -198,13 +199,13 @@ export function LibraryPage({
               <div className="flex items-center gap-3">
                 <FilterMenu
                   groups={[
-                    {
-                      label: m['app.label.flavor'](),
-                      flavors: instanceFlavors,
-                      value: instanceFlavor,
-                      onChange: onInstanceFlavorChange,
-                    },
+                    flavorGroup(
+                      instanceFlavors,
+                      instanceFlavor,
+                      onInstanceFlavorChange,
+                    ),
                   ]}
+                  label={m['app.collection.filter_by_flavor']()}
                 />
                 <Link
                   to="/instances"
@@ -234,13 +235,13 @@ export function LibraryPage({
             <div className="flex items-center gap-3">
               <FilterMenu
                 groups={[
-                  {
-                    label: m['app.label.flavor'](),
-                    flavors: serverFlavors,
-                    value: serverFlavor,
-                    onChange: onServerFlavorChange,
-                  },
+                  flavorGroup(
+                    serverFlavors,
+                    serverFlavor,
+                    onServerFlavorChange,
+                  ),
                 ]}
+                label={m['app.collection.filter_by_flavor']()}
               />
               <Link
                 to="/servers"

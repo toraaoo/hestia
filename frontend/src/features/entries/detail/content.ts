@@ -12,6 +12,22 @@ export interface EntryTarget {
 /** How the daemon matches an item: its project id, else its filename. */
 export const installedRef = (i: InstalledContent) => i.projectId || i.filename;
 
+/** The installed pool narrowed by the kind filter and the quick search. */
+export const filterContent = (
+  items: InstalledContent[],
+  kind: ContentKind | undefined,
+  search: string,
+): InstalledContent[] => {
+  const q = search.trim().toLowerCase();
+  return items.filter(
+    (i) =>
+      (!kind || i.kind === kind) &&
+      (!q ||
+        i.title.toLowerCase().includes(q) ||
+        i.filename.toLowerCase().includes(q)),
+  );
+};
+
 /** A stable identity for one installed row; the index keys an item by filename. */
 export const rowKey = (i: InstalledContent) => `${i.kind}:${i.filename}`;
 

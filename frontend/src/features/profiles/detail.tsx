@@ -6,12 +6,14 @@ import { useState } from 'react';
 import type { ContentKind, ProfileEntry } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
+import { FilterMenu } from '@/components/filter-menu';
 import { contentIcon, contentKindLabel } from '@/components/icons';
+import { SearchInput } from '@/components/search-input';
 import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { KindChips } from '@/features/content/components/kind-chips';
+import { kindGroup } from '@/features/content/components/kind-filter';
 import { ContentInstallModal, profileTarget } from '@/features/content/install';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { profileFilterKinds } from '@/features/profiles/page';
@@ -31,7 +33,7 @@ const entryRef = (entry: ProfileEntry) => entry.slug || entry.projectId;
 
 /**
  * A global profile's detail page — the same shape as an entry's content tab
- * (kind chips + rows + the install modal) for consistency. A reference renders
+ * (search + kind filter + rows + the install modal). A reference renders
  * as a content row pinned to "latest": the profile stores references, never
  * jars, so each apply resolves the version per instance. Titles and kinds come
  * from each reference's project detail, fetched per row.
@@ -50,6 +52,7 @@ export function ProfileDetailPage({
   const remove = useMutation(profileMutations.remove());
   const edit = useMutation(profileMutations.edit());
   const [adding, setAdding] = useState(false);
+  const [search, setSearch] = useState('');
 
   const profile = (list.data ?? []).find((p) => p.name === name);
 
@@ -85,7 +88,11 @@ export function ProfileDetailPage({
       source: entry.source,
     };
   });
-  const filtered = kind ? items.filter((i) => i.kind === kind) : items;
+  const q = search.trim().toLowerCase();
+  const filtered = items.filter(
+    (i) =>
+      (!kind || i.kind === kind) && (!q || i.name.toLowerCase().includes(q)),
+  );
 
   const removeReference = (ref: string) =>
     edit.mutate({ name: profile.name, remove: [ref] });
@@ -126,30 +133,43 @@ export function ProfileDetailPage({
       />
 
       <div className="flex-1 p-5">
-        <KindChips
-          kinds={profileFilterKinds}
-          kind={kind}
-          onKindChange={onKindChange}
-          count={(k) => items.filter((i) => i.kind === k).length}
-          action={
-            <Button
-              size="sm"
-              variant="outline"
-              data-icon="inline-start"
-              onClick={() => setAdding(true)}
-            >
-              <PlusIcon weight="bold" />
-              {m['content.add']()}
-            </Button>
-          }
-        />
+        <div className="mb-5 flex items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={m['app.search.content']()}
+            className="w-56"
+          />
+          <FilterMenu
+            groups={[
+              kindGroup({
+                kinds: profileFilterKinds,
+                kind,
+                onKindChange,
+                count: (k) => items.filter((i) => i.kind === k).length,
+              }),
+            ]}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            data-icon="inline-start"
+            className="ml-auto"
+            onClick={() => setAdding(true)}
+          >
+            <PlusIcon weight="bold" />
+            {m['content.add']()}
+          </Button>
+        </div>
         {filtered.length === 0 ? (
           <Empty>
-            {kind
-              ? m['content.none_of_kind']({
-                  kind: kindInfo[kind].label().toLowerCase(),
-                })
-              : m['content.none_installed']()}
+            {q
+              ? m['content.browse.nothing_matches']()
+              : kind
+                ? m['content.none_of_kind']({
+                    kind: kindInfo[kind].label().toLowerCase(),
+                  })
+                : m['content.none_installed']()}
           </Empty>
         ) : (
           <div className="divide-y divide-border border border-border">

@@ -1,15 +1,17 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
-import { useEffect, useRef } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { useIntersectionObserver } from '@uidotdev/usehooks';
+import { useEffect } from 'react';
 
 import { type ContentKind, type ContentProject, errorMessage } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
-import { chipClass } from '@/components/chip';
+import { FilterMenu } from '@/components/filter-menu';
 import { Page } from '@/components/page';
-import { Bone, CardGridSkeleton } from '@/components/skeleton';
+import { CardGridSkeleton } from '@/components/skeleton';
 import { ContentCard } from '@/features/content/components/content-card';
+import { kindGroup } from '@/features/content/components/kind-filter';
 import {
-  SourceSelect,
+  sourceGroup,
   useSourceOptions,
 } from '@/features/content/components/sources';
 import { contentKinds, kindInfo } from '@/features/content/lib/kinds';
@@ -34,6 +36,18 @@ export function BrowsePage({
   // The default source is the absence of the param, not an empty one.
   const sourceParam = source ? { source } : {};
 
+  // The kind is the route, so narrowing to one is navigation — which keeps a
+  // browsed kind shareable and survives a reload.
+  const navigate = useNavigate();
+  const goToKind = (next?: ContentKind) =>
+    next
+      ? navigate({
+          to: '/browse/$kind',
+          params: { kind: kindInfo[next].slug },
+          search: sourceParam,
+        })
+      : navigate({ to: '/browse', search: sourceParam });
+
   const url = isContentUrl(q) ? q : '';
   const link = useQuery(contentQueries.url(url));
 
@@ -56,19 +70,15 @@ export function BrowsePage({
     .sort((a, b) => b.downloads - a.downloads);
 
   // Grow the page when the sentinel scrolls into view (infinite scroll).
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [sentinelRef, sentinel] = useIntersectionObserver({
+    threshold: 0,
+    rootMargin: '600px',
+  });
   useEffect(() => {
-    const node = sentinelRef.current;
-    if (!node || !hasNextPage) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && !isFetchingNextPage) fetchNextPage();
-      },
-      { rootMargin: '600px' },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+    if (sentinel?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [sentinel, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <Page
@@ -77,45 +87,27 @@ export function BrowsePage({
       search
       searchPlaceholder={m['app.search.content_or_link']()}
       actions={
-        <SourceSelect
-          list={sources.list}
-          active={sources.active}
-          onChange={(next) => onSourceChange?.(next)}
-          className="w-32"
+        <FilterMenu
+          groups={[
+            kindGroup({
+              kinds: contentKinds,
+              kind,
+              onKindChange: goToKind,
+            }),
+            sourceGroup(sources.list, sources.active, (next) =>
+              onSourceChange?.(next),
+            ),
+          ]}
         />
       }
       skeleton={
-        <div>
-          <div className="mb-5 flex flex-wrap gap-1.5">
-            {contentKinds.map((k) => (
-              <Bone key={k} className="h-6 w-20" />
-            ))}
-          </div>
-          <CardGridSkeleton
-            grid="grid grid-cols-1 gap-3 xl:grid-cols-2"
-            count={8}
-            card="h-28"
-          />
-        </div>
+        <CardGridSkeleton
+          grid="grid grid-cols-1 gap-3 xl:grid-cols-2"
+          count={8}
+          card="h-28"
+        />
       }
     >
-      <div className="mb-5 flex flex-wrap gap-1.5">
-        <Link to="/browse" search={sourceParam} className={chipClass(!kind)}>
-          {m['app.label.all']()}
-        </Link>
-        {contentKinds.map((k) => (
-          <Link
-            key={k}
-            to="/browse/$kind"
-            params={{ kind: kindInfo[k].slug }}
-            search={sourceParam}
-            className={chipClass(kind === k)}
-          >
-            {kindInfo[k].label()}
-          </Link>
-        ))}
-      </div>
-
       {url ? (
         link.isPending ? (
           <CardGridSkeleton

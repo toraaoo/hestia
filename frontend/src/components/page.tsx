@@ -1,8 +1,7 @@
-import { MagnifyingGlassIcon } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/search-input';
 import { m } from '@/paraglide/messages.js';
 
 /**
@@ -59,15 +58,12 @@ export function Page({
 function PageSearch({ placeholder }: { placeholder: string }) {
   const { query, setQuery } = useSearch();
   return (
-    <div className="relative w-56">
-      <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={placeholder}
-        className="pl-8"
-      />
-    </div>
+    <SearchInput
+      value={query}
+      onChange={setQuery}
+      placeholder={placeholder}
+      className="w-56"
+    />
   );
 }
 

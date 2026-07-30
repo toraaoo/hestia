@@ -1,29 +1,14 @@
-import {
-  FunnelSimpleIcon,
-  RowsIcon,
-  SquaresFourIcon,
-} from '@phosphor-icons/react';
-import { Fragment } from 'react';
+import { RowsIcon, SquaresFourIcon } from '@phosphor-icons/react';
 
 import type { InstanceInfo, ServerInfo } from '@/api';
+import type { FilterGroup } from '@/components/filter-menu';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   EntryCard,
   type EntryCardModel,
   EntryRow,
 } from '@/features/entries/components/entry-card';
 import { agoLabel } from '@/lib/format';
-import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
 export type View = 'grid' | 'list';
@@ -114,59 +99,26 @@ export function filterCards(
   });
 }
 
-export type FlavorGroup = {
-  label: string;
-  flavors: string[];
-  value: string;
-  onChange: (flavor: string) => void;
-};
-
-/** All flavor filters merged into one funnel-icon dropdown, shared by list views. */
-export function FilterMenu({ groups }: { groups: FlavorGroup[] }) {
-  const filtered = groups.some((g) => g.value !== 'all');
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={m['app.collection.filter_by_flavor']()}
-            className={cn(filtered ? 'text-ember' : 'text-muted-foreground')}
-          >
-            <FunnelSimpleIcon weight={filtered ? 'bold' : 'regular'} />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" className="w-44">
-        {groups.map((group, i) => (
-          <Fragment key={group.label}>
-            {i > 0 && <DropdownMenuSeparator />}
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={group.value}
-                onValueChange={(value) => group.onChange(String(value))}
-              >
-                <DropdownMenuRadioItem value="all">
-                  {m['app.label.all']()}
-                </DropdownMenuRadioItem>
-                {group.flavors.map((f) => (
-                  <DropdownMenuRadioItem
-                    key={f}
-                    value={f}
-                    className="capitalize"
-                  >
-                    {f}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuGroup>
-          </Fragment>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+/** The flavor dimension of a card list: "All" plus every flavor present in it. */
+export function flavorGroup(
+  flavors: string[],
+  value: string,
+  onChange: (flavor: string) => void,
+): FilterGroup {
+  return {
+    label: m['app.label.flavor'](),
+    value,
+    neutral: 'all',
+    options: [
+      { value: 'all', label: m['app.label.all']() },
+      ...flavors.map((f) => ({
+        value: f,
+        label: f,
+        className: 'capitalize',
+      })),
+    ],
+    onChange,
+  };
 }
 
 /** A single toggle that flips grid⇄list, showing the view you'll switch to. */

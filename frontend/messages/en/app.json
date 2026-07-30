@@ -33,6 +33,7 @@
       "update": "Update"
     },
     "collection": {
+      "filter": "Filter",
       "filter_by_flavor": "Filter by flavor",
       "switch_to_grid": "Switch to grid view",
       "switch_to_list": "Switch to list view"
@@ -90,6 +91,7 @@
       "settings": "Settings",
       "system_resources": "System resources",
       "target": "Target",
+      "type": "Type",
       "unpin": "Unpin",
       "version": "Version",
       "versions": "Versions",
@@ -112,6 +114,7 @@
       "quick_play": "Quick play"
     },
     "search": {
+      "content": "Search content",
       "content_or_link": "Search, or paste a project link",
       "instances": "Search instances",
       "library": "Search library",

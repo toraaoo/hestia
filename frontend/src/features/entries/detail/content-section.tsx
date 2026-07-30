@@ -4,9 +4,11 @@ import { useState } from 'react';
 
 import type { ContentKind } from '@/api';
 import { Empty } from '@/components/empty';
+import { FilterMenu } from '@/components/filter-menu';
+import { SearchInput } from '@/components/search-input';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { KindChips } from '@/features/content/components/kind-chips';
+import { kindGroup } from '@/features/content/components/kind-filter';
 import { kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
@@ -14,6 +16,7 @@ import { useJobMutation } from '@/queries/jobs';
 import { serverMutations, serverQueries } from '@/queries/server';
 
 import {
+  filterContent,
   installedRef,
   type ListResult,
   type RowHandlers,
@@ -24,7 +27,7 @@ import {
 import { ContentListResult } from './content-list';
 
 /**
- * The content tab body: kind filter chips + the filtered installed list, wired
+ * The content tab body: the kind filter + the filtered installed list, wired
  * to the daemon. The two entry kinds now share one factory shape, so the
  * queries and mutation handlers are selected by kind without splitting the
  * component — hook order stays stable across a re-render either way.
@@ -125,28 +128,45 @@ function ContentSectionView({
     ),
   );
   const checking = updates.some((q) => q.isFetching);
-  const filtered = kind ? items.filter((c) => c.kind === kind) : items;
 
   // null = not selecting; a set of row keys while the select mode is active.
   const [selected, setSelected] = useState<Set<string> | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [search, setSearch] = useState('');
+  const filtered = filterContent(items, kind, search);
 
-  // Changing the kind filter hides rows a selection may still hold; clear it so
-  // a batch-remove can never delete a row the user can no longer see.
+  // Narrowing hides rows a selection may still hold; clear it so a batch-remove
+  // can never delete a row the user can no longer see.
   const changeKind = (next?: ContentKind) => {
     setSelected(null);
     onKindChange(next);
   };
+  const changeSearch = (next: string) => {
+    setSelected(null);
+    setSearch(next);
+  };
 
   return (
     <>
-      <KindChips
-        kinds={kinds}
-        kind={kind}
-        onKindChange={changeKind}
-        count={(k) => items.filter((c) => c.kind === k).length}
-        action={
-          selected ? (
+      <div className="mb-5 flex items-center gap-2">
+        <SearchInput
+          value={search}
+          onChange={changeSearch}
+          placeholder={m['app.search.content']()}
+          className="w-56"
+        />
+        <FilterMenu
+          groups={[
+            kindGroup({
+              kinds,
+              kind,
+              onKindChange: changeKind,
+              count: (k) => items.filter((c) => c.kind === k).length,
+            }),
+          ]}
+        />
+        <div className="ml-auto">
+          {selected ? (
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -195,10 +215,12 @@ function ContentSectionView({
               )}
               {action}
             </div>
-          )
-        }
-      />
-      {filtered.length === 0 && kind ? (
+          )}
+        </div>
+      </div>
+      {filtered.length === 0 && search.trim() ? (
+        <Empty>{m['content.browse.nothing_matches']()}</Empty>
+      ) : filtered.length === 0 && kind ? (
         <Empty>
           {m['content.none_of_kind']({
             kind: kindInfo[kind].label().toLowerCase(),

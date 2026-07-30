@@ -10,15 +10,16 @@ import {
   errorMessage,
   type ResolvedUrl,
 } from '@/api';
+import { FilterMenu } from '@/components/filter-menu';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { PickerPanel } from '@/components/picker-panel';
 import { projectKey } from '@/features/content/components/content-card';
+import { kindGroup } from '@/features/content/components/kind-filter';
 import { PickRow } from '@/features/content/components/pick-row';
 import {
-  SourceSelect,
+  sourceGroup,
   useSourceOptions,
 } from '@/features/content/components/sources';
-import { kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
 import { instanceQueries } from '@/queries/instance';
@@ -88,18 +89,20 @@ export function ContentStep({
             search={search}
             onSearch={setSearch}
             placeholder={m['app.search.content_or_link']()}
-            chips={kinds.map((k) => ({
-              label: kindInfo[k].label(),
-              active: activeKind === k,
-              disabled: datapackBlocked(k),
-              onClick: () => onKindChange(k),
-            }))}
             trailing={
-              <SourceSelect
-                list={sources.list}
-                active={sources.active}
-                onChange={onSourceChange}
-                className="w-32"
+              <FilterMenu
+                groups={[
+                  kinds.length > 1
+                    ? kindGroup({
+                        kinds,
+                        kind: activeKind,
+                        onKindChange: (next) => next && onKindChange(next),
+                        disabled: datapackBlocked,
+                        all: false,
+                      })
+                    : undefined,
+                  sourceGroup(sources.list, sources.active, onSourceChange),
+                ]}
               />
             }
           />

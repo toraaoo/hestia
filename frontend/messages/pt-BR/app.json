@@ -33,6 +33,7 @@
       "update": "Atualizar"
     },
     "collection": {
+      "filter": "Filtrar",
       "filter_by_flavor": "Filtrar por distribuição",
       "switch_to_grid": "Mudar para visualização em grade",
       "switch_to_list": "Mudar para visualização em lista"
@@ -90,6 +91,7 @@
       "settings": "Configurações",
       "system_resources": "Recursos do sistema",
       "target": "Destino",
+      "type": "Tipo",
       "unpin": "Desafixar",
       "version": "Versão",
       "versions": "Versões",
@@ -112,6 +114,7 @@
       "quick_play": "Jogo rápido"
     },
     "search": {
+      "content": "Pesquisar conteúdo",
       "content_or_link": "Pesquise ou cole o link de um projeto",
       "instances": "Pesquisar instâncias",
       "library": "Pesquisar na biblioteca",

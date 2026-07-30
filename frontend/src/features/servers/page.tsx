@@ -2,12 +2,13 @@ import { PlusIcon } from '@phosphor-icons/react';
 import { useMutation } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useSearch } from '@/components/app-shell/search-context';
+import { FilterMenu } from '@/components/filter-menu';
 import { Page } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import {
   EntryCollection,
-  FilterMenu,
   filterCards,
+  flavorGroup,
   flavorsOf,
   serverToCard,
   type View,
@@ -68,14 +69,8 @@ export function ServersPage({
       actions={
         <>
           <FilterMenu
-            groups={[
-              {
-                label: m['app.label.flavor'](),
-                flavors,
-                value: flavor,
-                onChange: onFlavorChange,
-              },
-            ]}
+            groups={[flavorGroup(flavors, flavor, onFlavorChange)]}
+            label={m['app.collection.filter_by_flavor']()}
           />
           <ViewToggle view={view} onView={onViewChange} />
           <Button
