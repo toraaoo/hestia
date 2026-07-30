@@ -14,6 +14,6 @@ echo "generating TypeScript bindings from proto…"
 rm -rf "$gen_dir"
 cargo test -p proto --features ts >/dev/null
 
-python3 scripts/gen-barrels.py
+python scripts/gen-barrels.py
 
 echo "wrote $gen_dir and per-module barrels"

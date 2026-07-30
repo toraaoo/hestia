@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Compile news/*.md into the announcement feed document.
 
 Each markdown file is one announcement: YAML-ish frontmatter becomes the typed

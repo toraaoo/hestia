@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Write one per-proto-module barrel that re-exports its generated TS types,
 plus the types/index.ts that fans them all in. Driven by scripts/gen-types.sh
 after ts-rs has written the flat generated/ files.
