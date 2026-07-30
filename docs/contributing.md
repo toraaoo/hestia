@@ -457,6 +457,29 @@ the script is what makes it available on its own.) `generate:routes` regenerates
 
 See [packaging.md](packaging.md) for installers and sidecar bundling.
 
+## Git hooks
+
+The hooks live in [`.husky/`](../.husky) and are tracked, so they are the same
+for everyone. `husky-rs` (a dev-dependency of `common`) points `core.hooksPath`
+at that directory from its build script, so **one `cargo test` installs them** —
+there is nothing to run by hand. `NO_HUSKY_HOOKS=1` skips the install, which is
+what CI sets.
+
+| Hook | What it does |
+|---|---|
+| `pre-commit` | refuses staged conflict markers, then `cargo fmt` and `biome check --write` over the *staged* files, re-staging what they rewrite; runs the message-catalogue test when `frontend/messages/` is touched |
+| `commit-msg` | enforces `<type>(<scope>): <description>`, exempting git's own merge/revert/fixup subjects |
+| `pre-push` | the CI gates: `fmt --check` + `clippy -D warnings` + `test` for Rust, and the full Bun chain for the frontend |
+
+The split is by cost. A commit pays for formatters and millisecond greps; a push
+pays for clippy and the test suites. `pre-push` reads the ranges being pushed and
+runs only the side that changed, so a docs-only push is instant, and it mirrors
+CI's `--exclude desktop` on purpose — a gate stricter than CI would block pushes
+CI would pass.
+
+Either hook takes `--no-verify` when you need to bypass it
+(`git commit --no-verify`, `git push --no-verify`).
+
 ## Recording a decision
 
 When a non-trivial architectural choice is made, write it down in

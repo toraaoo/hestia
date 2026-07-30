@@ -1,15 +1,33 @@
 #!/bin/sh
 #
-# Format/lint staged code before it is committed. Managed by husky-rs, which
-# points core.hooksPath here on `cargo test`. Skip with `git commit --no-verify`.
+# Format/lint staged code before it is committed, and refuse what should never
+# be committed at all. Managed by husky-rs, which points core.hooksPath here on
+# `cargo test`. Skip with `git commit --no-verify`.
+#
+# Deliberately fast: formatters and cheap greps over the *staged* files only.
+# clippy, the test suites and the frontend typecheck are the pre-push gates —
+# they cost minutes, and a commit is not the place to pay that.
 set -e
+
+# --- Conflict markers: a half-finished merge must not become a commit ---
+# git's own detection over the staged diff, so it uses git's definition of a
+# marker and only sees lines this commit adds. The whitespace complaints it also
+# emits are filtered out: markdown ends a line in two spaces on purpose.
+markers=$(git diff --cached --check | grep 'leftover conflict marker' || true)
+if [ -n "$markers" ]; then
+    echo "husky: staged conflict markers —" >&2
+    printf '%s\n' "$markers" >&2
+    exit 1
+fi
 
 # --- Rust: rustfmt the staged Rust files, then re-stage them ---
 rust_staged=$(git diff --cached --name-only --diff-filter=ACM -- '*.rs')
 if [ -n "$rust_staged" ]; then
     cargo fmt --all
+    # `if` rather than `[ … ] && git add`: a missing last file would otherwise
+    # leave the loop's status non-zero and `set -e` would abort with no message.
     printf '%s\n' "$rust_staged" | while IFS= read -r file; do
-        [ -f "$file" ] && git add -- "$file"
+        if [ -f "$file" ]; then git add -- "$file"; fi
     done
 fi
 
@@ -21,9 +39,18 @@ if [ -n "$fe_staged" ]; then
         (cd frontend && printf '%s\n' "$rel" | xargs -r node_modules/.bin/biome check --write \
             --files-ignore-unknown=true --no-errors-on-unmatched)
         printf '%s\n' "$fe_staged" | while IFS= read -r file; do
-            [ -f "$file" ] && git add -- "$file"
+            if [ -f "$file" ]; then git add -- "$file"; fi
         done
     else
         echo "husky: frontend deps not installed (frontend/node_modules), skipping biome check" >&2
+    fi
+fi
+
+# --- Message catalogue: the guard that a new key reaches every locale ---
+# Cheap (milliseconds, no network, no build) and the one frontend test whose
+# failure is most often a commit-time slip, so it earns its place here.
+if [ -n "$(git diff --cached --name-only --diff-filter=ACM -- 'frontend/messages/')" ]; then
+    if [ -d frontend/node_modules ]; then
+        (cd frontend && bun run test -- tests/messages.test.ts)
     fi
 fi

@@ -8,6 +8,9 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # husky-rs installs the repo's git hooks from its build script; a CI checkout
+  # has nothing to commit or push, so it has no use for them.
+  NO_HUSKY_HOOKS: 1
 
 jobs:
   check:

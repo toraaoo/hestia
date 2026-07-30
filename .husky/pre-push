@@ -1,7 +1,87 @@
 #!/bin/sh
 #
-# Run the workspace test suite before pushing. Managed by husky-rs, which points
-# core.hooksPath here on `cargo test`. Skip with `git push --no-verify`.
+# The CI gates, run before the push rather than after it. Managed by husky-rs,
+# which points core.hooksPath here on `cargo test`. Skip with
+# `git push --no-verify`.
+#
+# Mirrors .github/workflows/ci.yml deliberately, including its
+# `--exclude desktop` (that crate needs the system webview, which CI does not
+# install and a contributor may not have). A gate stricter than CI blocks pushes
+# CI would pass; a looser one lets red builds through.
+#
+# Only the side that changed is checked: the ranges being pushed decide, so a
+# docs-only push costs nothing and a Rust-only push never waits on Bun.
 set -e
 
-cargo test --workspace
+run_rust=0
+run_frontend=0
+scope_all=0
+changed=''
+refs_read=0
+
+# stdin is one `<local ref> <local sha> <remote ref> <remote sha>` line per ref.
+# Read it directly rather than through a pipe, so the assignments survive.
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+    refs_read=$((refs_read + 1))
+    # An all-zero local sha deletes the ref — nothing to verify.
+    case "$local_sha" in
+        *[!0]*) ;;
+        *) continue ;;
+    esac
+    case "$remote_sha" in
+        # A known remote tip bounds the range exactly.
+        *[!0]*) changed="$changed
+$(git diff --name-only "$remote_sha" "$local_sha")" ;;
+        # A new branch has no remote tip to diff against, so check everything
+        # rather than guess a base.
+        *) scope_all=1 ;;
+    esac
+done
+
+# No refs on stdin, or a range we could not bound, means verify the lot.
+if [ "$refs_read" -eq 0 ] || [ "$scope_all" -eq 1 ]; then
+    run_rust=1
+    run_frontend=1
+else
+    if printf '%s\n' "$changed" | grep -qE '\.rs$|Cargo\.(toml|lock)$|rust-toolchain\.toml$|deny\.toml$'; then
+        run_rust=1
+    fi
+    if printf '%s\n' "$changed" | grep -q '^frontend/'; then
+        run_frontend=1
+    fi
+fi
+
+if [ "$run_rust" -eq 0 ] && [ "$run_frontend" -eq 0 ]; then
+    echo "husky: no Rust or frontend changes in this push, skipping the build gates"
+    exit 0
+fi
+
+if [ "$run_rust" -eq 1 ]; then
+    echo "husky: rust — fmt, clippy, test"
+    cargo fmt --all --check
+    cargo clippy --workspace --exclude desktop --all-targets -- -D warnings
+    cargo test --workspace --exclude desktop
+fi
+
+if [ "$run_frontend" -eq 1 ]; then
+    if ! command -v bun >/dev/null 2>&1; then
+        echo "husky: frontend changed but bun is not installed — see https://bun.sh" >&2
+        echo "       (or push with --no-verify if you have verified another way)" >&2
+        exit 1
+    fi
+    if [ ! -d frontend/node_modules ]; then
+        echo "husky: frontend changed but deps are missing — run (cd frontend && bun install)" >&2
+        exit 1
+    fi
+    echo "husky: frontend — messages, check, typecheck, test, build"
+    # src/paraglide/ is generated and untracked, and the app imports from it, so
+    # the messages compile before anything that resolves those imports.
+    (
+        cd frontend
+        bun run generate:messages
+        bun run check
+        bun run typecheck
+        bun run test
+        bun run build
+    )
+fi
