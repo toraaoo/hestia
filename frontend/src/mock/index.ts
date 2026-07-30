@@ -1,6 +1,6 @@
 // Dev-only fixture bridge: fakes `window.__TAURI_INTERNALS__` so the frontend
 // runs in a plain browser (no daemon, no Tauri shell). See ./fixtures.
-import { mockIPC } from '@tauri-apps/api/mocks';
+import { mockIPC, mockWindows } from '@tauri-apps/api/mocks';
 import { channels, commands } from './fixtures';
 
 // Safety net for an unlisted channel: an empty array-backed proxy whose every
@@ -36,6 +36,7 @@ function dispatch(cmd: string, args: Record<string, unknown>): unknown {
 }
 
 export async function installBrowserMock(): Promise<void> {
+  mockWindows('main');
   mockIPC(
     (cmd, args) => dispatch(cmd, (args ?? {}) as Record<string, unknown>),
     {
