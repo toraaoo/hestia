@@ -35,6 +35,31 @@ jobs:
       - name: test
         run: cargo test --workspace --exclude desktop
 
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: install
+        run: bun install --frozen-lockfile
+      # src/paraglide/ is generated and untracked, and the app imports from it,
+      # so the messages compile before anything that resolves those imports.
+      - name: generate messages
+        run: bun run generate:messages
+      - name: check
+        run: bun run check
+      - name: typecheck
+        run: bun run typecheck
+      - name: test
+        run: bun run test
+      - name: build
+        run: bun run build
+
   deny:
     runs-on: ubuntu-latest
     steps:
