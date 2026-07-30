@@ -83,12 +83,7 @@ function PinToggle({ entry }: { entry: EntryCardModel }) {
         e.stopPropagation();
         toggle(pin);
       }}
-      className={cn(
-        'grid size-6 place-items-center bg-background/80 ring-1 ring-border backdrop-blur-xs transition-opacity outline-none focus-visible:ring-ring',
-        pinned
-          ? 'text-foreground'
-          : 'text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100',
-      )}
+      className="grid size-6 place-items-center bg-background/80 ring-1 ring-border backdrop-blur-xs transition-opacity outline-none focus-visible:ring-ring text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
     >
       <PushPinIcon weight={pinned ? 'fill' : 'regular'} className="size-3.5" />
     </button>

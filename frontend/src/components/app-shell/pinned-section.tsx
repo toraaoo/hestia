@@ -6,6 +6,7 @@ import {
 } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { Reorder, type Transition } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -33,51 +34,70 @@ type ResolvedPin = PinnedEntry & {
   iconUrl?: string;
 };
 
-/** The drag-reorder handlers a pinned row wires to its DnD events. */
-interface DragProps {
-  draggable: boolean;
-  dragging: boolean;
-  onStart: () => void;
-  onEnter: () => void;
-  onDrop: () => void;
-  onEnd: () => void;
-}
+/**
+ * A sidebar row travels one row-height, so Motion's 450ms layout default
+ * reads as lag. Scoped to `layout` to leave the lift's own spring alone.
+ */
+const REORDER_TRANSITION: Transition = {
+  layout: { duration: 0.15, ease: [0.2, 0, 0, 1] },
+};
 
-/** Local reorder-while-dragging preview; the drop commits it to prefs. */
+/**
+ * Reorder state for the pin list.
+ *
+ * `Reorder` reports a new order on every crossing, so the drag runs against a
+ * local preview keyed by `pinKey` and only the release writes to prefs — one
+ * pref write per gesture rather than one per row swap. Keys rather than rows
+ * keep the preview from pinning stale run state while the write settles; it
+ * clears once prefs agree, and drops if the pins change underneath.
+ */
 function usePinnedReorder(
   pinned: ResolvedPin[],
   save: (entries: PinnedEntry[]) => void,
 ) {
-  const [drag, setDrag] = useState<{
-    list: ResolvedPin[];
-    index: number;
-  } | null>(null);
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const suppressClick = useRef(false);
 
-  const rows = drag?.list ?? pinned;
-  const begin = (index: number) => setDrag({ list: pinned, index });
-  const over = (index: number) =>
-    setDrag((current) => {
-      if (!current || current.index === index) return current;
-      const list = [...current.list];
-      const [moved] = list.splice(current.index, 1);
-      list.splice(index, 0, moved);
-      return { list, index };
-    });
-  const end = (commit: boolean) => {
-    if (commit && drag) save(drag.list.map(({ kind, id }) => ({ kind, id })));
-    setDrag(null);
-  };
+  const rows = useMemo(() => {
+    if (!order) return pinned;
+    const byKey = new Map(pinned.map((pin) => [pinKey(pin), pin]));
+    const preview = order.flatMap((key) => byKey.get(key) ?? []);
+    return preview.length === pinned.length ? preview : pinned;
+  }, [order, pinned]);
+
+  useEffect(() => {
+    if (order && order.join() === pinned.map(pinKey).join()) setOrder(null);
+  }, [order, pinned]);
 
   return {
     rows,
-    dragFor: (index: number): DragProps => ({
-      draggable: rows.length > 1,
-      dragging: drag !== null && drag.index === index,
-      onStart: () => begin(index),
-      onEnter: () => over(index),
-      onDrop: () => end(true),
-      onEnd: () => end(false),
-    }),
+    keys: useMemo(() => rows.map(pinKey), [rows]),
+    reorder: setOrder,
+    isDragging: (key: string) => dragging === key,
+    // Motion only reports a drag once it passes its own threshold, so a plain
+    // click still navigates; the one ending a drag must not.
+    onDragStart: (key: string) => {
+      suppressClick.current = true;
+      setDragging(key);
+    },
+    onDragEnd: () => {
+      setDragging(null);
+      // A drag that ends where it started leaves the effect above to clear the
+      // preview; writing an unchanged order would be a pref write for nothing.
+      if (rows.map(pinKey).join() === pinned.map(pinKey).join()) return;
+      save(rows.map(({ kind, id }) => ({ kind, id })));
+    },
+    onClickCapture: (event: React.MouseEvent) => {
+      if (!suppressClick.current) return;
+      suppressClick.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    // A drag ending off the row raises no click to clear the flag on.
+    onPointerDown: () => {
+      suppressClick.current = false;
+    },
   };
 }
 
@@ -138,7 +158,7 @@ export function PinnedSection({ pathname }: { pathname: string }) {
     saveRef.current(pinned.map(({ kind, id }) => ({ kind, id })));
   }, [ready, instances.data, servers.data, pinned, pinnedEntries]);
 
-  const { rows, dragFor } = usePinnedReorder(pinned, save);
+  const reorder = usePinnedReorder(pinned, save);
   const nothingToPin = instanceList.length === 0 && serverList.length === 0;
 
   return (
@@ -209,72 +229,90 @@ export function PinnedSection({ pathname }: { pathname: string }) {
           {m['app.label.nothing_pinned']()}
         </p>
       ) : (
-        <div className="space-y-0.5">
-          {rows.map((entry, index) => (
-            <PinnedLink
+        <Reorder.Group
+          as="div"
+          axis="y"
+          values={reorder.keys}
+          onReorder={reorder.reorder}
+          className="flex flex-col gap-0.5"
+        >
+          {reorder.rows.map((entry) => (
+            <PinnedRow
               key={pinKey(entry)}
               entry={entry}
               pathname={pathname}
               onUnpin={() => toggle({ kind: entry.kind, id: entry.id })}
-              drag={dragFor(index)}
+              reorder={reorder}
             />
           ))}
-        </div>
+        </Reorder.Group>
       )}
     </div>
+  );
+}
+
+function PinnedRow({
+  entry,
+  pathname,
+  onUnpin,
+  reorder,
+}: {
+  entry: ResolvedPin;
+  pathname: string;
+  onUnpin: () => void;
+  reorder: ReturnType<typeof usePinnedReorder>;
+}) {
+  const key = pinKey(entry);
+  const dragging = reorder.isDragging(key);
+
+  return (
+    <Reorder.Item
+      as="div"
+      value={key}
+      transition={REORDER_TRANSITION}
+      dragMomentum={false}
+      whileDrag={{ scale: 1.02 }}
+      onDragStart={() => reorder.onDragStart(key)}
+      onDragEnd={reorder.onDragEnd}
+      onPointerDown={reorder.onPointerDown}
+      onClickCapture={reorder.onClickCapture}
+      className="relative"
+    >
+      <PinnedLink
+        entry={entry}
+        pathname={pathname}
+        dragging={dragging}
+        onUnpin={onUnpin}
+      />
+    </Reorder.Item>
   );
 }
 
 function PinnedLink({
   entry,
   pathname,
+  dragging,
   onUnpin,
-  drag,
 }: {
   entry: ResolvedPin;
   pathname: string;
+  dragging: boolean;
   onUnpin: () => void;
-  drag: DragProps;
 }) {
   const active = pathname === `/${entry.kind}s/${entry.id}`;
   const content = <PinnedLinkContent entry={entry} onUnpin={onUnpin} />;
-  const className = pinnedLinkClass(active, drag.dragging);
-
-  const dragProps = {
-    draggable: drag.draggable,
-    onDragStart: (e: React.DragEvent) => {
-      e.dataTransfer.effectAllowed = 'move';
-      drag.onStart();
-    },
-    onDragEnter: drag.onEnter,
-    onDragOver: (e: React.DragEvent) => e.preventDefault(),
-    onDrop: (e: React.DragEvent) => {
-      e.preventDefault();
-      drag.onDrop();
-    },
-    onDragEnd: drag.onEnd,
-  };
+  const className = pinnedLinkClass(active, dragging);
 
   if (entry.kind === 'server') {
     return (
-      <Link
-        to="/servers/$id"
-        params={{ id: entry.id }}
-        className={className}
-        {...dragProps}
-      >
+      <Link to="/servers/$id" params={{ id: entry.id }} className={className}>
         {content}
       </Link>
     );
   }
 
   return (
-    <Link
-      to="/instances/$id"
-      params={{ id: entry.id }}
-      className={className}
-      {...dragProps}
-    >
+    <Link to="/instances/$id" params={{ id: entry.id }} className={className}>
       {content}
     </Link>
   );
@@ -286,7 +324,7 @@ function pinnedLinkClass(active: boolean, dragging: boolean) {
     active
       ? 'bg-muted text-foreground'
       : 'text-muted-foreground hover:bg-muted/60',
-    dragging && 'opacity-50',
+    dragging && 'bg-muted shadow-lg',
   );
 }
 
