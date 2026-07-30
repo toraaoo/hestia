@@ -2,7 +2,7 @@
 //! another version, checking whether one exists, toggling it, and removing it.
 
 use anyhow::{bail, Context, Result};
-use proto::content::{ContentKind, ContentProject, InstalledContent, VersionQuery};
+use proto::content::{ContentKind, ContentProject, InstalledContent, UntrackedFile, VersionQuery};
 use proto::minecraft::ProvisionPhase;
 
 use super::entry::{content_loader, EntryContent};
@@ -171,7 +171,7 @@ impl Engine {
 pub(super) fn list_content(
     ctx: &EntryContent,
     kind: ContentKind,
-) -> (Vec<InstalledContent>, Vec<String>) {
+) -> (Vec<InstalledContent>, Vec<UntrackedFile>) {
     let items: Vec<InstalledContent> = install::load(&ctx.entry_dir)
         .into_iter()
         .filter(|i| i.kind == kind)

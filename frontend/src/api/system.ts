@@ -11,6 +11,14 @@ export function openPath(path: string): Promise<void> {
 }
 
 /**
+ * Show a file in the OS file manager, selected in its folder — what a `.jar`
+ * needs, since opening it would hand it to whatever claims the extension.
+ */
+export function revealPath(path: string): Promise<void> {
+  return invokeCommand('plugin:opener|reveal_item_in_dir', { paths: [path] });
+}
+
+/**
  * The instance archive the app was launched with (double-clicking a `.hestia`
  * file), cleared as it is read. Null on an ordinary start.
  */

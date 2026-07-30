@@ -4,7 +4,7 @@
 //! call.
 
 use client::proto::content::{
-    ContentAddSpec, ContentFailure, ContentKind, ContentUpdate, InstalledContent,
+    ContentAddSpec, ContentFailure, ContentKind, ContentUpdate, InstalledContent, UntrackedFile,
 };
 use client::proto::minecraft::ProvisionProgress;
 use client::{Client, IpcError};
@@ -29,7 +29,7 @@ impl<'a> ContentEntry<'a> {
     pub(super) async fn list(
         &self,
         kind: ContentKind,
-    ) -> Result<(Vec<InstalledContent>, Vec<String>), IpcError> {
+    ) -> Result<(Vec<InstalledContent>, Vec<UntrackedFile>), IpcError> {
         match self.kind {
             EntryKind::Server => self.client.server().content_list(&self.id, kind).await,
             EntryKind::Instance => self.client.instance().content_list(&self.id, kind).await,

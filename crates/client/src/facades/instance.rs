@@ -7,7 +7,7 @@ use proto::content::{
     InstanceContentCheckUpdatesParams, InstanceContentEnable, InstanceContentEnableParams,
     InstanceContentList, InstanceContentListParams, InstanceContentRemove,
     InstanceContentRemoveParams, InstanceContentSetVersion, InstanceContentSetVersionParams,
-    InstanceContentUpdate, InstanceContentUpdateParams,
+    InstanceContentUpdate, InstanceContentUpdateParams, UntrackedFile,
 };
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
@@ -407,7 +407,7 @@ impl Instance<'_> {
         &self,
         instance: &str,
         kind: ContentKind,
-    ) -> Result<(Vec<InstalledContent>, Vec<String>), IpcError> {
+    ) -> Result<(Vec<InstalledContent>, Vec<UntrackedFile>), IpcError> {
         let params = InstanceContentListParams {
             instance: instance.to_string(),
             kind,

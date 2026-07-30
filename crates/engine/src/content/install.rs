@@ -12,7 +12,9 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-use proto::content::{ContentFile, ContentKind, ContentVersion, InstalledContent, ReleaseChannel};
+use proto::content::{
+    ContentFile, ContentKind, ContentVersion, InstalledContent, ReleaseChannel, UntrackedFile,
+};
 use proto::download::HashAlgorithm;
 use serde::{Deserialize, Serialize};
 
@@ -312,43 +314,46 @@ pub(crate) fn sha1_file(path: &Path) -> Result<String> {
     Ok(hasher.hex_digest())
 }
 
-/// Filenames present in the game's load dirs that no index entry accounts for —
-/// files the user dropped in by hand. A datapack is reported as `<world>/<file>`,
-/// since each world has its own load dir.
+/// Files present in the game's load dirs that no index entry accounts for —
+/// dropped in by hand. A datapack is named `<world>/<file>`, since each world
+/// has its own load dir. Each carries its path so a front-end can reveal it.
 pub(crate) fn untracked(
     data_dir: &Path,
     kind: ContentKind,
     items: &[InstalledContent],
     worlds: &[String],
-) -> Vec<String> {
+) -> Vec<UntrackedFile> {
     let known: HashSet<&str> = items.iter().map(|i| i.filename.as_str()).collect();
+    let mut found = Vec::new();
     if kind == ContentKind::DataPack {
-        let mut found = Vec::new();
         for world in worlds {
             let dir = data_dir.join(world).join("datapacks");
-            for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
-                let name = entry.file_name().to_string_lossy().into_owned();
-                if entry.path().is_file() && !known.contains(name.as_str()) {
-                    found.push(format!("{}/{name}", world_name(world)));
-                }
-            }
+            collect_untracked(&dir, &known, |name| format!("{}/{name}", world_name(world)))
+                .into_iter()
+                .for_each(|file| found.push(file));
         }
-        found.sort();
-        return found;
+    } else if let Ok(dir) = kind_dir(kind) {
+        found = collect_untracked(&data_dir.join(dir), &known, ToOwned::to_owned);
     }
-    let Ok(dir) = kind_dir(kind) else {
-        return Vec::new();
-    };
+    found.sort_by(|a, b| a.name.cmp(&b.name));
+    found
+}
+
+fn collect_untracked(
+    dir: &Path,
+    known: &HashSet<&str>,
+    label: impl Fn(&str) -> String,
+) -> Vec<UntrackedFile> {
     let mut found = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(data_dir.join(dir)) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if entry.path().is_file() && !known.contains(name.as_str()) {
-                found.push(name);
-            }
+    for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if entry.path().is_file() && !known.contains(name.as_str()) {
+            found.push(UntrackedFile {
+                name: label(&name),
+                path: entry.path().to_string_lossy().into_owned(),
+            });
         }
     }
-    found.sort();
     found
 }
 
@@ -641,6 +646,10 @@ mod tests {
             &["saves/one".to_string()],
         );
 
-        assert_eq!(found, vec!["one/handmade.zip".to_string()]);
+        assert_eq!(
+            found.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(),
+            vec!["one/handmade.zip"]
+        );
+        assert_eq!(found[0].path, stray.to_string_lossy());
     }
 }

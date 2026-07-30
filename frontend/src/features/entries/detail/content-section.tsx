@@ -1,8 +1,15 @@
-import { ArrowsClockwiseIcon, TrashIcon } from '@phosphor-icons/react';
+import {
+  ArrowsClockwiseIcon,
+  FileIcon,
+  FolderOpenIcon,
+  TrashIcon,
+} from '@phosphor-icons/react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
-import type { ContentKind } from '@/api';
+import type { ContentKind, UntrackedFile } from '@/api';
+import { errorMessage, system } from '@/api';
 import { Empty } from '@/components/empty';
 import { FilterMenu } from '@/components/filter-menu';
 import { SearchInput } from '@/components/search-input';
@@ -18,6 +25,7 @@ import { serverMutations, serverQueries } from '@/queries/server';
 
 import {
   filterContent,
+  filterUntracked,
   installedRef,
   type ListResult,
   type RowHandlers,
@@ -128,7 +136,6 @@ function ContentSectionView({
   packName: string;
 }) {
   const items = lists.flatMap((q) => q.data?.items ?? []);
-  const untracked = lists.flatMap((q) => q.data?.untracked ?? []);
   const updatable = new Set(
     updates.flatMap((q) =>
       (q.data ?? []).filter((u) => u.updatable).map((u) => u.filename),
@@ -141,6 +148,14 @@ function ContentSectionView({
   const [confirming, setConfirming] = useState(false);
   const [search, setSearch] = useState('');
   const filtered = filterContent(items, kind, search);
+  // A per-kind query carries its own untracked files, so the kind filter reads
+  // off the query's position rather than the file itself.
+  const untracked = filterUntracked(
+    lists.flatMap((list, i) =>
+      kind && kinds[i] !== kind ? [] : (list.data?.untracked ?? []),
+    ),
+    search,
+  );
 
   // Narrowing hides rows a selection may still hold; clear it so a batch-remove
   // can never delete a row the user can no longer see.
@@ -269,14 +284,71 @@ function ContentSectionView({
           setSelected(null);
         }}
       />
-      {untracked.length > 0 && (
-        <p className="mt-3 text-[11px] text-muted-foreground">
-          {m['content.untracked_note']({
-            count: untracked.length,
-            files: untracked.join(', '),
-          })}
-        </p>
-      )}
+      <UntrackedFiles files={untracked} />
     </>
+  );
+}
+
+/**
+ * The files sitting in the game's load dirs that no install record claims —
+ * dropped in by hand, so the launcher leaves them alone. The count is the whole
+ * message until asked for more — a folder with hundreds of them must never push
+ * the list off the page — and they open in place as rows like the installed
+ * pool, inside a region that scrolls on its own. Each row opens where it lives,
+ * the only thing the launcher can do with a file it does not manage.
+ */
+function UntrackedFiles({ files }: { files: UntrackedFile[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (files.length === 0) return null;
+  const reveal = (path: string) => {
+    system.revealPath(path).catch((error: Error) => {
+      toast.error(errorMessage(error));
+    });
+  };
+  return (
+    <div className="mt-4 text-[11px] text-muted-foreground">
+      {m['content.untracked.summary']({ count: files.length })}{' '}
+      <button
+        type="button"
+        aria-controls="untracked-files"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((prev) => !prev)}
+        className="underline underline-offset-3 outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        {expanded
+          ? m['content.untracked.show_less']()
+          : m['content.untracked.show_more']()}
+      </button>
+      {expanded && (
+        <ul
+          id="untracked-files"
+          className="mt-2 max-h-52 divide-y divide-border overflow-y-auto border border-border text-foreground"
+        >
+          {files.map((file) => (
+            <li
+              key={file.path}
+              className="group/untracked flex items-center gap-3 px-3 py-2.5"
+            >
+              <span className="grid size-7 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
+                <FileIcon className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm">
+                {file.name}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={m['content.untracked.reveal']()}
+                title={file.path}
+                className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/untracked:opacity-100"
+                onClick={() => reveal(file.path)}
+              >
+                <FolderOpenIcon />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

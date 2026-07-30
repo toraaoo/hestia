@@ -82,7 +82,12 @@
     "select_version": "Select version",
     "selected_count": "{count} selected",
     "stop_to_install": "Stop to install",
-    "untracked_note": "{count} untracked file(s) in the game dir: {files}",
+    "untracked": {
+      "reveal": "Show in file manager",
+      "show_less": "Show less",
+      "show_more": "Show more",
+      "summary": "{count} untracked file(s) in the game dir"
+    },
     "update_to_latest": "Update to latest",
     "world_datapacks": "world datapacks"
   }

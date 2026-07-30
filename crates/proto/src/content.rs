@@ -336,14 +336,25 @@ pub struct InstalledContent {
     pub disabled_worlds: Vec<String>,
 }
 
-/// The installed items of one kind, plus filenames found in the entry's game
-/// directory that no index entry accounts for.
+/// A file found in the entry's game directory that no index entry accounts for
+/// — dropped in by hand, so the launcher never touches it.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct UntrackedFile {
+    /// As it reads in the load dir; a datapack is `<world>/<file>`.
+    pub name: String,
+    /// Absolute, on the daemon's host — what a co-located front-end reveals.
+    pub path: String,
+}
+
+/// The installed items of one kind, plus the untracked files beside them.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ContentListResult {
     pub items: Vec<InstalledContent>,
-    pub untracked: Vec<String>,
+    pub untracked: Vec<UntrackedFile>,
 }
 
 /// One thing to install: exactly one of `project` (a platform project,

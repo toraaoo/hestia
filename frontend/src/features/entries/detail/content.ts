@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react';
-import type { ContentKind, ContentVersion, InstalledContent } from '@/api';
+import type {
+  ContentKind,
+  ContentVersion,
+  InstalledContent,
+  UntrackedFile,
+} from '@/api';
 
 /** The entry a content tab acts on. */
 export interface EntryTarget {
@@ -26,6 +31,15 @@ export const filterContent = (
         i.title.toLowerCase().includes(q) ||
         i.filename.toLowerCase().includes(q)),
   );
+};
+
+/** The untracked files in view, narrowed by the quick search. */
+export const filterUntracked = (
+  files: UntrackedFile[],
+  search: string,
+): UntrackedFile[] => {
+  const q = search.trim().toLowerCase();
+  return files.filter((file) => !q || file.name.toLowerCase().includes(q));
 };
 
 /** A stable identity for one installed row; the index keys an item by filename. */
@@ -101,7 +115,7 @@ export interface SectionProps {
 }
 
 export type ListResult = {
-  data?: { items: InstalledContent[]; untracked: string[] };
+  data?: { items: InstalledContent[]; untracked: UntrackedFile[] };
 };
 export type UpdatesResult = {
   data?: { filename: string; updatable: boolean }[];

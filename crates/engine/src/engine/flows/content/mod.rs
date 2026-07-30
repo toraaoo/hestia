@@ -13,7 +13,9 @@ pub(super) mod entry;
 mod manage;
 
 use anyhow::{bail, Context, Result};
-use proto::content::{ContentAddSpec, ContentFailure, ContentKind, InstalledContent};
+use proto::content::{
+    ContentAddSpec, ContentFailure, ContentKind, InstalledContent, UntrackedFile,
+};
 
 use self::entry::{EntryContent, EntrySide};
 use self::manage::{list_content, remove_content, set_enabled};
@@ -59,7 +61,7 @@ impl Engine {
         &self,
         reference: &str,
         kind: ContentKind,
-    ) -> Result<(Vec<InstalledContent>, Vec<String>)> {
+    ) -> Result<(Vec<InstalledContent>, Vec<UntrackedFile>)> {
         let (_, ctx) = self.server_content_ctx(reference)?;
         Ok(list_content(&ctx, kind))
     }
@@ -68,7 +70,7 @@ impl Engine {
         &self,
         reference: &str,
         kind: ContentKind,
-    ) -> Result<(Vec<InstalledContent>, Vec<String>)> {
+    ) -> Result<(Vec<InstalledContent>, Vec<UntrackedFile>)> {
         let (_, ctx) = self.instance_content_ctx(reference)?;
         Ok(list_content(&ctx, kind))
     }

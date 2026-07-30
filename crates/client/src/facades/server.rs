@@ -12,7 +12,7 @@ use proto::content::{
     ServerContentAddParams, ServerContentCheckUpdates, ServerContentCheckUpdatesParams,
     ServerContentEnable, ServerContentEnableParams, ServerContentList, ServerContentListParams,
     ServerContentRemove, ServerContentRemoveParams, ServerContentSetVersion,
-    ServerContentSetVersionParams, ServerContentUpdate, ServerContentUpdateParams,
+    ServerContentSetVersionParams, ServerContentUpdate, ServerContentUpdateParams, UntrackedFile,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, LoadersParams, ProvisionProgress, ResolveParams,
@@ -321,7 +321,7 @@ impl Server<'_> {
         &self,
         server: &str,
         kind: ContentKind,
-    ) -> Result<(Vec<InstalledContent>, Vec<String>), IpcError> {
+    ) -> Result<(Vec<InstalledContent>, Vec<UntrackedFile>), IpcError> {
         let params = ServerContentListParams {
             server: server.to_string(),
             kind,

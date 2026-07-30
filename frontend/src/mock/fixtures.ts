@@ -335,4 +335,5 @@ export const commands: Record<string, Handler> = {
     return null;
   },
   'plugin:opener|open_path': () => null,
+  'plugin:opener|reveal_item_in_dir': () => null,
 };

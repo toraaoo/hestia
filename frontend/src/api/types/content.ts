@@ -48,4 +48,5 @@ export type { ServerContentSetVersionParams } from "./generated/ServerContentSet
 export type { ServerContentUpdateParams } from "./generated/ServerContentUpdateParams";
 export type { SideSupport } from "./generated/SideSupport";
 export type { SourcesResult } from "./generated/SourcesResult";
+export type { UntrackedFile } from "./generated/UntrackedFile";
 export type { VersionQuery } from "./generated/VersionQuery";

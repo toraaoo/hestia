@@ -353,7 +353,11 @@ async fn list(client: &Client, entry: EntryKind, kind: ContentKind, reference: &
         ui::show(View::note(format!(
             "{} untracked file(s) in the game dir: {}",
             untracked.len(),
-            untracked.join(", ")
+            untracked
+                .iter()
+                .map(|f| f.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         )))?;
     }
     Ok(())

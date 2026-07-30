@@ -82,7 +82,12 @@
     "select_version": "Selecionar versão",
     "selected_count": "{count} selecionado(s)",
     "stop_to_install": "Pare para instalar",
-    "untracked_note": "{count} arquivo(s) não rastreado(s) na pasta do jogo: {files}",
+    "untracked": {
+      "reveal": "Mostrar no gerenciador de arquivos",
+      "show_less": "Mostrar menos",
+      "show_more": "Mostrar mais",
+      "summary": "{count} arquivo(s) não rastreado(s) na pasta do jogo"
+    },
     "update_to_latest": "Atualizar para a mais recente",
     "world_datapacks": "datapacks do mundo"
   }
