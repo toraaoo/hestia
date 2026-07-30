@@ -8,10 +8,12 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "generate-routes": "tsr generate",
+    "generate:routes": "tsr generate",
+    "generate:messages": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check"
