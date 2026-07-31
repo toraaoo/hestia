@@ -81,6 +81,18 @@ pub enum WarningInfo {
     /// source: it is installed and loads, but carries no provenance, so it can
     /// never be updated in place.
     ImportFilesUntracked { count: u32, files: Vec<String> },
+    /// A file hestia keeps could not be read as the document it should be —
+    /// written by a newer build, hand-edited into something that no longer
+    /// decodes, or damaged — so it was renamed aside and whatever it held is
+    /// back at its defaults. `path` is where the original is now, because the
+    /// only useful thing about an unreadable file is where to find it.
+    DocumentQuarantined {
+        document: String,
+        path: String,
+        /// Operational English naming the schema problem, shown as secondary
+        /// text: the version it declared, or why it would not parse.
+        detail: String,
+    },
     /// The multiplayer list was edited while a session had the instance open.
     /// `servers.dat` belongs to the running game, which holds the list in
     /// memory and writes the whole file back when it exits — so that copy wins
@@ -135,6 +147,10 @@ impl WarningInfo {
                  multiplayer screen instead"
                     .to_string()
             }
+            DocumentQuarantined { path, .. } => format!(
+                "nothing was deleted — the file is at `{path}`; update hestia if it came from a \
+                 newer version, or delete it once you have what you need from it"
+            ),
         }
     }
 }
@@ -174,6 +190,12 @@ impl fmt::Display for WarningInfo {
                 f,
                 "'{instance}' has {sessions} session(s) open: the running game will overwrite this \
                  change to the multiplayer list when it exits"
+            ),
+            DocumentQuarantined {
+                document, detail, ..
+            } => write!(
+                f,
+                "{document} could not be read and was set aside: {detail}"
             ),
         }
     }
