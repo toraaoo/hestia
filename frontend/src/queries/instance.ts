@@ -28,6 +28,18 @@ import { jobMutation } from './jobs';
 import { keys } from './keys';
 import { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
 
+/** A launch, and whether it may run alongside the sessions already up. */
+export interface LaunchVars {
+  id: string;
+  newSession?: boolean;
+}
+
+/** A stop aimed at one session of an instance, or at all of them. */
+export interface StopVars {
+  id: string;
+  session?: string;
+}
+
 export const instanceQueries = {
   list: () =>
     queryOptions({
@@ -195,17 +207,21 @@ export const instanceMutations = {
    * Id-by-variable variants for list rows, which can't call a per-id hook. A
    * launch materialises files, so it streams provisioning progress through the
    * job store like the per-id `launch` above.
+   *
+   * `newSession` is the daemon's concurrency opt-in — without it a launch of a
+   * running instance is refused.
    */
   launchAny: () =>
-    jobMutation<InstanceLaunchDoneEvent, string>({
+    jobMutation<InstanceLaunchDoneEvent, LaunchVars>({
       mutationKey: [...keys.instances.all, 'launch'],
-      meta: (id) => ({
+      meta: ({ id }) => ({
         kind: 'instance.launch',
         label: 'launch',
         entry: { kind: 'instance', id },
       }),
-      run: (id, onProgress) => api.launch({ instance: id }, onProgress),
-      invalidates: (id) => [
+      run: ({ id, newSession }, onProgress) =>
+        api.launch({ instance: id, newSession }, onProgress),
+      invalidates: ({ id }) => [
         keys.instances.list(),
         keys.instances.detail(id),
         keys.processes.list(),
@@ -217,27 +233,30 @@ export const instanceMutations = {
    * `launchAny`, carrying what the session should join on start.
    */
   launchQuick: () =>
-    jobMutation<InstanceLaunchDoneEvent, { id: string; quickPlay: QuickPlay }>({
-      mutationKey: [...keys.instances.all, 'launch', 'quick'],
-      meta: ({ id }) => ({
-        kind: 'instance.launch',
-        label: 'launch',
-        entry: { kind: 'instance', id },
-      }),
-      run: ({ id, quickPlay }, onProgress) =>
-        api.launch({ instance: id, quickPlay }, onProgress),
-      invalidates: ({ id }) => [
-        keys.instances.list(),
-        keys.instances.detail(id),
-        keys.processes.list(),
-        keys.accounts.all,
-      ],
-    }),
+    jobMutation<InstanceLaunchDoneEvent, LaunchVars & { quickPlay: QuickPlay }>(
+      {
+        mutationKey: [...keys.instances.all, 'launch', 'quick'],
+        meta: ({ id }) => ({
+          kind: 'instance.launch',
+          label: 'launch',
+          entry: { kind: 'instance', id },
+        }),
+        run: ({ id, quickPlay, newSession }, onProgress) =>
+          api.launch({ instance: id, quickPlay, newSession }, onProgress),
+        invalidates: ({ id }) => [
+          keys.instances.list(),
+          keys.instances.detail(id),
+          keys.processes.list(),
+          keys.accounts.all,
+        ],
+      },
+    ),
+  /** `session` stops just that one; absent stops every session. */
   stopAny: () =>
-    mutation<void, string>({
+    mutation<void, StopVars>({
       mutationKey: [...keys.instances.all, 'stop'],
-      mutationFn: (id) => api.stop(id),
-      invalidates: (id) => [
+      mutationFn: ({ id, session }) => api.stop(id, session),
+      invalidates: ({ id }) => [
         keys.instances.list(),
         keys.instances.detail(id),
         keys.processes.list(),

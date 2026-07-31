@@ -2,14 +2,13 @@ import {
   FolderOpenIcon,
   PlayIcon,
   PlusIcon,
-  PowerIcon,
   UploadSimpleIcon,
 } from '@phosphor-icons/react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type { ContentKind } from '@/api';
-import { errorMessage, type InstanceInfo, system } from '@/api';
+import { errorMessage, system } from '@/api';
 import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { entryIcon } from '@/components/icons';
@@ -17,7 +16,6 @@ import { Stat, TabCount } from '@/components/page';
 import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -36,15 +34,18 @@ import {
   SideCard,
   StatCard,
 } from '@/features/entries/detail';
+import { SessionList } from '@/features/instances/components/session-list';
 import { WorldRow } from '@/features/instances/components/world-row';
 import { ExportInstanceModal } from '@/features/instances/export-modal';
 import { useLaunchModal } from '@/features/instances/launch-modal';
+import { InstanceRunControl } from '@/features/instances/run-control';
 import { InstanceLogsTab } from '@/features/instances/tabs/logs';
 import { InstanceServersTab } from '@/features/instances/tabs/servers';
 import { InstanceSettingsTab } from '@/features/instances/tabs/settings';
 import { ProfilesPanel } from '@/features/profiles/panel';
 import { agoLabel, bytes, memGb, uptime } from '@/lib/format';
 import { supportsQuickPlay } from '@/lib/quick-play';
+import { runningSessions } from '@/lib/sessions';
 import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import {
@@ -63,10 +64,6 @@ export type InstanceTab =
   | 'servers'
   | 'logs'
   | 'settings';
-
-function runningSessions(instance: InstanceInfo): number {
-  return (instance.sessions ?? []).filter((s) => s.state === 'running').length;
-}
 
 export function InstanceDetailPage({
   id,
@@ -88,6 +85,8 @@ export function InstanceDetailPage({
   const profiles = useQuery(instanceQueries.profiles(id));
   const [addingContent, setAddingContent] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [focus, setFocus] = useState<string | null>(null);
+  const [logSession, setLogSession] = useState<string | null>(null);
   const { launch, isLaunching } = useLaunchModal();
   // Joining a world or a server is the same launch job, carrying what to join.
   const launchQuick = useJobMutation(instanceMutations.launchQuick());
@@ -104,11 +103,10 @@ export function InstanceDetailPage({
     0,
   );
 
-  const sessions = instance ? runningSessions(instance) : 0;
-  const running = sessions > 0;
-  const liveSession = (instance?.sessions ?? []).find(
-    (s) => s.state === 'running',
-  );
+  const sessions = instance ? runningSessions(instance) : [];
+  const running = sessions.length > 0;
+  const liveSession =
+    sessions.find((s) => s.id === focus) ?? sessions[sessions.length - 1];
   const metrics = useProcessMetrics(liveSession?.id ?? null);
 
   const memoryLimitGb = (() => {
@@ -173,7 +171,7 @@ export function InstanceDetailPage({
             {running && (
               <Badge variant="secondary" className="gap-1.5">
                 <StatusDot tone="on" />
-                {m['entry.sessions_running']({ count: sessions })}
+                {m['entry.sessions_running']({ count: sessions.length })}
               </Badge>
             )}
           </>
@@ -190,25 +188,13 @@ export function InstanceDetailPage({
               <FolderOpenIcon className="size-4" />
             </Button>
             {running ? (
-              <ConfirmDialog
-                trigger={
-                  <Button
-                    variant="outline"
-                    data-icon="inline-start"
-                    disabled={stop.isPending}
-                  >
-                    <PowerIcon weight="bold" />
-                    {m['app.action.stop']()}
-                  </Button>
-                }
-                title={m['entry.stop.title']({ name: instance.name })}
-                description={
-                  sessions > 1
-                    ? m['entry.stop.sessions_description']({ count: sessions })
-                    : m['entry.stop.instance_description']()
-                }
-                confirmLabel={m['app.action.stop']()}
-                onConfirm={() => stop.mutate({})}
+              <InstanceRunControl
+                name={instance.name}
+                sessions={sessions}
+                busy={stop.isPending}
+                launching={isLaunching(id)}
+                onNewSession={() => launch(instance, { newSession: true })}
+                onStop={(session) => stop.mutate({ session })}
               />
             ) : (
               <Button
@@ -279,6 +265,24 @@ export function InstanceDetailPage({
                 />
               </div>
               <ResourceCards live={live} />
+              {running && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                    {m['app.label.sessions']()}
+                  </h2>
+                  <SessionList
+                    sessions={sessions}
+                    focused={liveSession?.id}
+                    onFocus={setFocus}
+                    onLogs={(session) => {
+                      setLogSession(session);
+                      onTabChange('logs');
+                    }}
+                    onStop={(session) => stop.mutate({ session })}
+                    stopping={stop.isPending}
+                  />
+                </section>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -418,6 +422,7 @@ export function InstanceDetailPage({
                       {
                         id,
                         quickPlay: { kind: 'world', target: world.folder },
+                        newSession: running,
                       },
                       { onSuccess: (done) => toastWarnings(done.warnings) },
                     )
@@ -433,7 +438,13 @@ export function InstanceDetailPage({
         </TabsContent>
 
         <TabsContent value="logs" className="flex min-h-0 flex-col p-5">
-          <InstanceLogsTab id={id} name={instance.name} />
+          <InstanceLogsTab
+            id={id}
+            name={instance.name}
+            sessions={sessions}
+            session={logSession}
+            onSessionChange={setLogSession}
+          />
         </TabsContent>
 
         <TabsContent value="settings" className="p-5">

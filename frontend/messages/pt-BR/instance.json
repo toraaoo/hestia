@@ -5,6 +5,9 @@
       "preparing": "Preparando os arquivos para a primeira execução…",
       "title": "Iniciando {name}"
     },
+    "logs": {
+      "all_sessions": "Todas as sessões"
+    },
     "logs_empty": "Inicie esta instância para transmitir o log aqui.",
     "missing": "Essa instância não existe mais.",
     "new": "Nova instância",

@@ -114,9 +114,15 @@ export function LibraryPage({
             busy:
               isLaunching(instance.id) ||
               (stopInstance.isPending &&
-                stopInstance.variables === instance.id),
+                stopInstance.variables?.id === instance.id),
+            launching: isLaunching(instance.id),
+            stopping:
+              stopInstance.isPending &&
+              stopInstance.variables?.id === instance.id,
             onStart: () => launchInstance(instance),
-            onStop: () => stopInstance.mutate(instance.id),
+            onStop: (session) =>
+              stopInstance.mutate({ id: instance.id, session }),
+            onNewSession: () => launchInstance(instance, { newSession: true }),
           },
           instance.lastPlayedUnix,
         ),

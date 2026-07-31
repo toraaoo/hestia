@@ -9,6 +9,7 @@ import {
   EntryRow,
 } from '@/features/entries/components/entry-card';
 import { agoLabel } from '@/lib/format';
+import { runningSessions } from '@/lib/sessions';
 import { m } from '@/paraglide/messages.js';
 
 export type View = 'grid' | 'list';
@@ -17,12 +18,13 @@ export type View = 'grid' | 'list';
 export type CardActions = {
   busy: boolean;
   onStart: () => void;
-  onStop: () => void;
+  /** `session` names one session to stop; absent stops the entry outright. */
+  onStop: (session?: string) => void;
+  /** Instances only: launch alongside the sessions already running. */
+  onNewSession?: () => void;
+  launching?: boolean;
+  stopping?: boolean;
 };
-
-function runningSessions(instance: InstanceInfo): number {
-  return (instance.sessions ?? []).filter((s) => s.state === 'running').length;
-}
 
 /** Map a live server record to the card shape, with its quick actions wired. */
 export function serverToCard(
@@ -57,24 +59,28 @@ export function instanceToCard(
   actions: CardActions,
   lastPlayedUnix?: number,
 ): EntryCardModel {
-  const running = runningSessions(instance);
+  const sessions = runningSessions(instance);
   return {
     id: instance.id,
     name: instance.name,
     kind: 'instance',
     flavor: instance.flavor,
     version: instance.gameVersion,
-    running: running > 0,
+    running: sessions.length > 0,
     ready: true,
     subtitle:
-      running > 0
-        ? m['entry.sessions_running']({ count: running })
+      sessions.length > 0
+        ? m['entry.sessions_running']({ count: sessions.length })
         : lastPlayedUnix
           ? `${m['app.label.last_played']()} ${agoLabel(lastPlayedUnix)}`
           : m['app.status.stopped'](),
+    sessions,
     busy: actions.busy,
+    launching: actions.launching,
+    stopping: actions.stopping,
     onStart: actions.onStart,
     onStop: actions.onStop,
+    onNewSession: actions.onNewSession,
   };
 }
 

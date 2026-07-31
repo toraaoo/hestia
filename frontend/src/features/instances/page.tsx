@@ -49,9 +49,12 @@ export function InstancesPage({
           {
             busy:
               isLaunching(instance.id) ||
-              (stop.isPending && stop.variables === instance.id),
+              (stop.isPending && stop.variables?.id === instance.id),
+            launching: isLaunching(instance.id),
+            stopping: stop.isPending && stop.variables?.id === instance.id,
             onStart: () => launch(instance),
-            onStop: () => stop.mutate(instance.id),
+            onStop: (session) => stop.mutate({ id: instance.id, session }),
+            onNewSession: () => launch(instance, { newSession: true }),
           },
           instance.lastPlayedUnix,
         ),

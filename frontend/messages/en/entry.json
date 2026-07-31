@@ -43,6 +43,14 @@
     },
     "overview_summary": "A {flavor} {version} instance with {mods} mods across {worlds} worlds.",
     "quick_actions": "Quick actions",
+    "session": {
+      "menu": "Session actions",
+      "name": "Session {seq}",
+      "new": "New session",
+      "pid": "PID {pid}",
+      "stop_all": "Stop all sessions",
+      "stop_one": "Stop session {seq}"
+    },
     "sessions_running": "{count} running",
     "settings": {
       "allocated_memory": "Allocated memory",
@@ -66,6 +74,8 @@
     "stop": {
       "instance_description": "The running game session is closed. Unsaved progress may be lost.",
       "server_description": "The server shuts down and any connected players are disconnected.",
+      "session_description": "Only this session is closed; {count} keep running. Unsaved progress may be lost.",
+      "session_title": "Stop session {seq}?",
       "sessions_description": "All {count} running sessions are closed. Unsaved progress may be lost.",
       "title": "Stop {name}?"
     }

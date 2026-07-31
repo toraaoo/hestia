@@ -1,6 +1,7 @@
 import { PlayIcon, PowerIcon, PushPinIcon } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
 
+import type { ProcessInfo } from '@/api';
 import { entryIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
+import { InstanceRunControl } from '@/features/instances/run-control';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { usePinned } from '@/queries/pinned';
@@ -24,10 +26,18 @@ export interface EntryCardModel {
   subtitle: string;
   /** A custom icon shown in place of the kind glyph. */
   iconUrl?: string;
+  /** An instance's live sessions, oldest first; a server has none. */
+  sessions?: ProcessInfo[];
   /** Wired quick actions; absent leaves the button inert. */
   onStart?: () => void;
-  onStop?: () => void;
+  /** `session` names one to stop; absent stops the entry outright. */
+  onStop?: (session?: string) => void;
+  /** Launch alongside the running sessions; absent hides the option. */
+  onNewSession?: () => void;
   busy?: boolean;
+  /** Split out of `busy` so a launch in flight still leaves stopping live. */
+  launching?: boolean;
+  stopping?: boolean;
 }
 
 function statusOf(entry: EntryCardModel) {
@@ -97,6 +107,19 @@ function ActionButton({
   entry: EntryCardModel;
   size?: 'sm' | 'xs';
 }) {
+  if (entry.running && entry.onNewSession) {
+    return (
+      <InstanceRunControl
+        name={entry.name}
+        sessions={entry.sessions ?? []}
+        size={size}
+        busy={entry.stopping}
+        launching={entry.launching}
+        onNewSession={entry.onNewSession}
+        onStop={(session) => entry.onStop?.(session)}
+      />
+    );
+  }
   if (entry.running) {
     return (
       <ConfirmDialog
@@ -176,7 +199,7 @@ export function EntryCard({ entry }: { entry: EntryCardModel }) {
           <div className="absolute top-2 right-2">
             <PinToggle entry={entry} />
           </div>
-          <div className="absolute right-2 bottom-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="absolute right-2 bottom-2 opacity-0 transition-opacity group-hover:opacity-100 has-aria-expanded:opacity-100">
             <ActionButton entry={entry} />
           </div>
         </div>

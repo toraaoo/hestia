@@ -22,7 +22,11 @@ import { instanceMutations } from '@/queries/instance';
 import { backgroundJob, foregroundJob, useJobMutation } from '@/queries/jobs';
 
 interface LaunchModal {
-  launch: (instance: InstanceInfo) => void;
+  /**
+   * `newSession` launches alongside whatever is already running; without it a
+   * running instance is refused by the daemon.
+   */
+  launch: (instance: InstanceInfo, options?: { newSession?: boolean }) => void;
   isLaunching: (id: string) => boolean;
 }
 
@@ -57,13 +61,14 @@ export function LaunchModalProvider({
   // changes, not when a byte count does.
   const { mutate, isPending, variables } = mutation;
   const launch = useCallback(
-    (instance: InstanceInfo) => {
+    (instance: InstanceInfo, options?: { newSession?: boolean }) => {
       // The session is running either way; the warnings say what it runs
       // against (an unshared saves folder, say), so they follow a backgrounded
       // launch too.
-      mutate(instance.id, {
-        onSuccess: (done) => toastWarnings(done.warnings),
-      });
+      mutate(
+        { id: instance.id, newSession: options?.newSession },
+        { onSuccess: (done) => toastWarnings(done.warnings) },
+      );
       if (instance.lastPlayedUnix == null) {
         setTarget({ id: instance.id, name: instance.name });
       }
@@ -71,7 +76,7 @@ export function LaunchModalProvider({
     [mutate],
   );
   const isLaunching = useCallback(
-    (id: string) => isPending && variables === id,
+    (id: string) => isPending && variables?.id === id,
     [isPending, variables],
   );
   const value = useMemo(() => ({ launch, isLaunching }), [launch, isLaunching]);

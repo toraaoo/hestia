@@ -1,4 +1,4 @@
-import { CaretUpDownIcon, PlayIcon, PowerIcon } from '@phosphor-icons/react';
+import { CaretUpDownIcon, PlayIcon } from '@phosphor-icons/react';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -7,7 +7,6 @@ import type { InstanceInfo } from '@/api';
 import { entryIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,18 +18,16 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
 import { useLaunchModal } from '@/features/instances/launch-modal';
+import { InstanceRunControl } from '@/features/instances/run-control';
+import { runningSessions } from '@/lib/sessions';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
 import { instanceMutations, useInstances } from '@/queries/instance';
 
-function isRunning(instance: InstanceInfo): boolean {
-  return (instance.sessions ?? []).some((s) => s.state === 'running');
-}
-
 /**
  * The always-present quick-play strip along the bottom of the library. The
- * instance is chosen from a dropdown; the button launches it (or stops it when
- * a session is already running).
+ * instance is chosen from a dropdown; the button launches it, and gives way to
+ * the run control once a session is up.
  */
 export function PlayBar() {
   const { signedIn } = useAccounts();
@@ -43,10 +40,10 @@ export function PlayBar() {
   const sel = list.find((i) => i.id === selId) ?? list[0];
 
   const Icon = entryIcon('instance');
-  const running = sel ? isRunning(sel) : false;
-  const busy =
-    (sel ? isLaunching(sel.id) : false) ||
-    (stop.isPending && stop.variables === sel?.id);
+  const sessions = sel ? runningSessions(sel) : [];
+  const launching = sel ? isLaunching(sel.id) : false;
+  const stopping = stop.isPending && stop.variables?.id === sel?.id;
+  const busy = launching || stopping;
 
   return (
     <div className="flex h-[76px] items-center gap-3 border-t border-border bg-sidebar px-4">
@@ -121,23 +118,15 @@ export function PlayBar() {
         </Button>
       )}
 
-      {running ? (
-        <ConfirmDialog
-          trigger={
-            <Button
-              variant="outline"
-              size="sm"
-              data-icon="inline-start"
-              disabled={busy}
-            >
-              <PowerIcon weight="bold" />
-              {m['app.action.stop']()}
-            </Button>
-          }
-          title={m['entry.stop.title']({ name: sel?.name ?? '' })}
-          description={m['entry.stop.instance_description']()}
-          confirmLabel={m['app.action.stop']()}
-          onConfirm={() => sel && stop.mutate(sel.id)}
+      {sel && sessions.length > 0 ? (
+        <InstanceRunControl
+          name={sel.name}
+          sessions={sessions}
+          size="sm"
+          busy={stopping}
+          launching={launching}
+          onNewSession={() => launch(sel, { newSession: true })}
+          onStop={(session) => stop.mutate({ id: sel.id, session })}
         />
       ) : (
         <Button
@@ -162,11 +151,22 @@ function InstanceItem({
   instance: InstanceInfo;
   onSelect: () => void;
 }) {
+  const sessions = runningSessions(instance).length;
   return (
     <DropdownMenuItem onClick={onSelect}>
       <span className="min-w-0 flex-1 truncate">{instance.name}</span>
-      {isRunning(instance) ? (
-        <StatusDot tone="on" />
+      {sessions > 0 ? (
+        <>
+          {sessions > 1 && (
+            <span
+              className="font-mono text-[10px] text-muted-foreground"
+              title={m['entry.sessions_running']({ count: sessions })}
+            >
+              ×{sessions}
+            </span>
+          )}
+          <StatusDot tone="on" />
+        </>
       ) : (
         <span className="font-mono text-[10px] text-muted-foreground">
           {instance.gameVersion}

@@ -43,6 +43,14 @@
     },
     "overview_summary": "Uma instância {flavor} {version} com {mods} mods em {worlds} mundos.",
     "quick_actions": "Ações rápidas",
+    "session": {
+      "menu": "Ações da sessão",
+      "name": "Sessão {seq}",
+      "new": "Nova sessão",
+      "pid": "PID {pid}",
+      "stop_all": "Parar todas as sessões",
+      "stop_one": "Parar a sessão {seq}"
+    },
     "sessions_running": "{count} em execução",
     "settings": {
       "allocated_memory": "Memória alocada",
@@ -66,6 +74,8 @@
     "stop": {
       "instance_description": "A sessão de jogo em execução será fechada. Progresso não salvo pode ser perdido.",
       "server_description": "O servidor será desligado e os jogadores conectados serão desconectados.",
+      "session_description": "Apenas esta sessão é encerrada; {count} continuam em execução. O progresso não salvo pode ser perdido.",
+      "session_title": "Parar a sessão {seq}?",
       "sessions_description": "Todas as {count} sessões em execução serão fechadas. Progresso não salvo pode ser perdido.",
       "title": "Parar {name}?"
     }

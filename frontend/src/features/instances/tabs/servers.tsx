@@ -21,6 +21,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Switch } from '@/components/ui/switch';
 import { supportsQuickPlay } from '@/lib/quick-play';
+import { runningSessions } from '@/lib/sessions';
 import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
@@ -44,6 +45,7 @@ export function InstanceServersTab({ instance }: { instance: InstanceInfo }) {
   const [removing, setRemoving] = useState<ServerEntry | null>(null);
 
   const joinable = supportsQuickPlay(instance.gameVersion);
+  const running = runningSessions(instance).length > 0;
   // The game's own scratch rows (direct-connect) are not the player's servers.
   const list = (servers.data ?? []).filter((server) => !server.hidden);
 
@@ -86,6 +88,7 @@ export function InstanceServersTab({ instance }: { instance: InstanceInfo }) {
                   {
                     id: instance.id,
                     quickPlay: { kind: 'server', target: server.address },
+                    newSession: running,
                   },
                   { onSuccess: (done) => toastWarnings(done.warnings) },
                 )

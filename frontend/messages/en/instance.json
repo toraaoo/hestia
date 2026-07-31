@@ -5,6 +5,9 @@
       "preparing": "Preparing files for the first launch…",
       "title": "Launching {name}"
     },
+    "logs": {
+      "all_sessions": "All sessions"
+    },
     "logs_empty": "Launch this instance to stream its log here.",
     "missing": "That instance no longer exists.",
     "new": "New instance",
