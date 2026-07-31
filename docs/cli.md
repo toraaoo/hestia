@@ -488,8 +488,14 @@ hestia config set autostart true # register the daemon to start at login
 hestia config set instance.multi-session true # allow an instance to run several sessions
 hestia config set sync.enabled false          # stop sharing settings across instances
 hestia config set announcements.enabled false # stop fetching news and notices
+hestia config set discord.enabled false       # stop publishing Discord presence
 hestia config set content.curseforge-key <key> # unlock the CurseForge source
 ```
+
+While `discord.enabled` is on, a running Discord client is told which instance is being played, its flavor and game
+version, and how long the session has run — and that the launcher is open at all, as an idle presence, since the daemon
+is resident. It needs the Discord *desktop* client on the same machine (presence is local IPC, which Discord in a
+browser does not expose); with none running, nothing is published and nothing is retried until one appears.
 
 CurseForge's API refuses every request without a key, so that source is offered only once one resolves: this setting,
 else a key the distributor baked into the build. Get one from the

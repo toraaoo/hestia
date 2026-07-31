@@ -130,6 +130,16 @@ export function GeneralTab() {
             onChange={(checked) => commit('announcements.enabled', checked)}
           />
         </Setting>
+
+        <Setting id="discord">
+          <SwitchRow
+            id="discord-enabled"
+            label={m['settings.discord.enabled_label']()}
+            description={m['settings.discord.enabled_description']()}
+            checked={entries.discord?.enabled ?? true}
+            onChange={(checked) => commit('discord.enabled', checked)}
+          />
+        </Setting>
       </SettingsSection>
 
       <SettingsSection group="updates" legend={m['settings.update.title']()}>

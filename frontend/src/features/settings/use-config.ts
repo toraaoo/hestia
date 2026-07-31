@@ -18,6 +18,7 @@ export interface ConfigEntries {
   defaults?: { memory?: string; 'jvm-args'?: string };
   content?: { 'curseforge-key'?: string };
   announcements?: { enabled?: boolean };
+  discord?: { enabled?: boolean };
   instance?: { 'multi-session'?: boolean };
   modpack?: ModpackConfig;
 }

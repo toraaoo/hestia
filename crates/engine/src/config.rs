@@ -31,6 +31,23 @@ pub struct Settings {
     pub sync: SyncSettings,
     /// Corrections applied over a modpack's own declarations.
     pub modpack: ModpackSettings,
+    /// What the launcher publishes to a local Discord client.
+    pub discord: DiscordSettings,
+}
+
+/// Discord Rich Presence, keyed `discord.enabled`. On, the daemon publishes
+/// what is being played — and that the launcher is open at all — to whoever can
+/// see the user's Discord profile, so the key exists to switch that off.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DiscordSettings {
+    pub enabled: bool,
+}
+
+impl Default for DiscordSettings {
+    fn default() -> Self {
+        DiscordSettings { enabled: true }
+    }
 }
 
 /// The corrections over what a modpack claims about itself, addressed by the

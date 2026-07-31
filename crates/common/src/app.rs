@@ -52,6 +52,19 @@ pub fn update_pubkeys() -> impl Iterator<Item = &'static str> {
 pub const ANNOUNCE_ENDPOINT: &str =
     "https://github.com/toraaoo/hestia/releases/download/announcements/announcements.json";
 
+/// The Discord application Rich Presence is published as, from the Discord
+/// developer portal. Not a secret and not a credential: it names the
+/// application whose title and art the Discord client renders, and it travels
+/// in every presence payload. There is no backend behind it — presence is local
+/// IPC to the user's own Discord client, so the application exists only to hold
+/// the name and the uploaded art assets.
+pub const DISCORD_APP_ID: &str = "1532750283753656543";
+
+/// The art asset key uploaded under the application's Rich Presence assets.
+/// Discord resolves it against that application; an unknown key renders no
+/// image rather than failing the update.
+pub const DISCORD_LARGE_IMAGE: &str = "hestia";
+
 /// The announcement feed's own signing key — deliberately *not* [`UPDATE_PUBKEY`].
 ///
 /// The feed is published by a workflow that runs on a push to the default
