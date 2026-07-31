@@ -208,7 +208,7 @@ export function ServerDetailPage({
             <div className="flex flex-col gap-5">
               <WarningNotice
                 warnings={info.data?.warnings}
-                className="max-w-2xl"
+                className="w-full"
               />
               {ping.data?.motd && (
                 <p className="max-w-2xl text-sm leading-relaxed text-foreground/90">
