@@ -1,5 +1,5 @@
-//! Joining directly: the instance's multiplayer list, and the two verbs that
-//! launch straight into a world or a server (Quick Play).
+//! The instance's multiplayer list — the servers the in-game list shows —
+//! and joining one straight from a launch (Quick Play).
 //!
 //! The list is the game's own `servers.dat`, so an edit made while a session is
 //! open is answered with a warning rather than refused — the daemon says so on
@@ -17,21 +17,6 @@ use crate::ui::{self, View};
 /// ping has its own timeout, so a handful of connections keeps a stale entry
 /// from holding up the ones behind it.
 const PING_CONCURRENCY: usize = 8;
-
-#[derive(Subcommand)]
-pub enum WorldCmd {
-    /// Launch the instance straight into a save world (needs Minecraft 1.20+)
-    Play {
-        /// World folder under `data/saves/` (prompts when omitted)
-        world: Option<String>,
-        #[arg(long, help = "Account name or uuid (default: the switched-to account)")]
-        account: Option<String>,
-        #[arg(short, long, help = "Return immediately instead of following the logs")]
-        detach: bool,
-        #[arg(long, help = "Launch another session even if one is already running")]
-        new_session: bool,
-    },
-}
 
 #[derive(Subcommand)]
 pub enum ServerCmd {
@@ -73,32 +58,7 @@ pub enum ServerCmd {
     },
 }
 
-pub(super) async fn run_world(client: &Client, instance: &str, cmd: WorldCmd) -> Result<()> {
-    match cmd {
-        WorldCmd::Play {
-            world,
-            account,
-            detach,
-            new_session,
-        } => {
-            let folder = match world {
-                Some(folder) => folder,
-                None => pick_world(client, instance).await?,
-            };
-            super::launch(
-                client,
-                instance,
-                account.as_deref().unwrap_or_default(),
-                new_session,
-                detach,
-                Some(QuickPlay::World(folder)),
-            )
-            .await
-        }
-    }
-}
-
-pub(super) async fn run_server(client: &Client, instance: &str, cmd: ServerCmd) -> Result<()> {
+pub(super) async fn run(client: &Client, instance: &str, cmd: ServerCmd) -> Result<()> {
     match cmd {
         ServerCmd::Play {
             server,
@@ -108,7 +68,7 @@ pub(super) async fn run_server(client: &Client, instance: &str, cmd: ServerCmd) 
         } => {
             let address = match server {
                 Some(server) => resolve_address(client, instance, &server).await?,
-                None => pick_server(client, instance).await?,
+                None => pick(client, instance).await?,
             };
             super::launch(
                 client,
@@ -200,24 +160,7 @@ async fn ping_all(client: &Client, servers: &[ServerEntry]) -> Vec<Option<String
         .await
 }
 
-async fn pick_world(client: &Client, instance: &str) -> Result<String> {
-    let worlds = client.instance().worlds(instance).await?;
-    if worlds.is_empty() {
-        bail!("'{instance}' has no worlds yet — create one in-game first");
-    }
-    let labels: Vec<String> = worlds
-        .iter()
-        .map(|w| format!("{} ({})", w.name, w.folder))
-        .collect();
-    let index = ui::select("which world?", &labels)?;
-    Ok(worlds
-        .into_iter()
-        .nth(index)
-        .expect("selector index")
-        .folder)
-}
-
-async fn pick_server(client: &Client, instance: &str) -> Result<String> {
+async fn pick(client: &Client, instance: &str) -> Result<String> {
     let servers = visible(client.instance().servers(instance).await?);
     if servers.is_empty() {
         bail!(
@@ -269,12 +212,4 @@ fn matching<'a>(servers: &'a [ServerEntry], reference: &str) -> Option<&'a Serve
 /// its own (direct-connect), which are not the player's servers.
 fn visible(servers: Vec<ServerEntry>) -> Vec<ServerEntry> {
     servers.into_iter().filter(|s| !s.hidden).collect()
-}
-
-/// The launch target a `--world` / `--server` pair names. clap has already
-/// refused both at once, so the pair can only spell one target.
-pub fn target(world: Option<String>, server: Option<String>) -> Option<QuickPlay> {
-    world
-        .map(QuickPlay::World)
-        .or_else(|| server.map(QuickPlay::Server))
 }

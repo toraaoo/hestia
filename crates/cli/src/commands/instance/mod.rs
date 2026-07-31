@@ -11,16 +11,17 @@ mod config;
 mod create;
 mod entry;
 pub(crate) mod lifecycle;
-pub(crate) mod multiplayer;
+pub(crate) mod servers;
 mod transfer;
 mod update;
+mod world;
 
 use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use client::proto::content::ContentKind;
-use client::proto::instance::WorldInfo;
+use client::proto::instance::QuickPlay;
 use client::Client;
 
 use crate::commands::content::{self, ContentCmd, EntryKind};
@@ -29,6 +30,15 @@ use crate::commands::modpack::EntryModpackCmd;
 use crate::ui::Spinner;
 
 pub use lifecycle::launch;
+
+/// The launch target a `--world` / `--server` pair names — the grammar's own
+/// translation of the two flags into the one thing the wire carries. clap has
+/// already refused both at once, so the pair can only spell one target.
+pub fn quick_play(world: Option<String>, server: Option<String>) -> Option<QuickPlay> {
+    world
+        .map(QuickPlay::World)
+        .or_else(|| server.map(QuickPlay::Server))
+}
 
 #[derive(Subcommand)]
 #[command(
@@ -148,14 +158,14 @@ enum InstanceAction {
     /// Play one of the instance's save worlds directly
     World {
         #[command(subcommand)]
-        cmd: multiplayer::WorldCmd,
+        cmd: world::WorldCmd,
     },
     /// The instance's multiplayer list, with each server's status
     Servers,
     /// Join or manage the servers in the instance's multiplayer list
     Server {
         #[command(subcommand)]
-        cmd: multiplayer::ServerCmd,
+        cmd: servers::ServerCmd,
     },
     /// Watch a running session's CPU and memory on a fullscreen graph
     Monitor {
@@ -333,7 +343,7 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
                 account.as_deref().unwrap_or_default(),
                 new_session,
                 detach,
-                multiplayer::target(world, server),
+                quick_play(world, server),
             )
             .await
         }
@@ -357,10 +367,10 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             let sessions = entry::fetch(client, &name).await?.sessions;
             entry::show_detail(&info, &sessions)
         }
-        InstanceAction::Worlds => worlds(client, &name).await,
-        InstanceAction::World { cmd } => multiplayer::run_world(client, &name, cmd).await,
-        InstanceAction::Servers => multiplayer::list(client, &name).await,
-        InstanceAction::Server { cmd } => multiplayer::run_server(client, &name, cmd).await,
+        InstanceAction::Worlds => world::list(client, &name).await,
+        InstanceAction::World { cmd } => world::run(client, &name, cmd).await,
+        InstanceAction::Servers => servers::list(client, &name).await,
+        InstanceAction::Server { cmd } => servers::run(client, &name, cmd).await,
         InstanceAction::Monitor { session } => lifecycle::monitor(client, &name, session).await,
         InstanceAction::Logs {
             tail,
@@ -413,56 +423,6 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
         } => adopt(client, &name, targets).await,
         InstanceAction::Remove => lifecycle::remove(client, &name).await,
     }
-}
-
-/// The instance's save worlds, as each `level.dat` describes itself. A
-/// first-class verb, not just the datapack picker's private read: every daemon
-/// capability gets a scriptable form.
-async fn worlds(client: &Client, name: &str) -> Result<()> {
-    let worlds = client.instance().worlds(name).await?;
-    if worlds.is_empty() {
-        return crate::ui::show(crate::ui::View::note(
-            "no worlds yet — create one in-game first",
-        ));
-    }
-    let rows = worlds
-        .iter()
-        .map(|world| {
-            vec![
-                world.name.clone(),
-                world.folder.clone(),
-                world.version.clone(),
-                mode_label(world),
-                mc::last_played_label(world.last_played_unix),
-                crate::ui::human_bytes(world.size_bytes),
-            ]
-        })
-        .collect();
-    crate::ui::show(crate::ui::View::table(
-        "Worlds",
-        ["NAME", "FOLDER", "VERSION", "MODE", "PLAYED", "SIZE"],
-        rows,
-    ))
-}
-
-/// The world's game mode, with the flags that change how it plays.
-fn mode_label(world: &WorldInfo) -> String {
-    if !world.read {
-        return "unreadable".into();
-    }
-    let mut label = format!("{:?}", world.game_mode).to_lowercase();
-    if world.hardcore {
-        label.push_str(" hardcore");
-    } else {
-        label = format!(
-            "{label} ({})",
-            format!("{:?}", world.difficulty).to_lowercase()
-        );
-    }
-    if world.cheats {
-        label.push_str(" +cheats");
-    }
-    label
 }
 
 async fn adopt(client: &Client, name: &str, targets: Vec<String>) -> Result<()> {

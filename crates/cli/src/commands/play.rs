@@ -6,7 +6,7 @@
 
 use anyhow::{bail, Result};
 
-use crate::commands::instance::{self, multiplayer};
+use crate::commands::instance;
 use crate::ui;
 
 pub async fn run(
@@ -28,7 +28,7 @@ pub async fn run(
         account.as_deref().unwrap_or_default(),
         new_session,
         detach,
-        multiplayer::target(world, server),
+        instance::quick_play(world, server),
     )
     .await
 }
