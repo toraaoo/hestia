@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use proto::content::ContentFailure;
-use proto::error::{EntryKind, ErrorInfo, Field, Reason};
+use proto::error::{ErrorInfo, Field, Reason};
 use proto::modpack::{ModpackRef, ModpackTarget};
 use proto::transfer::{ArchiveEntry, ArchiveInfo, ExportFormat, ImportFormat};
 use proto::warning::WarningInfo;
@@ -283,16 +283,6 @@ impl Engine {
             }
         }
         outcome
-    }
-
-    fn instance_record(&self, reference: &str) -> Result<InstanceRecord> {
-        self.instances.get(reference).ok_or_else(|| {
-            ErrorInfo::EntryNotFound {
-                entry: EntryKind::Instance,
-                reference: reference.to_string(),
-            }
-            .into()
-        })
     }
 
     fn instance_name_taken(&self, name: &str) -> bool {

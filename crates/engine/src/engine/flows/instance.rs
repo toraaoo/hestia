@@ -1,10 +1,11 @@
 //! Instance creation, in-place version updates, and the launch preparation that
 //! materialises the client jar, libraries, and assets.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
-use proto::instance::{InstanceDetails, WorldInfo};
+use anyhow::{bail, Context, Result};
+use proto::error::{ErrorInfo, Field, Reason};
+use proto::instance::{InstanceDetails, QuickPlay, WorldInfo};
 use proto::minecraft::{ConfigEntry, ProvisionPhase};
 use proto::warning::WarningInfo;
 
@@ -15,7 +16,7 @@ use crate::instances::InstanceRecord;
 use crate::minecraft::launch::{self, InstancePaths, LaunchAccount, LaunchPlan};
 use crate::minecraft::log4j;
 use crate::minecraft::materialize::{self, OnProgress};
-use crate::minecraft::world;
+use crate::minecraft::{ping, world};
 
 impl Engine {
     /// The instance's save worlds under `data/saves/`, each described from its
@@ -151,25 +152,36 @@ impl Engine {
     }
 
     /// Materialise everything an instance launch needs — the Java runtime, the
-    /// client jar, libraries, assets — and assemble the JVM invocation for the
-    /// given account (empty picks the sole signed-in one). `profile` overrides
-    /// the active profile for this launch (`none` = no profile); `reconcile`
-    /// off skips the sync/mirror pass entirely — sessions are already running,
-    /// so the mirror is in use (jars are open, locked on Windows).
+    /// client jar, libraries, assets — and assemble the JVM invocation.
+    ///
+    /// A quick-play target is validated up front, before any of that work: a
+    /// launch that cannot join what it was asked to join should fail in the
+    /// moment it was asked, not after several minutes of downloads.
     pub async fn prepare_instance(
         &self,
-        reference: &str,
-        account: &str,
-        session_seq: u32,
-        profile: &str,
-        reconcile: bool,
+        request: LaunchRequest<'_>,
         on_progress: OnProgress<'_>,
     ) -> Result<PreparedLaunch> {
+        let LaunchRequest {
+            instance: reference,
+            account,
+            session_seq,
+            profile,
+            reconcile,
+            quick_play,
+        } = request;
         let record = self
             .instances
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
         let entry_dir = self.instances.instance_dir(&record);
+        if let Some(target) = quick_play.as_ref() {
+            validate_quick_play(
+                &record.profile.game_version,
+                &self.instances.data_dir(&record),
+                target,
+            )?;
+        }
         let launch_profile = if reconcile {
             profiles::resolve(&entry_dir, profile)?
         } else {
@@ -286,6 +298,7 @@ impl Engine {
             },
             &account,
             &jvm,
+            quick_play.as_ref(),
         );
         Ok(PreparedLaunch {
             record,
@@ -314,6 +327,56 @@ impl Engine {
             access_token,
         })
     }
+}
+
+/// One launch's inputs: which instance, as whom, under which profile, and what
+/// it joins on start. A struct rather than a parameter list — the two `&str`s
+/// that mean entirely different things sit next to each other, and a caller
+/// naming them cannot swap them by accident.
+pub struct LaunchRequest<'a> {
+    pub instance: &'a str,
+    /// Account name or uuid; empty picks the sole signed-in one.
+    pub account: &'a str,
+    pub session_seq: u32,
+    /// A profile override for this launch: empty is the active profile, the
+    /// literal `none` is no profile.
+    pub profile: &'a str,
+    /// Off skips the sync/mirror pass entirely — other sessions are already
+    /// running, so the mirror is in use (jars are open, locked on Windows).
+    pub reconcile: bool,
+    /// Join a world or server on start instead of opening to the title screen.
+    pub quick_play: Option<QuickPlay>,
+}
+
+/// Refuse a quick-play target the launch could not honour: a client too old for
+/// the arguments at all, a world folder that is not there, or an address the
+/// game would not parse. Each answers as the typed refusal a front-end renders,
+/// rather than as a launch that silently opens the title screen.
+fn validate_quick_play(game_version: &str, data_dir: &Path, target: &QuickPlay) -> Result<()> {
+    if !launch::supports_quick_play(game_version) {
+        bail!(ErrorInfo::QuickPlayUnsupported {
+            version: game_version.to_string(),
+        });
+    }
+    match target {
+        QuickPlay::World(folder) => {
+            let folder = folder.trim();
+            if !data_dir.join("saves").join(folder).is_dir() {
+                bail!(ErrorInfo::WorldNotFound {
+                    world: folder.to_string(),
+                });
+            }
+        }
+        QuickPlay::Server(address) => {
+            if ping::split_address(address).is_err() {
+                bail!(ErrorInfo::InvalidValue {
+                    field: Field::Address,
+                    reason: Reason::ServerAddress,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Everything a launch needs to spawn, plus what went less than perfectly on

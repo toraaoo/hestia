@@ -1,6 +1,17 @@
 //! Server List Ping: the status handshake the multiplayer list uses, over the
 //! game port. Varint-length-framed packets; the status reply body is a
 //! varint-prefixed JSON string.
+//!
+//! Two callers reach the same exchange: a *managed* server, always on loopback
+//! at its allocated port, and an arbitrary entry of an instance's multiplayer
+//! list, which is a host the player typed. The host is what the handshake
+//! carries, so a virtual-host proxy answers for the right server rather than
+//! for whatever the address resolves to.
+//!
+//! The address is used verbatim: a domain that publishes only a
+//! `_minecraft._tcp` SRV record (and no A record on the default port) will not
+//! answer here, since resolving one would mean taking on a DNS-record
+//! dependency for a status line.
 
 use std::time::Duration;
 
@@ -14,17 +25,68 @@ const IO_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_PAYLOAD: usize = 256 * 1024;
 const STATUS_INTENT: i32 = 1;
 const ANY_PROTOCOL: i32 = -1;
+pub const DEFAULT_PORT: u16 = 25565;
 
+/// Ping a managed server on loopback.
 pub async fn ping(port: u16) -> Result<ServerPingResult> {
-    let mut stream = tokio::time::timeout(IO_TIMEOUT, TcpStream::connect(("127.0.0.1", port)))
+    status("127.0.0.1", port)
         .await
-        .context("ping connect timed out")?
-        .context("cannot reach the server's game port")?;
+        .context("cannot reach the server's game port")
+}
+
+/// Ping `host` or `host:port` — an entry of a multiplayer list. The port
+/// defaults to Minecraft's 25565.
+pub async fn ping_address(address: &str) -> Result<ServerPingResult> {
+    let (host, port) = split_address(address)?;
+    status(&host, port)
+        .await
+        .with_context(|| format!("cannot reach {address}"))
+}
+
+/// Split `host`, `host:port`, or a bracketed IPv6 literal into its parts. An
+/// address is user input, so it is validated here rather than trusted to fail
+/// later at connect time with a worse message.
+pub fn split_address(address: &str) -> Result<(String, u16)> {
+    let address = address.trim();
+    if address.is_empty() {
+        bail!("a server address is required");
+    }
+    let (host, port) = match address.strip_prefix('[') {
+        Some(rest) => {
+            let (host, tail) = rest
+                .split_once(']')
+                .context("unclosed '[' in the address")?;
+            (host, tail.strip_prefix(':'))
+        }
+        // A bare IPv6 literal has several colons and no port; anything with one
+        // colon is host:port.
+        None if address.matches(':').count() > 1 => (address, None),
+        None => match address.split_once(':') {
+            Some((host, port)) => (host, Some(port)),
+            None => (address, None),
+        },
+    };
+    if host.is_empty() || host.contains(char::is_whitespace) {
+        bail!("'{address}' is not a server address");
+    }
+    let port = match port {
+        None | Some("") => DEFAULT_PORT,
+        Some(port) => port
+            .parse()
+            .with_context(|| format!("'{port}' is not a port number"))?,
+    };
+    Ok((host.to_string(), port))
+}
+
+async fn status(host: &str, port: u16) -> Result<ServerPingResult> {
+    let mut stream = tokio::time::timeout(IO_TIMEOUT, TcpStream::connect((host, port)))
+        .await
+        .context("ping connect timed out")??;
 
     let mut handshake = Vec::new();
     write_varint(&mut handshake, 0x00);
     write_varint(&mut handshake, ANY_PROTOCOL);
-    write_string(&mut handshake, "127.0.0.1");
+    write_string(&mut handshake, host);
     handshake.extend_from_slice(&port.to_be_bytes());
     write_varint(&mut handshake, STATUS_INTENT);
     write_packet(&mut stream, &handshake).await?;
@@ -183,6 +245,36 @@ fn read_varint_slice(cursor: &mut &[u8]) -> Result<i32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_address_splits_into_host_and_port() {
+        assert_eq!(
+            split_address("smp.example.net").unwrap(),
+            ("smp.example.net".to_string(), DEFAULT_PORT)
+        );
+        assert_eq!(
+            split_address(" smp.example.net:25566 ").unwrap(),
+            ("smp.example.net".to_string(), 25566)
+        );
+        assert_eq!(
+            split_address("[::1]:25566").unwrap(),
+            ("::1".to_string(), 25566)
+        );
+        assert_eq!(
+            split_address("fe80::1").unwrap(),
+            ("fe80::1".to_string(), DEFAULT_PORT)
+        );
+    }
+
+    #[test]
+    fn a_malformed_address_is_refused() {
+        for address in ["", "   ", "host:port", "host:99999", "two hosts", "[::1"] {
+            assert!(
+                split_address(address).is_err(),
+                "'{address}' should not parse"
+            );
+        }
+    }
 
     #[test]
     fn varint_round_trips() {

@@ -7,9 +7,14 @@ mod backup;
 mod content;
 mod flavors;
 mod instance;
+
+pub use instance::LaunchRequest;
 mod modpack;
 
 pub use modpack::ModpackOutcome;
+mod multiplayer;
+
+pub use multiplayer::ServerListWrite;
 mod profiles;
 mod server;
 mod skins;
@@ -61,6 +66,18 @@ impl Engine {
             .with_context(|| {
                 format!("java {major} is not installed (run `hestia java install {major}`)")
             })
+    }
+
+    /// The stored record a reference names, as the typed refusal every flow
+    /// answers an unknown instance with.
+    fn instance_record(&self, reference: &str) -> Result<crate::instances::InstanceRecord> {
+        self.instances.get(reference).ok_or_else(|| {
+            proto::error::ErrorInfo::EntryNotFound {
+                entry: proto::error::EntryKind::Instance,
+                reference: reference.to_string(),
+            }
+            .into()
+        })
     }
 }
 

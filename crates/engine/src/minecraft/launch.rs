@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
+use proto::instance::QuickPlay;
 use proto::minecraft::{InstanceProfile, ServerProfile};
 use serde::{Deserialize, Serialize};
 
@@ -265,14 +266,31 @@ fn server_invocation(
     }
 }
 
+/// The first release that understands the Quick Play arguments (1.20, snapshot
+/// 23w14a). An older client parses them as unknown options and opens to the
+/// title screen instead, so a launch that asked to join something is refused
+/// rather than quietly ignored.
+pub const QUICK_PLAY_SINCE: (u64, u64, u64) = (1, 20, 0);
+
+/// Whether `game_version` takes the Quick Play arguments. A version that does
+/// not parse as a release triple — a snapshot, an April Fools' build — answers
+/// no: it may well support them, but nothing here can tell, and refusing is the
+/// answer that cannot silently drop the player at the title screen.
+pub fn supports_quick_play(game_version: &str) -> bool {
+    crate::version::parse(game_version).is_some_and(|v| v >= QUICK_PLAY_SINCE)
+}
+
 /// The client invocation: substituted JVM args, the main class, then
-/// substituted game args, run from the instance's game directory.
+/// substituted game args, run from the instance's game directory. `quick_play`
+/// appends the join-on-start argument; the caller has already checked the
+/// version takes it.
 pub fn instance_plan(
     profile: &InstanceProfile,
     java: &Path,
     paths: &InstancePaths<'_>,
     account: &LaunchAccount,
     settings: &JavaSettings,
+    quick_play: Option<&QuickPlay>,
 ) -> LaunchPlan {
     let classpath = build_classpath(profile, paths);
     let vars = build_vars(profile, paths, account, classpath);
@@ -298,6 +316,16 @@ pub fn instance_plan(
     args.extend(settings.flags());
     args.push(profile.main_class.clone());
     args.extend(profile.game_args.iter().map(|a| substitute(a, &vars)));
+    // The manifest declares these behind feature rules, which resolve to
+    // nothing here (see `meta::rules_allow`), so the pair is appended directly.
+    if let Some(quick_play) = quick_play {
+        let (flag, target) = match quick_play {
+            QuickPlay::World(folder) => ("--quickPlaySingleplayer", folder),
+            QuickPlay::Server(address) => ("--quickPlayMultiplayer", address),
+        };
+        args.push(flag.to_string());
+        args.push(target.clone());
+    }
 
     LaunchPlan {
         program: java.to_path_buf(),
@@ -572,6 +600,7 @@ mod tests {
             &paths,
             &account(),
             &JavaSettings::default(),
+            None,
         );
         let main_at = plan
             .args
@@ -583,6 +612,66 @@ mod tests {
             .any(|a| a.contains("client.jar")));
         assert_eq!(plan.args[main_at + 1..], ["--username", "Steve"]);
         assert_eq!(plan.cwd, Path::new("/inst"));
+    }
+
+    #[test]
+    fn instance_plan_appends_the_quick_play_target_after_the_game_args() {
+        let profile = InstanceProfile {
+            client: Artifact::default(),
+            main_class: "net.minecraft.client.main.Main".into(),
+            jvm_args: vec!["-cp".into(), "${classpath}".into()],
+            game_args: vec!["--username".into(), "${auth_player_name}".into()],
+            ..Default::default()
+        };
+        let paths = InstancePaths {
+            game_dir: Path::new("/inst"),
+            natives_dir: Path::new("/inst/natives"),
+            client_jar: Path::new("/versions/client.jar"),
+            libraries_root: Path::new("/libraries"),
+            assets_root: Path::new("/assets"),
+            log_config: None,
+        };
+        let plan_for = |target: QuickPlay| {
+            instance_plan(
+                &profile,
+                Path::new("java"),
+                &paths,
+                &account(),
+                &JavaSettings::default(),
+                Some(&target),
+            )
+            .args
+        };
+
+        let world = plan_for(QuickPlay::World("New World".into()));
+        assert_eq!(
+            world[world.len() - 4..],
+            [
+                "--username",
+                "Steve",
+                "--quickPlaySingleplayer",
+                "New World"
+            ],
+            "the target follows the manifest's own game args"
+        );
+        let server = plan_for(QuickPlay::Server("smp.example.net:25566".into()));
+        assert_eq!(
+            server[server.len() - 2..],
+            ["--quickPlayMultiplayer", "smp.example.net:25566"]
+        );
+    }
+
+    #[test]
+    fn quick_play_needs_1_20_and_a_version_it_can_read() {
+        assert!(supports_quick_play("1.20"));
+        assert!(supports_quick_play("1.21.1"));
+        assert!(!supports_quick_play("1.19.4"));
+        assert!(!supports_quick_play("1.7.10"));
+        assert!(
+            !supports_quick_play("23w14a"),
+            "a snapshot cannot be placed, and a launch that would open the title screen instead \
+             is worse than a refusal"
+        );
     }
 
     #[test]
@@ -608,6 +697,7 @@ mod tests {
             &paths,
             &account(),
             &JavaSettings::default(),
+            None,
         );
         let main_at = plan
             .args
@@ -646,6 +736,7 @@ mod tests {
             &paths,
             &account(),
             &JavaSettings::default(),
+            None,
         );
         assert_eq!(plan.args[0], "-cp");
         assert!(plan.args[1].contains("client.jar"));
@@ -720,6 +811,7 @@ mod tests {
             &paths,
             &account(),
             &settings(Some("2048M"), &["-XX:+UseZGC"]),
+            None,
         );
         let main_at = plan
             .args

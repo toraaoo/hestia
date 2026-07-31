@@ -39,7 +39,8 @@ pub use config::{Config, ConfigError, Settings};
 pub use content::Content;
 pub use download::Downloader;
 pub use engine::{
-    Engine, ExportOutcome, ImportOutcome, ModpackOutcome, ServerCreateSpec, ServerUpdateSpec,
+    Engine, ExportOutcome, ImportOutcome, LaunchRequest, ModpackOutcome, ServerCreateSpec,
+    ServerListWrite, ServerUpdateSpec,
 };
 pub use error::error_info;
 pub use instances::{InstanceRecord, Instances};

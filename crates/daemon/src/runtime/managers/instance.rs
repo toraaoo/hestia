@@ -2,11 +2,11 @@ use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use engine::Engine;
+use engine::{Engine, LaunchRequest};
 use proto::error::ErrorInfo;
 use proto::instance::{
     InstanceLaunchCancelledEvent, InstanceLaunchDoneEvent, InstanceLaunchErrorEvent,
-    InstanceLaunchProgressEvent,
+    InstanceLaunchProgressEvent, QuickPlay,
 };
 use proto::minecraft::ProvisionProgress;
 use proto::process::{LogSource, ProcessSpec, RestartPolicy};
@@ -45,17 +45,16 @@ impl InstanceLaunchManager {
 
     /// Prepare and spawn a fresh session of an instance off-thread. Instances may
     /// run several sessions at once, so this always launches — it does not refuse
-    /// a running instance. `profile` overrides the active content profile for
-    /// this launch; `reconcile` off skips the sync/mirror pass (sessions are
-    /// already running, so the mirror is in use). Returns the launch job id.
-    pub fn start(
-        &self,
-        instance_id: String,
-        account: String,
-        profile: String,
-        reconcile: bool,
-        id: String,
-    ) -> Option<String> {
+    /// a running instance. Returns the launch job id.
+    pub fn start(&self, order: LaunchOrder) -> Option<String> {
+        let LaunchOrder {
+            instance_id,
+            account,
+            profile,
+            reconcile,
+            quick_play,
+            id,
+        } = order;
         let id = job_id(id, "instance-launch");
         let (session_id, seq) = self.reserve_session(&instance_id);
 
@@ -83,12 +82,15 @@ impl InstanceLaunchManager {
             let outcome = launch(
                 &engine,
                 &processes,
-                &instance_id,
                 &session_id,
-                seq,
-                &account,
-                &profile,
-                reconcile,
+                LaunchRequest {
+                    instance: &instance_id,
+                    account: &account,
+                    session_seq: seq,
+                    profile: &profile,
+                    reconcile,
+                    quick_play,
+                },
                 &running,
             )
             .await;
@@ -154,20 +156,16 @@ impl InstanceLaunchManager {
 
 /// Materialise the instance, then hand the plan to the supervisor under the
 /// session's own id and per-session log file.
-#[allow(clippy::too_many_arguments)]
 async fn launch(
     engine: &Engine,
     processes: &ProcessSupervisor,
-    instance_id: &str,
     session_id: &str,
-    seq: u32,
-    account: &str,
-    profile: &str,
-    reconcile: bool,
+    request: LaunchRequest<'_>,
     on_progress: &engine::Job<'_>,
 ) -> Result<Launched, LaunchFailure> {
+    let instance_id = request.instance.to_string();
     let prepared = engine
-        .prepare_instance(instance_id, account, seq, profile, reconcile, on_progress)
+        .prepare_instance(request, on_progress)
         .await
         .map_err(LaunchFailure::from)?;
 
@@ -182,7 +180,7 @@ async fn launch(
     };
     match processes.start(spec).await {
         Ok(info) => {
-            if let Err(e) = engine.instances().mark_launched(instance_id) {
+            if let Err(e) = engine.instances().mark_launched(&instance_id) {
                 tracing::warn!(instance = %instance_id, error = %e, "failed to stamp last-played");
             }
             Ok(Launched {
@@ -200,6 +198,23 @@ async fn launch(
             detail: format!("cannot spawn the game: {e}"),
         })),
     }
+}
+
+/// What a caller is asking the manager to launch. The daemon's own order,
+/// distinct from the engine's [`LaunchRequest`]: it carries the job id and owns
+/// its strings, since the launch outlives the request that asked for it.
+pub struct LaunchOrder {
+    pub instance_id: String,
+    /// Account name or uuid; empty picks the sole signed-in one.
+    pub account: String,
+    /// Content-profile override for this launch (`none` = no profile).
+    pub profile: String,
+    /// Off skips the sync/mirror pass — other sessions have the mirror in use.
+    pub reconcile: bool,
+    /// Join a world or server on start instead of the title screen.
+    pub quick_play: Option<QuickPlay>,
+    /// Client-supplied job id; empty asks for an allocated one.
+    pub id: String,
 }
 
 /// Why a launch did not produce a session. Cancellation is kept apart from

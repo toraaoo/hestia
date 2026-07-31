@@ -16,7 +16,7 @@ mod update;
 pub use backup::{BackupJob, BackupManager};
 pub use content::{ContentJob, ContentManager};
 pub use download::DownloadManager;
-pub use instance::InstanceLaunchManager;
+pub use instance::{InstanceLaunchManager, LaunchOrder};
 pub use java::JavaInstallManager;
 pub(crate) use job::topic_event;
 pub use job::Cancellations;

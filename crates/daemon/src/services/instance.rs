@@ -4,21 +4,32 @@
 
 use proto::error::{EntryKind, ErrorInfo, Field, ProfileScope};
 use proto::instance::{
-    InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList, InstanceConfigListResult,
-    InstanceConfigSet, InstanceCreate, InstanceCreateResult, InstanceFlavors, InstanceInfoQuery,
-    InstanceLaunch, InstanceLaunchResult, InstanceList, InstanceListResult, InstanceLoaders,
-    InstanceLogs, InstanceProfileCapture, InstanceProfileCreate, InstanceProfileEdit,
-    InstanceProfileList, InstanceProfileListResult, InstanceProfileRelease, InstanceProfileRemove,
-    InstanceProfileRename, InstanceProfileUse, InstanceRemove, InstanceRename, InstanceResolve,
-    InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds,
-    InstanceWorldsResult,
+    AddressPing, InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList,
+    InstanceConfigListResult, InstanceConfigSet, InstanceCreate, InstanceCreateResult,
+    InstanceFlavors, InstanceInfoQuery, InstanceLaunch, InstanceLaunchResult, InstanceList,
+    InstanceListResult, InstanceLoaders, InstanceLogs, InstanceProfileCapture,
+    InstanceProfileCreate, InstanceProfileEdit, InstanceProfileList, InstanceProfileListResult,
+    InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename, InstanceProfileUse,
+    InstanceRemove, InstanceRename, InstanceResolve, InstanceServerEdit, InstanceServerRemove,
+    InstanceServers, InstanceServersResult, InstanceServersWriteResult, InstanceStop,
+    InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds, InstanceWorldsResult,
+    ServerEntry,
 };
 use proto::minecraft::{ConfigEntry, FlavorsResult, LoadersResult, VersionsResult};
 use proto::process::ProcessLogsResult;
 use proto::Empty;
 
 use super::guards::{ensure_no_content, ensure_no_transfer, ensure_stopped, find_instance};
-use crate::runtime::{instance_process_id, Channels};
+use crate::runtime::{instance_process_id, Channels, LaunchOrder};
+
+/// The shared shape of a multiplayer-list write: the list as it now stands,
+/// carrying whatever the write could not guarantee.
+fn server_list_result(written: engine::ServerListWrite) -> InstanceServersWriteResult {
+    InstanceServersWriteResult {
+        servers: written.servers,
+        warnings: written.warnings,
+    }
+}
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<InstanceFlavors, _, _>(|_: Empty, ctx| async move {
@@ -143,6 +154,50 @@ pub(super) fn register(on: &mut Channels<'_>) {
         Ok(InstanceWorldsResult { worlds })
     });
 
+    on.handle::<InstanceServers, _, _>(|p, ctx| async move {
+        let servers = ctx
+            .runtime
+            .engine()
+            .instance_servers(&p.instance)
+            .map_err(crate::runtime::engine_error)?;
+        Ok(InstanceServersResult { servers })
+    });
+
+    on.handle::<InstanceServerEdit, _, _>(|p, ctx| async move {
+        let written = ctx
+            .runtime
+            .engine()
+            .edit_instance_server(
+                &p.instance,
+                &p.server,
+                ServerEntry {
+                    name: p.name,
+                    address: p.address,
+                    accept_textures: p.accept_textures,
+                    ..ServerEntry::default()
+                },
+            )
+            .map_err(crate::runtime::engine_error)?;
+        Ok(server_list_result(written))
+    });
+
+    on.handle::<InstanceServerRemove, _, _>(|p, ctx| async move {
+        let written = ctx
+            .runtime
+            .engine()
+            .remove_instance_server(&p.instance, &p.server)
+            .map_err(crate::runtime::engine_error)?;
+        Ok(server_list_result(written))
+    });
+
+    on.handle::<AddressPing, _, _>(|p, ctx| async move {
+        ctx.runtime
+            .engine()
+            .ping_address(&p.address)
+            .await
+            .map_err(crate::runtime::engine_error)
+    });
+
     on.handle::<InstanceRemove, _, _>(|p, ctx| async move {
         let record = find_instance(&ctx, &p.instance)?;
         ensure_no_transfer(&ctx, &instance_process_id(&record.id), &record.name)?;
@@ -224,11 +279,14 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 });
             }
         }
-        match ctx
-            .runtime
-            .instance_launches()
-            .start(record.id, p.account, p.profile, !running, p.id)
-        {
+        match ctx.runtime.instance_launches().start(LaunchOrder {
+            instance_id: record.id,
+            account: p.account,
+            profile: p.profile,
+            reconcile: !running,
+            quick_play: p.quick_play,
+            id: p.id,
+        }) {
             Some(id) => Ok(InstanceLaunchResult { id }),
             None => Err(ErrorInfo::Internal {
                 detail: "that instance could not be launched".into(),

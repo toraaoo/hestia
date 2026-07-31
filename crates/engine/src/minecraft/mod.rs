@@ -12,6 +12,7 @@ mod paper;
 pub(crate) mod ping;
 mod provider;
 pub(crate) mod rcon;
+pub(crate) mod servers;
 mod spigot;
 mod vanilla;
 pub(crate) mod world;

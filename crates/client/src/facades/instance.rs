@@ -9,6 +9,7 @@ use proto::content::{
     InstanceContentRemoveParams, InstanceContentSetVersion, InstanceContentSetVersionParams,
     InstanceContentUpdate, InstanceContentUpdateParams, UntrackedFile,
 };
+use proto::instance::{AddressPing, AddressPingParams};
 use proto::instance::{
     InstanceConfigGet, InstanceConfigGetParams, InstanceConfigList, InstanceConfigSet,
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceDetails,
@@ -18,14 +19,17 @@ use proto::instance::{
     InstanceProfileEdit, InstanceProfileEditParams, InstanceProfileList, InstanceProfileRef,
     InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename,
     InstanceProfileRenameParams, InstanceProfileUse, InstanceRef, InstanceRemove, InstanceRename,
-    InstanceRenameParams, InstanceResolve, InstanceStop, InstanceStopParams, InstanceUpdate,
-    InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile, WorldInfo,
+    InstanceRenameParams, InstanceResolve, InstanceServerEdit, InstanceServerEditParams,
+    InstanceServerRef, InstanceServerRemove, InstanceServers, InstanceServersWriteResult,
+    InstanceStop, InstanceStopParams, InstanceUpdate, InstanceUpdateParams, InstanceVersions,
+    InstanceWorlds, Profile, QuickPlay, ServerEntry, WorldInfo,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, LoadersParams, ProvisionProgress,
     ResolveParams, VersionsParams,
 };
 use proto::process::ProcessLogLine;
+use proto::server::ServerPingResult;
 
 use crate::facades::jobs::{forward, run_content_job};
 use crate::session::{job_id, Session};
@@ -149,6 +153,61 @@ impl Instance<'_> {
             .worlds)
     }
 
+    /// The instance's multiplayer list (`servers.dat`), in the order the game
+    /// shows it.
+    pub async fn servers(&self, instance: &str) -> Result<Vec<ServerEntry>, IpcError> {
+        Ok(self
+            .session
+            .call::<InstanceServers>(&instance_ref(instance))
+            .await?
+            .servers)
+    }
+
+    /// Add an entry to the multiplayer list, or rewrite the one `target` names
+    /// (empty adds). The running game owns the file, so the result carries a
+    /// warning when a session is open to say the edit will be overwritten.
+    pub async fn server_edit(
+        &self,
+        instance: &str,
+        target: &str,
+        name: &str,
+        address: &str,
+        accept_textures: bool,
+    ) -> Result<InstanceServersWriteResult, IpcError> {
+        self.session
+            .call::<InstanceServerEdit>(&InstanceServerEditParams {
+                instance: instance.to_string(),
+                server: target.to_string(),
+                name: name.to_string(),
+                address: address.to_string(),
+                accept_textures,
+            })
+            .await
+    }
+
+    pub async fn server_remove(
+        &self,
+        instance: &str,
+        target: &str,
+    ) -> Result<InstanceServersWriteResult, IpcError> {
+        self.session
+            .call::<InstanceServerRemove>(&InstanceServerRef {
+                instance: instance.to_string(),
+                server: target.to_string(),
+            })
+            .await
+    }
+
+    /// Status of a multiplayer address, over the Server List Ping — what the
+    /// in-game list shows beside each entry.
+    pub async fn ping_address(&self, address: &str) -> Result<ServerPingResult, IpcError> {
+        self.session
+            .call::<AddressPing>(&AddressPingParams {
+                address: address.to_string(),
+            })
+            .await
+    }
+
     pub async fn remove(&self, instance: &str) -> Result<(), IpcError> {
         self.session
             .call::<InstanceRemove>(&instance_ref(instance))
@@ -226,15 +285,17 @@ impl Instance<'_> {
     /// Launch an instance, blocking until the game process has spawned (or the
     /// preparation failed) and forwarding each progress event to `on_progress`.
     /// `profile` overrides the active content profile for this launch (empty
-    /// keeps it; `none` launches with no profile). Returns the supervised
-    /// process id and pid, plus anything the preparation could not do properly
-    /// (a sync target left unshared, for instance).
+    /// keeps it; `none` launches with no profile); `quick_play` joins a world or
+    /// server on start instead of opening to the title screen. Returns the
+    /// supervised process id and pid, plus anything the preparation could not do
+    /// properly (a sync target left unshared, for instance).
     pub async fn launch(
         &self,
         instance: &str,
         account: &str,
         new_session: bool,
         profile: &str,
+        quick_play: Option<QuickPlay>,
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
     ) -> Result<InstanceLaunchDoneEvent, IpcError> {
         let id = job_id("instance-launch");
@@ -245,6 +306,7 @@ impl Instance<'_> {
             id: id.clone(),
             new_session,
             profile: profile.to_string(),
+            quick_play,
         };
         let payload = self
             .session
