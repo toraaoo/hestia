@@ -6,10 +6,23 @@
       "clear_description": "Libera os downloads em cache. Os arquivos são baixados novamente da rede na próxima vez que forem necessários.",
       "clear_title": "Limpar o cache de downloads?"
     },
+    "close_action": {
+      "hint": "Servidores e sessões de jogo continuam rodando em qualquer opção — o daemon sobrevive à janela, e uma carga de trabalho sobrevive ao daemon.",
+      "label": "Ao fechar a janela",
+      "quit": "Fechar a janela e manter o daemon rodando",
+      "stop_daemon": "Fechar a janela e parar o daemon",
+      "tray": "Manter o Hestia na bandeja"
+    },
     "content_sources": "Fontes de conteúdo",
     "curseforge_key": "Chave de API do CurseForge",
     "curseforge_key_hint": "O CurseForge só responde a requisições com uma chave, então ele é oferecido como fonte assim que você definir uma. Obtenha a sua em console.curseforge.com.",
+    "daemon": {
+      "hint": "O processo em segundo plano com que todo front-end conversa. Reiniciá-lo não encerra nada que esteja rodando.",
+      "title": "Daemon"
+    },
     "data_dir": "Diretório de dados",
+    "data_dir_confirm_description": "O daemon passa a servir instâncias, servidores e runtimes a partir do novo caminho. Os arquivos existentes não são movidos para você — aponte para um diretório que você já moveu, ou o Hestia começa vazio nele.",
+    "data_dir_confirm_title": "Mover o diretório de dados?",
     "data_dir_hint": "Onde ficam instâncias e servidores.",
     "default_jvm_args": "Argumentos JVM padrão",
     "default_memory": "Memória alocada padrão",
@@ -17,22 +30,29 @@
     "download_cache": "Cache de downloads",
     "general": "Geral",
     "in_use": "Em uso",
-    "install_prompt": "Instalar:",
-    "installed_runtimes": "Runtimes instalados",
     "instances": {
       "multi_session_description": "Avançado. Inicia uma instância novamente enquanto ela já está em execução. As sessões compartilham os mesmos mundos, configurações e mods — o Minecraft só protege um mundo contra ser aberto duas vezes.",
       "multi_session_label": "Permitir várias sessões ao mesmo tempo",
       "section": "Instâncias"
     },
     "java": {
+      "defaults": "Padrões",
+      "installing": "Instalando…",
+      "not_installed": "Não instalado",
+      "runtime_name": "Java {major}",
+      "runtimes": "Runtimes Java",
+      "runtimes_hint": "As entradas instalam o que precisam sozinhas; instalar aqui apenas adianta isso.",
       "uninstall": "Desinstalar runtime",
       "uninstall_description": "{name} será removido. Entradas que precisam dele o reinstalam na próxima inicialização.",
       "uninstall_title": "Desinstalar runtime?"
     },
-    "java_performance": "Java e desempenho",
     "keep_open": "Manter o launcher aberto enquanto um jogo roda",
     "language": "Idioma",
+    "list": {
+      "empty": "Nada na lista"
+    },
     "modpack": {
+      "custom": "Correções personalizadas",
       "default_excludes": "Corrigir as declarações de servidor do pacote",
       "default_excludes_hint": "Desligado, o pacote é aceito exatamente como publicado — mods de cliente inclusos.",
       "exclude": "Nunca instalar",
@@ -49,12 +69,18 @@
       "enabled_label": "Mostrar novidades e avisos"
     },
     "no_default": "Nenhum padrão definido",
+    "search_empty": "Nenhuma configuração corresponde a “{query}”.",
+    "search_placeholder": "Buscar configurações",
     "source_needs_key": "Precisa de chave",
     "source_ready": "Pronta",
     "start_at_login": "Iniciar o Hestia ao fazer login",
-    "storage_daemon": "Armazenamento e daemon",
+    "storage": {
+      "hint": "Downloads que o Hestia pode buscar de novo — seguro liberar a qualquer momento.",
+      "title": "Armazenamento"
+    },
     "subtitle": "Launcher, runtimes e daemon",
     "sync": {
+      "add_custom": "Adicionar",
       "add_file_placeholder": "options.txt",
       "add_folder_placeholder": "saves",
       "adopt": {
@@ -62,14 +88,33 @@
         "description": "Move o conteúdo existente das pastas da instância para o armazenamento compartilhado e as vincula. A instância precisa estar parada.",
         "done": "Adotado: {targets}"
       },
+      "custom": "Personalizado",
       "description": "Arquivos são copiados e mesclados a cada inicialização; pastas são vinculadas a um armazenamento compartilhado.",
       "enabled_description": "Desligado, cada instância mantém suas próprias configurações e mundos. Pastas já compartilhadas continuam assim.",
       "enabled_label": "Compartilhar configurações entre instâncias",
       "files": "Arquivos copiados",
+      "files_hint": "Copiados para cada instância ao iniciar e de volta ao sair — o mais novo vence, e o options.txt é mesclado chave a chave.",
       "folders": "Pastas vinculadas",
+      "folders_hint": "Vinculadas a um único armazenamento compartilhado, então toda instância vê a mesma pasta.",
       "no_folder_targets": "Nenhuma pasta configurada.",
       "section": "Compartilhado entre instâncias",
-      "status_title": "Estado dos vínculos por instância"
+      "status_title": "Estado dos vínculos por instância",
+      "target": {
+        "config": "Configuração de mods",
+        "options_txt": "Teclas, vídeo e áudio",
+        "resourcepacks": "Pacotes de recursos",
+        "saves": "Mundos",
+        "screenshots": "Capturas de tela",
+        "servers_dat": "A lista de servidores multijogador",
+        "shaderpacks": "Pacotes de shaders"
+      }
+    },
+    "tabs": {
+      "content": "Conteúdo",
+      "general": "Geral",
+      "instances": "Instâncias",
+      "java": "Java",
+      "storage": "Armazenamento"
     },
     "update": {
       "available": "A versão {version} está disponível",

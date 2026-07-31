@@ -6,10 +6,23 @@
       "clear_description": "Frees the cached downloads. Files are re-fetched from the network the next time they're needed.",
       "clear_title": "Clear download cache?"
     },
+    "close_action": {
+      "hint": "Servers and game sessions keep running whichever you pick — the daemon outlives the window, and a workload outlives the daemon.",
+      "label": "When the window is closed",
+      "quit": "Close the window, leave the daemon running",
+      "stop_daemon": "Close the window and stop the daemon",
+      "tray": "Keep Hestia in the tray"
+    },
     "content_sources": "Content sources",
     "curseforge_key": "CurseForge API key",
     "curseforge_key_hint": "CurseForge only answers requests carrying a key, so it is offered as a source once you set one. Get yours from console.curseforge.com.",
+    "daemon": {
+      "hint": "The background process every front-end talks to. Restarting it stops nothing you have running.",
+      "title": "Daemon"
+    },
     "data_dir": "Data directory",
+    "data_dir_confirm_description": "The daemon serves instances, servers and runtimes from the new path. Existing files are not moved for you — point this at a directory you have already moved, or Hestia starts empty there.",
+    "data_dir_confirm_title": "Move the data directory?",
     "data_dir_hint": "Where instances and servers live.",
     "default_jvm_args": "Default JVM arguments",
     "default_memory": "Default allocated memory",
@@ -17,22 +30,29 @@
     "download_cache": "Download cache",
     "general": "General",
     "in_use": "In use",
-    "install_prompt": "Install:",
-    "installed_runtimes": "Installed runtimes",
     "instances": {
       "multi_session_description": "Advanced. Launch an instance again while it is already running. Sessions share one set of worlds, configs and mods — Minecraft only guards a world against being opened twice.",
       "multi_session_label": "Allow several sessions at once",
       "section": "Instances"
     },
     "java": {
+      "defaults": "Defaults",
+      "installing": "Installing…",
+      "not_installed": "Not installed",
+      "runtime_name": "Java {major}",
+      "runtimes": "Java runtimes",
+      "runtimes_hint": "Entries install what they need on their own; installing here just gets it over with.",
       "uninstall": "Uninstall runtime",
-      "uninstall_title": "Uninstall runtime?",
-      "uninstall_description": "{name} will be removed. Entries that need it reinstall it on the next start."
+      "uninstall_description": "{name} will be removed. Entries that need it reinstall it on the next start.",
+      "uninstall_title": "Uninstall runtime?"
     },
-    "java_performance": "Java & performance",
     "keep_open": "Keep the launcher open while a game runs",
     "language": "Language",
+    "list": {
+      "empty": "Nothing listed"
+    },
     "modpack": {
+      "custom": "Custom corrections",
       "default_excludes": "Correct a pack's server declarations",
       "default_excludes_hint": "Off, a pack is trusted exactly as published — client mods included.",
       "exclude": "Never install",
@@ -49,12 +69,18 @@
       "enabled_label": "Show news and notices"
     },
     "no_default": "No default set",
+    "search_empty": "No setting matches “{query}”.",
+    "search_placeholder": "Search settings",
     "source_needs_key": "Needs a key",
     "source_ready": "Ready",
     "start_at_login": "Start Hestia at login",
-    "storage_daemon": "Storage & daemon",
+    "storage": {
+      "hint": "Downloads Hestia can fetch again — safe to reclaim at any time.",
+      "title": "Storage"
+    },
     "subtitle": "Launcher, runtimes and daemon",
     "sync": {
+      "add_custom": "Add",
       "add_file_placeholder": "options.txt",
       "add_folder_placeholder": "saves",
       "adopt": {
@@ -62,14 +88,33 @@
         "description": "Moves the instance’s existing folder contents into the shared store and links them. The instance must be stopped.",
         "done": "Adopted: {targets}"
       },
+      "custom": "Custom",
       "description": "Files are copied and merged at each launch; folders are linked into one shared store.",
       "enabled_description": "Off, every instance keeps its own settings, configs and worlds. Folders already shared stay shared.",
       "enabled_label": "Share settings between instances",
       "files": "Copied files",
+      "files_hint": "Copied into each instance at launch and back out after — the newest wins, and options.txt merges key by key.",
       "folders": "Linked folders",
+      "folders_hint": "Linked into one shared store, so every instance sees the same folder.",
       "no_folder_targets": "No folder targets configured.",
       "section": "Shared between instances",
-      "status_title": "Instance link status"
+      "status_title": "Instance link status",
+      "target": {
+        "config": "Mod configuration",
+        "options_txt": "Keybinds, video and audio settings",
+        "resourcepacks": "Resource packs",
+        "saves": "Worlds",
+        "screenshots": "Screenshots",
+        "servers_dat": "The multiplayer server list",
+        "shaderpacks": "Shader packs"
+      }
+    },
+    "tabs": {
+      "content": "Content",
+      "general": "General",
+      "instances": "Instances",
+      "java": "Java",
+      "storage": "Storage"
     },
     "update": {
       "available": "Version {version} is available",
