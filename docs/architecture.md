@@ -213,10 +213,14 @@ system tray.
 - **The disk is the registry.** Java runtimes, backups, servers, instances,
   global profiles and finished processes are all discovered by scanning a
   directory, not by consulting a separate index that can disagree with it.
-- **Write through a temp, rename to commit.** Downloads, backups and installs
-  stage to `.part`/`.staging` and rename on success, so a failure leaves nothing
-  half-written — and a restart reclaims anything abandoned
+- **Write through a temp, rename to commit.** Downloads, backups, installs and
+  every persisted record stage to `.part`/`.staging` and rename on success, so a
+  failure leaves nothing half-written — and a restart reclaims anything abandoned
   ([0027](decisions/0027-temp-artifacts-are-reclaimed-at-startup.md)).
+- **A document says which schema it is.** Everything of the user's on disk carries
+  a `schemaVersion` and migrates forward as it is read; one this build cannot read
+  is set aside, never overwritten
+  ([0064](decisions/0064-a-managed-document-carries-its-schema-version.md)).
 - **Validate at the edge.** Payloads decode through the contract; the config
   schema rejects unknown keys; paths from a client are checked for escape.
 - **Wire-in is one line, in one place** — but that place is a module *directory*,
@@ -255,7 +259,7 @@ system tray.
 |---|---|
 | `crates/proto/tests/` | `wire` and `golden` — the envelope and contract encodings, so a wire change is caught |
 | `crates/engine/tests/` | `store` (config/cache/java/server/instance persistence), `auth_oracle` (the sign-in state machine), `process` (tree termination) |
-| `crates/engine/src/**` | unit tests beside the code: archive detection and round trips, the Prism component mapping, the export ignore rules, launch-plan assembly (including the quick-play target and its version gate), the `servers.dat` round trip, server-address parsing, the Log4Shell-safe session config, sync reconciliation and folder linking, Modrinth and CurseForge mapping, pack-format detection and `.mrpack`/URL parsing, version picking, per-flavor accepted kinds, JVM-args precedence, PaperMC and SpigotMC catalogue parsing |
+| `crates/engine/src/**` | unit tests beside the code: archive detection and round trips, the Prism component mapping, the export ignore rules, launch-plan assembly (including the quick-play target and its version gate), document schema stamping, migration and quarantine, the `servers.dat` round trip, server-address parsing, the Log4Shell-safe session config, sync reconciliation and folder linking, Modrinth and CurseForge mapping, pack-format detection and `.mrpack`/URL parsing, version picking, per-flavor accepted kinds, JVM-args precedence, PaperMC and SpigotMC catalogue parsing |
 | `crates/daemon/tests/e2e.rs` | a client-to-daemon round trip over a real socket |
 | `frontend/tests/` | the message catalogue (locale coverage, placeholder parity, no dead or missing keys), the export dialog's tree/exclusion conversions, and the quick-play version gate |
 

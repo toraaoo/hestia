@@ -79,6 +79,37 @@ The reclaim is deliberately **not** recursive: each subsystem knows the one
 directory its artifacts land in, and walking a data home whose asset store is six
 figures of files is not a cost to pay at every start.
 
+## Persisted documents — `schema`
+
+Every user-owned file in the data home — the settings, the accounts, an entry's
+record, its content index and profiles, the modpack record, the skin library, a
+global profile — is a `Document`: it carries a top-level `schemaVersion` and is
+read and written through `engine::schema`
+([0064](../decisions/0064-a-managed-document-carries-its-schema-version.md)).
+
+| Concern | How |
+|---|---|
+| Current version | `1 + MIGRATIONS.len()`, derived — adding a migration is appending one function |
+| A migration step | rewrites `serde_json::Value`, not the Rust type, so it stays a record of the shape that existed |
+| No stamp on the file | the baseline; every step applies |
+| Newer than this build, malformed, or failing its migration | renamed to `<name>.unreadable-<stamp>`, defaults used, warning recorded |
+| Needs bringing forward | migrated on read and written back, so the disk converges as it is used |
+| Writing | temp file renamed into place; owner-only mode set *before* the rename where it matters |
+
+Derived state is deliberately excluded — the announcement cache, process records,
+Java runtime records, the download cache. Discarding one loses nothing, which is
+already what happens when it fails to read.
+
+Quarantines are not caused by the request that hit them, so they collect in one
+process-wide sink and surface through `daemon.status` and, for the documents an
+import lands, on the import's own result.
+
+Both archive formats are documents under the same rule: the `.hestia` manifest
+carries the instance record stamped rather than inlined, and a backup archive
+leads with `hestia.backup.json`. An archive is not hestia's to rename aside, so a
+schema failure there is refused (`ArchiveUnsupported` / `ArchiveInvalid`) rather
+than quarantined.
+
 ## Settings — `config`
 
 The schema is one `Settings` struct: a setting is a field with its default,

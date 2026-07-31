@@ -40,6 +40,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0038** — [A finished process is labelled, not merely unrecorded](0038-a-finished-process-is-tombstoned.md)
 - **0040** — [Following logs is scoped to the entry, not to one run of it](0040-following-logs-is-entry-scoped.md)
 - **0058** — [News and notices are one mechanism with a severity dial, not two systems](0058-announcements-are-one-mechanism.md)
+- **0064** — [A managed document carries its own schema version, and an unreadable one is set aside](0064-a-managed-document-carries-its-schema-version.md)
 
 ### [The daemon](../architecture/daemon.md)
 

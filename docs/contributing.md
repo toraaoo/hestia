@@ -179,6 +179,53 @@ still write `engine.provision_server(…)`.
 
 ---
 
+## Persist something, or change its shape
+
+Anything of the user's that the engine writes to the data home is a
+`schema::Document`: it declares its name and its migration chain, and `schema::load`/`save` handle the stamping,
+the temp-file write and the quarantine of a file this build cannot read
+([0064](decisions/0064-a-managed-document-carries-its-schema-version.md)).
+
+```rust
+impl Document for InstanceRecord {
+    const NAME: &'static str = "instance.json";
+}
+```
+
+For a record living under an entry directory, that is all — `registry::read_record`/`write_record`/`scan` take the file
+name from `NAME`, so there is no second constant to pass. A document with its own path (the settings, a global profile)
+calls `schema::load`/`save` directly.
+
+**An additive field needs no migration.** `#[serde(default)]` already decodes an older file, which is why most documents
+have an empty chain.
+
+**A change an older file cannot survive is a migration**: append a step, and the version follows.
+
+```rust
+impl Document for Stored {
+    const NAME: &'static str = "a global profile";
+    const MIGRATIONS: &'static [Step] = &[lift_bare_array];
+}
+
+/// v1 → v2: the file was a bare JSON array, which has nowhere to carry a stamp.
+fn lift_bare_array(value: &mut Value) -> anyhow::Result<()> {
+    if let Some(entries) = value.as_array() {
+        *value = serde_json::json!({ "entries": entries });
+    }
+    Ok(())
+}
+```
+
+A step rewrites the `Value`, never the deserialized type — the struct only describes the newest schema, so a step that
+decoded would need rewriting every time the struct moved. Steps run in order from whatever version the file declares, and
+the result is written back, so a document migrates once.
+
+Pin the step with a test that writes the old shape and reads the new one (`profiles.rs` and `schema/mod.rs` have the
+pattern). If the document also travels in an archive, check `transfer/hestia.rs` — the manifest carries the instance
+record stamped, so an archive migrates through the same chain.
+
+---
+
 ## Add a daemon channel
 
 One `on.handle::<C>(…)` in the domain's `register()`
