@@ -1,4 +1,9 @@
-# Hestia
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/hero/hero-dark.png">
+    <img src="assets/hero/hero-light.png" alt="Hestia" width="440">
+  </picture>
+</p>
 
 A Minecraft launcher built in Rust.
 
