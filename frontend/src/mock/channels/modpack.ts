@@ -1,0 +1,155 @@
+/**
+ * `instance.modpack.*` and `server.modpack.*` — a pack into a new or existing
+ * entry, and what an entry runs. Install and update are jobs on the shared
+ * `modpack.*` topics; their done event carries the entry the pack landed in,
+ * which for a creating install is the only way the caller learns its id.
+ */
+import type { InstalledContent, InstalledModpack } from '@/api/types';
+
+import { jobIdOf, startJob } from '../job';
+import * as content from '../state/content';
+import * as entries from '../state/entries';
+import { type Handlers, now, str } from '../support';
+
+const PACK_MODS = ['sodium', 'fabric-api', 'lithium'];
+
+interface Target {
+  mode?: string;
+  name?: string;
+  entry?: string;
+}
+
+function pack(name: string, version = '1.4.0'): InstalledModpack {
+  const project = content.find('fabulously-optimized');
+  return {
+    source: project.source,
+    projectId: project.id,
+    slug: project.slug,
+    name,
+    versionId: `${project.id}-v0`,
+    versionNumber: version,
+    gameVersion: '1.21.1',
+    loader: 'fabric',
+    loaderVersion: '0.16.5',
+    iconUrl: project.iconUrl,
+    installedUnix: now(),
+    files: [],
+    overrides: [],
+  };
+}
+
+/** Where a pack install lands: an existing entry, or one the job creates. */
+function landing(
+  payload: Record<string, unknown>,
+  server: boolean,
+): { id: string; name: string } {
+  const target = (payload.target ?? {}) as Target;
+  if (target.mode === 'existing' && target.entry) {
+    const entry = server
+      ? entries.findServer(target.entry)
+      : entries.findInstance(target.entry);
+    return { id: entry.id, name: entry.name };
+  }
+  const name = target.name || 'Fabulously Optimized';
+  const created = server
+    ? entries.addServer({ name, flavor: 'fabric', version: '1.21.1' })
+    : entries.addInstance({
+        name,
+        flavor: 'fabric',
+        version: '1.21.1',
+        loaderVersion: '0.16.5',
+      });
+  return { id: created.id, name: created.name };
+}
+
+function installJob(
+  payload: Record<string, unknown>,
+  server: boolean,
+): { id: string } {
+  return startJob({
+    id: jobIdOf(payload, 'modpack-install'),
+    family: 'modpack',
+    steps: [
+      { phase: 'resolving', detail: 'reading the pack index' },
+      { phase: 'java', detail: 'Java runtime' },
+      { phase: 'content', detail: 'pack files' },
+      { phase: 'overrides', detail: 'config overrides' },
+    ],
+    done: () => {
+      const where = landing(payload, server);
+      const installed: InstalledContent[] = content.install(
+        where.id,
+        'mod',
+        PACK_MODS,
+        'modpack:fabulously-optimized',
+      );
+      const record = pack(where.name);
+      record.files = installed.map((item) => item.filename);
+      entries.setPack(where.id, record);
+      return {
+        entry: where.id,
+        entryName: where.name,
+        pack: record,
+        failures: [],
+        warnings: [],
+      };
+    },
+  });
+}
+
+function updateJob(
+  payload: Record<string, unknown>,
+  server: boolean,
+): { id: string } {
+  const ref = str(payload, server ? 'server' : 'instance');
+  const entry = server ? entries.findServer(ref) : entries.findInstance(ref);
+  return startJob({
+    id: jobIdOf(payload, 'modpack-update'),
+    family: 'modpack',
+    steps: [
+      { phase: 'resolving', detail: 'the published version' },
+      { phase: 'content', detail: 'pack files' },
+    ],
+    done: () => {
+      const record = pack(
+        entries.packOf(entry.id)?.name ?? entry.name,
+        str(payload, 'version', '1.5.0'),
+      );
+      entries.setPack(entry.id, record);
+      return {
+        entry: entry.id,
+        entryName: entry.name,
+        pack: record,
+        failures: [],
+        warnings: [],
+      };
+    },
+  });
+}
+
+function status(ref: string, server: boolean) {
+  const entry = server ? entries.findServer(ref) : entries.findInstance(ref);
+  return { pack: entries.packOf(entry.id) };
+}
+
+function remove(ref: string, server: boolean) {
+  const entry = server ? entries.findServer(ref) : entries.findInstance(ref);
+  const installed = entries.packOf(entry.id);
+  const removedFiles = content.removeByOrigin(
+    entry.id,
+    `modpack:${installed?.slug ?? ''}`,
+  );
+  entries.clearPack(entry.id);
+  return { removedFiles, removedOverrides: 0, kept: [] };
+}
+
+export const channels: Handlers = {
+  'instance.modpack.install': (p) => installJob(p, false),
+  'server.modpack.install': (p) => installJob(p, true),
+  'instance.modpack.update': (p) => updateJob(p, false),
+  'server.modpack.update': (p) => updateJob(p, true),
+  'instance.modpack.status': (p) => status(str(p, 'instance'), false),
+  'server.modpack.status': (p) => status(str(p, 'server'), true),
+  'instance.modpack.remove': (p) => remove(str(p, 'instance'), false),
+  'server.modpack.remove': (p) => remove(str(p, 'server'), true),
+};

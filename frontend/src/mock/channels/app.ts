@@ -1,0 +1,42 @@
+/** `health.*`, `app.*` and `daemon.*` — the fixture daemon talking about itself. */
+import type {
+  AppInfoResult,
+  DaemonStatusResult,
+  PingResult,
+} from '@/api/types';
+
+import { connection } from '../bus';
+import { HOME } from '../state/entries';
+import type { Handlers } from '../support';
+
+const PID = 4_242;
+const started = Date.now();
+
+export const status = (): DaemonStatusResult => ({
+  pid: PID,
+  version: '0.0.1-mock',
+  uptimeSeconds: Math.floor((Date.now() - started) / 1000),
+  home: HOME,
+  log: `${HOME}/logs/hestiad.log`,
+});
+
+export const channels: Handlers = {
+  'health.ping': (): PingResult => ({ status: 'ok', pid: PID }),
+
+  'app.info': (): AppInfoResult => ({
+    name: 'Hestia',
+    version: '0.0.1-mock',
+    id: 'gg.toraaoo.hestia',
+    vendor: 'toraaoo',
+    channel: 'dev',
+  }),
+
+  'daemon.status': status,
+
+  // Nothing here to stop, but the shell reports the transition — so the
+  // offline banner behaves, and `start_daemon` is what brings it back.
+  'daemon.stop': () => {
+    connection('disconnected');
+    return { stopping: true };
+  },
+};

@@ -231,6 +231,35 @@ content browse, profiles, skins, news and settings, over a shared app shell with
 an offline overlay, a first-run sign-in prompt and route guards for the
 account-gated instance surface.
 
+## Browser dev — the fixture daemon
+
+`frontend/src/mock/` fakes `window.__TAURI_INTERNALS__` so the UI runs under a
+plain `vite dev` with no shell and no `hestiad` behind it. It is installed from
+`main.tsx` only in a dev build, and only when the real shell is absent, so it
+never reaches a desktop bundle.
+
+It is laid out like the thing it replaces, one module per domain on each side:
+
+| In the mock | Stands in for |
+|---|---|
+| `state/` | `crates/engine` — the mutable world (entries, content pools, processes, worlds, settings) |
+| `channels/` | `crates/daemon/src/services/` — one registrar per domain |
+| `commands/` | `crates/desktop/src/commands/` plus the bundled Tauri plugins |
+| `router.ts` | the daemon's router and the shell's `ipc_call` bridge |
+| `job.ts`, `bus.ts` | the job managers and the event hub |
+
+It is a **stateful** fake, because the two things a canned response cannot do
+are the two that matter in dev: a create must show up in the list it was made
+from, and a job must **settle** — `runJob` blocks until a terminal event
+arrives, so a fixture that answers the start call and publishes nothing hangs
+the caller forever. Jobs here walk their phases on a timer, publish progress,
+and settle; a started entry registers a supervised process and broadcasts
+`process.started` / `.output` / `.metrics` / `.exit` like the supervisor does.
+Fixtures are typed against the generated `proto` mirrors, so a wire change fails
+the typecheck here rather than silently serving a stale shape. An unlisted
+channel is not an error: it answers with an empty-proxy value that degrades
+instead of crashing the page, and warns to the console.
+
 ## Messages
 
 The catalogue (paraglide/inlang, `frontend/messages/`) is organised on **one
