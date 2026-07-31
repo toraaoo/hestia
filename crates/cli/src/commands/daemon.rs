@@ -44,6 +44,7 @@ pub async fn run(cmd: DaemonCmd) -> Result<ExitStatus> {
                         ("home", s.home.display().to_string()),
                         ("log", s.log.display().to_string()),
                     ]))?;
+                    ui::show_warnings(&s.quarantined)?;
                     Ok(ExitStatus::Active)
                 }
                 Err(_) => {

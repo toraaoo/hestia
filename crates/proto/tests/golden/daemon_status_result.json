@@ -3,5 +3,6 @@
   "version": "0.0.1",
   "uptimeSeconds": 3600,
   "home": "/home/user/.hestia",
-  "log": "/home/user/.hestia/logs/hestiad.log"
+  "log": "/home/user/.hestia/logs/hestiad.log",
+  "quarantined": []
 }

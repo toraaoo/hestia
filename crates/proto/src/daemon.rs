@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty};
+use crate::warning::WarningInfo;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
@@ -13,6 +14,10 @@ pub struct DaemonStatusResult {
     pub uptime_seconds: i64,
     pub home: PathBuf,
     pub log: PathBuf,
+    /// Documents this daemon could not read and set aside since it started. Not
+    /// caused by any one request, so they have no result of their own to ride
+    /// out on and are reported here instead.
+    pub quarantined: Vec<WarningInfo>,
 }
 
 pub struct DaemonStatus;
