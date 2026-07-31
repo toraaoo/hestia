@@ -163,8 +163,11 @@ flowchart TD
     PLAN --> SPAWN["supervisor spawns<br/>instance-&lt;id&gt;_&lt;seq&gt;"]
 ```
 
-**Sessions.** A client can run more than once at a time, but that is **opt-in**:
-`launch` refuses a running instance unless `new_session` is set. Under the hood
+**Sessions.** A client can run more than once at a time, but that is **opt-in
+twice**: the `instance.multi-session` setting has to allow concurrency at all
+(off by default), and `launch` still refuses a running instance unless
+`new_session` is set — a launch that asks while the setting is off is refused
+with `MultiSessionDisabled`, which names a setting rather than a stop. Under the hood
 `instance-<id>` is an *entry key* (the unit for backup/update/content/rename
 guards) and each launch gets a *session key* `instance-<id>_<seq>`. Servers stay
 singular ([0041](../decisions/0041-an-instance-runs-many-sessions.md)).

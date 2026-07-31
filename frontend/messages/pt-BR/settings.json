@@ -19,6 +19,11 @@
     "in_use": "Em uso",
     "install_prompt": "Instalar:",
     "installed_runtimes": "Runtimes instalados",
+    "instances": {
+      "multi_session_description": "Avançado. Inicia uma instância novamente enquanto ela já está em execução. As sessões compartilham os mesmos mundos, configurações e mods — o Minecraft só protege um mundo contra ser aberto duas vezes.",
+      "multi_session_label": "Permitir várias sessões ao mesmo tempo",
+      "section": "Instâncias"
+    },
     "java": {
       "uninstall": "Desinstalar runtime",
       "uninstall_description": "{name} será removido. Entradas que precisam dele o reinstalam na próxima inicialização.",

@@ -50,6 +50,7 @@
       "modpack_invalid": "Não foi possível ler este modpack: {detail}",
       "modpack_loader_unsupported": "Este modpack precisa do loader {loader}, que o Hestia não possui.",
       "modpack_not_installed": "'{name}' não foi criado a partir de um modpack.",
+      "multi_session_disabled": "{name} já está em execução. Ative várias sessões ao mesmo tempo nas Configurações para iniciá-la de novo.",
       "mutually_exclusive": "Escolha exatamente um de: {options}.",
       "no_console": "{name} ainda não tem console — reinicie-o.",
       "no_game_port": "{name} não tem porta de jogo alocada.",

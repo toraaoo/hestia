@@ -155,7 +155,8 @@ hestia instance modded launch    # ensures java/client/libraries/assets, runs,
                                  #   then follows the logs fullscreen
                                  #   (-d/--detach returns immediately)
 hestia instance modded launch --new-session   # launch another session while one
-                                 #   is already running (default refuses — see
+                                 #   is already running (off unless
+                                 #   instance.multi-session is on — see
                                  #   "Multiple sessions" below)
 hestia instance modded update 1.21.4  # move to another version (saves stay,
                                  #   but nothing is backed up — export first
@@ -260,10 +261,12 @@ in-game multiplayer screen.
 
 ### Multiple sessions
 
-An instance can run **more than one session at a time**, but it is off by default: `launch`/`play` refuse an instance
-that is already running unless you pass `--new-session`.
+An instance can run **more than one session at a time**, gated twice. The capability is switched off launcher-wide until
+`instance.multi-session` is turned on — two sessions share one `data/`, so it is for users who know what that means —
+and each launch then opts in with `--new-session`; without it a running instance is still refused.
 
 ```bash
+hestia config set instance.multi-session true   # unlock concurrent sessions
 hestia play modded               # session 1
 hestia play modded               # refused: "already running; pass --new-session"
 hestia play modded --new-session # session 2, running alongside session 1
@@ -341,7 +344,7 @@ asks you to qualify it).
 hestia play                      # launch an instance — one runs directly, several
                                  #   prompt a pick; follows the logs (-d skips).
                                  #   --new-session runs another alongside a
-                                 #   running one (default refuses)
+                                 #   running one (needs instance.multi-session)
 hestia start modded              # start a server (attaches its console) or launch
                                  #   an instance (follows its logs); -d/--detach
                                  #   returns immediately
@@ -482,6 +485,7 @@ hestia config get home           # resolved data directory
 hestia config set home <dir>     # persist the data dir (empty reverts to default)
 hestia config get autostart      # true if the daemon starts at login
 hestia config set autostart true # register the daemon to start at login
+hestia config set instance.multi-session true # allow an instance to run several sessions
 hestia config set sync.enabled false          # stop sharing settings across instances
 hestia config set announcements.enabled false # stop fetching news and notices
 hestia config set content.curseforge-key <key> # unlock the CurseForge source

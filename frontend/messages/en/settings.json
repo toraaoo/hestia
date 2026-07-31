@@ -19,6 +19,11 @@
     "in_use": "In use",
     "install_prompt": "Install:",
     "installed_runtimes": "Installed runtimes",
+    "instances": {
+      "multi_session_description": "Advanced. Launch an instance again while it is already running. Sessions share one set of worlds, configs and mods — Minecraft only guards a world against being opened twice.",
+      "multi_session_label": "Allow several sessions at once",
+      "section": "Instances"
+    },
     "java": {
       "uninstall": "Uninstall runtime",
       "uninstall_title": "Uninstall runtime?",

@@ -46,6 +46,7 @@ interface ConfigEntries {
   defaults?: { memory?: string; 'jvm-args'?: string };
   content?: { 'curseforge-key'?: string };
   announcements?: { enabled?: boolean };
+  instance?: { 'multi-session'?: boolean };
   modpack?: ModpackConfig;
 }
 
@@ -292,6 +293,25 @@ export function SettingsPage() {
                   commitConfig('content.curseforge-key', value)
                 }
               />
+            </FieldGroup>
+          </FieldSet>
+
+          <FieldSet>
+            <FieldLegend>{m['settings.instances.section']()}</FieldLegend>
+            <FieldGroup>
+              <Field>
+                <CheckboxRow
+                  id="multi-session"
+                  label={m['settings.instances.multi_session_label']()}
+                  checked={entries.instance?.['multi-session'] ?? false}
+                  onChange={(checked) =>
+                    commitConfig('instance.multi-session', checked)
+                  }
+                />
+                <FieldDescription>
+                  {m['settings.instances.multi_session_description']()}
+                </FieldDescription>
+              </Field>
             </FieldGroup>
           </FieldSet>
 

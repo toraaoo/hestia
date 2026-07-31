@@ -12,7 +12,8 @@ it's just as comfortable from a terminal as from a window.
 > **Servers and instances.** A server is fully provisioned at create (jar, Java
 > runtime, EULA), claims its own port, and has an RCON-backed console. An
 > instance materialises its files at launch, runs as the signed-in account, and
-> can run several concurrent sessions, or start straight in a world or on a
+> can run several concurrent sessions once `instance.multi-session` allows it,
+> or start straight in a world or on a
 > server from its multiplayer list. Both move between game versions in place;
 > downgrades warn, and a server's data is backed up first.
 >

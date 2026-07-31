@@ -23,6 +23,19 @@ fn config_rejects_unknown_keys() {
 }
 
 #[test]
+fn config_gates_multi_session_off_until_asked_for() {
+    let dir = temp_dir("config-multi-session");
+    let path = dir.path().join("config");
+    let cfg = Config::new(path.clone());
+    assert!(!cfg.settings().instance.multi_session);
+
+    cfg.set("instance.multi-session", serde_json::json!(true))
+        .unwrap();
+    assert!(cfg.settings().instance.multi_session);
+    assert!(Config::new(path).settings().instance.multi_session);
+}
+
+#[test]
 fn config_jvm_defaults_validate_and_normalise() {
     let dir = temp_dir("config-defaults");
     let cfg = Config::new(dir.path().join("config"));

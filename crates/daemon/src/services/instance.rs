@@ -253,14 +253,28 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 reference: p.account.clone(),
             });
         }
-        // Concurrent sessions are opt-in: by default a running instance is
-        // refused, and `new_session` unlocks a second (or third) launch.
+        // Concurrent sessions are gated twice: `instance.multi-session` has to
+        // allow them at all, and the launch opts in with `new_session`.
         let running = ctx.runtime.instance_running(&record.id);
-        if !p.new_session && running {
-            return Err(ErrorInfo::EntryRunning {
-                entry: EntryKind::Instance,
-                name: record.name.clone(),
-            });
+        if running {
+            if !p.new_session {
+                return Err(ErrorInfo::EntryRunning {
+                    entry: EntryKind::Instance,
+                    name: record.name.clone(),
+                });
+            }
+            if !ctx
+                .runtime
+                .engine()
+                .config()
+                .settings()
+                .instance
+                .multi_session
+            {
+                return Err(ErrorInfo::MultiSessionDisabled {
+                    name: record.name.clone(),
+                });
+            }
         }
         // A concurrent session runs against the mirror the live sessions use
         // (the reconcile is skipped), so a profile override that differs from

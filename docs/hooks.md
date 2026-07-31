@@ -285,6 +285,7 @@ The only named hooks. Everything else is a factory passed to `useQuery`/`useMuta
 | `useAnnouncements()` / `useDismissAnnouncements()` / `useRefreshAnnouncements()` | the news feed                        |
 | `useUpdateCheck(enabled)` / `useInstallUpdate()`        | self-update, over the shell's updater commands                |
 | `usePrefs()` / `usePinned()`                            | desktop-local UI state, over the `prefs_*` shell commands     |
+| `useMultiSession()`                                     | whether `instance.multi-session` allows concurrent sessions   |
 | `useEntryIconLookup()`                                  | `(id) => iconUrl`, over the `icons_*` shell commands          |
 
 ### Servers — `serverQueries` / `serverMutations`

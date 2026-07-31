@@ -2,10 +2,16 @@
 
 *Applies to: [Servers & instances](../architecture/entries.md)*
 
-A client can be launched more than once at a time — **opt-in**: `launch` still
-refuses a running instance by default, and the `new_session` param
-(`--new-session`) unlocks a concurrent launch, so the common case stays a single
-session and the safety rail is the default. Under the hood `instance-<id>` is no
+A client can be launched more than once at a time — **opt-in twice**. The
+capability is off launcher-wide until `instance.multi-session` is turned on:
+concurrent sessions share one `data/` and Minecraft arbitrates only a world, so
+the rest (configs, the content mirror, the options file) is last-writer-wins and
+that is not a default anyone should discover by accident. With it on, `launch`
+*still* refuses a running instance unless the `new_session` param
+(`--new-session`) asks for a concurrent one, so the common case stays a single
+session. The two refusals are distinct — one is fixed by stopping the instance,
+the other by a setting — rather than one message that guesses which the caller
+meant. Under the hood `instance-<id>` is no
 longer a single supervisor key — it splits into an *entry key* (`instance-<id>`,
 still the unit for the backup/update/content/rename guards and their in-flight
 sets) and a per-launch *session key* (`instance-<id>_<seq>`). Ids are `[0-9a-f]`

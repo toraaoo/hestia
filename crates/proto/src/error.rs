@@ -423,6 +423,12 @@ pub enum ErrorInfo {
         entry: EntryKind,
         name: String,
     },
+    /// A concurrent session was asked for while `instance.multi-session` is
+    /// off. Distinct from `EntryRunning`: nothing is in the way, the capability
+    /// is simply switched off, and the fix is a setting rather than a stop.
+    MultiSessionDisabled {
+        name: String,
+    },
     NotRunning {
         entry: EntryKind,
         name: String,
@@ -691,6 +697,11 @@ impl fmt::Display for ErrorInfo {
             AlreadyExists { entry, name } => write!(f, "a {entry} named '{name}' already exists"),
             PortUnavailable { port } => write!(f, "port {port} is unavailable"),
             EntryRunning { name, .. } => write!(f, "{name} is running — stop it first"),
+            MultiSessionDisabled { name } => write!(
+                f,
+                "{name} is already running — running several sessions at once is off; turn it on \
+                 with 'config set instance.multi-session true'"
+            ),
             NotRunning { name, .. } => write!(f, "{name} is not running"),
             Provisioning { name } => write!(f, "{name} is still being set up"),
             UpdateInProgress { name } => write!(f, "{name} is being updated"),

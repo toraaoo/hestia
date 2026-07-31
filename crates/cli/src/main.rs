@@ -51,7 +51,11 @@ enum Command {
         account: Option<String>,
         #[arg(short, long, help = "Return immediately instead of following the logs")]
         detach: bool,
-        #[arg(long, help = "Launch another session even if one is already running")]
+        #[arg(
+            long,
+            help = "Launch another session even if one is already running (needs 'config set \
+                    instance.multi-session true')"
+        )]
         new_session: bool,
         #[arg(long, help = "Open a save world on start, by folder (Minecraft 1.20+)")]
         world: Option<String>,

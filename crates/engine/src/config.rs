@@ -25,6 +25,8 @@ pub struct Settings {
     pub content: ContentSettings,
     /// The news and notices feed.
     pub announcements: AnnounceSettings,
+    /// What an instance is allowed to do beyond the safe default.
+    pub instance: InstanceSettings,
     /// Shared settings/configs across instances.
     pub sync: SyncSettings,
     /// Corrections applied over a modpack's own declarations.
@@ -55,6 +57,16 @@ impl Default for ModpackSettings {
             overrides_exclusions: String::new(),
         }
     }
+}
+
+/// What an instance may do beyond one session at a time, keyed
+/// `instance.multi-session`. Concurrent sessions share a single `data/` — the
+/// worlds, the configs, the content mirror — which Minecraft arbitrates only
+/// per world, so the capability is off until a user asks for it.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct InstanceSettings {
+    pub multi_session: bool,
 }
 
 /// Whether instances share their settings targets at all. Sync moves a user's

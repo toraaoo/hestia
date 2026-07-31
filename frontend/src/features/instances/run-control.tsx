@@ -14,7 +14,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { uptime } from '@/lib/format';
 import { sessionSeq } from '@/lib/sessions';
+import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+import { useMultiSession } from '@/queries/config';
 
 type Size = 'xs' | 'sm' | 'default';
 
@@ -29,7 +31,9 @@ type StopTarget = { session?: string };
 
 /**
  * What a running instance offers: Stop, plus the menu a further launch and the
- * per-session stops hang off.
+ * per-session stops hang off. The menu appears only when there is something in
+ * it — concurrent sessions are gated behind `instance.multi-session`, and with
+ * that off a single-session instance has nothing but its stop.
  *
  * Every handler stops propagation — the control renders inside the library's
  * card links, and the menu's portalled content still bubbles through the React
@@ -54,9 +58,11 @@ export function InstanceRunControl({
   onStop: (session?: string) => void;
 }) {
   const [confirm, setConfirm] = useState<StopTarget | null>(null);
+  const multiSession = useMultiSession();
   const now = Date.now() / 1000;
   const target = confirm?.session;
   const seq = target ? sessionSeq(target) : 0;
+  const menu = multiSession || sessions.length > 1;
 
   return (
     <>
@@ -66,7 +72,7 @@ export function InstanceRunControl({
           size={size}
           data-icon="inline-start"
           disabled={busy}
-          className="border-r-0"
+          className={cn(menu && 'border-r-0')}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -76,61 +82,67 @@ export function InstanceRunControl({
           <PowerIcon weight="bold" />
           {m['app.action.stop']()}
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="outline"
-                size={CARET_SIZE[size]}
-                aria-label={m['entry.session.menu']()}
-                title={m['entry.session.menu']()}
-                disabled={busy}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <CaretDownIcon weight="bold" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent
-            align="end"
-            className="w-56"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <DropdownMenuItem disabled={launching} onClick={onNewSession}>
-              <PlayIcon weight="fill" />
-              {m['entry.session.new']()}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setConfirm({})}>
-              {sessions.length > 1
-                ? m['entry.session.stop_all']()
-                : m['app.action.stop']()}
-            </DropdownMenuItem>
-            {sessions.length > 1 && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>
-                  {m['app.label.sessions']()}
-                </DropdownMenuLabel>
-                {sessions.map((session) => (
-                  <DropdownMenuItem
-                    key={session.id}
-                    onClick={() => setConfirm({ session: session.id })}
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {m['entry.session.stop_one']({
-                        seq: sessionSeq(session.id),
-                      })}
-                    </span>
-                    <span className="font-mono text-[10px] text-muted-foreground">
-                      {uptime(now - session.startedUnix)}
-                    </span>
+        {menu && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size={CARET_SIZE[size]}
+                  aria-label={m['entry.session.menu']()}
+                  title={m['entry.session.menu']()}
+                  disabled={busy}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <CaretDownIcon weight="bold" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent
+              align="end"
+              className="w-56"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {multiSession && (
+                <>
+                  <DropdownMenuItem disabled={launching} onClick={onNewSession}>
+                    <PlayIcon weight="fill" />
+                    {m['entry.session.new']()}
                   </DropdownMenuItem>
-                ))}
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem onClick={() => setConfirm({})}>
+                {sessions.length > 1
+                  ? m['entry.session.stop_all']()
+                  : m['app.action.stop']()}
+              </DropdownMenuItem>
+              {sessions.length > 1 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>
+                    {m['app.label.sessions']()}
+                  </DropdownMenuLabel>
+                  {sessions.map((session) => (
+                    <DropdownMenuItem
+                      key={session.id}
+                      onClick={() => setConfirm({ session: session.id })}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {m['entry.session.stop_one']({
+                          seq: sessionSeq(session.id),
+                        })}
+                      </span>
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        {uptime(now - session.startedUnix)}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       <ConfirmDialog

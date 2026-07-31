@@ -1,5 +1,5 @@
 /** `config.*` — query/mutation factories, consumed through useQuery/useMutation. */
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import * as api from '../api/config';
 import { mutation } from './core';
 import { keys } from './keys';
@@ -28,3 +28,15 @@ export const configMutations = {
       invalidates: () => [keys.config.all, keys.content.all, keys.sync.all],
     }),
 };
+
+/**
+ * Whether an instance may run several sessions at once
+ * (`instance.multi-session`). Unresolved reads as off, so the concurrent-launch
+ * affordances never offer what the daemon would refuse.
+ */
+export function useMultiSession(): boolean {
+  const { data } = useQuery(configQueries.value(MULTI_SESSION_KEY));
+  return data === true;
+}
+
+export const MULTI_SESSION_KEY = 'instance.multi-session';
