@@ -1,0 +1,7 @@
+{
+  "name": "Hermitcraft",
+  "address": "smp.example.net:25565",
+  "icon": "iVBORw0KGgo=",
+  "acceptTextures": true,
+  "hidden": false
+}

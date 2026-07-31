@@ -88,6 +88,7 @@ pub enum Field {
     Path,
     Flavor,
     World,
+    Address,
     Memory,
     JvmArgs,
     Port,
@@ -111,6 +112,7 @@ impl fmt::Display for Field {
             Field::Path => "a file path",
             Field::Flavor => "a flavor",
             Field::World => "a world",
+            Field::Address => "a server address",
             Field::Memory => "memory",
             Field::JvmArgs => "jvm arguments",
             Field::Port => "a port",
@@ -139,6 +141,7 @@ pub enum Reason {
     MinBackups,
     JavaMajor,
     AbsolutePath,
+    ServerAddress,
 }
 
 impl fmt::Display for Reason {
@@ -159,6 +162,7 @@ impl fmt::Display for Reason {
                 "the path must be absolute — the daemon is a separate process and does not share \
                  your working directory"
             }
+            Reason::ServerAddress => "a server address looks like host or host:port",
         })
     }
 }
@@ -349,6 +353,12 @@ pub enum ErrorInfo {
     InvalidTexture {
         detail: String,
     },
+    /// A launch asked to join a world or server directly, but the game only
+    /// learned the Quick Play arguments in 1.20 — an older client would ignore
+    /// them and open to the title screen, which is not what was asked for.
+    QuickPlayUnsupported {
+        version: String,
+    },
 
     // --- not found ---
     EntryNotFound {
@@ -373,6 +383,11 @@ pub enum ErrorInfo {
     },
     WorldNotFound {
         world: String,
+    },
+    /// No entry of the instance's multiplayer list (`servers.dat`) matches, by
+    /// name or by address.
+    ServerListEntryNotFound {
+        reference: String,
     },
     AccountNotFound {
         reference: String,
@@ -580,6 +595,7 @@ impl ErrorInfo {
             | ProfileNotFound { .. }
             | SkinNotFound { .. }
             | WorldNotFound { .. }
+            | ServerListEntryNotFound { .. }
             | AccountNotFound { .. }
             | VersionNotFound { .. }
             | ConfigKeyUnknown { .. }
@@ -648,6 +664,11 @@ impl fmt::Display for ErrorInfo {
                  which Hestia cannot install for you — get it from {url}, then try again"
             ),
             InvalidTexture { detail } => write!(f, "{detail}"),
+            QuickPlayUnsupported { version } => write!(
+                f,
+                "joining a world or server on launch needs Minecraft 1.20 or newer; this instance \
+                 runs {version}"
+            ),
             EntryNotFound { entry, reference } => write!(f, "no {entry} matches '{reference}'"),
             ProcessNotFound { id } => write!(f, "no process '{id}'"),
             BackupNotFound { reference } => write!(f, "no backup matches '{reference}'"),
@@ -657,6 +678,10 @@ impl fmt::Display for ErrorInfo {
             ProfileNotFound { scope, name } => write!(f, "no {scope} profile named '{name}'"),
             SkinNotFound { key } => write!(f, "no skin matches '{key}'"),
             WorldNotFound { world } => write!(f, "no world '{world}' in this instance"),
+            ServerListEntryNotFound { reference } => write!(
+                f,
+                "no server named '{reference}' in this instance's multiplayer list"
+            ),
             AccountNotFound { reference } => write!(f, "no account matches '{reference}'"),
             VersionNotFound { reference } => write!(f, "no version matches '{reference}'"),
             ConfigKeyUnknown { key } => write!(f, "unknown config key '{key}'"),

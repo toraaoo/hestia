@@ -268,6 +268,112 @@ impl Contract for InstanceWorlds {
     type Result = InstanceWorldsResult;
 }
 
+/// One entry of the instance's multiplayer list, as `servers.dat` stores it.
+/// The file is the game's, not ours: it is read on demand and rewritten whole,
+/// so an entry carries every field back that it came with.
+#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct ServerEntry {
+    /// The player-given name; the identity a `play` takes, alongside the address.
+    pub name: String,
+    /// `host` or `host:port` exactly as the game stores it.
+    pub address: String,
+    /// The server's cached icon, base64-encoded PNG; empty when it has none.
+    /// Inlined for the same reason a world's is — see [`WorldInfo::icon`].
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub icon: String,
+    /// Whether the game auto-accepts the server's resource pack.
+    pub accept_textures: bool,
+    /// Hidden entries are the game's own scratch rows (direct-connect), which
+    /// the multiplayer list does not show.
+    pub hidden: bool,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct InstanceServersResult {
+    /// The instance's multiplayer list, in the file's own order — the order the
+    /// game shows, which the player arranged.
+    pub servers: Vec<ServerEntry>,
+}
+
+pub struct InstanceServers;
+impl Contract for InstanceServers {
+    const CHANNEL: &'static str = "instance.servers";
+    type Params = InstanceRef;
+    type Result = InstanceServersResult;
+}
+
+/// Add to, or edit, the instance's multiplayer list. `server` names the entry
+/// to edit (by name or address) and is empty when adding.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct InstanceServerEditParams {
+    pub instance: String,
+    /// The existing entry to rewrite; empty appends a new one.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub server: String,
+    pub name: String,
+    pub address: String,
+    pub accept_textures: bool,
+}
+
+/// A write to the multiplayer list, with what it could not guarantee. A running
+/// session owns `servers.dat` and rewrites it wholesale when it exits, so an
+/// edit made underneath one is reported as degraded rather than refused.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct InstanceServersWriteResult {
+    pub servers: Vec<ServerEntry>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<WarningInfo>,
+}
+
+pub struct InstanceServerEdit;
+impl Contract for InstanceServerEdit {
+    const CHANNEL: &'static str = "instance.server.edit";
+    type Params = InstanceServerEditParams;
+    type Result = InstanceServersWriteResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct InstanceServerRef {
+    pub instance: String,
+    /// The entry to act on, by name or address.
+    pub server: String,
+}
+
+pub struct InstanceServerRemove;
+impl Contract for InstanceServerRemove {
+    const CHANNEL: &'static str = "instance.server.remove";
+    type Params = InstanceServerRef;
+    type Result = InstanceServersWriteResult;
+}
+
+/// Status of an arbitrary multiplayer address, over the Server List Ping the
+/// in-game list uses. Separate from `server.ping`, which reaches a *managed*
+/// server on loopback and takes an entry reference rather than an address.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct AddressPingParams {
+    /// `host` or `host:port`; the port defaults to 25565.
+    pub address: String,
+}
+
+pub struct AddressPing;
+impl Contract for AddressPing {
+    const CHANNEL: &'static str = "minecraft.ping";
+    type Params = AddressPingParams;
+    type Result = crate::server::ServerPingResult;
+}
+
 pub struct InstanceRemove;
 impl Contract for InstanceRemove {
     const CHANNEL: &'static str = "instance.remove";
@@ -529,6 +635,25 @@ pub struct InstanceLaunchParams {
     /// therefore reserved as profile names.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub profile: String,
+    /// Skip the menus and join a world or a server on start. Absent launches to
+    /// the title screen; the game only understands this from 1.20 on, so an
+    /// older instance refuses rather than silently ignoring it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quick_play: Option<QuickPlay>,
+}
+
+/// What a launch joins directly. One target or none — a launch cannot open a
+/// world *and* connect to a server, so the two are variants rather than two
+/// fields that would need a cross-check at every layer.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "snake_case", tag = "kind", content = "target")]
+pub enum QuickPlay {
+    /// A save directory under `data/saves/` — the folder name, not the world's
+    /// display name, which is what `--quickPlaySingleplayer` takes.
+    World(String),
+    /// `host` or `host:port`, as `--quickPlayMultiplayer` takes it.
+    Server(String),
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]

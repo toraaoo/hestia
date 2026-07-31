@@ -81,6 +81,11 @@ pub enum WarningInfo {
     /// source: it is installed and loads, but carries no provenance, so it can
     /// never be updated in place.
     ImportFilesUntracked { count: u32, files: Vec<String> },
+    /// The multiplayer list was edited while a session had the instance open.
+    /// `servers.dat` belongs to the running game, which holds the list in
+    /// memory and writes the whole file back when it exits — so that copy wins
+    /// and this edit is lost with it.
+    ServerListInUse { instance: String, sessions: u32 },
 }
 
 impl WarningInfo {
@@ -125,6 +130,11 @@ impl WarningInfo {
             ImportFilesUntracked { .. } => {
                 "reinstall them from a source (`mod add <name>`) to make them updatable".to_string()
             }
+            ServerListInUse { .. } => {
+                "close the game, then make the change again — or add the server from the in-game \
+                 multiplayer screen instead"
+                    .to_string()
+            }
         }
     }
 }
@@ -159,6 +169,11 @@ impl fmt::Display for WarningInfo {
             ImportFilesUntracked { count, .. } => write!(
                 f,
                 "{count} file(s) came from the archive itself, so they cannot be updated"
+            ),
+            ServerListInUse { instance, sessions } => write!(
+                f,
+                "'{instance}' has {sessions} session(s) open: the running game will overwrite this \
+                 change to the multiplayer list when it exits"
             ),
         }
     }
