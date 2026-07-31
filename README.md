@@ -5,185 +5,182 @@
   </picture>
 </p>
 
-A Minecraft launcher built in Rust.
+<p align="center">
+  <b>A Minecraft launcher for people who also live in a terminal.</b><br>
+  Play instances, host servers, and manage mods — from a window or a shell.
+</p>
 
-Alongside a desktop UI (Tauri), Hestia ships a first-class **CLI** front-end, so
-it's just as comfortable from a terminal as from a window.
+<p align="center">
+  <a href="https://github.com/toraaoo/hestia/releases/latest"><img alt="Download" src="https://img.shields.io/badge/download-latest%20release-e8873d?style=flat-square"></a>
+  <a href="https://github.com/toraaoo/hestia/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/toraaoo/hestia/ci.yml?style=flat-square&label=ci"></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/linux%20%C2%B7%20windows-x86__64-lightgrey?style=flat-square">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square"></a>
+</p>
 
-> **Status:** early development (`v0.0.1`). Hestia runs as a daemon (`hestiad`)
-> with thin clients over a local socket, and the vertical slice is complete —
-> everything below works end to end.
->
-> **Servers and instances.** A server is fully provisioned at create (jar, Java
-> runtime, EULA), claims its own port, and has an RCON-backed console. An
-> instance materialises its files at launch, runs as the signed-in account, and
-> can run several concurrent sessions once `instance.multi-session` allows it,
-> or start straight in a world or on a
-> server from its multiplayer list. Both move between game versions in place;
-> downgrades warn, and a server's data is backed up first.
->
-> **Flavors.** Vanilla, Fabric and NeoForge on both sides; Paper, Folia, Spigot
-> and CraftBukkit for servers. NeoForge builds its game jar locally from the
-> installer, and Spigot/CraftBukkit are compiled on your machine with SpigotMC's
-> BuildTools (needs `git`) — so a first create on those takes a few minutes.
-> Each flavor describes itself over the wire, including the content kinds it
-> takes.
->
-> **Content.** Mods, plugins, resourcepacks, shaders and datapacks from Modrinth
-> or CurseForge, a page URL or a local file, with dependencies resolved.
-> CurseForge's API needs a key (`config set content.curseforge-key`), and the
-> source is not offered until one resolves. Whole modpacks install into a new or
-> existing entry, their mods joining the pool as ordinary updatable content — a
-> CurseForge pack from its source or page URL rather than from a file, since only
-> CurseForge resolves the ids its manifest names. An instance's pool can be
-> sliced into named content profiles, and reusable global profiles apply project
-> references across instances.
->
-> **Data.** Server backups on demand and on a schedule, with retention pruning.
-> An instance travels as one file instead: export it whole, or as a `.mrpack`
-> other launchers read, and import back a hestia archive, a `.mrpack`, or a
-> Prism/MultiMC instance. Instance settings and worlds are shared across
-> instances (`sync`) — files merged, folders linked into one store — switchable
-> off wholesale.
->
-> **Around it.** Microsoft sign-in with skin and cape management, a process
-> supervisor whose workloads survive daemon restarts, signed announcements,
-> self-update, a system tray, the full CLI, and the desktop shell with its
-> library, entry, browse, skins, news and settings pages.
->
-> **Not built yet:** natives extraction for pre-1.19 clients, and the legacy
-> asset layout.
+<p align="center">
+  <img src="assets/screenshots/library.png" alt="The Hestia library: instances you play and servers you host" width="820">
+</p>
 
-## Front-ends
+Hestia keeps your instances and your servers in one place. Sign in once, create a modded instance, install mods from
+Modrinth or CurseForge, host a server your friends can join, and move any of it between game versions without rebuilding
+it.
 
-Hestia is one daemon-backed core with several ways to drive it:
+Underneath, a small resident daemon owns everything — so your server keeps running when you close the window, and the
+desktop app and the CLI are just two views of the same state.
 
-- **CLI** (`hestia`) — scriptable command-line interface for automation and power
-  users.
-- **Desktop** (`hestia-desktop`) — a Tauri shell hosting the React UI, wired to
-  the daemon through a generic IPC bridge with a typed TS API and query layer.
-- **Tray** (`tray`) — a resident system-tray helper spawned alongside the
-  daemon: status, quick actions (start/restart, autostart, quit).
+## The CLI is not an afterthought
 
-## Project layout
+Everything the app can do, `hestia` can do. Create a server, watch it boot on its own RCON-backed console, send it a
+command, and walk away — it keeps running.
 
-A single cargo workspace. The one-way dependency arrows are enforced by cargo:
-a crate that does not list `engine` as a dependency **cannot** reach launcher
-logic — only over the socket via `client`.
+<p align="center">
+  <img src="assets/demo/cli-server.gif" alt="Creating a vanilla server, starting it, and driving its console from the CLI" width="820">
+</p>
 
-```
-hestia/
-├── Cargo.toml                 [workspace] members = ["crates/*"]
-├── rust-toolchain.toml        pinned toolchain + clippy/rustfmt
-├── deny.toml                  cargo-deny: licenses, bans, advisories
-├── crates/
-│   ├── proto/                 wire contracts + domain types (serde)
-│   ├── ipc/                   transport (unix socket / named pipe) + envelope (tokio)
-│   ├── common/                logging (tracing) + app identity + paths
-│   ├── client/                typed client SDK (facades over a Session)
-│   ├── engine/                config·cache·download·java·accounts·skins·minecraft·content·process (daemon-only)
-│   ├── cli/                   bin: hestia   (clap)
-│   ├── daemon/                bin: hestiad  (router, services, supervisor)
-│   ├── tray/                  bin: tray     (tray-icon + tao)
-│   └── desktop/               bin: hestia-desktop (Tauri v2 shell)
-├── frontend/                  desktop UI (React + Vite + TS) — self-contained
-├── docs/                      architecture (per subsystem) + decisions
-└── news/                      published announcements
-```
+Content works the same way. Mods, shaders, resource packs and data packs install from Modrinth or CurseForge with their
+dependencies resolved.
 
-## Tech stack
+<p align="center">
+  <img src="assets/demo/cli-content.gif" alt="Installing Sodium, Iris and a shader pack into an instance from the CLI" width="820">
+</p>
 
-- **Rust** (edition 2021), **cargo** workspace
-- [tokio](https://tokio.rs/) — async runtime (client + daemon)
-- [tracing](https://github.com/tokio-rs/tracing) — structured logging
-- [clap](https://github.com/clap-rs/clap) — command-line parsing
-- [reqwest](https://github.com/seanmonstar/reqwest) — HTTP (engine downloader, auth)
-- [serde](https://serde.rs/) — the wire/marshalling layer
-- [p256](https://github.com/RustCrypto/elliptic-curves) — Xbox proof-key ECDSA
-- [Tauri v2](https://tauri.app/) + [React](https://react.dev/) + [Vite](https://vitejs.dev/) — desktop
-
-## Building
+The grammar is entry-first — name the thing, then say what to do to it:
 
 ```bash
-# Clone and build the daemon + CLI (fast — no desktop/webview deps)
-git clone <repo-url> && cd hestia
-cargo build -p cli -p daemon
+hestia server smp config set memory 4G     # applies from the next start
+hestia server smp backup create            # archive the world + config
+hestia instance modded mod add sodium      # install a mod, deps resolved
 ```
 
-The `cli`, `daemon`, and `tray` binaries build with plain `cargo` and
-cross-compile cleanly. The **desktop** app needs the system webview libraries
-(WebKitGTK on Linux, WebView2 on Windows) and the Bun-built frontend; it does
-not cross-compile and is built per-OS:
+## And the app is not a wrapper
+
+**Find it.** Mods, plugins, resource packs, shaders, data packs and whole modpacks from Modrinth or CurseForge — or
+paste a project link and it resolves.
+
+<p align="center">
+  <img src="assets/screenshots/browse.png" alt="Browsing mods, packs and shaders" width="820">
+</p>
+
+**Keep it.** Everything installed lands in one pool you can update in place and slice into named profiles.
+
+<p align="center">
+  <img src="assets/screenshots/content.png" alt="An instance's installed content" width="820">
+</p>
+
+**Host it.** A server is fully provisioned at create — jar, Java runtime, EULA, its own port — with live resource
+charts, backups on demand or on a schedule, and a console over RCON.
+
+<p align="center">
+  <img src="assets/screenshots/console.png" alt="A server console over RCON" width="820">
+</p>
+
+**Look the part.** A skin library with a real-time 3D preview, the vanilla characters, and your capes — applied straight
+to your account.
+
+<p align="center">
+  <img src="assets/screenshots/skins.png" alt="The skin library with a 3D preview" width="820">
+</p>
+
+## What it supports
+
+| Area          | What works                                                         |
+|:--------------|:-------------------------------------------------------------------|
+| **Instances** | Vanilla · Fabric · NeoForge                                        |
+| **Servers**   | Vanilla · Fabric · NeoForge · Paper · Folia · Spigot · CraftBukkit |
+| **Content**   | Modrinth · CurseForge · a page URL · a local file                  |
+| **Import**    | Hestia archives · `.mrpack` · Prism / MultiMC instances            |
+| **Export**    | Hestia archives · `.mrpack`                                        |
+
+NeoForge builds its game jar locally from the installer, and Spigot/CraftBukkit compile on your machine with SpigotMC's
+BuildTools (needs `git`) — so a first create on those takes a few minutes. CurseForge needs an API key
+(`hestia config set content.curseforge-key`); the source isn't offered until one resolves.
+
+A few more things it does: several concurrent sessions of one instance, starting straight into a world or onto a server,
+in-place version changes both ways (downgrades warn, and a server is backed up first), settings and worlds shared across
+instances, a system tray, and self-update.
+
+**Not built yet:** natives extraction for pre-1.19 clients, and the legacy asset layout — very old versions won't launch
+correctly.
+
+## Install
+
+Grab an installer from the [latest release](https://github.com/toraaoo/hestia/releases/latest). One download installs
+everything: the desktop app, the daemon, the tray, and the
+`hestia` CLI.
+
+| Platform             | Formats                                         |
+|----------------------|-------------------------------------------------|
+| **Linux** (x86_64)   | `.deb` · `.rpm` · AppImage · portable `.tar.gz` |
+| **Windows** (x86_64) | `.exe` (NSIS) · `.msi` · portable `.zip`        |
+
+The Windows installer lets you deselect components and puts the CLI on `PATH`. The desktop app updates itself from the
+release feed.
+
+<details>
+<summary><b>Or build it from source</b></summary>
+
+The daemon and CLI need nothing but a Rust toolchain:
 
 ```bash
-# Desktop: Tauri drives the frontend build from crates/desktop/tauri.conf.json
+git clone https://github.com/toraaoo/hestia && cd hestia
+cargo build --release -p cli -p daemon
+```
+
+The desktop app also needs the system webview (WebKitGTK on Linux, WebView2 on Windows) and [Bun](https://bun.sh/):
+
+```bash
 cargo install tauri-cli --version '^2'
 (cd frontend && bun install)
-(cd crates/desktop && cargo tauri build)     # or `cargo tauri dev` for HMR
+(cd crates/desktop && cargo tauri build)
 ```
 
-The [`scripts/`](scripts/) helpers wrap all of this: `scripts/build.sh cli`,
-`scripts/run.sh daemon serve`, `scripts/run.sh desktop`, `scripts/package.sh`
-(Tauri installers + portable archive — see [docs/packaging.md](docs/packaging.md)).
-For an interactive loop, `scripts/dev.sh` opens a subshell with `hestia`/`hestiad`
-on `PATH` (or `scripts/dev.sh --desktop` for the Tauri shell with frontend HMR).
-A debug run also serves `news/` as the announcement feed and points the daemon at
-it, so an unpublished entry can be seen — `--no-news` skips that.
+`scripts/` wraps all of it — `scripts/build.sh`, `scripts/run.sh`,
+`scripts/package.sh`. See [docs/packaging.md](docs/packaging.md).
+
+</details>
 
 ## Quick start
 
 ```bash
-hestia                            # help
 hestia account login              # sign in (Microsoft device-code flow)
-hestia play                       # launch an instance (prompts to pick when several)
+hestia instance create            # interactive: flavor → version
+hestia play                       # launch it
 ```
 
-Create and drive a server or a client instance. Anything a `create` needs but
-wasn't given is prompted for on a terminal:
+Servers and instances share the same verbs:
 
 ```bash
-hestia server create              # interactive: flavor → version → EULA confirm
-hestia instance create            # interactive: flavor → version
-
+hestia server create              # interactive: flavor → version → EULA
 hestia start <name>               # start a server or launch an instance
 hestia stop <name>                # stop whichever it is
 hestia logs <name> -f             # follow its captured output
 ```
 
-The grammar is entry-first — anything that acts on a specific server or instance
-names it right after the noun, then the action:
+The daemon is never started behind your back — `hestia daemon start` (or the login autostart) brings it up, and commands
+tell you when it's down.
 
-```bash
-hestia server smp config set memory 4G   # applies from the next start
-hestia server smp backup create          # archive the world + config
-hestia instance modded mod add sodium    # install a mod (deps resolved)
-```
+Your data lives in `~/.hestia` (`%APPDATA%\Hestia` on Windows), overridable with
+`--home`, `$HESTIA_HOME`, or `hestia config set home`.
 
-The **full command reference** — servers, instances, backups, content, Java,
-config, and daemon lifecycle — is in **[docs/cli.md](docs/cli.md)**.
-
-The data directory is resolved as: `--home` → `$HESTIA_HOME` → a persisted
-pointer (`config set home`) → the platform default (`~/.hestia`, or
-`%APPDATA%\Hestia` on Windows). **Debug builds** anchor the default at
-`<workspace>/.hestia` so development never populates the real per-user directory.
+**[The full command reference →](docs/cli.md)**
 
 ## Documentation
 
-- **[docs/cli.md](docs/cli.md)** — the complete `hestia` command reference.
-- **[docs/architecture.md](docs/architecture.md)** — how Hestia is put together:
-  the daemon/engine boundary, the crate graph, and a page per subsystem.
-- **[docs/decisions/](docs/decisions/README.md)** — why it is put together that
-  way: one entry per architectural choice, with what it replaced.
-- **[docs/contributing.md](docs/contributing.md)** — conventions and recipes.
-- **[docs/packaging.md](docs/packaging.md)** — installers and release artifacts.
-- **[docs/hooks.md](docs/hooks.md)** — the desktop UI's queries layer: hook
-  usage for frontend development.
-- **[news/README.md](news/README.md)** — how to publish an announcement.
+| Page                                         | What's in it                                                                       |
+|----------------------------------------------|------------------------------------------------------------------------------------|
+| [docs/cli.md](docs/cli.md)                   | every `hestia` command                                                             |
+| [docs/architecture.md](docs/architecture.md) | how it's put together — the daemon boundary, the crate graph, a page per subsystem |
+| [docs/decisions/](docs/decisions/README.md)  | why it's put together that way                                                     |
+| [docs/contributing.md](docs/contributing.md) | conventions and copy-and-adapt recipes                                             |
+| [docs/packaging.md](docs/packaging.md)       | installers and release artifacts                                                   |
+
+Contributions are welcome — [docs/contributing.md](docs/contributing.md) has the wire-in recipes, and adding a feature
+is usually one line in each of five places.
 
 ## License
 
 [GPL-3.0-only](LICENSE) © 2026 toraaoo
 
 The desktop skin preview and its thumbnail renderer are ported from
-[Modrinth's launcher](https://github.com/modrinth/code) (GPL-3.0-only,
-© Rinth, Inc.) — the reason Hestia is GPL rather than MIT.
+[Modrinth's launcher](https://github.com/modrinth/code) (GPL-3.0-only, © Rinth, Inc.) — the reason Hestia is GPL rather
+than MIT.
