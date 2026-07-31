@@ -14,7 +14,7 @@ const started = Date.now();
 
 export const status = (): DaemonStatusResult => ({
   pid: PID,
-  version: '0.0.1-mock',
+  version: '0.0.1',
   uptimeSeconds: Math.floor((Date.now() - started) / 1000),
   home: HOME,
   log: `${HOME}/logs/hestiad.log`,
@@ -25,7 +25,7 @@ export const channels: Handlers = {
 
   'app.info': (): AppInfoResult => ({
     name: 'Hestia',
-    version: '0.0.1-mock',
+    version: '0.0.1',
     id: 'gg.toraaoo.hestia',
     vendor: 'toraaoo',
     channel: 'dev',

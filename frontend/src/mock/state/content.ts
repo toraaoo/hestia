@@ -18,21 +18,23 @@ import type {
 
 import { ago, fail, now } from '../support';
 
-const ICON = (id: string) => `https://cdn.modrinth.com/data/${id}/icon.png`;
+const ICON = (id: string, hash: string) =>
+  `https://cdn.modrinth.com/data/${id}/${hash}`;
 
 function project(
-  partial: Pick<ContentProject, 'id' | 'slug' | 'kind' | 'title' | 'author'> &
+  partial: Pick<
+    ContentProject,
+    'id' | 'slug' | 'kind' | 'title' | 'author' | 'description' | 'iconUrl'
+  > &
     Partial<ContentProject>,
 ): ContentProject {
   return {
     source: 'modrinth',
     kinds: [partial.kind],
-    description: `${partial.title} — a fixture project served by the browser mock.`,
-    body: `## ${partial.title}\n\nRendered from the fixture daemon, not from a platform.`,
+    body: `## ${partial.title}\n\n${partial.description}`,
     categories: ['optimization'],
     downloads: 1_200_000,
     follows: 4_300,
-    iconUrl: ICON(partial.id),
     gallery: [],
     clientSide: 'required',
     serverSide: 'optional',
@@ -47,7 +49,14 @@ const catalogue: ContentProject[] = [
     kind: 'mod',
     title: 'Sodium',
     author: 'jellysquid3',
-    downloads: 42_000_000,
+    description:
+      'A high-performance rendering engine replacement for Minecraft, which greatly improves frame rates and reduces micro-stutter.',
+    iconUrl: ICON(
+      'AANobbMI',
+      '295862f4724dc3f78df3447ad6072b2dcd3ef0c9_96.webp',
+    ),
+    downloads: 196_995_125,
+    follows: 39_314,
   }),
   project({
     id: 'P7dR8mSH',
@@ -55,8 +64,12 @@ const catalogue: ContentProject[] = [
     kind: 'mod',
     title: 'Fabric API',
     author: 'modmuss50',
+    description:
+      'Lightweight and modular API providing common hooks and intercompatibility measures utilized by mods using the Fabric toolchain.',
+    iconUrl: ICON('P7dR8mSH', 'icon.png'),
     categories: ['library'],
-    downloads: 88_000_000,
+    downloads: 220_119_403,
+    follows: 34_535,
     serverSide: 'required',
   }),
   project({
@@ -65,6 +78,14 @@ const catalogue: ContentProject[] = [
     kind: 'mod',
     title: 'Lithium',
     author: 'jellysquid3',
+    description:
+      'No-compromises game logic optimization mod, useful for both single-player games and multi-player servers.',
+    iconUrl: ICON(
+      'gvQqBUqZ',
+      'bcc8686c13af0143adf4285d741256af824f70b7_96.webp',
+    ),
+    downloads: 113_567_219,
+    follows: 22_797,
     serverSide: 'required',
   }),
   project({
@@ -73,7 +94,15 @@ const catalogue: ContentProject[] = [
     kind: 'mod',
     title: 'Iris Shaders',
     author: 'coderbot',
-    categories: ['optimization', 'utility'],
+    description:
+      'A modern shader pack loader for Minecraft intended to be compatible with existing OptiFine shader packs.',
+    iconUrl: ICON(
+      'YL57xq9U',
+      '18d0e7f076d3d6ed5bedd472b853909aac5da202_96.webp',
+    ),
+    categories: ['decoration', 'optimization'],
+    downloads: 153_625_014,
+    follows: 28_267,
     serverSide: 'unsupported',
   }),
   project({
@@ -82,16 +111,29 @@ const catalogue: ContentProject[] = [
     kind: 'shader',
     title: 'Complementary Shaders — Reimagined',
     author: 'EminGT',
-    categories: ['realistic'],
+    description:
+      'Preserving the elements of Minecraft with exceptional quality, detail, and performance.',
+    iconUrl: ICON(
+      'HVnmMxH1',
+      '79cb7c8123bbc54945305b2ebad6b8881efdf5f8_96.webp',
+    ),
+    categories: ['colored-lighting', 'vanilla-like'],
+    downloads: 58_971_667,
+    follows: 10_348,
     serverSide: 'unsupported',
   }),
   project({
-    id: '1KVo5zza',
+    id: 'w0TnApzs',
     slug: 'faithful-32x',
     kind: 'resource_pack',
     title: 'Faithful 32x',
     author: 'Faithful Team',
-    categories: ['decoration'],
+    description:
+      'The original Minecraft texture feel, with double the resolution and double the fun!',
+    iconUrl: ICON('w0TnApzs', 'e8403d1fb2f55321ae74402c1e8c90a3a5670856.png'),
+    categories: ['32x', 'vanilla-like'],
+    downloads: 4_129_699,
+    follows: 1_432,
   }),
   project({
     id: '8oi3bsk5',
@@ -99,26 +141,49 @@ const catalogue: ContentProject[] = [
     kind: 'data_pack',
     title: 'Terralith',
     author: 'Starmute',
+    description:
+      'Explore almost 100 new biomes consisting of both realism and light fantasy, using just Vanilla blocks.',
+    iconUrl: ICON(
+      '8oi3bsk5',
+      '1959d924a1088944bbf07a06ba523726112d7e7a_96.webp',
+    ),
     categories: ['worldgen'],
+    downloads: 20_467_954,
+    follows: 8_139,
     serverSide: 'required',
   }),
   project({
-    id: 'hZLYEnCH',
+    id: 'hXiIvTyT',
     slug: 'essentialsx',
     kind: 'plugin',
     title: 'EssentialsX',
     author: 'EssentialsX Team',
-    categories: ['management'],
+    description: 'The essential plugin suite for Paper and Spigot servers.',
+    iconUrl: ICON(
+      'hXiIvTyT',
+      'e621675be1d0421b43b65ab8082507532d937009_96.webp',
+    ),
+    categories: ['economy', 'social', 'utility'],
+    downloads: 680_449,
+    follows: 760,
     clientSide: 'unsupported',
     serverSide: 'required',
   }),
   project({
-    id: '1KVo5zzb',
+    id: '1KVo5zza',
     slug: 'fabulously-optimized',
     kind: 'modpack',
     title: 'Fabulously Optimized',
     author: 'Robotkoer',
-    categories: ['optimization'],
+    description:
+      'Beautiful graphics, speedy performance and familiar features in a simple package.',
+    iconUrl: ICON(
+      '1KVo5zza',
+      'd8152911f8fd5d7e9a8c499fe89045af81fe816e_96.webp',
+    ),
+    categories: ['lightweight', 'multiplayer', 'optimization'],
+    downloads: 15_230_434,
+    follows: 4_668,
   }),
 ];
 

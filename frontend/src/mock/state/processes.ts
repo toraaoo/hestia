@@ -81,7 +81,7 @@ export function start(
   };
   supervised.set(id, {
     info,
-    lines: banner.map((line) => ({ stream: 'stdout', line })),
+    lines: banner.map((line) => ({ stream: 'stdout', line: stamp(line) })),
     cpu: 18,
     mem: 1_400 * 1024 * 1024,
     tick: 0,
@@ -126,11 +126,15 @@ function stamp(line: string): string {
 }
 
 const CHATTER = [
-  'Saving chunks for level "world"',
-  'Time elapsed: 84 ms',
-  'Player joined the game',
-  'Player lost connection: Disconnected',
-  'Preparing spawn area: 92%',
+  'Ari joined the game',
+  'Ari[/127.0.0.1:52114] logged in with entity id 214 at (118.5, 71.0, -304.2)',
+  'Saving chunks for level "world"/minecraft:overworld',
+  'Kai joined the game',
+  '<Ari> anyone got spare iron',
+  'Saved the game',
+  '<Kai> heading to the mine, brb',
+  'Kai lost connection: Disconnected',
+  'Kai left the game',
 ];
 
 /**

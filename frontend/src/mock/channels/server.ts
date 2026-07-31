@@ -14,12 +14,30 @@ import { type Handlers, num, ok, str } from '../support';
 import { channels as backupChannels } from './backup';
 import { configChannels, contentChannels } from './entry';
 
-const BANNER = [
-  'Starting minecraft server version 1.21.4',
+/** What a vanilla server prints on the way up, down to the RCON listener. */
+const banner = (server: ServerInfo): string[] => [
+  `Starting minecraft server version ${server.gameVersion}`,
   'Loading properties',
+  'Default game type: SURVIVAL',
+  'Generating keypair',
+  `Starting Minecraft server on *:${server.gamePort ?? 25_565}`,
   'Preparing level "world"',
-  'Done (4.812s)! For help, type "help"',
+  'Preparing start region for dimension minecraft:overworld',
+  'Time elapsed: 1275 ms',
+  'Done (3.412s)! For help, type "help"',
+  'Starting remote control listener',
+  'Thread RCON Listener started',
 ];
+
+/** The handful of vanilla commands the fixture answers over RCON. */
+const RCON: Record<string, (args: string) => string> = {
+  say: (args) => `[Server] ${args}`,
+  list: () => 'There are 2 of a max of 20 players online: Ari, Kai',
+  seed: () => 'Seed: [-4707391018842391]',
+  time: () => 'The time is 13240',
+  'save-all': () => 'Saved the game',
+  help: () => 'Try: list, say <message>, seed, time, save-all.',
+};
 
 /** A server record composed with its live process. */
 const withProcess = (server: ServerInfo): ServerInfo => ({
@@ -52,7 +70,7 @@ export const channels: Handlers = {
     return {
       playersOnline: processes.serverProcess(server.id) ? 2 : 0,
       playersMax: 20,
-      motd: `${server.name} — a mock server`,
+      motd: `${server.name} — a ${server.flavor} ${server.gameVersion} server`,
       version: server.gameVersion,
     };
   },
@@ -141,7 +159,7 @@ export const channels: Handlers = {
       processes.serverProcessId(server.id),
       `${entries.HOME}/java/${server.javaMajor}/bin/java`,
       ['-Xmx4G', '-jar', 'server.jar', 'nogui'],
-      BANNER,
+      banner(server),
     );
     return { processId: process.id, pid: process.pid };
   },
@@ -164,8 +182,12 @@ export const channels: Handlers = {
     const id = serverId(p);
     if (!processes.serverProcess(id))
       throw { code: 'handler_error', message: 'the server is not running' };
-    const command = str(p, 'command');
-    return { response: `Unknown or incomplete command: ${command}` };
+    const command = str(p, 'command').trim();
+    const [verb, ...rest] = command.split(/\s+/);
+    const response = RCON[verb]?.(rest.join(' '));
+    return {
+      response: response ?? `Unknown or incomplete command: ${command}`,
+    };
   },
 
   ...configChannels('server', serverId),
