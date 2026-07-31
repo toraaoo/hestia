@@ -8,6 +8,7 @@
 
 use std::collections::HashSet;
 use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -15,8 +16,15 @@ use anyhow::{bail, Context, Result};
 use proto::backup::{BackupInfo, BackupKind};
 use serde::{Deserialize, Serialize};
 
+use crate::schema::{self, Document};
+
 const BACKUPS: &str = "backups";
 const EXTENSION: &str = ".tar.gz";
+/// The archive's first entry: what it is and which schema it was written with,
+/// so a restore refuses an archive from a newer build instead of scattering
+/// whatever it finds into the server's data directory. An archive without one
+/// predates the manifest and restores as before.
+const MANIFEST: &str = "hestia.backup.json";
 /// The in-progress archive: renamed onto the real name only once written whole.
 const PART_SUFFIX: &str = ".part";
 const SESSION_LOCK: &str = "session.lock";
@@ -38,6 +46,17 @@ pub const DEFAULT_RETENTION: usize = 7;
 // A tighter schedule than this re-archives the world faster than it can
 // meaningfully change and keeps the server's saving paused too often.
 const MIN_INTERVAL: Duration = Duration::from_secs(5 * 60);
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+struct Manifest {
+    created_unix: i64,
+    created_by: String,
+}
+
+impl Document for Manifest {
+    const NAME: &'static str = MANIFEST;
+}
 
 /// Per-server scheduled-backup tuning stored on the record: how often the
 /// daemon archives the running server and how many scheduled archives to keep
@@ -226,6 +245,7 @@ fn write_archive(
     let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
     let mut builder = tar::Builder::new(encoder);
     builder.follow_symlinks(false);
+    append_manifest(&mut builder)?;
 
     let total = count_files(data_dir, exclude)?;
     let mut done = 0u64;
@@ -249,9 +269,27 @@ fn write_archive(
     Ok(())
 }
 
+fn append_manifest<W: std::io::Write>(builder: &mut tar::Builder<W>) -> Result<()> {
+    let manifest = Manifest {
+        created_unix: now_unix(),
+        created_by: format!("{} {}", common::app::NAME, common::app::VERSION),
+    };
+    let encoded = serde_json::to_vec_pretty(&schema::encode(&manifest)?)
+        .context("the backup manifest serializes")?;
+    let mut header = tar::Header::new_gnu();
+    header.set_size(encoded.len() as u64);
+    header.set_mode(0o644);
+    header.set_cksum();
+    builder
+        .append_data(&mut header, MANIFEST, encoded.as_slice())
+        .context("cannot write the backup manifest")
+}
+
 /// The top-level names under `data_dir` a backup includes (everything not
 /// excluded, skipping non-UTF-8 names — tar headers are byte-exact but the
 /// exclude match is string-based, so an unmatchable name is safer skipped).
+/// The manifest name is reserved: a data file called that would otherwise be
+/// archived twice and read as the manifest on the way back.
 fn included_roots(data_dir: &Path, exclude: &[String]) -> Result<Vec<PathBuf>> {
     let mut roots = Vec::new();
     let entries = std::fs::read_dir(data_dir)
@@ -263,7 +301,7 @@ fn included_roots(data_dir: &Path, exclude: &[String]) -> Result<Vec<PathBuf>> {
             tracing::warn!(path = %entry.path().display(), "skipping non-UTF-8 name");
             continue;
         };
-        if exclude.iter().any(|e| e == name) {
+        if name == MANIFEST || exclude.iter().any(|e| e == name) {
             continue;
         }
         roots.push(PathBuf::from(name));
@@ -461,6 +499,16 @@ fn extract_archive(archive: &Path, dest: &Path, on_progress: OnProgress<'_>) -> 
     let mut done = 0u64;
     for entry in tar.entries().context("reading the archive")? {
         let mut entry = entry.context("reading an archive entry")?;
+        // The manifest is written first, so an archive this build cannot read is
+        // refused before anything of it reaches the staging tree.
+        if entry.path().is_ok_and(|p| p.as_os_str() == MANIFEST) {
+            let mut text = String::new();
+            entry
+                .read_to_string(&mut text)
+                .context("reading the backup manifest")?;
+            check_manifest(&text)?;
+            continue;
+        }
         entry
             .unpack_in(dest)
             .context("extracting an archive entry")?;
@@ -468,6 +516,22 @@ fn extract_archive(archive: &Path, dest: &Path, on_progress: OnProgress<'_>) -> 
         on_progress(done, 0)?;
     }
     Ok(())
+}
+
+fn check_manifest(text: &str) -> Result<()> {
+    let value = serde_json::from_str(text)
+        .with_context(|| format!("{MANIFEST} is malformed"))
+        .map_err(|e| unsupported(e.to_string()))?;
+    schema::decode::<Manifest>(value).map_err(|e| unsupported(e.to_string()))?;
+    Ok(())
+}
+
+fn unsupported(detail: String) -> anyhow::Error {
+    proto::error::ErrorInfo::ArchiveUnsupported {
+        format: "backup".to_string(),
+        component: detail,
+    }
+    .into()
 }
 
 /// Delete the oldest `kind` backups beyond `keep`; other kinds are untouched.
@@ -574,8 +638,86 @@ mod tests {
         assert_eq!(content("server.jar"), "newer-jar");
         assert_eq!(content("logs/latest.log"), "log");
 
+        assert!(
+            !data.join(MANIFEST).exists(),
+            "the manifest describes the archive, not the server's data"
+        );
+
         assert!(remove(entry, &backup.id).unwrap());
         assert!(list(entry).is_empty());
+    }
+
+    #[test]
+    fn a_backup_from_a_newer_build_is_refused_rather_than_unpacked() {
+        let entry_dir = temp_entry("newer-backup");
+        let entry = entry_dir.path();
+        let data = entry.join("data");
+        write(&data.join("world/level.dat"), "one");
+        let backup = create(entry, &data, BackupKind::Manual, &[], &|_, _| Ok(())).unwrap();
+
+        // Rewrite the archive with a manifest this build cannot read.
+        let path = backups_dir(entry).join(format!("{}{EXTENSION}", backup.id));
+        let mut manifest = schema::encode(&Manifest::default()).unwrap();
+        manifest[schema::FIELD] = serde_json::Value::from(Manifest::version() + 1);
+        let encoded = serde_json::to_vec(&manifest).unwrap();
+        {
+            let encoder = flate2::write::GzEncoder::new(
+                File::create(&path).unwrap(),
+                flate2::Compression::default(),
+            );
+            let mut builder = tar::Builder::new(encoder);
+            let mut header = tar::Header::new_gnu();
+            header.set_size(encoded.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, MANIFEST, encoded.as_slice())
+                .unwrap();
+            builder.into_inner().unwrap().finish().unwrap();
+        }
+
+        write(&data.join("world/level.dat"), "two");
+        let error = restore(entry, &data, &backup.id, &[], &|_, _| Ok(())).expect_err("refused");
+
+        assert!(matches!(
+            error.downcast::<proto::error::ErrorInfo>().unwrap(),
+            proto::error::ErrorInfo::ArchiveUnsupported { .. }
+        ));
+        assert_eq!(
+            std::fs::read_to_string(data.join("world/level.dat")).unwrap(),
+            "two",
+            "a refused restore leaves the current data alone"
+        );
+    }
+
+    #[test]
+    fn a_backup_with_no_manifest_still_restores() {
+        let entry_dir = temp_entry("legacy-backup");
+        let entry = entry_dir.path();
+        let data = entry.join("data");
+        write(&data.join("world/level.dat"), "one");
+
+        // An archive as builds before the manifest wrote them: data roots only.
+        let dir = backups_dir(entry);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(format!("19700101-000000-manual{EXTENSION}"));
+        {
+            let encoder = flate2::write::GzEncoder::new(
+                File::create(&path).unwrap(),
+                flate2::Compression::default(),
+            );
+            let mut builder = tar::Builder::new(encoder);
+            builder.append_dir_all("world", data.join("world")).unwrap();
+            builder.into_inner().unwrap().finish().unwrap();
+        }
+
+        write(&data.join("world/level.dat"), "two");
+        restore(entry, &data, "19700101-000000-manual", &[], &|_, _| Ok(())).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(data.join("world/level.dat")).unwrap(),
+            "one"
+        );
     }
 
     #[test]
