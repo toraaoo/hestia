@@ -280,7 +280,9 @@ bun run build
 ```
 
 CI (`.github/workflows/ci.yml`) runs both sides: `check` (fmt, clippy, test on
-Linux and Windows), `frontend` (the chain above), and `deny`.
+Linux and Windows), `frontend` (the chain above), `desktop` (clippy and tests for
+the Tauri crate `check` excludes), and `deny`. The release workflow calls the
+same file as its gate — see [packaging.md](packaging.md#ci).
 
 ## Recording a decision
 

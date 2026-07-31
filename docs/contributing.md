@@ -476,9 +476,10 @@ what CI sets.
 
 The split is by cost. A commit pays for formatters and millisecond greps; a push
 pays for clippy and the test suites. `pre-push` reads the ranges being pushed and
-runs only the side that changed, so a docs-only push is instant, and it mirrors
-CI's `--exclude desktop` on purpose — a gate stricter than CI would block pushes
-CI would pass.
+runs only the side that changed, so a docs-only push is instant, and it skips the
+`desktop` crate on purpose — that one needs the system webview and a staged
+sidecar set, so CI covers it in its own job rather than every push paying for it.
+A hook stricter than CI would block pushes CI would pass; looser is fine.
 
 Either hook takes `--no-verify` when you need to bypass it
 (`git commit --no-verify`, `git push --no-verify`).

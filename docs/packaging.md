@@ -128,9 +128,9 @@ rotation logic". A retry re-downloads, which is acceptable for something that ha
 
 `scripts/package.sh` builds without the key by flipping
 `createUpdaterArtifacts` off, so local packaging works unsigned. CI refuses a **tagged** release with no key
-configured — the guard is the first step of the
-`package` job, because a tag attaches installers to the Release before the
-`manifest` job runs, and builds published without a `latest.json` would poll an endpoint that never answers.
+configured — the guard is in the `preflight` job, which runs before anything is built, because a tag attaches
+installers to the Release as each platform finishes and builds published without a `latest.json` would poll an
+endpoint that never answers.
 
 ### Authenticode — the path, not the requirement
 
@@ -190,13 +190,26 @@ works out of the box. Built without it, the source stays hidden until a user set
 which overrides the baked-in key either way. It is baked into the binary, so it is extractable — do not use a key you
 are not willing to distribute.
 
+Releases take it from the `CURSEFORGE_API_KEY` repository secret, which
+[`release.yml`](../.github/workflows/release.yml) passes into the build as that variable. Only `hestiad` links `engine`,
+so the key rides in the daemon sidecar and nowhere else. `engine/build.rs` declares
+`rerun-if-env-changed`, so a warm CI cache still recompiles against the current value rather than shipping a stale one.
+A tagged release without the secret warns rather than fails.
+
 ## CI
 
-- [`ci.yml`](../.github/workflows/ci.yml) — three jobs. `check` runs `fmt` + `clippy` + `test` on Linux and Windows,
+- [`ci.yml`](../.github/workflows/ci.yml) — four jobs. `check` runs `fmt` + `clippy` + `test` on Linux and Windows,
   excluding the `desktop` crate so no webview is needed; the Linux job installs the GTK and appindicator dev packages
   the `tray` crate links. `frontend` runs the Bun chain — `generate:messages` (`src/paraglide/` is generated and
   untracked, so it precedes anything resolving those imports), then `check` (biome), `typecheck` (tsc), `test` (vitest)
-  and `build`. `deny` runs `cargo-deny`.
-- [`release.yml`](../.github/workflows/release.yml) — on a `v*` tag, runs
-  `scripts/package.sh all` on a Linux and a Windows runner and attaches every artifact to the GitHub Release. A manual
-  `workflow_dispatch` is a dry run: it builds and uploads workflow artifacts but does not touch a Release.
+  and `build`. `desktop` covers what `check` excludes: it installs the WebKitGTK stack, builds the frontend
+  (`generate_context!` embeds `frontend/dist`) and stages debug sidecars (tauri-build requires the `externalBin` files
+  to exist), then runs clippy and the crate's tests. `deny` runs `cargo-deny`. The workflow also declares
+  `workflow_call`, so the release can reuse it verbatim.
+- [`release.yml`](../.github/workflows/release.yml) — on a `v*` tag: `preflight` → `gate` → `package` → `manifest`.
+  `preflight` refuses the release before anything is compiled if the tag, `Cargo.toml` and `tauri.conf.json` disagree on
+  the version, if `CHANGELOG.md` has no matching section, or if the updater signing key is missing. `gate` calls
+  `ci.yml`, since that workflow's own triggers cover branches but not tags. `package` then verifies `Cargo.lock` is
+  current (`cargo fetch --locked`), runs `scripts/package.sh all` on a Linux and a Windows runner, and attaches every
+  artifact to the GitHub Release. A manual `workflow_dispatch` is a dry run: the same gates run, but it uploads workflow
+  artifacts without touching a Release.

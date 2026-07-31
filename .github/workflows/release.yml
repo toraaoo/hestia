@@ -15,7 +15,78 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # A tag attaches installers to the Release as each platform finishes, so
+  # anything that would invalidate the release must fail before the first
+  # build starts, not once half the artifacts are already public.
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versions agree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
+          tauri="$(jq -r .version crates/desktop/tauri.conf.json)"
+          echo "Cargo.toml=$cargo tauri.conf.json=$tauri"
+          [ "$cargo" = "$tauri" ] || {
+            echo "::error::Cargo.toml ($cargo) and tauri.conf.json ($tauri) disagree"
+            exit 1
+          }
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            [ "$tag" = "$cargo" ] || {
+              echo "::error::tag $GITHUB_REF_NAME does not match version $cargo"
+              exit 1
+            }
+          fi
+          echo "version=$cargo" >>"$GITHUB_ENV"
+
+      - name: The changelog has this version's section
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes="$(awk -v want="## $version" '
+            $0 == want { grab = 1; next }
+            grab && /^## / { exit }
+            grab { print }
+          ' CHANGELOG.md)"
+          if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
+            echo "::error::CHANGELOG.md has no '## $version' section"
+            exit 1
+          fi
+          printf '%s\n' "$notes"
+
+      - name: The updater signing key is configured
+        if: github.ref_type == 'tag'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set. See docs/packaging.md#signing."
+            exit 1
+          fi
+
+      # Not fatal: without it the CurseForge source stays hidden until a user
+      # sets `content.curseforge-key` themselves.
+      - name: The CurseForge key is configured
+        if: github.ref_type == 'tag'
+        env:
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+        run: |
+          if [ -z "${CURSEFORGE_API_KEY:-}" ]; then
+            echo "::warning::the CURSEFORGE_API_KEY secret is not set; this release ships without a CurseForge key. See docs/packaging.md."
+          fi
+
+  # ci.yml runs on branch pushes, not tags; without this a tag publishes code
+  # that fmt, clippy and the test suites never saw.
+  gate:
+    needs: preflight
+    uses: ./.github/workflows/ci.yml
+
   package:
+    needs: gate
     strategy:
       fail-fast: false
       matrix:
@@ -28,21 +99,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      # A tag publishes installers before the manifest job runs, so a missing
-      # key must stop the release here rather than after the artifacts are
-      # already attached: those builds would poll a latest.json that never
-      # appears, and nothing can sign an update they would accept.
-      - name: Require the updater signing key for a tagged release
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
-            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set. See docs/packaging.md#signing."
-            exit 1
-          fi
-
       - uses: actions/checkout@v4
 
       - name: Install Tauri Linux dependencies
@@ -58,6 +114,11 @@ jobs:
         with:
           key: release-${{ matrix.name }}
 
+      # Proves Cargo.lock resolves Cargo.toml as committed, so the release
+      # builds the dependency set that was tested rather than a fresh solve.
+      - name: Verify the lockfile is current
+        run: cargo fetch --locked
+
       - uses: oven-sh/setup-bun@v2
       - name: Install frontend dependencies
         working-directory: frontend
@@ -68,11 +129,15 @@ jobs:
         with:
           tool: tauri-cli@2.10.1
 
+      # engine/build.rs re-runs on a changed HESTIA_CURSEFORGE_API_KEY, so a
+      # warm cache still bakes in the current value. The key ends up inside a
+      # public binary and is extractable — see docs/packaging.md.
       - name: Build installers + portable archive
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          HESTIA_CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
         run: scripts/package.sh all
 
       - name: Upload workflow artifacts
@@ -134,9 +199,6 @@ jobs:
             grab && /^## / { exit }
             grab { print }
           ' CHANGELOG.md)"
-          if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
-            echo "::warning::CHANGELOG.md has no '## $version' section; latest.json will carry no notes"
-          fi
           manifest="$(jq -n --arg v "$version" --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg n "$notes" \
             '{version: $v, notes: $n, pub_date: $d, platforms: {}}')"

@@ -4,10 +4,10 @@
 # which points core.hooksPath here on `cargo test`. Skip with
 # `git push --no-verify`.
 #
-# Mirrors .github/workflows/ci.yml deliberately, including its
-# `--exclude desktop` (that crate needs the system webview, which CI does not
-# install and a contributor may not have). A gate stricter than CI blocks pushes
-# CI would pass; a looser one lets red builds through.
+# Mirrors .github/workflows/ci.yml's `check` and `frontend` jobs. `desktop` is
+# excluded: that crate needs the system webview and a staged sidecar set, so CI
+# covers it in a job of its own rather than every push paying for it. A gate
+# stricter than CI blocks pushes CI would pass, so looser is the safe direction.
 #
 # Only the side that changed is checked: the ranges being pushed decide, so a
 # docs-only push costs nothing and a Rust-only push never waits on Bun.
