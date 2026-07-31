@@ -7,6 +7,25 @@ asset on the standing `announcements` release tag, which the launcher polls.
 Nothing here is fetched directly — the launcher only ever reads the compiled
 `announcements.json`.
 
+## Writing one
+
+`scripts/announce.sh new` writes the file so the format below stays something
+you read rather than retype. It fills the frontmatter, names the file
+`<published>-<id>.md`, refuses an id another entry already owns, and compiles
+what it wrote before leaving it behind:
+
+```bash
+scripts/announce.sh new "Update to 0.0.4 — rcon passwords could reach the log" \
+  --severity critical --max-version 0.0.3 --edit
+```
+
+With no title it prompts for one (and for the severity) on a terminal. The id
+defaults to a slug of the title — pass `--id` to scope it (`rcon-password-log-0-0-3`),
+since it is permanent. Every other key is a flag: `--published`, `--expires`,
+`--link`, `--platforms`, `--channels`, `--min-version`, `--max-version`. The body
+comes from `--body`, from stdin with `--body -`, or is left as a `TODO:` line for
+you to replace; `--edit` opens the file in `$EDITOR`.
+
 ## Running it locally
 
 A debug run of either runner serves this directory as the feed and points the

@@ -2,6 +2,7 @@
 # Compile (and optionally sign) the announcement feed from news/*.md.
 #
 #   scripts/announce.sh                 # compile + preview the payload
+#   scripts/announce.sh new "Title"     # scaffold news/<date>-<id>.md
 #   scripts/announce.sh --envelope      # wrap unsigned, for a local daemon
 #   scripts/announce.sh --serve [port]  # serve the unsigned envelope on 127.0.0.1
 #   scripts/announce.sh --sign          # wrap signed (CI; needs the private key)
@@ -21,7 +22,14 @@ mode="${1:-preview}"
 repo="${GITHUB_REPOSITORY:-toraaoo/hestia}"
 base_url="https://github.com/${repo}/releases/download/announcements"
 
-payload="$(python scripts/announce.py news "$base_url")"
+# Authoring writes a file rather than reading the feed, so it runs before the
+# compile — a news/ that does not compile is exactly when a scaffold is useful.
+if [ "$mode" = "new" ]; then
+  shift
+  exec python scripts/announce.py new "$@"
+fi
+
+payload="$(python scripts/announce.py compile news --base-url "$base_url")"
 
 case "$mode" in
   preview)
@@ -76,7 +84,7 @@ EOF
     jq -n --arg s "$signature" --arg p "$payload" '{signature: $s, payload: $p}'
     ;;
   *)
-    echo "unknown mode: $mode (preview | --envelope | --serve | --sign)" >&2
+    echo "unknown mode: $mode (preview | new | --envelope | --serve | --sign)" >&2
     exit 2
     ;;
 esac

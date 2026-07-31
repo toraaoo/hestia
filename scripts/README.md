@@ -11,7 +11,7 @@ packaging.
 | `clean.sh`     | `cargo clean` plus the frontend `dist`/`node_modules` and Tauri `gen` |
 | `sidecars.sh`  | build + stage `hestia`/`hestiad`/`tray` as Tauri sidecars for bundling |
 | `package.sh`   | release artifacts: Tauri installers + portable archive (`all`/`bundle`/`portable`) |
-| `announce.sh`  | compile `news/*.md` into the feed: preview, serve it locally, or sign it (CI) |
+| `announce.sh`  | announcements: scaffold one (`new`), compile `news/*.md` into the feed, serve it locally, or sign it (CI) |
 | `news.sh`      | sourced by `dev.sh`/`run.sh`: serve that feed and point the daemon at it |
 | `win.ps1`      | Windows entry point — forwards each verb to the matching `*.sh` via Git Bash |
 
@@ -28,6 +28,7 @@ scripts/dev.sh                    # subshell: hestia + hestiad on PATH
 scripts/dev.sh java list          # one-shot CLI (builds first)
 scripts/dev.sh --desktop          # desktop shell with frontend HMR
 
+scripts/announce.sh new "Title"   # scaffold news/<date>-<id>.md, then edit it
 scripts/announce.sh               # compile news/ and print the feed payload
 scripts/announce.sh --serve       # serve it on 127.0.0.1:8787 by hand
 scripts/dev.sh --no-news          # subshell without the local feed
