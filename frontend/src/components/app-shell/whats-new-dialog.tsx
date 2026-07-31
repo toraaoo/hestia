@@ -62,7 +62,10 @@ export function WhatsNewDialog() {
           <AlertDialogTitle>
             {m['settings.update.whats_new']({ version: version ?? '' })}
           </AlertDialogTitle>
-          <AlertDialogDescription render={<div />}>
+          <AlertDialogDescription
+            render={<div />}
+            className="max-h-[60vh] overflow-y-auto pr-1"
+          >
             <Markdown>{notes.data}</Markdown>
           </AlertDialogDescription>
         </AlertDialogHeader>

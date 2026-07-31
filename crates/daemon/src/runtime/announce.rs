@@ -19,7 +19,14 @@ use super::Runtime;
 
 /// Announcements are edited by hand and read at a glance; polling more often
 /// than this spends requests on a document that changes a few times a year.
+#[cfg(not(debug_assertions))]
 const INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
+
+/// A debug run serves `news/` off the local disk, where the document changes
+/// every time an entry is edited — six hours there means never. The short tick
+/// exists only in a debug binary, so it cannot reach a shipped build.
+#[cfg(debug_assertions)]
+const INTERVAL: Duration = Duration::from_secs(30);
 
 pub fn spawn_announcement_poller(runtime: Arc<Runtime>) {
     tokio::spawn(async move {

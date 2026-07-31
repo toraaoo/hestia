@@ -133,7 +133,7 @@ reading.
 | Loop | Cadence | What it does |
 |---|---|---|
 | `scheduler.rs` | every minute | archive each **running** server whose `backup-interval` has elapsed since its newest backup, then prune `scheduled` archives beyond `backup-retention`. A stopped server's world cannot change, so it is never re-archived |
-| `announce.rs` | at startup, then every few hours | fetch the feed; publish `announce.changed` when what applies to this build changes. A failed poll publishes nothing — the cached list is still what the daemon serves |
+| `announce.rs` | at startup, then every six hours (30s in a debug build, where the feed is served off local `news/`) | fetch the feed; publish `announce.changed` when what applies to this build changes. A failed poll publishes nothing — the cached list is still what the daemon serves |
 | `metrics.rs` | every 2 s | sample CPU and memory for supervised processes, normalising CPU by logical core count so a multi-threaded JVM reports a share of the machine rather than 800% |
 
 `event_hub.rs` fans events out to subscribed connections, filtered by id, and

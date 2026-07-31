@@ -51,10 +51,15 @@ export function CriticalAnnouncementDialog() {
 
   return (
     <AlertDialog open>
-      <AlertDialogContent>
+      <AlertDialogContent className="sm:max-w-2xl">
         <AlertDialogHeader>
           <AlertDialogTitle>{current.title}</AlertDialogTitle>
-          <AlertDialogDescription>
+          {/* A critical notice is authored, not length-limited — cap it and let
+              it scroll rather than let a long one grow past the viewport. */}
+          <AlertDialogDescription
+            render={<div />}
+            className="max-h-[60vh] overflow-y-auto pr-1"
+          >
             <Markdown>{current.body}</Markdown>
           </AlertDialogDescription>
         </AlertDialogHeader>

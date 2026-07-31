@@ -124,7 +124,7 @@ impl Announce {
         let source = endpoint();
         let parsed = verify_and_parse(document, source.trust)?;
         let mut inner = self.inner.lock().unwrap();
-        let changed = inner.visible_ids(now) != visible_ids(&parsed.entries, now);
+        let changed = visible(&inner.entries, now) != visible(&parsed.entries, now);
         inner.entries = parsed.entries;
         inner.fetched = now;
         // An unsigned feed is held in memory and never written: the cache is
@@ -203,21 +203,18 @@ impl Inner {
             enabled: true,
         }
     }
-
-    fn visible_ids(&self, now: i64) -> Vec<String> {
-        visible_ids(&self.entries, now)
-    }
 }
 
-fn visible_ids(entries: &[feed::Entry], now: i64) -> Vec<String> {
+/// The entries this build would show, in a stable order so that reordering the
+/// published document is not itself a change. Compared whole rather than by id:
+/// a correction to a live announcement's body is exactly the case a poll exists
+/// to notice, and an id-only comparison reports it as unchanged.
+fn visible(entries: &[feed::Entry], now: i64) -> Vec<&feed::Entry> {
     let ctx = feed::Context::current(now);
-    let mut ids: Vec<String> = entries
-        .iter()
-        .filter(|entry| entry.applies(&ctx))
-        .map(|entry| entry.id.clone())
-        .collect();
-    ids.sort();
-    ids
+    let mut visible: Vec<&feed::Entry> =
+        entries.iter().filter(|entry| entry.applies(&ctx)).collect();
+    visible.sort_by(|a, b| a.id.cmp(&b.id));
+    visible
 }
 
 fn verify_and_parse(document: &str, trust: Trust) -> Result<Feed> {
@@ -300,7 +297,47 @@ fn now_unix() -> i64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{endpoint, verify_and_parse, Announce, Trust};
+    use super::{endpoint, feed, verify_and_parse, visible, Announce, Trust};
+
+    fn entry(id: &str, body: &str) -> feed::Entry {
+        feed::Entry {
+            id: id.into(),
+            body: body.into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn an_edited_body_counts_as_a_change() {
+        // The poll's whole job is to notice a correction to something already
+        // published, which keeps its id — comparing ids alone reported that as
+        // unchanged and no front-end ever refreshed.
+        let before = vec![entry("an-id", "original")];
+        let after = vec![entry("an-id", "corrected")];
+        assert_ne!(visible(&before, 0), visible(&after, 0));
+    }
+
+    #[test]
+    fn reordering_the_document_is_not_a_change() {
+        let before = vec![entry("a", "one"), entry("b", "two")];
+        let after = vec![entry("b", "two"), entry("a", "one")];
+        assert_eq!(visible(&before, 0), visible(&after, 0));
+    }
+
+    #[test]
+    fn an_entry_this_build_never_sees_is_not_a_change() {
+        // Targeting is applied before the comparison, so editing an entry aimed
+        // at another platform must not wake this one up.
+        let other = feed::Entry {
+            platforms: vec!["nonesuch".into()],
+            ..entry("an-id", "original")
+        };
+        let edited = feed::Entry {
+            body: "corrected".into(),
+            ..other.clone()
+        };
+        assert_eq!(visible(&[other], 0), visible(&[edited], 0));
+    }
 
     #[test]
     fn an_unsigned_feed_is_refused() {

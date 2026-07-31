@@ -28,7 +28,11 @@ pub struct Feed {
 }
 
 /// One authored announcement, before targeting is applied.
-#[derive(Deserialize, Default, Clone)]
+///
+/// `PartialEq` is what a poll compares: an entry is "the same" only when every
+/// authored field matches, so an edit to a published body is a change even
+/// though the id did not move.
+#[derive(Deserialize, Default, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Entry {
     pub id: String,

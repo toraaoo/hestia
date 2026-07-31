@@ -224,6 +224,13 @@ The feed is **minisign-signed** and verified against `ANNOUNCE_PUBKEY`
 fails closed. The poll is the daemon's one unprompted outbound request, so it is
 switchable with `announcements.enabled` — off, nothing is fetched.
 
+A refresh reports whether it **changed**, which the daemon's poller turns into an
+`announce.changed` push. The comparison is over the whole of each entry this
+build can see, not its id: correcting a live announcement's body is exactly what
+a poll exists to notice, and it keeps the id. Targeting is applied first, so an
+edit aimed at another platform or channel wakes nobody, and the compared list is
+ordered by id, so reordering the published document is not itself a change.
+
 ## Self-update
 
 `update.rs` checks the published release manifest (`latest.json`) and downloads
