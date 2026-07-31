@@ -20,8 +20,9 @@ use proto::skins::SkinVariant;
 use serde::{Deserialize, Serialize};
 
 use self::mojang::Profile;
+use crate::registry;
+use crate::schema::Document;
 
-const INDEX_FILE: &str = "library.json";
 // Absorbs bursts of skin.list reads; Mojang's profile API rate-limits hard.
 const PROFILE_TTL: Duration = Duration::from_secs(30);
 
@@ -40,6 +41,10 @@ pub struct LibraryEntry {
 struct LibraryFile {
     #[serde(default)]
     skins: Vec<LibraryEntry>,
+}
+
+impl Document for LibraryFile {
+    const NAME: &'static str = "library.json";
 }
 
 pub struct Skins {
@@ -236,17 +241,11 @@ fn png_dimensions(data: &[u8]) -> Option<(u32, u32)> {
 }
 
 fn load(dir: &std::path::Path) -> LibraryFile {
-    let Ok(text) = fs::read_to_string(dir.join(INDEX_FILE)) else {
-        return LibraryFile::default();
-    };
-    serde_json::from_str(&text).unwrap_or_default()
+    registry::read_record(dir).unwrap_or_default()
 }
 
 fn save(dir: &std::path::Path, file: &LibraryFile) -> Result<()> {
-    fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
-    let text = serde_json::to_string_pretty(file).expect("skin library serializes");
-    fs::write(dir.join(INDEX_FILE), format!("{text}\n"))?;
-    Ok(())
+    registry::write_record(dir, file)
 }
 
 #[cfg(test)]

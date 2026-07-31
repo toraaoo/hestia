@@ -16,6 +16,7 @@ use std::path::Path;
 use proto::content::ContentKind;
 
 use crate::content::install;
+use crate::schema::Document;
 
 /// Names skipped wherever they appear: OS turds, the world lock (transient
 /// state, never data), and partial files.
@@ -61,7 +62,7 @@ impl Rules {
         }
         // The record travels in the manifest, which an import reads before it
         // has anywhere to put a file.
-        if relative == crate::instances::RECORD || SKIP_ROOTS.contains(&relative) {
+        if relative == crate::instances::InstanceRecord::NAME || SKIP_ROOTS.contains(&relative) {
             return true;
         }
         if relative

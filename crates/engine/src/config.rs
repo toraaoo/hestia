@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::minecraft::launch::{normalize_memory, parse_jvm_args, JavaSettings};
+use crate::schema::{self, Document};
 
 /// The config schema. A setting is a typed field with its default; a nested
 /// struct becomes a sub-object. The reserved keys (home, autostart) are routed
@@ -137,6 +138,10 @@ pub struct ContentSettings {
     pub curseforge_key: String,
 }
 
+impl Document for Settings {
+    const NAME: &'static str = "config.json";
+}
+
 impl Settings {
     /// Validate and canonicalise after a raw dotted-path set — the same rules
     /// the per-entry `memory`/`jvm-args` keys enforce.
@@ -183,6 +188,8 @@ pub enum ConfigError {
     Rejected { key: String, message: String },
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error(transparent)]
+    Save(anyhow::Error),
 }
 
 pub struct Config {
@@ -273,19 +280,11 @@ impl Config {
 }
 
 fn load_settings(path: &Path) -> Settings {
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return Settings::default();
-    };
-    serde_json::from_str(&text).unwrap_or_default()
+    schema::load(path).unwrap_or_default()
 }
 
 fn save_settings(path: &Path, settings: &Settings) -> Result<(), ConfigError> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let text = serde_json::to_string_pretty(settings).expect("Settings serializes");
-    std::fs::write(path, format!("{text}\n"))?;
-    Ok(())
+    schema::save(path, settings).map_err(ConfigError::Save)
 }
 
 // The config keys are kebab-case (`defaults.jvm-args`); the settings serialize

@@ -13,8 +13,7 @@ use proto::instance::Profile;
 use serde::{Deserialize, Serialize};
 
 use crate::registry;
-
-const FILE: &str = "profiles.json";
+use crate::schema::Document;
 
 /// The name reserved by the launch override (`--profile none` = no profile).
 const RESERVED: &str = "none";
@@ -32,6 +31,10 @@ struct Members {
     members: Vec<String>,
 }
 
+impl Document for Stored {
+    const NAME: &'static str = "profiles.json";
+}
+
 /// Whether a pool item of this kind can be a profile member. Datapacks are
 /// world-of-record (never pool content); modpacks are not single-file installs.
 pub(crate) fn selectable(kind: ContentKind) -> bool {
@@ -42,11 +45,11 @@ pub(crate) fn selectable(kind: ContentKind) -> bool {
 }
 
 fn load_stored(entry_dir: &Path) -> Stored {
-    registry::read_record(entry_dir, FILE).unwrap_or_default()
+    registry::read_record(entry_dir).unwrap_or_default()
 }
 
 fn save_stored(entry_dir: &Path, stored: &Stored) -> Result<()> {
-    registry::write_record(entry_dir, FILE, stored)
+    registry::write_record(entry_dir, stored)
 }
 
 /// A profile's captured settings store (`<instance>/profiles/<name>/`). Its

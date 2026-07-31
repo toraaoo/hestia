@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::minecraft::launch::{JavaSettings, JVM_ARGS_KEY, MEMORY_KEY};
 use crate::registry;
+use crate::schema::Document;
 
-pub(crate) const RECORD: &str = "instance.json";
 pub(crate) const DATA: &str = "data";
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -36,6 +36,10 @@ pub struct InstanceRecord {
     #[serde(default)]
     pub jvm: JavaSettings,
     pub profile: InstanceProfile,
+}
+
+impl Document for InstanceRecord {
+    const NAME: &'static str = "instance.json";
 }
 
 pub struct Instances {
@@ -71,7 +75,7 @@ impl Instances {
     }
 
     pub fn list(&self) -> Vec<InstanceRecord> {
-        let mut records: Vec<InstanceRecord> = registry::scan(&self.dir(), RECORD);
+        let mut records: Vec<InstanceRecord> = registry::scan(&self.dir());
         records.sort_by(|a, b| a.name.cmp(&b.name));
         records
     }
@@ -119,7 +123,7 @@ impl Instances {
         let dir = self.instance_dir(&record);
         std::fs::create_dir_all(&dir)
             .with_context(|| format!("cannot create {}", dir.display()))?;
-        registry::write_record(&dir, RECORD, &record)?;
+        registry::write_record(&dir, &record)?;
         tracing::info!(id = %record.id, name, "instance registered");
         Ok(record)
     }
@@ -132,7 +136,7 @@ impl Instances {
             .get(id)
             .with_context(|| format!("unknown instance: {id}"))?;
         record.profile = profile;
-        registry::write_record(&self.instance_dir(&record), RECORD, &record)?;
+        registry::write_record(&self.instance_dir(&record), &record)?;
         tracing::info!(
             id = %record.id,
             version = %record.profile.game_version,
@@ -149,7 +153,7 @@ impl Instances {
             .get(id)
             .with_context(|| format!("unknown instance: {id}"))?;
         record.last_played_unix = Some(registry::now_unix());
-        registry::write_record(&self.instance_dir(&record), RECORD, &record)
+        registry::write_record(&self.instance_dir(&record), &record)
     }
 
     /// Add an exited session's duration to the cumulative playtime. A
@@ -162,7 +166,7 @@ impl Instances {
             .get(id)
             .with_context(|| format!("unknown instance: {id}"))?;
         record.playtime_seconds += seconds;
-        registry::write_record(&self.instance_dir(&record), RECORD, &record)
+        registry::write_record(&self.instance_dir(&record), &record)
     }
 
     /// Read one JVM setting (`memory` / `jvm-args`); `Ok(None)` means unset. An
@@ -187,7 +191,7 @@ impl Instances {
                 key: key.to_string()
             });
         }
-        registry::write_record(&self.instance_dir(&record), RECORD, &record)
+        registry::write_record(&self.instance_dir(&record), &record)
     }
 
     /// Both JVM settings with their current values (empty when unset).
@@ -226,7 +230,7 @@ impl Instances {
                 format!("cannot move {} to {}", old_dir.display(), new_dir.display())
             })?;
         }
-        registry::write_record(&new_dir, RECORD, &record)?;
+        registry::write_record(&new_dir, &record)?;
         tracing::info!(id = %record.id, name = %new_name, "instance renamed");
         Ok(record)
     }

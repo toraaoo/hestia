@@ -2,13 +2,13 @@
 //! each entry is a directory holding a JSON record, listing scans the parent —
 //! the disk is the registry.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{bail, Context, Result};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use anyhow::{bail, Result};
 use uuid::Uuid;
+
+use crate::schema::{self, Document};
 
 pub(crate) fn now_unix() -> i64 {
     SystemTime::now()
@@ -87,25 +87,29 @@ pub(crate) fn slugify(name: &str) -> Result<String> {
     }
 }
 
-pub(crate) fn read_record<T: DeserializeOwned>(dir: &Path, file: &str) -> Option<T> {
-    let text = std::fs::read_to_string(dir.join(file)).ok()?;
-    serde_json::from_str(&text).ok()
+/// Where a record lives: its directory plus the file name the document type
+/// itself declares, so the two can never be paired wrongly at a call site.
+pub(crate) fn record_path<T: Document>(dir: &Path) -> PathBuf {
+    dir.join(T::NAME)
 }
 
-pub(crate) fn write_record<T: Serialize>(dir: &Path, file: &str, record: &T) -> Result<()> {
-    let text = serde_json::to_string_pretty(record).context("record serializes")?;
-    std::fs::write(dir.join(file), format!("{text}\n"))
-        .with_context(|| format!("cannot write {file} in {}", dir.display()))
+pub(crate) fn read_record<T: Document>(dir: &Path) -> Option<T> {
+    schema::load(&record_path::<T>(dir))
+}
+
+pub(crate) fn write_record<T: Document>(dir: &Path, record: &T) -> Result<()> {
+    schema::save(&record_path::<T>(dir), record)
 }
 
 /// Every record under `dir` (one subdirectory per entry, skipping any that has
-/// no readable record).
-pub(crate) fn scan<T: DeserializeOwned>(dir: &Path, file: &str) -> Vec<T> {
+/// no readable record — an unreadable one is set aside and reported by
+/// [`schema::load`] rather than passed off as absent).
+pub(crate) fn scan<T: Document>(dir: &Path) -> Vec<T> {
     let mut records = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             if entry.path().is_dir() {
-                if let Some(record) = read_record(&entry.path(), file) {
+                if let Some(record) = read_record(&entry.path()) {
                     records.push(record);
                 }
             }

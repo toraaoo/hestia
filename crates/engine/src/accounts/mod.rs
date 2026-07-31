@@ -24,6 +24,8 @@ use microsoft::{
 };
 use signing::{base64url_nopad, format_uuid_v4, hex, random_bytes, ProofKey};
 
+use crate::schema::{self, Document};
+
 const REFRESH_MARGIN_SECONDS: i64 = 300;
 
 /// The account's refresh token was rejected; recover only by re-login. Mapped to
@@ -88,6 +90,10 @@ struct AccountsFile {
     /// first signed-in one.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     default_uuid: String,
+}
+
+impl Document for AccountsFile {
+    const NAME: &'static str = "accounts.json";
 }
 
 pub struct Accounts {
@@ -455,23 +461,11 @@ fn sha256_bytes(text: &str) -> Vec<u8> {
 }
 
 fn load(path: &Path) -> AccountsFile {
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return AccountsFile::default();
-    };
-    serde_json::from_str(&text).unwrap_or_default()
+    schema::load(path).unwrap_or_default()
 }
 
+// The file holds tokens, so it is written owner-only — the mode lands on the
+// temp file before the rename, so it is never briefly readable by anyone else.
 fn save(path: &Path, file: &AccountsFile) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let text = serde_json::to_string_pretty(file).expect("accounts file serializes");
-    std::fs::write(path, format!("{text}\n"))?;
-    // The file holds tokens: keep it owner-only where permissions exist.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
-    }
-    Ok(())
+    schema::save_private(path, file)
 }

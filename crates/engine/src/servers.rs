@@ -20,8 +20,8 @@ use crate::minecraft::launch::{self, JavaSettings, LaunchPlan};
 use crate::minecraft::materialize::{self, OnProgress};
 use crate::process::{Outcome, ProcessSupervisor, Task};
 use crate::registry;
+use crate::schema::Document;
 
-const RECORD: &str = "server.json";
 const PROPERTIES: &str = "server.properties";
 // The key set the server's own pristine generation run emitted — the schema
 // `config_set` validates against, kept beside the record because it describes
@@ -91,6 +91,10 @@ pub struct ServerRecord {
     pub profile: ServerProfile,
 }
 
+impl Document for ServerRecord {
+    const NAME: &'static str = "server.json";
+}
+
 impl ServerRecord {
     /// Whether the server can be started: fully provisioned, nothing in flight.
     pub fn ready(&self) -> bool {
@@ -148,7 +152,7 @@ impl Servers {
     }
 
     pub fn list(&self) -> Vec<ServerRecord> {
-        let mut records: Vec<ServerRecord> = registry::scan(&self.dir(), RECORD);
+        let mut records: Vec<ServerRecord> = registry::scan(&self.dir());
         records.sort_by(|a, b| a.name.cmp(&b.name));
         records
     }
@@ -192,7 +196,7 @@ impl Servers {
         let dir = self.server_dir(&record);
         std::fs::create_dir_all(&dir)
             .with_context(|| format!("cannot create {}", dir.display()))?;
-        registry::write_record(&dir, RECORD, &record)?;
+        registry::write_record(&dir, &record)?;
         tracing::info!(id = %record.id, name, game_port, "server registered");
         Ok(record)
     }
@@ -265,7 +269,7 @@ impl Servers {
         )?;
         record.game_port = Some(game_port);
         record.rcon = Some(rcon);
-        registry::write_record(&self.server_dir(&record), RECORD, &record)?;
+        registry::write_record(&self.server_dir(&record), &record)?;
         Ok(record)
     }
 
@@ -443,7 +447,7 @@ impl Servers {
         record.profile = profile;
         record.phase = ServerPhase::Updating;
         let data = self.data_dir(&record);
-        registry::write_record(&self.server_dir(&record), RECORD, &record)?;
+        registry::write_record(&self.server_dir(&record), &record)?;
 
         if !record.profile.libraries.is_empty() {
             materialize::ensure_libraries(
@@ -479,7 +483,7 @@ impl Servers {
             .get(id)
             .with_context(|| format!("unknown server: {id}"))?;
         record.phase = phase;
-        registry::write_record(&self.server_dir(&record), RECORD, &record)?;
+        registry::write_record(&self.server_dir(&record), &record)?;
         Ok(record)
     }
 
@@ -552,7 +556,7 @@ impl Servers {
                 format!("cannot move {} to {}", old_dir.display(), new_dir.display())
             })?;
         }
-        registry::write_record(&new_dir, RECORD, &record)?;
+        registry::write_record(&new_dir, &record)?;
         tracing::info!(id = %record.id, name = %new_name, "server renamed");
         Ok(record)
     }
@@ -605,7 +609,7 @@ impl Servers {
             .get(id)
             .with_context(|| format!("unknown server: {id}"))?;
         if record.jvm.set(key, value)? || record.backup.set(key, value)? {
-            registry::write_record(&self.server_dir(&record), RECORD, &record)?;
+            registry::write_record(&self.server_dir(&record), &record)?;
             return Ok(());
         }
         if MANAGED_PROPERTIES.contains(&key) {

@@ -17,19 +17,22 @@ use proto::modpack::{InstalledModpack, ModpackOverride};
 
 use crate::content::install;
 use crate::registry;
+use crate::schema::Document;
 
-const RECORD: &str = "modpack.json";
+impl Document for InstalledModpack {
+    const NAME: &'static str = "modpack.json";
+}
 
 pub(crate) fn load(entry_dir: &Path) -> Option<InstalledModpack> {
-    registry::read_record::<InstalledModpack>(entry_dir, RECORD)
+    registry::read_record::<InstalledModpack>(entry_dir)
 }
 
 pub(crate) fn save(entry_dir: &Path, pack: &InstalledModpack) -> Result<()> {
-    registry::write_record(entry_dir, RECORD, pack)
+    registry::write_record(entry_dir, pack)
 }
 
 pub(crate) fn clear(entry_dir: &Path) {
-    let path = entry_dir.join(RECORD);
+    let path = registry::record_path::<InstalledModpack>(entry_dir);
     if let Err(e) = std::fs::remove_file(&path) {
         if e.kind() != std::io::ErrorKind::NotFound {
             tracing::warn!(path = %path.display(), error = %e, "cannot remove the modpack record");

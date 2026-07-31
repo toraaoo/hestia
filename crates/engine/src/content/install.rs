@@ -21,13 +21,16 @@ use serde::{Deserialize, Serialize};
 use crate::checksum::Hasher;
 use crate::content::profiles;
 use crate::registry;
-
-const INDEX: &str = "content.json";
+use crate::schema::Document;
 
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct Index {
     items: Vec<InstalledContent>,
+}
+
+impl Document for Index {
+    const NAME: &'static str = "content.json";
 }
 
 /// The directory name for an installable kind — the game's own load-dir name
@@ -150,13 +153,13 @@ fn candidate_paths(
 }
 
 pub(crate) fn load(entry_dir: &Path) -> Vec<InstalledContent> {
-    registry::read_record::<Index>(entry_dir, INDEX)
+    registry::read_record::<Index>(entry_dir)
         .map(|i| i.items)
         .unwrap_or_default()
 }
 
 pub(crate) fn save(entry_dir: &Path, items: Vec<InstalledContent>) -> Result<()> {
-    registry::write_record(entry_dir, INDEX, &Index { items })
+    registry::write_record(entry_dir, &Index { items })
 }
 
 pub(crate) fn managed_path(entry_dir: &Path, item: &InstalledContent) -> Result<PathBuf> {
