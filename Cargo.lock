@@ -689,6 +689,7 @@ dependencies = [
  "clap",
  "client",
  "common",
+ "futures-util",
  "proto",
  "ratatui",
  "serde_json",

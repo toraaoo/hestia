@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
-use client::proto::instance::InstanceLaunchDoneEvent;
+use client::proto::instance::{InstanceLaunchDoneEvent, QuickPlay};
 use client::proto::process::ProcessState;
 use client::{Client, ProcessEvent};
 
@@ -23,8 +23,9 @@ pub async fn launch(
     account: &str,
     new_session: bool,
     detach: bool,
+    quick_play: Option<QuickPlay>,
 ) -> Result<()> {
-    let launched = launch_once(client, reference, account, new_session).await?;
+    let launched = launch_once(client, reference, account, new_session, quick_play).await?;
     let process_id = launched.process_id;
     if detach || !ui::interactive_output() {
         ui::show(View::line(format!(
@@ -54,6 +55,7 @@ async fn launch_once(
     reference: &str,
     account: &str,
     new_session: bool,
+    quick_play: Option<QuickPlay>,
 ) -> Result<InstanceLaunchDoneEvent> {
     let mut retried = false;
     loop {
@@ -61,9 +63,14 @@ async fn launch_once(
         let progress = reporter.clone();
         let result = client
             .instance()
-            .launch(reference, account, new_session, "", move |p| {
-                progress.update(p)
-            })
+            .launch(
+                reference,
+                account,
+                new_session,
+                "",
+                quick_play.clone(),
+                move |p| progress.update(p),
+            )
             .await;
         reporter.finish();
         match result {
@@ -123,7 +130,7 @@ pub(crate) async fn restart(
     }
     // Restarting one session leaves the others running, so its relaunch must opt
     // into a concurrent session; a full restart stopped everything first.
-    launch(client, instance, account, target.is_some(), detach).await
+    launch(client, instance, account, target.is_some(), detach, None).await
 }
 
 /// Resolve an optional `--session` handle to a full process id against the live

@@ -53,6 +53,14 @@ enum Command {
         detach: bool,
         #[arg(long, help = "Launch another session even if one is already running")]
         new_session: bool,
+        #[arg(long, help = "Open a save world on start, by folder (Minecraft 1.20+)")]
+        world: Option<String>,
+        #[arg(
+            long,
+            conflicts_with = "world",
+            help = "Join a server on start, by address (Minecraft 1.20+)"
+        )]
+        server: Option<String>,
     },
     /// Minecraft accounts (Microsoft sign-in, switching)
     #[command(visible_alias = "auth")]
@@ -290,7 +298,9 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
             account,
             detach,
             new_session,
-        } => commands::play::run(instance, account, new_session, detach).await,
+            world,
+            server,
+        } => commands::play::run(instance, account, new_session, detach, world, server).await,
         Command::Account { cmd } => commands::account::run(cmd).await,
         Command::Java { cmd } => commands::java::run(cmd).await,
         Command::Instance { cmd } => commands::instance::run(cmd).await,

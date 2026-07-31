@@ -11,6 +11,7 @@ mod config;
 mod create;
 mod entry;
 pub(crate) mod lifecycle;
+pub(crate) mod multiplayer;
 mod transfer;
 mod update;
 
@@ -111,6 +112,14 @@ enum InstanceAction {
         detach: bool,
         #[arg(long, help = "Launch another session even if one is already running")]
         new_session: bool,
+        #[arg(long, help = "Open a save world on start, by folder (Minecraft 1.20+)")]
+        world: Option<String>,
+        #[arg(
+            long,
+            conflicts_with = "world",
+            help = "Join a server on start, by address (Minecraft 1.20+)"
+        )]
+        server: Option<String>,
     },
     /// Kill the instance's sessions (all, or one with --session)
     Stop {
@@ -136,6 +145,18 @@ enum InstanceAction {
     Info,
     /// The instance's save worlds (where datapacks install)
     Worlds,
+    /// Play one of the instance's save worlds directly
+    World {
+        #[command(subcommand)]
+        cmd: multiplayer::WorldCmd,
+    },
+    /// The instance's multiplayer list, with each server's status
+    Servers,
+    /// Join or manage the servers in the instance's multiplayer list
+    Server {
+        #[command(subcommand)]
+        cmd: multiplayer::ServerCmd,
+    },
     /// Watch a running session's CPU and memory on a fullscreen graph
     Monitor {
         #[arg(
@@ -303,6 +324,8 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             account,
             detach,
             new_session,
+            world,
+            server,
         } => {
             launch(
                 client,
@@ -310,6 +333,7 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
                 account.as_deref().unwrap_or_default(),
                 new_session,
                 detach,
+                multiplayer::target(world, server),
             )
             .await
         }
@@ -334,6 +358,9 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             entry::show_detail(&info, &sessions)
         }
         InstanceAction::Worlds => worlds(client, &name).await,
+        InstanceAction::World { cmd } => multiplayer::run_world(client, &name, cmd).await,
+        InstanceAction::Servers => multiplayer::list(client, &name).await,
+        InstanceAction::Server { cmd } => multiplayer::run_server(client, &name, cmd).await,
         InstanceAction::Monitor { session } => lifecycle::monitor(client, &name, session).await,
         InstanceAction::Logs {
             tail,

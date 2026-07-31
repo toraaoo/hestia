@@ -1,9 +1,12 @@
 //! `hestia play` — the happy path: launch an instance. With no argument the
 //! sole instance launches directly; several prompt an interactive pick.
+//!
+//! `--world` / `--server` skip the menus and join on start (Quick Play), the
+//! same targets the entry-first `instance <name> world|server play` verbs take.
 
 use anyhow::{bail, Result};
 
-use crate::commands::instance;
+use crate::commands::instance::{self, multiplayer};
 use crate::ui;
 
 pub async fn run(
@@ -11,6 +14,8 @@ pub async fn run(
     account: Option<String>,
     new_session: bool,
     detach: bool,
+    world: Option<String>,
+    server: Option<String>,
 ) -> Result<()> {
     let client = super::connect().await?;
     let reference = match reference {
@@ -23,6 +28,7 @@ pub async fn run(
         account.as_deref().unwrap_or_default(),
         new_session,
         detach,
+        multiplayer::target(world, server),
     )
     .await
 }
