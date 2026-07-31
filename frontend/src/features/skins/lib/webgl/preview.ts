@@ -47,6 +47,14 @@ const DRAG_TO_RADIANS = 0.01;
 /** Three-quarter view: dead-on reads flat, and hides the arm silhouette. */
 const INITIAL_ROTATION = Math.PI + 0.38;
 
+/**
+ * `loadedCape` before any cape has been applied, which `undefined` cannot say —
+ * it already means "no cape". Without the distinction a fresh model with no
+ * cape short-circuits the diff in `setCape` and keeps the GLTF's own cape
+ * material: opaque white, and visible.
+ */
+const CAPE_UNSET = Symbol('cape-unset');
+
 export interface SkinPreviewOptions {
   canvas: HTMLCanvasElement;
   container: HTMLElement;
@@ -90,7 +98,7 @@ export class SkinPreview {
   private disposed = false;
   private modelVersion = 0;
   private capeVersion = 0;
-  private loadedCape: string | undefined;
+  private loadedCape: string | undefined | typeof CAPE_UNSET = CAPE_UNSET;
 
   constructor(options: SkinPreviewOptions) {
     this.container = options.container;
@@ -156,7 +164,7 @@ export class SkinPreview {
 
     this.initAnimations(model, gltf.animations);
     syncDamageFlash(model, this.flashIntensity);
-    this.loadedCape = undefined;
+    this.loadedCape = CAPE_UNSET;
     await this.setCape(cape);
     this.refit();
   }
