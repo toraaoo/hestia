@@ -70,6 +70,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0042** — [Per-session logs come from a generated Log4j2 config, not a captured pipe](0042-per-session-log4j-config.md)
 - **0056** — [Server provisioning is front-loaded by design](0056-server-provisioning-is-front-loaded.md)
 - **0059** — [The server console is RCON, not a stdin pipe](0059-the-console-is-rcon-not-a-pipe.md)
+- **0062** — [Joining directly is a launch parameter, not a second launch path](0062-joining-directly-is-a-launch-parameter.md)
 
 ### [Content & modpacks](../architecture/content.md)
 

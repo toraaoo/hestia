@@ -172,6 +172,8 @@ hestia instance modded info      # descriptor, folder, disk footprint, and each
 hestia instance modded worlds    # the save worlds, read from each level.dat:
                                  #   in-game name, folder, version, mode, when
                                  #   it was last played, and its size
+hestia instance modded servers   # the multiplayer list (servers.dat), each entry
+                                 #   with what it answers right now
 hestia instance modded stop      # kill every session (--session <h> targets one)
 hestia instance modded restart   # stop, then launch again (--session <h> for one)
 hestia instance modded rename mp # rename (stopped): rewrites the display name;
@@ -221,6 +223,40 @@ an archive pinning a loader hestia has no flavor for is refused by name rather t
 
 An export needs the instance **stopped**, and refuses while a content or modpack job is touching it. Paths are resolved
 against your shell's working directory, then sent as absolute — the daemon is a separate process and does not share it.
+
+### Playing a world or a server directly
+
+A launch normally stops at the title screen. `--world` and `--server` skip it and join on start (Minecraft's Quick Play,
+**1.20 and newer** — an older instance is refused rather than dropped at the menu):
+
+```bash
+hestia play modded --world "New World"          # straight into a save
+hestia play modded --server smp.example.net     # straight onto a server
+hestia instance modded launch --world creative  # the same two flags on launch
+```
+
+The entry-first spelling picks interactively when the target is omitted, and takes an entry of the instance's own
+multiplayer list by name:
+
+```bash
+hestia instance modded world play               # prompts with the save worlds
+hestia instance modded world play "New World"   # by folder
+hestia instance modded server play              # prompts with the multiplayer list
+hestia instance modded server play "Mock SMP"   # by list name — or by any address
+```
+
+The list is the game's own `servers.dat`, and it can be edited from here:
+
+```bash
+hestia instance modded servers                       # name, address, and live status
+hestia instance modded server add smp smp.example.net
+hestia instance modded server edit smp --address smp.example.net:25566
+hestia instance modded server remove smp
+```
+
+One caveat, and hestia says so on the result rather than refusing: a **running game owns that file** and rewrites it
+whole when it exits, so an edit made while a session is open is lost with it. Close the game, or add the server from the
+in-game multiplayer screen.
 
 ### Multiple sessions
 

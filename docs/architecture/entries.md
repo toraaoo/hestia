@@ -299,6 +299,34 @@ span more than a decade of formats, and a corrupt or mid-write one still has to
 appear in the listing, so a failure yields the folder alone with `read: false`
 ([0025](../decisions/0025-a-world-describes-itself.md)).
 
+## Joining directly
+
+A launch can name what the session should open: `InstanceLaunchParams.quickPlay`
+carries either a world folder or a server address, and the launch plan appends
+Minecraft's own `--quickPlaySingleplayer` / `--quickPlayMultiplayer`. One target
+or none — it is a variant, not two fields that every layer would have to
+cross-check.
+
+The target is validated **before** anything is materialised: a game version older
+than 1.20 has no such arguments and is refused (`QuickPlayUnsupported`), as is a
+world folder that is not there or an address that does not parse. Refusing is the
+point — an ignored argument would drop the player at the title screen and call
+the launch a success ([0062](../decisions/0062-joining-directly-is-a-launch-parameter.md)).
+
+## The multiplayer list
+
+`instance.servers` reads the instance's own `servers.dat` — uncompressed NBT,
+one row per server the in-game list shows — and `instance.server.edit` /
+`.remove` write it back whole. `minecraft.ping` gives one address's status over
+the same Server List Ping the game's list uses, so a row can say what the server
+is answering right now.
+
+That file belongs to the running game, which holds the list in memory and
+rewrites it wholesale when it exits. An edit made underneath a live session is
+therefore made *and* reported as degraded (`ServerListInUse`), rather than
+refused: the daemon cannot make the write durable, but it can say so
+([0029](../decisions/0029-degraded-outcomes-ride-on-the-result.md)).
+
 ## Decisions
 
 - [0021 — The entry root is Hestia's; `data/` is the game's](../decisions/0021-entry-root-versus-data-dir.md)
@@ -308,6 +336,7 @@ appear in the listing, so a failure yields the folder alone with `read: false`
 - [0025 — A world describes itself; a directory listing does not](../decisions/0025-a-world-describes-itself.md)
 - [0026 — An unfinished record says which kind of unfinished](../decisions/0026-server-phase-over-a-ready-bool.md)
 - [0028 — The properties schema is generated, not maintained](../decisions/0028-properties-schema-is-generated.md)
+- [0062 — Joining directly is a launch parameter, not a second launch path](../decisions/0062-joining-directly-is-a-launch-parameter.md)
 - [0041 — An instance runs many sessions; a server runs one](../decisions/0041-an-instance-runs-many-sessions.md)
 - [0042 — Per-session logs come from a generated Log4j2 config](../decisions/0042-per-session-log4j-config.md)
 - [0056 — Server provisioning is front-loaded by design](../decisions/0056-server-provisioning-is-front-loaded.md)
