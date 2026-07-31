@@ -40,15 +40,19 @@ import { WorldRow } from '@/features/instances/components/world-row';
 import { ExportInstanceModal } from '@/features/instances/export-modal';
 import { useLaunchModal } from '@/features/instances/launch-modal';
 import { InstanceLogsTab } from '@/features/instances/tabs/logs';
+import { InstanceServersTab } from '@/features/instances/tabs/servers';
 import { InstanceSettingsTab } from '@/features/instances/tabs/settings';
 import { ProfilesPanel } from '@/features/profiles/panel';
 import { agoLabel, bytes, memGb, uptime } from '@/lib/format';
+import { supportsQuickPlay } from '@/lib/quick-play';
+import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import {
   instanceMutations,
   instanceQueries,
   useInstance,
 } from '@/queries/instance';
+import { useJobMutation } from '@/queries/jobs';
 import { useProcessMetrics } from '@/queries/metrics';
 
 export type InstanceTab =
@@ -56,6 +60,7 @@ export type InstanceTab =
   | 'content'
   | 'profiles'
   | 'worlds'
+  | 'servers'
   | 'logs'
   | 'settings';
 
@@ -84,6 +89,8 @@ export function InstanceDetailPage({
   const [addingContent, setAddingContent] = useState(false);
   const [exporting, setExporting] = useState(false);
   const { launch, isLaunching } = useLaunchModal();
+  // Joining a world or a server is the same launch job, carrying what to join.
+  const launchQuick = useJobMutation(instanceMutations.launchQuick());
   const stop = useMutation(instanceMutations.stop(id));
   const instance = query.data;
   const accepts = instance?.accepts ?? [];
@@ -144,6 +151,7 @@ export function InstanceDetailPage({
   };
 
   const worldList = worlds.data ?? [];
+  const joinable = supportsQuickPlay(instance.gameVersion);
 
   return (
     <div className="flex h-full flex-col">
@@ -238,6 +246,7 @@ export function InstanceDetailPage({
             {m['app.label.worlds']()}
             <TabCount n={worldList.length} />
           </TabsTrigger>
+          <TabsTrigger value="servers">{m['app.label.servers']()}</TabsTrigger>
           <TabsTrigger value="logs">{m['app.label.logs']()}</TabsTrigger>
           <TabsTrigger value="settings">
             {m['app.label.settings']()}
@@ -392,10 +401,35 @@ export function InstanceDetailPage({
           ) : (
             <div className="divide-y divide-border border border-border">
               {worldList.map((world) => (
-                <WorldRow key={world.folder} world={world} />
+                <WorldRow
+                  key={world.folder}
+                  world={world}
+                  playing={
+                    launchQuick.isPending &&
+                    launchQuick.variables?.quickPlay.target === world.folder
+                  }
+                  disabledReason={
+                    joinable
+                      ? undefined
+                      : m['instance.quick_play.unsupported']()
+                  }
+                  onPlay={() =>
+                    launchQuick.mutate(
+                      {
+                        id,
+                        quickPlay: { kind: 'world', target: world.folder },
+                      },
+                      { onSuccess: (done) => toastWarnings(done.warnings) },
+                    )
+                  }
+                />
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="servers" className="p-5">
+          <InstanceServersTab instance={instance} />
         </TabsContent>
 
         <TabsContent value="logs" className="flex min-h-0 flex-col p-5">

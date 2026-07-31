@@ -34,6 +34,55 @@ const account = {
   needsReauth: false,
 };
 
+const worlds = [
+  {
+    folder: 'New World',
+    name: 'New World',
+    read: true,
+    version: '1.21.1',
+    gameMode: 'survival',
+    difficulty: 'normal',
+    hardcore: false,
+    cheats: false,
+    lastPlayedUnix: now() - 3_600,
+    sizeBytes: 128 * 1024 * 1024,
+    icon: '',
+  },
+  {
+    folder: 'creative-flats',
+    name: 'Creative Flats',
+    read: true,
+    version: '1.21.1',
+    gameMode: 'creative',
+    difficulty: 'peaceful',
+    hardcore: false,
+    cheats: true,
+    lastPlayedUnix: now() - 86_400 * 9,
+    sizeBytes: 12 * 1024 * 1024,
+    icon: '',
+  },
+];
+
+// The multiplayer list is edited by two of the channels below, so the mock
+// keeps it mutable — an add or a remove shows up in the list like it would
+// against a real daemon.
+const servers = [
+  {
+    name: 'Mock SMP',
+    address: 'smp.example.net',
+    icon: '',
+    acceptTextures: true,
+    hidden: false,
+  },
+  {
+    name: 'Creative Realm',
+    address: 'creative.example.net:25566',
+    icon: '',
+    acceptTextures: false,
+    hidden: false,
+  },
+];
+
 const instance = {
   id: 'a1',
   name: 'Fabric Playground',
@@ -209,7 +258,38 @@ export const channels: Record<string, Handler> = {
   'instance.flavors': () => ({ flavors }),
   'instance.loaders': () => ({ loaders: ['0.16.5'] }),
   'instance.versions': () => ({ versions }),
-  'instance.worlds': () => ({ worlds: [] }),
+  'instance.worlds': () => ({ worlds }),
+  'instance.servers': () => ({ servers }),
+  'instance.server.edit': (payload) => {
+    const entry = {
+      name: String(payload.name ?? ''),
+      address: String(payload.address ?? ''),
+      icon: '',
+      acceptTextures: Boolean(payload.acceptTextures),
+      hidden: false,
+    };
+    const target = String(payload.server ?? '');
+    const at = servers.findIndex(
+      (s) => s.name === target || s.address === target,
+    );
+    if (target && at >= 0) servers[at] = entry;
+    else servers.push(entry);
+    return { servers, warnings: [] };
+  },
+  'instance.server.remove': (payload) => {
+    const target = String(payload.server ?? '');
+    const at = servers.findIndex(
+      (s) => s.name === target || s.address === target,
+    );
+    if (at >= 0) servers.splice(at, 1);
+    return { servers, warnings: [] };
+  },
+  'minecraft.ping': () => ({
+    playersOnline: 3,
+    playersMax: 20,
+    motd: 'A Mock Server',
+    version: '1.21.1',
+  }),
   'instance.logs': logs,
   'instance.resolve': () => ({}),
   'instance.create': () => ({ instance }),

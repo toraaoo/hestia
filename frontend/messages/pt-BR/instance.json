@@ -36,6 +36,27 @@
       "formats": "arquivo hestia, pacote Modrinth ou instância Prism/MultiMC",
       "reading": "Lendo o arquivo…",
       "title": "Importar uma instância"
+    },
+    "quick_play": {
+      "unsupported": "Entrar direto ao iniciar exige o Minecraft 1.20 ou mais recente."
+    },
+    "servers": {
+      "summary": "Os servidores na lista multijogador desta instância.",
+      "empty": "Nenhum servidor na lista desta instância ainda.",
+      "offline": "Offline",
+      "players": "{online}/{max} online",
+      "textures": "Pacotes de recursos",
+      "add": {
+        "action": "Adicionar servidor",
+        "title": "Adicionar um servidor"
+      },
+      "edit": {
+        "title": "Editar “{name}”"
+      },
+      "remove": {
+        "title": "Remover “{name}”?",
+        "description": "O servidor sai da lista multijogador desta instância. Nada muda no servidor em si."
+      }
     }
   }
 }

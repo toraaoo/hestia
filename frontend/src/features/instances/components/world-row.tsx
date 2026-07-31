@@ -1,5 +1,8 @@
+import { PlayIcon } from '@phosphor-icons/react';
 import type { WorldInfo } from '@/api';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { WorldIcon } from '@/features/instances/components/world-icon';
 import { agoLabel, bytes } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
@@ -11,10 +14,24 @@ const msg = m as unknown as Record<string, () => string>;
  * over the folder the game reads, with the flags that change how it plays. A
  * world we could not read shows its folder and says so, rather than presenting
  * defaults as facts.
+ *
+ * `onPlay` adds the join-on-start action; without it the row is the plain
+ * listing the datapack picker renders.
  */
-export function WorldRow({ world }: { world: WorldInfo }) {
+export function WorldRow({
+  world,
+  onPlay,
+  playing = false,
+  disabledReason,
+}: {
+  world: WorldInfo;
+  onPlay?: () => void;
+  playing?: boolean;
+  /** Why playing is unavailable (an older game version); enables it when unset. */
+  disabledReason?: string;
+}) {
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5">
+    <div className="group flex items-center gap-3 px-3 py-2.5">
       <WorldIcon world={world} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -46,6 +63,20 @@ export function WorldRow({ world }: { world: WorldInfo }) {
         <Badge variant="outline" className="shrink-0 font-mono">
           {world.version}
         </Badge>
+      )}
+      {onPlay && (
+        <Button
+          size="sm"
+          variant="ghost"
+          data-icon="inline-start"
+          className="shrink-0"
+          disabled={playing || disabledReason != null}
+          title={disabledReason}
+          onClick={onPlay}
+        >
+          {playing ? <Spinner /> : <PlayIcon weight="fill" />}
+          {m['app.action.play']()}
+        </Button>
       )}
     </div>
   );

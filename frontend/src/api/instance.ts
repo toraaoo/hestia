@@ -21,8 +21,11 @@ import type {
   InstanceLaunchDoneEvent,
   InstanceLaunchParams,
   InstanceProfileListResult,
+  InstanceServerEditParams,
+  InstanceServersWriteResult,
   InstanceUpdateParams,
   Profile,
+  ServerEntry,
   WorldInfo,
 } from './types/instance';
 import type {
@@ -34,6 +37,7 @@ import type {
   ResolveParams,
 } from './types/minecraft';
 import type { ProcessLogLine } from './types/process';
+import type { ServerPingResult } from './types/server';
 
 type OnProgress = (progress: ProvisionProgress) => void;
 
@@ -112,6 +116,37 @@ export async function worlds(instance: string): Promise<WorldInfo[]> {
     instance,
   });
   return result.worlds;
+}
+
+/** The multiplayer list (`servers.dat`), in the order the game shows it. */
+export async function servers(instance: string): Promise<ServerEntry[]> {
+  const result = await call<{ servers: ServerEntry[] }>('instance.servers', {
+    instance,
+  });
+  return result.servers;
+}
+
+/**
+ * Add an entry to the multiplayer list, or rewrite the one `server` names
+ * (empty adds). The running game owns the file, so the result carries a
+ * warning when a session is open to say the edit will be overwritten.
+ */
+export function serverEdit(
+  params: Partial<InstanceServerEditParams>,
+): Promise<InstanceServersWriteResult> {
+  return call('instance.server.edit', params);
+}
+
+export function serverRemove(
+  instance: string,
+  server: string,
+): Promise<InstanceServersWriteResult> {
+  return call('instance.server.remove', { instance, server });
+}
+
+/** Status of a multiplayer address, over the Server List Ping. */
+export function pingAddress(address: string): Promise<ServerPingResult> {
+  return call('minecraft.ping', { address });
 }
 
 /**

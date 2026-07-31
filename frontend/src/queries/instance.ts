@@ -14,8 +14,10 @@ import type {
   InstanceCreateParams,
   InstanceInfo,
   InstanceLaunchDoneEvent,
+  InstanceServersWriteResult,
   InstanceUpdateParams,
   Profile,
+  QuickPlay,
   ResolveParams,
 } from '../api';
 import * as api from '../api/instance';
@@ -69,6 +71,23 @@ export const instanceQueries = {
     queryOptions({
       queryKey: keys.instances.worlds(id),
       queryFn: () => api.worlds(id),
+    }),
+  /** The instance's multiplayer list, in the order the game shows it. */
+  servers: (id: string) =>
+    queryOptions({
+      queryKey: keys.instances.servers(id),
+      queryFn: () => api.servers(id),
+    }),
+  /**
+   * What a server answers right now. Its own key so a row refreshes without
+   * re-reading the list, and short-lived because a player count is.
+   */
+  serverStatus: (address: string) =>
+    queryOptions({
+      queryKey: keys.instances.serverStatus(address),
+      queryFn: () => api.pingAddress(address),
+      staleTime: 30_000,
+      retry: false,
     }),
   logs: (id: string, options: { session?: string; tail?: number } = {}) =>
     queryOptions({
@@ -151,6 +170,27 @@ export const instanceMutations = {
         keys.processes.list(),
       ],
     }),
+  /** Adds an entry to the multiplayer list, or rewrites the one `server` names. */
+  serverEdit: (id: string) =>
+    mutation<
+      InstanceServersWriteResult,
+      {
+        server?: string;
+        name: string;
+        address: string;
+        acceptTextures: boolean;
+      }
+    >({
+      mutationKey: [...keys.instances.servers(id), 'edit'],
+      mutationFn: (params) => api.serverEdit({ ...params, instance: id }),
+      invalidates: () => [keys.instances.servers(id)],
+    }),
+  serverRemove: (id: string) =>
+    mutation<InstanceServersWriteResult, string>({
+      mutationKey: [...keys.instances.servers(id), 'remove'],
+      mutationFn: (server) => api.serverRemove(id, server),
+      invalidates: () => [keys.instances.servers(id)],
+    }),
   /**
    * Id-by-variable variants for list rows, which can't call a per-id hook. A
    * launch materialises files, so it streams provisioning progress through the
@@ -166,6 +206,27 @@ export const instanceMutations = {
       }),
       run: (id, onProgress) => api.launch({ instance: id }, onProgress),
       invalidates: (id) => [
+        keys.instances.list(),
+        keys.instances.detail(id),
+        keys.processes.list(),
+        keys.accounts.all,
+      ],
+    }),
+  /**
+   * Launch straight into a world or a server (Quick Play) — the same job as
+   * `launchAny`, carrying what the session should join on start.
+   */
+  launchQuick: () =>
+    jobMutation<InstanceLaunchDoneEvent, { id: string; quickPlay: QuickPlay }>({
+      mutationKey: [...keys.instances.all, 'launch', 'quick'],
+      meta: ({ id }) => ({
+        kind: 'instance.launch',
+        label: 'launch',
+        entry: { kind: 'instance', id },
+      }),
+      run: ({ id, quickPlay }, onProgress) =>
+        api.launch({ instance: id, quickPlay }, onProgress),
+      invalidates: ({ id }) => [
         keys.instances.list(),
         keys.instances.detail(id),
         keys.processes.list(),
