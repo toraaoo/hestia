@@ -133,11 +133,22 @@ impl Link {
     }
 }
 
+/// Set by automated tests: several throwaway daemons reaching for the one
+/// Discord client at once leaves some of them blocked in its handshake, and a
+/// test daemon has nothing to publish anyway.
+fn suppressed() -> bool {
+    std::env::var_os("HESTIA_NO_PRESENCE").is_some_and(|value| !value.is_empty() && value != "0")
+}
+
 /// Start publishing presence, returning the handle the shutdown path clears
 /// through. `None` when the build names no Discord application.
 pub fn spawn_presence_updater(runtime: Arc<Runtime>) -> Option<Arc<Presence>> {
     if common::app::DISCORD_APP_ID.is_empty() {
         tracing::debug!("no discord application configured; presence disabled");
+        return None;
+    }
+    if suppressed() {
+        tracing::debug!("HESTIA_NO_PRESENCE set; not publishing discord presence");
         return None;
     }
     let presence = Arc::new(Presence {

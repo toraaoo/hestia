@@ -43,6 +43,10 @@ Consequences worth writing down:
   presence says the launcher is open even when nothing is running. That is a
   deliberate choice and the reason the setting exists: it is also the one thing
   presence reveals that the user did not do on purpose.
+- **Automated tests opt out** with `HESTIA_NO_PRESENCE=1`, as they already do for
+  the tray. Discord's handshake answers one connecting client at a time, so a
+  test run standing several throwaway daemons up at once leaves the rest of them
+  blocked in that read — with nothing worth publishing either way.
 - **No Discord client is the ordinary case**, not a fault. Its absence is polled
   for at a sixth of the tick rate, and the crate's per-attempt warning is held
   below the foreign-log threshold, or a daemon on a machine that never runs
