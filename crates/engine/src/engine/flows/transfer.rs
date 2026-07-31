@@ -25,11 +25,25 @@ use crate::cancel::Job;
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
 use crate::registry;
+use crate::schema;
 use crate::transfer::archive::{self, Reader};
 use crate::transfer::{self, contents, hestia, Blueprint, Descriptor, Recipe, Source, Target};
 
 /// Where an export with no destination lands, under the data home.
 const EXPORTS: &str = "exports";
+
+/// Documents set aside since `mark` that belong to this entry — scoped by path
+/// so a concurrent operation's quarantine is not reported as this import's.
+fn quarantined_under(mark: schema::notices::Mark, entry_dir: &Path) -> Vec<WarningInfo> {
+    let prefix = entry_dir.display().to_string();
+    schema::notices::since(mark)
+        .into_iter()
+        .filter(|warning| match warning {
+            WarningInfo::DocumentQuarantined { path, .. } => path.starts_with(&prefix),
+            _ => false,
+        })
+        .collect()
+}
 
 /// What an export produced.
 pub struct ExportOutcome {
@@ -174,12 +188,17 @@ impl Engine {
             "instance imported"
         );
 
+        let mark = schema::notices::mark();
+        crate::content::migrate(&entry_dir);
+        let mut warnings = landed.warnings;
+        warnings.extend(quarantined_under(mark, &entry_dir));
+
         self.link_new_instance(&record.name, &data_dir);
         Ok(ImportOutcome {
             format,
             record,
             failures: Vec::new(),
-            warnings: landed.warnings,
+            warnings,
         })
     }
 

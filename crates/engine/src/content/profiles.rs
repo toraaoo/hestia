@@ -44,6 +44,11 @@ pub(crate) fn selectable(kind: ContentKind) -> bool {
     )
 }
 
+/// Read the file for its migration side effect alone.
+pub(crate) fn migrate(entry_dir: &Path) {
+    let _ = load_stored(entry_dir);
+}
+
 fn load_stored(entry_dir: &Path) -> Stored {
     registry::read_record(entry_dir).unwrap_or_default()
 }

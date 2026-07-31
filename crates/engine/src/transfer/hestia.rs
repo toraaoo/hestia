@@ -17,6 +17,7 @@ use anyhow::{Context, Result};
 use proto::error::ErrorInfo;
 use proto::transfer::{ExportFormat, ImportFormat};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use super::archive::{self, Reader, Writer, Written};
 use super::exclude::Rules;
@@ -24,26 +25,33 @@ use super::{Blueprint, Descriptor, Format, Landed, Recipe, Source, Target};
 use crate::cancel::Job;
 use crate::instances::InstanceRecord;
 use crate::registry;
+use crate::schema::{self, Document};
 
 pub(crate) const MANIFEST: &str = "hestia.instance.json";
-
-/// The manifest schema. Bumped only when a reader could no longer make sense of
-/// an older archive — additive fields do not need it, since every field decodes
-/// through `#[serde(default)]`.
-pub(crate) const FORMAT_VERSION: u32 = 1;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub(crate) struct Manifest {
-    pub(crate) format_version: u32,
     pub(crate) exported_unix: i64,
     /// Which build wrote it — the first thing worth knowing about an archive
     /// that will not read back.
     pub(crate) exported_by: String,
-    /// The exported instance's record. Its `id` is **not** honoured on import:
-    /// an imported instance is a new entry and gets a fresh one. It is carried
-    /// so an archive can be traced back to what produced it.
-    pub(crate) instance: InstanceRecord,
+    /// The exported instance's record, carried stamped rather than inlined as a
+    /// typed field so it migrates through its own chain on the way in. Its `id`
+    /// is not honoured on import.
+    pub(crate) instance: Value,
+}
+
+impl Document for Manifest {
+    const NAME: &'static str = MANIFEST;
+}
+
+impl Manifest {
+    fn record(&self) -> Result<InstanceRecord> {
+        schema::decode::<InstanceRecord>(self.instance.clone())
+            .map(|decoded| decoded.document)
+            .map_err(unreadable)
+    }
 }
 
 pub(crate) struct Hestia;
@@ -58,17 +66,20 @@ impl Format for Hestia {
     }
 
     fn read(&self, reader: &mut Reader, prefix: &str) -> Result<Blueprint> {
-        let manifest = manifest(reader, prefix)?;
-        let profile = &manifest.instance.profile;
+        let record = manifest(reader, prefix)?.record()?;
+        if record.profile.game_version.is_empty() {
+            return Err(invalid(format!("{MANIFEST} pins no Minecraft version")).into());
+        }
+        let profile = &record.profile;
         let descriptor = Descriptor {
-            name: manifest.instance.name.clone(),
+            name: record.name.clone(),
             game_version: profile.game_version.clone(),
             loader: super::loader_of(profile),
             loader_version: profile.loader_version.clone().unwrap_or_default(),
         };
         Ok(Blueprint {
             descriptor,
-            recipe: Recipe::Record(Box::new(manifest.instance)),
+            recipe: Recipe::Record(Box::new(record)),
         })
     }
 
@@ -95,19 +106,24 @@ fn manifest(reader: &mut Reader, prefix: &str) -> Result<Manifest> {
     let text = reader
         .read_text(&format!("{prefix}{MANIFEST}"))
         .map_err(|e| invalid(e.to_string()))?;
-    let manifest: Manifest = serde_json::from_str(&text)
+    let value = serde_json::from_str(&text)
         .map_err(|e| invalid(format!("{MANIFEST} is malformed: {e}")))?;
-    if manifest.format_version > FORMAT_VERSION {
-        return Err(ErrorInfo::ArchiveUnsupported {
+    schema::decode::<Manifest>(value)
+        .map(|decoded| decoded.document)
+        .map_err(unreadable)
+}
+
+/// An archive is not ours to set aside, so a schema failure is refused by name:
+/// a document from a newer hestia is unsupported, anything else is invalid.
+fn unreadable(error: schema::SchemaError) -> anyhow::Error {
+    match error {
+        schema::SchemaError::FromTheFuture { found, .. } => ErrorInfo::ArchiveUnsupported {
             format: "hestia".to_string(),
-            component: format!("archive format {}", manifest.format_version),
+            component: format!("schema {found}"),
         }
-        .into());
+        .into(),
+        other => invalid(other.to_string()).into(),
     }
-    if manifest.instance.profile.game_version.is_empty() {
-        return Err(invalid(format!("{MANIFEST} pins no Minecraft version")).into());
-    }
-    Ok(manifest)
 }
 
 fn invalid(detail: String) -> ErrorInfo {
@@ -131,12 +147,12 @@ pub(crate) fn default_destination(
 
 pub(crate) fn export(source: &Source<'_>, destination: &Path, job: &Job<'_>) -> Result<Written> {
     let manifest = Manifest {
-        format_version: FORMAT_VERSION,
         exported_unix: registry::now_unix(),
         exported_by: format!("{} {}", common::app::NAME, common::app::VERSION),
-        instance: source.record.clone(),
+        instance: schema::encode(source.record)?,
     };
-    let encoded = serde_json::to_vec_pretty(&manifest).context("the manifest serializes")?;
+    let encoded = serde_json::to_vec_pretty(&schema::encode(&manifest)?)
+        .context("the manifest serializes")?;
     let rules = Rules::new(source.entry_dir, source.data_dir, source.exclude);
 
     let mut writer = Writer::create(destination)?;
@@ -253,38 +269,97 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_newer_archive_format_is_refused_rather_than_guessed_at() {
-        let dir = temp("newer");
-        let archive_path = dir.path().join("future.hestia");
-        let mut manifest = Manifest {
-            format_version: FORMAT_VERSION + 1,
-            instance: record(),
-            ..Default::default()
-        };
-        {
-            let mut writer = Writer::create(&archive_path).unwrap();
-            writer
-                .add_bytes(MANIFEST, &serde_json::to_vec(&manifest).unwrap())
-                .unwrap();
-            writer.finish().unwrap();
-        }
-        let mut reader = Reader::open(&archive_path).unwrap();
-        assert!(Hestia.read(&mut reader, "").is_err());
+    /// Write an archive holding only `manifest`, as raw JSON.
+    fn archive_of(path: &Path, manifest: &Value) {
+        let mut writer = Writer::create(path).unwrap();
+        writer
+            .add_bytes(MANIFEST, &serde_json::to_vec(manifest).unwrap())
+            .unwrap();
+        writer.finish().unwrap();
+    }
 
-        manifest.format_version = FORMAT_VERSION;
-        manifest.instance.profile.game_version = String::new();
-        let broken = dir.path().join("broken.hestia");
-        {
-            let mut writer = Writer::create(&broken).unwrap();
-            writer
-                .add_bytes(MANIFEST, &serde_json::to_vec(&manifest).unwrap())
-                .unwrap();
-            writer.finish().unwrap();
+    fn read_error(path: &Path) -> ErrorInfo {
+        match Hestia.read(&mut Reader::open(path).unwrap(), "") {
+            Ok(_) => panic!("the archive was accepted"),
+            Err(e) => e.downcast::<ErrorInfo>().expect("a typed archive error"),
         }
-        assert!(Hestia
-            .read(&mut Reader::open(&broken).unwrap(), "")
-            .is_err());
+    }
+
+    #[test]
+    fn a_newer_manifest_schema_is_refused_rather_than_guessed_at() {
+        let dir = temp("newer-manifest");
+        let path = dir.path().join("future.hestia");
+        let mut manifest = schema::encode(&Manifest {
+            instance: schema::encode(&record()).unwrap(),
+            ..Default::default()
+        })
+        .unwrap();
+        manifest[schema::FIELD] = Value::from(Manifest::version() + 1);
+        archive_of(&path, &manifest);
+
+        assert!(matches!(
+            read_error(&path),
+            ErrorInfo::ArchiveUnsupported { .. }
+        ));
+    }
+
+    /// The record travels stamped with its own version, so an archive whose
+    /// manifest this build reads fine can still carry a record it cannot.
+    #[test]
+    fn a_newer_record_schema_inside_a_readable_manifest_is_refused_too() {
+        let dir = temp("newer-record");
+        let path = dir.path().join("future-record.hestia");
+        let mut instance = schema::encode(&record()).unwrap();
+        instance[schema::FIELD] = Value::from(InstanceRecord::version() + 1);
+        archive_of(
+            &path,
+            &schema::encode(&Manifest {
+                instance,
+                ..Default::default()
+            })
+            .unwrap(),
+        );
+
+        assert!(matches!(
+            read_error(&path),
+            ErrorInfo::ArchiveUnsupported { .. }
+        ));
+    }
+
+    #[test]
+    fn an_unstamped_manifest_reads_as_the_baseline() {
+        let dir = temp("legacy-manifest");
+        let path = dir.path().join("legacy.hestia");
+        archive_of(
+            &path,
+            &serde_json::json!({ "instance": serde_json::to_value(record()).unwrap() }),
+        );
+
+        let blueprint = Hestia.read(&mut Reader::open(&path).unwrap(), "").unwrap();
+
+        assert_eq!(blueprint.descriptor.name, "Cozy");
+        assert_eq!(blueprint.descriptor.game_version, "1.21.1");
+    }
+
+    #[test]
+    fn a_manifest_pinning_no_version_is_invalid() {
+        let dir = temp("no-version");
+        let path = dir.path().join("broken.hestia");
+        let mut record = record();
+        record.profile.game_version = String::new();
+        archive_of(
+            &path,
+            &schema::encode(&Manifest {
+                instance: schema::encode(&record).unwrap(),
+                ..Default::default()
+            })
+            .unwrap(),
+        );
+
+        assert!(matches!(
+            read_error(&path),
+            ErrorInfo::ArchiveInvalid { .. }
+        ));
     }
 
     #[test]

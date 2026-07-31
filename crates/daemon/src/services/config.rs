@@ -27,6 +27,9 @@ fn config_err(e: ConfigError) -> ErrorInfo {
         ConfigError::Io(e) => ErrorInfo::Internal {
             detail: e.to_string(),
         },
+        ConfigError::Save(e) => ErrorInfo::Internal {
+            detail: format!("{e:#}"),
+        },
     }
 }
 
