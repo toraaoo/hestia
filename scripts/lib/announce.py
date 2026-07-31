@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 """The news/ toolchain: compile the announcement feed, or scaffold an entry.
 
+Driven by scripts/announce.sh, which owns the envelope, the local server and the
+signature — this is only the document:
+
     announce.py compile [news] --base-url URL   # {version, entries} on stdout
     announce.py new "Title" [--severity …]      # write news/<date>-<id>.md
 

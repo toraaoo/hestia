@@ -1,22 +1,23 @@
 # win.ps1 — run the scripts/ dev flow on Windows from PowerShell.
 #
-# Build/run/package verbs forward to the matching scripts/*.sh, so the shell
-# scripts stay the single source of truth (no duplicated packaging logic). Two
-# things PowerShell owns natively rather than delegating to Git Bash: stopping
-# every running hestiad before a build (a live hestiad.exe hard-locks the .exe
-# cargo is about to overwrite), and the interactive `dev` subshell — bare
+# Every verb forwards to the matching scripts/<verb>.sh, so the shell scripts
+# stay the single source of truth (no duplicated packaging logic) and adding one
+# needs nothing here — the verbs are discovered, never listed. Two things
+# PowerShell owns natively rather than delegating to Git Bash: stopping every
+# running hestiad before a build (a live hestiad.exe hard-locks the .exe cargo
+# is about to overwrite), and the interactive `dev` subshell — bare
 # `win.ps1 dev` drops you into PowerShell, not `bash -i`.
 #
 # Requires Git for Windows (bash.exe) for the forwarded verbs. WSL's bash is
 # intentionally skipped: it runs a Linux userland that can't see the Windows
 # cargo target. Bare `dev` is pure PowerShell and needs only cargo.
 #
+#   scripts\win.ps1                                         # the verbs it found
 #   scripts\win.ps1 dev      [--desktop] [hestia args...]   # PS subshell / one-shot CLI
 #   scripts\win.ps1 build    [cli|daemon|desktop|all] [cargo flags...]
 #   scripts\win.ps1 run      <cli|daemon|desktop> [args...]
-#   scripts\win.ps1 sidecars [target-triple]
 #   scripts\win.ps1 package  [all|bundle|portable]
-#   scripts\win.ps1 clean    [cargo flags...]
+#   scripts\win.ps1 announce [new "Title" | --serve]
 param(
   [Parameter(Position = 0)][string]$Command,
   [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest
@@ -51,17 +52,16 @@ function Stop-Hestia {
   }
 }
 
-$scripts = @{
-  build    = "scripts/build.sh"
-  run      = "scripts/run.sh"
-  dev      = "scripts/dev.sh"
-  sidecars = "scripts/sidecars.sh"
-  package  = "scripts/package.sh"
-  clean    = "scripts/clean.sh"
+# The verb list *is* scripts/: every scripts/<verb>.sh is forwardable, so a new
+# script is reachable from PowerShell the moment it exists. Sourced-only helpers
+# live in scripts/lib/ and are not verbs — that directory is the distinction.
+$scripts = @{}
+Get-ChildItem "scripts/*.sh" | ForEach-Object {
+  $scripts[$_.BaseName] = "scripts/$($_.Name)"
 }
 
 if (-not $Command -or -not $scripts.ContainsKey($Command)) {
-  Write-Host "usage: win.ps1 <$($scripts.Keys -join '|')> [args...]"
+  Write-Host "usage: win.ps1 <$(($scripts.Keys | Sort-Object) -join '|')> [args...]"
   if ($Command) { exit 1 } else { exit 0 }
 }
 

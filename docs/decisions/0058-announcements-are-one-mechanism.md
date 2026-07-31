@@ -42,7 +42,7 @@ no announcements rather than trusting what it was handed — and the cached
 document is re-verified on load, so it is trusted because it verifies *now*, the
 same rule the download cache applies when it re-hashes a blob on the way out.
 
-**Publishing is a commit.** `news/*.md` compiles (`scripts/announce.py`) into
+**Publishing is a commit.** `news/*.md` compiles (`scripts/lib/announce.py`) into
 one document that CI signs and uploads to a standing `announcements` release tag
 — a dedicated tag, because `releases/latest/` would tie news to the release
 cadence and 404 on any release that omitted the asset. Validation is strict and

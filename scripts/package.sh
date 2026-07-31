@@ -7,8 +7,7 @@
 #
 # Tauri bundles the desktop app + the hestiad/tray/hestia sidecars into each
 # installer; the portable archive is the same set of standalone binaries.
-set -euo pipefail
-cd "$(dirname "$0")/.."
+. "$(dirname "$0")/lib/common.sh"
 
 action="${1:-all}"
 
@@ -51,10 +50,10 @@ portable() {
   if [ "$os" = windows ]; then
     powershell -NoProfile -Command \
       "Compress-Archive -Path 'target/package/$name/*' -DestinationPath 'target/package/$name.zip' -Force"
-    echo "wrote target/package/$name.zip"
+    log "wrote target/package/$name.zip"
   else
     tar -C target/package -czf "target/package/$name.tar.gz" "$name"
-    echo "wrote target/package/$name.tar.gz"
+    log "wrote target/package/$name.tar.gz"
   fi
 }
 
@@ -62,8 +61,5 @@ case "$action" in
   all) bundle && portable ;;
   bundle) bundle ;;
   portable) portable ;;
-  *)
-    echo "usage: $0 [all|bundle|portable]" >&2
-    exit 1
-    ;;
+  *) die "usage: $0 [all|bundle|portable]" ;;
 esac

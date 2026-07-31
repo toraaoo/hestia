@@ -3,17 +3,16 @@
 # per-type files land in frontend/src/api/types/generated/, wrapped by one
 # per-module barrel each; both are committed. Run this after changing any
 # `#[derive(ts_rs::TS)]` type in `crates/proto`.
-set -euo pipefail
-cd "$(dirname "$0")/.."
+. "$(dirname "$0")/lib/common.sh"
 
 gen_dir="$PWD/frontend/src/api/types/generated"
 
 # The export dir and the i64/u64 → number mapping live in .cargo/config.toml so
 # the annotations stay a bare `#[ts(export)]`.
-echo "generating TypeScript bindings from proto…"
+log "generating TypeScript bindings from proto…"
 rm -rf "$gen_dir"
 cargo test -p proto --features ts >/dev/null
 
-python scripts/gen-barrels.py
+python scripts/lib/gen-barrels.py
 
-echo "wrote $gen_dir and per-module barrels"
+log "wrote $gen_dir and per-module barrels"

@@ -4,8 +4,7 @@
 # Examples:
 #   scripts/build.sh cli --release
 #   scripts/build.sh all
-set -euo pipefail
-cd "$(dirname "$0")/.."
+. "$(dirname "$0")/lib/common.sh"
 
 target="${1:-all}"
 shift || true

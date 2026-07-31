@@ -9,8 +9,7 @@
 # A debug `daemon` or `desktop` run serves news/ as the announcement feed and
 # points the daemon at it. Not for `cli`, which does not fetch, and not for
 # --release, which has no endpoint override to honour.
-set -euo pipefail
-cd "$(dirname "$0")/.."
+. "$(dirname "$0")/lib/common.sh"
 
 profile=""
 news=1
@@ -36,7 +35,7 @@ if [ -n "$profile" ]; then
 fi
 
 if [ "$news" = 1 ]; then
-  . scripts/news.sh
+  . scripts/lib/news.sh
   # The signals matter as much as EXIT: an untrapped one skips EXIT and strands
   # the server on the port the next run wants.
   trap stop_local_feed EXIT
@@ -66,5 +65,5 @@ case "$target" in
       (cd crates/desktop && cargo tauri dev)
     fi
     ;;
-  *) echo "usage: $0 [--release] [cli|daemon|desktop] [args]" >&2; exit 1 ;;
+  *) die "usage: $0 [--release] [cli|daemon|desktop] [args]" ;;
 esac

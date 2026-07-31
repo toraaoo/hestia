@@ -13,8 +13,7 @@
 #   scripts/sidecars.sh <target-triple> # cross target (passed to cargo --target)
 #   scripts/sidecars.sh --debug         # host target, debug (dev sidecars)
 #   scripts/sidecars.sh --ensure        # ensure the staged set is current
-set -euo pipefail
-cd "$(dirname "$0")/.."
+. "$(dirname "$0")/lib/common.sh"
 
 profile="release"
 triple=""
@@ -29,7 +28,7 @@ done
 
 cross=1
 [ -n "$triple" ] || { triple="$(rustc -vV | sed -n 's/^host: //p')"; cross=0; }
-[ -n "$triple" ] || { echo "could not determine target triple" >&2; exit 1; }
+[ -n "$triple" ] || die "could not determine target triple"
 
 build_args=()
 [ "$profile" = "release" ] && build_args=(--release)
@@ -48,7 +47,7 @@ esac
 
 dest="crates/desktop/binaries"
 
-echo "building $profile sidecars for $triple"
+log "building $profile sidecars for $triple"
 cargo build "${build_args[@]}" "${target_args[@]}" -p cli -p daemon -p tray
 
 mkdir -p "$dest"

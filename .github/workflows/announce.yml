@@ -15,13 +15,13 @@ on:
     branches: [main]
     paths:
       - "news/**"
-      - "scripts/announce.py"
+      - "scripts/lib/announce.py"
       - "scripts/announce.sh"
       - ".github/workflows/announce.yml"
   pull_request:
     paths:
       - "news/**"
-      - "scripts/announce.py"
+      - "scripts/lib/announce.py"
       - "scripts/announce.sh"
       - ".github/workflows/announce.yml"
   workflow_dispatch: {}

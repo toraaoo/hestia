@@ -15,8 +15,7 @@
 # debug build reading an overridden endpoint waives the signature check, so an
 # unsigned envelope renders (see engine/src/announce/mod.rs::endpoint). Nothing
 # unsigned is ever cached, and a release build has no path to the waiver.
-set -euo pipefail
-cd "$(dirname "$0")/.."
+. "$(dirname "$0")/lib/common.sh"
 
 mode="${1:-preview}"
 repo="${GITHUB_REPOSITORY:-toraaoo/hestia}"
@@ -26,10 +25,10 @@ base_url="https://github.com/${repo}/releases/download/announcements"
 # compile — a news/ that does not compile is exactly when a scaffold is useful.
 if [ "$mode" = "new" ]; then
   shift
-  exec python scripts/announce.py new "$@"
+  exec python scripts/lib/announce.py new "$@"
 fi
 
-payload="$(python scripts/announce.py compile news --base-url "$base_url")"
+payload="$(python scripts/lib/announce.py compile news --base-url "$base_url")"
 
 case "$mode" in
   preview)

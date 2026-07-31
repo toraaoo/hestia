@@ -14,11 +14,7 @@
 #
 # The CLI auto-spawns the sibling daemon, so `hestia java list` just works.
 # Debug builds keep data under <repo>/.hestia, so this never touches ~/.hestia.
-set -euo pipefail
-cd "$(dirname "$0")/.."
-
-if [ -t 1 ]; then _C='\033[1;36m'; _R='\033[0m'; else _C=''; _R=''; fi
-log() { printf '%b==>%b %s\n' "$_C" "$_R" "$*"; }
+. "$(dirname "$0")/lib/common.sh"
 
 # Ignore an installed hestia entirely while developing: drop PATH entries that
 # carry one, and pin a dev-only daemon endpoint so the dev CLI never reaches
@@ -74,7 +70,7 @@ trap 'cleanup; exit 130' INT
 trap 'cleanup; exit 143' TERM HUP PIPE
 
 if [ "$news" = 1 ]; then
-  . scripts/news.sh
+  . scripts/lib/news.sh
   serve_local_feed
 fi
 

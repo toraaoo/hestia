@@ -13,12 +13,11 @@
 # Needs ImageMagick (`magick`) and tauri-cli (`cargo install tauri-cli`).
 #
 #   scripts/gen-icons.sh
-set -euo pipefail
-cd "$(dirname "$0")/.."
+. "$(dirname "$0")/lib/common.sh"
 
 src="assets/icons/ember.svg"
-[ -f "$src" ] || { echo "missing $src" >&2; exit 1; }
-command -v magick >/dev/null || { echo "ImageMagick (magick) is required" >&2; exit 1; }
+[ -f "$src" ] || die "missing $src"
+command -v magick >/dev/null || die "ImageMagick (magick) is required"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -26,12 +25,12 @@ trap 'rm -rf "$tmp"' EXIT
 # Tauri's icon command reads rasters, not SVG, and wants a 1024px square.
 magick -background none "$src" -resize 1024x1024 "$tmp/app.png"
 
-echo "generating crates/desktop/icons"
+log "generating crates/desktop/icons"
 cargo tauri icon "$tmp/app.png" -o crates/desktop/icons >/dev/null
 # Desktop-only project; tauri emits mobile sets unconditionally.
 rm -rf crates/desktop/icons/android crates/desktop/icons/ios
 
-echo "generating frontend/public/favicon.ico"
+log "generating frontend/public/favicon.ico"
 magick -background none "$src" \
   -define icon:auto-resize=16,24,32,48,64,256 frontend/public/favicon.ico
 
@@ -39,11 +38,11 @@ magick -background none "$src" \
 # plate, trimmed to the cube and re-padded so every platform scales it alike.
 # PNG32 + depth 8 is load-bearing: a Q16 ImageMagick writes 16-bit channels by
 # default, which tray_icon::Icon::from_rgba cannot take.
-echo "generating crates/tray/assets/icon.png"
+log "generating crates/tray/assets/icon.png"
 grep -v '<rect' "$src" > "$tmp/mark.svg"
 magick -background none "$tmp/mark.svg" -resize 1024x1024 \
   -trim +repage -resize 240x240 \
   -gravity center -background none -extent 256x256 \
   -depth 8 PNG32:crates/tray/assets/icon.png
 
-echo "done — commit the regenerated icons"
+log "done — commit the regenerated icons"

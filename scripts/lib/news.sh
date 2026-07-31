@@ -9,10 +9,11 @@
 #
 # Sets NEWS_FEED_PID rather than installing its own EXIT trap, because both
 # callers already own theirs and the last trap installed would win.
+#
+# Every line here goes to stderr: a one-shot `dev.sh java list` is piped, and
+# the feed's chatter must not land in what the caller is reading.
 
-_news_log() {
-  printf '%b==>%b %s\n' "${_C:-}" "${_R:-}" "$*" >&2
-}
+. "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 # Being the default means never blocking the dev loop: every failure here drops
 # the override and leaves the daemon on the published feed, which is the same
@@ -33,11 +34,11 @@ serve_local_feed() {
         mv "$feed.new" "$feed"
       else
         rm -f "$feed.new"
-        _news_log "news/ does not compile — the feed on $port is left as it was"
+        log "news/ does not compile — the feed on $port is left as it was" >&2
       fi
     fi
     export HESTIA_ANNOUNCE_ENDPOINT="$url"
-    _news_log "announcement feed already on $port — reusing it"
+    log "announcement feed already on $port — reusing it" >&2
     return 0
   fi
 
@@ -45,7 +46,7 @@ serve_local_feed() {
   # its error has to land here, not in a backgrounded job's discarded output.
   local errors
   errors="$(scripts/announce.sh 2>&1 > /dev/null)" || {
-    _news_log "news/ does not compile — serving no local feed:"
+    log "news/ does not compile — serving no local feed:" >&2
     printf '%s\n' "$errors" >&2
     return 0
   }
@@ -53,7 +54,7 @@ serve_local_feed() {
   scripts/announce.sh --serve "$port" > /dev/null 2>&1 &
   NEWS_FEED_PID=$!
   export HESTIA_ANNOUNCE_ENDPOINT="$url"
-  _news_log "announcement feed on $url (unsigned — debug builds only)"
+  log "announcement feed on $url (unsigned — debug builds only)" >&2
 }
 
 stop_local_feed() {

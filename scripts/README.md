@@ -3,17 +3,45 @@
 Thin wrappers around `cargo` and `cargo tauri` for local development and
 packaging.
 
-| Script         | What it does                                                        |
-|----------------|---------------------------------------------------------------------|
-| `build.sh`     | `cargo build` a target (`cli`, `daemon`, `desktop`, or `all`)        |
-| `run.sh`       | build then run (`cli`, `daemon`, or `desktop` against the Vite dev server) |
-| `dev.sh`       | dev subshell with `hestia`/`hestiad` on PATH; one-shot CLI; `--desktop` HMR |
-| `clean.sh`     | `cargo clean` plus the frontend `dist`/`node_modules` and Tauri `gen` |
-| `sidecars.sh`  | build + stage `hestia`/`hestiad`/`tray` as Tauri sidecars for bundling |
-| `package.sh`   | release artifacts: Tauri installers + portable archive (`all`/`bundle`/`portable`) |
-| `announce.sh`  | announcements: scaffold one (`new`), compile `news/*.md` into the feed, serve it locally, or sign it (CI) |
-| `news.sh`      | sourced by `dev.sh`/`run.sh`: serve that feed and point the daemon at it |
-| `win.ps1`      | Windows entry point — forwards each verb to the matching `*.sh` via Git Bash |
+```
+scripts/
+├── <verb>.sh        one file per verb — what you run
+├── win.ps1          the Windows entry point
+└── lib/             what a verb uses; never run directly
+```
+
+**A file at the top level is a verb.** `win.ps1` discovers `scripts/*.sh` and
+forwards to whichever one matches, so a new script is reachable from PowerShell
+the moment it exists — there is no list to update. Anything a verb *sources* or
+*drives* is not a verb and lives in `lib/`, which the discovery glob does not
+reach: that directory is the whole distinction, and it is why the split is worth
+having.
+
+| Verb            | What it does                                                        |
+|-----------------|---------------------------------------------------------------------|
+| `build.sh`      | `cargo build` a target (`cli`, `daemon`, `desktop`, or `all`)        |
+| `run.sh`        | build then run (`cli`, `daemon`, or `desktop` against the Vite dev server) |
+| `dev.sh`        | dev subshell with `hestia`/`hestiad` on PATH; one-shot CLI; `--desktop` HMR |
+| `clean.sh`      | `cargo clean` plus the frontend `dist`/`node_modules` and Tauri `gen` |
+| `sidecars.sh`   | build + stage `hestia`/`hestiad`/`tray` as Tauri sidecars for bundling |
+| `package.sh`    | release artifacts: Tauri installers + portable archive (`all`/`bundle`/`portable`) |
+| `announce.sh`   | announcements: scaffold one (`new`), compile `news/*.md` into the feed, serve it locally, or sign it (CI) |
+| `gen-types.sh`  | regenerate the TypeScript bindings for the `proto` wire types (ts-rs) |
+| `gen-icons.sh`  | regenerate every shipped icon from `assets/icons/ember.svg`           |
+
+| Helper             | Used by                                                          |
+|--------------------|------------------------------------------------------------------|
+| `lib/common.sh`    | sourced first by every verb: strict mode, the repo root as cwd, `log`/`die` |
+| `lib/news.sh`      | sourced by `dev.sh`/`run.sh`: serve the feed and point the daemon at it |
+| `lib/announce.py`  | `announce.sh` — compiles `news/*.md`, and scaffolds a new entry     |
+| `lib/gen-barrels.py` | `gen-types.sh` — the per-module barrels over the generated types |
+
+A verb starts with one line, and everything after it can assume the repo root:
+
+```bash
+#!/usr/bin/env bash
+. "$(dirname "$0")/lib/common.sh"
+```
 
 Examples:
 
