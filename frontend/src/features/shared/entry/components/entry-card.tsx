@@ -1,18 +1,20 @@
 import { PlayIcon, PowerIcon, PushPinIcon } from '@phosphor-icons/react';
-import { Link } from '@tanstack/react-router';
+import { createLink } from '@tanstack/react-router';
+import { motion } from 'motion/react';
 
 import type { ProcessInfo } from '@/api';
 import { entryIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
 import { EntryRunControl } from '@/features/shared/entry/components';
+import { layoutMorph, listItem } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { usePinned } from '@/queries/pinned';
+import type { View } from './collection';
 
 export interface EntryCardModel {
   id: string;
@@ -40,6 +42,8 @@ export interface EntryCardModel {
   stopping?: boolean;
 }
 
+const MotionLink = createLink(motion.a);
+
 function statusOf(entry: EntryCardModel) {
   if (!entry.ready)
     return { tone: 'warn' as const, label: m['app.status.preparing']() };
@@ -60,13 +64,15 @@ function detailTo(kind: 'instance' | 'server') {
 
 function StatusBadge({
   status,
+  overlay,
 }: {
   status: NonNullable<ReturnType<typeof statusOf>>;
+  overlay?: boolean;
 }) {
   return (
     <Badge
       variant="secondary"
-      className="gap-1.5 bg-background/80 backdrop-blur-xs"
+      className={cn('gap-1.5', overlay && 'bg-background/80 backdrop-blur-xs')}
     >
       <StatusDot tone={status.tone} />
       {status.label}
@@ -75,7 +81,13 @@ function StatusBadge({
 }
 
 /** Sidebar pin toggle: visible on hover, or always while pinned. */
-function PinToggle({ entry }: { entry: EntryCardModel }) {
+function PinToggle({
+  entry,
+  overlay,
+}: {
+  entry: EntryCardModel;
+  overlay?: boolean;
+}) {
   const { ready, isPinned, toggle } = usePinned();
   const pin = { kind: entry.kind, id: entry.id };
   const pinned = isPinned(pin);
@@ -93,7 +105,10 @@ function PinToggle({ entry }: { entry: EntryCardModel }) {
         e.stopPropagation();
         toggle(pin);
       }}
-      className="grid size-6 place-items-center bg-background/80 ring-1 ring-border backdrop-blur-xs transition-opacity outline-none focus-visible:ring-ring text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
+      className={cn(
+        'grid size-6 place-items-center text-muted-foreground opacity-0 transition-opacity outline-none group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-ring',
+        overlay && 'bg-background/80 ring-1 ring-border backdrop-blur-xs',
+      )}
     >
       <PushPinIcon weight={pinned ? 'fill' : 'regular'} className="size-3.5" />
     </button>
@@ -169,43 +184,61 @@ function ActionButton({
   );
 }
 
-/** Grid tile: art banner + name + loader/version chips + footer. */
-export function EntryCard({ entry }: { entry: EntryCardModel }) {
+export function EntryTile({
+  entry,
+  view,
+}: {
+  entry: EntryCardModel;
+  view: View;
+}) {
   const status = statusOf(entry);
   const Icon = entryIcon(entry.kind);
+  const grid = view === 'grid';
 
   return (
-    <Link
+    <MotionLink
+      layout
+      variants={listItem}
+      exit="exit"
+      transition={layoutMorph}
       to={detailTo(entry.kind)}
       params={{ id: entry.id }}
-      className="group block outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      className={cn(
+        'group relative flex outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        grid
+          ? 'flex-col overflow-hidden border border-border bg-card transition-colors hover:border-ember/40'
+          : 'items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40 focus-visible:ring-inset',
+      )}
     >
-      <Card className="gap-0 overflow-hidden py-0 transition-colors group-hover:border-ember/40">
-        <div className="relative flex h-24 items-center justify-center border-b border-border bg-muted/40">
-          {entry.iconUrl ? (
-            <img
-              src={entry.iconUrl}
-              alt=""
-              className="size-full object-cover"
-            />
-          ) : (
-            <Icon className="size-9 text-muted-foreground/40" />
-          )}
-          {status && (
-            <div className="absolute top-2 left-2">
-              <StatusBadge status={status} />
-            </div>
-          )}
-          <div className="absolute top-2 right-2">
-            <PinToggle entry={entry} />
-          </div>
-          <div className="absolute right-2 bottom-2 opacity-0 transition-opacity group-hover:opacity-100 has-aria-expanded:opacity-100">
-            <ActionButton entry={entry} />
-          </div>
-        </div>
+      <motion.div
+        layout
+        transition={layoutMorph}
+        className={cn(
+          'relative grid shrink-0 place-items-center overflow-hidden',
+          grid
+            ? 'h-24 w-full border-b border-border bg-muted/40'
+            : 'size-9 bg-muted ring-1 ring-border',
+        )}
+      >
+        {entry.iconUrl ? (
+          <img src={entry.iconUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <Icon
+            className={cn(
+              'text-muted-foreground',
+              grid ? 'size-9 opacity-40' : 'size-4.5',
+            )}
+          />
+        )}
+      </motion.div>
 
-        <div className="space-y-2 p-3">
-          <div className="truncate text-sm font-medium">{entry.name}</div>
+      <motion.div
+        layout
+        transition={layoutMorph}
+        className={cn('min-w-0', grid ? 'w-full space-y-2 p-3' : 'flex-1')}
+      >
+        <span className="block truncate text-sm font-medium">{entry.name}</span>
+        {grid && (
           <div className="flex items-center gap-1.5">
             <Badge variant="secondary" className="uppercase">
               {entry.flavor}
@@ -214,46 +247,42 @@ export function EntryCard({ entry }: { entry: EntryCardModel }) {
               {entry.version}
             </Badge>
           </div>
-          <div className="truncate font-mono text-[11px] text-muted-foreground">
-            {entry.subtitle}
-          </div>
-        </div>
-      </Card>
-    </Link>
-  );
-}
-
-/** List row: icon + name + chips inline + action. */
-export function EntryRow({ entry }: { entry: EntryCardModel }) {
-  const status = statusOf(entry);
-  const Icon = entryIcon(entry.kind);
-
-  return (
-    <Link
-      to={detailTo(entry.kind)}
-      params={{ id: entry.id }}
-      className={cn(
-        'group flex items-center gap-3 px-3 py-2.5 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset',
-      )}
-    >
-      <span className="grid size-9 shrink-0 place-items-center overflow-hidden bg-muted text-muted-foreground ring-1 ring-border">
-        {entry.iconUrl ? (
-          <img src={entry.iconUrl} alt="" className="size-full object-cover" />
-        ) : (
-          <Icon className="size-4.5" />
         )}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">{entry.name}</span>
-          {status && <StatusBadge status={status} />}
-        </div>
-        <div className="truncate font-mono text-[11px] text-muted-foreground">
-          {entry.flavor} · {entry.version} · {entry.subtitle}
-        </div>
-      </div>
-      <PinToggle entry={entry} />
-      <ActionButton entry={entry} />
-    </Link>
+        <span className="block truncate font-mono text-[11px] text-muted-foreground">
+          {grid
+            ? entry.subtitle
+            : `${entry.flavor} · ${entry.version} · ${entry.subtitle}`}
+        </span>
+      </motion.div>
+
+      {status && (
+        <motion.div
+          layout
+          transition={layoutMorph}
+          className={cn(grid && 'absolute top-2 left-2')}
+        >
+          <StatusBadge status={status} overlay={grid} />
+        </motion.div>
+      )}
+
+      <motion.div
+        layout
+        transition={layoutMorph}
+        className={cn(grid && 'absolute top-2 right-2')}
+      >
+        <PinToggle entry={entry} overlay={grid} />
+      </motion.div>
+
+      <motion.div
+        layout
+        transition={layoutMorph}
+        className={cn(
+          grid &&
+            'absolute top-15 right-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-aria-expanded:opacity-100',
+        )}
+      >
+        <ActionButton entry={entry} />
+      </motion.div>
+    </MotionLink>
   );
 }

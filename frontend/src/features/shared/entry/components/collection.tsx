@@ -1,15 +1,17 @@
 import { RowsIcon, SquaresFourIcon } from '@phosphor-icons/react';
+import { AnimatePresence, motion } from 'motion/react';
 
 import type { InstanceInfo, ServerInfo } from '@/api';
 import type { FilterGroup } from '@/components/filter-menu';
 import { Button } from '@/components/ui/button';
 import {
-  EntryCard,
   type EntryCardModel,
-  EntryRow,
+  EntryTile,
 } from '@/features/shared/entry/components';
 import { agoLabel } from '@/lib/format';
+import { layoutMorph, listContainer } from '@/lib/motion';
 import { runningSessions } from '@/lib/sessions';
+import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
 export type View = 'grid' | 'list';
@@ -171,20 +173,24 @@ export function EntryCollection({
       </p>
     );
   }
-  if (view === 'list') {
-    return (
-      <div className="divide-y divide-border border border-border">
-        {cards.map((entry) => (
-          <EntryRow key={entry.id} entry={entry} />
-        ))}
-      </div>
-    );
-  }
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-      {cards.map((entry) => (
-        <EntryCard key={entry.id} entry={entry} />
-      ))}
-    </div>
+    <motion.div
+      layout
+      initial="hidden"
+      animate="show"
+      variants={listContainer}
+      transition={layoutMorph}
+      className={cn(
+        view === 'list'
+          ? 'divide-y divide-border border border-border'
+          : 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
+      )}
+    >
+      <AnimatePresence initial={false}>
+        {cards.map((entry) => (
+          <EntryTile key={entry.id} entry={entry} view={view} />
+        ))}
+      </AnimatePresence>
+    </motion.div>
   );
 }

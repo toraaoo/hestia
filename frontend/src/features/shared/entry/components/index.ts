@@ -9,7 +9,7 @@ export {
   type View,
   ViewToggle,
 } from './collection';
-export { EntryCard, type EntryCardModel, EntryRow } from './entry-card';
+export { type EntryCardModel, EntryTile } from './entry-card';
 export { EntryIconMenu } from './icon-menu';
 export {
   isMeasurable,

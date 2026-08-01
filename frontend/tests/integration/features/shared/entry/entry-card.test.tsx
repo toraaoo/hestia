@@ -2,9 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  EntryCard,
   type EntryCardModel,
-  EntryRow,
+  EntryTile,
 } from '@/features/shared/entry/components';
 import { m } from '@/paraglide/messages.js';
 import { renderWithProviders, resetQueryCache } from '../../../../support';
@@ -22,11 +21,11 @@ const entry = (over: Partial<EntryCardModel> = {}): EntryCardModel => ({
 });
 
 const show = (model: EntryCardModel) =>
-  renderWithProviders(<EntryCard entry={model} />, { route: true });
+  renderWithProviders(<EntryTile entry={model} view="grid" />, { route: true });
 
 afterEach(resetQueryCache);
 
-describe('EntryCard', () => {
+describe('EntryTile (grid)', () => {
   it('shows the entry’s identity', async () => {
     show(entry());
     expect(await screen.findByText('SMP')).toBeDefined();
@@ -118,9 +117,11 @@ describe('EntryCard', () => {
   });
 });
 
-describe('EntryRow', () => {
+describe('EntryTile (list)', () => {
   it('renders the same entry as one line', async () => {
-    renderWithProviders(<EntryRow entry={entry()} />, { route: true });
+    renderWithProviders(<EntryTile entry={entry()} view="list" />, {
+      route: true,
+    });
     expect(await screen.findByText('SMP')).toBeDefined();
     expect(
       screen.getByText('paper · 1.21.1 · :25565 · Stopped'),
