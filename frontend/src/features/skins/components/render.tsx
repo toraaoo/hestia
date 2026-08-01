@@ -7,10 +7,12 @@ import {
   drawCapeFront,
   loadTexture,
 } from '@/features/skins/lib/texture';
-import { SkinPreview } from '@/features/skins/lib/webgl/preview';
-import { thumbnail } from '@/features/skins/lib/webgl/thumbnails';
+import type { SkinPreview } from '@/features/skins/lib/webgl/preview';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+
+const previewModule = () => import('@/features/skins/lib/webgl/preview');
+const thumbnailModule = () => import('@/features/skins/lib/webgl/thumbnails');
 
 /** A static posed render of a full skin — the card-grid view. */
 export function SkinPose({
@@ -29,7 +31,8 @@ export function SkinPose({
   useEffect(() => {
     let live = true;
     setSrc(null);
-    thumbnail(variant, texture, capeTexture)
+    thumbnailModule()
+      .then(({ thumbnail }) => thumbnail(variant, texture, capeTexture))
       .then((url) => {
         if (live) setSrc(url);
       })
@@ -104,21 +107,31 @@ export function SkinModel({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<SkinPreview | null>(null);
+  const latest = useRef({ variant, texture, capeTexture });
+  latest.current = { variant, texture, capeTexture };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: mounts once, reloaded in place below — a rebuild would drop the WebGL context
   useEffect(() => {
     if (!containerRef.current || !canvasRef.current) return;
-    const preview = new SkinPreview({
-      canvas: canvasRef.current,
-      container: containerRef.current,
-      variant,
-      texture,
-      cape: capeTexture,
-    });
-    previewRef.current = preview;
+    let disposed = false;
+
+    void previewModule()
+      .then(({ SkinPreview }) => {
+        if (disposed || !containerRef.current || !canvasRef.current) return;
+        previewRef.current = new SkinPreview({
+          canvas: canvasRef.current,
+          container: containerRef.current,
+          variant: latest.current.variant,
+          texture: latest.current.texture,
+          cape: latest.current.capeTexture,
+        });
+      })
+      .catch(() => {});
+
     return () => {
+      disposed = true;
+      const preview = previewRef.current;
       previewRef.current = null;
-      preview.dispose();
+      preview?.dispose();
     };
   }, []);
 
