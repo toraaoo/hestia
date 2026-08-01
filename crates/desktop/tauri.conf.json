@@ -67,7 +67,7 @@
     ],
     "externalBin": [
       "binaries/hestiad",
-      "binaries/hestiatray",
+      "binaries/hestia-tray",
       "binaries/hestia"
     ],
     "icon": [

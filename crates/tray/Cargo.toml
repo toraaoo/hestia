@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [[bin]]
-name = "hestiatray"
+name = "hestia-tray"
 path = "src/main.rs"
 
 [features]

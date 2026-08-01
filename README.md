@@ -111,7 +111,7 @@ everything: the desktop app, the daemon, the tray, and the
 | Platform             | Formats                                         |
 |----------------------|-------------------------------------------------|
 | **Linux** (x86_64)   | `.deb` · `.rpm` · AppImage · portable `.tar.gz` |
-| **Windows** (x86_64) | `.exe` (NSIS) · `.msi` · portable `.zip`        |
+| **Windows** (x86_64) | `.exe` (NSIS) · portable `.zip`                  |
 
 The Windows installer lets you deselect components and puts the CLI on `PATH`. The desktop app updates itself from the
 release feed.

@@ -7,19 +7,11 @@ use std::time::Duration;
 
 use ipc::Connection;
 
-fn daemon_name() -> &'static str {
-    if cfg!(windows) {
-        "hestiad.exe"
-    } else {
-        "hestiad"
-    }
-}
-
 /// Start the daemon detached from this process's session, so it outlives the
 /// front-end that spawned it.
 pub fn spawn_daemon() -> std::io::Result<()> {
-    let name = daemon_name();
-    let program = common::paths::sibling_binary(name).unwrap_or_else(|| PathBuf::from(name));
+    let names = common::app::DAEMON_BIN;
+    let program = common::paths::sibling_binary(names).unwrap_or_else(|| PathBuf::from(names[0]));
     tracing::debug!(program = %program.display(), "spawning the daemon");
     let mut cmd = Command::new(program);
     cmd.arg("serve")

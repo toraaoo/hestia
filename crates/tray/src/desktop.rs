@@ -6,14 +6,6 @@
 
 use std::process::{Command, Stdio};
 
-fn desktop_name() -> &'static str {
-    if cfg!(windows) {
-        "hestia-desktop.exe"
-    } else {
-        "hestia-desktop"
-    }
-}
-
 pub fn launch() {
     spawn(&[], "desktop launched", "cannot launch the desktop");
 }
@@ -28,7 +20,7 @@ pub fn quit() {
 }
 
 fn spawn(args: &[&str], ok_msg: &str, err_msg: &str) {
-    let Some(program) = common::paths::sibling_binary(desktop_name()) else {
+    let Some(program) = common::paths::sibling_binary(common::app::DESKTOP_BIN) else {
         tracing::warn!("desktop binary not found in this layout");
         return;
     };

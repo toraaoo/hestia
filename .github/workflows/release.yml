@@ -127,7 +127,7 @@ jobs:
       - name: Install Tauri CLI
         uses: taiki-e/install-action@v2
         with:
-          tool: tauri-cli@2.10.1
+          tool: tauri-cli@2.11.4
 
       # engine/build.rs re-runs on a changed HESTIA_CURSEFORGE_API_KEY, so a
       # warm cache still bakes in the current value. The key ends up inside a
@@ -152,7 +152,6 @@ jobs:
             target/release/bundle/appimage/*.sig
             target/release/bundle/nsis/*-setup.exe
             target/release/bundle/nsis/*.sig
-            target/release/bundle/msi/*.msi
             target/package/*.tar.gz
             target/package/*.zip
 
@@ -165,7 +164,6 @@ jobs:
             target/release/bundle/rpm/*.rpm
             target/release/bundle/appimage/*.AppImage
             target/release/bundle/nsis/*-setup.exe
-            target/release/bundle/msi/*.msi
             target/package/*.tar.gz
             target/package/*.zip
 

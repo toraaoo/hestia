@@ -17,6 +17,22 @@ pub const VENDOR: &str = "prytaneum";
 pub const CHANNEL: &str = "dev";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// Shipped name first, cargo's output last, so a dev build still resolves.
+#[cfg(windows)]
+pub const DESKTOP_BIN: &[&str] = &["Hestia.exe", "hestia-desktop.exe"];
+#[cfg(not(windows))]
+pub const DESKTOP_BIN: &[&str] = &["hestia-desktop"];
+
+#[cfg(windows)]
+pub const TRAY_BIN: &[&str] = &["Hestia Tray.exe", "hestia-tray.exe"];
+#[cfg(not(windows))]
+pub const TRAY_BIN: &[&str] = &["hestia-tray"];
+
+#[cfg(windows)]
+pub const DAEMON_BIN: &[&str] = &["hestiad.exe"];
+#[cfg(not(windows))]
+pub const DAEMON_BIN: &[&str] = &["hestiad"];
+
 /// The release manifest every front-end checks for a newer version, and the
 /// minisign public key its artifacts are verified against. Both must match
 /// `plugins.updater` in `crates/desktop/tauri.conf.json` — the desktop shell

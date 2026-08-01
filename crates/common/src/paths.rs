@@ -26,14 +26,16 @@ fn layout_root(dir: &Path) -> &Path {
 }
 
 /// Locate another binary of this build: beside the running one, at the layout
-/// root, or in the root's `bin/`.
-pub fn sibling_binary(name: &str) -> Option<PathBuf> {
+/// root, or in the root's `bin/`. `names` are tried in order.
+pub fn sibling_binary(names: &[&str]) -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?.to_path_buf();
     let root = layout_root(&dir).to_path_buf();
-    [dir.join(name), root.join(name), root.join("bin").join(name)]
-        .into_iter()
-        .find(|candidate| candidate.is_file())
+    names.iter().find_map(|name| {
+        [dir.join(name), root.join(name), root.join("bin").join(name)]
+            .into_iter()
+            .find(|candidate| candidate.is_file())
+    })
 }
 
 /// A `data/` directory inside the build's own layout — the portable archives

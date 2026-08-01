@@ -1,7 +1,7 @@
 ; Hestia's NSIS installer template — a fork of tauri-bundler's stock
-; installer.nsi (tauri-cli v2.10.1), rendered by the bundler with the same
+; installer.nsi (tauri-cli v2.11.4), rendered by the bundler with the same
 ; handlebars context. Keep the fork in lockstep with the pinned tauri-cli
-; version (release.yml installs tauri-cli@2.10.1).
+; version (release.yml installs tauri-cli@2.11.4).
 ;
 ; What the fork adds over stock:
 ;   - a components page: core (hestiad + tray, required), the desktop app,
@@ -31,6 +31,12 @@ ManifestDPIAwareness PerMonitorV2
   ; Set the compression algorithm. We default to LZMA.
   SetCompressor /SOLID "{{compression}}"
 !endif
+
+; Keep above !include to stay ahead of any plugin command
+; see https://github.com/tauri-apps/tauri/pull/15422#discussion_r3289239624
+{{#if signed_plugins_path}}
+!addplugindir "{{signed_plugins_path}}"
+{{/if}}
 
 !include MUI2.nsh
 !include FileFunc.nsh
@@ -64,6 +70,8 @@ ${UnStrRep}
 !define INSTALLERICON "{{installer_icon}}"
 !define SIDEBARIMAGE "{{sidebar_image}}"
 !define HEADERIMAGE "{{header_image}}"
+!define UNINSTALLERICON "{{uninstaller_icon}}"
+!define UNINSTALLERHEADERIMAGE "{{uninstaller_header_image}}"
 !define MAINBINARYNAME "{{main_binary_name}}"
 !define MAINBINARYSRCPATH "{{main_binary_path}}"
 !define BUNDLEID "{{bundle_id}}"
@@ -86,8 +94,11 @@ ${UnStrRep}
 !define STARTMENUFOLDER "{{start_menu_folder}}"
 
 !define DAEMONBINARY "hestiad.exe"
-!define TRAYBINARY "hestiatray.exe"
 !define CLIBINARY "hestia.exe"
+; Staged under cargo's name, installed under the product's — the pair in
+; common::app::TRAY_BIN.
+!define TRAYSIDECAR "hestia-tray.exe"
+!define TRAYBINARY "Hestia Tray.exe"
 ; The two binaries a user launches sit at the install root; the two reached by
 ; a shell or by each other sit below it. common::paths resolves the data home
 ; from the root either way.
@@ -165,10 +176,26 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
   !define MUI_WELCOMEFINISHPAGE_BITMAP "${SIDEBARIMAGE}"
 !endif
 
-; Installer header image
+; Enable header images for installer and uninstaller pages when either image is configured.
 !if "${HEADERIMAGE}" != ""
   !define MUI_HEADERIMAGE
-  !define MUI_HEADERIMAGE_BITMAP  "${HEADERIMAGE}"
+!else if "${UNINSTALLERHEADERIMAGE}" != ""
+  !define MUI_HEADERIMAGE
+!endif
+
+; Installer header image
+!if "${HEADERIMAGE}" != ""
+  !define MUI_HEADERIMAGE_BITMAP "${HEADERIMAGE}"
+!endif
+
+; Uninstaller header image
+!if "${UNINSTALLERHEADERIMAGE}" != ""
+  !define MUI_HEADERIMAGE_UNBITMAP "${UNINSTALLERHEADERIMAGE}"
+!endif
+
+; Uninstaller icon
+!if "${UNINSTALLERICON}" != ""
+  !define MUI_UNICON "${UNINSTALLERICON}"
 !endif
 
 ; Define registry key to store installer language
@@ -667,8 +694,8 @@ Section "Hestia core (daemon & tray)" SecCore
 
   SetOutPath $INSTDIR
   {{#each binaries}}
-    !if "{{this}}" == "hestiatray.exe"
-      File /a "/oname={{this}}" "{{no-escape @key}}"
+    !if "{{this}}" == "${TRAYSIDECAR}"
+      File /a "/oname=${TRAYBINARY}" "{{no-escape @key}}"
     !endif
   {{/each}}
 

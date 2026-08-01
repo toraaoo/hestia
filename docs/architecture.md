@@ -61,7 +61,7 @@ them:
 |---|---|---|---|
 | CLI | `hestia` | clap + ratatui | scripting and terminal use; the fully-wired reference front-end |
 | Desktop | `hestia-desktop` | Tauri v2 + React/Vite | the visual surface — library, entries, content browse, skins |
-| Tray | `hestiatray` | tray-icon + tao | status and quick actions beside every serving daemon |
+| Tray | `hestia-tray` | tray-icon + tao | status and quick actions beside every serving daemon |
 
 ## The crate graph
 
@@ -78,7 +78,7 @@ flowchart TD
     cli["<b>cli</b> → hestia"]
     daemon["<b>daemon</b> → hestiad"]
     desktop["<b>desktop</b> → hestia-desktop"]
-    tray["<b>tray</b> → hestiatray"]
+    tray["<b>tray</b> → hestia-tray"]
 
     client --> proto & ipc & common
     engine --> proto & common

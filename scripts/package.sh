@@ -2,10 +2,10 @@
 # Build release artifacts locally, mirroring the release workflow.
 #
 #   scripts/package.sh            # sidecars + Tauri installers + portable archive
-#   scripts/package.sh bundle     # Tauri installers only (deb/rpm/appimage or nsis/msi)
+#   scripts/package.sh bundle     # Tauri installers only (deb/rpm/appimage or nsis)
 #   scripts/package.sh portable   # portable archive only (.tar.gz on Linux, .zip on Windows)
 #
-# Tauri bundles the desktop app + the hestiad/hestiatray/hestia sidecars into each
+# Tauri bundles the desktop app + the hestiad/hestia-tray/hestia sidecars into each
 # installer. The portable archive is the same four binaries, but compiled with
 # the `portable` feature, so they are a separate build rather than a copy of the
 # installers' — see `portable()`.
@@ -24,7 +24,7 @@ esac
 bundle() {
   scripts/sidecars.sh
   case "$os" in
-    windows) targets="nsis,msi" ;;
+    windows) targets="nsis" ;;
     macos) targets="app,dmg" ;;
     *) targets="deb,rpm,appimage" ;;
   esac
@@ -61,11 +61,14 @@ portable() {
 
   rm -rf "$stage"
   mkdir -p "$stage/bin" "$stage/data"
-  # The same split the Windows installer lays down: what a user launches at the
-  # root, what a shell or another binary reaches below it.
-  for bin in hestia-desktop hestiatray; do
-    cp "$out/release/$bin$ext" "$stage/"
-  done
+  # The split the Windows installer lays down, under the names common::app's
+  # DESKTOP_BIN and TRAY_BIN put first.
+  if [ "$os" = windows ]; then
+    cp "$out/release/hestia-desktop.exe" "$stage/Hestia.exe"
+    cp "$out/release/hestia-tray.exe" "$stage/Hestia Tray.exe"
+  else
+    cp "$out/release/hestia-desktop" "$out/release/hestia-tray" "$stage/"
+  fi
   for bin in hestia hestiad; do
     cp "$out/release/$bin$ext" "$stage/bin/"
   done

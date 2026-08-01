@@ -10,9 +10,9 @@ builds and publishes the artifacts on version tags.
 | Platform | Formats                                      |
 |----------|----------------------------------------------|
 | Linux    | `.deb`, `.rpm`, AppImage, portable `.tar.gz` |
-| Windows  | NSIS `.exe`, WiX `.msi`, portable `.zip`     |
+| Windows  | NSIS `.exe`, portable `.zip`                 |
 
-x86_64 only for now. Builds run on Linux and Windows runners (the MSI can only be produced on Windows).
+x86_64 only for now. Builds run on Linux and Windows runners.
 
 ## One installer, everything bundled
 
@@ -20,32 +20,59 @@ The desktop app is the product; the daemon, tray, and CLI ride along as Tauri **
 [`crates/desktop/tauri.conf.json`](../crates/desktop/tauri.conf.json)):
 
 - `hestiad` — the resident daemon the desktop app drives over the socket.
-- `hestiatray` — the system-tray helper.
+- `hestia-tray` — the system-tray helper.
 - `hestia` — the CLI/TUI.
 
 Each is built with the target-triple suffix Tauri requires (`hestiad-x86_64-unknown-linux-gnu`, …) and staged into
 `crates/desktop/binaries/`
-by [`scripts/sidecars.sh`](../scripts/sidecars.sh); the bundler strips the suffix on install. `deb`/`rpm`/AppImage and
-the MSI install the **full set** with no component picker; the NSIS installer is customized — see below.
+by [`scripts/sidecars.sh`](../scripts/sidecars.sh); the bundler strips the suffix on install. `deb`/`rpm`/AppImage
+install the **full set** with no component picker; the NSIS installer is customized — see below.
+
+## What the binaries are called
+
+Two names per binary, and which one ships depends on the platform — the source of truth is `common::app`
+(`DESKTOP_BIN`, `TRAY_BIN`, `DAEMON_BIN`), which lists them most-preferred first so `common::paths::sibling_binary`
+resolves a sibling in any layout, including a dev build under cargo's names.
+
+| | Windows | Linux |
+|---|---|---|
+| desktop shell | `Hestia.exe` | `hestia-desktop` |
+| tray | `Hestia Tray.exe` | `hestia-tray` |
+| CLI | `hestia.exe` | `hestia` |
+| daemon | `hestiad.exe` | `hestiad` |
+
+Windows names the two a user meets — in Program Files, in Task Manager — after the product, via `mainBinaryName` in
+[`tauri.windows.conf.json`](../crates/desktop/tauri.windows.conf.json) for the shell and an `/oname=` rename in the NSIS
+template for the tray. Linux keeps cargo's names, because `deb`/`rpm` install into `/usr/bin`, where a capital or a
+space would be hostile to the shell that has to type them; nothing user-visible there comes from the binary name anyway
+(the launcher reads `Name=` from the `.desktop` entry, and the AppImage is named from `productName`).
+
+**This is why the `bin/` split exists.** `Hestia.exe` and `hestia.exe` differ only by case, and Windows paths are
+case-insensitive — they cannot share a directory.
 
 ## The NSIS installer
 
+NSIS is the **only** Windows installer. The WiX `.msi` was dropped: it installs every binary into one flat directory,
+which the names above cannot survive — `Hestia.exe` and `hestia.exe` would collide — and fixing it meant a second
+forked bundler template to re-diff on every tauri-cli bump. It bought nothing the NSIS installer does not already do
+better; `installMode: both` covers per-user and per-machine, which was the MSI's only real advantage.
+
 Windows uses a **custom NSIS template**
 ([`crates/desktop/windows/installer.nsi`](../crates/desktop/windows/installer.nsi)), a fork of tauri-bundler's stock
-template rendered with the same handlebars context. It must track the pinned tauri-cli version (`2.10.1`, both locally
+template rendered with the same handlebars context. It must track the pinned tauri-cli version (`2.11.4`, both locally
 and in [`release.yml`](../.github/workflows/release.yml)) — re-diff the fork against upstream's
 `crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi` when bumping.
 
 What it adds over stock:
 
-- **Components page** — *Hestia core* (`hestiad` + `hestiatray`, required), *Desktop app*, and *CLI* (both checked by default,
+- **Components page** — *Hestia core* (`hestiad` + the tray, required), *Desktop app*, and *CLI* (both checked by default,
   deselectable). Choices are persisted in the uninstall registry key and become the defaults for the next run — and the
   effective selection for silent/passive updates. Deselecting a previously installed component on an update removes it.
 - **Install mode `both`** — per-user or all-users, chosen at install time (`bundle.windows.nsis.installMode` in
   `tauri.conf.json`), remembered for updates and uninstall.
-- **A split layout** — `hestia-desktop.exe` and `hestiatray.exe` install to
-  `$INSTDIR`, because a user launches them; `hestia.exe` and `hestiad.exe` to
-  `$INSTDIR\bin`, because a shell or another binary reaches them. The portable archive lays down the same split.
+- **A split layout** — `Hestia.exe` and `Hestia Tray.exe` install to `$INSTDIR`, because a user launches them;
+  `hestia.exe` and `hestiad.exe` to `$INSTDIR\bin`, because a shell or another binary reaches them. The portable
+  archive lays down the same split.
 - **CLI on PATH** — the CLI component appends `$INSTDIR\bin` to the user or machine `PATH` (matching the install mode)
   and removes it on uninstall or deselection, so `hestia` is reachable without also exposing the daemon, the tray and
   the shell.
@@ -76,8 +103,8 @@ a copy of the installers' binaries. They are a separate `cargo build` under the
 
 ```
 hestia-<version>-<triple>/
-├── hestia-desktop        what a user launches
-├── hestiatray
+├── Hestia.exe            what a user launches  (hestia-desktop on Linux)
+├── Hestia Tray.exe                              (hestia-tray on Linux)
 ├── bin/
 │   ├── hestia            what a shell or another binary reaches
 │   └── hestiad
@@ -205,9 +232,8 @@ scripts/package.sh portable
 ```
 
 `cargo tauri build` runs the frontend build itself (via `beforeBuildCommand`), so only `bun install` (in `frontend/`)
-and a staged sidecar set are prerequisites. Bundles land in `target/release/bundle/{deb,rpm,appimage,nsis,msi}/`;
-portable archives in `target/package/`. On Windows use `scripts\win.ps1 package`; the MSI additionally needs the WiX
-Toolset the bundler fetches on first run.
+and a staged sidecar set are prerequisites. Bundles land in `target/release/bundle/{deb,rpm,appimage,nsis}/`;
+portable archives in `target/package/`. On Windows use `scripts\win.ps1 package`.
 
 **`HESTIA_CURSEFORGE_API_KEY`** is read at compile time by the `engine` crate: a distributor that has registered for a
 [CurseForge key](https://console.curseforge.com/) sets it in the build environment and the CurseForge content source

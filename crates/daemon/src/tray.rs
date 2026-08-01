@@ -7,14 +7,6 @@
 
 use std::process::{Command, Stdio};
 
-fn tray_name() -> &'static str {
-    if cfg!(windows) {
-        "hestiatray.exe"
-    } else {
-        "hestiatray"
-    }
-}
-
 fn suppressed() -> bool {
     std::env::var_os("HESTIA_NO_TRAY").is_some_and(|value| !value.is_empty() && value != "0")
 }
@@ -40,7 +32,7 @@ pub fn spawn() {
         tracing::debug!("no interactive display; not spawning the tray");
         return;
     }
-    let Some(program) = common::paths::sibling_binary(tray_name()) else {
+    let Some(program) = common::paths::sibling_binary(common::app::TRAY_BIN) else {
         tracing::debug!("tray binary not found in this layout; not spawning");
         return;
     };
