@@ -24,10 +24,10 @@ import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
 
-import type { PickedFile, Target } from '../targets';
+import { useIsProfileTarget, useTarget } from '../target-context';
+import type { PickedFile } from '../targets';
 
 export function ReviewStep({
-  target,
   picked,
   files,
   versionIds,
@@ -37,7 +37,6 @@ export function ReviewStep({
   onSetFileKind,
   worlds,
 }: {
-  target: Target | null;
   picked: ContentProject[];
   files: PickedFile[];
   versionIds: Record<string, string>;
@@ -47,7 +46,7 @@ export function ReviewStep({
   onSetFileKind: (path: string, kind: ContentKind) => void;
   worlds?: string[];
 }) {
-  const isProfile = target?.type === 'profile';
+  const target = useTarget();
 
   return (
     <div className="flex flex-col gap-4 p-1">
@@ -70,9 +69,7 @@ export function ReviewStep({
         {picked.map((p) => (
           <ReviewItemRow
             key={projectKey(p)}
-            target={target}
             project={p}
-            isProfile={isProfile}
             versionId={versionIds[projectKey(p)] ?? ''}
             onVersion={(id) => onVersion(projectKey(p), id)}
             onRemove={() => onRemoveProject(p)}
@@ -82,7 +79,6 @@ export function ReviewStep({
           <FileReviewRow
             key={f.path}
             file={f}
-            target={target}
             onSetKind={(kind) => onSetFileKind(f.path, kind)}
             onRemove={() => onRemoveFile(f.path)}
           />
@@ -100,16 +96,14 @@ function installDir(kind: ContentKind): string {
 
 function FileReviewRow({
   file,
-  target,
   onSetKind,
   onRemove,
 }: {
   file: PickedFile;
-  target: Target | null;
   onSetKind: (kind: ContentKind) => void;
   onRemove: () => void;
 }) {
-  const kinds = target?.accepts ?? [];
+  const kinds = useTarget()?.accepts ?? [];
 
   if (!file.valid) {
     return (
@@ -187,20 +181,18 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
 }
 
 function ReviewItemRow({
-  target,
   project,
-  isProfile,
   versionId,
   onVersion,
   onRemove,
 }: {
-  target: Target | null;
   project: ContentProject;
-  isProfile: boolean;
   versionId: string;
   onVersion: (id: string) => void;
   onRemove: () => void;
 }) {
+  const target = useTarget();
+  const isProfile = useIsProfileTarget();
   const versions = useQuery({
     ...contentQueries.versions({
       source: project.source,

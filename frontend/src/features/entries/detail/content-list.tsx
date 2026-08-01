@@ -38,36 +38,26 @@ import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
 import {
-  type EntryTarget,
   kindLoader,
   packWorlds,
   parseOrigin,
-  type RowHandlers,
   rowKey,
   worldEnabled,
 } from './content';
+import { useContent } from './content-context';
 
 export function ContentListResult({
-  entry,
   items,
   updatable,
-  handlers,
-  entryWorlds,
-  packName,
   selected,
   onToggleSelect,
 }: {
-  entry: EntryTarget;
   items: InstalledContent[];
   updatable: Set<string>;
-  handlers: RowHandlers;
-  /** The instance's save worlds, for a datapack that names none of its own. */
-  entryWorlds: string[];
-  /** The name of the pack the entry runs, empty when it runs none. */
-  packName: string;
   selected: Set<string> | null;
   onToggleSelect: (key: string) => void;
 }) {
+  const { entry, handlers, entryWorlds } = useContent();
   const [changing, setChanging] = useState<InstalledContent | null>(null);
 
   if (items.length === 0) {
@@ -81,7 +71,6 @@ export function ContentListResult({
             key={rowKey(c)}
             item={c}
             updatable={updatable.has(c.filename)}
-            handlers={handlers}
             // Only an instance has many worlds to scope; a server has one, so
             // its datapack row stays a plain row.
             worlds={
@@ -89,7 +78,6 @@ export function ContentListResult({
                 ? packWorlds(c, entryWorlds)
                 : []
             }
-            packName={packName}
             onChangeVersion={() => setChanging(c)}
             checked={selected ? selected.has(rowKey(c)) : undefined}
             onToggle={() => onToggleSelect(rowKey(c))}
@@ -146,25 +134,21 @@ function OriginBadge({
 function ContentRow({
   item,
   updatable,
-  handlers,
   worlds,
-  packName,
   onChangeVersion,
   checked,
   onToggle,
 }: {
   item: InstalledContent;
   updatable: boolean;
-  handlers: RowHandlers;
   /** The worlds this row can scope to; empty for everything but a datapack. */
   worlds: string[];
-  /** The name of the pack the entry runs, for a row a pack installed. */
-  packName: string;
   onChangeVersion: () => void;
   /** Set while the batch-select mode is active; undefined otherwise. */
   checked?: boolean;
   onToggle: () => void;
 }) {
+  const { handlers, packName } = useContent();
   const [removing, setRemoving] = useState(false);
   const [iconBroken, setIconBroken] = useState(false);
   const selecting = checked !== undefined;
@@ -326,7 +310,7 @@ function ContentRow({
         </div>
         {worlds.length > 0 && (
           <AccordionContent className="pt-0 pb-0 pl-13">
-            <WorldRows item={item} worlds={worlds} handlers={handlers} />
+            <WorldRows item={item} worlds={worlds} />
           </AccordionContent>
         )}
       </AccordionItem>
@@ -342,12 +326,11 @@ function ContentRow({
 function WorldRows({
   item,
   worlds,
-  handlers,
 }: {
   item: InstalledContent;
   worlds: string[];
-  handlers: RowHandlers;
 }) {
+  const { handlers } = useContent();
   const [removing, setRemoving] = useState<string | null>(null);
   return (
     <div className="flex flex-col pb-1.5">

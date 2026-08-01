@@ -36,6 +36,7 @@ import { ContentStep } from './steps/content';
 import { ReviewStep } from './steps/review';
 import { TargetStep } from './steps/target';
 import { WorldsStep } from './steps/worlds';
+import { TargetCtx } from './target-context';
 import { type Target, targetTakesKind, useTargets } from './targets';
 import { useInstallWizard } from './use-wizard';
 
@@ -215,157 +216,158 @@ export function ContentInstallModal({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!installing) onOpenChange(o);
-      }}
-    >
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Icon className="size-4.5 text-muted-foreground" />
-            {title}
-          </DialogTitle>
-          <DialogDescription>{hint}</DialogDescription>
-        </DialogHeader>
+    <TargetCtx.Provider value={target}>
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          if (!installing) onOpenChange(o);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon className="size-4.5 text-muted-foreground" />
+              {title}
+            </DialogTitle>
+            <DialogDescription>{hint}</DialogDescription>
+          </DialogHeader>
 
-        {installing ? (
-          <div className="flex min-h-72 flex-col justify-center px-1">
-            <Progress value={progressPct}>
-              <ProgressLabel>
-                {progressPhase || m['content.installing']()}
-              </ProgressLabel>
-              <ProgressValue />
-            </Progress>
-          </div>
-        ) : (
-          <>
-            <div className="flex max-h-[58vh] min-h-64 flex-col overflow-hidden p-1">
-              {stepId === 'target' ? (
-                <TargetStep
-                  kind={project?.kind ?? 'mod'}
-                  targets={targets.filter(
-                    (t) => project && targetTakesKind(t, project.kind),
-                  )}
-                  selectedId={targetId}
-                  onSelect={(t) => dispatch({ type: 'target', id: t.id })}
-                />
-              ) : stepId === 'content' ? (
-                target && (
-                  <ContentStep
-                    target={target}
-                    kind={kindFilter}
-                    onKindChange={(kind) =>
-                      dispatch({ type: 'kindFilter', kind })
-                    }
-                    source={source}
-                    onSourceChange={(next) =>
-                      dispatch({ type: 'source', source: next })
-                    }
-                    picked={picked}
-                    onToggle={toggleProject}
-                    onAddFiles={(files) =>
-                      dispatch({ type: 'addFiles', files })
-                    }
-                  />
-                )
-              ) : stepId === 'worlds' ? (
-                <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-                  <WorldsStep
-                    instanceId={target?.id ?? ''}
-                    selected={worlds}
-                    onToggle={(world, on) =>
-                      dispatch({ type: 'toggleWorld', world, on })
-                    }
-                  />
-                </div>
-              ) : (
-                <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-                  <ReviewStep
-                    target={target}
-                    picked={picked}
-                    files={files}
-                    versionIds={versionIds}
-                    onVersion={(ref, id) =>
-                      dispatch({ type: 'version', ref, id })
-                    }
-                    onRemoveProject={toggleProject}
-                    onRemoveFile={(path) =>
-                      dispatch({ type: 'removeFile', path })
-                    }
-                    onSetFileKind={(path, kind) =>
-                      dispatch({ type: 'setFileKind', path, kind })
-                    }
-                    worlds={needsWorlds ? worlds : undefined}
-                  />
-                </div>
-              )}
-              {error && (
-                <p className="mt-3 shrink-0 px-1 text-xs text-destructive">
-                  {error}
-                </p>
-              )}
+          {installing ? (
+            <div className="flex min-h-72 flex-col justify-center px-1">
+              <Progress value={progressPct}>
+                <ProgressLabel>
+                  {progressPhase || m['content.installing']()}
+                </ProgressLabel>
+                <ProgressValue />
+              </Progress>
             </div>
-
-            <DialogFooter className="items-center">
-              <div className="mr-auto flex items-center gap-3">
-                <StepDots
-                  steps={steps}
-                  active={Math.min(step, steps.length - 1)}
-                />
-                {mode === 'entry' && selectedCount > 0 && (
-                  <span className="text-[11px] text-muted-foreground">
-                    {m['content.selected_count']({ count: selectedCount })}
-                  </span>
+          ) : (
+            <>
+              <div className="flex max-h-[58vh] min-h-64 flex-col overflow-hidden p-1">
+                {stepId === 'target' ? (
+                  <TargetStep
+                    kind={project?.kind ?? 'mod'}
+                    targets={targets.filter(
+                      (t) => project && targetTakesKind(t, project.kind),
+                    )}
+                    selectedId={targetId}
+                    onSelect={(t) => dispatch({ type: 'target', id: t.id })}
+                  />
+                ) : stepId === 'content' ? (
+                  target && (
+                    <ContentStep
+                      target={target}
+                      kind={kindFilter}
+                      onKindChange={(kind) =>
+                        dispatch({ type: 'kindFilter', kind })
+                      }
+                      source={source}
+                      onSourceChange={(next) =>
+                        dispatch({ type: 'source', source: next })
+                      }
+                      picked={picked}
+                      onToggle={toggleProject}
+                      onAddFiles={(files) =>
+                        dispatch({ type: 'addFiles', files })
+                      }
+                    />
+                  )
+                ) : stepId === 'worlds' ? (
+                  <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+                    <WorldsStep
+                      instanceId={target?.id ?? ''}
+                      selected={worlds}
+                      onToggle={(world, on) =>
+                        dispatch({ type: 'toggleWorld', world, on })
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+                    <ReviewStep
+                      picked={picked}
+                      files={files}
+                      versionIds={versionIds}
+                      onVersion={(ref, id) =>
+                        dispatch({ type: 'version', ref, id })
+                      }
+                      onRemoveProject={toggleProject}
+                      onRemoveFile={(path) =>
+                        dispatch({ type: 'removeFile', path })
+                      }
+                      onSetFileKind={(path, kind) =>
+                        dispatch({ type: 'setFileKind', path, kind })
+                      }
+                      worlds={needsWorlds ? worlds : undefined}
+                    />
+                  </div>
+                )}
+                {error && (
+                  <p className="mt-3 shrink-0 px-1 text-xs text-destructive">
+                    {error}
+                  </p>
                 )}
               </div>
-              {step === 0 ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                >
-                  {m['app.action.cancel']()}
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  data-icon="inline-start"
-                  onClick={() =>
-                    dispatch({ type: 'step', step: Math.max(0, step - 1) })
-                  }
-                >
-                  <CaretLeftIcon />
-                  {m['app.action.back']()}
-                </Button>
-              )}
-              {stepId === 'review' ? (
-                <Button
-                  type="button"
-                  disabled={!canAdvance}
-                  className="bg-ember text-ember-foreground hover:bg-ember/90"
-                  onClick={install}
-                >
-                  {m['app.action.install']()}
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  data-icon="inline-end"
-                  disabled={!canAdvance}
-                  className="bg-ember text-ember-foreground hover:bg-ember/90"
-                  onClick={() => dispatch({ type: 'step', step: step + 1 })}
-                >
-                  {m['app.action.next']()}
-                  <CaretRightIcon />
-                </Button>
-              )}
-            </DialogFooter>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
+
+              <DialogFooter className="items-center">
+                <div className="mr-auto flex items-center gap-3">
+                  <StepDots
+                    steps={steps}
+                    active={Math.min(step, steps.length - 1)}
+                  />
+                  {mode === 'entry' && selectedCount > 0 && (
+                    <span className="text-[11px] text-muted-foreground">
+                      {m['content.selected_count']({ count: selectedCount })}
+                    </span>
+                  )}
+                </div>
+                {step === 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    {m['app.action.cancel']()}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    data-icon="inline-start"
+                    onClick={() =>
+                      dispatch({ type: 'step', step: Math.max(0, step - 1) })
+                    }
+                  >
+                    <CaretLeftIcon />
+                    {m['app.action.back']()}
+                  </Button>
+                )}
+                {stepId === 'review' ? (
+                  <Button
+                    type="button"
+                    disabled={!canAdvance}
+                    className="bg-ember text-ember-foreground hover:bg-ember/90"
+                    onClick={install}
+                  >
+                    {m['app.action.install']()}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    data-icon="inline-end"
+                    disabled={!canAdvance}
+                    className="bg-ember text-ember-foreground hover:bg-ember/90"
+                    onClick={() => dispatch({ type: 'step', step: step + 1 })}
+                  >
+                    {m['app.action.next']()}
+                    <CaretRightIcon />
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </TargetCtx.Provider>
   );
 }

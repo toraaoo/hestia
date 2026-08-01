@@ -33,6 +33,7 @@ import {
   type SectionProps,
   type UpdatesResult,
 } from './content';
+import { type ContentContext, ContentCtx, useContent } from './content-context';
 import { ContentListResult } from './content-list';
 
 /**
@@ -101,40 +102,39 @@ export function ContentSection({
       }),
   };
 
+  const context: ContentContext = {
+    entry,
+    handlers,
+    packName: pack.data?.name ?? '',
+    entryWorlds: (worlds.data ?? []).map((world) => world.folder),
+  };
+
   return (
-    <ContentSectionView
-      entry={entry}
-      kinds={kinds}
-      kind={kind}
-      onKindChange={onKindChange}
-      action={action}
-      lists={lists}
-      updates={updates}
-      handlers={handlers}
-      entryWorlds={(worlds.data ?? []).map((world) => world.folder)}
-      packName={pack.data?.name ?? ''}
-    />
+    <ContentCtx.Provider value={context}>
+      <ContentSectionView
+        kinds={kinds}
+        kind={kind}
+        onKindChange={onKindChange}
+        action={action}
+        lists={lists}
+        updates={updates}
+      />
+    </ContentCtx.Provider>
   );
 }
 
 function ContentSectionView({
-  entry,
   kinds,
   kind,
   onKindChange,
   action,
   lists,
   updates,
-  handlers,
-  entryWorlds,
-  packName,
-}: SectionProps & {
+}: Omit<SectionProps, 'entry'> & {
   lists: ListResult[];
   updates: UpdatesResult[];
-  handlers: RowHandlers;
-  entryWorlds: string[];
-  packName: string;
 }) {
+  const { handlers } = useContent();
   const items = lists.flatMap((q) => q.data?.items ?? []);
   const updatable = new Set(
     updates.flatMap((q) =>
@@ -250,12 +250,8 @@ function ContentSectionView({
         </Empty>
       ) : (
         <ContentListResult
-          entry={entry}
           items={filtered}
           updatable={updatable}
-          handlers={handlers}
-          entryWorlds={entryWorlds}
-          packName={packName}
           selected={selected}
           onToggleSelect={(key) =>
             setSelected((prev) => {
