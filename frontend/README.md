@@ -1,213 +1,49 @@
-Welcome to your new TanStack Start app! 
+# frontend
 
-# Getting Started
+The UI for `hestia-desktop`. A plain client SPA — React 19, TanStack Router + Query, Tailwind v4 — rendered inside a
+Tauri v2 webview. There is no Node server at runtime: Tauri opens the dev server in dev and bundles `dist/` in release.
 
-To run this application:
+Everything the UI knows comes from the daemon over the shell's one generic
+`ipc_call` bridge. See [../docs/architecture/frontends.md](../docs/architecture/frontends.md)
+for the design, [../docs/contributing.md](../docs/contributing.md) for the copy-and-adapt recipes,
+and [../docs/hooks.md](../docs/hooks.md) for consuming the queries layer.
+
+## Layout
+
+| Path              | What lives there                                               |
+|-------------------|----------------------------------------------------------------|
+| `src/api/`        | typed daemon calls, one namespace per domain, over `core/`     |
+| `src/queries/`    | React Query bindings 1:1 with `api/`, plus the job store       |
+| `src/features/`   | one directory per product area                                 |
+| `src/components/` | shared chrome and the `ui/` primitives                         |
+| `src/routes/`     | file-based routes; `routeTree.gen.ts` is generated and tracked |
+| `src/mock/`       | the browser fixture daemon — dev only, stripped from release   |
+| `messages/`       | the message catalogue, one file per root, per locale           |
+| `tests/`          | `unit/` and `integration/`, over the harness in `support/`     |
+
+## Working on it
 
 ```bash
 bun install
-bun --bun run dev
+bun run generate:messages   # src/paraglide/ — generated, untracked, imported
+bun run dev                 # browser, against the fixture daemon in src/mock
 ```
 
-# Building For Production
+`generate:messages` comes first: the app imports from `src/paraglide/`, which is compiled from `messages/` and never
+committed, so a typecheck or build before it fails on unresolved imports. For the real thing, `scripts/dev.sh --desktop`
+from the repo root runs the Tauri shell against a live daemon.
 
-To build this application for production:
+## Checks
+
+The same chain CI runs, in this order:
 
 ```bash
-bun --bun run build
+bun run check       # biome: lint + format
+bun run typecheck   # tsc --noEmit
+bun run test        # vitest
+bun run build
 ```
 
-## Testing
-
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
-
-```bash
-bun --bun run test
-```
-
-## Styling
-
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-### Removing Tailwind CSS
-
-If you prefer not to use Tailwind CSS:
-
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `bun install @tailwindcss/vite tailwindcss -D`
-
-## Linting & Formatting
-
-This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
-
-
-```bash
-bun --bun run lint
-bun --bun run format
-bun --bun run check
-```
-
-
-# Paraglide i18n
-
-This add-on wires up ParaglideJS for localized routing and message formatting.
-
-- Messages live in `project.inlang/messages`.
-- URLs are localized through the Paraglide Vite plugin and router `rewrite` hooks.
-- Run the dev server or build to regenerate the `src/paraglide` outputs.
-
-
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+Tests are split by what they touch: `unit/` is pure logic, and `integration/`
+renders through `tests/support` — the app's real query client plus the
+`src/mock` fixture daemon, so there is no second set of fakes to drift.

@@ -151,3 +151,6 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# Compiled from messages/ by paraglide; the app imports it, never commit it.
+src/paraglide/
