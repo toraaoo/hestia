@@ -1,5 +1,11 @@
 import { useLocation } from '@tanstack/react-router';
-import { createContext, type ReactNode, useContext, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 
 /**
  * The shell's search box lives in the persistent chrome (Topbar) while the
@@ -25,11 +31,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     setQuery('');
   }
 
-  return (
-    <SearchCtx.Provider value={{ query, setQuery }}>
-      {children}
-    </SearchCtx.Provider>
-  );
+  const value = useMemo(() => ({ query, setQuery }), [query]);
+
+  return <SearchCtx.Provider value={value}>{children}</SearchCtx.Provider>;
 }
 
 export function useSearch(): SearchState {

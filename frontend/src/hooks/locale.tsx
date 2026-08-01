@@ -1,4 +1,11 @@
-import { createContext, type ReactNode, useContext, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 
 import { getLocale, type locales, setLocale } from '@/paraglide/runtime.js';
 
@@ -21,15 +28,23 @@ const LocaleContext = createContext<LocaleContextValue | null>(null);
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(getLocale());
 
-  const changeLocale = (next: Locale) => {
-    if (next === locale) return;
-    setLocale(next, { reload: false });
-    document.documentElement.lang = next;
-    setLocaleState(next);
-  };
+  const changeLocale = useCallback(
+    (next: Locale) => {
+      if (next === locale) return;
+      setLocale(next, { reload: false });
+      document.documentElement.lang = next;
+      setLocaleState(next);
+    },
+    [locale],
+  );
+
+  const value = useMemo(
+    () => ({ locale, changeLocale }),
+    [locale, changeLocale],
+  );
 
   return (
-    <LocaleContext.Provider value={{ locale, changeLocale }}>
+    <LocaleContext.Provider value={value}>
       <LocaleBoundary key={locale}>{children}</LocaleBoundary>
     </LocaleContext.Provider>
   );

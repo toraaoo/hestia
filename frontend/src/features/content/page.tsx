@@ -1,9 +1,9 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useIntersectionObserver } from '@uidotdev/usehooks';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 
-import { type ContentKind, type ContentProject, errorMessage } from '@/api';
+import { type ContentKind, errorMessage } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
 import { FilterMenu } from '@/components/filter-menu';
 import { Page } from '@/components/page';
@@ -14,12 +14,10 @@ import {
   sourceGroup,
   useSourceOptions,
 } from '@/features/content/components/sources';
+import { mergeHits, projectKey } from '@/features/content/lib/hits';
 import { contentKinds, kindInfo } from '@/features/content/lib/kinds';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
-
-/** Merge/sort key so the same project from one source is never listed twice. */
-const projectKey = (p: ContentProject) => `${p.source}:${p.id}`;
 
 export function BrowsePage({
   kind,
@@ -60,14 +58,10 @@ export function BrowsePage({
   });
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = search;
 
-  const hits = (search.data?.pages ?? [])
-    .flat()
-    .flatMap((r) => r.hits)
-    .filter(
-      (p, i, all) =>
-        all.findIndex((x) => projectKey(x) === projectKey(p)) === i,
-    )
-    .sort((a, b) => b.downloads - a.downloads);
+  const hits = useMemo(
+    () => mergeHits(search.data?.pages),
+    [search.data?.pages],
+  );
 
   // Grow the page when the sentinel scrolls into view (infinite scroll).
   const [sentinelRef, sentinel] = useIntersectionObserver({
