@@ -9,6 +9,7 @@ use proto::content::{
     ContentKind, ContentProject, ContentVersion, ResolvedModpack, SearchQuery, SearchResult,
     VersionQuery,
 };
+
 use proto::minecraft::{Artifact, GameVersion, InstanceProfile, ServerProfile};
 
 /// A flavor that resolves to a profile naming `artifact`, or fails when it is
@@ -193,5 +194,93 @@ fn clone_of(flavor: &Flavor) -> Flavor {
         id: flavor.id,
         versions: flavor.versions.clone(),
         artifact: flavor.artifact.clone(),
+    }
+}
+
+/// A project the fixture source catalogues.
+pub fn project(id: &str, kind: ContentKind) -> ContentProject {
+    ContentProject {
+        id: id.to_string(),
+        slug: id.to_string(),
+        title: id.to_string(),
+        source: "fixture".to_string(),
+        kind,
+        kinds: vec![kind],
+        client_side: proto::content::SideSupport::Required,
+        server_side: proto::content::SideSupport::Required,
+        ..ContentProject::default()
+    }
+}
+
+/// A downloadable version of `project`, served from `files`, optionally
+/// requiring `deps`.
+pub fn version(project: &str, files: &Files, game: &str, deps: &[&str]) -> ContentVersion {
+    ContentVersion {
+        source: "fixture".to_string(),
+        id: format!("{project}-1"),
+        project_id: project.to_string(),
+        name: project.to_string(),
+        version_number: "1.0.0".to_string(),
+        game_versions: vec![game.to_string()],
+        loaders: vec!["fabric".to_string()],
+        files: vec![proto::content::ContentFile {
+            artifact: proto::minecraft::Artifact {
+                url: files.url(&format!("{project}.jar")),
+                filename: format!("{project}.jar"),
+                size: Files::BODY.len() as u64,
+                checksum: None,
+            },
+            primary: true,
+        }],
+        dependencies: deps
+            .iter()
+            .map(|d| proto::content::ContentDependency {
+                project_id: (*d).to_string(),
+                kind: proto::content::DependencyKind::Required,
+                ..proto::content::ContentDependency::default()
+            })
+            .collect(),
+        ..ContentVersion::default()
+    }
+}
+
+/// The smallest HTTP server that can hand back a jar, so an install writes real
+/// bytes without reaching a platform.
+pub struct Files {
+    port: u16,
+}
+
+impl Files {
+    pub const BODY: &'static [u8] = b"PK\x03\x04 not really a jar";
+
+    pub async fn serve() -> Files {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        tokio::spawn(async move {
+            loop {
+                let Ok((mut socket, _)) = listener.accept().await else {
+                    return;
+                };
+                tokio::spawn(async move {
+                    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                    let mut scratch = [0u8; 1024];
+                    let _ = socket.read(&mut scratch).await;
+                    let head = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        Files::BODY.len()
+                    );
+                    let _ = socket.write_all(head.as_bytes()).await;
+                    let _ = socket.write_all(Files::BODY).await;
+                    let _ = socket.flush().await;
+                });
+            }
+        });
+        Files { port }
+    }
+
+    pub fn url(&self, name: &str) -> String {
+        format!("http://127.0.0.1:{}/{name}", self.port)
     }
 }

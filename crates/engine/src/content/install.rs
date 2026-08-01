@@ -250,6 +250,18 @@ pub(crate) fn remove_files(
 
 /// Whether `reference` names this item: its project id, slug, filename, or
 /// title (the human-facing ones case-insensitively).
+/// Where in `index` an incoming item lands: the same kind, and either the same
+/// project or the same filename. One rule, because a plain install and a pack
+/// apply must agree on what "already installed" means — a pack supplying a mod
+/// the user installed by hand replaces that row rather than doubling it.
+pub(crate) fn replaces(index: &[InstalledContent], item: &InstalledContent) -> Option<usize> {
+    index.iter().position(|i| {
+        i.kind == item.kind
+            && (i.filename == item.filename
+                || (!item.project_id.is_empty() && i.project_id == item.project_id))
+    })
+}
+
 pub(crate) fn matches(item: &InstalledContent, reference: &str) -> bool {
     item.project_id == reference
         || item.filename == reference
@@ -363,6 +375,40 @@ fn collect_untracked(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_incoming_item_replaces_the_same_project_or_the_same_filename() {
+        let item = |project: &str, filename: &str| InstalledContent {
+            kind: ContentKind::Mod,
+            project_id: project.to_string(),
+            filename: filename.to_string(),
+            ..InstalledContent::default()
+        };
+        let index = vec![
+            item("sodium", "sodium-0.5.jar"),
+            item("", "hand-dropped.jar"),
+        ];
+
+        assert_eq!(
+            replaces(&index, &item("sodium", "sodium-0.6.jar")),
+            Some(0),
+            "a new version of the same project replaces it"
+        );
+        assert_eq!(
+            replaces(&index, &item("", "hand-dropped.jar")),
+            Some(1),
+            "a pack supplying a file the user dropped in takes that row"
+        );
+        assert_eq!(replaces(&index, &item("iris", "iris.jar")), None);
+
+        let mut datapack = item("sodium", "sodium-0.6.jar");
+        datapack.kind = ContentKind::DataPack;
+        assert_eq!(
+            replaces(&index, &datapack),
+            None,
+            "the same project installed as another kind is a separate row"
+        );
+    }
 
     fn version(id: &str, number: &str, channel: ReleaseChannel, games: &[&str]) -> ContentVersion {
         ContentVersion {

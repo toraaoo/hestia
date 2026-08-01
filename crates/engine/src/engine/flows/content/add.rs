@@ -118,12 +118,7 @@ impl Engine {
         let entry_worlds = ctx.worlds();
         let mut index = install::load(&ctx.entry_dir);
         for item in &items {
-            let replaced = index.iter().position(|i| {
-                i.kind == item.kind
-                    && ((!item.project_id.is_empty() && i.project_id == item.project_id)
-                        || i.filename == item.filename)
-            });
-            if let Some(pos) = replaced {
+            if let Some(pos) = install::replaces(&index, item) {
                 let old = index.remove(pos);
                 if old.filename != item.filename {
                     install::remove_files(&ctx.entry_dir, &ctx.data_dir, &old, &entry_worlds);

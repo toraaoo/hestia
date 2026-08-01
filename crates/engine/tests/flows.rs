@@ -4,12 +4,27 @@
 
 mod fixture;
 
-use engine::{Cancel, Job, ServerCreateSpec};
+use engine::{Cancel, EntryRef, Job, ServerCreateSpec};
+use proto::content::{ContentAddItem, ContentAddSpec, ContentKind};
 use proto::error::ErrorInfo;
 use proto::minecraft::ProvisionProgress;
 
 fn job<'a>(cancel: &'a Cancel, report: &'a (dyn Fn(&ProvisionProgress) + Send + Sync)) -> Job<'a> {
     Job::new(report, cancel)
+}
+
+fn add(projects: &[&str]) -> ContentAddSpec {
+    ContentAddSpec {
+        kind: ContentKind::Mod,
+        items: projects
+            .iter()
+            .map(|p| ContentAddItem {
+                project: (*p).to_string(),
+                ..ContentAddItem::default()
+            })
+            .collect(),
+        ..ContentAddSpec::default()
+    }
 }
 
 fn spec(flavor: &str) -> ServerCreateSpec {
@@ -114,4 +129,156 @@ async fn a_cancelled_create_stops_before_it_claims_anything() {
         engine.servers().list().is_empty(),
         "the checkpoint sits between resolve and create, so nothing is registered"
     );
+}
+
+/// An instance to install content into, built over the fixture flavor.
+async fn instance(home: &std::path::Path, source: fixture::Source) -> (engine::Engine, String) {
+    let engine = fixture::engine(
+        home,
+        vec![fixture::Flavor::resolving("fabric")],
+        vec![source],
+    );
+    let record = engine
+        .create_instance("modded", "fabric", "1.21", None, &[])
+        .await
+        .expect("create the instance");
+    (engine, record.id)
+}
+
+#[tokio::test]
+async fn a_batch_installs_its_roots_and_their_required_dependencies_once() {
+    let home = tempfile::tempdir().expect("temp home");
+    let files = fixture::Files::serve().await;
+    let source = fixture::Source {
+        projects: vec![
+            fixture::project("sodium", ContentKind::Mod),
+            fixture::project("iris", ContentKind::Mod),
+            fixture::project("fabric-api", ContentKind::Mod),
+        ],
+        versions: vec![
+            fixture::version("sodium", &files, "1.21", &["fabric-api"]),
+            fixture::version("iris", &files, "1.21", &["fabric-api"]),
+            fixture::version("fabric-api", &files, "1.21", &[]),
+        ],
+    };
+    let (engine, id) = instance(home.path(), source).await;
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+
+    let (installed, failures) = engine
+        .add_entry_content(
+            EntryRef::Instance(&id),
+            &add(&["sodium", "iris"]),
+            &job(&cancel, &report),
+        )
+        .await
+        .expect("the batch runs");
+
+    assert!(failures.is_empty(), "no item should fail: {failures:?}");
+    let names: Vec<&str> = installed.iter().map(|i| i.project_id.as_str()).collect();
+    assert_eq!(
+        names.iter().filter(|n| **n == "fabric-api").count(),
+        1,
+        "a dependency shared across the batch installs once, got {names:?}"
+    );
+    assert_eq!(installed.len(), 3, "two roots plus the shared dependency");
+}
+
+#[tokio::test]
+async fn a_root_that_fails_does_not_stop_the_batch() {
+    let home = tempfile::tempdir().expect("temp home");
+    let files = fixture::Files::serve().await;
+    let source = fixture::Source {
+        projects: vec![fixture::project("sodium", ContentKind::Mod)],
+        versions: vec![fixture::version("sodium", &files, "1.21", &[])],
+    };
+    let (engine, id) = instance(home.path(), source).await;
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+
+    let (installed, failures) = engine
+        .add_entry_content(
+            EntryRef::Instance(&id),
+            &add(&["ghost", "sodium"]),
+            &job(&cancel, &report),
+        )
+        .await
+        .expect("the batch runs past the failure");
+
+    assert_eq!(installed.len(), 1, "the good root still installs");
+    assert_eq!(failures.len(), 1, "the unknown project is reported, once");
+    assert_eq!(failures[0].item, "ghost");
+}
+
+#[tokio::test]
+async fn what_a_batch_installed_is_what_the_entry_then_lists() {
+    let home = tempfile::tempdir().expect("temp home");
+    let files = fixture::Files::serve().await;
+    let source = fixture::Source {
+        projects: vec![fixture::project("sodium", ContentKind::Mod)],
+        versions: vec![fixture::version("sodium", &files, "1.21", &[])],
+    };
+    let (engine, id) = instance(home.path(), source).await;
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+
+    engine
+        .add_entry_content(
+            EntryRef::Instance(&id),
+            &add(&["sodium"]),
+            &job(&cancel, &report),
+        )
+        .await
+        .expect("install");
+
+    let (listed, _) = engine
+        .entry_content(EntryRef::Instance(&id), ContentKind::Mod)
+        .expect("list");
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].project_id, "sodium");
+    assert!(listed[0].enabled);
+
+    // The index and the disk agree: removing it takes the file with it.
+    assert!(engine
+        .remove_entry_content(EntryRef::Instance(&id), ContentKind::Mod, "sodium", &[])
+        .expect("remove"));
+    let (after, _) = engine
+        .entry_content(EntryRef::Instance(&id), ContentKind::Mod)
+        .expect("list");
+    assert!(after.is_empty(), "the index follows the removal");
+}
+
+#[tokio::test]
+async fn disabling_an_item_keeps_it_installed() {
+    let home = tempfile::tempdir().expect("temp home");
+    let files = fixture::Files::serve().await;
+    let source = fixture::Source {
+        projects: vec![fixture::project("sodium", ContentKind::Mod)],
+        versions: vec![fixture::version("sodium", &files, "1.21", &[])],
+    };
+    let (engine, id) = instance(home.path(), source).await;
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+
+    engine
+        .add_entry_content(
+            EntryRef::Instance(&id),
+            &add(&["sodium"]),
+            &job(&cancel, &report),
+        )
+        .await
+        .expect("install");
+
+    let matched = engine
+        .enable_entry_content(
+            EntryRef::Instance(&id),
+            ContentKind::Mod,
+            "sodium",
+            false,
+            &[],
+        )
+        .expect("disable");
+    assert_eq!(matched, 1);
+
+    let (listed, _) = engine
+        .entry_content(EntryRef::Instance(&id), ContentKind::Mod)
+        .expect("list");
+    assert_eq!(listed.len(), 1, "a disabled item is still installed");
+    assert!(!listed[0].enabled);
 }

@@ -398,11 +398,7 @@ impl Engine {
 
         for mut item in items {
             item.origin = origin.clone();
-            match index.iter().position(|i| {
-                i.kind == item.kind
-                    && (i.filename == item.filename
-                        || (!item.project_id.is_empty() && i.project_id == item.project_id))
-            }) {
+            match install::replaces(&index, &item) {
                 Some(pos) => {
                     let old = index.remove(pos);
                     if old.filename != item.filename {
