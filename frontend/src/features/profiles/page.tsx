@@ -20,10 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  type View,
-  ViewToggle,
-} from '@/features/entries/components/collection';
+import { type View, ViewToggle } from '@/features/shared/entry/components';
 import { m } from '@/paraglide/messages.js';
 import { profileMutations, profileQueries } from '@/queries/profile';
 

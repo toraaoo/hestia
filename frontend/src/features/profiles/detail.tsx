@@ -13,10 +13,13 @@ import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { kindGroup } from '@/features/content/components/kind-filter';
-import { ContentInstallModal, profileTarget } from '@/features/content/install';
-import { kindInfo } from '@/features/content/lib/kinds';
+import {
+  ContentInstallDialog,
+  profileTarget,
+} from '@/features/content/install';
 import { profileFilterKinds } from '@/features/profiles/page';
+import { kindGroup } from '@/features/shared/content/components';
+import { kindInfo } from '@/features/shared/content/lib';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
 import { profileMutations, profileQueries } from '@/queries/profile';
@@ -204,7 +207,7 @@ export function ProfileDetailPage({
         )}
       </div>
 
-      <ContentInstallModal
+      <ContentInstallDialog
         entry={profileTarget(profile)}
         open={adding}
         onOpenChange={setAdding}

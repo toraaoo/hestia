@@ -1,8 +1,8 @@
-export { ContentInstallModal } from './modal';
-export { ModpackInstallModal } from './modpack-modal';
+export { ContentInstallDialog } from './dialog';
 export {
   instanceTarget,
   profileTarget,
   serverTarget,
   type Target,
-} from './targets';
+} from './lib';
+export { ModpackInstallDialog } from './modpack-dialog';

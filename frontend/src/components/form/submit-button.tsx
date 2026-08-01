@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
-
+import { useFormContext } from '@/components/form/context';
 import { Button } from '@/components/ui/button';
-import { useFormContext } from '@/hooks/form-context';
 
 /**
  * A submit button bound to the form context: disabled while the form is

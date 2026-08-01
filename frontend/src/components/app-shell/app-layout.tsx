@@ -12,14 +12,14 @@ import { Sidebar } from '@/components/app-shell/sidebar';
 import { StatusBar } from '@/components/app-shell/status-bar';
 import { TopNav } from '@/components/app-shell/top-nav';
 import { WhatsNewDialog } from '@/components/app-shell/whats-new-dialog';
-import { LaunchModalProvider } from '@/features/instances/launch-modal';
+import { LaunchDialogProvider } from '@/features/instances/dialogs';
 
 export function AppLayout() {
   const { pathname } = useLocation();
 
   return (
     <SearchProvider>
-      <LaunchModalProvider>
+      <LaunchDialogProvider>
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
           <TopNav />
 
@@ -40,7 +40,7 @@ export function AppLayout() {
         <OfflineOverlay />
         <CriticalAnnouncementDialog />
         <WhatsNewDialog />
-      </LaunchModalProvider>
+      </LaunchDialogProvider>
     </SearchProvider>
   );
 }

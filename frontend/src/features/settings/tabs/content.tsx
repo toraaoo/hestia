@@ -2,12 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 
 import { Badge } from '@/components/ui/badge';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
-import { SavedInput } from '@/features/settings/components/controls';
 import {
+  ModpackSettings,
+  SavedInput,
   Setting,
   SettingsSection,
-} from '@/features/settings/components/filtered';
-import { ModpackSettings } from '@/features/settings/components/modpack';
+} from '@/features/settings/components';
 import { useConfig } from '@/features/settings/use-config';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';

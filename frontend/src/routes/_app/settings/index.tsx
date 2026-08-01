@@ -1,9 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import {
-  SETTINGS_TABS,
-  type SettingsTab,
-} from '@/features/settings/lib/search';
+import { SETTINGS_TABS, type SettingsTab } from '@/features/settings/lib';
 import { SettingsPage } from '@/features/settings/page';
 
 export const Route = createFileRoute('/_app/settings/')({

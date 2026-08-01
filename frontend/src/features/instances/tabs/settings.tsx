@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import type { ConfigEntry, InstanceInfo } from '@/api';
-import { EntrySettingsTab } from '@/features/entries/settings';
+import { EntrySettingsTab } from '@/features/shared/entry/settings';
 import { m } from '@/paraglide/messages.js';
 import { configQueries, launcherDefaults } from '@/queries/config';
 import { instanceMutations, instanceQueries } from '@/queries/instance';

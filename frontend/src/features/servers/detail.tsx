@@ -20,21 +20,23 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WarningNotice } from '@/components/warning-notice';
-import { ContentInstallModal, serverTarget } from '@/features/content/install';
-import { EntryIconMenu } from '@/features/entries/components/icon-menu';
+import { ContentInstallDialog, serverTarget } from '@/features/content/install';
 import {
+  ServerBackupsTab,
+  ServerConsoleTab,
+  ServerSettingsTab,
+} from '@/features/servers/tabs';
+import {
+  EntryIconMenu,
   type LiveResources,
   ResourceCards,
-} from '@/features/entries/components/resource-panel';
+} from '@/features/shared/entry/components';
 import {
   ContentSection,
   ModpackCard,
   SideCard,
   StatCard,
-} from '@/features/entries/detail';
-import { ServerBackupsTab } from '@/features/servers/tabs/backups';
-import { ServerConsoleTab } from '@/features/servers/tabs/console';
-import { ServerSettingsTab } from '@/features/servers/tabs/settings';
+} from '@/features/shared/entry/detail';
 import { agoLabel, bytes, memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { useProcessMetrics } from '@/queries/metrics';
@@ -314,7 +316,7 @@ export function ServerDetailPage({
         </TabsContent>
       </Tabs>
 
-      <ContentInstallModal
+      <ContentInstallDialog
         entry={serverTarget(server)}
         open={addingContent}
         onOpenChange={setAddingContent}

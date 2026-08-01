@@ -6,13 +6,13 @@ import {
   CAPE_W,
   drawCapeFront,
   loadTexture,
-} from '@/features/skins/lib/texture';
-import type { SkinPreview } from '@/features/skins/lib/webgl/preview';
+} from '@/features/skins/lib';
+import type { SkinPreview } from '@/features/skins/lib/webgl';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
-const previewModule = () => import('@/features/skins/lib/webgl/preview');
-const thumbnailModule = () => import('@/features/skins/lib/webgl/thumbnails');
+const previewModule = () => import('@/features/skins/lib/webgl');
+const thumbnailModule = () => import('@/features/skins/lib/webgl');
 
 /** A static posed render of a full skin — the card-grid view. */
 export function SkinPose({

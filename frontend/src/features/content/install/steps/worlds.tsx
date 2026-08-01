@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
-import { WorldIcon } from '@/features/instances/components/world-icon';
+import { WorldIcon } from '@/features/shared/entry/components';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { instanceQueries } from '@/queries/instance';

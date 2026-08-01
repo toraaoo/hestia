@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-
+import { useFieldContext } from '@/components/form/context';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Field,
@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { useFieldContext } from '@/hooks/form-context';
 
 /**
  * The reusable, form-bound field components shared by every `useAppForm` form

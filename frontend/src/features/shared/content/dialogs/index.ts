@@ -1,0 +1,1 @@
+export { ContentVersionDialog } from './version';

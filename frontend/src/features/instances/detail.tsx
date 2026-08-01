@@ -20,29 +20,32 @@ import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  ContentInstallModal,
+  ContentInstallDialog,
   instanceTarget,
 } from '@/features/content/install';
-import { EntryIconMenu } from '@/features/entries/components/icon-menu';
+import { SessionList, WorldRow } from '@/features/instances/components';
 import {
+  ExportInstanceDialog,
+  useLaunchDialog,
+} from '@/features/instances/dialogs';
+import {
+  InstanceLogsTab,
+  InstanceServersTab,
+  InstanceSettingsTab,
+} from '@/features/instances/tabs';
+import { ProfilesPanel } from '@/features/profiles/components';
+import {
+  EntryIconMenu,
+  EntryRunControl,
   type LiveResources,
   ResourceCards,
-} from '@/features/entries/components/resource-panel';
+} from '@/features/shared/entry/components';
 import {
   ContentSection,
   ModpackCard,
   SideCard,
   StatCard,
-} from '@/features/entries/detail';
-import { SessionList } from '@/features/instances/components/session-list';
-import { WorldRow } from '@/features/instances/components/world-row';
-import { ExportInstanceModal } from '@/features/instances/export-modal';
-import { useLaunchModal } from '@/features/instances/launch-modal';
-import { InstanceRunControl } from '@/features/instances/run-control';
-import { InstanceLogsTab } from '@/features/instances/tabs/logs';
-import { InstanceServersTab } from '@/features/instances/tabs/servers';
-import { InstanceSettingsTab } from '@/features/instances/tabs/settings';
-import { ProfilesPanel } from '@/features/profiles/panel';
+} from '@/features/shared/entry/detail';
 import { agoLabel, bytes, memGb, uptime } from '@/lib/format';
 import { supportsQuickPlay } from '@/lib/quick-play';
 import { runningSessions } from '@/lib/sessions';
@@ -87,7 +90,7 @@ export function InstanceDetailPage({
   const [exporting, setExporting] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
   const [logSession, setLogSession] = useState<string | null>(null);
-  const { launch, isLaunching } = useLaunchModal();
+  const { launch, isLaunching } = useLaunchDialog();
   // Joining a world or a server is the same launch job, carrying what to join.
   const launchQuick = useJobMutation(instanceMutations.launchQuick());
   const stop = useMutation(instanceMutations.stop(id));
@@ -188,7 +191,7 @@ export function InstanceDetailPage({
               <FolderOpenIcon className="size-4" />
             </Button>
             {running ? (
-              <InstanceRunControl
+              <EntryRunControl
                 name={instance.name}
                 sessions={sessions}
                 busy={stop.isPending}
@@ -456,12 +459,12 @@ export function InstanceDetailPage({
         </TabsContent>
       </Tabs>
 
-      <ContentInstallModal
+      <ContentInstallDialog
         entry={instanceTarget(instance)}
         open={addingContent}
         onOpenChange={setAddingContent}
       />
-      <ExportInstanceModal
+      <ExportInstanceDialog
         id={id}
         name={instance.name}
         open={exporting}

@@ -8,14 +8,14 @@ import { useSearch } from '@/components/app-shell/search-context';
 import { FilterMenu } from '@/components/filter-menu';
 import { Page } from '@/components/page';
 import { CardGridSkeleton } from '@/components/skeleton';
-import { ContentCard } from '@/features/content/components/content-card';
-import { kindGroup } from '@/features/content/components/kind-filter';
 import {
+  ContentCard,
   sourceGroup,
   useSourceOptions,
-} from '@/features/content/components/sources';
-import { mergeHits, projectKey } from '@/features/content/lib/hits';
-import { contentKinds, kindInfo } from '@/features/content/lib/kinds';
+} from '@/features/content/components';
+import { mergeHits, projectKey } from '@/features/content/lib';
+import { kindGroup } from '@/features/shared/content/components';
+import { contentKinds, kindInfo } from '@/features/shared/content/lib';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
 

@@ -16,16 +16,16 @@ import {
 import {
   projectKey,
   projectRef,
-} from '@/features/content/components/content-card';
-import { SourceBadge } from '@/features/content/components/sources';
-import { kindInfo } from '@/features/content/lib/kinds';
+  SourceBadge,
+} from '@/features/content/components';
+import { kindInfo } from '@/features/shared/content/lib';
 import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
 
-import { useIsProfileTarget, useTarget } from '../target-context';
-import type { PickedFile } from '../targets';
+import { useIsProfileTarget, useTarget } from '../hooks';
+import type { PickedFile } from '../lib';
 
 export function ReviewStep({
   picked,

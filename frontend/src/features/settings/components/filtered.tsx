@@ -6,10 +6,7 @@ import {
   FieldLegend,
   FieldSet,
 } from '@/components/ui/field';
-import type {
-  SettingsGroup,
-  SettingsMatch,
-} from '@/features/settings/lib/search';
+import type { SettingsGroup, SettingsMatch } from '@/features/settings/lib';
 
 const MatchCtx = createContext<SettingsMatch | null>(null);
 

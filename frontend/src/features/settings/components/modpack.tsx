@@ -7,8 +7,11 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { RowList, SwitchRow } from '@/features/settings/components/controls';
-import { useFiltering } from '@/features/settings/components/filtered';
+import {
+  RowList,
+  SwitchRow,
+  useFiltering,
+} from '@/features/settings/components';
 import type { ModpackConfig } from '@/features/settings/use-config';
 import { m } from '@/paraglide/messages.js';
 

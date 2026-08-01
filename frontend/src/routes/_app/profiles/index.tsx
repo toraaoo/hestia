@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-
-import type { View } from '@/features/entries/components/collection';
 import { ProfilesPage } from '@/features/profiles/page';
+import type { View } from '@/features/shared/entry/components';
 
 export const Route = createFileRoute('/_app/profiles/')({
   validateSearch: (search: Record<string, unknown>): { view?: View } => ({

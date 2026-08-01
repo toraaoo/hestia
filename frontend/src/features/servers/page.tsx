@@ -5,18 +5,18 @@ import { useSearch } from '@/components/app-shell/search-context';
 import { FilterMenu } from '@/components/filter-menu';
 import { Page } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import type { EntryCardModel } from '@/features/shared/entry/components';
 import {
   EntryCollection,
+  EntryGridSkeleton,
   filterCards,
   flavorGroup,
   flavorsOf,
   serverToCard,
   type View,
   ViewToggle,
-} from '@/features/entries/components/collection';
-import type { EntryCardModel } from '@/features/entries/components/entry-card';
-import { EntryGridSkeleton } from '@/features/entries/components/skeleton';
-import { CreateEntryModal } from '@/features/entries/create';
+} from '@/features/shared/entry/components';
+import { CreateEntryDialog } from '@/features/shared/entry/dialogs';
 import { m } from '@/paraglide/messages.js';
 import { serverMutations, useServers } from '@/queries/server';
 
@@ -89,7 +89,7 @@ export function ServersPage({
         view={view}
         empty={m['server.none_match']()}
       />
-      <CreateEntryModal
+      <CreateEntryDialog
         kind="server"
         open={creating}
         onOpenChange={setCreating}

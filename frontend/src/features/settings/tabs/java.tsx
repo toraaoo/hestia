@@ -2,12 +2,12 @@ import { useState } from 'react';
 
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Slider } from '@/components/ui/slider';
-import { SavedInput } from '@/features/settings/components/controls';
 import {
+  RuntimeList,
+  SavedInput,
   Setting,
   SettingsSection,
-} from '@/features/settings/components/filtered';
-import { RuntimeList } from '@/features/settings/components/runtimes';
+} from '@/features/settings/components';
 import { useConfig } from '@/features/settings/use-config';
 import { memGb } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';

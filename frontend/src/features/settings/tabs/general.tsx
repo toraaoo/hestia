@@ -7,12 +7,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SavedInput, SwitchRow } from '@/features/settings/components/controls';
 import {
+  SavedInput,
   Setting,
   SettingsSection,
-} from '@/features/settings/components/filtered';
-import { UpdatePanel } from '@/features/settings/components/update';
+  SwitchRow,
+  UpdatePanel,
+} from '@/features/settings/components';
 import { useConfig } from '@/features/settings/use-config';
 import { type Locale, useLocale } from '@/hooks/locale';
 import { m } from '@/paraglide/messages.js';

@@ -16,7 +16,7 @@ import {
   isMeasurable,
   overallRatio,
   ProvisionProgressView,
-} from '@/features/entries/components/provision-progress';
+} from '@/features/shared/entry/components';
 import { m } from '@/paraglide/messages.js';
 import { useDaemon } from '@/queries/daemon';
 import { useInstances } from '@/queries/instance';

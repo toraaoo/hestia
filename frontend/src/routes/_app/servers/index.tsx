@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-
-import type { View } from '@/features/entries/components/collection';
 import { ServersPage } from '@/features/servers/page';
+import type { View } from '@/features/shared/entry/components';
 
 export const Route = createFileRoute('/_app/servers/')({
   validateSearch: (

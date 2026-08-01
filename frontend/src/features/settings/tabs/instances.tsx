@@ -1,9 +1,9 @@
-import { SwitchRow } from '@/features/settings/components/controls';
 import {
   Setting,
   SettingsSection,
-} from '@/features/settings/components/filtered';
-import { SyncSettings } from '@/features/settings/components/sync';
+  SwitchRow,
+  SyncSettings,
+} from '@/features/settings/components';
 import { useConfig } from '@/features/settings/use-config';
 import { m } from '@/paraglide/messages.js';
 

@@ -3,7 +3,7 @@ import type { WorldInfo } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { WorldIcon } from '@/features/instances/components/world-icon';
+import { WorldIcon } from '@/features/shared/entry/components';
 import { agoLabel, bytes } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 

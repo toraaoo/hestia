@@ -3,11 +3,11 @@ import { useState } from 'react';
 import type { ContentKind } from '@/api';
 import { contentKindLabel, entryIcon } from '@/components/icons';
 import { PickerPanel } from '@/components/picker-panel';
-import { PickRow } from '@/features/content/components/pick-row';
+import { PickRow } from '@/features/shared/content/components';
 import { m } from '@/paraglide/messages.js';
 
 import { FilterBar } from '../filter-bar';
-import { entryTypeLabel, type Target } from '../targets';
+import { entryTypeLabel, type Target } from '../lib';
 
 export function TargetStep({
   kind,

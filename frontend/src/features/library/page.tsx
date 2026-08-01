@@ -15,7 +15,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  ImportInstanceDialog,
+  useLaunchDialog,
+} from '@/features/instances/dialogs';
+import { useArchiveDrop, useOpenedArchive } from '@/features/instances/hooks';
+import type { EntryCardModel } from '@/features/shared/entry/components';
+import {
   EntryCollection,
+  EntryGridSkeleton,
   filterCards,
   flavorGroup,
   flavorsOf,
@@ -23,14 +30,8 @@ import {
   serverToCard,
   type View,
   ViewToggle,
-} from '@/features/entries/components/collection';
-import type { EntryCardModel } from '@/features/entries/components/entry-card';
-import { EntryGridSkeleton } from '@/features/entries/components/skeleton';
-import { CreateEntryModal } from '@/features/entries/create';
-import { ImportInstanceModal } from '@/features/instances/import-modal';
-import { useLaunchModal } from '@/features/instances/launch-modal';
-import { useOpenedArchive } from '@/features/instances/opened-archive';
-import { useArchiveDrop } from '@/features/instances/use-archive-drop';
+} from '@/features/shared/entry/components';
+import { CreateEntryDialog } from '@/features/shared/entry/dialogs';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
 import { instanceMutations, useInstances } from '@/queries/instance';
@@ -62,7 +63,7 @@ export function LibraryPage({
   const stopServer = useMutation(serverMutations.stopAny());
 
   const instances = useInstances();
-  const { launch: launchInstance, isLaunching } = useLaunchModal();
+  const { launch: launchInstance, isLaunching } = useLaunchDialog();
   const stopInstance = useMutation(instanceMutations.stopAny());
 
   const [newKind, setNewKind] = useState<'server' | 'instance'>('instance');
@@ -266,7 +267,7 @@ export function LibraryPage({
         </Section>
       </div>
 
-      <CreateEntryModal
+      <CreateEntryDialog
         kind={newKind}
         open={creating}
         onOpenChange={setCreating}
@@ -275,7 +276,7 @@ export function LibraryPage({
           setImporting(true);
         }}
       />
-      <ImportInstanceModal
+      <ImportInstanceDialog
         open={importing}
         onOpenChange={setImporting}
         initialPath={dropped}

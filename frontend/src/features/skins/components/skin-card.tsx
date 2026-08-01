@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { SkinPose } from '@/features/skins/components/render';
+import { SkinPose } from '@/features/skins/components';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 

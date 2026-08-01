@@ -11,10 +11,10 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { Switch } from '@/components/ui/switch';
 import {
   AddRow,
+  Setting,
   SwitchRow,
   ValueRow,
-} from '@/features/settings/components/controls';
-import { Setting } from '@/features/settings/components/filtered';
+} from '@/features/settings/components';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { syncMutations, syncQueries } from '@/queries/sync';

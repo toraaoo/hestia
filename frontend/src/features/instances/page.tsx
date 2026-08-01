@@ -6,19 +6,19 @@ import { FilterMenu } from '@/components/filter-menu';
 import { Page } from '@/components/page';
 import { SignInGate } from '@/components/sign-in-gate';
 import { Button } from '@/components/ui/button';
+import { useLaunchDialog } from '@/features/instances/dialogs';
+import type { EntryCardModel } from '@/features/shared/entry/components';
 import {
   EntryCollection,
+  EntryGridSkeleton,
   filterCards,
   flavorGroup,
   flavorsOf,
   instanceToCard,
   type View,
   ViewToggle,
-} from '@/features/entries/components/collection';
-import type { EntryCardModel } from '@/features/entries/components/entry-card';
-import { EntryGridSkeleton } from '@/features/entries/components/skeleton';
-import { CreateEntryModal } from '@/features/entries/create';
-import { useLaunchModal } from '@/features/instances/launch-modal';
+} from '@/features/shared/entry/components';
+import { CreateEntryDialog } from '@/features/shared/entry/dialogs';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
 import { instanceMutations, useInstances } from '@/queries/instance';
@@ -37,7 +37,7 @@ export function InstancesPage({
   const { query } = useSearch();
   const { signedIn, ready } = useAccounts();
   const instances = useInstances();
-  const { launch, isLaunching } = useLaunchModal();
+  const { launch, isLaunching } = useLaunchDialog();
   const stop = useMutation(instanceMutations.stopAny());
   const [creating, setCreating] = useState(false);
 
@@ -101,7 +101,7 @@ export function InstancesPage({
             view={view}
             empty={m['instance.none_match']()}
           />
-          <CreateEntryModal
+          <CreateEntryDialog
             kind="instance"
             open={creating}
             onOpenChange={setCreating}

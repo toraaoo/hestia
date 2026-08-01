@@ -17,8 +17,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
-import { useLaunchModal } from '@/features/instances/launch-modal';
-import { InstanceRunControl } from '@/features/instances/run-control';
+import { useLaunchDialog } from '@/features/instances/dialogs';
+import { EntryRunControl } from '@/features/shared/entry/components';
 import { runningSessions } from '@/lib/sessions';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
@@ -32,7 +32,7 @@ import { instanceMutations, useInstances } from '@/queries/instance';
 export function PlayBar() {
   const { signedIn } = useAccounts();
   const instances = useInstances();
-  const { launch, isLaunching } = useLaunchModal();
+  const { launch, isLaunching } = useLaunchDialog();
   const stop = useMutation(instanceMutations.stopAny());
 
   const list = instances.data ?? [];
@@ -119,7 +119,7 @@ export function PlayBar() {
       )}
 
       {sel && sessions.length > 0 ? (
-        <InstanceRunControl
+        <EntryRunControl
           name={sel.name}
           sessions={sessions}
           size="sm"

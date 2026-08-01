@@ -7,10 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
-  ContentInstallModal,
-  ModpackInstallModal,
+  ContentInstallDialog,
+  ModpackInstallDialog,
 } from '@/features/content/install';
-import { kindInfo } from '@/features/content/lib/kinds';
+import { kindInfo } from '@/features/shared/content/lib';
 import { compact } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 
@@ -112,14 +112,14 @@ export function ContentCard({
       {/* A modpack builds an entry rather than going into one, so it gets its
           own dialog instead of the shared content one. */}
       {project.kind === 'modpack' ? (
-        <ModpackInstallModal
+        <ModpackInstallDialog
           project={project}
           pinnedVersion={pinnedVersion}
           open={installing}
           onOpenChange={setInstalling}
         />
       ) : (
-        <ContentInstallModal
+        <ContentInstallDialog
           project={project}
           pinnedVersion={pinnedVersion}
           open={installing}

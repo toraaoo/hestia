@@ -10,12 +10,12 @@ import { Markdown } from '@/components/markdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SourceBadge } from '@/features/content/components/sources';
+import { SourceBadge } from '@/features/content/components';
 import {
-  ContentInstallModal,
-  ModpackInstallModal,
+  ContentInstallDialog,
+  ModpackInstallDialog,
 } from '@/features/content/install';
-import { kindInfo } from '@/features/content/lib/kinds';
+import { kindInfo } from '@/features/shared/content/lib';
 import { agoLabel, compact } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
@@ -181,14 +181,14 @@ export function ProjectDetailPage({
       {/* A modpack builds an entry rather than going into one, so it gets its
           own dialog instead of the shared content one. */}
       {p.kind === 'modpack' ? (
-        <ModpackInstallModal
+        <ModpackInstallDialog
           project={p}
           pinnedVersion={pinnedVersion}
           open={installOpen}
           onOpenChange={setInstallOpen}
         />
       ) : (
-        <ContentInstallModal
+        <ContentInstallDialog
           project={p}
           pinnedVersion={pinnedVersion}
           open={installOpen}

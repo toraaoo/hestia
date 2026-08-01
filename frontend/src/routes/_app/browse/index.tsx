@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-
-import { sourceSearch } from '@/features/content/lib/kinds';
 import { BrowsePage } from '@/features/content/page';
+import { sourceSearch } from '@/features/shared/content/lib';
 
 export const Route = createFileRoute('/_app/browse/')({
   validateSearch: sourceSearch,

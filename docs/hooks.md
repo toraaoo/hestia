@@ -87,8 +87,8 @@ Catalogue reads (`serverQueries.flavors()`, `serverQueries.versions(flavor)`,
 Pending reads render hand-drawn, theme-matched skeletons — ordinary components over the same tokens (`bg-muted`, the
 app's square corners), no capture step and no dependency. `Bone` (`components/skeleton.tsx`) is the pulsing primitive;
 `CardGridSkeleton` mirrors a page's real grid classes so bones land where cards will; a page-shaped composition lives
-beside any page that needs more (`features/skins/skeleton.tsx`, the entry grid shared by servers/instances/library in
-`features/entries/skeleton.tsx`). Two seams:
+beside any page that needs more (`features/skins/components/skeleton.tsx`, the entry grid shared by
+servers/instances/library in `features/shared/entry/components/skeleton.tsx`). Two seams:
 
 - A routed page passes `skeleton={<… />}` with its pending flag to `Page` —
   `<Page skeleton={<EntryGridSkeleton />} loading={isPending} …>` — and the body swaps for the skeleton while the header

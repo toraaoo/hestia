@@ -10,7 +10,7 @@ import {
   buildTree,
   excludedRoots,
   selectedBytes,
-} from '@/features/instances/tree';
+} from '@/features/instances/lib';
 
 function entry(path: string, sizeBytes: number, directory = false): ArchiveEntry {
   return {

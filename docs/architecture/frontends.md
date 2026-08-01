@@ -231,6 +231,37 @@ content browse, profiles, skins, news and settings, over a shared app shell with
 an offline overlay, a first-run sign-in prompt and route guards for the
 account-gated instance surface.
 
+Every feature has the same shape, and a directory only exists once it has
+something in it:
+
+```
+features/<name>/
+├── page.tsx          the route body; detail.tsx for a $id route
+├── components/       presentational pieces
+├── dialogs/          one file per dialog, named for what it does
+├── hooks/            use-*.ts — stateful React
+├── lib/              pure helpers, no React
+├── tabs/             a detail page's tab bodies
+└── <flow>/           a wizard: dialog.tsx · steps/ · its own hooks/ + lib/
+```
+
+Rules that keep it from drifting:
+
+- **A directory is reached through its `index.ts`.** Every multi-file directory
+  has one, and an import from outside names the directory, never a file inside
+  it (`@/features/skins/components`). Siblings import each other relatively, so
+  nothing imports its own barrel.
+- **A dialog is a `Dialog`.** One word for the concept, matching the
+  `components/ui/dialog` primitive it is built on.
+- **Vocabulary two features share lives in `features/shared/`,** which is a leaf:
+  `features/shared/*` may not import `features/<feature>/*`. `shared/entry` is
+  what a server and an instance both are (cards, the create wizard, the detail
+  sections, the settings tab); `shared/content` is the content vocabulary the
+  browse pages, the entry content tabs and the profile pages all resolve against.
+  Everything else is one-directional — `library → instances`,
+  `instances → content · profiles`, `servers → content` — so the feature graph
+  is acyclic.
+
 ## Browser dev — the fixture daemon
 
 `frontend/src/mock/` fakes `window.__TAURI_INTERNALS__` so the UI runs under a

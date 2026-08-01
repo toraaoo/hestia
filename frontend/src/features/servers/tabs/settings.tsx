@@ -11,11 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useDraft } from '@/features/shared/entry/hooks';
 import {
   configValue,
   EntrySettingsTab,
-  useDraft,
-} from '@/features/entries/settings';
+} from '@/features/shared/entry/settings';
 import { m } from '@/paraglide/messages.js';
 import { configQueries, launcherDefaults } from '@/queries/config';
 import { useJobMutation } from '@/queries/jobs';

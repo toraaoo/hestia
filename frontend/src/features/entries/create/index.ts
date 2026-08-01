@@ -1,1 +1,0 @@
-export { CreateEntryModal } from './modal';

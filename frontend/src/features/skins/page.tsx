@@ -8,18 +8,18 @@ import { Page, Section } from '@/components/page';
 import { SignInGate } from '@/components/sign-in-gate';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { CapeCard, CapeGrid } from '@/features/skins/components/cape-card';
-import { PreviewPanel } from '@/features/skins/components/preview-panel';
-import { SkinsPageSkeleton } from '@/features/skins/components/skeleton';
 import {
+  CapeCard,
+  CapeGrid,
+  PreviewPanel,
   SkinCard,
   SkinGrid,
+  SkinsPageSkeleton,
   skinDisplayName,
-} from '@/features/skins/components/skin-card';
-import type { SkinDraft } from '@/features/skins/edit-modal';
-import { EditSkinModal } from '@/features/skins/edit-modal';
-import { collapseDefaults } from '@/features/skins/lib/defaults';
-import { readTextureFile } from '@/features/skins/lib/texture';
+} from '@/features/skins/components';
+import type { SkinDraft } from '@/features/skins/dialogs';
+import { EditSkinDialog } from '@/features/skins/dialogs';
+import { collapseDefaults, readTextureFile } from '@/features/skins/lib';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
 import { skinMutations, skinQueries } from '@/queries/skins';
@@ -38,7 +38,7 @@ export function SkinsPage() {
   const clearCape = useMutation(skinMutations.clearCape());
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [modal, setModal] = useState<{
+  const [dialog, setDialog] = useState<{
     skin: Skin | null;
     texture?: string;
   } | null>(null);
@@ -85,22 +85,22 @@ export function SkinsPage() {
   const addFromFile = async (file: File | undefined) => {
     if (!file?.type.includes('png')) return;
     add.reset();
-    setModal({ skin: null, texture: await readTextureFile(file) });
+    setDialog({ skin: null, texture: await readTextureFile(file) });
   };
 
   const openEdit = (skin: Skin) => {
     update.reset();
-    setModal({ skin });
+    setDialog({ skin });
   };
 
   const saveDraft = (draft: SkinDraft) => {
-    const editing = modal?.skin;
+    const editing = dialog?.skin;
     if (editing) {
       update.mutate(
         { key: editing.key, name: draft.name, variant: draft.variant },
         {
           onSuccess: () => {
-            setModal(null);
+            setDialog(null);
             applyCape(draft.capeId);
           },
         },
@@ -114,7 +114,7 @@ export function SkinsPage() {
         },
         {
           onSuccess: (skin) => {
-            setModal(null);
+            setDialog(null);
             setSelectedKey(skin.key);
             applyCape(draft.capeId);
           },
@@ -250,13 +250,13 @@ export function SkinsPage() {
     >
       {body}
 
-      <EditSkinModal
-        open={modal !== null}
+      <EditSkinDialog
+        open={dialog !== null}
         onOpenChange={(open) => {
-          if (!open) setModal(null);
+          if (!open) setDialog(null);
         }}
-        skin={modal?.skin ?? null}
-        initialTexture={modal?.texture}
+        skin={dialog?.skin ?? null}
+        initialTexture={dialog?.texture}
         capes={capes}
         equippedCapeId={equippedCape?.id}
         saving={add.isPending || update.isPending}

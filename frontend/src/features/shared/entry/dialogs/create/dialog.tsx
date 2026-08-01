@@ -1,0 +1,350 @@
+import {
+  CaretLeftIcon,
+  CaretRightIcon,
+  FileArrowUpIcon,
+} from '@phosphor-icons/react';
+import { revalidateLogic } from '@tanstack/react-form';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+
+import type { ConfigEntry, Flavor } from '@/api';
+import { useAppForm } from '@/components/form';
+import { entryIcon } from '@/components/icons';
+import { StepDots } from '@/components/step-dots';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ProvisionProgressView } from '@/features/shared/entry/components';
+import {
+  createWizardDefaults,
+  createWizardSchema,
+  detailsStepSchema,
+  flavorStepSchema,
+  versionStepSchema,
+  type WizardValues,
+} from '@/features/shared/entry/lib';
+import { memGb } from '@/lib/format';
+import { toastWarnings } from '@/lib/warnings';
+import { m } from '@/paraglide/messages.js';
+import { configQueries, launcherDefaults } from '@/queries/config';
+import { instanceMutations, instanceQueries } from '@/queries/instance';
+import { backgroundJob, foregroundJob, useJobMutation } from '@/queries/jobs';
+import { serverMutations, serverQueries } from '@/queries/server';
+
+import {
+  FlavorOption,
+  type Kind,
+  STEP_HINTS,
+  STEPS,
+  type Step,
+  StepForm,
+} from './fields';
+import { DetailsStep } from './steps/details';
+import { VersionStep } from './steps/version';
+
+/**
+ * The New server / New instance wizard: flavor → version → details, wired to
+ * the daemon's provider catalogue and the real create job. A server create
+ * streams provisioning phases as a progress bar; an instance create is a quick
+ * record write. On success the dialog closes and the list invalidates.
+ */
+export function CreateEntryDialog({
+  kind,
+  open,
+  onOpenChange,
+  onImport,
+}: {
+  kind: Kind;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Leave the wizard for the import dialog — an instance can also arrive whole. */
+  onImport?: () => void;
+}) {
+  const [step, setStep] = useState<Step>('flavor');
+  const [search, setSearch] = useState('');
+  const [showSnapshots, setShowSnapshots] = useState(false);
+
+  const serverFlavors = useQuery({
+    ...serverQueries.flavors(),
+    enabled: kind === 'server',
+  });
+  const instanceFlavors = useQuery({
+    ...instanceQueries.flavors(),
+    enabled: kind === 'instance',
+  });
+  const flavorsQuery = kind === 'server' ? serverFlavors : instanceFlavors;
+  const flavors: Flavor[] = useMemo(
+    () => flavorsQuery.data ?? [],
+    [flavorsQuery.data],
+  );
+
+  const config = useQuery(configQueries.list());
+  const defaultMemory = launcherDefaults(config.data).memory ?? '';
+  const defaultMemoryGb = defaultMemory ? memGb(defaultMemory) : 4;
+  const defaultMemoryRef = useRef(defaultMemoryGb);
+  defaultMemoryRef.current = defaultMemoryGb;
+
+  const createServer = useJobMutation(serverMutations.create());
+  const createInstance = useMutation(instanceMutations.create());
+  const creating = createServer.isPending || createInstance.isPending;
+  const progress = createServer.progress;
+  const job = createServer.job;
+
+  useEffect(() => {
+    if (creating && job?.status === 'running') foregroundJob(job.id);
+  }, [creating, job?.id, job?.status]);
+
+  const close = () => {
+    if (job?.status === 'running') backgroundJob(job.id);
+    onOpenChange(false);
+  };
+
+  const form = useAppForm({
+    defaultValues: createWizardDefaults('', defaultMemoryGb),
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: createWizardSchema(kind) },
+    onSubmit: async ({ value }) => {
+      // Inherit the launcher default when the slider is left on it: store no
+      // per-entry override, so a later change to the global default cascades.
+      const memoryEntries: ConfigEntry[] =
+        defaultMemory !== '' &&
+        value.details.memory === defaultMemoryRef.current
+          ? []
+          : [{ key: 'memory', value: `${value.details.memory}G` }];
+      try {
+        if (kind === 'server') {
+          const created = await createServer.mutateAsync(
+            serverParams(value, memoryEntries),
+          );
+          toast.success(m['app.toast.created']({ name: created.server.name }));
+          toastWarnings(created.warnings);
+        } else {
+          const instance = await createInstance.mutateAsync(
+            instanceParams(value, memoryEntries),
+          );
+          toast.success(m['app.toast.created']({ name: instance.name }));
+        }
+        onOpenChange(false);
+      } catch {
+        // The global mutation error handler surfaces the toast; swallow here so
+        // the dialog stays open without a second notification.
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    setStep('flavor');
+    setSearch('');
+    setShowSnapshots(false);
+    form.reset(createWizardDefaults('', defaultMemoryRef.current));
+  }, [open, form]);
+
+  const Icon = entryIcon(kind);
+  const stepIndex = STEPS.indexOf(step);
+
+  const nav = (
+    <DialogFooter className="items-center">
+      <StepDots steps={STEPS} active={stepIndex} className="mr-auto" />
+      {stepIndex === 0 ? (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onOpenChange(false)}
+        >
+          {m['app.action.cancel']()}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setStep(STEPS[stepIndex - 1])}
+          data-icon="inline-start"
+        >
+          <CaretLeftIcon />
+          {m['app.action.back']()}
+        </Button>
+      )}
+      {step === 'details' ? (
+        <Button
+          type="submit"
+          className="bg-ember text-ember-foreground hover:bg-ember/90"
+        >
+          {kind === 'server'
+            ? m['entry.create.server_title']()
+            : m['entry.create.instance_title']()}
+        </Button>
+      ) : (
+        <Button
+          type="submit"
+          data-icon="inline-end"
+          className="bg-ember text-ember-foreground hover:bg-ember/90"
+        >
+          {m['app.action.next']()}
+          <CaretRightIcon />
+        </Button>
+      )}
+    </DialogFooter>
+  );
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => (o ? onOpenChange(true) : close())}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Icon className="size-4.5 text-muted-foreground" />
+            {kind === 'server' ? m['server.new']() : m['instance.new']()}
+          </DialogTitle>
+          <DialogDescription>
+            {creating
+              ? kind === 'server'
+                ? m['entry.create.provisioning_server']()
+                : m['entry.create.provisioning_instance']()
+              : STEP_HINTS[step](kind)}
+          </DialogDescription>
+        </DialogHeader>
+
+        {creating ? (
+          <ProvisionProgressView
+            progress={progress}
+            indeterminate={kind === 'instance'}
+            className="min-h-72"
+          />
+        ) : step === 'flavor' ? (
+          <form.FormGroup
+            name="flavor"
+            validators={{ onDynamic: flavorStepSchema() }}
+            onGroupSubmit={() => setStep('version')}
+          >
+            {(group) => (
+              <StepForm onSubmit={group.handleSubmit} footer={nav}>
+                <form.AppField name="flavor.flavor">
+                  {(field) => (
+                    <div className="grid gap-2">
+                      {flavors.map((f) => (
+                        <FlavorOption
+                          key={f.id}
+                          flavor={f}
+                          selected={field.state.value === f.id}
+                          onSelect={() => {
+                            field.handleChange(f.id);
+                            form.setFieldValue('version.version', '');
+                            form.setFieldValue('version.loaderVersion', '');
+                          }}
+                        />
+                      ))}
+                      {kind === 'instance' && onImport && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onOpenChange(false);
+                            onImport();
+                          }}
+                          className="flex items-center gap-3 border border-border border-dashed px-3 py-2.5 text-left outline-none hover:bg-accent/50 focus-visible:ring-1 focus-visible:ring-ring"
+                        >
+                          <FileArrowUpIcon className="size-4 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0">
+                            <span className="block font-medium text-sm">
+                              {m['instance.import.action']()}
+                            </span>
+                            <span className="block text-muted-foreground text-xs">
+                              {m['instance.import.formats']()}
+                            </span>
+                          </span>
+                        </button>
+                      )}
+                      {flavors.length === 0 && (
+                        <p className="px-1 py-6 text-center text-xs text-muted-foreground">
+                          {flavorsQuery.isPending
+                            ? m['app.status.loading']()
+                            : m['entry.create.no_versions_match']()}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </form.AppField>
+              </StepForm>
+            )}
+          </form.FormGroup>
+        ) : step === 'version' ? (
+          <form.FormGroup
+            name="version"
+            validators={{ onDynamic: versionStepSchema() }}
+            onGroupSubmit={() => setStep('details')}
+          >
+            {(group) => (
+              <StepForm onSubmit={group.handleSubmit} footer={nav}>
+                <form.Subscribe selector={(s) => s.values.flavor.flavor}>
+                  {(flavor) => (
+                    <VersionStep
+                      form={form}
+                      kind={kind}
+                      flavor={flavor}
+                      search={search}
+                      onSearch={setSearch}
+                      showSnapshots={showSnapshots}
+                      onShowSnapshots={setShowSnapshots}
+                    />
+                  )}
+                </form.Subscribe>
+              </StepForm>
+            )}
+          </form.FormGroup>
+        ) : (
+          <form.FormGroup
+            name="details"
+            validators={{ onDynamic: detailsStepSchema(kind) }}
+            onGroupSubmit={() => form.handleSubmit()}
+          >
+            {(group) => (
+              <StepForm onSubmit={group.handleSubmit} footer={nav}>
+                <DetailsStep form={form} kind={kind} />
+              </StepForm>
+            )}
+          </form.FormGroup>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Build the server create params from the wizard's collected values. */
+function serverParams(value: WizardValues, memoryEntries: ConfigEntry[]) {
+  const d = value.details;
+  const config: ConfigEntry[] = [
+    ...memoryEntries,
+    { key: 'motd', value: d.motd },
+    { key: 'gamemode', value: d.gamemode },
+    { key: 'difficulty', value: d.difficulty },
+    { key: 'max-players', value: d.maxPlayers },
+    { key: 'hardcore', value: String(d.hardcore) },
+    { key: 'online-mode', value: String(d.onlineMode) },
+  ];
+  return {
+    ...instanceParams(value, memoryEntries),
+    eula: true,
+    port: d.port ? Number(d.port) : undefined,
+    config,
+  };
+}
+
+function instanceParams(value: WizardValues, memoryEntries: ConfigEntry[]) {
+  const d = value.details;
+  return {
+    name: d.name || undefined,
+    flavor: value.flavor.flavor,
+    version: value.version.version,
+    loaderVersion: value.version.loaderVersion || undefined,
+    config: memoryEntries,
+  };
+}

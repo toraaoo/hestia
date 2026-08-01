@@ -13,13 +13,12 @@ import {
 import { FilterMenu } from '@/components/filter-menu';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { PickerPanel } from '@/components/picker-panel';
-import { projectKey } from '@/features/content/components/content-card';
-import { kindGroup } from '@/features/content/components/kind-filter';
-import { PickRow } from '@/features/content/components/pick-row';
 import {
+  projectKey,
   sourceGroup,
   useSourceOptions,
-} from '@/features/content/components/sources';
+} from '@/features/content/components';
+import { kindGroup, PickRow } from '@/features/shared/content/components';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
 import { instanceQueries } from '@/queries/instance';
@@ -30,7 +29,7 @@ import {
   type PickedFile,
   type Target,
   useInstalledRefs,
-} from '../targets';
+} from '../lib';
 
 export function ContentStep({
   target,

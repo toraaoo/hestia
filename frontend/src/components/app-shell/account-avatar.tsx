@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { drawHead, HEAD, loadTexture } from '@/features/skins/lib/texture';
+import { drawHead, HEAD, loadTexture } from '@/features/skins/lib';
 import { cn } from '@/lib/utils';
 
 /**

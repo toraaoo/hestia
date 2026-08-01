@@ -5,18 +5,20 @@ import { SearchInput } from '@/components/search-input';
 import { Bone } from '@/components/skeleton';
 import { FieldGroup } from '@/components/ui/field';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SettingsFilter } from '@/features/settings/components/filtered';
+import { SettingsFilter } from '@/features/settings/components';
 import {
   firstTabWithMatch,
   SETTINGS_TABS,
   type SettingsTab,
   search,
-} from '@/features/settings/lib/search';
-import { ContentTab } from '@/features/settings/tabs/content';
-import { GeneralTab } from '@/features/settings/tabs/general';
-import { InstancesTab } from '@/features/settings/tabs/instances';
-import { JavaTab } from '@/features/settings/tabs/java';
-import { StorageTab } from '@/features/settings/tabs/storage';
+} from '@/features/settings/lib';
+import {
+  ContentTab,
+  GeneralTab,
+  InstancesTab,
+  JavaTab,
+  StorageTab,
+} from '@/features/settings/tabs';
 import { useConfig } from '@/features/settings/use-config';
 import { m } from '@/paraglide/messages.js';
 import { usePrefs } from '@/queries/prefs';

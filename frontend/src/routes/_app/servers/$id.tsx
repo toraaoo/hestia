@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import type { ContentKind } from '@/api';
-import { isContentKind } from '@/features/content/lib/kinds';
 import { ServerDetailPage, type ServerTab } from '@/features/servers/detail';
+import { isContentKind } from '@/features/shared/content/lib';
 
 const tabs: ServerTab[] = ['console', 'content', 'backups', 'settings'];
 

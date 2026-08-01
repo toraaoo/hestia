@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ContentProject, SearchResult } from '@/api';
-import { mergeHits, projectKey } from '@/features/content/lib/hits';
+import { mergeHits, projectKey } from '@/features/content/lib';
 
 const project = (
   id: string,

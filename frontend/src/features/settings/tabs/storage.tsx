@@ -11,10 +11,7 @@ import {
   FieldLabel,
 } from '@/components/ui/field';
 import { StatusDot } from '@/components/ui/status-dot';
-import {
-  Setting,
-  SettingsSection,
-} from '@/features/settings/components/filtered';
+import { Setting, SettingsSection } from '@/features/settings/components';
 import { bytes } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { cacheMutations, cacheQueries } from '@/queries/cache';
