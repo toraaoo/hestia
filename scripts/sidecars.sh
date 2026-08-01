@@ -51,7 +51,7 @@ log "building $profile sidecars for $triple"
 cargo build "${build_args[@]}" "${target_args[@]}" -p cli -p daemon -p tray
 
 mkdir -p "$dest"
-for bin in hestia hestiad tray; do
+for bin in hestia hestiad hestiatray; do
   cp "$srcdir/$bin$ext" "$dest/$bin-$triple$ext"
   echo "  staged $dest/$bin-$triple$ext"
 done

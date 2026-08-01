@@ -61,7 +61,7 @@ them:
 |---|---|---|---|
 | CLI | `hestia` | clap + ratatui | scripting and terminal use; the fully-wired reference front-end |
 | Desktop | `hestia-desktop` | Tauri v2 + React/Vite | the visual surface — library, entries, content browse, skins |
-| Tray | `tray` | tray-icon + tao | status and quick actions beside every serving daemon |
+| Tray | `hestiatray` | tray-icon + tao | status and quick actions beside every serving daemon |
 
 ## The crate graph
 

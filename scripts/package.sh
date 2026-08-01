@@ -5,7 +5,7 @@
 #   scripts/package.sh bundle     # Tauri installers only (deb/rpm/appimage or nsis/msi)
 #   scripts/package.sh portable   # portable archive only (.tar.gz on Linux, .zip on Windows)
 #
-# Tauri bundles the desktop app + the hestiad/tray/hestia sidecars into each
+# Tauri bundles the desktop app + the hestiad/hestiatray/hestia sidecars into each
 # installer; the portable archive is the same set of standalone binaries.
 . "$(dirname "$0")/lib/common.sh"
 
@@ -43,7 +43,7 @@ portable() {
   stage="target/package/$name"
   rm -rf "$stage"
   mkdir -p "$stage"
-  for bin in hestia hestiad tray hestia-desktop; do
+  for bin in hestia hestiad hestiatray hestia-desktop; do
     [ -f "target/release/$bin$ext" ] && cp "target/release/$bin$ext" "$stage/"
   done
   cp LICENSE README.md "$stage/" 2>/dev/null || true

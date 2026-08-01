@@ -20,7 +20,7 @@ The desktop app is the product; the daemon, tray, and CLI ride along as Tauri **
 [`crates/desktop/tauri.conf.json`](../crates/desktop/tauri.conf.json)):
 
 - `hestiad` — the resident daemon the desktop app drives over the socket.
-- `tray` — the system-tray helper.
+- `hestiatray` — the system-tray helper.
 - `hestia` — the CLI/TUI.
 
 Each is built with the target-triple suffix Tauri requires (`hestiad-x86_64-unknown-linux-gnu`, …) and staged into
@@ -38,7 +38,7 @@ and in [`release.yml`](../.github/workflows/release.yml)) — re-diff the fork a
 
 What it adds over stock:
 
-- **Components page** — *Hestia core* (`hestiad` + `tray`, required), *Desktop app*, and *CLI* (both checked by default,
+- **Components page** — *Hestia core* (`hestiad` + `hestiatray`, required), *Desktop app*, and *CLI* (both checked by default,
   deselectable). Choices are persisted in the uninstall registry key and become the defaults for the next run — and the
   effective selection for silent/passive updates. Deselecting a previously installed component on an update removes it.
 - **Install mode `both`** — per-user or all-users, chosen at install time (`bundle.windows.nsis.installMode` in

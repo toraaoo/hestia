@@ -10,9 +10,9 @@ use std::process::{Command, Stdio};
 
 fn tray_name() -> &'static str {
     if cfg!(windows) {
-        "tray.exe"
+        "hestiatray.exe"
     } else {
-        "tray"
+        "hestiatray"
     }
 }
 

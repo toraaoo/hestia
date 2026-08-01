@@ -84,7 +84,7 @@ ${UnStrRep}
 !define STARTMENUFOLDER "{{start_menu_folder}}"
 
 !define DAEMONBINARY "hestiad.exe"
-!define TRAYBINARY "tray.exe"
+!define TRAYBINARY "hestiatray.exe"
 !define CLIBINARY "hestia.exe"
 ; Must match the daemon's autostart registration (crates/daemon/src/autostart.rs)
 !define AUTOSTARTTASK "${PRODUCTNAME} Daemon"
