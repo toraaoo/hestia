@@ -86,3 +86,13 @@ pub struct UpdateErrorEvent {
 impl Topic for UpdateErrorEvent {
     const TOPIC: &'static str = "update.error";
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCancelledEvent {
+    pub id: String,
+}
+impl Topic for UpdateCancelledEvent {
+    const TOPIC: &'static str = "update.cancelled";
+}

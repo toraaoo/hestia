@@ -3,8 +3,8 @@
 //! An export is keyed by the instance it reads, so it queues behind the same
 //! in-flight claim a backup or content job takes — archiving a tree while
 //! something else rewrites it would produce an archive of neither state. An
-//! import has no entry to key on yet (that is what it creates), so it is keyed
-//! by its own job id, exactly as a modpack install that creates its entry is.
+//! import has no entry to key on yet (that is what it creates), so it takes no
+//! claim, exactly as a modpack install that creates its entry does.
 
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ use proto::transfer::{
     ImportCancelledEvent, ImportDoneEvent, ImportErrorEvent, ImportProgressEvent,
 };
 
-use super::job::{job_id, topic_event, Cancellations, InFlight};
+use super::job::{progress_event, settle, Cancellations, Runner, Spec};
 use crate::runtime::{instance_info, instance_process_id, EventHub};
 
 /// One import or export — what `TransferManager::start` runs off-thread.
@@ -32,170 +32,116 @@ pub enum TransferJob {
     },
 }
 
-impl TransferJob {
-    fn key(&self, id: &str) -> String {
-        match self {
-            TransferJob::Export { instance_id, .. } => instance_process_id(instance_id),
-            TransferJob::Import { .. } => id.to_string(),
-        }
-    }
-
-    fn id_prefix(&self) -> &'static str {
-        match self {
-            TransferJob::Export { .. } => "instance-export",
-            TransferJob::Import { .. } => "instance-import",
-        }
-    }
-}
-
 pub struct TransferManager {
-    engine: Arc<Engine>,
-    hub: Arc<EventHub>,
-    active: InFlight<String>,
-    cancellations: Cancellations,
+    runner: Runner<String>,
 }
 
 impl TransferManager {
     pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, cancellations: Cancellations) -> Self {
         TransferManager {
-            engine,
-            hub,
-            active: InFlight::new(),
-            cancellations,
+            runner: Runner::new(engine, hub, cancellations),
         }
     }
 
     /// Whether a transfer is still running for this entry key
     /// (`instance-<id>`).
     pub fn in_flight(&self, key: &str) -> bool {
-        self.active.contains(key)
+        self.runner.in_flight(key)
     }
 
     /// Start a transfer off-thread. Returns the job id, or `None` when that
     /// entry is already busy.
     pub fn start(&self, job: TransferJob, id: String) -> Option<String> {
-        let id = job_id(id, job.id_prefix());
-        let key = job.key(&id);
-        let Some(claim) = self.active.claim(key.clone()) else {
-            tracing::debug!(entry = %key, "transfer job already in flight");
-            return None;
+        match job {
+            TransferJob::Export {
+                instance_id,
+                format,
+                destination,
+                exclude,
+            } => self.export(id, instance_id, format, destination, exclude),
+            TransferJob::Import { path, name } => self.import(id, path, name),
+        }
+    }
+
+    fn export(
+        &self,
+        id: String,
+        instance_id: String,
+        format: ExportFormat,
+        destination: String,
+        exclude: Vec<String>,
+    ) -> Option<String> {
+        let spec = Spec {
+            id,
+            prefix: "instance-export",
+            key: Some(instance_process_id(&instance_id)),
+            progress: progress_event(|id, progress: &ProvisionProgress| ExportProgressEvent {
+                id,
+                progress: progress.clone(),
+            }),
+            done: settle(|id, export: engine::ExportOutcome| ExportDoneEvent {
+                id,
+                path: export.path.to_string_lossy().into_owned(),
+                size_bytes: export.size_bytes,
+                files: export.files,
+                warnings: export.warnings,
+            }),
+            cancelled: Some(settle(|id, ()| ExportCancelledEvent { id })),
+            error: settle(|id, e| ExportErrorEvent {
+                id,
+                error: crate::runtime::engine_error(e),
+            }),
         };
 
-        let engine = self.engine.clone();
-        let hub = self.hub.clone();
-        let cancellations = self.cancellations.clone();
-        let job_id = id.clone();
-        tracing::info!(job = %id, entry = %key, kind = job.id_prefix(), "transfer job started");
-
-        tokio::spawn(async move {
-            let _claim = claim;
-            let (cancel, _registered) = cancellations.register(&job_id);
-            match job {
-                TransferJob::Export {
-                    instance_id,
+        self.runner.start(spec, move |engine, reporter| {
+            Box::pin(async move {
+                engine.export_instance(
+                    &instance_id,
                     format,
-                    destination,
-                    exclude,
-                } => {
-                    let progress = export_progress(hub.clone(), job_id.clone());
-                    let running = engine::Job::new(progress.as_ref(), &cancel);
-                    let outcome = engine.export_instance(
-                        &instance_id,
-                        format,
-                        &destination,
-                        &exclude,
-                        &running,
-                    );
-                    match outcome {
-                        Ok(export) => {
-                            tracing::info!(
-                                job = %job_id,
-                                files = export.files,
-                                bytes = export.size_bytes,
-                                "export done"
-                            );
-                            hub.publish(&topic_event(&ExportDoneEvent {
-                                id: job_id.clone(),
-                                path: export.path.to_string_lossy().into_owned(),
-                                size_bytes: export.size_bytes,
-                                files: export.files,
-                                warnings: export.warnings,
-                            }));
-                        }
-                        Err(e) if engine::is_cancelled(&e) => {
-                            tracing::info!(job = %job_id, "export cancelled");
-                            hub.publish(&topic_event(&ExportCancelledEvent { id: job_id.clone() }));
-                        }
-                        Err(e) => {
-                            tracing::error!(job = %job_id, error = format!("{e:#}"), "export failed");
-                            hub.publish(&topic_event(&ExportErrorEvent {
-                                id: job_id.clone(),
-                                error: crate::runtime::engine_error(e),
-                            }));
-                        }
-                    }
-                }
-                TransferJob::Import { path, name } => {
-                    let progress = import_progress(hub.clone(), job_id.clone());
-                    let running = engine::Job::new(progress.as_ref(), &cancel);
-                    match engine.import_instance(&path, &name, &running).await {
-                        Ok(import) => {
-                            tracing::info!(
-                                job = %job_id,
-                                instance = %import.record.id,
-                                format = import.format.as_str(),
-                                "import done"
-                            );
-                            // The view an import answers with is the same one
-                            // `instance.list` returns, so a front-end can drop
-                            // it straight into the library it already renders.
-                            // A just-imported instance has no sessions by
-                            // definition — nothing has launched it yet.
-                            let accepts = engine.instance_accepts(&import.record.profile.flavor);
-                            let instance = instance_info(import.record, Vec::new(), accepts);
-                            hub.publish(&topic_event(&ImportDoneEvent {
-                                id: job_id.clone(),
-                                format: import.format,
-                                instance,
-                                failures: import.failures,
-                                warnings: import.warnings,
-                            }));
-                        }
-                        Err(e) if engine::is_cancelled(&e) => {
-                            tracing::info!(job = %job_id, "import cancelled");
-                            hub.publish(&topic_event(&ImportCancelledEvent { id: job_id.clone() }));
-                        }
-                        Err(e) => {
-                            tracing::error!(job = %job_id, error = format!("{e:#}"), "import failed");
-                            hub.publish(&topic_event(&ImportErrorEvent {
-                                id: job_id.clone(),
-                                error: crate::runtime::engine_error(e),
-                            }));
-                        }
-                    }
-                }
-            }
-        });
-        Some(id)
+                    &destination,
+                    &exclude,
+                    &reporter.job(),
+                )
+            })
+        })
     }
-}
 
-type Progress = Box<dyn Fn(&ProvisionProgress) + Send + Sync>;
+    fn import(&self, id: String, path: String, name: String) -> Option<String> {
+        let spec = Spec {
+            id,
+            prefix: "instance-import",
+            key: None,
+            progress: progress_event(|id, progress: &ProvisionProgress| ImportProgressEvent {
+                id,
+                progress: progress.clone(),
+            }),
+            // The view an import answers with is the same one `instance.list`
+            // returns, so a front-end can drop it straight into the library it
+            // already renders.
+            done: settle(|id, done: ImportDoneEvent| ImportDoneEvent { id, ..done }),
+            cancelled: Some(settle(|id, ()| ImportCancelledEvent { id })),
+            error: settle(|id, e| ImportErrorEvent {
+                id,
+                error: crate::runtime::engine_error(e),
+            }),
+        };
 
-fn export_progress(hub: Arc<EventHub>, id: String) -> Progress {
-    Box::new(move |p| {
-        hub.publish(&topic_event(&ExportProgressEvent {
-            id: id.clone(),
-            progress: p.clone(),
-        }));
-    })
-}
-
-fn import_progress(hub: Arc<EventHub>, id: String) -> Progress {
-    Box::new(move |p| {
-        hub.publish(&topic_event(&ImportProgressEvent {
-            id: id.clone(),
-            progress: p.clone(),
-        }));
-    })
+        self.runner.start(spec, move |engine, reporter| {
+            Box::pin(async move {
+                let import = engine
+                    .import_instance(&path, &name, &reporter.job())
+                    .await?;
+                let accepts = engine.instance_accepts(&import.record.profile.flavor);
+                // A just-imported instance has no sessions by definition.
+                let instance = instance_info(import.record, Vec::new(), accepts);
+                Ok(ImportDoneEvent {
+                    id: String::new(),
+                    format: import.format,
+                    instance,
+                    failures: import.failures,
+                    warnings: import.warnings,
+                })
+            })
+        })
+    }
 }

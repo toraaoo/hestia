@@ -12,16 +12,14 @@ use proto::minecraft::ProvisionProgress;
 use proto::process::{LogSource, ProcessSpec, RestartPolicy};
 use proto::warning::WarningInfo;
 
-use super::job::{coalesce_progress, job_id, topic_event, Cancellations};
+use super::job::{progress_event, settle, Cancellations, Runner, Spec};
 use crate::runtime::{
     instance_session_id, instance_session_prefix, EventHub, ProcessSupervisor, StartError,
 };
 
 pub struct InstanceLaunchManager {
-    engine: Arc<Engine>,
-    hub: Arc<EventHub>,
+    runner: Runner<String>,
     processes: Arc<ProcessSupervisor>,
-    cancellations: Cancellations,
     /// Session ids reserved between seq allocation and the supervisor accepting
     /// them, so two concurrent launches of one instance can't collide on a seq.
     reserved: Arc<Mutex<HashSet<String>>>,
@@ -35,17 +33,15 @@ impl InstanceLaunchManager {
         cancellations: Cancellations,
     ) -> Self {
         InstanceLaunchManager {
-            engine,
-            hub,
+            runner: Runner::new(engine, hub, cancellations),
             processes,
-            cancellations,
             reserved: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
     /// Prepare and spawn a fresh session of an instance off-thread. Instances may
-    /// run several sessions at once, so this always launches — it does not refuse
-    /// a running instance. Returns the launch job id.
+    /// run several sessions at once, so this takes no in-flight claim — it does
+    /// not refuse a running instance. Returns the launch job id.
     pub fn start(&self, order: LaunchOrder) -> Option<String> {
         let LaunchOrder {
             instance_id,
@@ -55,79 +51,55 @@ impl InstanceLaunchManager {
             quick_play,
             id,
         } = order;
-        let id = job_id(id, "instance-launch");
         let (session_id, seq) = self.reserve_session(&instance_id);
 
-        let engine = self.engine.clone();
-        let hub = self.hub.clone();
+        let spec = Spec {
+            id,
+            prefix: "instance-launch",
+            key: None,
+            progress: progress_event(|id, progress: &ProvisionProgress| {
+                InstanceLaunchProgressEvent {
+                    id,
+                    progress: progress.clone(),
+                }
+            }),
+            done: settle(|id, launched: Launched| InstanceLaunchDoneEvent {
+                id,
+                process_id: launched.process_id,
+                pid: launched.pid,
+                warnings: launched.warnings,
+            }),
+            cancelled: Some(settle(|id, ()| InstanceLaunchCancelledEvent { id })),
+            error: settle(|id, e| InstanceLaunchErrorEvent {
+                id,
+                error: crate::runtime::engine_error(e),
+            }),
+        };
+
         let processes = self.processes.clone();
         let reserved = self.reserved.clone();
-        let cancellations = self.cancellations.clone();
-        let job_id = id.clone();
-        tracing::info!(job = %id, instance = %instance_id, session = %session_id, account = %account, "instance launch started");
-
-        tokio::spawn(async move {
-            let progress_hub = hub.clone();
-            let progress_id = job_id.clone();
-            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> =
-                Box::new(coalesce_progress(move |p: &ProvisionProgress| {
-                    progress_hub.publish(&topic_event(&InstanceLaunchProgressEvent {
-                        id: progress_id.clone(),
-                        progress: p.clone(),
-                    }));
-                }));
-
-            let (cancel, _registered) = cancellations.register(&job_id);
-            let running = engine::Job::new(on_progress.as_ref(), &cancel);
-            let outcome = launch(
-                &engine,
-                &processes,
-                &session_id,
-                LaunchRequest {
-                    instance: &instance_id,
-                    account: &account,
-                    session_seq: seq,
-                    profile: &profile,
-                    reconcile,
-                    quick_play,
-                },
-                &running,
-            )
-            .await;
-            // The supervisor now owns the id (or the launch failed) — release it.
-            reserved.lock().unwrap().remove(&session_id);
-            match outcome {
-                Ok(launched) => {
-                    tracing::info!(
-                        job = %job_id,
-                        process = %launched.process_id,
-                        pid = launched.pid,
-                        warnings = launched.warnings.len(),
-                        "instance launch done"
-                    );
-                    hub.publish(&topic_event(&InstanceLaunchDoneEvent {
-                        id: job_id.clone(),
-                        process_id: launched.process_id,
-                        pid: launched.pid,
-                        warnings: launched.warnings,
-                    }));
-                }
-                Err(LaunchFailure::Cancelled) => {
-                    tracing::info!(job = %job_id, instance = %instance_id, "instance launch cancelled");
-                    hub.publish(&topic_event(&InstanceLaunchCancelledEvent {
-                        id: job_id.clone(),
-                    }));
-                }
-                Err(LaunchFailure::Failed(error)) => {
-                    tracing::error!(job = %job_id, instance = %instance_id, %error, "instance launch failed");
-                    hub.publish(&topic_event(&InstanceLaunchErrorEvent {
-                        id: job_id.clone(),
-                        error,
-                    }));
-                }
-            }
-        });
-        Some(id)
+        self.runner.start(spec, move |engine, reporter| {
+            Box::pin(async move {
+                let outcome = launch(
+                    engine,
+                    &processes,
+                    &session_id,
+                    LaunchRequest {
+                        instance: &instance_id,
+                        account: &account,
+                        session_seq: seq,
+                        profile: &profile,
+                        reconcile,
+                        quick_play,
+                    },
+                    &reporter.job(),
+                )
+                .await;
+                // The supervisor now owns the id (or the launch failed) — release it.
+                reserved.lock().unwrap().remove(&session_id);
+                outcome
+            })
+        })
     }
 
     /// Claim the next free session id for an instance under the reservation lock,
@@ -162,12 +134,9 @@ async fn launch(
     session_id: &str,
     request: LaunchRequest<'_>,
     on_progress: &engine::Job<'_>,
-) -> Result<Launched, LaunchFailure> {
+) -> anyhow::Result<Launched> {
     let instance_id = request.instance.to_string();
-    let prepared = engine
-        .prepare_instance(request, on_progress)
-        .await
-        .map_err(LaunchFailure::from)?;
+    let prepared = engine.prepare_instance(request, on_progress).await?;
 
     let spec = ProcessSpec {
         id: session_id.to_string(),
@@ -189,14 +158,14 @@ async fn launch(
                 warnings: prepared.warnings,
             })
         }
-        Err(StartError::EmptyProgram | StartError::InvalidId(_)) => {
-            Err(LaunchFailure::Failed(ErrorInfo::Internal {
-                detail: "invalid launch plan".to_string(),
-            }))
+        Err(StartError::EmptyProgram | StartError::InvalidId(_)) => Err(ErrorInfo::Internal {
+            detail: "invalid launch plan".to_string(),
         }
-        Err(e @ StartError::Spawn { .. }) => Err(LaunchFailure::Failed(ErrorInfo::Internal {
+        .into()),
+        Err(e @ StartError::Spawn { .. }) => Err(ErrorInfo::Internal {
             detail: format!("cannot spawn the game: {e}"),
-        })),
+        }
+        .into()),
     }
 }
 
@@ -215,23 +184,6 @@ pub struct LaunchOrder {
     pub quick_play: Option<QuickPlay>,
     /// Client-supplied job id; empty asks for an allocated one.
     pub id: String,
-}
-
-/// Why a launch did not produce a session. Cancellation is kept apart from
-/// failure all the way out: nothing went wrong, so the job must not report an
-/// error to a front-end that would show it as one.
-enum LaunchFailure {
-    Cancelled,
-    Failed(ErrorInfo),
-}
-
-impl From<anyhow::Error> for LaunchFailure {
-    fn from(error: anyhow::Error) -> Self {
-        match engine::is_cancelled(&error) {
-            true => LaunchFailure::Cancelled,
-            false => LaunchFailure::Failed(crate::runtime::engine_error(error)),
-        }
-    }
 }
 
 /// A started session, with whatever the preparation could not do properly.

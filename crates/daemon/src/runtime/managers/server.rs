@@ -4,214 +4,144 @@ use engine::{Engine, ServerCreateSpec, ServerUpdateSpec};
 use proto::minecraft::ProvisionProgress;
 use proto::server::{
     ServerCreateCancelledEvent, ServerCreateDoneEvent, ServerCreateErrorEvent, ServerCreateParams,
-    ServerCreateProgressEvent, ServerUpdateCancelledEvent, ServerUpdateDoneEvent,
+    ServerCreateProgressEvent, ServerInfo, ServerUpdateCancelledEvent, ServerUpdateDoneEvent,
     ServerUpdateErrorEvent, ServerUpdateParams, ServerUpdateProgressEvent,
 };
+use proto::warning::WarningInfo;
 
-use super::job::{coalesce_progress, job_id, topic_event, Cancellations, InFlight};
+use super::job::{progress_event, settle, Cancellations, Runner, Spec};
 use crate::runtime::{server_info, EventHub};
 
+/// What both server jobs settle with: the wire's view of the server, plus
+/// whatever the provision degraded on. Assembled where the engine is in reach,
+/// so the done event stays a plain constructor.
+type Provisioned = (ServerInfo, Vec<WarningInfo>);
+
+fn provisioned(engine: &Engine, outcome: (engine::ServerRecord, Vec<WarningInfo>)) -> Provisioned {
+    let (record, warnings) = outcome;
+    let accepts = engine.server_accepts(&record.profile.flavor);
+    (server_info(record, None, accepts), warnings)
+}
+
 pub struct ServerCreateManager {
-    engine: Arc<Engine>,
-    hub: Arc<EventHub>,
-    cancellations: Cancellations,
-    active: InFlight<String>,
+    runner: Runner<String>,
 }
 
 impl ServerCreateManager {
     pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, cancellations: Cancellations) -> Self {
         ServerCreateManager {
-            engine,
-            hub,
-            cancellations,
-            active: InFlight::new(),
+            runner: Runner::new(engine, hub, cancellations),
         }
     }
 
     /// Whether a create for this server name is still provisioning.
     pub fn in_flight(&self, name: &str) -> bool {
-        self.active.contains(name)
+        self.runner.in_flight(name)
     }
 
     /// Start a provisioning job off-thread, one per server name at a time.
     /// Returns the job id, or `None` if that name is already being created.
     pub fn start(&self, params: ServerCreateParams) -> Option<String> {
-        let id = job_id(params.id.clone(), "server-create");
         let key = if params.name.trim().is_empty() {
             format!("{}-{}", params.flavor, params.version)
         } else {
             params.name.trim().to_string()
         };
-        let Some(claim) = self.active.claim(key.clone()) else {
-            tracing::debug!(server = %key, "server create already in flight");
-            return None;
+        let spec = Spec {
+            id: params.id.clone(),
+            prefix: "server-create",
+            key: Some(key),
+            progress: progress_event(|id, progress: &ProvisionProgress| {
+                ServerCreateProgressEvent {
+                    id,
+                    progress: progress.clone(),
+                }
+            }),
+            done: settle(
+                |id, (server, warnings): Provisioned| ServerCreateDoneEvent {
+                    id,
+                    server,
+                    warnings,
+                },
+            ),
+            cancelled: Some(settle(|id, ()| ServerCreateCancelledEvent { id })),
+            error: settle(|id, e| ServerCreateErrorEvent {
+                id,
+                error: crate::runtime::engine_error(e),
+            }),
         };
 
-        let engine = self.engine.clone();
-        let hub = self.hub.clone();
-        let cancellations = self.cancellations.clone();
-        let job_id = id.clone();
-        tracing::info!(
-            job = %id,
-            name = %params.name,
-            flavor = %params.flavor,
-            version = %params.version,
-            "server create started"
-        );
-
-        tokio::spawn(async move {
-            let _claim = claim;
-            let progress_hub = hub.clone();
-            let progress_id = job_id.clone();
-            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> =
-                Box::new(coalesce_progress(move |p: &ProvisionProgress| {
-                    progress_hub.publish(&topic_event(&ServerCreateProgressEvent {
-                        id: progress_id.clone(),
-                        progress: p.clone(),
-                    }));
-                }));
-
-            let spec = ServerCreateSpec {
-                name: params.name,
-                flavor: params.flavor,
-                version: params.version,
-                loader_version: params.loader_version,
-                port: params.port,
-                config: params.config,
-            };
-
-            let (cancel, _registered) = cancellations.register(&job_id);
-            let running = engine::Job::new(on_progress.as_ref(), &cancel);
-            match engine.provision_server(spec, &running).await {
-                Ok((record, warnings)) => {
-                    tracing::info!(
-                        job = %job_id,
-                        server = %record.id,
-                        name = %record.name,
-                        warnings = warnings.len(),
-                        "server create done"
-                    );
-                    let accepts = engine.server_accepts(&record.profile.flavor);
-                    hub.publish(&topic_event(&ServerCreateDoneEvent {
-                        id: job_id.clone(),
-                        server: server_info(record, None, accepts),
-                        warnings,
-                    }));
-                }
-                Err(e) if engine::is_cancelled(&e) => {
-                    tracing::info!(job = %job_id, "server create cancelled");
-                    hub.publish(&topic_event(&ServerCreateCancelledEvent {
-                        id: job_id.clone(),
-                    }));
-                }
-                Err(e) => {
-                    tracing::error!(job = %job_id, error = format!("{e:#}"), "server create failed");
-                    hub.publish(&topic_event(&ServerCreateErrorEvent {
-                        id: job_id.clone(),
-                        error: crate::runtime::engine_error(e),
-                    }));
-                }
-            }
-        });
-        Some(id)
+        self.runner.start(spec, move |engine, reporter| {
+            Box::pin(async move {
+                let create = ServerCreateSpec {
+                    name: params.name,
+                    flavor: params.flavor,
+                    version: params.version,
+                    loader_version: params.loader_version,
+                    port: params.port,
+                    config: params.config,
+                };
+                let outcome = engine.provision_server(create, &reporter.job()).await?;
+                Ok(provisioned(engine, outcome))
+            })
+        })
     }
 }
 
 pub struct ServerUpdateManager {
-    engine: Arc<Engine>,
-    hub: Arc<EventHub>,
-    cancellations: Cancellations,
-    active: InFlight<String>,
+    runner: Runner<String>,
 }
 
 impl ServerUpdateManager {
     pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, cancellations: Cancellations) -> Self {
         ServerUpdateManager {
-            engine,
-            hub,
-            cancellations,
-            active: InFlight::new(),
+            runner: Runner::new(engine, hub, cancellations),
         }
     }
 
     /// Whether an update for this server id is still running.
     pub fn in_flight(&self, server_id: &str) -> bool {
-        self.active.contains(server_id)
+        self.runner.in_flight(server_id)
     }
 
     /// Start an update job off-thread, one per server at a time. Returns the
     /// job id, or `None` if that server is already being updated.
     pub fn start(&self, server_id: String, params: ServerUpdateParams) -> Option<String> {
-        let id = job_id(params.id.clone(), "server-update");
-        let Some(claim) = self.active.claim(server_id.clone()) else {
-            tracing::debug!(server = %server_id, "server update already in flight");
-            return None;
+        let spec = Spec {
+            id: params.id.clone(),
+            prefix: "server-update",
+            key: Some(server_id.clone()),
+            progress: progress_event(|id, progress: &ProvisionProgress| {
+                ServerUpdateProgressEvent {
+                    id,
+                    progress: progress.clone(),
+                }
+            }),
+            done: settle(
+                |id, (server, warnings): Provisioned| ServerUpdateDoneEvent {
+                    id,
+                    server,
+                    warnings,
+                },
+            ),
+            cancelled: Some(settle(|id, ()| ServerUpdateCancelledEvent { id })),
+            error: settle(|id, e| ServerUpdateErrorEvent {
+                id,
+                error: crate::runtime::engine_error(e),
+            }),
         };
 
-        let engine = self.engine.clone();
-        let hub = self.hub.clone();
-        let cancellations = self.cancellations.clone();
-        let job_id = id.clone();
-        tracing::info!(
-            job = %id,
-            server = %server_id,
-            version = %params.version,
-            allow_downgrade = params.allow_downgrade,
-            "server update started"
-        );
-
-        tokio::spawn(async move {
-            let _claim = claim;
-            let progress_hub = hub.clone();
-            let progress_id = job_id.clone();
-            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> =
-                Box::new(coalesce_progress(move |p: &ProvisionProgress| {
-                    progress_hub.publish(&topic_event(&ServerUpdateProgressEvent {
-                        id: progress_id.clone(),
-                        progress: p.clone(),
-                    }));
-                }));
-
-            let spec = ServerUpdateSpec {
-                server: server_id.clone(),
-                version: params.version,
-                loader_version: params.loader_version,
-                allow_downgrade: params.allow_downgrade,
-            };
-
-            let (cancel, _registered) = cancellations.register(&job_id);
-            let running = engine::Job::new(on_progress.as_ref(), &cancel);
-            match engine.update_server(spec, &running).await {
-                Ok((record, warnings)) => {
-                    tracing::info!(
-                        job = %job_id,
-                        server = %record.id,
-                        version = %record.profile.game_version,
-                        warnings = warnings.len(),
-                        "server update done"
-                    );
-                    let accepts = engine.server_accepts(&record.profile.flavor);
-                    hub.publish(&topic_event(&ServerUpdateDoneEvent {
-                        id: job_id.clone(),
-                        server: server_info(record, None, accepts),
-                        warnings,
-                    }));
-                }
-                Err(e) if engine::is_cancelled(&e) => {
-                    tracing::info!(job = %job_id, server = %server_id, "server update cancelled");
-                    hub.publish(&topic_event(&ServerUpdateCancelledEvent {
-                        id: job_id.clone(),
-                    }));
-                }
-                Err(e) => {
-                    tracing::error!(job = %job_id, server = %server_id, error = format!("{e:#}"), "server update failed");
-                    hub.publish(&topic_event(&ServerUpdateErrorEvent {
-                        id: job_id.clone(),
-                        error: crate::runtime::engine_error(e),
-                    }));
-                }
-            }
-        });
-        Some(id)
+        self.runner.start(spec, move |engine, reporter| {
+            Box::pin(async move {
+                let update = ServerUpdateSpec {
+                    server: server_id,
+                    version: params.version,
+                    loader_version: params.loader_version,
+                    allow_downgrade: params.allow_downgrade,
+                };
+                let outcome = engine.update_server(update, &reporter.job()).await?;
+                Ok(provisioned(engine, outcome))
+            })
+        })
     }
 }

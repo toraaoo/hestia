@@ -1,89 +1,61 @@
 use std::sync::Arc;
 
-use engine::Engine;
-use proto::java::{JavaInstallCancelledEvent, JavaInstallDoneEvent, JavaInstallErrorEvent};
+use engine::{Engine, JavaInstallOutcome};
+use proto::java::{
+    JavaInstallCancelledEvent, JavaInstallDoneEvent, JavaInstallErrorEvent, JavaInstallProgress,
+    JavaInstallProgressEvent,
+};
 
-use super::job::{coalesce_progress, job_id, topic_event, Cancellations, InFlight};
+use super::job::{progress_event, settle, Cancellations, Runner, Spec};
 use crate::runtime::EventHub;
 
 pub struct JavaInstallManager {
-    engine: Arc<Engine>,
-    hub: Arc<EventHub>,
-    active: InFlight<i32>,
-    cancellations: Cancellations,
+    runner: Runner<i32>,
 }
 
 impl JavaInstallManager {
     pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, cancellations: Cancellations) -> Self {
         JavaInstallManager {
-            engine,
-            hub,
-            active: InFlight::new(),
-            cancellations,
+            runner: Runner::new(engine, hub, cancellations),
         }
     }
 
     /// Start an install off-thread, one per release line at a time. Returns the
     /// job id, or `None` if that line is already installing.
     pub fn start(&self, major: i32, id: String, force: bool) -> Option<String> {
-        let id = job_id(id, "java-install");
-        let Some(claim) = self.active.claim(major) else {
-            tracing::debug!(major, "java install already in flight");
-            return None;
+        let spec = Spec {
+            id,
+            prefix: "java-install",
+            key: Some(major),
+            progress: progress_event(|id, progress: &JavaInstallProgress| {
+                JavaInstallProgressEvent {
+                    id,
+                    progress: progress.clone(),
+                }
+            }),
+            done: settle(|id, outcome: JavaInstallOutcome| JavaInstallDoneEvent {
+                id,
+                runtime: outcome.runtime,
+                already_installed: outcome.already_installed,
+            }),
+            cancelled: Some(settle(|id, ()| JavaInstallCancelledEvent { id })),
+            error: settle(|id, e| JavaInstallErrorEvent {
+                id,
+                error: crate::runtime::engine_error(e),
+            }),
         };
 
-        let engine = self.engine.clone();
-        let hub = self.hub.clone();
-        let cancellations = self.cancellations.clone();
-        let job_id = id.clone();
-        tracing::info!(job = %id, major, force, "java install started");
-
-        tokio::spawn(async move {
-            let _claim = claim;
-            let progress_hub = hub.clone();
-            let progress_id = job_id.clone();
-            let on_progress = coalesce_progress(move |p: &proto::java::JavaInstallProgress| {
-                progress_hub.publish(&topic_event(&proto::java::JavaInstallProgressEvent {
-                    id: progress_id.clone(),
-                    progress: p.clone(),
-                }));
-            });
-
-            let (cancel, _registered) = cancellations.register(&job_id);
-            let result = engine
-                .java()
-                .install(major, force, Some(engine.cache()), &cancel, on_progress)
-                .await;
-
-            match result {
-                Ok(outcome) => {
-                    tracing::info!(
-                        job = %job_id,
-                        major,
-                        already_installed = outcome.already_installed,
-                        "java install done"
-                    );
-                    hub.publish(&topic_event(&JavaInstallDoneEvent {
-                        id: job_id.clone(),
-                        runtime: outcome.runtime,
-                        already_installed: outcome.already_installed,
-                    }));
-                }
-                Err(e) if engine::is_cancelled(&e) => {
-                    tracing::info!(job = %job_id, major, "java install cancelled");
-                    hub.publish(&topic_event(&JavaInstallCancelledEvent {
-                        id: job_id.clone(),
-                    }));
-                }
-                Err(e) => {
-                    tracing::error!(job = %job_id, major, error = format!("{e:#}"), "java install failed");
-                    hub.publish(&topic_event(&JavaInstallErrorEvent {
-                        id: job_id.clone(),
-                        error: crate::runtime::engine_error(e),
-                    }));
-                }
-            }
-        });
-        Some(id)
+        self.runner.start(spec, move |engine, reporter| {
+            Box::pin(async move {
+                let cancel = reporter.cancel();
+                let report = reporter.checked();
+                engine
+                    .java()
+                    .install(major, force, Some(engine.cache()), cancel, move |p| {
+                        let _ = report(p);
+                    })
+                    .await
+            })
+        })
     }
 }

@@ -7,7 +7,7 @@ use proto::backup::{
 };
 use proto::minecraft::ProvisionProgress;
 
-use super::job::{job_id, topic_event, Cancellations, InFlight};
+use super::job::{progress_event, settle, Cancellations, Runner, Spec};
 use crate::runtime::{server_process_id, EventHub};
 
 /// One backup or restore job for one server — what `BackupManager::start`
@@ -34,100 +34,60 @@ impl BackupJob {
             BackupJob::ServerRestore { .. } => "server-restore",
         }
     }
-
-    async fn run(
-        self,
-        engine: &Engine,
-        on_progress: &engine::Job<'_>,
-    ) -> anyhow::Result<BackupInfo> {
-        match self {
-            BackupJob::ServerBackup { server_id, live } => {
-                engine
-                    .backup_server(&server_id, BackupKind::Manual, live, on_progress)
-                    .await
-            }
-            BackupJob::ServerRestore { server_id, backup } => {
-                engine
-                    .restore_server_backup(&server_id, &backup, on_progress)
-                    .await
-            }
-        }
-    }
 }
 
 pub struct BackupManager {
-    engine: Arc<Engine>,
-    hub: Arc<EventHub>,
-    active: InFlight<String>,
-    cancellations: Cancellations,
+    runner: Runner<String>,
 }
 
 impl BackupManager {
     pub fn new(engine: Arc<Engine>, hub: Arc<EventHub>, cancellations: Cancellations) -> Self {
         BackupManager {
-            engine,
-            hub,
-            active: InFlight::new(),
-            cancellations,
+            runner: Runner::new(engine, hub, cancellations),
         }
     }
 
     /// Whether a backup or restore is still running for this server key
     /// (`server-<id>`).
     pub fn in_flight(&self, key: &str) -> bool {
-        self.active.contains(key)
+        self.runner.in_flight(key)
     }
 
     /// Start a backup/restore job off-thread, one per entry at a time.
     /// Returns the job id, or `None` if that entry is already busy.
     pub fn start(&self, job: BackupJob, id: String) -> Option<String> {
-        let id = job_id(id, job.id_prefix());
-        let key = job.key();
-        let Some(claim) = self.active.claim(key.clone()) else {
-            tracing::debug!(entry = %key, "backup job already in flight");
-            return None;
+        let spec = Spec {
+            id,
+            prefix: job.id_prefix(),
+            key: Some(job.key()),
+            progress: progress_event(|id, progress: &ProvisionProgress| BackupProgressEvent {
+                id,
+                progress: progress.clone(),
+            }),
+            done: settle(|id, backup: BackupInfo| BackupDoneEvent { id, backup }),
+            cancelled: Some(settle(|id, ()| BackupCancelledEvent { id })),
+            error: settle(|id, e| BackupErrorEvent {
+                id,
+                error: crate::runtime::engine_error(e),
+            }),
         };
 
-        let engine = self.engine.clone();
-        let hub = self.hub.clone();
-        let cancellations = self.cancellations.clone();
-        let job_id = id.clone();
-        tracing::info!(job = %id, entry = %key, kind = job.id_prefix(), "backup job started");
-
-        tokio::spawn(async move {
-            let _claim = claim;
-            let progress_hub = hub.clone();
-            let progress_id = job_id.clone();
-            let on_progress: Box<dyn Fn(&ProvisionProgress) + Send + Sync> = Box::new(move |p| {
-                progress_hub.publish(&topic_event(&BackupProgressEvent {
-                    id: progress_id.clone(),
-                    progress: p.clone(),
-                }));
-            });
-
-            let (cancel, _registered) = cancellations.register(&job_id);
-            let running = engine::Job::new(on_progress.as_ref(), &cancel);
-            match job.run(&engine, &running).await {
-                Ok(backup) => {
-                    tracing::info!(job = %job_id, backup = %backup.id, size = backup.size, "backup job done");
-                    hub.publish(&topic_event(&BackupDoneEvent {
-                        id: job_id.clone(),
-                        backup,
-                    }));
+        self.runner.start(spec, move |engine, reporter| {
+            Box::pin(async move {
+                let running = reporter.job();
+                match job {
+                    BackupJob::ServerBackup { server_id, live } => {
+                        engine
+                            .backup_server(&server_id, BackupKind::Manual, live, &running)
+                            .await
+                    }
+                    BackupJob::ServerRestore { server_id, backup } => {
+                        engine
+                            .restore_server_backup(&server_id, &backup, &running)
+                            .await
+                    }
                 }
-                Err(e) if engine::is_cancelled(&e) => {
-                    tracing::info!(job = %job_id, "backup job cancelled");
-                    hub.publish(&topic_event(&BackupCancelledEvent { id: job_id.clone() }));
-                }
-                Err(e) => {
-                    tracing::error!(job = %job_id, error = format!("{e:#}"), "backup job failed");
-                    hub.publish(&topic_event(&BackupErrorEvent {
-                        id: job_id.clone(),
-                        error: crate::runtime::engine_error(e),
-                    }));
-                }
-            }
-        });
-        Some(id)
+            })
+        })
     }
 }
