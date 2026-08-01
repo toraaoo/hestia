@@ -586,8 +586,8 @@ Nothing is fetched while it is off, and `hestia news` says so rather than preten
 ## Updating Hestia
 
 ```bash
-hestia self-update               # check, confirm, download and apply
-hestia self-update --yes         # no confirmation prompt
+hestia update                    # check, confirm, download and apply
+hestia update --yes              # no confirmation prompt
 ```
 
 The installer is verified against a compiled-in signing key before it runs; an artifact that fails to verify is

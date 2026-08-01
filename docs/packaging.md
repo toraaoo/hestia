@@ -89,11 +89,46 @@ What it adds over stock:
 
 ## Auto-updates
 
-The desktop app ships `tauri-plugin-updater`, polling
-`https://github.com/toraaoo/hestia/releases/latest/download/latest.json`. On a
-`v*` tag, the release workflow's `manifest` job composes `latest.json` from the signed NSIS setup (`windows-x86_64`) and
-AppImage (`linux-x86_64`) and attaches it to the Release. On Windows the update runs the NSIS installer passively, so
-the custom template's remembered install dir + components apply.
+The **daemon** owns self-update — `engine/src/update/`, reached over `update.check`,
+`update.download` and `update.apply`. Every front-end is a caller; none reads the manifest, holds a key, or runs an
+installer ([decision 0066](decisions/0066-the-daemon-owns-self-update.md)).
+
+It polls `https://github.com/toraaoo/hestia/releases/latest/download/latest.json`.
+On a `v*` tag the release workflow's `manifest` job composes `latest.json` and attaches it to the Release:
+
+```json
+{
+  "version": "0.1.0",
+  "notes": "…",
+  "platforms": {
+    "windows-x86_64": { "url": "…-setup.exe", "signature": "…" },
+    "linux-x86_64": {
+      "url": "….AppImage", "signature": "…",
+      "formats": {
+        "deb": { "url": "….deb", "signature": "…" },
+        "rpm": { "url": "….rpm", "signature": "…" }
+      }
+    }
+  }
+}
+```
+
+A platform's top-level entry is its default artifact — the NSIS setup, the AppImage. `formats` carries the rest, and is
+additive: a build that predates a format never asks for it and reads the same manifest a newer one does.
+
+How a copy was installed is **detected, not recorded** (`update/install.rs`), and decides both which artifact is asked
+for and how it is applied:
+
+| Install | Detected by | Applied with |
+|---|---|---|
+| NSIS | `uninstall.exe` at the layout root | the setup, `/P /UPDATE`, via `ShellExecuteW` so UAC can prompt |
+| AppImage | `$APPIMAGE` | staged beside the image, renamed over it |
+| deb / rpm | the binary is under a system prefix and `dpkg-query -S` / `rpm -qf` owns it | `dpkg -i` / `rpm -U`, escalated |
+| portable, `target/` | anything else, and always under the `portable` feature | nothing — the front-end offers the download URL |
+
+Escalation on Linux tries `pkexec` first (the one step that can *prompt*), then passwordless `sudo`. When neither can
+even ask, the daemon returns `ElevationRequired` carrying the exact command — `hestia update` then offers to run it,
+because the CLI has a terminal the daemon does not.
 
 ## The portable archives
 
@@ -127,22 +162,19 @@ Two independent signatures, often confused. Only one of them is mandatory.
 
 |                                          | What it proves                   | Who checks it             | Required?                                    |
 |------------------------------------------|----------------------------------|---------------------------|----------------------------------------------|
-| **Updater signature** (minisign/Ed25519) | this download came from us       | the app's own updater     | **yes** — the updater cannot work without it |
+| **Update signature** (minisign/Ed25519)  | this download came from us       | `engine/src/signature.rs`  | **yes** — the updater cannot work without it |
 | **Authenticode** (code signing cert)     | Windows knows who published this | Windows SmartScreen + UAC | no — costs a warning, not a failure          |
 
-### The updater key
+### The update key
 
-One minisign keypair, generated with `cargo tauri signer generate -w
-~/.tauri/hestia.key`. The **public** half lives in two places kept in agreement by `crates/common/tests/updater.rs`:
+One minisign keypair. The **public** half lives in exactly one place —
+`common::app::UPDATE_PUBKEY` — because only the daemon verifies anything;
+`crates/common/tests/updater.rs` fails the build if a second copy reappears in `tauri.conf.json`.
 
-- `plugins.updater.pubkey` in [`tauri.conf.json`](../crates/desktop/tauri.conf.json)
-  — what the desktop shell's `tauri-plugin-updater` verifies against;
-- `common::app::UPDATE_PUBKEY` — what the daemon and CLI verify against (`engine/src/update.rs`), since neither links
-  Tauri.
-
-The **private** half signs releases, either as the `TAURI_SIGNING_PRIVATE_KEY`
-repository secret (with `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) or locally by whoever cuts the release. Offline is the
-safer default, because:
+The **private** half signs releases through [`scripts/sign.sh`](../scripts/sign.sh), either as the
+`RELEASE_SIGNING_KEY` repository secret (with `RELEASE_SIGNING_KEY_PASSWORD`) or locally by whoever cuts the release.
+CI signs the finished artifacts itself rather than letting the bundler do it: the bundler never signed `.deb` or `.rpm`
+at all, and those are exactly what the `formats` map needs. Offline is the safer default, because:
 
 > **A build trusts only the keys compiled into it.** Nothing sent later changes
 > that, so a successor key has to ship *before* it is needed — which is what
@@ -155,10 +187,9 @@ Two keys ship in every build. `UPDATE_PUBKEY` signs releases;
 `UPDATE_PUBKEY_NEXT` is the successor, whose private half stays offline and out of CI until the day it is needed. To
 rotate:
 
-1. Swap the values — the spare becomes `UPDATE_PUBKEY`, in `common::app` *and*
-   in `tauri.conf.json` (`crates/common/tests/updater.rs` fails the build if the two disagree).
+1. Swap the values — the spare becomes `UPDATE_PUBKEY`, in `common::app`. That is the only file to touch.
 2. Generate a fresh spare into `UPDATE_PUBKEY_NEXT`, private half offline.
-3. Replace `TAURI_SIGNING_PRIVATE_KEY` / `..._PASSWORD` with the new signing key's, and cut a release.
+3. Replace `RELEASE_SIGNING_KEY` / `..._PASSWORD` with the new signing key's, and cut a release.
 
 Builds already in the field verify against the successor they were shipped with, so they accept the new release without
 an intermediate version.
@@ -170,16 +201,12 @@ pubkey, then sign v3 with the new key. It needs no extra code, but it requires s
 the key was lost or leaked — and it strands anyone who skips the intermediate version, which for a launcher is routine.
 Carrying the successor instead is what OpenBSD's signify does, what
 [sparkle#1501](https://github.com/sparkle-project/Sparkle/issues/1501) proposes for Sparkle, and what tauri#7585 asks
-for (`pubkey: Option<Vec<String>>`, "try the first, and if it fails try the second"). When that lands upstream,
-`update_pubkeys` and the desktop's retry loop can be deleted in favour of it.
+for (`pubkey: Option<Vec<String>>`, "try the first, and if it fails try the second").
 
-The daemon and CLI verify the key set directly (`engine/src/update.rs`). The desktop shell cannot:
-`tauri-plugin-updater` holds one `pubkey` in its config and verifies against only that, so `commands/update.rs` builds
-one updater per key through the builder's `.pubkey()` override — the hook the plugin's own docs point at for "key
-rotation logic". A retry re-downloads, which is acceptable for something that happens once per rotation.
+`engine/src/signature.rs` accepts any key in the set, so a rotation costs nothing at the verification site — this was
+awkward only while the desktop verified through `tauri-plugin-updater`, whose config holds exactly one key.
 
-`scripts/package.sh` builds without the key by flipping
-`createUpdaterArtifacts` off, so local packaging works unsigned. CI refuses a **tagged** release with no key
+`scripts/package.sh` builds unsigned, since signing is a separate step. CI refuses a **tagged** release with no key
 configured — the guard is in the `preflight` job, which runs before anything is built, because a tag attaches
 installers to the Release as each platform finishes and builds published without a `latest.json` would poll an
 endpoint that never answers.

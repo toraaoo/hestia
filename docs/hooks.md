@@ -283,7 +283,7 @@ The only named hooks. Everything else is a factory passed to `useQuery`/`useMuta
 | `useInstallModpack(kind)` / `useUpdateModpack(kind, id)` *(job)* | the pack jobs                                        |
 | `useRemoveModpack(kind, id)`                            | remove the pack record                                        |
 | `useAnnouncements()` / `useDismissAnnouncements()` / `useRefreshAnnouncements()` | the news feed                        |
-| `useUpdateCheck(enabled)` / `useInstallUpdate()`        | self-update, over the shell's updater commands                |
+| `useUpdateCheck(enabled)` / `useDownloadUpdate()` / `useApplyUpdate()` | self-update, over the daemon's `update.*` channels |
 | `usePrefs()` / `usePinned()`                            | desktop-local UI state, over the `prefs_*` shell commands     |
 | `useMultiSession()`                                     | whether `instance.multi-session` allows concurrent sessions   |
 | `useEntryIconLookup()`                                  | `(id) => iconUrl`, over the `icons_*` shell commands          |

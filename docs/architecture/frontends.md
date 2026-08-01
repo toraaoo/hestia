@@ -178,7 +178,7 @@ each needs something only the shell process has:
 | `prefs_list\|set\|remove` (`prefs.rs`) | UI state is the front-end's concern, so it never crosses the socket — written directly to `<data_home>/prefs.json`, resolving the same data home the engine uses ([0052](../decisions/0052-desktop-prefs-live-in-the-data-home.md)) |
 | `icons_list`, `icon_set\|remove` (`icons.rs`) | a picked image is copied to `<data_home>/icons/<entry-id>.<ext>` so it survives the original moving. The webview loads them over the asset protocol, whose scope is widened to that directory per call, since the data home can move at runtime |
 | `crash_list\|read\|clear`, `crash_report`, `log_write` (`diagnostics.rs`) | a webview error kills the UI without touching the Rust stack, so the shell records it into the same crash directory the daemon writes to. `log_write` routes console logging into the process `tracing` subscriber under the `ui` target |
-| `changelog`, `update_check\|install` (`update.rs`) | installing an update replaces the running binary — `tauri-plugin-updater`'s job, not the daemon's. Release notes are compiled in from `CHANGELOG.md`, deliberately local so the shell can show them on the first run *after* an update |
+| `changelog` (`update.rs`) | release notes are compiled in from `CHANGELOG.md`, deliberately local so the shell can show them on the first run *after* an update — when the network may be the thing that went wrong. Update itself is a daemon channel like everything else |
 | `start_daemon` (`bridge.rs`) | the `Client::start()` spawn path behind the offline overlay's start button |
 
 ## The frontend

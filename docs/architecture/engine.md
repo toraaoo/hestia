@@ -264,9 +264,24 @@ ordered by id, so reordering the published document is not itself a change.
 
 ## Self-update
 
-`update.rs` checks the published release manifest (`latest.json`) and downloads
-the signed installer for this platform, verified against `UPDATE_PUBKEY`. Network
-reads are stateless; the staging directory only holds the downloaded installer.
+`update/` owns the whole path — the check against the published release manifest
+(`latest.json`), the download of the artifact for this platform, its minisign
+verification against `update_pubkeys()`, and running it. No front-end does any of
+it ([0066](../decisions/0066-the-daemon-owns-self-update.md)).
+
+| Module | What it is |
+|---|---|
+| `mod.rs` | the manifest, the check, the download, and the guard that `apply` is only ever handed a file this daemon staged |
+| `install.rs` | how this copy was installed — NSIS, AppImage, deb, rpm, or unmanaged — detected rather than recorded, since a build that writes it down is wrong the moment someone moves it |
+| `apply.rs` | one entry point per platform, so no caller branches on the install shape |
+
+The install shape picks the artifact *and* the installer. A package asks the
+manifest's `formats` map for its own format and accepts nothing else — offering a
+deb install an AppImage would download something it has no way to apply. The
+`portable` feature short-circuits detection to unmanaged: an archive the user
+unpacked by hand has no installer to update through.
+
+Network reads are stateless; the staging directory only holds the download.
 
 `version.rs` is the comparison both this and announcement targeting share:
 anything unparsable compares as *no answer*, and every caller treats that as a
