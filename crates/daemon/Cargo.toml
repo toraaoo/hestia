@@ -10,6 +10,10 @@ publish.workspace = true
 name = "hestiad"
 path = "src/main.rs"
 
+[features]
+# Build the portable archive's binaries: data lives inside the install.
+portable = ["common/portable"]
+
 [dependencies]
 engine = { workspace = true }
 proto = { workspace = true }

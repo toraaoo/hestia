@@ -78,7 +78,7 @@ flowchart TD
     cli["<b>cli</b> → hestia"]
     daemon["<b>daemon</b> → hestiad"]
     desktop["<b>desktop</b> → hestia-desktop"]
-    tray["<b>tray</b> → tray"]
+    tray["<b>tray</b> → hestiatray"]
 
     client --> proto & ipc & common
     engine --> proto & common
@@ -141,7 +141,7 @@ sequenceDiagram
 The data home separates what is *yours* from what the launcher can regenerate.
 It resolves as `--home` → `$HESTIA_HOME` → a persisted pointer (`config set
 home`) → the platform default (`~/.hestia`, `%APPDATA%\Hestia` on Windows).
-Debug builds anchor at `<workspace>/.hestia` so development never touches your
+Debug builds anchor at `target/<profile>/data` so development never touches your
 real directory.
 
 ```

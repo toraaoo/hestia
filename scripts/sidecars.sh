@@ -3,7 +3,7 @@
 # `cargo tauri build` bundles them into every desktop installer.
 #
 # Release is the default (what installers ship). `--debug` stages debug builds
-# instead: the daemon's `debug_assertions` then keep dev data under <repo>/.hestia
+# instead: the daemon's `debug_assertions` then keep dev data under target/debug/data
 # rather than the real ~/.hestia — used by `scripts/dev.sh --desktop`.
 #
 # Tauri's externalBin requires each binary to carry the target-triple suffix

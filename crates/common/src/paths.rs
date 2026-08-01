@@ -11,27 +11,42 @@ fn env_path(name: &str) -> Option<PathBuf> {
     }
 }
 
-/// Debug-only: resolve `<workspace>/.hestia` from the running binary's location.
-/// A dev binary sits at `<workspace>/target/<profile>/<bin>` (tests under
-/// `target/<profile>/deps/`), so the workspace root is the parent of `target`.
-/// Resolved at runtime so relocating the repo never needs a rebuild.
-#[cfg(debug_assertions)]
-fn dev_data_home() -> Option<PathBuf> {
-    use std::ffi::OsStr;
-
+/// A `data/` directory inside the build's own layout, used when the data must
+/// travel with the binaries instead of living in the per-user directory: the
+/// portable archives, and every debug build.
+///
+/// The anchor is the layout's *root*, never the executable's own directory, so
+/// that every binary of one build agrees on one home. Two directories are
+/// stepped out of to find it:
+///
+/// - `bin/` — the installed and portable layout, where the support binaries sit
+///   below the desktop shell;
+/// - `deps/` — where cargo puts test binaries, which must resolve the same home
+///   as the `target/<profile>/` binaries they exercise.
+#[cfg(any(feature = "portable", debug_assertions))]
+fn contained_data_home() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
-    let target = exe
-        .ancestors()
-        .find(|p| p.file_name() == Some(OsStr::new("target")))?;
-    Some(target.parent()?.join(".hestia"))
+    contained_root(exe.parent()?).map(|root| root.join("data"))
 }
 
-/// The platform default data directory. Debug builds anchor at `<workspace>/.hestia`
-/// so development never touches the real per-user directory.
+/// The layout root holding `dir`, stepping out of a `bin/` or `deps/` directory.
+#[cfg(any(feature = "portable", debug_assertions))]
+fn contained_root(dir: &Path) -> Option<&Path> {
+    use std::ffi::OsStr;
+
+    match dir.file_name() {
+        Some(name) if name == OsStr::new("bin") || name == OsStr::new("deps") => dir.parent(),
+        _ => Some(dir),
+    }
+}
+
+/// The platform default data directory. Portable and debug builds keep their
+/// data inside the build's own layout, so neither ever touches the real
+/// per-user directory.
 fn platform_data_home() -> PathBuf {
-    #[cfg(debug_assertions)]
+    #[cfg(any(feature = "portable", debug_assertions))]
     {
-        if let Some(dir) = dev_data_home() {
+        if let Some(dir) = contained_data_home() {
             return dir;
         }
     }
@@ -117,4 +132,25 @@ pub fn config_path(override_dir: Option<&Path>) -> PathBuf {
 /// The directory holding Hestia's own logs, within the resolved data directory.
 pub fn log_dir(override_dir: Option<&Path>) -> PathBuf {
     data_home(override_dir).join("logs")
+}
+
+#[cfg(all(test, any(feature = "portable", debug_assertions)))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_binary_of_one_layout_agrees_on_the_root() {
+        let root = Path::new("/opt/hestia");
+        // The desktop shell sits at the root, its support binaries below it, and
+        // cargo's test binaries a level down from the profile dir.
+        for dir in [root, &root.join("bin"), &root.join("deps")] {
+            assert_eq!(contained_root(dir), Some(root), "{}", dir.display());
+        }
+    }
+
+    #[test]
+    fn an_ordinary_directory_name_is_the_root_itself() {
+        let dir = Path::new("/opt/hestia/binaries");
+        assert_eq!(contained_root(dir), Some(dir));
+    }
 }

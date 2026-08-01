@@ -25,7 +25,7 @@ stop_hestia() {
 stop_hestia
 
 # The staged sidecars must match the requested profile: a debug build bundles
-# debug sidecars (dev data under <repo>/.hestia), a --release one the release
+# debug sidecars (dev data under target/debug/data), a --release one the release
 # set. sidecars.sh defaults to release, so forward the profile explicitly.
 sidecar_profile="--debug"
 for arg in "$@"; do

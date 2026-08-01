@@ -13,7 +13,7 @@
 # has no endpoint override to honour.
 #
 # The CLI auto-spawns the sibling daemon, so `hestia java list` just works.
-# Debug builds keep data under <repo>/.hestia, so this never touches ~/.hestia.
+# Debug builds keep data under target/<profile>/data, so this never touches ~/.hestia.
 . "$(dirname "$0")/lib/common.sh"
 
 # Ignore an installed hestia entirely while developing: drop PATH entries that

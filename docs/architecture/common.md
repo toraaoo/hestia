@@ -30,7 +30,7 @@ flowchart LR
     D --> D3["&lt;workspace&gt;/.hestia<br/><i>debug builds only</i>"]
 ```
 
-Debug builds anchor at `<workspace>/.hestia` so development never populates your
+Debug builds anchor at `target/<profile>/data` so development never populates your
 real per-user directory. The module also provides `config_path`, `log_dir` and
 `set_persisted_home`.
 

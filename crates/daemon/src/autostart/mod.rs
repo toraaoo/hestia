@@ -4,7 +4,11 @@
 
 use anyhow::{bail, Context, Result};
 
-pub const SUPPORTED: bool = !cfg!(debug_assertions);
+/// A portable build is deliberately excluded: registering autostart would write
+/// an absolute path into the login session pointing at a directory the user can
+/// move, rename, or unplug, leaving a broken entry behind on the host — the one
+/// trace a portable install exists to avoid.
+pub const SUPPORTED: bool = !cfg!(debug_assertions) && !cfg!(feature = "portable");
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -25,9 +29,17 @@ pub fn is_enabled() -> bool {
     SUPPORTED && backend::is_enabled()
 }
 
+/// Why [`SUPPORTED`] is false, so a client is told which build it is talking to
+/// rather than a reason that does not apply.
+const UNSUPPORTED_REASON: &str = if cfg!(feature = "portable") {
+    "start at login is unavailable in a portable build"
+} else {
+    "start at login is unavailable in debug builds"
+};
+
 pub fn set(enabled: bool) -> Result<()> {
     if enabled && !SUPPORTED {
-        bail!("start at login is unavailable in debug builds");
+        bail!(UNSUPPORTED_REASON);
     }
     let result = if enabled {
         backend::enable().context("failed to enable autostart")
