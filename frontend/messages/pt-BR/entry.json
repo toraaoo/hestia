@@ -18,6 +18,7 @@
       },
       "instance_title": "Criar instância",
       "name_hint": "Deixe em branco para usar a distribuição e a versão.",
+      "no_flavors": "Não foi possível carregar as distribuições.",
       "no_versions_match": "Nenhuma versão corresponde.",
       "properties": {
         "difficulty": "Dificuldade",

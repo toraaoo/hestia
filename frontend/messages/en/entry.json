@@ -18,6 +18,7 @@
       },
       "instance_title": "Create instance",
       "name_hint": "Leave blank to use the flavor and version.",
+      "no_flavors": "Couldn't load the distributions.",
       "no_versions_match": "No versions match.",
       "properties": {
         "difficulty": "Difficulty",

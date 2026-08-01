@@ -267,7 +267,7 @@ export function CreateEntryDialog({
                         <p className="px-1 py-6 text-center text-xs text-muted-foreground">
                           {flavorsQuery.isPending
                             ? m['app.status.loading']()
-                            : m['entry.create.no_versions_match']()}
+                            : m['entry.create.no_flavors']()}
                         </p>
                       )}
                     </div>

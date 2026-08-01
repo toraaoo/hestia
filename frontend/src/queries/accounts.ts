@@ -19,6 +19,20 @@ export const accountQueries = {
     }),
 };
 
+/**
+ * The daemon refuses `instance.*` and `sync.*` until an account is signed in
+ * (`daemon/src/runtime/router.rs::requires_account`), and an errored query is
+ * not retried on mount — so anything read behind the gate stays stuck on its
+ * `unauthorized` failure. Every mutation that opens or closes the gate sweeps
+ * them along with its own keys.
+ */
+const gateKeys = () => [
+  keys.accounts.all,
+  keys.skins.all,
+  keys.instances.all,
+  keys.sync.all,
+];
+
 export const accountMutations = {
   /**
    * The desktop sign-in: one shell command drives the whole sisu flow behind a
@@ -28,7 +42,7 @@ export const accountMutations = {
     mutation<Account | null, void>({
       mutationKey: [...keys.accounts.all, 'login', 'sisu'],
       mutationFn: () => api.loginSisu(),
-      invalidates: () => [keys.accounts.all, keys.skins.all],
+      invalidates: gateKeys,
     }),
   beginLogin: () =>
     mutation<AccountLoginBeginResult, LoginMethod>({
@@ -39,7 +53,7 @@ export const accountMutations = {
     mutation<Account, { id: string; code?: string }>({
       mutationKey: [...keys.accounts.all, 'login', 'complete'],
       mutationFn: ({ id, code }) => api.completeLogin(id, code),
-      invalidates: () => [keys.accounts.all, keys.skins.all],
+      invalidates: gateKeys,
     }),
   /** Pick the default account launches use; `account` is a name or uuid. */
   switch: () =>
@@ -52,7 +66,7 @@ export const accountMutations = {
     mutation<void, string>({
       mutationKey: [...keys.accounts.all, 'remove'],
       mutationFn: (account) => api.remove(account),
-      invalidates: () => [keys.accounts.all, keys.skins.all],
+      invalidates: gateKeys,
     }),
 };
 
