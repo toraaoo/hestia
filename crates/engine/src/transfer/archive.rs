@@ -153,13 +153,13 @@ impl Writer {
         let total = members.len() as u64;
         for (done, member) in members.iter().enumerate() {
             job.check()?;
-            job.report(&ProvisionProgress {
-                phase: ProvisionPhase::Archive,
-                current: done as u64,
+            tick(
+                job,
+                ProvisionPhase::Archive,
+                done as u64,
                 total,
-                detail: member.name.clone(),
-                ..Default::default()
-            });
+                &member.name,
+            );
             // A file that vanished mid-export (a log rotating, a world saving)
             // is not a reason to lose the whole archive.
             if !member.source.is_file() {
@@ -168,6 +168,7 @@ impl Writer {
             }
             self.add_file(&member.name, &member.source)?;
         }
+        tick(job, ProvisionPhase::Archive, total, total, "");
         Ok(())
     }
 
@@ -271,13 +272,7 @@ impl Reader {
         let mut written = 0;
         for (done, (index, relative)) in planned.into_iter().enumerate() {
             job.check()?;
-            job.report(&ProvisionProgress {
-                phase: ProvisionPhase::Extract,
-                current: done as u64,
-                total,
-                detail: relative.clone(),
-                ..Default::default()
-            });
+            tick(job, ProvisionPhase::Extract, done as u64, total, &relative);
             if !is_safe_path(&relative) {
                 anyhow::bail!(proto::error::ErrorInfo::ArchiveInvalid {
                     format: "zip".to_string(),
@@ -290,6 +285,7 @@ impl Reader {
             self.write_entry(index, &dest.join(&relative))?;
             written += 1;
         }
+        tick(job, ProvisionPhase::Extract, total, total, "");
         Ok(written)
     }
 
@@ -308,6 +304,16 @@ impl Reader {
             .with_context(|| format!("cannot write {}", target.display()))?;
         Ok(())
     }
+}
+
+fn tick(job: &Job<'_>, phase: ProvisionPhase, current: u64, total: u64, detail: &str) {
+    job.report(&ProvisionProgress {
+        phase,
+        current,
+        total,
+        detail: detail.to_string(),
+        ..Default::default()
+    });
 }
 
 pub(crate) fn filename_of(path: &Path) -> String {
@@ -385,6 +391,41 @@ mod tests {
             "lang:en"
         );
         assert!(back.path().join("mods/sodium.jar").is_file());
+    }
+
+    #[test]
+    fn both_gauges_reach_their_total() {
+        let dir = temp("ticks");
+        let root = &dir.path().join("instance");
+        write(root, "data/options.txt", "lang:en");
+        write(root, "mods/sodium.jar", "jar bytes");
+
+        let archive = dir.path().join("out.hestia");
+        let cancel = crate::cancel::Cancel::new();
+        let seen = std::sync::Mutex::new(Vec::new());
+        let record = |p: &ProvisionProgress| {
+            seen.lock().unwrap().push((p.phase, p.current, p.total));
+        };
+        let job = Job::new(&record, &cancel);
+
+        let mut writer = Writer::create(&archive).unwrap();
+        writer.add_all(&plan(root, "", &|_| true), &job).unwrap();
+        writer.finish().unwrap();
+        let back = temp("ticks-out");
+        Reader::open(&archive)
+            .unwrap()
+            .extract_under("", back.path(), &job, &|_| true)
+            .unwrap();
+
+        let seen = seen.into_inner().unwrap();
+        let last = |phase: ProvisionPhase| {
+            seen.iter()
+                .rev()
+                .find(|(p, _, _)| *p == phase)
+                .map(|(_, current, total)| (*current, *total))
+        };
+        assert_eq!(last(ProvisionPhase::Archive), Some((2, 2)));
+        assert_eq!(last(ProvisionPhase::Extract), Some((2, 2)));
     }
 
     #[test]
