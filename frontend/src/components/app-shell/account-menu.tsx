@@ -28,6 +28,8 @@ export function AccountMenu() {
     active,
     isPending,
     login,
+    signingIn,
+    signInFailed,
     switch: switchAccount,
     remove: removeAccount,
   } = useAccounts();
@@ -54,7 +56,7 @@ export function AccountMenu() {
     return (
       <button
         type="button"
-        disabled={login.isPending}
+        disabled={signingIn}
         onClick={() => login.mutate()}
         className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset disabled:opacity-60"
       >
@@ -63,12 +65,10 @@ export function AccountMenu() {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm">
-            {login.isPending
-              ? m['account.signing_in']()
-              : m['account.sign_in']()}
+            {signingIn ? m['account.signing_in']() : m['account.sign_in']()}
           </span>
           <span className="block truncate text-[11px] text-muted-foreground">
-            {login.isError
+            {signInFailed
               ? m['account.sign_in_failed']()
               : m['account.not_signed_in']()}
           </span>
@@ -99,7 +99,7 @@ export function AccountMenu() {
                 <span
                   className={`block truncate text-[11px] ${active.needsReauth ? 'text-destructive' : 'text-muted-foreground'}`}
                 >
-                  {login.isPending
+                  {signingIn
                     ? m['account.signing_in']()
                     : active.needsReauth
                       ? m['account.reauth_required']()
@@ -117,7 +117,7 @@ export function AccountMenu() {
             </DropdownMenuLabel>
             {active.needsReauth && (
               <DropdownMenuItem
-                disabled={login.isPending}
+                disabled={signingIn}
                 onClick={() => login.mutate()}
                 className="text-destructive focus:text-destructive"
               >
@@ -152,7 +152,7 @@ export function AccountMenu() {
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuItem
-              disabled={login.isPending}
+              disabled={signingIn}
               onClick={() => login.mutate()}
             >
               <PlusIcon />

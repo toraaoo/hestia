@@ -6,7 +6,7 @@ import { useAccounts, useConnection, usePrefs } from '@/queries';
 const DISMISS_KEY = 'welcome-dismissed';
 
 export function FirstRunOverlay() {
-  const { signedIn, ready: accountsReady, login } = useAccounts();
+  const { signedIn, ready: accountsReady, login, signingIn } = useAccounts();
   const { get, set, ready: prefsReady } = usePrefs();
   const connected = useConnection() === 'connected';
 
@@ -26,10 +26,8 @@ export function FirstRunOverlay() {
           </p>
         </div>
         <div className="flex w-full flex-col gap-2">
-          <Button disabled={login.isPending} onClick={() => login.mutate()}>
-            {login.isPending
-              ? m['account.signing_in']()
-              : m['account.sign_in']()}
+          <Button disabled={signingIn} onClick={() => login.mutate()}>
+            {signingIn ? m['account.signing_in']() : m['account.sign_in']()}
           </Button>
           <Button variant="ghost" onClick={() => set(DISMISS_KEY, true)}>
             {m['app.welcome.dismiss']()}

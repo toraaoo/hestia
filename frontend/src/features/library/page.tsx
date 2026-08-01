@@ -295,7 +295,7 @@ export function LibraryPage({
 
 /** Instances need a signed-in account, so their section blocks until sign-in. */
 function InstancesSignInPrompt() {
-  const { login } = useAccounts();
+  const { login, signingIn } = useAccounts();
   return (
     <div className="flex flex-col items-center gap-4 border border-dashed border-border px-4 py-10 text-center">
       <div className="space-y-1">
@@ -307,11 +307,11 @@ function InstancesSignInPrompt() {
       <Button
         size="sm"
         data-icon="inline-start"
-        disabled={login.isPending}
+        disabled={signingIn}
         onClick={() => login.mutate()}
       >
         <SignInIcon weight="bold" />
-        {login.isPending ? m['account.signing_in']() : m['account.sign_in']()}
+        {signingIn ? m['account.signing_in']() : m['account.sign_in']()}
       </Button>
     </div>
   );

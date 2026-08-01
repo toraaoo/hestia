@@ -5,7 +5,12 @@
  * stored — hence its long-lived pending state.
  */
 import type { QueryClient } from '@tanstack/react-query';
-import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
+import {
+  queryOptions,
+  useMutation,
+  useMutationState,
+  useQuery,
+} from '@tanstack/react-query';
 import type { Account, AccountLoginBeginResult, LoginMethod } from '../api';
 import * as api from '../api/accounts';
 import { mutation } from './core';
@@ -78,6 +83,17 @@ export function useAccounts() {
   const switchAccount = useMutation(accountMutations.switch());
   const remove = useMutation(accountMutations.remove());
 
+  // Every surface that offers sign-in mounts its own observer, so a login
+  // started from one leaves the others' `isPending`/`isError` false. The
+  // shared truth is the mutation cache: read the state of every login under
+  // the key, wherever it was fired from.
+  const logins = useMutationState({
+    filters: { mutationKey: [...keys.accounts.all, 'login'] },
+    select: (m) => m.state.status,
+  });
+  const signingIn = logins.includes('pending');
+  const signInFailed = !signingIn && logins.at(-1) === 'error';
+
   const accounts = query.data?.accounts ?? [];
   const active =
     accounts.find((a) => a.uuid === query.data?.defaultUuid) ?? accounts[0];
@@ -86,6 +102,8 @@ export function useAccounts() {
     accounts,
     active,
     signedIn: active ? !active.needsReauth : false,
+    signingIn,
+    signInFailed,
     isPending: query.isPending,
     ready: !query.isPending,
     login,

@@ -5,7 +5,7 @@ import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
 
 export function SignInGate({ title, hint }: { title: string; hint: string }) {
-  const { login } = useAccounts();
+  const { login, signingIn } = useAccounts();
 
   return (
     <div className="grid h-full min-h-full place-items-center px-4">
@@ -19,11 +19,11 @@ export function SignInGate({ title, hint }: { title: string; hint: string }) {
         </div>
         <Button
           data-icon="inline-start"
-          disabled={login.isPending}
+          disabled={signingIn}
           onClick={() => login.mutate()}
         >
           <SignInIcon weight="bold" />
-          {login.isPending ? m['account.signing_in']() : m['account.sign_in']()}
+          {signingIn ? m['account.signing_in']() : m['account.sign_in']()}
         </Button>
       </div>
     </div>
