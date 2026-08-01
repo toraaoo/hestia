@@ -4,9 +4,10 @@
 
 mod fixture;
 
-use engine::{Cancel, EntryRef, Job, ServerCreateSpec};
+use engine::{Cancel, EntryRef, Job, LaunchRequest, ServerCreateSpec};
 use proto::content::{ContentAddItem, ContentAddSpec, ContentKind};
 use proto::error::ErrorInfo;
+use proto::instance::QuickPlay;
 use proto::minecraft::ProvisionProgress;
 
 fn job<'a>(cancel: &'a Cancel, report: &'a (dyn Fn(&ProvisionProgress) + Send + Sync)) -> Job<'a> {
@@ -281,4 +282,133 @@ async fn disabling_an_item_keeps_it_installed() {
         .expect("list");
     assert_eq!(listed.len(), 1, "a disabled item is still installed");
     assert!(!listed[0].enabled);
+}
+
+/// An instance ready to launch: a fixture flavor, a Java runtime already on
+/// disk, and a signed-in account whose token has not expired.
+async fn launchable(home: &std::path::Path) -> (engine::Engine, String) {
+    let files = fixture::Files::serve().await;
+    let engine = fixture::engine(
+        home,
+        vec![fixture::Flavor::serving("fabric", &files)],
+        vec![],
+    );
+    fixture::java_runtime(home, 21);
+    fixture::account(home, "player");
+    let record = engine
+        .create_instance("modded", "fabric", "1.21", None, &[])
+        .await
+        .expect("create the instance");
+    (engine, record.id)
+}
+
+fn launch<'a>(instance: &'a str, quick_play: Option<QuickPlay>) -> LaunchRequest<'a> {
+    LaunchRequest {
+        instance,
+        account: "",
+        session_seq: 1,
+        profile: "",
+        reconcile: true,
+        quick_play,
+    }
+}
+
+#[tokio::test]
+async fn a_launch_materializes_the_client_jar_under_mojangs_own_name() {
+    let home = tempfile::tempdir().expect("temp home");
+    let (engine, id) = launchable(home.path()).await;
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+
+    let prepared = engine
+        .prepare_instance(launch(&id, None), &job(&cancel, &report))
+        .await
+        .expect("prepare");
+
+    // A modloader booting off the module path filters the vanilla jar out by
+    // this exact name, so it is a contract, not a naming preference.
+    let jar = home.path().join("meta/versions/1.21/1.21.jar");
+    assert!(jar.is_file(), "the client jar lands at {}", jar.display());
+    assert!(
+        prepared.plan.args.iter().any(|a| a.contains("1.21.jar")) || prepared.plan.program.exists(),
+        "the plan names the runtime it just ensured"
+    );
+}
+
+#[tokio::test]
+async fn a_session_gets_its_own_log_file_outside_the_backed_up_tree() {
+    let home = tempfile::tempdir().expect("temp home");
+    let (engine, id) = launchable(home.path()).await;
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+
+    let mut request = launch(&id, None);
+    request.session_seq = 3;
+    let prepared = engine
+        .prepare_instance(request, &job(&cancel, &report))
+        .await
+        .expect("prepare");
+
+    assert!(
+        prepared.log_file.ends_with("session-3.log"),
+        "each concurrent session tails its own file, got {}",
+        prepared.log_file.display()
+    );
+    let instance_dir = home.path().join("instances");
+    assert!(
+        prepared.log_file.starts_with(&instance_dir)
+            && !prepared
+                .log_file
+                .components()
+                .any(|c| c.as_os_str() == "data"),
+        "session logs live outside data/, so a backup does not carry them"
+    );
+    assert!(
+        prepared.log_file.parent().is_some_and(|d| d.is_dir()),
+        "the session log directory is created before the plan names it"
+    );
+}
+
+#[tokio::test]
+async fn joining_a_world_that_is_not_there_is_refused_before_any_work() {
+    let home = tempfile::tempdir().expect("temp home");
+    let (engine, id) = launchable(home.path()).await;
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+
+    let refused = engine
+        .prepare_instance(
+            launch(&id, Some(QuickPlay::World("ghost".into()))),
+            &job(&cancel, &report),
+        )
+        .await
+        .map(|_| ())
+        .expect_err("no such world");
+
+    assert!(matches!(
+        engine::error_info(refused),
+        ErrorInfo::WorldNotFound { .. }
+    ));
+    // The gate sits ahead of the materialize, so nothing was downloaded for a
+    // launch that was never going to happen.
+    assert!(
+        !home.path().join("meta/versions").exists(),
+        "the quick-play gate runs before the client jar is ensured"
+    );
+}
+
+#[tokio::test]
+async fn a_cancelled_launch_stops_at_a_checkpoint() {
+    let home = tempfile::tempdir().expect("temp home");
+    let (engine, id) = launchable(home.path()).await;
+    let cancel = Cancel::new();
+    cancel.cancel();
+    let report = |_: &ProvisionProgress| {};
+
+    let stopped = engine
+        .prepare_instance(launch(&id, None), &job(&cancel, &report))
+        .await
+        .map(|_| ())
+        .expect_err("cancelled");
+    assert!(
+        engine::is_cancelled(&stopped),
+        "a cancellation is not a failure"
+    );
 }

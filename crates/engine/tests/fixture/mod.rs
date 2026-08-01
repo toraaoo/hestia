@@ -34,6 +34,21 @@ impl Flavor {
         }
     }
 
+    /// A flavor whose artifact is actually downloadable, for a flow that
+    /// materializes it.
+    pub fn serving(id: &'static str, files: &Files) -> Flavor {
+        Flavor {
+            id,
+            versions: vec!["1.21", "1.20.1"],
+            artifact: Some(Artifact {
+                url: files.url("client.jar"),
+                filename: "client.jar".into(),
+                size: Files::BODY.len() as u64,
+                checksum: None,
+            }),
+        }
+    }
+
     pub fn failing(id: &'static str) -> Flavor {
         Flavor {
             id,
@@ -107,10 +122,20 @@ impl InstanceProvider for Flavor {
         Ok(self.catalogue())
     }
     async fn resolve(&self, request: &engine::ResolveRequest) -> Result<InstanceProfile> {
+        let client = self.primary()?;
         Ok(InstanceProfile {
             flavor: self.id.to_string(),
             game_version: request.version.clone(),
-            client: self.primary()?,
+            asset_index: proto::minecraft::AssetIndex {
+                id: request.version.clone(),
+                artifact: Artifact {
+                    url: client.url.replace("client.jar", "assets.json"),
+                    filename: format!("{}.json", request.version),
+                    ..Artifact::default()
+                },
+                total_size: 0,
+            },
+            client,
             java_major: 21,
             main_class: "net.minecraft.client.main.Main".into(),
             ..InstanceProfile::default()
@@ -252,6 +277,9 @@ pub struct Files {
 
 impl Files {
     pub const BODY: &'static [u8] = b"PK\x03\x04 not really a jar";
+    /// An index naming no objects: the assets pass has nothing to fetch, but
+    /// still has to find and parse one.
+    pub const ASSET_INDEX: &'static [u8] = br#"{"objects":{}}"#;
 
     pub async fn serve() -> Files {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -266,13 +294,20 @@ impl Files {
                 tokio::spawn(async move {
                     use tokio::io::{AsyncReadExt, AsyncWriteExt};
                     let mut scratch = [0u8; 1024];
-                    let _ = socket.read(&mut scratch).await;
+                    let read = socket.read(&mut scratch).await.unwrap_or(0);
+                    let request = String::from_utf8_lossy(&scratch[..read]).to_string();
+                    // An asset index has to parse; everything else is opaque
+                    // bytes as far as a materialize is concerned.
+                    let body: &[u8] = match request.contains(".json") {
+                        true => Files::ASSET_INDEX,
+                        false => Files::BODY,
+                    };
                     let head = format!(
                         "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                        Files::BODY.len()
+                        body.len()
                     );
                     let _ = socket.write_all(head.as_bytes()).await;
-                    let _ = socket.write_all(Files::BODY).await;
+                    let _ = socket.write_all(body).await;
                     let _ = socket.flush().await;
                 });
             }
@@ -283,4 +318,55 @@ impl Files {
     pub fn url(&self, name: &str) -> String {
         format!("http://127.0.0.1:{}/{name}", self.port)
     }
+}
+
+/// Register a Java runtime on disk so `ensure_java` finds it instead of
+/// resolving one upstream — the store scans its directory, so the disk is the
+/// only seam a test needs.
+pub fn java_runtime(home: &std::path::Path, major: i32) {
+    let install = home.join("java").join(format!("fixture-{major}"));
+    let bin = install.join("bin");
+    std::fs::create_dir_all(&bin).expect("java dir");
+    let exe = if cfg!(windows) { "java.exe" } else { "java" };
+    std::fs::write(bin.join(exe), b"#!/bin/sh\nexit 0\n").expect("java binary");
+    std::fs::write(
+        install.join("runtime.json"),
+        serde_json::json!({
+            "vendor": "fixture",
+            "major": major,
+            "release_name": format!("jdk-{major}"),
+            "executable": format!("bin/{exe}"),
+        })
+        .to_string(),
+    )
+    .expect("runtime record");
+}
+
+/// Sign an account in on disk, with a token far enough from expiry that
+/// `access_token` hands it back rather than refreshing it upstream.
+pub fn account(home: &std::path::Path, name: &str) -> String {
+    let uuid = "00000000000000000000000000000001".to_string();
+    let far_future = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_secs() as i64
+        + 86_400;
+    std::fs::create_dir_all(home).expect("home");
+    std::fs::write(
+        home.join("accounts.json"),
+        serde_json::json!({
+            "accounts": [{
+                "uuid": uuid,
+                "name": name,
+                "refreshToken": "fixture-refresh",
+                "accessToken": "fixture-access",
+                "expiresAt": far_future,
+                "needsReauth": false,
+            }],
+            "defaultUuid": uuid,
+        })
+        .to_string(),
+    )
+    .expect("accounts.json");
+    uuid
 }
