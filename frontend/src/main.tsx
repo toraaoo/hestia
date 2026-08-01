@@ -9,6 +9,7 @@ import { LocaleProvider } from './hooks/locale';
 import { installCrashHandlers } from './lib/crash';
 import { initDesktopShell } from './lib/desktop';
 import { log } from './lib/log';
+import { reportReady } from './lib/splash';
 import { queryClient, startInvalidation } from './queries';
 import { startSessionTracking } from './queries/sessions';
 import { getRouter } from './router';
@@ -41,4 +42,5 @@ if (rootElement && !rootElement.innerHTML) {
       </ErrorBoundary>
     </StrictMode>,
   );
+  reportReady();
 }

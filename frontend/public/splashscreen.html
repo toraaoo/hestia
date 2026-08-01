@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hestia</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        background: oklch(0.145 0 0);
+        border: 1px solid oklch(1 0 0 / 10%);
+        box-sizing: border-box;
+        font-family: system-ui, sans-serif;
+        cursor: default;
+        user-select: none;
+        overflow: hidden;
+      }
+      img {
+        width: 132px;
+        height: 132px;
+      }
+      .word {
+        color: oklch(0.985 0 0);
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        opacity: 0;
+        animation: fade 460ms ease-out 1300ms both;
+      }
+      .bar {
+        position: relative;
+        width: 104px;
+        height: 2px;
+        overflow: hidden;
+        background: oklch(1 0 0 / 10%);
+        opacity: 0;
+        animation: fade 460ms ease-out 1500ms both;
+      }
+      .bar::after {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 35%;
+        background: #f57c12;
+        animation: sweep 1.15s ease-in-out infinite;
+        content: '';
+      }
+      @keyframes fade {
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes sweep {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(300%);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <img src="/splash.svg" alt="Hestia" />
+    <span class="word">Hestia</span>
+    <span class="bar"></span>
+  </body>
+</html>

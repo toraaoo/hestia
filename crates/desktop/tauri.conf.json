@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Hestia",
         "width": 1280,
         "height": 800,
@@ -20,6 +21,18 @@
         "decorations": false,
         "center": true,
         "visible": false
+      },
+      {
+        "label": "splashscreen",
+        "title": "Hestia",
+        "url": "splashscreen.html",
+        "width": 360,
+        "height": 300,
+        "decorations": false,
+        "resizable": false,
+        "center": true,
+        "skipTaskbar": true,
+        "visible": true
       }
     ],
     "security": {

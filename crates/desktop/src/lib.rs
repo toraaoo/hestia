@@ -42,9 +42,7 @@ pub fn run() {
                 app.handle().exit(0);
                 return Ok(());
             }
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-            }
+            commands::splash::arm(app.handle().clone());
             // A file the app was *launched* with arrives before the webview
             // can listen, so it waits until the webview asks for it.
             if let Some(path) = commands::open::archive_from(&std::env::args().collect::<Vec<_>>())
@@ -67,6 +65,7 @@ pub fn run() {
             commands::icons::icon_set,
             commands::icons::icon_remove,
             commands::open::pending_archive,
+            commands::splash::ready,
             commands::diagnostics::log_write,
             commands::diagnostics::crash_report,
             commands::diagnostics::crash_list,
