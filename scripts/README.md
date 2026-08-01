@@ -26,6 +26,8 @@ having.
 | `sidecars.sh`   | build + stage `hestia`/`hestiad`/`tray` as Tauri sidecars for bundling |
 | `package.sh`    | release artifacts: Tauri installers + portable archive (`all`/`bundle`/`portable`) |
 | `announce.sh`   | announcements: scaffold one (`new`), compile `news/*.md` into the feed, serve it locally, or sign it (CI) |
+| `update.sh`     | self-update: generate a dev key, compile a fake `latest.json`, serve it locally |
+| `sign.sh`       | minisign release artifacts (`<file>.sig`), or verify them (CI)      |
 | `gen-types.sh`  | regenerate the TypeScript bindings for the `proto` wire types (ts-rs) |
 | `gen-icons.sh`  | regenerate every shipped icon from `assets/icons/ember.svg`           |
 
@@ -60,7 +62,24 @@ scripts/announce.sh new "Title"   # scaffold news/<date>-<id>.md, then edit it
 scripts/announce.sh               # compile news/ and print the feed payload
 scripts/announce.sh --serve       # serve it on 127.0.0.1:8787 by hand
 scripts/dev.sh --no-news          # subshell without the local feed
+
+scripts/update.sh --keys          # a local update-signing keypair, once
+scripts/update.sh --serve         # fake release feed on 127.0.0.1:8788
 ```
+
+**Testing self-update locally.** Unlike the news feed this is opt-in, because a
+dev run should not offer a fake update every time. Generate a keypair once, paste
+the printed public half into `common::app::UPDATE_PUBKEY_NEXT`, rebuild, then:
+
+```bash
+scripts/update.sh --serve &
+HESTIA_UPDATE_ENDPOINT=http://127.0.0.1:8788/latest.json scripts/dev.sh
+hestia update --yes
+```
+
+The served artifact is a throwaway file but it is **signed**, and the signature
+is still checked — that is the part of the path most worth exercising. Only a
+debug build reads the override.
 
 A debug `dev.sh`, `run.sh daemon` or `run.sh desktop` **serves `news/` as the
 announcement feed** and points the daemon it starts at it, so an entry can be

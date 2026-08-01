@@ -28,14 +28,9 @@ bundle() {
     macos) targets="app,dmg" ;;
     *) targets="deb,rpm,appimage" ;;
   esac
-  # Updater artifacts (.sig) need the release signing key; without it in the
-  # environment, build the plain installers so local packaging still works.
-  config_args=()
-  if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
-    echo "TAURI_SIGNING_PRIVATE_KEY not set — skipping updater signatures" >&2
-    config_args=(--config '{"bundle":{"createUpdaterArtifacts":false}}')
-  fi
-  (cd crates/desktop && cargo tauri build --bundles "$targets" "${config_args[@]}")
+  # Signatures are minisign, applied to the finished artifacts by
+  # scripts/sign.sh — the bundler never signs anything.
+  (cd crates/desktop && cargo tauri build --bundles "$targets")
 }
 
 portable() {
