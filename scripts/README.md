@@ -81,6 +81,24 @@ The served artifact is a throwaway file but it is **signed**, and the signature
 is still checked — that is the part of the path most worth exercising. Only a
 debug build reads the override.
 
+A `target/` build is *unmanaged*, so that run stops at "download it at …" — the
+check and the version comparison, and no more. To reach the download, the
+verification and the apply, tell the daemon it is an AppImage, which is the one
+install shape that needs no root:
+
+```bash
+printf 'old\n' > /tmp/Hestia.AppImage && chmod +x /tmp/Hestia.AppImage
+APPIMAGE=/tmp/Hestia.AppImage \
+  HESTIA_UPDATE_ENDPOINT=http://127.0.0.1:8788/latest.json scripts/dev.sh
+hestia update --yes
+cat /tmp/Hestia.AppImage      # replaced, and still 0755
+```
+
+`deb`/`rpm` cannot be faked this way — detection asks `dpkg-query -S` / `rpm -qf`
+who owns the binary, so it needs a real package install. Windows needs a real
+NSIS install for the same reason: the uninstaller at the layout root is what
+`update/install.rs` looks for.
+
 A debug `dev.sh`, `run.sh daemon` or `run.sh desktop` **serves `news/` as the
 announcement feed** and points the daemon it starts at it, so an entry can be
 seen before it is published. `--no-news` skips it, `HESTIA_NEWS_PORT` moves it
