@@ -246,9 +246,9 @@ instances: ctx.runtime.engine().instances().list(),
 ```
 
 A brand-new domain adds `mod <domain>;` plus one `<domain>::register(&mut on);`
-line to `services/mod.rs` — the only change `make_router()` ever needs. Shared preconditions (`find_server`,
-`is_running`, `ensure_no_backup`, …) live in
-`services/guards.rs`.
+line to `services/mod.rs` — the only change `make_router()` ever needs. A handler that touches an entry resolves it
+through `guards::server_for` / `guards::instance_for` with an `Intent`, which applies every exclusion that intent
+implies — never a checklist of its own.
 
 Map engine errors to codes with `ServiceError::not_found` / `bad_request` /
 `handler_error`. For a long-running operation, follow `JavaInstallManager`

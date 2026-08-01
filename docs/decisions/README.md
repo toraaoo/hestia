@@ -48,6 +48,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0033** — [Instances are gated on a signed-in account, in the router](0033-instance-surface-gated-on-an-account.md)
 - **0034** — [An aggregation point is a directory, not a file](0034-an-aggregation-point-is-a-directory.md)
 - **0039** — [Stopping the daemon has three meanings; the front-end picks one, the wire carries two](0039-stopping-the-daemon-has-three-meanings.md)
+- **0065** — [A job family declares what differs; the runner owns the rest](0065-a-job-declares-what-differs.md)
 - **0063** — [Discord presence belongs to the daemon, and is a loop rather than a hook](0063-discord-presence-is-a-daemon-loop.md)
 
 ### [Minecraft providers](../architecture/minecraft.md)

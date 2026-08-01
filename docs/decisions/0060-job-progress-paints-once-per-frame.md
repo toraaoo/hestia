@@ -30,3 +30,22 @@ The rejected alternative was throttling at the display site (`useRate`, the
 progress view). That leaves every other subscriber re-rendering at the daemon's
 cadence and has to be repeated at the next surface that renders a job; the
 store is the one place that knows a burst is a burst.
+
+## Amended: coalescing belongs at the publish seam first
+
+Recorded as a front-end cadence bug, this read as done — and it was not. The
+same burst reaches the CLI and the tray, and it crosses the socket either way.
+The real fix is one layer earlier: the daemon coalesces each job's progress
+before it publishes, forwarding only on a phase change, past a 0.5% ratio step,
+or on the terminal tick.
+
+That coalescer existed, but the spawn/publish skeleton around it was copied per
+job family, so it had reached six of ten start sites — a backup, an export, a
+download and the self-update still published per file or per chunk. Progress
+coalescing is now the **runner's** obligation
+(`daemon/runtime/managers/job.rs`), uniform across every family by
+construction: a family declares its four topics and its work, never its
+cadence. See [0065](0065-a-job-declares-what-differs.md).
+
+The desktop's `requestAnimationFrame` store stays, as the second line it should
+always have been: it protects the render from any burst, wherever it came from.

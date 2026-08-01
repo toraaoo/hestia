@@ -91,9 +91,14 @@ account exists. It is a whole-domain lockdown, and prefixing covers
 `InstanceLaunchManager`, `BackupManager`, `ContentManager`, `ModpackManager`,
 `UpdateManager`.
 
-They all implement the same pattern: answer the channel immediately with a job
-id, run the blocking engine work off-thread, publish progress/done/error events
-through the hub.
+They all answer the channel immediately with a job id, run the blocking engine
+work off-thread, and publish progress/done/error events through the hub — but
+none of them implements that: `job.rs`'s `Runner` does. A manager builds a
+`Spec` naming its id, prefix, in-flight key and four topic constructors, and
+hands `Runner::start` a closure taking the engine and a `Reporter`. Claiming,
+spawning, progress coalescing, cancellation, terminal classification and logging
+are the runner's, so they cannot drift per family
+([0065](../decisions/0065-a-job-declares-what-differs.md)).
 
 ```mermaid
 sequenceDiagram
@@ -146,8 +151,10 @@ unsubscribes them on disconnect.
 One registrar per domain, each registering its channels with one
 `on.handle::<C>(…)` apiece. `services/mod.rs`'s `make_router()` is nothing but
 the list of `register()` calls; `services/guards.rs` holds the preconditions the
-registrars share (`find_server`, `is_running`, `ensure_stopped`,
-`ensure_no_backup|update|content`, `require_backup`).
+registrars share. A handler does not assemble its own: it names what it is about
+to do — `Intent::{Read, Start, Mutate, Backup, Lifecycle}` — and `server_for` /
+`instance_for` resolve the entry and apply the exclusions that intent implies
+for that side ([0032](../decisions/0032-one-registrar-per-domain.md)).
 
 There is no `Service` class per prefix — a handler is a closure, and the grouping
 is purely a compile-time one that keeps `make_router()` from becoming a

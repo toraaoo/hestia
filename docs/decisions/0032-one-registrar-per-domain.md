@@ -10,3 +10,21 @@ entity. The grouping exists because the flat `make_router()` grew to ~75
 channels in one 1100-line function, which is the aggregation-point smell, not a
 design: wiring in a channel is still exactly one `handle::<C>` line, now in the
 file that owns its domain.
+
+## Amended: a channel declares its intent, it does not re-derive its guards
+
+The rejection still holds — a `Service` object per prefix is a runtime entity
+nobody needed. But "a handler is a closure" put every precondition *inside* that
+closure, as a checklist each handler assembled by hand, and the checklists
+drifted: an instance content update could race an export while an add could not,
+and a server content remove skipped the update check its sibling made. Worse,
+one guard never fired at all — `ensure_stopped` asked the supervisor for
+`instance-<id>`, but an instance runs its sessions under `instance-<id>_<seq>`,
+so content was free to write jars a running JVM held open.
+
+A handler now names what it is about to do — `Intent::{Read, Start, Mutate,
+Backup, Lifecycle}` — and `guards::{server_for, instance_for}` resolves the
+entry and applies the exclusions that intent implies, per side. The decision's
+own goal is untouched: wiring in a channel is still one `handle::<C>` line in
+the file that owns its domain. What changed is that the line now carries what
+the channel needs instead of trusting the author to remember it.
