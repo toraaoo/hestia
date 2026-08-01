@@ -54,6 +54,8 @@
     "publisher": "prytaneum",
     "homepage": "https://github.com/toraaoo/hestia",
     "copyright": "Copyright © 2026 toraaoo. Published by prytaneum.",
+    "license": "GPL-3.0-only",
+    "licenseFile": "../../LICENSE",
     "fileAssociations": [
       {
         "ext": ["hestia"],
