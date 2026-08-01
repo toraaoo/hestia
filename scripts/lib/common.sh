@@ -18,3 +18,21 @@ die() {
   printf 'error: %s\n' "$*" >&2
   exit 1
 }
+
+# Refuse early, naming what to install, rather than dying mid-pipeline on a
+# `jq: command not found`.
+#
+# The tool is *run*, not merely located: Windows ships an App Execution Alias
+# for `python` that sits on PATH, satisfies `command -v`, and then prints an
+# advert for the Microsoft Store instead of running anything. Several version
+# flags are tried because there is no one spelling every tool answers —
+# minisign wants `-v` and exits 2 on `--version`.
+require() {
+  local tool="$1" hint="${2:-}" flag
+  if command -v "$tool" > /dev/null 2>&1; then
+    for flag in --version -v -V; do
+      "$tool" "$flag" > /dev/null 2>&1 && return 0
+    done
+  fi
+  die "$tool is required${hint:+ — $hint}"
+}

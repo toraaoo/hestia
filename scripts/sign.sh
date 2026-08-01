@@ -12,7 +12,7 @@
 # on disk) and RELEASE_SIGNING_KEY_PASSWORD.
 . "$(dirname "$0")/lib/common.sh"
 
-command -v minisign > /dev/null || die "minisign is not installed"
+require minisign "install it with your package manager (winget install jedisct1.minisign)"
 
 verify=false
 if [ "${1:-}" = "--verify" ]; then

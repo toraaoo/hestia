@@ -17,6 +17,9 @@
 # unsigned is ever cached, and a release build has no path to the waiver.
 . "$(dirname "$0")/lib/common.sh"
 
+require python "install a real python (winget install Python.Python.3.13); the Windows Store alias is not one"
+require jq "install it with your package manager (winget install jqlang.jq)"
+
 mode="${1:-preview}"
 repo="${GITHUB_REPOSITORY:-toraaoo/hestia}"
 base_url="https://github.com/${repo}/releases/download/announcements"
@@ -63,6 +66,7 @@ EOF
     exec python -m http.server "$port" --bind 127.0.0.1 --directory "$dir"
     ;;
   --sign)
+    require minisign "install it with your package manager"
     : "${ANNOUNCE_SIGNING_KEY:?ANNOUNCE_SIGNING_KEY is not set}"
     tmp="$(mktemp -d)"
     chmod 700 "$tmp"

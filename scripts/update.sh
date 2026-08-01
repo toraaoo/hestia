@@ -15,7 +15,8 @@
 # takes with it.
 . "$(dirname "$0")/lib/common.sh"
 
-command -v minisign > /dev/null || die "minisign is not installed"
+require minisign "install it with your package manager (winget install jedisct1.minisign)"
+require jq "install it with your package manager (winget install jqlang.jq)"
 
 dir="target/update"
 key="$dir/dev.key"
@@ -74,6 +75,7 @@ case "${1:-}" in
     echo "export HESTIA_UPDATE_PUBKEY=$(base64 -w0 < "$key.pub")"
     ;;
   --serve)
+    require python "install a real python (winget install Python.Python.3.13); the Windows Store alias is not one"
     compile > /dev/null
     log "update feed on http://127.0.0.1:$port/latest.json (version $version)"
     log "point a shell at it with:  eval \"\$($0 --env)\""
