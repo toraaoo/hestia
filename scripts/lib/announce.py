@@ -317,7 +317,8 @@ class Draft:
         if self.severity not in SEVERITIES:
             raise Error(f"severity {self.severity!r} is not one of {', '.join(SEVERITIES)}")
 
-        self.published = options.published or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+        self.filename_date = options.published or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+        self.published = options.published or str(now_utc())
         self.id = options.id or self._slug(self.title)
         if not ID_RE.match(self.id):
             raise Error(
@@ -332,7 +333,7 @@ class Draft:
 
     @property
     def path(self) -> Path:
-        return self.feed.directory / f"{self.published}-{self.id}.md"
+        return self.feed.directory / f"{self.filename_date}-{self.id}.md"
 
     def write(self) -> Path:
         path = self.path
