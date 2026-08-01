@@ -206,6 +206,11 @@ for (`pubkey: Option<Vec<String>>`, "try the first, and if it fails try the seco
 `engine/src/signature.rs` accepts any key in the set, so a rotation costs nothing at the verification site — this was
 awkward only while the desktop verified through `tauri-plugin-updater`, whose config holds exactly one key.
 
+Testing the update path locally never means editing these constants:
+[`scripts/update.sh --env`](../scripts/update.sh) hands the endpoint and the key to trust to a **debug** build through
+`HESTIA_UPDATE_ENDPOINT` and `HESTIA_UPDATE_PUBKEY`, and the second is honoured only alongside the first — so there is
+nothing to paste in and nothing to put back. A release build reads neither.
+
 `scripts/package.sh` builds unsigned, since signing is a separate step. CI refuses a **tagged** release with no key
 configured — the guard is in the `preflight` job, which runs before anything is built, because a tag attaches
 installers to the Release as each platform finishes and builds published without a `latest.json` would poll an

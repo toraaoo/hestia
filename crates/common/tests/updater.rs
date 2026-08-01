@@ -40,3 +40,18 @@ fn the_primary_key_is_the_one_releases_are_signed_with() {
         "the primary key must stay first: it is the one releases are signed with"
     );
 }
+
+/// The dev override is only ever reached with an overridden endpoint beside it,
+/// so a stray `HESTIA_UPDATE_PUBKEY` in someone's shell cannot quietly change
+/// what their build trusts. This test sets no endpoint, so the answer is the
+/// compiled-in set whenever the cache happens to be filled.
+#[test]
+fn a_pubkey_override_alone_changes_nothing() {
+    std::env::set_var("HESTIA_UPDATE_PUBKEY", "a-key-nobody-asked-for");
+    let keys: Vec<_> = common::app::update_pubkeys().collect();
+    std::env::remove_var("HESTIA_UPDATE_PUBKEY");
+    assert_eq!(
+        keys,
+        vec![common::app::UPDATE_PUBKEY, common::app::UPDATE_PUBKEY_NEXT]
+    );
+}

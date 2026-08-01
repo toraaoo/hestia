@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # Serve a fake release feed so the update path can be driven locally.
 #
-#   scripts/update.sh                 # compile a latest.json and print it
-#   scripts/update.sh --serve [port]  # serve it on 127.0.0.1
-#   scripts/update.sh --keys          # generate the local dev keypair
+#   eval "$(scripts/update.sh --env)"  # point this shell at the local feed
+#   scripts/update.sh --serve [port]   # serve it on 127.0.0.1
+#   scripts/update.sh                  # compile a latest.json and print it
 #
-# The artifact is a throwaway file, but it is *signed*, with a key this build
-# trusts — verification is the part of the path most worth exercising, so it is
-# not waived. `--keys` writes target/update/dev.key and prints the public half
-# to paste into common::app::UPDATE_PUBKEY for the duration of a test.
+# The artifact is a throwaway file, but it is *signed*, and the signature is
+# still checked — verification is the part of the path most worth exercising.
 #
-# Only a debug build reads HESTIA_UPDATE_ENDPOINT, so nothing here can point a
-# shipped binary anywhere.
+# Nothing here edits the source. The key is passed in HESTIA_UPDATE_PUBKEY,
+# which a **debug** build honours only alongside HESTIA_UPDATE_ENDPOINT, so a
+# shipped binary cannot be pointed anywhere and there is nothing to put back.
+# The keypair is generated on first use into target/update/, which `cargo clean`
+# takes with it.
 . "$(dirname "$0")/lib/common.sh"
 
 command -v minisign > /dev/null || die "minisign is not installed"
@@ -27,19 +28,15 @@ case "$(uname -s)" in
   *) target="linux-x86_64" ;;
 esac
 
-generate_keys() {
+ensure_keys() {
+  [ -f "$key" ] && return 0
   mkdir -p "$dir"
-  rm -f "$key" "$key.pub"
   minisign -G -f -s "$key" -p "$key.pub" -W > /dev/null
-  log "wrote $key"
-  echo
-  echo "paste this into crates/common/src/app.rs as UPDATE_PUBKEY_NEXT:"
-  base64 -w0 < "$key.pub"
-  echo
+  log "generated $key" >&2
 }
 
 compile() {
-  [ -f "$key" ] || die "no dev key — run: $0 --keys"
+  ensure_keys
   mkdir -p "$dir"
 
   # Stands in for an installer. Applying it will fail, which is the point at
@@ -58,15 +55,18 @@ compile() {
 }
 
 case "${1:-}" in
-  --keys) generate_keys ;;
+  --env)
+    ensure_keys
+    echo "export HESTIA_UPDATE_ENDPOINT=http://127.0.0.1:$port/latest.json"
+    echo "export HESTIA_UPDATE_PUBKEY=$(base64 -w0 < "$key.pub")"
+    ;;
   --serve)
     compile > /dev/null
     log "update feed on http://127.0.0.1:$port/latest.json (version $version)"
-    log "point a debug daemon at it:"
-    log "  HESTIA_UPDATE_ENDPOINT=http://127.0.0.1:$port/latest.json scripts/dev.sh"
+    log "point a shell at it with:  eval \"\$($0 --env)\""
     # exec so the server *is* this pid, matching announce.sh.
     exec python -m http.server "$port" --bind 127.0.0.1 --directory "$dir"
     ;;
   "") compile ;;
-  *) die "unknown mode: $1 (--keys | --serve | <none>)" ;;
+  *) die "unknown mode: $1 (--env | --serve | <none>)" ;;
 esac

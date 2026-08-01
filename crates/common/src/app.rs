@@ -52,9 +52,35 @@ pub const UPDATE_PUBKEY_NEXT: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1Ym
 /// Every key a release artifact may be signed with, newest last. Empty slots
 /// are skipped, so an unrotated build simply trusts one key.
 pub fn update_pubkeys() -> impl Iterator<Item = &'static str> {
-    [UPDATE_PUBKEY, UPDATE_PUBKEY_NEXT]
-        .into_iter()
-        .filter(|key| !key.is_empty())
+    let keys = match dev_pubkey() {
+        Some(key) => vec![key],
+        None => vec![UPDATE_PUBKEY, UPDATE_PUBKEY_NEXT],
+    };
+    keys.into_iter().filter(|key| !key.is_empty())
+}
+
+/// `HESTIA_UPDATE_PUBKEY` replaces the compiled-in key set for a local test, so
+/// testing self-update never means editing this file and remembering to put it
+/// back. It is honoured only in a **debug** build, and only alongside
+/// `HESTIA_UPDATE_ENDPOINT`: a key without a feed to go with it would change
+/// what an ordinary debug build trusts, which is not what anyone is asking for.
+#[cfg(debug_assertions)]
+fn dev_pubkey() -> Option<&'static str> {
+    use std::sync::OnceLock;
+
+    static KEY: OnceLock<Option<&'static str>> = OnceLock::new();
+    *KEY.get_or_init(|| {
+        let set = |name| std::env::var(name).ok().filter(|v| !v.trim().is_empty());
+        set("HESTIA_UPDATE_ENDPOINT")?;
+        // Leaked once, deliberately: every caller wants `&'static str`, and a
+        // debug-only override read once is not worth threading lifetimes for.
+        Some(&*Box::leak(set("HESTIA_UPDATE_PUBKEY")?.into_boxed_str()))
+    })
+}
+
+#[cfg(not(debug_assertions))]
+fn dev_pubkey() -> Option<&'static str> {
+    None
 }
 
 /// The announcement feed: the news and notices the launcher shows. A standing
