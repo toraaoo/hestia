@@ -1,6 +1,5 @@
 use ipc::errors::IpcError;
 use ipc::protocol::Event;
-use serde_json::Value;
 
 use crate::session::{job_id, Session};
 
@@ -81,13 +80,8 @@ impl Java<'_> {
             )
             .await?;
 
-        let runtime =
-            serde_json::from_value(payload.get("runtime").cloned().unwrap_or(Value::Null))
-                .map_err(|e| IpcError::Malformed(e.to_string()))?;
-        let already = payload
-            .get("already_installed")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        Ok((runtime, already))
+        let done: proto::java::JavaInstallDoneEvent =
+            serde_json::from_value(payload).map_err(|e| IpcError::Malformed(e.to_string()))?;
+        Ok((done.runtime, done.already_installed))
     }
 }
