@@ -6,7 +6,9 @@
 #   scripts/package.sh portable   # portable archive only (.tar.gz on Linux, .zip on Windows)
 #
 # Tauri bundles the desktop app + the hestiad/hestiatray/hestia sidecars into each
-# installer; the portable archive is the same set of standalone binaries.
+# installer. The portable archive is the same four binaries, but compiled with
+# the `portable` feature, so they are a separate build rather than a copy of the
+# installers' — see `portable()`.
 . "$(dirname "$0")/lib/common.sh"
 
 action="${1:-all}"
@@ -37,16 +39,37 @@ bundle() {
 }
 
 portable() {
-  local ext="" name stage
+  local ext="" name stage out
   [ "$os" = windows ] && ext=".exe"
   name="hestia-$version-$triple"
   stage="target/package/$name"
+  # Its own target dir: a portable binary resolves a different data home, so it
+  # must never end up in target/release/ where sidecars.sh stages the ones the
+  # installers bundle.
+  out="target/portable"
+
+  # tauri-build asserts the externalBin files exist, and generate_context!
+  # embeds frontend/dist — both are needed to compile the shell at all, even
+  # though a plain `cargo build` bundles neither.
+  scripts/sidecars.sh
+  [ -d frontend/dist ] || (cd frontend && bun run build)
+
+  log "building portable binaries"
+  cargo build --release --target-dir "$out" \
+    -p cli -p daemon -p tray -p desktop \
+    --features cli/portable,daemon/portable,tray/portable,desktop/portable
+
   rm -rf "$stage"
-  mkdir -p "$stage"
-  for bin in hestia hestiad hestiatray hestia-desktop; do
-    [ -f "target/release/$bin$ext" ] && cp "target/release/$bin$ext" "$stage/"
+  mkdir -p "$stage/bin" "$stage/data"
+  # The same split the Windows installer lays down: what a user launches at the
+  # root, what a shell or another binary reaches below it.
+  for bin in hestia-desktop hestiatray; do
+    cp "$out/release/$bin$ext" "$stage/"
   done
-  cp LICENSE README.md "$stage/" 2>/dev/null || true
+  for bin in hestia hestiad; do
+    cp "$out/release/$bin$ext" "$stage/bin/"
+  done
+  cp LICENSE README.md "$stage/"
   if [ "$os" = windows ]; then
     powershell -NoProfile -Command \
       "Compress-Archive -Path 'target/package/$name/*' -DestinationPath 'target/package/$name.zip' -Force"

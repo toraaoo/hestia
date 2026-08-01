@@ -43,8 +43,12 @@ What it adds over stock:
   effective selection for silent/passive updates. Deselecting a previously installed component on an update removes it.
 - **Install mode `both`** — per-user or all-users, chosen at install time (`bundle.windows.nsis.installMode` in
   `tauri.conf.json`), remembered for updates and uninstall.
-- **CLI on PATH** — the CLI component appends the install directory to the user or machine `PATH` (matching the install
-  mode) and removes it on uninstall or deselection.
+- **A split layout** — `hestia-desktop.exe` and `hestiatray.exe` install to
+  `$INSTDIR`, because a user launches them; `hestia.exe` and `hestiad.exe` to
+  `$INSTDIR\bin`, because a shell or another binary reaches them. The portable archive lays down the same split.
+- **CLI on PATH** — the CLI component appends `$INSTDIR\bin` to the user or machine `PATH` (matching the install mode)
+  and removes it on uninstall or deselection, so `hestia` is reachable without also exposing the daemon, the tray and
+  the shell.
 - **Graceful daemon handling** — before files are swapped, a running `hestiad`
   is asked to stop via `hestiad stop` (supervised game servers keep running — the daemon re-adopts them on its next
   start) and only killed if it lingers; the tray is stopped too. If the daemon was running, the installer restarts it
@@ -64,10 +68,31 @@ The desktop app ships `tauri-plugin-updater`, polling
 AppImage (`linux-x86_64`) and attaches it to the Release. On Windows the update runs the NSIS installer passively, so
 the custom template's remembered install dir + components apply.
 
-The **portable archives** are the same four binaries (`hestia`, `hestiad`,
-`tray`, `hestia-desktop`) plus `LICENSE`/`README`, packed flat by
-[`scripts/package.sh`](../scripts/package.sh) — Tauri has no portable target, so this is a plain `tar`/
-`Compress-Archive` step.
+## The portable archives
+
+Tauri has no portable target, so [`scripts/package.sh`](../scripts/package.sh) builds them itself — and they are **not**
+a copy of the installers' binaries. They are a separate `cargo build` under the
+`portable` feature into `target/portable/`, because that feature changes where the binaries resolve their data home:
+
+```
+hestia-<version>-<triple>/
+├── hestia-desktop        what a user launches
+├── hestiatray
+├── bin/
+│   ├── hestia            what a shell or another binary reaches
+│   └── hestiad
+├── data/                 the data home — nothing is written outside the archive
+├── LICENSE
+└── README.md
+```
+
+`common::paths` anchors the data home on the layout *root*, stepping out of
+`bin/`, so all four binaries agree on one `data/` regardless of which directory they sit in — and each finds the others
+through `common::paths::sibling_binary`. Autostart is compiled out under the feature: registering it would write an
+absolute path into the login session pointing at a directory the user can move or unplug.
+
+Linux packages keep the platform convention instead — `deb`/`rpm`/AppImage install every binary flat into `/usr/bin`,
+which the same lookup handles.
 
 ## Signing
 

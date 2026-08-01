@@ -1,6 +1,5 @@
-//! Locating and auto-starting the daemon. `hestiad` sits beside the current
-//! binary (all front-ends live in the same dir) or in a `bin/` subdirectory,
-//! else it is resolved through PATH.
+//! Locating and auto-starting the daemon. `hestiad` is found in the running
+//! front-end's own layout, else resolved through PATH.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -16,24 +15,11 @@ fn daemon_name() -> &'static str {
     }
 }
 
-fn find_daemon() -> PathBuf {
-    let exe = daemon_name();
-    if let Ok(current) = std::env::current_exe() {
-        if let Some(dir) = current.parent() {
-            for candidate in [dir.join(exe), dir.join("bin").join(exe)] {
-                if candidate.exists() {
-                    return candidate;
-                }
-            }
-        }
-    }
-    PathBuf::from(exe) // resolved through PATH
-}
-
 /// Start the daemon detached from this process's session, so it outlives the
 /// front-end that spawned it.
 pub fn spawn_daemon() -> std::io::Result<()> {
-    let program = find_daemon();
+    let name = daemon_name();
+    let program = common::paths::sibling_binary(name).unwrap_or_else(|| PathBuf::from(name));
     tracing::debug!(program = %program.display(), "spawning the daemon");
     let mut cmd = Command::new(program);
     cmd.arg("serve")
