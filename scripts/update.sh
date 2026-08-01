@@ -22,10 +22,22 @@ key="$dir/dev.key"
 version="${HESTIA_UPDATE_VERSION:-99.0.0}"
 port="${2:-8788}"
 
+# The artifact carries the extension the real one would, because the installer
+# is launched by association on Windows: a name Windows cannot recognise as an
+# executable would be *opened* instead, in whatever app claims it.
 case "$(uname -s)" in
-  MINGW* | MSYS* | CYGWIN*) target="windows-x86_64" ;;
-  Darwin) target="macos-x86_64" ;;
-  *) target="linux-x86_64" ;;
+  MINGW* | MSYS* | CYGWIN*)
+    target="windows-x86_64"
+    artifact_name="Hestia_${version}_x64-setup.exe"
+    ;;
+  Darwin)
+    target="macos-x86_64"
+    artifact_name="Hestia-${version}.app.tar.gz"
+    ;;
+  *)
+    target="linux-x86_64"
+    artifact_name="Hestia-${version}.AppImage"
+    ;;
 esac
 
 ensure_keys() {
@@ -39,10 +51,11 @@ compile() {
   ensure_keys
   mkdir -p "$dir"
 
-  # Stands in for an installer. Applying it will fail, which is the point at
-  # which a real artifact is swapped in; everything before that is exercised.
-  local artifact="$dir/hestia-$version-fake"
+  # Stands in for an installer. Only the AppImage shape can actually be applied
+  # from this — it is a file rename; a Windows setup would have to be a real one.
+  local artifact="$dir/$artifact_name"
   printf 'not a real installer — %s\n' "$version" > "$artifact"
+  chmod +x "$artifact"
   minisign -S -s "$key" -m "$artifact" -x "$dir/artifact.sig" > /dev/null 2>&1
 
   local url="http://127.0.0.1:$port/$(basename "$artifact")"
