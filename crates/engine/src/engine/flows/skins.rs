@@ -30,19 +30,39 @@ impl Engine {
         Ok((reference, token))
     }
 
+    /// Open a session for a change that replaces the equipped texture, having
+    /// first preserved whatever is equipped now. Every mutating flow goes
+    /// through here so there is nowhere left to forget the preserve — losing an
+    /// externally-set skin is the bug this module exists to prevent.
+    async fn begin_skin_change(&self, account: &str) -> Result<(String, String)> {
+        let (reference, token) = self.skin_session(account).await?;
+        let before = mojang::fetch_profile(&token).await?;
+        self.preserve_current_skin(&before).await;
+        Ok((reference, token))
+    }
+
+    /// The account's profile, fetched and cached when it is not already.
+    async fn cached_or_fetch_profile(
+        &self,
+        reference: &str,
+        token: &str,
+    ) -> Result<crate::skins::mojang::Profile> {
+        match self.skins().cached_profile(reference) {
+            Some(profile) => Ok(profile),
+            None => {
+                let profile = mojang::fetch_profile(token).await?;
+                self.skins().store_profile(reference, profile.clone());
+                Ok(profile)
+            }
+        }
+    }
+
     /// The account's skin picture: library entries, the vanilla defaults, and —
     /// when neither covers it — the equipped external skin; plus the owned
     /// capes. At most one skin and one cape are marked equipped.
     pub async fn list_skins(&self, account: &str) -> Result<(Vec<Skin>, Vec<Cape>)> {
         let (reference, token) = self.skin_session(account).await?;
-        let profile = match self.skins().cached_profile(&reference) {
-            Some(profile) => profile,
-            None => {
-                let profile = mojang::fetch_profile(&token).await?;
-                self.skins().store_profile(&reference, profile.clone());
-                profile
-            }
-        };
+        let profile = self.cached_or_fetch_profile(&reference, &token).await?;
         let active = profile.active_skin();
 
         let mut skins = Vec::new();
@@ -133,9 +153,7 @@ impl Engine {
             .context("the skin data is not valid base64")?;
         validate_skin_png(&png)?;
 
-        let (reference, token) = self.skin_session(account).await?;
-        let before = mojang::fetch_profile(&token).await?;
-        self.preserve_current_skin(&before).await;
+        let (reference, token) = self.begin_skin_change(account).await?;
 
         let after = match mojang::upload_skin(&token, png.clone(), variant).await? {
             Some(profile) => profile,
@@ -210,14 +228,7 @@ impl Engine {
 
     async fn adopt_equipped_skin(&self, account: &str, key: &str) -> Result<LibraryEntry> {
         let (reference, token) = self.skin_session(account).await?;
-        let profile = match self.skins().cached_profile(&reference) {
-            Some(profile) => profile,
-            None => {
-                let profile = mojang::fetch_profile(&token).await?;
-                self.skins().store_profile(&reference, profile.clone());
-                profile
-            }
-        };
+        let profile = self.cached_or_fetch_profile(&reference, &token).await?;
         let active = profile
             .active_skin()
             .filter(|a| a.key == key)
@@ -242,9 +253,7 @@ impl Engine {
 
     /// Equip a library or default skin by its key from `skin.list`.
     pub async fn equip_skin(&self, account: &str, key: &str) -> Result<()> {
-        let (reference, token) = self.skin_session(account).await?;
-        let before = mojang::fetch_profile(&token).await?;
-        self.preserve_current_skin(&before).await;
+        let (reference, token) = self.begin_skin_change(account).await?;
 
         if let Some(entry) = self.skins().entry(key) {
             let png = self.skins().texture(key)?;
@@ -273,9 +282,7 @@ impl Engine {
 
     /// Reset the account to its uuid-derived default skin.
     pub async fn reset_skin(&self, account: &str) -> Result<()> {
-        let (reference, token) = self.skin_session(account).await?;
-        let before = mojang::fetch_profile(&token).await?;
-        self.preserve_current_skin(&before).await;
+        let (reference, token) = self.begin_skin_change(account).await?;
         mojang::reset_skin(&token).await?;
         self.skins().invalidate_profile(&reference);
         tracing::info!("skin reset to the default");
