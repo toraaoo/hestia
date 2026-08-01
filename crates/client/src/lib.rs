@@ -38,14 +38,19 @@ pub struct Client {
 }
 
 impl Client {
+    /// Drive a daemon over an already-established connection.
+    pub fn over(connection: ipc::Connection) -> Client {
+        Client {
+            session: Session::new(connection),
+        }
+    }
+
     /// Connect to a running daemon. Never spawns — use [`Client::start`] for that.
     pub async fn connect() -> Result<Client, IpcError> {
         let endpoint = ipc::endpoint::default_endpoint();
         let conn = ipc::connect(&endpoint).await?;
         tracing::debug!(endpoint = %endpoint.display(), "connected to the daemon");
-        Ok(Client {
-            session: Session::new(conn),
-        })
+        Ok(Client::over(conn))
     }
 
     /// Start the daemon if not already running, then connect. The one path
@@ -53,26 +58,19 @@ impl Client {
     pub async fn start() -> Result<Client, IpcError> {
         let endpoint = ipc::endpoint::default_endpoint();
         if let Ok(conn) = ipc::connect(&endpoint).await {
-            return Ok(Client {
-                session: Session::new(conn),
-            });
+            return Ok(Client::over(conn));
         }
         tracing::debug!(endpoint = %endpoint.display(), "daemon not running; starting it");
         spawn::spawn_daemon()?;
         match spawn::connect_with_retry(&endpoint).await {
-            Some(conn) => Ok(Client {
-                session: Session::new(conn),
-            }),
+            Some(conn) => Ok(Client::over(conn)),
             None => Err(IpcError::ConnectionLost),
         }
     }
 
     /// Connect to a daemon listening on `endpoint` (no auto-spawn).
     pub async fn connect_to(endpoint: &Path) -> Result<Client, IpcError> {
-        let conn = ipc::connect(endpoint).await?;
-        Ok(Client {
-            session: Session::new(conn),
-        })
+        Ok(Client::over(ipc::connect(endpoint).await?))
     }
 
     pub fn session(&self) -> &Session {

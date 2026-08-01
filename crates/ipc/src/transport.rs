@@ -73,6 +73,11 @@ pub struct Connection {
 }
 
 impl Connection {
+    /// Frame over any full-duplex byte stream, not only a socket.
+    pub fn from_io<S: Stream + 'static>(stream: S) -> Self {
+        Connection::from_stream(Box::new(stream))
+    }
+
     fn from_stream(stream: BoxStream) -> Self {
         let (r, w) = tokio::io::split(stream);
         Connection {
