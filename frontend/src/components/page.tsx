@@ -1,7 +1,9 @@
+import { motion } from 'motion/react';
 import type { ReactNode } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
 import { SearchInput } from '@/components/search-input';
+import { fade } from '@/lib/motion';
 import { m } from '@/paraglide/messages.js';
 
 /**
@@ -49,7 +51,14 @@ export function Page({
         </div>
       </div>
       <div className="flex-1 p-5">
-        {loading && skeleton ? skeleton : children}
+        <motion.div
+          key={loading && skeleton ? 'skeleton' : 'content'}
+          variants={fade}
+          initial="hidden"
+          animate="show"
+        >
+          {loading && skeleton ? skeleton : children}
+        </motion.div>
       </div>
     </div>
   );

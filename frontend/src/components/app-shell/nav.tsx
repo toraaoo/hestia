@@ -9,7 +9,9 @@ import {
   TShirtIcon,
 } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
+import { motion } from 'motion/react';
 
+import { layoutMorph } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
@@ -85,12 +87,13 @@ export function NavLink({ item, active }: { item: NavItem; active: boolean }) {
           : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
       )}
     >
-      <span
-        className={cn(
-          'absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 bg-ember transition-opacity',
-          active ? 'opacity-100' : 'opacity-0',
-        )}
-      />
+      {active && (
+        <motion.span
+          layoutId="nav-active"
+          transition={layoutMorph}
+          className="absolute top-1/2 left-0 -mt-2.5 h-5 w-0.5 bg-ember"
+        />
+      )}
       <Icon weight={active ? 'fill' : 'regular'} className="size-4.5" />
       {label()}
     </Link>

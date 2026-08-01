@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from '@tanstack/react-router';
+import { motion } from 'motion/react';
 
 import { FirstRunOverlay } from '@/components/app-shell/first-run-overlay';
 import { OfflineOverlay } from '@/components/app-shell/offline-overlay';
@@ -8,6 +9,7 @@ import { Sidebar } from '@/components/app-shell/sidebar';
 import { StatusBar } from '@/components/app-shell/status-bar';
 import { TopNav } from '@/components/app-shell/top-nav';
 import { LaunchDialogProvider } from '@/features/instances/dialogs';
+import { fade } from '@/lib/motion';
 
 export function AppLayout() {
   const { pathname } = useLocation();
@@ -23,7 +25,15 @@ export function AppLayout() {
 
             <div className="flex min-w-0 flex-1 flex-col">
               <main className="flex-1 overflow-y-auto">
-                <Outlet />
+                <motion.div
+                  key={pathname}
+                  variants={fade}
+                  initial="hidden"
+                  animate="show"
+                  className="min-h-full"
+                >
+                  <Outlet />
+                </motion.div>
               </main>
               {pathname === '/' && <PlayBar />}
               <StatusBar />
