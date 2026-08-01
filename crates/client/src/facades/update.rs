@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use ipc::errors::IpcError;
 use ipc::protocol::Event;
-use serde_json::Value;
 
 use crate::session::{job_id, Session};
 
@@ -50,16 +49,8 @@ impl Update<'_> {
             )
             .await?;
 
-        let path = payload
-            .get("path")
-            .and_then(Value::as_str)
-            .map(PathBuf::from)
-            .ok_or_else(|| IpcError::Malformed("update.done carried no path".into()))?;
-        let version = payload
-            .get("version")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string();
-        Ok((path, version))
+        let done: proto::update::UpdateDoneEvent =
+            serde_json::from_value(payload).map_err(|e| IpcError::Malformed(e.to_string()))?;
+        Ok((done.path, done.version))
     }
 }

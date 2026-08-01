@@ -81,7 +81,7 @@ impl Topic for UpdateDoneEvent {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateErrorEvent {
     pub id: String,
-    pub message: String,
+    pub error: crate::error::ErrorInfo,
 }
 impl Topic for UpdateErrorEvent {
     const TOPIC: &'static str = "update.error";

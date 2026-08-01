@@ -11,6 +11,16 @@ use client::{error_info, IpcError};
 use fake::{event, Reply, Script};
 use serde_json::json;
 
+/// A job waits for its terminal event with no deadline of its own — that is
+/// the point of it. So a test that scripts one wrong would hang the suite
+/// forever; this turns that into a failure that says so.
+async fn settles<T>(what: impl std::future::Future<Output = T>) -> T {
+    match tokio::time::timeout(Duration::from_secs(5), what).await {
+        Ok(outcome) => outcome,
+        Err(_) => panic!("the job never settled: no scripted event matched its id or topic"),
+    }
+}
+
 fn runtime() -> JavaRuntime {
     JavaRuntime {
         vendor: "temurin".into(),
@@ -124,13 +134,16 @@ async fn a_job_settles_on_its_done_event() {
 
     let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let observed = seen.clone();
-    let (installed, already) = client
-        .java()
-        .install(21, false, "j1", move |p: &JavaInstallProgress| {
+    let (installed, already) = settles(client.java().install(
+        21,
+        false,
+        "j1",
+        move |p: &JavaInstallProgress| {
             observed.lock().unwrap().push(p.phase);
-        })
-        .await
-        .expect("install");
+        },
+    ))
+    .await
+    .expect("install");
 
     assert_eq!(installed.major, 21);
     // The done event is camelCase on the wire, like every other payload.
@@ -159,9 +172,7 @@ async fn a_job_settles_on_its_error_event() {
         )
         .serve();
 
-    let error = client
-        .java()
-        .install(21, false, "j2", |_| {})
+    let error = settles(client.java().install(21, false, "j2", |_| {}))
         .await
         .expect_err("failed");
     assert!(matches!(error_info(&error), ErrorInfo::InvalidValue { .. }));
@@ -179,9 +190,7 @@ async fn a_cancelled_job_is_not_reported_as_a_failure() {
         )
         .serve();
 
-    let error = client
-        .java()
-        .install(21, false, "j3", |_| {})
+    let error = settles(client.java().install(21, false, "j3", |_| {}))
         .await
         .expect_err("cancelled");
     assert!(
@@ -211,9 +220,7 @@ async fn a_job_ignores_events_belonging_to_another_job() {
         )
         .serve();
 
-    let (_, already) = client
-        .java()
-        .install(21, false, "mine", |_| {})
+    let (_, already) = settles(client.java().install(21, false, "mine", |_| {}))
         .await
         .expect("install");
     assert!(!already);
@@ -234,9 +241,7 @@ async fn a_job_subscribes_before_it_starts() {
     let seen = script.seen();
     let client = script.serve();
 
-    client
-        .java()
-        .install(21, false, "j4", |_| {})
+    settles(client.java().install(21, false, "j4", |_| {}))
         .await
         .expect("install");
 
@@ -258,5 +263,35 @@ async fn a_dropped_daemon_wakes_its_waiters() {
     assert!(
         matches!(error, IpcError::ConnectionLost),
         "a torn-down connection fails its waiters rather than timing them out, got {error:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_failed_self_update_reports_why() {
+    let client = Script::new()
+        // This facade allocates its own job id, so the reply has to echo back
+        // whatever the client sent rather than name one.
+        .on(
+            "update.download",
+            Reply::Job(Box::new(|id| {
+                vec![event(
+                    "update.error",
+                    json!({
+                        "id": id,
+                        "error": ErrorInfo::DownloadFailed {
+                            detail: "bad signature".into(),
+                        },
+                    }),
+                )]
+            })),
+        )
+        .serve();
+
+    let error = settles(client.update().download(|_| {}))
+        .await
+        .expect_err("failed");
+    assert!(
+        matches!(error_info(&error), ErrorInfo::DownloadFailed { .. }),
+        "the update family carries a typed error like every other job, got {error:?}"
     );
 }

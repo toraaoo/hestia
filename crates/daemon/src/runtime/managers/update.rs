@@ -32,7 +32,7 @@ impl UpdateManager {
             cancelled: Some(settle(|id, ()| UpdateCancelledEvent { id })),
             error: settle(|id, e| UpdateErrorEvent {
                 id,
-                message: format!("{e:#}"),
+                error: crate::runtime::engine_error(e),
             }),
         };
 
