@@ -560,6 +560,13 @@ pub enum ErrorInfo {
     },
 
     // --- operational (unbounded English `detail`) ---
+    /// Applying an update needs root and the daemon could not obtain it — no
+    /// polkit agent answered and there is no terminal to prompt on. Carries the
+    /// exact command, so a front-end with a terminal can hand it to the user
+    /// rather than describing what they ought to type.
+    ElevationRequired {
+        command: String,
+    },
     Io {
         operation: IoOp,
         detail: String,
@@ -611,7 +618,8 @@ impl ErrorInfo {
             }
             UnknownChannel { .. } => "unknown_channel",
             IncompatibleVersion { .. } => "version_mismatch",
-            Io { .. }
+            ElevationRequired { .. }
+            | Io { .. }
             | Upstream { .. }
             | DownloadFailed { .. }
             | RconFailed { .. }
@@ -788,6 +796,10 @@ impl fmt::Display for ErrorInfo {
                     "unsupported protocol version {got}; this daemon speaks version {want}"
                 )
             }
+            ElevationRequired { command } => write!(
+                f,
+                "installing this update needs administrator rights — run: {command}"
+            ),
             Io { operation, detail } => write!(f, "could not {operation}: {detail}"),
             Upstream { service, detail } => write!(f, "{service} request failed: {detail}"),
             DownloadFailed { detail } => write!(f, "download failed: {detail}"),

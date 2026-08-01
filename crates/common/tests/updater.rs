@@ -1,28 +1,25 @@
-//! Drift guard: the desktop shell reads its update endpoint and minisign key
-//! from `tauri.conf.json` (tauri-plugin-updater owns that file), while the
-//! daemon and CLI read `common::app`. Both must name the same feed and trust
-//! the same key, or a CLI self-update would verify against a key the desktop
-//! never signs with.
+//! The update feed is named once, in `common::app`. The desktop shell used to
+//! carry a second copy in `tauri.conf.json` for `tauri-plugin-updater`, kept in
+//! agreement by this test; the shell now asks the daemon like every other
+//! front-end, so what is guarded is that the duplicate has not come back.
 
 use std::path::Path;
 
-fn updater_config() -> serde_json::Value {
+fn tauri_conf() -> serde_json::Value {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../desktop/tauri.conf.json")
         .canonicalize()
         .expect("crates/desktop/tauri.conf.json is missing");
-    let conf: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    conf["plugins"]["updater"].clone()
+    serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap()
 }
 
 #[test]
-fn endpoint_matches_the_desktop_shell() {
-    let updater = updater_config();
-    assert_eq!(
-        updater["endpoints"][0].as_str(),
-        Some(common::app::UPDATE_ENDPOINT),
-        "common::app::UPDATE_ENDPOINT and tauri.conf.json's updater endpoint disagree"
+fn the_shell_does_not_configure_its_own_updater() {
+    assert!(
+        tauri_conf()["plugins"]["updater"].is_null(),
+        "tauri.conf.json declares plugins.updater again — the endpoint and the \
+         signing key would be written in two places, which is what the \
+         daemon-owned update path exists to avoid"
     );
 }
 
@@ -40,17 +37,6 @@ fn the_rotation_spare_is_a_different_key() {
 fn the_primary_key_is_the_one_releases_are_signed_with() {
     assert!(
         common::app::update_pubkeys().next() == Some(common::app::UPDATE_PUBKEY),
-        "the primary key must stay first: it is the one tauri.conf.json pins"
-    );
-}
-
-#[test]
-fn pubkey_matches_the_desktop_shell() {
-    let updater = updater_config();
-    assert_eq!(
-        updater["pubkey"].as_str(),
-        Some(common::app::UPDATE_PUBKEY),
-        "common::app::UPDATE_PUBKEY and tauri.conf.json's updater pubkey disagree — \
-         shipped clients would verify against different keys"
+        "the primary key must stay first: it is the one releases are signed with"
     );
 }

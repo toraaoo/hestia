@@ -33,11 +33,10 @@ pub const DAEMON_BIN: &[&str] = &["hestiad.exe"];
 #[cfg(not(windows))]
 pub const DAEMON_BIN: &[&str] = &["hestiad"];
 
-/// The release manifest every front-end checks for a newer version, and the
-/// minisign public key its artifacts are verified against. Both must match
-/// `plugins.updater` in `crates/desktop/tauri.conf.json` — the desktop shell
-/// reads them from there through `tauri-plugin-updater`, and
-/// `crates/common/tests/updater.rs` fails the build when the two disagree.
+/// The release manifest the daemon checks for a newer version, and the minisign
+/// public key its artifacts are verified against. Every front-end reaches this
+/// through `update.check`, so these two constants are the only place either is
+/// written down.
 pub const UPDATE_ENDPOINT: &str =
     "https://github.com/toraaoo/hestia/releases/latest/download/latest.json";
 pub const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJDNjM3NzcxQUEwRTdDQUQKUldTdGZBNnFjWGRqTERoaEIzaXFJcU1ZdU1YdXBVUk16cFdGVFQzYmZtT3ZVRC9mbjdYU0dOQlkK";
@@ -48,9 +47,6 @@ pub const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyB
 /// the same session as [`UPDATE_PUBKEY`], keep its private half offline and
 /// apart from the signing key, and start signing with it only once the builds
 /// that trust it are the ones in the field.
-///
-/// Only the daemon and CLI honour it ([`update_pubkeys`]); the desktop shell
-/// verifies through `tauri-plugin-updater`, whose config holds exactly one key.
 pub const UPDATE_PUBKEY_NEXT: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEQzQxRUVGQkU3M0UyRjkKUldUNTRuTys3eDdFelFCQXM2R21VbTN2RjljYTRpSGZOOURCclhxdGJuR0JNZlpwWEJCOHVaazQK";
 
 /// Every key a release artifact may be signed with, newest last. Empty slots

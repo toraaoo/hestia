@@ -25,6 +25,13 @@ fn layout_root(dir: &Path) -> &Path {
     }
 }
 
+/// The layout root of the running build — the directory a shipped install is
+/// rooted at, stepping out of `bin/` when that is where this binary sits.
+pub fn install_root() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    Some(layout_root(exe.parent()?).to_path_buf())
+}
+
 /// Locate another binary of this build: beside the running one, at the layout
 /// root, or in the root's `bin/`. `names` are tried in order.
 pub fn sibling_binary(names: &[&str]) -> Option<PathBuf> {
