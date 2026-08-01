@@ -1,6 +1,6 @@
 import { PlayIcon, PowerIcon, PushPinIcon } from '@phosphor-icons/react';
 import { createLink } from '@tanstack/react-router';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 
 import type { ProcessInfo } from '@/api';
 import { entryIcon } from '@/components/icons';
@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
 import { EntryRunControl } from '@/features/shared/entry/components';
-import { layoutMorph, listItem } from '@/lib/motion';
+import { duration, layoutMorph, listItem } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { usePinned } from '@/queries/pinned';
@@ -184,6 +184,16 @@ function ActionButton({
   );
 }
 
+const iconTransition = {
+  layout: layoutMorph,
+  opacity: { duration: duration.fast },
+};
+const metaTransition = {
+  layout: layoutMorph,
+  opacity: { duration: duration.fast },
+  height: { duration: duration.fast },
+};
+
 export function EntryTile({
   entry,
   view,
@@ -204,9 +214,9 @@ export function EntryTile({
       to={detailTo(entry.kind)}
       params={{ id: entry.id }}
       className={cn(
-        'group relative flex outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        'group relative flex overflow-hidden outline-none focus-visible:ring-1 focus-visible:ring-ring',
         grid
-          ? 'flex-col overflow-hidden border border-border bg-card transition-colors hover:border-ember/40'
+          ? 'flex-col border border-border bg-card transition-colors hover:border-ember/40'
           : 'items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40 focus-visible:ring-inset',
       )}
     >
@@ -220,34 +230,69 @@ export function EntryTile({
             : 'size-9 bg-muted ring-1 ring-border',
         )}
       >
-        {entry.iconUrl ? (
-          <img src={entry.iconUrl} alt="" className="size-full object-cover" />
-        ) : (
-          <Icon
-            className={cn(
-              'text-muted-foreground',
-              grid ? 'size-9 opacity-40' : 'size-4.5',
-            )}
-          />
-        )}
+        <AnimatePresence mode="wait" initial={false}>
+          {entry.iconUrl ? (
+            <motion.img
+              key="img"
+              layout
+              src={entry.iconUrl}
+              alt=""
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={iconTransition}
+              className="size-full object-cover"
+            />
+          ) : (
+            <motion.div
+              key="icon"
+              layout
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={iconTransition}
+            >
+              <Icon
+                className={cn(
+                  'text-muted-foreground',
+                  grid ? 'size-9 opacity-40' : 'size-4.5',
+                )}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
+      {/* Text block: position-only. Glyphs must never be scaled, and this
+          box's own size change isn't worth animating. */}
       <motion.div
-        layout
+        layout="position"
         transition={layoutMorph}
         className={cn('min-w-0', grid ? 'w-full space-y-2 p-3' : 'flex-1')}
       >
         <span className="block truncate text-sm font-medium">{entry.name}</span>
-        {grid && (
-          <div className="flex items-center gap-1.5">
-            <Badge variant="secondary" className="uppercase">
-              {entry.flavor}
-            </Badge>
-            <Badge variant="outline" className="font-mono">
-              {entry.version}
-            </Badge>
-          </div>
-        )}
+
+        <AnimatePresence initial={false}>
+          {grid && (
+            <motion.div
+              key="meta"
+              layout="position"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={metaTransition}
+              className="flex items-center gap-1.5 overflow-hidden"
+            >
+              <Badge variant="secondary" className="uppercase">
+                {entry.flavor}
+              </Badge>
+              <Badge variant="outline" className="font-mono">
+                {entry.version}
+              </Badge>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <span className="block truncate font-mono text-[11px] text-muted-foreground">
           {grid
             ? entry.subtitle
@@ -257,7 +302,7 @@ export function EntryTile({
 
       {status && (
         <motion.div
-          layout
+          layout="position"
           transition={layoutMorph}
           className={cn(grid && 'absolute top-2 left-2')}
         >
@@ -266,7 +311,7 @@ export function EntryTile({
       )}
 
       <motion.div
-        layout
+        layout="position"
         transition={layoutMorph}
         className={cn(grid && 'absolute top-2 right-2')}
       >
@@ -274,7 +319,7 @@ export function EntryTile({
       </motion.div>
 
       <motion.div
-        layout
+        layout="position"
         transition={layoutMorph}
         className={cn(
           grid &&
