@@ -6,7 +6,7 @@ import { devtools } from '@tanstack/devtools-vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 
 import viteReact from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 // Tauri drives the frontend: it opens a webview at `server` in dev and bundles
 // the static `build.outDir` (dist) in release. There is no Node server at
@@ -26,12 +26,37 @@ const config = defineConfig({
     tailwindcss(),
   ],
 
+  build: {
+    rolldownOptions: {
+      output: {
+        advancedChunks: {
+          groups: [
+            {
+              name: 'three-core',
+              test: /[\\/]node_modules[\\/]three[\\/]build[\\/]three\.core\.js/,
+            },
+            {
+              name: 'three',
+              test: /[\\/]node_modules[\\/]three[\\/]build[\\/]three\.module\.js/,
+            },
+          ],
+        },
+      },
+    },
+  },
+
   // `@/*` and `#/*` map to `src/*` (mirrors tsconfig paths + components.json).
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '#': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
+
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./tests/setup.ts'],
+    restoreMocks: true,
   },
 
   // Tauri expects a fixed port (tauri.conf.json `devUrl`) and its own console.

@@ -334,7 +334,7 @@ export function InstanceDetailPage({
                 kind="instance"
                 id={instance.id}
                 name={instance.name}
-                running={!!live}
+                running={running}
               />
               <SideCard title={m['entry.quick_actions']()}>
                 <div className="flex flex-col gap-1">
