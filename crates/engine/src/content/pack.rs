@@ -182,13 +182,7 @@ impl Archive {
         let mut written = Vec::new();
         for (done, (index, relative)) in planned.into_iter().enumerate() {
             job.check()?;
-            job.report(&proto::minecraft::ProvisionProgress {
-                phase: proto::minecraft::ProvisionPhase::Overrides,
-                current: done as u64,
-                total,
-                detail: relative.clone(),
-                ..Default::default()
-            });
+            overrides_tick(job, done as u64, total, &relative);
             if !keep(&relative) {
                 continue;
             }
@@ -199,6 +193,7 @@ impl Archive {
                 sha1,
             });
         }
+        overrides_tick(job, total, total, "");
         Ok(written)
     }
 
@@ -256,6 +251,16 @@ fn detect(zip: &mut zip::ZipArchive<Cursor<Vec<u8>>>) -> Format {
         _ => DEFAULT_OVERRIDES.to_string(),
     };
     Format::CurseForge { overrides }
+}
+
+fn overrides_tick(job: &Job, current: u64, total: u64, detail: &str) {
+    job.report(&proto::minecraft::ProvisionProgress {
+        phase: proto::minecraft::ProvisionPhase::Overrides,
+        current,
+        total,
+        detail: detail.to_string(),
+        ..Default::default()
+    });
 }
 
 fn temp_path(target: &Path) -> PathBuf {
@@ -506,6 +511,29 @@ mod tests {
         archive
             .extract_overrides(side, dest, &job, |_| true)
             .unwrap()
+    }
+
+    #[test]
+    fn the_last_tick_reports_the_whole_batch_done() {
+        let mut pack = archive(&[
+            ("modrinth.index.json", "{}"),
+            ("overrides/config/a.toml", "a"),
+            ("overrides/config/b.toml", "b"),
+        ]);
+        let dest_dir = temp("ticks");
+        let cancel = crate::cancel::Cancel::new();
+        let seen = std::sync::Mutex::new(Vec::new());
+        let record = |p: &proto::minecraft::ProvisionProgress| {
+            seen.lock().unwrap().push((p.current, p.total));
+        };
+        let job = Job::new(&record, &cancel);
+
+        pack.extract_overrides(Side::Client, dest_dir.path(), &job, |_| true)
+            .unwrap();
+
+        let seen = seen.into_inner().unwrap();
+        assert_eq!(seen.first(), Some(&(0, 2)));
+        assert_eq!(seen.last(), Some(&(2, 2)));
     }
 
     #[test]
