@@ -41,8 +41,8 @@ pub use content::provider::{ContentProvider, UrlRef};
 pub use content::Content;
 pub use download::Downloader;
 pub use engine::{
-    Engine, ExportOutcome, ImportOutcome, LaunchRequest, ModpackOutcome, ServerCreateSpec,
-    ServerListWrite, ServerUpdateSpec,
+    Engine, EntryRef, ExportOutcome, ImportOutcome, LaunchRequest, ModpackOutcome,
+    ServerCreateSpec, ServerListWrite, ServerUpdateSpec,
 };
 pub use error::error_info;
 pub use instances::{InstanceRecord, Instances};

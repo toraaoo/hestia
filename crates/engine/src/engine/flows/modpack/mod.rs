@@ -30,7 +30,7 @@ use proto::error::{EntryKind, ErrorInfo};
 use proto::modpack::{InstalledModpack, ModpackRef, ModpackRemoveResult, ModpackTarget};
 use proto::warning::WarningInfo;
 
-use super::content::entry::{EntryContent, EntrySide};
+use super::content::entry::{EntryContent, EntryRef, EntrySide};
 use crate::cancel::Job;
 use crate::content::provider::FileRef;
 use crate::content::{install, modpack, pack};
@@ -95,7 +95,13 @@ impl Engine {
         };
 
         let outcome = self
-            .apply_to_instance(&entry, &resolved, project.as_ref(), &mut archive, job)
+            .apply_to(
+                EntryRef::Instance(&entry),
+                &resolved,
+                project.as_ref(),
+                &mut archive,
+                job,
+            )
             .await;
         if outcome.is_err() && matches!(target, ModpackTarget::Create { .. }) {
             // A create that could not be filled leaves nothing, exactly as a
@@ -141,7 +147,13 @@ impl Engine {
         };
 
         let outcome = self
-            .apply_to_server(&entry, &resolved, project.as_ref(), &mut archive, job)
+            .apply_to(
+                EntryRef::Server(&entry),
+                &resolved,
+                project.as_ref(),
+                &mut archive,
+                job,
+            )
             .await;
         if outcome.is_err() && matches!(target, ModpackTarget::Create { .. }) {
             let _ = self.servers.remove(&entry);
@@ -153,119 +165,100 @@ impl Engine {
     /// carries the game version with it — that is what updating a pack means —
     /// so the entry's own version moves too, behind the same downgrade gate the
     /// plain version update uses.
-    pub async fn update_instance_modpack(
+    pub async fn update_entry_modpack(
         &self,
-        reference: &str,
+        target: EntryRef<'_>,
         version: &str,
         allow_downgrade: bool,
         job: &Job<'_>,
     ) -> Result<ModpackOutcome> {
-        let (record, ctx) = self.instance_content_ctx(reference)?;
-        let current = require_pack(&ctx, EntryKind::Instance, &record.name)?;
+        let (entry, ctx) = self.content_ctx(target)?;
+        let current = require_pack(&ctx, entry_kind(target), &entry.name)?;
         let (resolved, project, mut archive) = self.fetch_update(&current, version, job).await?;
 
-        if resolved.game_version != record.profile.game_version {
-            self.update_instance(
-                &record.id,
-                &resolved.game_version,
-                resolved.loader_version.clone(),
-                allow_downgrade,
-            )
-            .await?;
+        // A pack that moved game version carries its entry with it, through the
+        // same in-place update a plain version change uses.
+        if resolved.game_version != entry.game_version {
+            match target {
+                EntryRef::Instance(_) => {
+                    self.update_instance(
+                        &entry.id,
+                        &resolved.game_version,
+                        resolved.loader_version.clone(),
+                        allow_downgrade,
+                    )
+                    .await?;
+                }
+                EntryRef::Server(_) => {
+                    self.update_server(
+                        ServerUpdateSpec {
+                            server: entry.id.clone(),
+                            version: resolved.game_version.clone(),
+                            loader_version: resolved.loader_version.clone(),
+                            allow_downgrade,
+                        },
+                        job,
+                    )
+                    .await?;
+                }
+            }
         }
-        self.apply_to_instance(&record.id, &resolved, project.as_ref(), &mut archive, job)
-            .await
+        self.apply_to(
+            same_entry(target, &entry.id),
+            &resolved,
+            project.as_ref(),
+            &mut archive,
+            job,
+        )
+        .await
     }
 
-    pub async fn update_server_modpack(
-        &self,
-        reference: &str,
-        version: &str,
-        allow_downgrade: bool,
-        job: &Job<'_>,
-    ) -> Result<ModpackOutcome> {
-        let (record, ctx) = self.server_content_ctx(reference)?;
-        let current = require_pack(&ctx, EntryKind::Server, &record.name)?;
-        let (resolved, project, mut archive) = self.fetch_update(&current, version, job).await?;
-
-        if resolved.game_version != record.profile.game_version {
-            self.update_server(
-                ServerUpdateSpec {
-                    server: record.id.clone(),
-                    version: resolved.game_version.clone(),
-                    loader_version: resolved.loader_version.clone(),
-                    allow_downgrade,
-                },
-                job,
-            )
-            .await?;
-        }
-        self.apply_to_server(&record.id, &resolved, project.as_ref(), &mut archive, job)
-            .await
-    }
-
-    pub fn instance_modpack(&self, reference: &str) -> Result<Option<InstalledModpack>> {
-        let (_, ctx) = self.instance_content_ctx(reference)?;
+    pub fn entry_modpack(&self, entry: EntryRef<'_>) -> Result<Option<InstalledModpack>> {
+        let (_, ctx) = self.content_ctx(entry)?;
         Ok(modpack::load(&ctx.entry_dir))
     }
 
-    pub fn server_modpack(&self, reference: &str) -> Result<Option<InstalledModpack>> {
-        let (_, ctx) = self.server_content_ctx(reference)?;
-        Ok(modpack::load(&ctx.entry_dir))
-    }
-
-    pub fn remove_instance_modpack(&self, reference: &str) -> Result<ModpackRemoveResult> {
-        let (record, ctx) = self.instance_content_ctx(reference)?;
-        let pack = require_pack(&ctx, EntryKind::Instance, &record.name)?;
+    pub fn remove_entry_modpack(&self, target: EntryRef<'_>) -> Result<ModpackRemoveResult> {
+        let (entry, ctx) = self.content_ctx(target)?;
+        let pack = require_pack(&ctx, entry_kind(target), &entry.name)?;
         remove_pack(&ctx, &pack)
     }
 
-    pub fn remove_server_modpack(&self, reference: &str) -> Result<ModpackRemoveResult> {
-        let (record, ctx) = self.server_content_ctx(reference)?;
-        let pack = require_pack(&ctx, EntryKind::Server, &record.name)?;
-        remove_pack(&ctx, &pack)
-    }
-
-    async fn apply_to_instance(
+    async fn apply_to(
         &self,
-        reference: &str,
+        target: EntryRef<'_>,
         resolved: &ResolvedModpack,
         project: Option<&ContentProject>,
         archive: &mut pack::Archive,
         job: &Job<'_>,
     ) -> Result<ModpackOutcome> {
-        let (record, ctx) = self.instance_content_ctx(reference)?;
+        let (entry, ctx) = self.content_ctx(target)?;
         let (pack, failures, warnings) = self
             .apply_pack(&ctx, resolved, project, archive, job)
             .await?;
         Ok(ModpackOutcome {
-            entry: record.id,
-            entry_name: record.name,
+            entry: entry.id,
+            entry_name: entry.name,
             pack,
             failures,
             warnings,
         })
     }
+}
 
-    async fn apply_to_server(
-        &self,
-        reference: &str,
-        resolved: &ResolvedModpack,
-        project: Option<&ContentProject>,
-        archive: &mut pack::Archive,
-        job: &Job<'_>,
-    ) -> Result<ModpackOutcome> {
-        let (record, ctx) = self.server_content_ctx(reference)?;
-        let (pack, failures, warnings) = self
-            .apply_pack(&ctx, resolved, project, archive, job)
-            .await?;
-        Ok(ModpackOutcome {
-            entry: record.id,
-            entry_name: record.name,
-            pack,
-            failures,
-            warnings,
-        })
+fn entry_kind(entry: EntryRef<'_>) -> EntryKind {
+    match entry {
+        EntryRef::Server(_) => EntryKind::Server,
+        EntryRef::Instance(_) => EntryKind::Instance,
+    }
+}
+
+/// The same side, named by id — an entry resolved by name is re-resolved by the
+/// id it turned out to have.
+fn same_entry<'a>(entry: EntryRef<'_>, id: &'a str) -> EntryRef<'a> {
+    match entry {
+        EntryRef::Server(_) => EntryRef::Server(id),
+        EntryRef::Instance(_) => EntryRef::Instance(id),
     }
 }
 

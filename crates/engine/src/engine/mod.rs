@@ -7,7 +7,9 @@
 
 mod flows;
 
-pub use flows::{ExportOutcome, ImportOutcome, LaunchRequest, ModpackOutcome, ServerListWrite};
+pub use flows::{
+    EntryRef, ExportOutcome, ImportOutcome, LaunchRequest, ModpackOutcome, ServerListWrite,
+};
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};

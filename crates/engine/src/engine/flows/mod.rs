@@ -5,6 +5,7 @@
 mod announce;
 mod backup;
 mod content;
+pub use content::entry::EntryRef;
 mod flavors;
 mod instance;
 

@@ -10,6 +10,22 @@ use proto::content::{ContentAddSpec, ContentKind, ContentProject, SideSupport};
 use crate::content::install;
 use crate::engine::Engine;
 
+/// Which entry a content or pack flow is about. The side is a value the flow
+/// matches on, not a verb it duplicates.
+#[derive(Clone, Copy)]
+pub enum EntryRef<'a> {
+    Server(&'a str),
+    Instance(&'a str),
+}
+
+/// What every content and pack flow needs of the entry itself, whichever side
+/// it came from.
+pub struct Entry {
+    pub id: String,
+    pub name: String,
+    pub game_version: String,
+}
+
 /// The entry-shape a content operation needs, independent of whether the entry
 /// is a server or an instance.
 pub(in crate::engine::flows) struct EntryContent {

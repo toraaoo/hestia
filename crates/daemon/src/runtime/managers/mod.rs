@@ -14,7 +14,7 @@ mod transfer;
 mod update;
 
 pub use backup::{BackupJob, BackupManager};
-pub use content::{ContentJob, ContentManager};
+pub use content::{ContentJob, ContentManager, Entry as JobEntry};
 pub use download::DownloadManager;
 pub use instance::{InstanceLaunchManager, LaunchOrder};
 pub use java::JavaInstallManager;

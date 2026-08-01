@@ -2,14 +2,14 @@
 //! URL, or a local file; list, remove, and update what is installed. The managed
 //! directory under the entry root is the source of truth; `data/` holds a mirror.
 //!
-//! This module is the seam between the two sides and the work: every verb has a
-//! `server_*` and an `instance_*` form that resolves its entry into one
-//! [`entry::EntryContent`] and hands off. The work lives beside it — [`entry`]
-//! for what an entry is and accepts, [`add`] for installing, [`manage`] for
-//! everything already installed.
+//! This module is the seam between the two sides and the work: one verb each,
+//! taking an [`entry::EntryRef`] that resolves into one [`entry::EntryContent`]
+//! whichever side it names. The work lives beside it — [`entry`] for what an
+//! entry is and accepts, [`add`] for installing, [`manage`] for everything
+//! already installed.
 
 mod add;
-pub(super) mod entry;
+pub(crate) mod entry;
 mod manage;
 
 use anyhow::{bail, Context, Result};
@@ -17,61 +17,37 @@ use proto::content::{
     ContentAddSpec, ContentFailure, ContentKind, InstalledContent, UntrackedFile,
 };
 
-use self::entry::{EntryContent, EntrySide};
+use self::entry::{Entry, EntryContent, EntryRef, EntrySide};
 use self::manage::{list_content, remove_content, set_enabled};
 use super::phase_progress;
 use crate::content::{install, profiles};
 use crate::engine::Engine;
-use crate::instances::InstanceRecord;
 use crate::minecraft::materialize::OnProgress;
-use crate::servers::ServerRecord;
 
 impl Engine {
-    /// Install a batch of content into a server — each item a platform project,
+    /// Install a batch of content into an entry — each item a platform project,
     /// a direct URL, or a local file. Returns everything installed (items plus
     /// required dependencies) and, per item that could not be installed, a
     /// failure; the batch continues past them.
-    pub async fn add_server_content(
+    pub async fn add_entry_content(
         &self,
-        reference: &str,
+        entry: EntryRef<'_>,
         spec: &ContentAddSpec,
         on_progress: OnProgress<'_>,
     ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
-        let (_, ctx) = self.server_content_ctx(reference)?;
+        let (_, ctx) = self.content_ctx(entry)?;
         self.ensure_accepts(&ctx, spec.kind)?;
         self.add_content(&ctx, spec, on_progress).await
     }
 
-    /// Install a batch of content into an instance (mods, resourcepacks,
-    /// shaders, datapacks).
-    pub async fn add_instance_content(
-        &self,
-        reference: &str,
-        spec: &ContentAddSpec,
-        on_progress: OnProgress<'_>,
-    ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>)> {
-        let (_, ctx) = self.instance_content_ctx(reference)?;
-        self.ensure_accepts(&ctx, spec.kind)?;
-        self.add_content(&ctx, spec, on_progress).await
-    }
-
-    /// A server's installed items of one kind, plus untracked filenames found
+    /// An entry's installed items of one kind, plus untracked filenames found
     /// in its game directory.
-    pub fn server_content(
+    pub fn entry_content(
         &self,
-        reference: &str,
+        entry: EntryRef<'_>,
         kind: ContentKind,
     ) -> Result<(Vec<InstalledContent>, Vec<UntrackedFile>)> {
-        let (_, ctx) = self.server_content_ctx(reference)?;
-        Ok(list_content(&ctx, kind))
-    }
-
-    pub fn instance_content(
-        &self,
-        reference: &str,
-        kind: ContentKind,
-    ) -> Result<(Vec<InstalledContent>, Vec<UntrackedFile>)> {
-        let (_, ctx) = self.instance_content_ctx(reference)?;
+        let (_, ctx) = self.content_ctx(entry)?;
         Ok(list_content(&ctx, kind))
     }
 
@@ -79,25 +55,14 @@ impl Engine {
     /// its managed copy and every mirror of it. A non-empty `worlds` instead
     /// narrows a datapack to the worlds it keeps loading in. False when nothing
     /// matches.
-    pub fn remove_server_content(
+    pub fn remove_entry_content(
         &self,
-        reference: &str,
+        entry: EntryRef<'_>,
         kind: ContentKind,
         item: &str,
         worlds: &[String],
     ) -> Result<bool> {
-        let (_, ctx) = self.server_content_ctx(reference)?;
-        Ok(!remove_content(&ctx, kind, item, worlds)?.is_empty())
-    }
-
-    pub fn remove_instance_content(
-        &self,
-        reference: &str,
-        kind: ContentKind,
-        item: &str,
-        worlds: &[String],
-    ) -> Result<bool> {
-        let (_, ctx) = self.instance_content_ctx(reference)?;
+        let (_, ctx) = self.content_ctx(entry)?;
         // Content something else installed is owned by that thing: removing it
         // locally would silently reappear at the next apply or pack update, so
         // the removal is refused (there is no local-exclusion mechanism) and the
@@ -113,45 +78,38 @@ impl Engine {
             );
         }
         let removed = remove_content(&ctx, kind, item, worlds)?;
-        let gone: Vec<String> = removed
-            .iter()
-            .filter(|i| profiles::selectable(i.kind))
-            .map(|i| i.filename.clone())
-            .collect();
-        profiles::prune(&ctx.entry_dir, &gone)?;
+        // Content profiles are an instance concern, so only that side has
+        // selections to prune.
+        if ctx.side == EntrySide::Client {
+            let gone: Vec<String> = removed
+                .iter()
+                .filter(|i| profiles::selectable(i.kind))
+                .map(|i| i.filename.clone())
+                .collect();
+            profiles::prune(&ctx.entry_dir, &gone)?;
+        }
         Ok(!removed.is_empty())
     }
 
     /// Move platform-sourced items to their newest compatible version — one
     /// named item, or every item of the kind when `item` is empty. Returns
     /// what actually changed.
-    pub async fn update_server_content(
+    pub async fn update_entry_content(
         &self,
-        reference: &str,
+        entry: EntryRef<'_>,
         kind: ContentKind,
         item: &str,
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
-        let (_, ctx) = self.server_content_ctx(reference)?;
-        self.update_content(&ctx, kind, item, "", on_progress).await
-    }
-
-    pub async fn update_instance_content(
-        &self,
-        reference: &str,
-        kind: ContentKind,
-        item: &str,
-        on_progress: OnProgress<'_>,
-    ) -> Result<Vec<InstalledContent>> {
-        self.change_instance_version(reference, kind, item, "", on_progress)
+        self.change_version(entry, kind, item, "", on_progress)
             .await
     }
 
     /// Re-pin one named platform item to a specific published `version` (id or
     /// number), re-installing that version like an update.
-    pub async fn set_server_content_version(
+    pub async fn set_entry_content_version(
         &self,
-        reference: &str,
+        entry: EntryRef<'_>,
         kind: ContentKind,
         item: &str,
         version: &str,
@@ -162,50 +120,34 @@ impl Engine {
                 fields: vec![proto::error::Field::Item, proto::error::Field::Version]
             });
         }
-        let (_, ctx) = self.server_content_ctx(reference)?;
-        self.update_content(&ctx, kind, item, version, on_progress)
+        self.change_version(entry, kind, item, version, on_progress)
             .await
     }
 
-    pub async fn set_instance_content_version(
+    /// The version-change path shared by update (empty pin) and set-version
+    /// (explicit pin): apply the change, then follow each item's filename move
+    /// in every content profile.
+    async fn change_version(
         &self,
-        reference: &str,
-        kind: ContentKind,
-        item: &str,
-        version: &str,
-        on_progress: OnProgress<'_>,
-    ) -> Result<Vec<InstalledContent>> {
-        if item.is_empty() || version.is_empty() {
-            bail!(proto::error::ErrorInfo::FieldsRequired {
-                fields: vec![proto::error::Field::Item, proto::error::Field::Version]
-            });
-        }
-        self.change_instance_version(reference, kind, item, version, on_progress)
-            .await
-    }
-
-    /// The instance version-change path shared by update (empty pin) and
-    /// set-version (explicit pin): apply the change, then follow each item's
-    /// filename move in every content profile.
-    async fn change_instance_version(
-        &self,
-        reference: &str,
+        entry: EntryRef<'_>,
         kind: ContentKind,
         item: &str,
         pin: &str,
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
-        let (_, ctx) = self.instance_content_ctx(reference)?;
+        let (_, ctx) = self.content_ctx(entry)?;
         let before = install::load(&ctx.entry_dir);
         let updated = self
             .update_content(&ctx, kind, item, pin, on_progress)
             .await?;
-        for new_item in &updated {
-            let old = before
-                .iter()
-                .find(|i| i.kind == new_item.kind && i.project_id == new_item.project_id);
-            if let Some(old) = old {
-                profiles::remap(&ctx.entry_dir, &old.filename, &new_item.filename)?;
+        if ctx.side == EntrySide::Client {
+            for new_item in &updated {
+                let old = before
+                    .iter()
+                    .find(|i| i.kind == new_item.kind && i.project_id == new_item.project_id);
+                if let Some(old) = old {
+                    profiles::remap(&ctx.entry_dir, &old.filename, &new_item.filename)?;
+                }
             }
         }
         Ok(updated)
@@ -215,90 +157,85 @@ impl Engine {
     /// scopes a datapack toggle to those save worlds. Returns the number of
     /// matched entries — zero means nothing matched. The entry must be stopped
     /// (enforced at the service boundary).
-    pub fn enable_server_content(
+    pub fn enable_entry_content(
         &self,
-        reference: &str,
+        entry: EntryRef<'_>,
         kind: ContentKind,
         item: &str,
         enabled: bool,
         worlds: &[String],
     ) -> Result<usize> {
-        let (_, ctx) = self.server_content_ctx(reference)?;
-        set_enabled(&ctx, kind, item, enabled, worlds)
-    }
-
-    pub fn enable_instance_content(
-        &self,
-        reference: &str,
-        kind: ContentKind,
-        item: &str,
-        enabled: bool,
-        worlds: &[String],
-    ) -> Result<usize> {
-        let (_, ctx) = self.instance_content_ctx(reference)?;
+        let (_, ctx) = self.content_ctx(entry)?;
         set_enabled(&ctx, kind, item, enabled, worlds)
     }
 
     /// For each platform-sourced item of the kind, resolve the newest
     /// compatible version and report whether it differs from the current pin.
     /// An item whose versions cannot be resolved is skipped, not fatal.
-    pub async fn check_server_updates(
+    pub async fn check_entry_updates(
         &self,
-        reference: &str,
+        entry: EntryRef<'_>,
         kind: ContentKind,
     ) -> Result<Vec<proto::content::ContentUpdate>> {
-        let (_, ctx) = self.server_content_ctx(reference)?;
+        let (_, ctx) = self.content_ctx(entry)?;
         self.content_updates(&ctx, kind).await
     }
 
-    pub async fn check_instance_updates(
+    /// Resolve an entry into the shape every content and pack flow works
+    /// against. The one place the two sides are told apart.
+    pub(in crate::engine::flows) fn content_ctx(
         &self,
-        reference: &str,
-        kind: ContentKind,
-    ) -> Result<Vec<proto::content::ContentUpdate>> {
-        let (_, ctx) = self.instance_content_ctx(reference)?;
-        self.content_updates(&ctx, kind).await
-    }
-
-    pub(super) fn server_content_ctx(
-        &self,
-        reference: &str,
-    ) -> Result<(ServerRecord, EntryContent)> {
-        let record = self
-            .servers
-            .get(reference)
-            .with_context(|| format!("unknown server: {reference}"))?;
-        if !record.ready() {
-            bail!(proto::error::ErrorInfo::Provisioning {
-                name: record.name.clone()
-            });
+        entry: EntryRef<'_>,
+    ) -> Result<(Entry, EntryContent)> {
+        match entry {
+            EntryRef::Server(reference) => {
+                let record = self
+                    .servers
+                    .get(reference)
+                    .with_context(|| format!("unknown server: {reference}"))?;
+                if !record.ready() {
+                    bail!(proto::error::ErrorInfo::Provisioning {
+                        name: record.name.clone()
+                    });
+                }
+                let ctx = EntryContent {
+                    entry_dir: self.servers.server_dir(&record),
+                    data_dir: self.servers.data_dir(&record),
+                    game_version: record.profile.game_version.clone(),
+                    flavor: record.profile.flavor.clone(),
+                    side: EntrySide::Server,
+                };
+                Ok((
+                    Entry {
+                        id: record.id,
+                        name: record.name,
+                        game_version: record.profile.game_version,
+                    },
+                    ctx,
+                ))
+            }
+            EntryRef::Instance(reference) => {
+                let record = self
+                    .instances
+                    .get(reference)
+                    .with_context(|| format!("unknown instance: {reference}"))?;
+                let ctx = EntryContent {
+                    entry_dir: self.instances.instance_dir(&record),
+                    data_dir: self.instances.data_dir(&record),
+                    game_version: record.profile.game_version.clone(),
+                    flavor: record.profile.flavor.clone(),
+                    side: EntrySide::Client,
+                };
+                Ok((
+                    Entry {
+                        id: record.id,
+                        name: record.name,
+                        game_version: record.profile.game_version,
+                    },
+                    ctx,
+                ))
+            }
         }
-        let ctx = EntryContent {
-            entry_dir: self.servers.server_dir(&record),
-            data_dir: self.servers.data_dir(&record),
-            game_version: record.profile.game_version.clone(),
-            flavor: record.profile.flavor.clone(),
-            side: EntrySide::Server,
-        };
-        Ok((record, ctx))
-    }
-
-    pub(super) fn instance_content_ctx(
-        &self,
-        reference: &str,
-    ) -> Result<(InstanceRecord, EntryContent)> {
-        let record = self
-            .instances
-            .get(reference)
-            .with_context(|| format!("unknown instance: {reference}"))?;
-        let ctx = EntryContent {
-            entry_dir: self.instances.instance_dir(&record),
-            data_dir: self.instances.data_dir(&record),
-            game_version: record.profile.game_version.clone(),
-            flavor: record.profile.flavor.clone(),
-            side: EntrySide::Client,
-        };
-        Ok((record, ctx))
     }
 }
 

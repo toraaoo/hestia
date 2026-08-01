@@ -93,7 +93,12 @@ impl ModpackJob {
                 allow_downgrade,
             } => {
                 engine
-                    .update_instance_modpack(&instance_id, &version, allow_downgrade, on_progress)
+                    .update_entry_modpack(
+                        engine::EntryRef::Instance(&instance_id),
+                        &version,
+                        allow_downgrade,
+                        on_progress,
+                    )
                     .await
             }
             ModpackJob::UpdateServer {
@@ -102,7 +107,12 @@ impl ModpackJob {
                 allow_downgrade,
             } => {
                 engine
-                    .update_server_modpack(&server_id, &version, allow_downgrade, on_progress)
+                    .update_entry_modpack(
+                        engine::EntryRef::Server(&server_id),
+                        &version,
+                        allow_downgrade,
+                        on_progress,
+                    )
                     .await
             }
         }

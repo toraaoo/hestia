@@ -5,41 +5,27 @@ use proto::content::{
     ContentAddSpec, ContentCancelledEvent, ContentDoneEvent, ContentErrorEvent, ContentFailure,
     ContentKind, ContentProgressEvent, InstalledContent,
 };
+use proto::error::EntryKind;
 use proto::minecraft::ProvisionProgress;
 
 use super::job::{progress_event, settle, Cancellations, Runner, Spec};
 use crate::runtime::{instance_process_id, server_process_id, EventHub};
 
 /// One content install or update for one entry — what `ContentManager::start`
-/// runs off-thread.
+/// runs off-thread. The side is a field, not a second copy of every verb.
 pub enum ContentJob {
-    ServerAdd {
-        server_id: String,
+    Add {
+        entry: Entry,
         spec: ContentAddSpec,
     },
-    InstanceAdd {
-        instance_id: String,
-        spec: ContentAddSpec,
-    },
-    ServerUpdate {
-        server_id: String,
-        kind: ContentKind,
-        item: String,
-    },
-    InstanceUpdate {
-        instance_id: String,
+    Update {
+        entry: Entry,
         kind: ContentKind,
         item: String,
     },
     /// Re-pin one item to a specific published version.
-    ServerSetVersion {
-        server_id: String,
-        kind: ContentKind,
-        item: String,
-        version: String,
-    },
-    InstanceSetVersion {
-        instance_id: String,
+    SetVersion {
+        entry: Entry,
         kind: ContentKind,
         item: String,
         version: String,
@@ -51,6 +37,43 @@ pub enum ContentJob {
     },
 }
 
+/// Which entry a job is for, owned — the job outlives the request that asked
+/// for it, so it cannot borrow the reference.
+pub struct Entry {
+    pub kind: EntryKind,
+    pub id: String,
+}
+
+impl Entry {
+    pub fn server(id: String) -> Entry {
+        Entry {
+            kind: EntryKind::Server,
+            id,
+        }
+    }
+
+    pub fn instance(id: String) -> Entry {
+        Entry {
+            kind: EntryKind::Instance,
+            id,
+        }
+    }
+
+    fn as_ref(&self) -> engine::EntryRef<'_> {
+        match self.kind {
+            EntryKind::Server => engine::EntryRef::Server(&self.id),
+            EntryKind::Instance => engine::EntryRef::Instance(&self.id),
+        }
+    }
+
+    fn key(&self) -> String {
+        match self.kind {
+            EntryKind::Server => server_process_id(&self.id),
+            EntryKind::Instance => instance_process_id(&self.id),
+        }
+    }
+}
+
 type Installed = (Vec<InstalledContent>, Vec<ContentFailure>);
 
 impl ContentJob {
@@ -58,24 +81,27 @@ impl ContentJob {
     /// entry's process id like the backup jobs.
     fn key(&self) -> String {
         match self {
-            ContentJob::ServerAdd { server_id, .. }
-            | ContentJob::ServerUpdate { server_id, .. }
-            | ContentJob::ServerSetVersion { server_id, .. } => server_process_id(server_id),
-            ContentJob::InstanceAdd { instance_id, .. }
-            | ContentJob::InstanceUpdate { instance_id, .. }
-            | ContentJob::InstanceSetVersion { instance_id, .. }
-            | ContentJob::ProfileApply { instance_id, .. } => instance_process_id(instance_id),
+            ContentJob::Add { entry, .. }
+            | ContentJob::Update { entry, .. }
+            | ContentJob::SetVersion { entry, .. } => entry.key(),
+            ContentJob::ProfileApply { instance_id, .. } => instance_process_id(instance_id),
         }
     }
 
     fn id_prefix(&self) -> &'static str {
         match self {
-            ContentJob::ServerAdd { .. } => "server-content-add",
-            ContentJob::InstanceAdd { .. } => "instance-content-add",
-            ContentJob::ServerUpdate { .. } => "server-content-update",
-            ContentJob::InstanceUpdate { .. } => "instance-content-update",
-            ContentJob::ServerSetVersion { .. } => "server-content-set-version",
-            ContentJob::InstanceSetVersion { .. } => "instance-content-set-version",
+            ContentJob::Add { entry, .. } => match entry.kind {
+                EntryKind::Server => "server-content-add",
+                EntryKind::Instance => "instance-content-add",
+            },
+            ContentJob::Update { entry, .. } => match entry.kind {
+                EntryKind::Server => "server-content-update",
+                EntryKind::Instance => "instance-content-update",
+            },
+            ContentJob::SetVersion { entry, .. } => match entry.kind {
+                EntryKind::Server => "server-content-set-version",
+                EntryKind::Instance => "instance-content-set-version",
+            },
             ContentJob::ProfileApply { .. } => "profile-apply",
         }
     }
@@ -86,48 +112,22 @@ impl ContentJob {
         on_progress: &engine::Job<'_>,
     ) -> anyhow::Result<Installed> {
         match self {
-            ContentJob::ServerAdd { server_id, spec } => {
+            ContentJob::Add { entry, spec } => {
                 engine
-                    .add_server_content(&server_id, &spec, on_progress)
+                    .add_entry_content(entry.as_ref(), &spec, on_progress)
                     .await
             }
-            ContentJob::InstanceAdd { instance_id, spec } => {
-                engine
-                    .add_instance_content(&instance_id, &spec, on_progress)
-                    .await
-            }
-            ContentJob::ServerUpdate {
-                server_id,
-                kind,
-                item,
-            } => engine
-                .update_server_content(&server_id, kind, &item, on_progress)
+            ContentJob::Update { entry, kind, item } => engine
+                .update_entry_content(entry.as_ref(), kind, &item, on_progress)
                 .await
                 .map(|items| (items, Vec::new())),
-            ContentJob::InstanceUpdate {
-                instance_id,
-                kind,
-                item,
-            } => engine
-                .update_instance_content(&instance_id, kind, &item, on_progress)
-                .await
-                .map(|items| (items, Vec::new())),
-            ContentJob::ServerSetVersion {
-                server_id,
+            ContentJob::SetVersion {
+                entry,
                 kind,
                 item,
                 version,
             } => engine
-                .set_server_content_version(&server_id, kind, &item, &version, on_progress)
-                .await
-                .map(|items| (items, Vec::new())),
-            ContentJob::InstanceSetVersion {
-                instance_id,
-                kind,
-                item,
-                version,
-            } => engine
-                .set_instance_content_version(&instance_id, kind, &item, &version, on_progress)
+                .set_entry_content_version(entry.as_ref(), kind, &item, &version, on_progress)
                 .await
                 .map(|items| (items, Vec::new())),
             ContentJob::ProfileApply {

@@ -27,7 +27,7 @@ pub use engine::{ExitObserver, ProcessSupervisor, StartError};
 pub use event_hub::EventHub;
 pub use managers::{
     BackupJob, BackupManager, Cancellations, ContentJob, ContentManager, DownloadManager,
-    InstanceLaunchManager, JavaInstallManager, LaunchOrder, ModpackJob, ModpackManager,
+    InstanceLaunchManager, JavaInstallManager, JobEntry, LaunchOrder, ModpackJob, ModpackManager,
     ServerCreateManager, ServerUpdateManager, TransferJob, TransferManager, UpdateManager,
 };
 pub use metrics::spawn_metrics_sampler;

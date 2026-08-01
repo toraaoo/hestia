@@ -13,7 +13,7 @@ use proto::error::{ErrorInfo, Field};
 use proto::Empty;
 
 use super::guards::{instance_for, require_content_items, server_for, Intent};
-use crate::runtime::{Channels, ContentJob};
+use crate::runtime::{Channels, ContentJob, JobEntry};
 
 pub(super) fn register(on: &mut Channels<'_>) {
     register_sources(on);
@@ -106,8 +106,8 @@ fn register_server(on: &mut Channels<'_>) {
         require_content_items(&p.spec)?;
         let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
-            ContentJob::ServerAdd {
-                server_id: record.id,
+            ContentJob::Add {
+                entry: JobEntry::server(record.id),
                 spec: p.spec,
             },
             p.id,
@@ -124,7 +124,7 @@ fn register_server(on: &mut Channels<'_>) {
         let (items, untracked) = ctx
             .runtime
             .engine()
-            .server_content(&record.id, p.kind)
+            .entry_content(engine::EntryRef::Server(&record.id), p.kind)
             .map_err(crate::runtime::engine_error)?;
         Ok(ContentListResult { items, untracked })
     });
@@ -134,11 +134,12 @@ fn register_server(on: &mut Channels<'_>) {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
         let record = server_for(&ctx, &p.server, Intent::Mutate)?;
-        match ctx
-            .runtime
-            .engine()
-            .remove_server_content(&record.id, p.kind, &p.item, &p.worlds)
-        {
+        match ctx.runtime.engine().remove_entry_content(
+            engine::EntryRef::Server(&record.id),
+            p.kind,
+            &p.item,
+            &p.worlds,
+        ) {
             Ok(true) => Ok(Empty {}),
             Ok(false) => Err(ErrorInfo::ContentNotFound {
                 reference: p.item.clone(),
@@ -150,8 +151,8 @@ fn register_server(on: &mut Channels<'_>) {
     on.handle::<ServerContentUpdate, _, _>(|p, ctx| async move {
         let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
-            ContentJob::ServerUpdate {
-                server_id: record.id,
+            ContentJob::Update {
+                entry: JobEntry::server(record.id),
                 kind: p.kind,
                 item: p.item,
             },
@@ -169,11 +170,13 @@ fn register_server(on: &mut Channels<'_>) {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
         let record = server_for(&ctx, &p.server, Intent::Mutate)?;
-        match ctx
-            .runtime
-            .engine()
-            .enable_server_content(&record.id, p.kind, &p.item, p.enabled, &p.worlds)
-        {
+        match ctx.runtime.engine().enable_entry_content(
+            engine::EntryRef::Server(&record.id),
+            p.kind,
+            &p.item,
+            p.enabled,
+            &p.worlds,
+        ) {
             Ok(0) => Err(ErrorInfo::ContentNotFound {
                 reference: p.item.clone(),
             }),
@@ -187,7 +190,7 @@ fn register_server(on: &mut Channels<'_>) {
         let updates = ctx
             .runtime
             .engine()
-            .check_server_updates(&record.id, p.kind)
+            .check_entry_updates(engine::EntryRef::Server(&record.id), p.kind)
             .await
             .map_err(crate::runtime::engine_error)?;
         Ok(ContentUpdatesResult { updates })
@@ -201,8 +204,8 @@ fn register_server(on: &mut Channels<'_>) {
         }
         let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
-            ContentJob::ServerSetVersion {
-                server_id: record.id,
+            ContentJob::SetVersion {
+                entry: JobEntry::server(record.id),
                 kind: p.kind,
                 item: p.item,
                 version: p.version,
@@ -222,8 +225,8 @@ fn register_instance(on: &mut Channels<'_>) {
         require_content_items(&p.spec)?;
         let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
-            ContentJob::InstanceAdd {
-                instance_id: record.id,
+            ContentJob::Add {
+                entry: JobEntry::instance(record.id),
                 spec: p.spec,
             },
             p.id,
@@ -240,7 +243,7 @@ fn register_instance(on: &mut Channels<'_>) {
         let (items, untracked) = ctx
             .runtime
             .engine()
-            .instance_content(&record.id, p.kind)
+            .entry_content(engine::EntryRef::Instance(&record.id), p.kind)
             .map_err(crate::runtime::engine_error)?;
         Ok(ContentListResult { items, untracked })
     });
@@ -250,11 +253,12 @@ fn register_instance(on: &mut Channels<'_>) {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
         let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
-        match ctx
-            .runtime
-            .engine()
-            .remove_instance_content(&record.id, p.kind, &p.item, &p.worlds)
-        {
+        match ctx.runtime.engine().remove_entry_content(
+            engine::EntryRef::Instance(&record.id),
+            p.kind,
+            &p.item,
+            &p.worlds,
+        ) {
             Ok(true) => Ok(Empty {}),
             Ok(false) => Err(ErrorInfo::ContentNotFound {
                 reference: p.item.clone(),
@@ -266,8 +270,8 @@ fn register_instance(on: &mut Channels<'_>) {
     on.handle::<InstanceContentUpdate, _, _>(|p, ctx| async move {
         let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
-            ContentJob::InstanceUpdate {
-                instance_id: record.id,
+            ContentJob::Update {
+                entry: JobEntry::instance(record.id),
                 kind: p.kind,
                 item: p.item,
             },
@@ -285,11 +289,13 @@ fn register_instance(on: &mut Channels<'_>) {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
         let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
-        match ctx
-            .runtime
-            .engine()
-            .enable_instance_content(&record.id, p.kind, &p.item, p.enabled, &p.worlds)
-        {
+        match ctx.runtime.engine().enable_entry_content(
+            engine::EntryRef::Instance(&record.id),
+            p.kind,
+            &p.item,
+            p.enabled,
+            &p.worlds,
+        ) {
             Ok(0) => Err(ErrorInfo::ContentNotFound {
                 reference: p.item.clone(),
             }),
@@ -303,7 +309,7 @@ fn register_instance(on: &mut Channels<'_>) {
         let updates = ctx
             .runtime
             .engine()
-            .check_instance_updates(&record.id, p.kind)
+            .check_entry_updates(engine::EntryRef::Instance(&record.id), p.kind)
             .await
             .map_err(crate::runtime::engine_error)?;
         Ok(ContentUpdatesResult { updates })
@@ -317,8 +323,8 @@ fn register_instance(on: &mut Channels<'_>) {
         }
         let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
-            ContentJob::InstanceSetVersion {
-                instance_id: record.id,
+            ContentJob::SetVersion {
+                entry: JobEntry::instance(record.id),
                 kind: p.kind,
                 item: p.item,
                 version: p.version,

@@ -14,6 +14,7 @@ use proto::content::{
 use proto::instance::Profile;
 use proto::profile::{GlobalProfile, ProfileEntry};
 
+use super::content::entry::EntryRef;
 use crate::content::{install, profiles};
 use crate::engine::Engine;
 use crate::minecraft::materialize::OnProgress;
@@ -289,7 +290,7 @@ impl Engine {
                 worlds: Vec::new(),
             };
             let (mut items, mut group_failures) = self
-                .add_instance_content(&record.id, &spec, on_progress)
+                .add_entry_content(EntryRef::Instance(&record.id), &spec, on_progress)
                 .await?;
             installed.append(&mut items);
             failures.append(&mut group_failures);
