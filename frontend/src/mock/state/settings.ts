@@ -14,7 +14,6 @@ const settings: Tree = {
   autostart: false,
   defaults: { memory: '4G', 'jvm-args': '' },
   content: { 'curseforge-key': '' },
-  announcements: { enabled: true },
   discord: { enabled: true },
   instance: { 'multi-session': false },
   sync: { enabled: true },

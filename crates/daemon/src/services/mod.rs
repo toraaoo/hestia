@@ -4,7 +4,6 @@
 //! failure.
 
 mod accounts;
-mod announce;
 mod backup;
 mod cache;
 mod config;
@@ -46,7 +45,6 @@ pub fn make_router() -> Router {
     sync::register(&mut on);
     transfer::register(&mut on);
     update::register(&mut on);
-    announce::register(&mut on);
 
     router
 }

@@ -79,9 +79,6 @@ const TOPICS: Record<string, (payload: Record<string, unknown>) => QueryKey[]> =
     // footprint when it lands in the daemon's own exports/.
     'instance.import.done': () => [keys.instances.all],
     'instance.export.done': () => [[FOOTPRINT]],
-    // The daemon's poll found different announcements; the badge and the news
-    // page are both driven by the one list query.
-    'announce.changed': () => [keys.announce.all],
   };
 
 /** The key prefixes a daemon topic outdates — exported for the regression test. */

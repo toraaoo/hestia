@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AppNewsRouteImport } from './routes/_app/news'
 import { Route as AppBrowseIndexRouteImport } from './routes/_app/browse/index'
 import { Route as AppInstancesIndexRouteImport } from './routes/_app/instances/index'
 import { Route as AppInstancesIdRouteImport } from './routes/_app/instances/$id'
@@ -31,11 +30,6 @@ const AppRouteRoute = AppRouteRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppNewsRoute = AppNewsRouteImport.update({
-  id: '/news',
-  path: '/news',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppBrowseIndexRoute = AppBrowseIndexRouteImport.update({
@@ -96,7 +90,6 @@ const AppBrowseKindIdRoute = AppBrowseKindIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/news': typeof AppNewsRoute
   '/instances/$id': typeof AppInstancesIdRoute
   '/profiles/$name': typeof AppProfilesNameRoute
   '/servers/$id': typeof AppServersIdRoute
@@ -110,7 +103,6 @@ export interface FileRoutesByFullPath {
   '/browse/$kind/': typeof AppBrowseKindIndexRoute
 }
 export interface FileRoutesByTo {
-  '/news': typeof AppNewsRoute
   '/': typeof AppIndexRoute
   '/instances/$id': typeof AppInstancesIdRoute
   '/profiles/$name': typeof AppProfilesNameRoute
@@ -127,7 +119,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteRouteWithChildren
-  '/_app/news': typeof AppNewsRoute
   '/_app/': typeof AppIndexRoute
   '/_app/instances/$id': typeof AppInstancesIdRoute
   '/_app/profiles/$name': typeof AppProfilesNameRoute
@@ -145,7 +136,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/news'
     | '/instances/$id'
     | '/profiles/$name'
     | '/servers/$id'
@@ -159,7 +149,6 @@ export interface FileRouteTypes {
     | '/browse/$kind/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/news'
     | '/'
     | '/instances/$id'
     | '/profiles/$name'
@@ -175,7 +164,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
-    | '/_app/news'
     | '/_app/'
     | '/_app/instances/$id'
     | '/_app/profiles/$name'
@@ -208,13 +196,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/news': {
-      id: '/_app/news'
-      path: '/news'
-      fullPath: '/news'
-      preLoaderRoute: typeof AppNewsRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/browse/': {
@@ -298,7 +279,6 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteRouteChildren {
-  AppNewsRoute: typeof AppNewsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppInstancesIdRoute: typeof AppInstancesIdRoute
   AppProfilesNameRoute: typeof AppProfilesNameRoute
@@ -314,7 +294,6 @@ interface AppRouteRouteChildren {
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
-  AppNewsRoute: AppNewsRoute,
   AppIndexRoute: AppIndexRoute,
   AppInstancesIdRoute: AppInstancesIdRoute,
   AppProfilesNameRoute: AppProfilesNameRoute,

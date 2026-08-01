@@ -24,8 +24,6 @@ pub struct Settings {
     pub defaults: JvmDefaults,
     /// Credentials for the content sources that need one.
     pub content: ContentSettings,
-    /// The news and notices feed.
-    pub announcements: AnnounceSettings,
     /// What an instance is allowed to do beyond the safe default.
     pub instance: InstanceSettings,
     /// Shared settings/configs across instances.
@@ -100,21 +98,6 @@ pub struct SyncSettings {
 impl Default for SyncSettings {
     fn default() -> Self {
         SyncSettings { enabled: true }
-    }
-}
-
-/// Whether the launcher fetches its announcement feed. This is the daemon's
-/// only *unprompted* outbound request — the update check runs on demand — so
-/// it is switchable rather than assumed.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(default, rename_all = "camelCase")]
-pub struct AnnounceSettings {
-    pub enabled: bool,
-}
-
-impl Default for AnnounceSettings {
-    fn default() -> Self {
-        AnnounceSettings { enabled: true }
     }
 }
 

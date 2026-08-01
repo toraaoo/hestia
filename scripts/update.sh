@@ -79,7 +79,7 @@ case "${1:-}" in
     compile > /dev/null
     log "update feed on http://127.0.0.1:$port/latest.json (version $version)"
     log "point a shell at it with:  eval \"\$($0 --env)\""
-    # exec so the server *is* this pid, matching announce.sh.
+    # exec so the server *is* this pid.
     exec python -m http.server "$port" --bind 127.0.0.1 --directory "$dir"
     ;;
   "") compile ;;

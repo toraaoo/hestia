@@ -81,11 +81,6 @@
       "resolving_profile": "Resolving profile",
       "writing_pack_files": "Writing pack files"
     },
-    "severity": {
-      "critical": "Important",
-      "info": "News",
-      "warning": "Notice"
-    },
     "sync_state": {
       "cannot_link": "clashes with the store",
       "linked": "linked",

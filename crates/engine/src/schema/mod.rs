@@ -24,7 +24,7 @@
 //!
 //! # What is deliberately not versioned
 //!
-//! Derived state — the announcement cache, process records and tombstones,
+//! Derived state — process records and tombstones,
 //! installed-runtime records, the download cache. A document nothing is lost by
 //! discarding does not need a migration path; it needs deleting and
 //! regenerating, which is what already happens when one fails to read. Desktop

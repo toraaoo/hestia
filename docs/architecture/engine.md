@@ -28,7 +28,6 @@ flowchart TD
         JAVA["java"]
         PROC["processes"]
         UPD["update"]
-        ANN["announce"]
     end
     subgraph domain["domain"]
         MC["minecraft"]
@@ -44,7 +43,7 @@ flowchart TD
     E --> plumbing
     E --> domain
 
-    FLOWS["<b>engine/flows/</b><br/>server · instance · backup · content<br/>modpack · profiles · skins · sync · announce"]
+    FLOWS["<b>engine/flows/</b><br/>server · instance · backup · content<br/>modpack · profiles · skins · sync"]
     E -.->|"impl Engine blocks<br/>composed over the subsystems"| FLOWS
 ```
 
@@ -96,8 +95,8 @@ read and written through `engine::schema`
 | Needs bringing forward | migrated on read and written back, so the disk converges as it is used |
 | Writing | temp file renamed into place; owner-only mode set *before* the rename where it matters |
 
-Derived state is deliberately excluded — the announcement cache, process records,
-Java runtime records, the download cache. Discarding one loses nothing, which is
+Derived state is deliberately excluded — process records, Java runtime records,
+the download cache. Discarding one loses nothing, which is
 already what happens when it fails to read.
 
 Quarantines are not caused by the request that hit them, so they collect in one
@@ -151,8 +150,7 @@ flowchart LR
 
 Hits are **re-hashed on the way out**, so a damaged blob is evicted and the fetch
 falls back to the network. The cache can make things faster; it can never make
-them wrong. The same rule applies to the announcement feed, which is re-verified
-on load rather than trusted because it verified once.
+them wrong.
 
 ## Java runtimes
 
@@ -236,32 +234,6 @@ retention prunes the oldest tombstoned ones
 completion, relays what it narrates as progress, and is cancelled through the
 supervisor.
 
-## Announcements
-
-`announce/` is news and notices fetched from Hestia's published feed. Three
-concerns, one module apiece: `feed` is the document format and the targeting rule
-(pure, no I/O), `store` is the cached document and the dismissal set (disk, no
-network), and `mod.rs` composes them with the fetch.
-
-There is **one** mechanism with a severity dial rather than a news system and a
-notices system: an untargeted `info` entry *is* news, and a version-ranged
-`critical` one *is* a notice. Targeting (platform, release channel, version
-range) is applied in the engine, so the wire type is narrower than the feed
-entry — a front-end renders what it is given
-([0058](../decisions/0058-announcements-are-one-mechanism.md)).
-
-The feed is **minisign-signed** and verified against `ANNOUNCE_PUBKEY`
-(`signature.rs`, shared with the updater but a different key). An empty key set
-fails closed. The poll is the daemon's one unprompted outbound request, so it is
-switchable with `announcements.enabled` — off, nothing is fetched.
-
-A refresh reports whether it **changed**, which the daemon's poller turns into an
-`announce.changed` push. The comparison is over the whole of each entry this
-build can see, not its id: correcting a live announcement's body is exactly what
-a poll exists to notice, and it keeps the id. Targeting is applied first, so an
-edit aimed at another platform or channel wakes nobody, and the compared list is
-ordered by id, so reordering the published document is not itself a change.
-
 ## Self-update
 
 `update/` owns the whole path — the check against the published release manifest
@@ -283,10 +255,9 @@ unpacked by hand has no installer to update through.
 
 Network reads are stateless; the staging directory only holds the download.
 
-`version.rs` is the comparison both this and announcement targeting share:
-anything unparsable compares as *no answer*, and every caller treats that as a
-refusal — a malformed version can neither trigger an update nor decide that an
-announcement applies.
+`version.rs` is the comparison the check rests on: anything unparsable compares
+as *no answer*, and every caller treats that as a refusal — a malformed version
+cannot trigger an update.
 
 ## Small shared pieces
 
@@ -295,7 +266,7 @@ announcement applies.
 | `cancel.rs` | `Cancel`, the cooperative cancellation flag, and `Job`, which carries it beside the progress reporter — a step that reports progress is exactly a step that can stop between reports |
 | `registry.rs` | id allocation (`allocate_id`) and directory naming (`dir_name`) shared by the entry stores ([0023](../decisions/0023-id-is-a-uuid-directory-is-a-slug.md)) |
 | `usage.rs` | directory footprint, treating a symlink as a boundary so a linked sync folder is not counted into the instance that points at it |
-| `signature.rs` | minisign verification for the announcement feed and the updater |
+| `signature.rs` | minisign verification for the updater |
 | `error.rs` | the engine's `thiserror` enums, mapped to `ipc::errors` codes at the daemon's service boundary |
 
 ## Decisions
@@ -305,4 +276,3 @@ announcement applies.
 - [0037 — Workloads outlive the daemon by design](../decisions/0037-workloads-outlive-the-daemon.md)
 - [0038 — A finished process is labelled, not merely unrecorded](../decisions/0038-a-finished-process-is-tombstoned.md)
 - [0040 — Following logs is scoped to the entry, not to one run of it](../decisions/0040-following-logs-is-entry-scoped.md)
-- [0058 — News and notices are one mechanism with a severity dial](../decisions/0058-announcements-are-one-mechanism.md)

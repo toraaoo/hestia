@@ -213,11 +213,6 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::daemon::DaemonCmd,
     },
-    /// News and notices for this build
-    News {
-        #[command(subcommand)]
-        cmd: Option<commands::news::NewsCmd>,
-    },
     /// Update Hestia itself from the release feed
     Update {
         #[arg(short = 'y', long, help = "Apply without the confirmation prompt")]
@@ -368,7 +363,6 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
         Command::Cache { cmd } => commands::cache::run(cmd).await,
         Command::Config { cmd } => commands::config::run(cmd).await,
         Command::Sync { cmd } => commands::sync::run(cmd).await,
-        Command::News { cmd } => commands::news::run(cmd).await,
         Command::Update { yes } => commands::update::run(yes).await,
         // Handled by `dispatch`: these answer with their own exit status.
         Command::Daemon { .. } | Command::Server { .. } | Command::Process { .. } => {

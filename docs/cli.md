@@ -487,7 +487,6 @@ hestia config get autostart      # true if the daemon starts at login
 hestia config set autostart true # register the daemon to start at login
 hestia config set instance.multi-session true # allow an instance to run several sessions
 hestia config set sync.enabled false          # stop sharing settings across instances
-hestia config set announcements.enabled false # stop fetching news and notices
 hestia config set discord.enabled false       # stop publishing Discord presence
 hestia config set content.curseforge-key <key> # unlock the CurseForge source
 ```
@@ -556,32 +555,6 @@ guess: "stop the launcher" says nothing about the server, so it prompts on a ter
 naming both flags — a script has to state which it meant. With nothing running there is nothing to ask and it stops
 immediately. The tray's **Quit** and the desktop's stop button always mean
 `--keep`: neither can ask, and neither should end a running server on your behalf.
-
-## News and notices
-
-Announcements about Hestia itself, fetched from its published feed. Every entry is filtered against *this* build — an
-entry can name a platform, a release channel and a version range — so what you see is what applies to you.
-
-```bash
-hestia news                      # what applies to this build and is unread
-hestia news list --all           # including what you've already read
-hestia news show <id>            # one announcement in full
-hestia news read                 # mark every unread one read
-hestia news read <id>...         # mark specific ones read
-hestia news refresh              # check now instead of waiting for the poll
-```
-
-Reads answer from the daemon's cache, so they are instant and work offline;
-`refresh` is the only verb that touches the network. The daemon polls every six hours, and read state is shared with the
-desktop — marking something read in one is marking it read in both.
-
-The feed is the daemon's only unprompted outbound request. Turn it off with:
-
-```bash
-hestia config set announcements.enabled false
-```
-
-Nothing is fetched while it is off, and `hestia news` says so rather than pretending the feed is empty.
 
 ## Updating Hestia
 

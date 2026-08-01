@@ -4,7 +4,6 @@
 //! linking it.
 
 mod accounts;
-mod announce;
 mod backup;
 mod cache;
 mod cancel;
@@ -32,7 +31,6 @@ mod usage;
 mod version;
 
 pub use accounts::{Accounts, LoginChallenge, ReauthRequired};
-pub use announce::Refreshed;
 pub use backup::BackupSettings;
 pub use cache::{Cache, CacheEntry, CacheUsage};
 pub use cancel::{is_cancelled, Cancel, Job};

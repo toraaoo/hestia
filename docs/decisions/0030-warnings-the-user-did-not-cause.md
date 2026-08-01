@@ -32,8 +32,8 @@ reconciled from then on, so a pack *can* share if that is what the user wants.
 And **hestia never breaks a link it did not just make** — a folder already
 sharing keeps sharing, whatever else changes.
 
-Sharing is now switchable outright (`sync.enabled`, the config store like
-`announcements.enabled`): moving a user's files into a common store is a policy
+Sharing is now switchable outright (`sync.enabled`, in the config store):
+moving a user's files into a common store is a policy
 some people simply do not want, and the honest answer to that is a switch, not a
 warning they cannot turn off. Off, no pass runs — and existing links are left
 exactly where they are.

@@ -81,11 +81,6 @@
       "resolving_profile": "Resolvendo perfil",
       "writing_pack_files": "Gravando arquivos do pacote"
     },
-    "severity": {
-      "critical": "Importante",
-      "info": "Novidades",
-      "warning": "Aviso"
-    },
     "sync_state": {
       "cannot_link": "conflita com o armazenamento",
       "linked": "vinculada",

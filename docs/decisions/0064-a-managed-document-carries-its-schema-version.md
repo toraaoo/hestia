@@ -59,7 +59,7 @@ write-then-chmod could not promise.
 
 ## What is not versioned
 
-Derived state: the announcement cache, process records and tombstones, installed
+Derived state: process records and tombstones, installed
 Java runtime records, the download cache. A document nothing is lost by
 discarding needs deleting and regenerating, not a migration path, and that is
 already what happens when one fails to read. Desktop preferences stay out too —

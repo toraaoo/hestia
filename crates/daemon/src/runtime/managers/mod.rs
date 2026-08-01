@@ -18,7 +18,6 @@ pub use content::{ContentJob, ContentManager, Entry as JobEntry};
 pub use download::DownloadManager;
 pub use instance::{InstanceLaunchManager, LaunchOrder};
 pub use java::JavaInstallManager;
-pub(crate) use job::topic_event;
 pub use job::Cancellations;
 pub use modpack::{ModpackJob, ModpackManager};
 pub use server::{ServerCreateManager, ServerUpdateManager};

@@ -25,7 +25,6 @@ having.
 | `clean.sh`      | `cargo clean` plus the frontend `dist`/`node_modules` and Tauri `gen` |
 | `sidecars.sh`   | build + stage `hestia`/`hestiad`/`tray` as Tauri sidecars for bundling |
 | `package.sh`    | release artifacts: Tauri installers + portable archive (`all`/`bundle`/`portable`) |
-| `announce.sh`   | announcements: scaffold one (`new`), compile `news/*.md` into the feed, serve it locally, or sign it (CI) |
 | `update.sh`     | self-update: serve a signed fake `latest.json` locally, and print the env to reach it |
 | `sign.sh`       | minisign release artifacts (`<file>.sig`), or verify them (CI)      |
 | `gen-types.sh`  | regenerate the TypeScript bindings for the `proto` wire types (ts-rs) |
@@ -34,8 +33,6 @@ having.
 | Helper             | Used by                                                          |
 |--------------------|------------------------------------------------------------------|
 | `lib/common.sh`    | sourced first by every verb: strict mode, the repo root as cwd, `log`/`die` |
-| `lib/news.sh`      | sourced by `dev.sh`/`run.sh`: serve the feed and point the daemon at it |
-| `lib/announce.py`  | `announce.sh` — compiles `news/*.md`, and scaffolds a new entry     |
 | `lib/gen-barrels.py` | `gen-types.sh` — the per-module barrels over the generated types |
 
 A verb starts with one line, and everything after it can assume the repo root:
@@ -58,17 +55,12 @@ scripts/dev.sh                    # subshell: hestia + hestiad on PATH
 scripts/dev.sh java list          # one-shot CLI (builds first)
 scripts/dev.sh --desktop          # desktop shell with frontend HMR
 
-scripts/announce.sh new "Title"   # scaffold news/<date>-<id>.md, then edit it
-scripts/announce.sh               # compile news/ and print the feed payload
-scripts/announce.sh --serve       # serve it on 127.0.0.1:8787 by hand
-scripts/dev.sh --no-news          # subshell without the local feed
-
 eval "$(scripts/update.sh --env)"  # point this shell at the local feed
 scripts/update.sh --serve         # fake release feed on 127.0.0.1:8788
 ```
 
-**Testing self-update locally.** Unlike the news feed this is opt-in, because a
-dev run should not offer a fake update every time. Nothing here edits the source:
+**Testing self-update locally.** Opt-in, because a dev run should not offer a
+fake update every time. Nothing here edits the source:
 `--env` prints the endpoint *and* the key to trust, and a debug build honours
 `HESTIA_UPDATE_PUBKEY` only alongside `HESTIA_UPDATE_ENDPOINT` — so there is no
 constant to paste in and nothing to remember to put back. A release build reads
@@ -102,16 +94,3 @@ cat /tmp/Hestia.AppImage      # replaced, and still 0755
 who owns the binary, so it needs a real package install. Windows needs a real
 NSIS install for the same reason: the uninstaller at the layout root is what
 `update/install.rs` looks for.
-
-A debug `dev.sh`, `run.sh daemon` or `run.sh desktop` **serves `news/` as the
-announcement feed** and points the daemon it starts at it, so an entry can be
-seen before it is published. `--no-news` skips it, `HESTIA_NEWS_PORT` moves it
-off 8787, and a `--release` run never does it — only a debug binary honours the
-endpoint override. Nothing here fails a run: if `news/` does not compile, or the
-port is taken by something else, the feed is skipped with a note and the daemon
-falls back to the published one. The exception is bare `win.ps1 dev`, which is
-pure PowerShell and needs only cargo; a forwarded verb (`win.ps1 run daemon
-serve`) serves the feed as usual.
-
-See [news/README.md](../news/README.md) for the announcement format and the
-publishing path.

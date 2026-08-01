@@ -1,9 +1,6 @@
-/**
- * The `update.*` channels. `changelog` is the one part that stays in the shell,
- * because it is compiled into this binary rather than fetched.
- */
+/** The `update.*` channels. */
 
-import { call, invokeCommand } from './core/ipc';
+import { call } from './core/ipc';
 import { type JobRun, runJob } from './core/jobs';
 import type { DownloadProgress } from './types/download';
 import type {
@@ -37,13 +34,4 @@ export function apply(path: string): Promise<UpdateApplyResult> {
     { path },
     { timeoutMs: 300_000 },
   );
-}
-
-/**
- * This build's own release notes, compiled into the binary. Empty when the
- * changelog has no section for it. Local by design — the first run after an
- * update is exactly when the network may be the thing that went wrong.
- */
-export function changelog(): Promise<string> {
-  return invokeCommand('changelog');
 }

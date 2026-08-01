@@ -50,7 +50,7 @@ nothing.
 
 One module per domain: `app`, `health`, `daemon`, `config`, `cache`, `download`,
 `java`, `accounts`, `skins`, `process`, `server`, `instance`, `backup`,
-`content`, `modpack`, `profile`, `sync`, `announce`, `update`, `job`, `events`.
+`content`, `modpack`, `profile`, `sync`, `update`, `job`, `events`.
 Three are shared vocabularies rather than domains of their own:
 
 - **`minecraft`** — what the `server` and `instance` domains have in common:

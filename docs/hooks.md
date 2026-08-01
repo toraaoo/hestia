@@ -282,7 +282,6 @@ The only named hooks. Everything else is a factory passed to `useQuery`/`useMuta
 | `useModpack(kind, id)`                                  | an entry's installed pack                                     |
 | `useInstallModpack(kind)` / `useUpdateModpack(kind, id)` *(job)* | the pack jobs                                        |
 | `useRemoveModpack(kind, id)`                            | remove the pack record                                        |
-| `useAnnouncements()` / `useDismissAnnouncements()` / `useRefreshAnnouncements()` | the news feed                        |
 | `useUpdateCheck(enabled)` / `useDownloadUpdate()` / `useApplyUpdate()` | self-update, over the daemon's `update.*` channels |
 | `usePrefs()` / `usePinned()`                            | desktop-local UI state, over the `prefs_*` shell commands     |
 | `useMultiSession()`                                     | whether `instance.multi-session` allows concurrent sessions   |
@@ -410,8 +409,6 @@ One shared factory set, bound per entry kind, so servers and instances cannot dr
 | `syncQueries.config()` / `.status()`          | `sync.get\|status`          | —                                      |
 | `syncMutations.set()`                         | `sync.set`                  | `SyncTargets`                          |
 | `syncMutations.adopt(id)`                     | `instance.sync.adopt`       | `targets?: string[]`                   |
-| `announceQueries.list()`                      | `announce.list`             | —                                      |
-| `announceMutations.dismiss()` / `.refresh()`  | `announce.dismiss\|refresh` | `ids: string[]` / —                    |
 | `updateQueries.check()`                       | `update_check` (shell)      | —                                      |
 | `updateMutations.install()`                   | `update_install` (shell)    | —                                      |
 | `iconQueries.list()`                          | `icons_list` (shell)        | —                                      |

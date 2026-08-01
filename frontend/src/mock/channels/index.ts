@@ -5,7 +5,6 @@
  */
 import type { Handlers } from '../support';
 import { channels as account } from './account';
-import { channels as announce } from './announce';
 import { channels as app } from './app';
 import { channels as cache } from './cache';
 import { channels as config } from './config';
@@ -26,7 +25,6 @@ import { channels as update } from './update';
 export const channels: Handlers = {
   ...app,
   ...account,
-  ...announce,
   ...cache,
   ...config,
   ...content,

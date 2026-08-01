@@ -1,9 +1,8 @@
 //! Minisign verification, shared by everything the launcher fetches and trusts.
 //!
 //! Each consumer brings its own key set — release artifacts are verified against
-//! [`common::app::update_pubkeys`], the announcement feed against
-//! [`common::app::announce_pubkeys`] — so a key that can sign one cannot sign
-//! the other.
+//! [`common::app::update_pubkeys`] — so a key that can sign one artifact cannot
+//! sign another.
 
 use std::path::Path;
 

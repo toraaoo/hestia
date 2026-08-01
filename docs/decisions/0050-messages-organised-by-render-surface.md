@@ -4,7 +4,7 @@
 
 The catalogue (paraglide/inlang, `frontend/messages/`) had grown to 705 keys in
 a single 800-line file under 43 top-level namespaces that mixed four different
-axes at once: feature (`skins`, `news`, `sync`), widget type (`label`, `action`,
+axes at once: feature (`skins`, `profile`, `sync`), widget type (`label`, `action`,
 `tab`, `status`), domain enum (`kind`, `flavor`, `gamemode`), and wire shape
 (`error`, `warning`) — plus catch-alls (`common`, `resources`, one key apiece)
 and an `entry`/`entry_settings` split that existed only because flat naming had
@@ -17,7 +17,7 @@ behind with nothing checking it.
 There are now four roots and one rule for each. **`app.*`** is shell chrome and
 shared vocabulary (nav, window, action, label, status, toast, search, time,
 jobs, validation, daemon). **One root per feature** — `library`, `entry`,
-`server`, `instance`, `content`, `profile`, `skin`, `settings`, `news`,
+`server`, `instance`, `content`, `profile`, `skin`, `settings`,
 `account` — mirroring `frontend/src/features/`, so the string a component
 renders lives in the file named after that component's directory (`entry.*`
 holds what servers and instances share: the create wizard, per-entry settings,

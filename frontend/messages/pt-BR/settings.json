@@ -68,10 +68,6 @@
       "pattern_placeholder": "config/**",
       "title": "Modpacks"
     },
-    "news": {
-      "enabled_description": "O Hestia verifica seu feed de anúncios a cada poucas horas. Desative e ele não fará essa requisição.",
-      "enabled_label": "Mostrar novidades e avisos"
-    },
     "no_default": "Nenhum padrão definido",
     "search_empty": "Nenhuma configuração corresponde a “{query}”.",
     "search_placeholder": "Buscar configurações",
@@ -134,8 +130,7 @@
       "notes": "Novidades",
       "restart_required": "Atualização instalada — reinicie o Hestia para usá-la",
       "title": "Atualizações",
-      "up_to_date": "O Hestia está atualizado",
-      "whats_new": "Novidades da versão {version}"
+      "up_to_date": "O Hestia está atualizado"
     }
   }
 }

@@ -4,7 +4,6 @@
 //! socket.
 
 mod accounts;
-mod announce;
 mod app;
 mod cache;
 mod config;
@@ -23,7 +22,6 @@ mod transfer;
 mod update;
 
 pub use accounts::Accounts;
-pub use announce::Announce;
 pub use app::App;
 pub use cache::Cache;
 pub use config::Config;

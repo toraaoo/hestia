@@ -136,9 +136,9 @@ impl Update {
     }
 }
 
-/// `HESTIA_UPDATE_ENDPOINT` points a **debug** build at a local feed, the escape
-/// hatch announcements also have. The signature is still checked against the
-/// compiled-in keys, so a local test signs with a key this build trusts.
+/// `HESTIA_UPDATE_ENDPOINT` points a **debug** build at a local feed. The
+/// signature is still checked against the compiled-in keys, so a local test
+/// signs with a key this build trusts.
 fn endpoint() -> String {
     #[cfg(debug_assertions)]
     if let Ok(url) = std::env::var("HESTIA_UPDATE_ENDPOINT") {

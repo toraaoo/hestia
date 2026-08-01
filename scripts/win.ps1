@@ -17,7 +17,6 @@
 #   scripts\win.ps1 build    [cli|daemon|desktop|all] [cargo flags...]
 #   scripts\win.ps1 run      <cli|daemon|desktop> [args...]
 #   scripts\win.ps1 package  [all|bundle|portable]
-#   scripts\win.ps1 announce [new "Title" | --serve]
 param(
   [Parameter(Position = 0)][string]$Command,
   [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest

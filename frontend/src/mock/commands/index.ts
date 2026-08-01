@@ -11,7 +11,6 @@ import { commands as icons } from './icons';
 import { commands as opener } from './opener';
 import { commands as prefs } from './prefs';
 import { commands as shell } from './shell';
-import { commands as update } from './update';
 import { commands as window } from './window';
 
 export const commands: Handlers = {
@@ -22,6 +21,5 @@ export const commands: Handlers = {
   ...opener,
   ...prefs,
   ...shell,
-  ...update,
   ...window,
 };

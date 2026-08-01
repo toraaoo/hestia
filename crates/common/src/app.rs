@@ -83,13 +83,6 @@ fn dev_pubkey() -> Option<&'static str> {
     None
 }
 
-/// The announcement feed: the news and notices the launcher shows. A standing
-/// `announcements` release tag whose asset is replaced in place, so publishing
-/// is decoupled from cutting a version — `releases/latest/` would tie the two
-/// together and 404 on any release that omitted the asset.
-pub const ANNOUNCE_ENDPOINT: &str =
-    "https://github.com/toraaoo/hestia/releases/download/announcements/announcements.json";
-
 /// The Discord application Rich Presence is published as, from the Discord
 /// developer portal. Not a secret and not a credential: it names the
 /// application whose title and art the Discord client renders, and it travels
@@ -103,31 +96,6 @@ pub const DISCORD_APP_ID: &str = "1532750283753656543";
 /// image rather than failing the update.
 pub const DISCORD_LARGE_IMAGE: &str = "hestia";
 
-/// The announcement feed's own signing key — deliberately *not* [`UPDATE_PUBKEY`].
-///
-/// The feed is published by a workflow that runs on a push to the default
-/// branch, while installers are signed only from a release tag. Sharing one key
-/// would put the installer-signing secret within reach of anything that can land
-/// a commit, so the lower-stakes artifact gets its own trust root: a compromised
-/// announcement key can say things, never ship code.
-///
-/// Generated with `cargo tauri signer generate` (which writes the public half
-/// already base64-wrapped, so it is pasted here verbatim). **An empty key set
-/// fails closed** — the engine refuses an unverifiable feed rather than
-/// trusting it — so announcements do not appear until this is filled in.
-pub const ANNOUNCE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM5NTNFNDNFMDM2ODJBOEMKUldTTUttZ0RQdVJUT1RhdTBLTU9UMW4rbnkvQnpRdzN1K1JiNGhTVUxFWGZFdjFUeSs2bUI2UTQK";
-
-/// The announcement rotation spare, with the same rules as [`UPDATE_PUBKEY_NEXT`]:
-/// a binary trusts only what is compiled into it, so the successor must ship
-/// before it is needed.
-pub const ANNOUNCE_PUBKEY_NEXT: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg2QzZFMjFENTFDOUQ5MDYKUldRRzJjbFJIZUxHaGxaRXgzTjlTd0N4SDlaazN6QWhTWHJrZGhoby8wMTRQY05ZYisyaDlRYkMK";
-
-/// Every key the announcement feed may be signed with, newest last.
-pub fn announce_pubkeys() -> impl Iterator<Item = &'static str> {
-    [ANNOUNCE_PUBKEY, ANNOUNCE_PUBKEY_NEXT]
-        .into_iter()
-        .filter(|key| !key.is_empty())
-}
 /// The agent every outbound HTTP request identifies itself with.
 ///
 /// PaperMC and Modrinth both *ask* for a contact URL or address alongside the

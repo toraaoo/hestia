@@ -50,7 +50,7 @@ artifact to *download* depends on how the copy was installed.
   one URL and Linux now ships three artifacts.
 - CI signs artifacts itself with `minisign` — the bundler never signed `.deb` or
   `.rpm`, which is exactly what `formats` needs — so `TAURI_SIGNING_*`
-  disappears in favour of `RELEASE_SIGNING_KEY`, matching `ANNOUNCE_SIGNING_KEY`.
+  disappears in favour of `RELEASE_SIGNING_KEY`.
 - Elevation is *asked for*, not refused for want of it: `pkexec` unconditionally
   (a text polkit agent would have answered, so gating on `$DISPLAY` declines on
   its behalf), then passwordless `sudo`. Only when nothing can even ask does the
@@ -60,6 +60,3 @@ artifact to *download* depends on how the copy was installed.
   has no installer to update through, and a path heuristic could be defeated by
   dropping one under `/usr/bin`.
 
-The shell keeps exactly one bespoke command, `changelog`, and for the same
-reason it always had: the notes are compiled into the binary and shown on the
-first run *after* an update, which is when the network is least trustworthy.

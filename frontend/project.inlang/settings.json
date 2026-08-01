@@ -18,7 +18,6 @@
       "./messages/{locale}/profile.json",
       "./messages/{locale}/skin.json",
       "./messages/{locale}/settings.json",
-      "./messages/{locale}/news.json",
       "./messages/{locale}/domain.json",
       "./messages/{locale}/error.json",
       "./messages/{locale}/warning.json"

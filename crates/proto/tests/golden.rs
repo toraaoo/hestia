@@ -9,7 +9,6 @@
 //! hand as the authoritative wire contract.)
 
 use proto::accounts::{Account, AccountLoginBeginResult};
-use proto::announce::{AnnounceListResult, Announcement};
 use proto::app::AppInfoResult;
 use proto::backup::BackupInfo;
 use proto::cache::{CacheEntry, CacheInfoResult};
@@ -164,10 +163,4 @@ golden!(
     process_metrics_event,
     ProcessMetricsEvent,
     "process_metrics_event.json"
-);
-golden!(announcement, Announcement, "announcement.json");
-golden!(
-    announce_list_result,
-    AnnounceListResult,
-    "announce_list_result.json"
 );

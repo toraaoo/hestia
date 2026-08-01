@@ -1,9 +1,8 @@
 # Changelog
 
-Release notes, newest first. The section matching the running version is
-compiled into the binary (`common::changelog`) and shown once after an upgrade,
-and the release workflow reads the same section into `latest.json`'s `notes` —
-so what a user reads in the app is what the updater offered them.
+Release notes, newest first. The release workflow reads the section matching
+the version being cut into `latest.json`'s `notes`, so what the updater offers
+is what is written here.
 
 One `## <version>` heading per release. Everything until the next heading is
 that release's notes, rendered as markdown.
@@ -22,4 +21,3 @@ First numbered build of the all-Rust workspace.
   save-off dance.
 - **Shared settings** across instances: `options.txt` merged, worlds and
   configs linked into one store.
-- **Announcements** — this changelog is the first thing that uses them.

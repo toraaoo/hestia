@@ -2,7 +2,6 @@
 //! per concern, each an `impl Engine` block, so the aggregate itself stays the
 //! wiring and nothing more.
 
-mod announce;
 mod backup;
 mod content;
 pub use content::entry::EntryRef;

@@ -443,7 +443,7 @@ roots — put the string where it is *rendered*, not where it happens to be defi
 | Root                    | What goes in it                                                                                                                                         |
 |-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `app.*`                 | shell chrome and shared vocabulary — `nav`, `window`, `action`, `label`, `status`, `toast`, `search`, `time`, `jobs`, `validation`, `daemon`            |
-| `<feature>.*`           | one root per `frontend/src/features/` directory — `library`, `entry`, `server`, `instance`, `content`, `profile`, `skin`, `settings`, `news`, `account` |
+| `<feature>.*`           | one root per `frontend/src/features/` directory — `library`, `entry`, `server`, `instance`, `content`, `profile`, `skin`, `settings`, `account` |
 | `domain.*`              | vocabulary mirroring a `proto` enum — content kinds, flavors, gamemodes, difficulties, provision phases, entry types                                    |
 | `error.*` / `warning.*` | the daemon's own `ErrorInfo`/`WarningInfo` vocabulary, keyed by variant (`kind`, `code`, `token`, `hint`)                                               |
 
@@ -475,9 +475,6 @@ and `hestiad` on `PATH` (debug builds keep data in `target/<profile>/data`), or
 `scripts/dev.sh java list` for a one-shot. The daemon is never auto-spawned — start it with `hestia daemon start` (or
 login autostart); commands error pointing there when it is down. `hestia daemon status|start|stop|restart`
 manages it explicitly.
-
-A debug run also serves `news/` as the announcement feed and points the daemon at it, so an entry can be seen before it
-is published — `--no-news` skips it, and [news/README.md](../news/README.md) has the format and the publishing path.
 
 The desktop app needs the system webview (WebKitGTK on Linux, WebView2 on Windows)
 and the Bun-built frontend:

@@ -25,7 +25,6 @@ flowchart TB
         HUB["event_hub — fan out by job id"]
         MGRS["managers — off-thread jobs"]
         SCHED["scheduler — backups"]
-        ANNP["announce poll"]
         METR["metrics sampler"]
         PRES["discord presence"]
     end
@@ -139,7 +138,6 @@ reading.
 | Loop | Cadence | What it does |
 |---|---|---|
 | `scheduler.rs` | every minute | archive each **running** server whose `backup-interval` has elapsed since its newest backup, then prune `scheduled` archives beyond `backup-retention`. A stopped server's world cannot change, so it is never re-archived |
-| `announce.rs` | at startup, then every six hours (30s in a debug build, where the feed is served off local `news/`) | fetch the feed; publish `announce.changed` when what applies to this build changes. A failed poll publishes nothing — the cached list is still what the daemon serves |
 | `metrics.rs` | every 2 s | sample CPU and memory for supervised processes, normalising CPU by logical core count so a multi-threaded JVM reports a share of the machine rather than 800% |
 | `presence.rs` | every 5 s, on its own thread | publish Discord Rich Presence — the newest running session, else idle — sending only when the card changed. Gated on `discord.enabled` and skipped entirely under `HESTIA_NO_PRESENCE=1`; a missing Discord client is polled for at a sixth of the rate ([0063](../decisions/0063-discord-presence-is-a-daemon-loop.md)) |
 
@@ -179,7 +177,6 @@ is purely a compile-time one that keeps `make_router()` from becoming a
 | `modpack` | `server\|instance.modpack.install\|update\|status\|remove` |
 | `profile` | `profile.list\|create\|remove\|edit` — the global reference lists |
 | `sync` | `sync.get\|set\|status` |
-| `announce` | `announce.list\|dismiss\|refresh` |
 | `update` | `update.check\|download` |
 
 Two conventions worth knowing when reading them:

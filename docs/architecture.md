@@ -171,7 +171,7 @@ obvious unit to reclaim ([0057](decisions/0057-meta-root-for-materialised-files.
 |---|---|
 | [The socket boundary](architecture/wire.md) | `proto` contracts, the `ipc` envelope, the `client` SDK, jobs, events, cancellation, warnings |
 | [Cross-cutting foundations](architecture/common.md) | app identity, logging, crash reports, path resolution |
-| [The engine](architecture/engine.md) | the aggregate root, config, cache, downloads, Java, the process supervisor, announcements, self-update |
+| [The engine](architecture/engine.md) | the aggregate root, config, cache, downloads, Java, the process supervisor, self-update |
 | [The daemon](architecture/daemon.md) | the serve loop, router, runtime, job managers, service registrars, autostart |
 | [Minecraft providers](architecture/minecraft.md) | flavors, version catalogues, profile resolution, materialize, launch plans, RCON |
 | [Servers & instances](architecture/entries.md) | entry stores, directory layout, provisioning, ports, backups, sync, worlds |
@@ -197,8 +197,7 @@ version updates both ways · server backups, on demand and
 scheduled · content install and management from Modrinth, a URL or a local file ·
 modpacks into a new or existing entry · per-instance content profiles and global
 profiles · instance import and export (hestia, `.mrpack`, Prism/MultiMC) ·
-shared instance settings and worlds (`sync`) · signed announcements ·
-self-update · the CLI over all of it · the desktop shell and its pages · the
+shared instance settings and worlds (`sync`) · self-update · the CLI over all of it · the desktop shell and its pages · the
 system tray.
 
 **Not built yet:**

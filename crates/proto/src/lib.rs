@@ -2,7 +2,6 @@
 //! no I/O, no async. `serde` derive is the marshalling layer.
 
 pub mod accounts;
-pub mod announce;
 pub mod app;
 pub mod backup;
 pub mod cache;
