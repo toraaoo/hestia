@@ -1,8 +1,9 @@
-//! `hestia self-update` — check the release feed and apply the new installer.
+//! `hestia update` — check the release feed and install the new version.
 
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use client::IpcError;
 
 use crate::ui::{self, DownloadReporter, Spinner, View};
 
@@ -19,7 +20,7 @@ pub async fn run(yes: bool) -> Result<()> {
         )));
     };
 
-    if !apply::supported() {
+    if !info.applicable {
         return ui::show(View::note(format!(
             "hestia {} is available (installed: {}) — download it at {}",
             info.version, status.current, info.url
@@ -46,49 +47,58 @@ pub async fn run(yes: bool) -> Result<()> {
         .await?;
     reporter.finish();
 
-    apply::start(&path)?;
-    ui::show(View::line(format!(
-        "installer for {version} started — it stops the daemon, updates, and restarts it"
-    )))
+    let applied = match client.update().apply(&path).await {
+        Ok(applied) => applied,
+        Err(e) => match elevation_command(&e) {
+            Some(command) => return elevate(&command, yes),
+            None => return Err(e.into()),
+        },
+    };
+
+    ui::show(View::line(if applied.relaunches {
+        format!("installer for {version} started — it stops the daemon, updates, and restarts it")
+    } else {
+        format!("hestia {version} installed — restart hestiad to run it")
+    }))
 }
 
-#[cfg(windows)]
-mod apply {
-    use std::path::Path;
-
-    use anyhow::{Context, Result};
-
-    /// Applying only makes sense under an NSIS-managed installation, marked
-    /// by the uninstaller sitting beside this binary.
-    pub fn supported() -> bool {
-        std::env::current_exe()
-            .ok()
-            .and_then(|exe| exe.parent().map(|dir| dir.join("uninstall.exe").exists()))
-            .unwrap_or(false)
+/// The daemon has no terminal to prompt on, so it hands back the command it
+/// could not elevate; this process does have one.
+fn elevate(command: &str, yes: bool) -> Result<()> {
+    if !yes {
+        let accepted = ui::confirm(
+            &format!("installing needs administrator rights — run `{command}`?"),
+            "run it",
+            "cancel",
+        )
+        .context("pass --yes to elevate without a prompt")?;
+        if !accepted {
+            return ui::show(View::note(format!(
+                "update staged — run `{command}` to finish"
+            )));
+        }
     }
 
-    /// Run the downloaded installer passively: /P shows only a progress page,
-    /// /UPDATE reuses the recorded install dir, mode, and component choices.
-    pub fn start(installer: &Path) -> Result<()> {
-        std::process::Command::new(installer)
-            .args(["/P", "/UPDATE"])
-            .spawn()
-            .context("cannot start the installer")?;
-        Ok(())
+    let mut parts = command.split_whitespace();
+    let program = parts
+        .next()
+        .context("the daemon returned an empty command")?;
+    let status = std::process::Command::new(program)
+        .args(parts)
+        .status()
+        .with_context(|| format!("cannot run {program}"))?;
+    if !status.success() {
+        anyhow::bail!("`{command}` exited with {status}");
     }
+    ui::show(View::line("update installed — restart hestiad to run it"))
 }
 
-#[cfg(not(windows))]
-mod apply {
-    use std::path::Path;
-
-    use anyhow::{bail, Result};
-
-    pub fn supported() -> bool {
-        false
-    }
-
-    pub fn start(_installer: &Path) -> Result<()> {
-        bail!("self-update applies only to installer-managed installations");
+fn elevation_command(error: &IpcError) -> Option<String> {
+    let IpcError::Daemon { info, .. } = error else {
+        return None;
+    };
+    match serde_json::from_value::<proto::error::ErrorInfo>(info.clone()).ok()? {
+        proto::error::ErrorInfo::ElevationRequired { command } => Some(command),
+        _ => None,
     }
 }

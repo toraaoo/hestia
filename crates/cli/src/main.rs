@@ -219,8 +219,7 @@ enum Command {
         cmd: Option<commands::news::NewsCmd>,
     },
     /// Update Hestia itself from the release feed
-    #[command(name = "self-update")]
-    SelfUpdate {
+    Update {
         #[arg(short = 'y', long, help = "Apply without the confirmation prompt")]
         yes: bool,
     },
@@ -370,7 +369,7 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
         Command::Config { cmd } => commands::config::run(cmd).await,
         Command::Sync { cmd } => commands::sync::run(cmd).await,
         Command::News { cmd } => commands::news::run(cmd).await,
-        Command::SelfUpdate { yes } => commands::update::run(yes).await,
+        Command::Update { yes } => commands::update::run(yes).await,
         // Handled by `dispatch`: these answer with their own exit status.
         Command::Daemon { .. } | Command::Server { .. } | Command::Process { .. } => {
             unreachable!()
