@@ -106,7 +106,7 @@ export function ModpackInstallDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {m['content.install_title']({ name: project.title })}
