@@ -27,8 +27,8 @@ export const channels: Handlers = {
   'app.info': (): AppInfoResult => ({
     name: 'Hestia',
     version: '0.0.1',
-    id: 'gg.toraaoo.hestia',
-    vendor: 'toraaoo',
+    id: 'org.prytaneum.hestia',
+    vendor: 'prytaneum',
     channel: 'dev',
   }),
 

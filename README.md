@@ -179,7 +179,7 @@ is usually one line in each of five places.
 
 ## License
 
-[GPL-3.0-only](LICENSE) © 2026 toraaoo
+[GPL-3.0-only](LICENSE) © 2026 toraaoo — published by [prytaneum](https://github.com/prytaneum)
 
 The desktop skin preview and its thumbnail renderer are ported from
 [Modrinth's launcher](https://github.com/modrinth/code) (GPL-3.0-only, © Rinth, Inc.) — the reason Hestia is GPL rather
