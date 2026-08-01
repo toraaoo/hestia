@@ -268,6 +268,13 @@ leaves a tweaked one exactly as found, reporting which through
 disk — nothing there is yours yet
 ([0011](../decisions/0011-modpack-decomposes-into-existing-parts.md)).
 
+**Whether there is an update is asked, not assumed.**
+`<kind>.modpack.check_update` resolves the pack's newest published version
+through the same pick an unpinned update makes, and answers with both version
+numbers plus `updatable` — so what a front-end offers and what an update would
+install cannot disagree. A pack imported from a file has no catalogue behind it
+and answers with nothing to check, the same reason `fetch_update` refuses it.
+
 **A pack's mods are identified for free — or the long way round.** A pack index
 names each file by URL and hash alone, with no ids. A Modrinth CDN URL carries
 both, so `parse_file_url` recovers them and one bulk call fills in every title and

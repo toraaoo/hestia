@@ -9,7 +9,12 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { WarningNotice } from '@/components/warning-notice';
 import { m } from '@/paraglide/messages.js';
 import type { JobEntryKind } from '@/queries';
-import { useModpack, useRemoveModpack, useUpdateModpack } from '@/queries';
+import {
+  useModpack,
+  useModpackUpdateCheck,
+  useRemoveModpack,
+  useUpdateModpack,
+} from '@/queries';
 
 import { ProvisionProgressView } from '../components/provision-progress';
 import { SideCard } from './cards';
@@ -34,6 +39,11 @@ export function ModpackCard({
   const update = useUpdateModpack(kind, id);
   const remove = useRemoveModpack(kind, id);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const check = useModpackUpdateCheck(
+    kind,
+    id,
+    (pack.data?.projectId ?? '') !== '',
+  );
 
   if (pack.isLoading) return null;
   if (!pack.data) {
@@ -54,6 +64,9 @@ export function ModpackCard({
   // update against — the daemon refuses it, and the button should not offer it.
   const updatable = installed.projectId !== '';
   const busy = update.isPending || remove.isPending;
+  // An unreachable catalogue leaves the offer standing: the daemon is the one
+  // that decides, and refusing to try would be worse than a wasted call.
+  const upToDate = check.data ? !check.data.updatable : false;
 
   return (
     <SideCard title={m['content.modpack.title']()}>
@@ -97,19 +110,29 @@ export function ModpackCard({
         )}
         <WarningNotice warnings={update.data?.warnings} />
 
+        {updatable && upToDate && (
+          <p className="text-xs text-muted-foreground">
+            {m['content.modpack.up_to_date']()}
+          </p>
+        )}
+
         <div className="flex gap-2">
-          {updatable && (
+          {updatable && !upToDate && (
             <Button
               size="sm"
               variant="outline"
-              disabled={busy || running}
+              disabled={busy || running || check.isLoading}
               onClick={() =>
                 update
                   .mutateAsync({})
                   .catch((error) => toast.error(errorMessage(error)))
               }
             >
-              {m['content.modpack.update']()}
+              {check.data?.updatable
+                ? m['content.modpack.update_to']({
+                    version: check.data.latestVersionNumber,
+                  })
+                : m['content.modpack.update']()}
             </Button>
           )}
           <Button

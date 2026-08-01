@@ -355,6 +355,7 @@ One shared factory set, bound per entry kind, so servers and instances cannot dr
 | Factory                       | Channel                   | Variables                       |
 |-------------------------------|---------------------------|---------------------------------|
 | `.status(kind, id)`           | `<kind>.modpack.status`   | —                               |
+| `.updateCheck(kind, id)`      | `<kind>.modpack.check_update` | —                           |
 | `.install(kind)` *(job)*      | `<kind>.modpack.install`  | `ModpackInstallParams`          |
 | `.update(kind, id)` *(job)*   | `<kind>.modpack.update`   | `{ version?, allowDowngrade? }` |
 | `.remove(kind, id)`           | `<kind>.modpack.remove`   | —                               |

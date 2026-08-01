@@ -58,7 +58,9 @@
         "label": "Where to install"
       },
       "title": "Modpack",
-      "update": "Update pack"
+      "up_to_date": "On the newest published version.",
+      "update": "Update pack",
+      "update_to": "Update to {version}"
     },
     "no_target_for_kind": "No server or instance can take a {kind}.",
     "no_versions": "No versions.",

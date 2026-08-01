@@ -83,6 +83,12 @@ pub enum EntryModpackCmd {
             help = "Allow moving to a pack built for an older game version (saves do not downgrade)"
         )]
         downgrade: bool,
+        #[arg(
+            long,
+            conflicts_with_all = ["version", "downgrade"],
+            help = "Only report whether a newer pack version exists, without applying"
+        )]
+        check: bool,
     },
     /// Uninstall the pack's content, keeping files you have edited
     #[command(visible_alias = "rm")]
@@ -137,9 +143,10 @@ pub async fn run_entry(entry: EntryKind, name: String, cmd: EntryModpackCmd) -> 
     let client = connect().await?;
     match cmd {
         EntryModpackCmd::Status => status(&client, entry, &name).await,
-        EntryModpackCmd::Update { version, downgrade } => {
-            update(&client, entry, &name, version, downgrade).await
-        }
+        EntryModpackCmd::Update { check: true, .. } => check_update(&client, entry, &name).await,
+        EntryModpackCmd::Update {
+            version, downgrade, ..
+        } => update(&client, entry, &name, version, downgrade).await,
         EntryModpackCmd::Remove => remove(&client, entry, &name).await,
     }
 }
@@ -153,6 +160,28 @@ async fn status(client: &Client, entry: EntryKind, name: &str) -> Result<()> {
         return ui::show(View::note(format!("'{name}' was not built from a modpack")));
     };
     show_pack(&pack)
+}
+
+async fn check_update(client: &Client, entry: EntryKind, name: &str) -> Result<()> {
+    let update = match entry {
+        EntryKind::Server => client.modpack().server_check_update(name).await?,
+        EntryKind::Instance => client.modpack().instance_check_update(name).await?,
+    };
+    let Some(update) = update else {
+        return ui::show(View::note(format!(
+            "'{name}' runs no pack that can be checked"
+        )));
+    };
+    if !update.updatable {
+        return ui::show(View::note(format!(
+            "'{name}' is on the newest pack version ({})",
+            update.latest_version_number
+        )));
+    }
+    ui::show(View::detail([
+        ("current", update.current_version_number),
+        ("latest", update.latest_version_number),
+    ]))
 }
 
 async fn update(

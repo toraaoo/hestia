@@ -12,6 +12,7 @@ import * as entries from '../state/entries';
 import { type Handlers, now, str } from '../support';
 
 const PACK_MODS = ['sodium', 'fabric-api', 'lithium'];
+const LATEST = '1.5.0';
 
 interface Target {
   mode?: string;
@@ -132,6 +133,21 @@ function status(ref: string, server: boolean) {
   return { pack: entries.packOf(entry.id) };
 }
 
+function checkUpdate(ref: string, server: boolean) {
+  const entry = server ? entries.findServer(ref) : entries.findInstance(ref);
+  const installed = entries.packOf(entry.id);
+  if (!installed?.projectId) return {};
+  return {
+    update: {
+      currentVersionId: installed.versionId,
+      currentVersionNumber: installed.versionNumber,
+      latestVersionId: `${installed.projectId}-v1`,
+      latestVersionNumber: LATEST,
+      updatable: installed.versionNumber !== LATEST,
+    },
+  };
+}
+
 function remove(ref: string, server: boolean) {
   const entry = server ? entries.findServer(ref) : entries.findInstance(ref);
   const installed = entries.packOf(entry.id);
@@ -150,6 +166,9 @@ export const channels: Handlers = {
   'server.modpack.update': (p) => updateJob(p, true),
   'instance.modpack.status': (p) => status(str(p, 'instance'), false),
   'server.modpack.status': (p) => status(str(p, 'server'), true),
+  'instance.modpack.check_update': (p) =>
+    checkUpdate(str(p, 'instance'), false),
+  'server.modpack.check_update': (p) => checkUpdate(str(p, 'server'), true),
   'instance.modpack.remove': (p) => remove(str(p, 'instance'), false),
   'server.modpack.remove': (p) => remove(str(p, 'server'), true),
 };

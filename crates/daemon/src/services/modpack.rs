@@ -7,9 +7,10 @@
 
 use proto::error::{ErrorInfo, Field};
 use proto::modpack::{
-    InstanceModpackInstall, InstanceModpackRemove, InstanceModpackStatus, InstanceModpackUpdate,
-    ModpackJobResult, ModpackRef, ModpackStatusResult, ModpackTarget, ServerModpackInstall,
-    ServerModpackRemove, ServerModpackStatus, ServerModpackUpdate,
+    InstanceModpackCheckUpdate, InstanceModpackInstall, InstanceModpackRemove,
+    InstanceModpackStatus, InstanceModpackUpdate, ModpackJobResult, ModpackRef,
+    ModpackStatusResult, ModpackTarget, ModpackUpdateResult, ServerModpackCheckUpdate,
+    ServerModpackInstall, ServerModpackRemove, ServerModpackStatus, ServerModpackUpdate,
 };
 
 use super::guards::{instance_for, server_for, Intent};
@@ -68,6 +69,17 @@ fn register_instance(on: &mut Channels<'_>) {
             .entry_modpack(engine::EntryRef::Instance(&record.id))
             .map_err(crate::runtime::engine_error)?;
         Ok(ModpackStatusResult { pack })
+    });
+
+    on.handle::<InstanceModpackCheckUpdate, _, _>(|p, ctx| async move {
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
+        let update = ctx
+            .runtime
+            .engine()
+            .entry_modpack_update(engine::EntryRef::Instance(&record.id))
+            .await
+            .map_err(crate::runtime::engine_error)?;
+        Ok(ModpackUpdateResult { update })
     });
 
     on.handle::<InstanceModpackRemove, _, _>(|p, ctx| async move {
@@ -134,6 +146,17 @@ fn register_server(on: &mut Channels<'_>) {
             .entry_modpack(engine::EntryRef::Server(&record.id))
             .map_err(crate::runtime::engine_error)?;
         Ok(ModpackStatusResult { pack })
+    });
+
+    on.handle::<ServerModpackCheckUpdate, _, _>(|p, ctx| async move {
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
+        let update = ctx
+            .runtime
+            .engine()
+            .entry_modpack_update(engine::EntryRef::Server(&record.id))
+            .await
+            .map_err(crate::runtime::engine_error)?;
+        Ok(ModpackUpdateResult { update })
     });
 
     on.handle::<ServerModpackRemove, _, _>(|p, ctx| async move {

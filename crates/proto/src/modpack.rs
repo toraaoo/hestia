@@ -106,6 +106,29 @@ pub struct ModpackStatusResult {
     pub pack: Option<InstalledModpack>,
 }
 
+/// Whether the pack an entry runs has a newer published version, and which one
+/// an unpinned update would move it to.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct ModpackUpdate {
+    pub current_version_id: String,
+    pub current_version_number: String,
+    pub latest_version_id: String,
+    pub latest_version_number: String,
+    pub updatable: bool,
+}
+
+/// Absent when there is nothing to check: no pack, or one imported from a file,
+/// which has no catalogue behind it.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct ModpackUpdateResult {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub update: Option<ModpackUpdate>,
+}
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
@@ -231,6 +254,20 @@ impl Contract for ServerModpackStatus {
     const CHANNEL: &'static str = "server.modpack.status";
     type Params = ServerModpackRef;
     type Result = ModpackStatusResult;
+}
+
+pub struct InstanceModpackCheckUpdate;
+impl Contract for InstanceModpackCheckUpdate {
+    const CHANNEL: &'static str = "instance.modpack.check_update";
+    type Params = InstanceModpackRef;
+    type Result = ModpackUpdateResult;
+}
+
+pub struct ServerModpackCheckUpdate;
+impl Contract for ServerModpackCheckUpdate {
+    const CHANNEL: &'static str = "server.modpack.check_update";
+    type Params = ServerModpackRef;
+    type Result = ModpackUpdateResult;
 }
 
 pub struct InstanceModpackRemove;

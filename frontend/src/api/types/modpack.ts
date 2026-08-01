@@ -13,6 +13,8 @@ export type { ModpackRef } from "./generated/ModpackRef";
 export type { ModpackRemoveResult } from "./generated/ModpackRemoveResult";
 export type { ModpackStatusResult } from "./generated/ModpackStatusResult";
 export type { ModpackTarget } from "./generated/ModpackTarget";
+export type { ModpackUpdate } from "./generated/ModpackUpdate";
+export type { ModpackUpdateResult } from "./generated/ModpackUpdateResult";
 export type { ServerModpackInstallParams } from "./generated/ServerModpackInstallParams";
 export type { ServerModpackRef } from "./generated/ServerModpackRef";
 export type { ServerModpackUpdateParams } from "./generated/ServerModpackUpdateParams";

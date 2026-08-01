@@ -27,7 +27,9 @@ use proto::content::{
     ContentFailure, ContentProject, InstalledContent, ModpackFile, ResolvedModpack,
 };
 use proto::error::{EntryKind, ErrorInfo};
-use proto::modpack::{InstalledModpack, ModpackRef, ModpackRemoveResult, ModpackTarget};
+use proto::modpack::{
+    InstalledModpack, ModpackRef, ModpackRemoveResult, ModpackTarget, ModpackUpdate,
+};
 use proto::warning::WarningInfo;
 
 use super::content::entry::{EntryContent, EntryRef, EntrySide};
@@ -216,6 +218,29 @@ impl Engine {
     pub fn entry_modpack(&self, entry: EntryRef<'_>) -> Result<Option<InstalledModpack>> {
         let (_, ctx) = self.content_ctx(entry)?;
         Ok(modpack::load(&ctx.entry_dir))
+    }
+
+    /// Whether the entry's pack has a newer published version, over the same
+    /// pick an unpinned [`Self::update_entry_modpack`] makes. `None` when there
+    /// is nothing to check: no pack, or one imported from a file.
+    pub async fn entry_modpack_update(&self, entry: EntryRef<'_>) -> Result<Option<ModpackUpdate>> {
+        let (_, ctx) = self.content_ctx(entry)?;
+        let Some(current) = modpack::load(&ctx.entry_dir) else {
+            return Ok(None);
+        };
+        if current.project_id.is_empty() {
+            return Ok(None);
+        }
+        let latest = self
+            .pick_pack_version(&current.source, &current.project_id, "")
+            .await?;
+        Ok(Some(ModpackUpdate {
+            updatable: latest.id != current.version_id,
+            current_version_id: current.version_id,
+            current_version_number: current.version_number,
+            latest_version_id: latest.id,
+            latest_version_number: latest.version_number,
+        }))
     }
 
     pub fn remove_entry_modpack(&self, target: EntryRef<'_>) -> Result<ModpackRemoveResult> {

@@ -17,6 +17,7 @@ import type {
   ModpackRef,
   ModpackRemoveResult,
   ModpackTarget,
+  ModpackUpdate,
 } from './types/modpack';
 
 const topics = {
@@ -122,6 +123,29 @@ export async function serverStatus(
     { server },
   );
   return result.pack ?? null;
+}
+
+/** `null` when there is nothing to check: no pack, or one from a file. */
+export async function instanceCheckUpdate(
+  instance: string,
+): Promise<ModpackUpdate | null> {
+  const result = await call<{ update?: ModpackUpdate }>(
+    'instance.modpack.check_update',
+    { instance },
+    { timeoutMs: 120_000 },
+  );
+  return result.update ?? null;
+}
+
+export async function serverCheckUpdate(
+  server: string,
+): Promise<ModpackUpdate | null> {
+  const result = await call<{ update?: ModpackUpdate }>(
+    'server.modpack.check_update',
+    { server },
+    { timeoutMs: 120_000 },
+  );
+  return result.update ?? null;
 }
 
 export function removeInstance(instance: string): Promise<ModpackRemoveResult> {

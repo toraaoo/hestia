@@ -12,6 +12,7 @@ import type {
   ModpackDoneEvent,
   ModpackRemoveResult,
   ModpackTarget,
+  ModpackUpdate,
 } from '../api';
 import type { PackRef } from '../api/modpack';
 import * as api from '../api/modpack';
@@ -48,6 +49,18 @@ export const modpackQueries = {
       queryKey: entryKeys(kind).modpack(id),
       queryFn: (): Promise<InstalledModpack | null> =>
         kind === 'server' ? api.serverStatus(id) : api.instanceStatus(id),
+    }),
+  /** A catalogue round trip, so it is not refetched on every mount. */
+  updateCheck: (kind: JobEntryKind, id: string, enabled = true) =>
+    queryOptions({
+      queryKey: [...entryKeys(kind).modpack(id), 'check'],
+      queryFn: (): Promise<ModpackUpdate | null> =>
+        kind === 'server'
+          ? api.serverCheckUpdate(id)
+          : api.instanceCheckUpdate(id),
+      enabled,
+      staleTime: 10 * 60_000,
+      retry: false,
     }),
 };
 
@@ -88,6 +101,14 @@ export const modpackMutations = {
 
 export function useModpack(kind: JobEntryKind, id: string) {
   return useQuery(modpackQueries.status(kind, id));
+}
+
+export function useModpackUpdateCheck(
+  kind: JobEntryKind,
+  id: string,
+  enabled = true,
+) {
+  return useQuery(modpackQueries.updateCheck(kind, id, enabled));
 }
 
 export function useInstallModpack(kind: JobEntryKind) {

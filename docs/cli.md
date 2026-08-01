@@ -405,6 +405,7 @@ What the entry does with the pack as a whole is entry-first:
 
 ```bash
 hestia instance cozy modpack status     # which pack, which version
+hestia instance cozy modpack update --check   # is there a newer one?
 hestia instance cozy modpack update     # → the newest published version
 hestia instance cozy modpack update 6.3.0 --downgrade
 hestia instance cozy modpack remove     # keeps files you have edited

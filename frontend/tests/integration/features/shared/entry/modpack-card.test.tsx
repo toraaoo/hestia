@@ -36,7 +36,9 @@ const card = (running: boolean) =>
   );
 
 const updateButton = () =>
-  screen.getByRole('button', { name: m['content.modpack.update']() });
+  screen.getByRole('button', {
+    name: m['content.modpack.update_to']({ version: '1.5.0' }),
+  });
 const removeButton = () =>
   screen.getByRole('button', { name: m['content.modpack.remove.action']() });
 
@@ -67,6 +69,19 @@ describe('the modpack card', () => {
     await waitFor(() => expect(removeButton()).toBeDefined());
     expect(
       screen.queryByRole('button', { name: m['content.modpack.update']() }),
+    ).toBeNull();
+  });
+
+  it('offers nothing to update when the pack is on the newest version', async () => {
+    setPack(instance.id, pack({ versionNumber: '1.5.0' }));
+    card(false);
+    await waitFor(() =>
+      expect(screen.getByText(m['content.modpack.up_to_date']())).toBeDefined(),
+    );
+    expect(
+      screen.queryByRole('button', {
+        name: m['content.modpack.update_to']({ version: '1.5.0' }),
+      }),
     ).toBeNull();
   });
 

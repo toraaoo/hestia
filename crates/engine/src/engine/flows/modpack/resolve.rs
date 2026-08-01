@@ -148,7 +148,7 @@ impl Engine {
         }
         let version = self.pick_pack_version(&source, &project.id, &pin).await?;
         job.check()?;
-        let (resolved, bytes) = self.content.fetch_modpack(&source, &version).await?;
+        let (resolved, bytes) = self.content.fetch_modpack(&source, &version.id).await?;
         Ok((resolved, Some(project), pack::Archive::open(bytes)?))
     }
 
@@ -180,7 +180,12 @@ impl Engine {
     /// Newest-first, so an empty pin takes the newest release and falls back to
     /// the newest of any channel. Deliberately unfiltered by game version: a
     /// pack *states* its game version rather than being selected for one.
-    async fn pick_pack_version(&self, source: &str, project: &str, pin: &str) -> Result<String> {
+    pub(super) async fn pick_pack_version(
+        &self,
+        source: &str,
+        project: &str,
+        pin: &str,
+    ) -> Result<ContentVersion> {
         let versions = self
             .content
             .versions(&VersionQuery {
@@ -203,11 +208,11 @@ impl Engine {
             let pinned = [pin.to_string()];
             if let Ok(found) = self.content.versions_by_id(source, &pinned).await {
                 if let Some(version) = found.into_iter().next() {
-                    return Ok(version.id);
+                    return Ok(version);
                 }
             }
         }
-        picked.map(|v| v.id.clone()).ok_or_else(|| {
+        picked.cloned().ok_or_else(|| {
             ErrorInfo::VersionNotFound {
                 reference: match pin.is_empty() {
                     true => project.to_string(),

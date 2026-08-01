@@ -6,18 +6,24 @@
 //! the done event, which carries the entry the pack landed in. That id is the
 //! only way a caller learns which entry a *creating* install just made.
 
+use std::time::Duration;
+
 use ipc::errors::IpcError;
 use proto::minecraft::ProvisionProgress;
 use proto::modpack::{
-    InstalledModpack, InstanceModpackInstall, InstanceModpackInstallParams, InstanceModpackRef,
-    InstanceModpackRemove, InstanceModpackStatus, InstanceModpackUpdate,
-    InstanceModpackUpdateParams, ModpackDoneEvent, ModpackRef, ModpackRemoveResult, ModpackTarget,
+    InstalledModpack, InstanceModpackCheckUpdate, InstanceModpackInstall,
+    InstanceModpackInstallParams, InstanceModpackRef, InstanceModpackRemove, InstanceModpackStatus,
+    InstanceModpackUpdate, InstanceModpackUpdateParams, ModpackDoneEvent, ModpackRef,
+    ModpackRemoveResult, ModpackTarget, ModpackUpdate, ServerModpackCheckUpdate,
     ServerModpackInstall, ServerModpackInstallParams, ServerModpackRef, ServerModpackRemove,
     ServerModpackStatus, ServerModpackUpdate, ServerModpackUpdateParams,
 };
 
 use crate::facades::jobs::forward;
 use crate::session::{job_id, Session};
+
+/// A catalogue round trip, so it outlives the default call timeout.
+const CHECK_TIMEOUT: Duration = Duration::from_secs(120);
 
 pub struct Modpack<'a> {
     pub(crate) session: &'a Session,
@@ -150,6 +156,36 @@ impl Modpack<'_> {
             .call::<ServerModpackStatus>(&params)
             .await?
             .pack)
+    }
+
+    /// Whether the instance's pack has a newer published version. `None` when
+    /// there is nothing to check — no pack, or one imported from a file.
+    pub async fn instance_check_update(
+        &self,
+        instance: &str,
+    ) -> Result<Option<ModpackUpdate>, IpcError> {
+        let params = InstanceModpackRef {
+            instance: instance.to_string(),
+        };
+        Ok(self
+            .session
+            .call_with_timeout::<InstanceModpackCheckUpdate>(&params, CHECK_TIMEOUT)
+            .await?
+            .update)
+    }
+
+    pub async fn server_check_update(
+        &self,
+        server: &str,
+    ) -> Result<Option<ModpackUpdate>, IpcError> {
+        let params = ServerModpackRef {
+            server: server.to_string(),
+        };
+        Ok(self
+            .session
+            .call_with_timeout::<ServerModpackCheckUpdate>(&params, CHECK_TIMEOUT)
+            .await?
+            .update)
     }
 
     pub async fn remove_instance(&self, instance: &str) -> Result<ModpackRemoveResult, IpcError> {

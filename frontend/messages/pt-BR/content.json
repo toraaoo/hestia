@@ -58,7 +58,9 @@
         "label": "Onde instalar"
       },
       "title": "Modpack",
-      "update": "Atualizar pacote"
+      "up_to_date": "Já está na versão publicada mais recente.",
+      "update": "Atualizar pacote",
+      "update_to": "Atualizar para {version}"
     },
     "no_target_for_kind": "Nenhum servidor ou instância pode receber um {kind}.",
     "no_versions": "Nenhuma versão.",
