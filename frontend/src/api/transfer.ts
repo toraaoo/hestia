@@ -9,8 +9,7 @@
  */
 
 import { call } from './core/ipc';
-import { jobId, runJob } from './core/jobs';
-import type { ProvisionProgress } from './types/minecraft';
+import { type JobRun, runJob } from './core/jobs';
 import type {
   ArchiveEntry,
   ArchiveInfo,
@@ -60,20 +59,18 @@ export interface ExportInput {
 export function exportInstance(
   instance: string,
   input: ExportInput,
-  onProgress?: (progress: ProvisionProgress) => void,
+  job: JobRun,
 ): Promise<ExportDoneEvent> {
-  const id = jobId('instance-export');
   return runJob<ExportDoneEvent>({
-    id,
+    ...job,
     topics: exportTopics,
-    onProgress,
     start: () =>
       call('instance.export', {
         instance,
         format: input.format,
         destination: input.destination ?? '',
         exclude: input.exclude ?? [],
-        id,
+        id: job.id,
       }),
   });
 }
@@ -85,13 +82,11 @@ export function exportInstance(
 export function importInstance(
   path: string,
   name = '',
-  onProgress?: (progress: ProvisionProgress) => void,
+  job: JobRun,
 ): Promise<ImportDoneEvent> {
-  const id = jobId('instance-import');
   return runJob<ImportDoneEvent>({
-    id,
+    ...job,
     topics: importTopics,
-    onProgress,
-    start: () => call('instance.import', { path, name, id }),
+    start: () => call('instance.import', { path, name, id: job.id }),
   });
 }

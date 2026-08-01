@@ -7,7 +7,7 @@
 
 import type { ContentAddInput } from './content';
 import { call, tryCall } from './core/ipc';
-import { jobId, runJob } from './core/jobs';
+import { type JobRun, runJob } from './core/jobs';
 import type {
   ContentDoneEvent,
   ContentKind,
@@ -33,13 +33,10 @@ import type {
   Flavor,
   GameVersion,
   InstanceProfile,
-  ProvisionProgress,
   ResolveParams,
 } from './types/minecraft';
 import type { ProcessLogLine } from './types/process';
 import type { ServerPingResult } from './types/server';
-
-type OnProgress = (progress: ProvisionProgress) => void;
 
 export async function flavors(): Promise<Flavor[]> {
   const result = await call<{ flavors: Flavor[] }>('instance.flavors');
@@ -155,18 +152,16 @@ export function pingAddress(address: string): Promise<ServerPingResult> {
  */
 export function launch(
   params: Partial<InstanceLaunchParams>,
-  onProgress?: OnProgress,
+  job: JobRun,
 ): Promise<InstanceLaunchDoneEvent> {
-  const id = jobId('instance-launch');
   return runJob<InstanceLaunchDoneEvent>({
-    id,
+    ...job,
     topics: {
       progress: 'instance.launch.progress',
       done: 'instance.launch.done',
       error: 'instance.launch.error',
     },
-    onProgress,
-    start: () => call('instance.launch', { ...params, id }),
+    start: () => call('instance.launch', { ...params, id: job.id }),
   });
 }
 
@@ -292,14 +287,13 @@ export const profiles = {
   apply(
     instance: string,
     profile: string,
-    onProgress?: OnProgress,
+    job: JobRun,
   ): Promise<ContentDoneEvent> {
-    const id = jobId('profile-apply');
     return runJob<ContentDoneEvent>({
-      id,
+      ...job,
       topics: { done: 'content.done', error: 'content.error' },
-      onProgress,
-      start: () => call('instance.profile.apply', { instance, profile, id }),
+      start: () =>
+        call('instance.profile.apply', { instance, profile, id: job.id }),
     });
   },
 };
@@ -309,18 +303,17 @@ export const content = {
   add(
     instance: string,
     spec: ContentAddInput,
-    onProgress?: OnProgress,
+    job: JobRun,
   ): Promise<ContentDoneEvent> {
-    const id = jobId('instance-content');
     return runJob<ContentDoneEvent>({
-      id,
+      ...job,
       topics: {
         progress: 'content.progress',
         done: 'content.done',
         error: 'content.error',
       },
-      onProgress,
-      start: () => call('instance.content.add', { instance, ...spec, id }),
+      start: () =>
+        call('instance.content.add', { instance, ...spec, id: job.id }),
     });
   },
 
@@ -342,19 +335,17 @@ export const content = {
     instance: string,
     kind: ContentKind,
     item = '',
-    onProgress?: OnProgress,
+    job: JobRun,
   ): Promise<ContentDoneEvent> {
-    const id = jobId('instance-content-update');
     return runJob<ContentDoneEvent>({
-      id,
+      ...job,
       topics: {
         progress: 'content.progress',
         done: 'content.done',
         error: 'content.error',
       },
-      onProgress,
       start: () =>
-        call('instance.content.update', { instance, kind, item, id }),
+        call('instance.content.update', { instance, kind, item, id: job.id }),
     });
   },
 
@@ -394,24 +385,22 @@ export const content = {
     kind: ContentKind,
     item: string,
     version: string,
-    onProgress?: OnProgress,
+    job: JobRun,
   ): Promise<ContentDoneEvent> {
-    const id = jobId('instance-content-set-version');
     return runJob<ContentDoneEvent>({
-      id,
+      ...job,
       topics: {
         progress: 'content.progress',
         done: 'content.done',
         error: 'content.error',
       },
-      onProgress,
       start: () =>
         call('instance.content.set_version', {
           instance,
           kind,
           item,
           version,
-          id,
+          id: job.id,
         }),
     });
   },

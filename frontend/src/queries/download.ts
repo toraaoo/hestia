@@ -12,6 +12,6 @@ export const downloadMutations = {
     >({
       mutationKey: ['downloads', 'start'],
       meta: (spec) => ({ kind: 'download', label: `download ${spec.url}` }),
-      run: (spec, onProgress) => api.start(spec, onProgress),
+      run: (spec, job) => api.start(spec, job),
     }),
 };

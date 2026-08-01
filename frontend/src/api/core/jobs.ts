@@ -50,23 +50,21 @@ function cancelledTopic(done: string): string {
   return done.replace(/\.done$/, '.cancelled');
 }
 
-export interface JobOptions<TProgress = ProvisionProgress> {
+/**
+ * One run's identity, minted by the caller and threaded into the API function.
+ * Passed in rather than reported back so the caller's tracking cannot be
+ * orphaned by an `await` on the way to `runJob`.
+ */
+export interface JobRun<TProgress = ProvisionProgress> {
   id: string;
-  topics: JobTopics;
   onProgress?: (progress: TProgress) => void;
-  /** The call that starts the job on the daemon. */
-  start: () => Promise<unknown>;
 }
 
-let watcher: ((id: string) => void) | null = null;
-
-/**
- * Report the id of the job started next, so a caller that did not mint it can
- * still cancel it. `runJob` reports before its first `await`, so the window is
- * synchronous and two concurrent starts cannot interleave.
- */
-export function watchNextJob(report: (id: string) => void): void {
-  watcher = report;
+export interface JobOptions<TProgress = ProvisionProgress>
+  extends JobRun<TProgress> {
+  topics: JobTopics;
+  /** The call that starts the job on the daemon. */
+  start: () => Promise<unknown>;
 }
 
 /**
@@ -78,8 +76,6 @@ export async function runJob<
   TProgress = ProvisionProgress,
 >(options: JobOptions<TProgress>): Promise<TDone> {
   const { id, topics, onProgress } = options;
-  watcher?.(id);
-  watcher = null;
   let resolveOutcome!: (done: TDone) => void;
   let rejectOutcome!: (error: HestiaError) => void;
   const outcome = new Promise<TDone>((resolve, reject) => {

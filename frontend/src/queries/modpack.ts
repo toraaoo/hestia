@@ -57,10 +57,10 @@ export const modpackMutations = {
     jobMutation<ModpackDoneEvent, InstallInput>({
       mutationKey: ['modpack', kind, 'install'],
       meta: () => ({ kind: 'modpack.install', label: 'install modpack' }),
-      run: ({ pack, target, eula, port }, onProgress) =>
+      run: ({ pack, target, eula, port }, job) =>
         kind === 'server'
-          ? api.installServer(pack, target, { eula, port }, onProgress)
-          : api.installInstance(pack, target, onProgress),
+          ? api.installServer(pack, target, { eula, port }, job)
+          : api.installInstance(pack, target, job),
       invalidates: () => [keys.servers.all, keys.instances.all],
     }),
   update: (kind: JobEntryKind, id: string) =>
@@ -71,10 +71,10 @@ export const modpackMutations = {
         label: 'update modpack',
         entry: { kind, id },
       }),
-      run: ({ version, allowDowngrade }, onProgress) =>
+      run: ({ version, allowDowngrade }, job) =>
         kind === 'server'
-          ? api.updateServer(id, version, allowDowngrade, onProgress)
-          : api.updateInstance(id, version, allowDowngrade, onProgress),
+          ? api.updateServer(id, version, allowDowngrade, job)
+          : api.updateInstance(id, version, allowDowngrade, job),
       invalidates: () => invalidates(kind, id),
     }),
   remove: (kind: JobEntryKind, id: string) =>

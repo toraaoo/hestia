@@ -1,7 +1,7 @@
 /** The `java.*` channels. */
 
 import { call } from './core/ipc';
-import { jobId, runJob } from './core/jobs';
+import { type JobRun, runJob } from './core/jobs';
 import type {
   JavaInstallDoneEvent,
   JavaInstallProgress,
@@ -21,20 +21,22 @@ export async function list(): Promise<JavaRuntime[]> {
 
 export function install(
   major: number,
-  options: { force?: boolean } = {},
-  onProgress?: (progress: JavaInstallProgress) => void,
+  options: { force?: boolean },
+  job: JobRun<JavaInstallProgress>,
 ): Promise<JavaInstallDoneEvent> {
-  const id = jobId('java-install');
   return runJob<JavaInstallDoneEvent, JavaInstallProgress>({
-    id,
+    ...job,
     topics: {
       progress: 'java.install.progress',
       done: 'java.install.done',
       error: 'java.install.error',
     },
-    onProgress,
     start: () =>
-      call('java.install', { major, id, force: options.force ?? false }),
+      call('java.install', {
+        major,
+        id: job.id,
+        force: options.force ?? false,
+      }),
   });
 }
 

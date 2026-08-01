@@ -219,8 +219,8 @@ export const instanceMutations = {
         label: 'launch',
         entry: { kind: 'instance', id },
       }),
-      run: ({ id, newSession }, onProgress) =>
-        api.launch({ instance: id, newSession }, onProgress),
+      run: ({ id, newSession }, job) =>
+        api.launch({ instance: id, newSession }, job),
       invalidates: ({ id }) => [
         keys.instances.list(),
         keys.instances.detail(id),
@@ -241,8 +241,8 @@ export const instanceMutations = {
           label: 'launch',
           entry: { kind: 'instance', id },
         }),
-        run: ({ id, quickPlay, newSession }, onProgress) =>
-          api.launch({ instance: id, quickPlay, newSession }, onProgress),
+        run: ({ id, quickPlay, newSession }, job) =>
+          api.launch({ instance: id, quickPlay, newSession }, job),
         invalidates: ({ id }) => [
           keys.instances.list(),
           keys.instances.detail(id),
@@ -333,8 +333,7 @@ export const instanceMutations = {
           label: `apply ${profile}`,
           entry: { kind: 'instance', id },
         }),
-        run: (profile, onProgress) =>
-          api.profiles.apply(id, profile, onProgress),
+        run: (profile, job) => api.profiles.apply(id, profile, job),
         invalidates: () => [
           keys.instances.content(id),
           keys.instances.profiles(id),

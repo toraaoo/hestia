@@ -10,8 +10,7 @@
  */
 
 import { call } from './core/ipc';
-import { jobId, runJob } from './core/jobs';
-import type { ProvisionProgress } from './types/minecraft';
+import { type JobRun, runJob } from './core/jobs';
 import type {
   InstalledModpack,
   ModpackDoneEvent,
@@ -32,14 +31,13 @@ export type PackRef = Partial<ModpackRef>;
 export function installInstance(
   pack: PackRef,
   target: ModpackTarget,
-  onProgress?: (progress: ProvisionProgress) => void,
+  job: JobRun,
 ): Promise<ModpackDoneEvent> {
-  const id = jobId('instance-modpack-install');
   return runJob<ModpackDoneEvent>({
-    id,
+    ...job,
     topics,
-    onProgress,
-    start: () => call('instance.modpack.install', { ...pack, target, id }),
+    start: () =>
+      call('instance.modpack.install', { ...pack, target, id: job.id }),
   });
 }
 
@@ -47,16 +45,19 @@ export function installInstance(
 export function installServer(
   pack: PackRef,
   target: ModpackTarget,
-  options: { eula?: boolean; port?: number } = {},
-  onProgress?: (progress: ProvisionProgress) => void,
+  options: { eula?: boolean; port?: number },
+  job: JobRun,
 ): Promise<ModpackDoneEvent> {
-  const id = jobId('server-modpack-install');
   return runJob<ModpackDoneEvent>({
-    id,
+    ...job,
     topics,
-    onProgress,
     start: () =>
-      call('server.modpack.install', { ...pack, target, ...options, id }),
+      call('server.modpack.install', {
+        ...pack,
+        target,
+        ...options,
+        id: job.id,
+      }),
   });
 }
 
@@ -68,19 +69,17 @@ export function updateInstance(
   instance: string,
   version = '',
   allowDowngrade = false,
-  onProgress?: (progress: ProvisionProgress) => void,
+  job: JobRun,
 ): Promise<ModpackDoneEvent> {
-  const id = jobId('instance-modpack-update');
   return runJob<ModpackDoneEvent>({
-    id,
+    ...job,
     topics,
-    onProgress,
     start: () =>
       call('instance.modpack.update', {
         instance,
         version,
         allowDowngrade,
-        id,
+        id: job.id,
       }),
   });
 }
@@ -89,15 +88,18 @@ export function updateServer(
   server: string,
   version = '',
   allowDowngrade = false,
-  onProgress?: (progress: ProvisionProgress) => void,
+  job: JobRun,
 ): Promise<ModpackDoneEvent> {
-  const id = jobId('server-modpack-update');
   return runJob<ModpackDoneEvent>({
-    id,
+    ...job,
     topics,
-    onProgress,
     start: () =>
-      call('server.modpack.update', { server, version, allowDowngrade, id }),
+      call('server.modpack.update', {
+        server,
+        version,
+        allowDowngrade,
+        id: job.id,
+      }),
   });
 }
 

@@ -48,7 +48,7 @@ export const transferMutations = {
         label: `export ${name} (${input.format})`,
         entry: { kind: 'instance', id },
       }),
-      run: (input, onProgress) => api.exportInstance(id, input, onProgress),
+      run: (input, job) => api.exportInstance(id, input, job),
       invalidates: () => [[FOOTPRINT]],
     }),
   import: () =>
@@ -58,8 +58,7 @@ export const transferMutations = {
         kind: 'instance.import',
         label: `import ${fileName(path)}`,
       }),
-      run: ({ path, name }, onProgress) =>
-        api.importInstance(path, name ?? '', onProgress),
+      run: ({ path, name }, job) => api.importInstance(path, name ?? '', job),
       invalidates: () => [keys.instances.list()],
     }),
 };

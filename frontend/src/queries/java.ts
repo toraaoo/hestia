@@ -32,8 +32,7 @@ export const javaMutations = {
         kind: 'java.install',
         label: `install java ${major}`,
       }),
-      run: ({ major, force }, onProgress) =>
-        api.install(major, { force }, onProgress),
+      run: ({ major, force }, job) => api.install(major, { force }, job),
       invalidates: () => [keys.java.all],
     }),
   uninstall: () =>

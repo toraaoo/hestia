@@ -10,19 +10,17 @@ import type {
   ContentAddInput,
   ContentDoneEvent,
   ContentKind,
-  ProvisionProgress,
+  JobRun,
 } from '../api';
 import { mutation } from './core';
 import { type JobEntryKind, jobMutation } from './jobs';
-
-type OnProgress = (progress: ProvisionProgress) => void;
 
 /** The content api surface both `serverApi.content` and `instanceApi.content` satisfy. */
 export interface EntryContentApi {
   add(
     id: string,
     spec: ContentAddInput,
-    onProgress?: OnProgress,
+    job: JobRun,
   ): Promise<ContentDoneEvent>;
   remove(
     id: string,
@@ -33,8 +31,8 @@ export interface EntryContentApi {
   update(
     id: string,
     kind: ContentKind,
-    item?: string,
-    onProgress?: OnProgress,
+    item: string | undefined,
+    job: JobRun,
   ): Promise<ContentDoneEvent>;
   enable(
     id: string,
@@ -48,7 +46,7 @@ export interface EntryContentApi {
     kind: ContentKind,
     item: string,
     version: string,
-    onProgress?: OnProgress,
+    job: JobRun,
   ): Promise<ContentDoneEvent>;
 }
 
@@ -81,7 +79,7 @@ export function entryContentFactories(cfg: EntryContentConfig) {
           label: `add ${spec.kind}`,
           entry: { kind: cfg.kind, id },
         }),
-        run: (spec, onProgress) => cfg.api.add(id, spec, onProgress),
+        run: (spec, job) => cfg.api.add(id, spec, job),
         invalidates: () => invalidates(id),
       }),
     remove: (id: string) =>
@@ -100,8 +98,7 @@ export function entryContentFactories(cfg: EntryContentConfig) {
           label: `update ${kind}s`,
           entry: { kind: cfg.kind, id },
         }),
-        run: ({ kind, item }, onProgress) =>
-          cfg.api.update(id, kind, item, onProgress),
+        run: ({ kind, item }, job) => cfg.api.update(id, kind, item, job),
         invalidates: () => invalidates(id),
       }),
     enable: (id: string) =>
@@ -125,8 +122,8 @@ export function entryContentFactories(cfg: EntryContentConfig) {
           label: `pin ${kind}`,
           entry: { kind: cfg.kind, id },
         }),
-        run: ({ kind, item, version }, onProgress) =>
-          cfg.api.setVersion(id, kind, item, version, onProgress),
+        run: ({ kind, item, version }, job) =>
+          cfg.api.setVersion(id, kind, item, version, job),
         invalidates: () => invalidates(id),
       }),
   };

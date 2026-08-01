@@ -36,10 +36,10 @@ export {
 export {
   JobCancelled,
   type JobOptions,
+  type JobRun,
   type JobTopics,
   jobId,
   runJob,
-  watchNextJob,
 } from './core/jobs';
 export { warningHint, warningMessage } from './core/warnings';
 export * as daemon from './daemon';

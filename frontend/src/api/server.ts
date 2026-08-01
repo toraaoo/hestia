@@ -8,7 +8,7 @@
 
 import type { ContentAddInput } from './content';
 import { call, tryCall } from './core/ipc';
-import { jobId, runJob } from './core/jobs';
+import { type JobRun, runJob } from './core/jobs';
 import type { BackupInfo } from './types/backup';
 import type {
   ContentDoneEvent,
@@ -20,7 +20,6 @@ import type {
   ConfigEntry,
   Flavor,
   GameVersion,
-  ProvisionProgress,
   ResolveParams,
   ServerProfile,
 } from './types/minecraft';
@@ -34,8 +33,6 @@ import type {
   ServerUpdateDoneEvent,
   ServerUpdateParams,
 } from './types/server';
-
-type OnProgress = (progress: ProvisionProgress) => void;
 
 export async function flavors(): Promise<Flavor[]> {
   const result = await call<{ flavors: Flavor[] }>('server.flavors');
@@ -87,35 +84,31 @@ export function ping(server: string): Promise<ServerPingResult> {
 
 export async function create(
   params: Partial<ServerCreateParams>,
-  onProgress?: OnProgress,
+  job: JobRun,
 ): Promise<ServerCreateDoneEvent> {
-  const id = jobId('server-create');
   return await runJob<ServerCreateDoneEvent>({
-    id,
+    ...job,
     topics: {
       progress: 'server.create.progress',
       done: 'server.create.done',
       error: 'server.create.error',
     },
-    onProgress,
-    start: () => call('server.create', { ...params, id }),
+    start: () => call('server.create', { ...params, id: job.id }),
   });
 }
 
 export async function update(
   params: Omit<ServerUpdateParams, 'id'>,
-  onProgress?: OnProgress,
+  job: JobRun,
 ): Promise<ServerUpdateDoneEvent> {
-  const id = jobId('server-update');
   return await runJob<ServerUpdateDoneEvent>({
-    id,
+    ...job,
     topics: {
       progress: 'server.update.progress',
       done: 'server.update.done',
       error: 'server.update.error',
     },
-    onProgress,
-    start: () => call('server.update', { ...params, id }),
+    start: () => call('server.update', { ...params, id: job.id }),
   });
 }
 
@@ -188,13 +181,11 @@ export const config = {
 
 export const backup = {
   /** Archives a running server live (world saving pauses over RCON). */
-  async create(server: string, onProgress?: OnProgress): Promise<BackupInfo> {
-    const id = jobId('server-backup');
+  async create(server: string, job: JobRun): Promise<BackupInfo> {
     const done = await runJob<{ id: string; backup: BackupInfo }>({
-      id,
+      ...job,
       topics: { done: 'backup.done', error: 'backup.error' },
-      onProgress,
-      start: () => call('server.backup.create', { server, id }),
+      start: () => call('server.backup.create', { server, id: job.id }),
     });
     return done.backup;
   },
@@ -210,15 +201,13 @@ export const backup = {
   async restore(
     server: string,
     backupId: string,
-    onProgress?: OnProgress,
+    job: JobRun,
   ): Promise<BackupInfo> {
-    const id = jobId('server-restore');
     const done = await runJob<{ id: string; backup: BackupInfo }>({
-      id,
+      ...job,
       topics: { done: 'backup.done', error: 'backup.error' },
-      onProgress,
       start: () =>
-        call('server.backup.restore', { server, backup: backupId, id }),
+        call('server.backup.restore', { server, backup: backupId, id: job.id }),
     });
     return done.backup;
   },
@@ -233,18 +222,16 @@ export const content = {
   add(
     server: string,
     spec: ContentAddInput,
-    onProgress?: OnProgress,
+    job: JobRun,
   ): Promise<ContentDoneEvent> {
-    const id = jobId('server-content');
     return runJob<ContentDoneEvent>({
-      id,
+      ...job,
       topics: {
         progress: 'content.progress',
         done: 'content.done',
         error: 'content.error',
       },
-      onProgress,
-      start: () => call('server.content.add', { server, ...spec, id }),
+      start: () => call('server.content.add', { server, ...spec, id: job.id }),
     });
   },
 
@@ -266,18 +253,17 @@ export const content = {
     server: string,
     kind: ContentKind,
     item = '',
-    onProgress?: OnProgress,
+    job: JobRun,
   ): Promise<ContentDoneEvent> {
-    const id = jobId('server-content-update');
     return runJob<ContentDoneEvent>({
-      id,
+      ...job,
       topics: {
         progress: 'content.progress',
         done: 'content.done',
         error: 'content.error',
       },
-      onProgress,
-      start: () => call('server.content.update', { server, kind, item, id }),
+      start: () =>
+        call('server.content.update', { server, kind, item, id: job.id }),
     });
   },
 
@@ -317,19 +303,23 @@ export const content = {
     kind: ContentKind,
     item: string,
     version: string,
-    onProgress?: OnProgress,
+    job: JobRun,
   ): Promise<ContentDoneEvent> {
-    const id = jobId('server-content-set-version');
     return runJob<ContentDoneEvent>({
-      id,
+      ...job,
       topics: {
         progress: 'content.progress',
         done: 'content.done',
         error: 'content.error',
       },
-      onProgress,
       start: () =>
-        call('server.content.set_version', { server, kind, item, version, id }),
+        call('server.content.set_version', {
+          server,
+          kind,
+          item,
+          version,
+          id: job.id,
+        }),
     });
   },
 };

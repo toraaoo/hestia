@@ -121,7 +121,7 @@ export const serverMutations = {
         kind: 'server.create',
         label: `create ${params.name || `${params.flavor} ${params.version}`}`,
       }),
-      run: (params, onProgress) => api.create(params, onProgress),
+      run: (params, job) => api.create(params, job),
       invalidates: () => [keys.servers.list()],
     }),
   update: (id: string) =>
@@ -135,8 +135,7 @@ export const serverMutations = {
         label: `update to ${params.version}`,
         entry: { kind: 'server', id },
       }),
-      run: (params, onProgress) =>
-        api.update({ ...params, server: id }, onProgress),
+      run: (params, job) => api.update({ ...params, server: id }, job),
       invalidates: () => [
         keys.servers.list(),
         keys.servers.detail(id),
@@ -222,7 +221,7 @@ export const serverMutations = {
           label: 'back up',
           entry: { kind: 'server', id },
         }),
-        run: (_variables, onProgress) => api.backup.create(id, onProgress),
+        run: (_variables, job) => api.backup.create(id, job),
         invalidates: () => [keys.servers.backups(id), keys.servers.info(id)],
       }),
     /** Refused while the server runs or is busy; swaps `data/` wholesale. */
@@ -234,8 +233,7 @@ export const serverMutations = {
           label: 'restore backup',
           entry: { kind: 'server', id },
         }),
-        run: (backupId, onProgress) =>
-          api.backup.restore(id, backupId, onProgress),
+        run: (backupId, job) => api.backup.restore(id, backupId, job),
         invalidates: () => [keys.servers.detail(id), keys.servers.info(id)],
       }),
     remove: (id: string) =>

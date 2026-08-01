@@ -15,8 +15,8 @@ import {
 } from '@tanstack/react-query';
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { logger } from '@/lib/log';
-import type { ProvisionProgress } from '../api';
-import { HestiaError, job as jobApi, TRANSPORT, watchNextJob } from '../api';
+import type { JobRun, ProvisionProgress } from '../api';
+import { HestiaError, job as jobApi, jobId, TRANSPORT } from '../api';
 import { invalidate } from './client';
 
 const log = logger('jobs');
@@ -123,16 +123,14 @@ export interface JobHandle<TData> {
 /** Run one tracked job: register it, stream its progress, settle its state. */
 export function startJob<TData, TProgress>(
   meta: JobMeta,
-  run: (onProgress: (progress: TProgress) => void) => Promise<TData>,
+  run: (job: JobRun<TProgress>) => Promise<TData>,
 ): JobHandle<TData> {
-  // Keyed by the daemon's own job id, which the API function mints and `runJob`
-  // reports back — the id `job.cancel` takes.
-  let id = '';
-  watchNextJob((jobId) => {
-    id = jobId;
-  });
-  const started = run((progress) => {
-    if (jobs.get(id)?.status === 'running') patch(id, { progress }, true);
+  const id = jobId(meta.kind);
+  const started = run({
+    id,
+    onProgress: (progress) => {
+      if (jobs.get(id)?.status === 'running') patch(id, { progress }, true);
+    },
   });
 
   log.debug({ id, op: meta.kind, entry: meta.entry?.id }, 'job started');
@@ -231,10 +229,7 @@ export function useEntryJobs(kind: JobEntryKind, id: string): Job[] {
 export interface JobSpec<TData, TVariables, TProgress> {
   mutationKey: QueryKey;
   meta: (variables: TVariables) => JobMeta;
-  run: (
-    variables: TVariables,
-    onProgress: (progress: TProgress) => void,
-  ) => Promise<TData>;
+  run: (variables: TVariables, job: JobRun<TProgress>) => Promise<TData>;
   /** Key prefixes swept when the job settles, success or error. */
   invalidates?: (variables: TVariables) => QueryKey[];
 }
@@ -296,7 +291,7 @@ export function useJobMutation<TData, TVariables, TProgress>(
     mutationFn: (variables) => {
       const handle = startJob<TData, TProgress>(
         options.job.meta(variables),
-        (onProgress) => options.job.run(variables, onProgress),
+        (job) => options.job.run(variables, job),
       );
       setStartedIds((ids) => [...ids, handle.id]);
       return handle.result;

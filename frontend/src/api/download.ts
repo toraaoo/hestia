@@ -4,22 +4,20 @@
  */
 
 import { call } from './core/ipc';
-import { jobId, runJob } from './core/jobs';
+import { type JobRun, runJob } from './core/jobs';
 import type { DownloadProgress, DownloadSpec } from './types/download';
 
 export function start(
   spec: Omit<DownloadSpec, 'id'>,
-  onProgress?: (progress: DownloadProgress) => void,
+  job: JobRun<DownloadProgress>,
 ): Promise<{ id: string; path: string }> {
-  const id = jobId('download');
   return runJob<{ id: string; path: string }, DownloadProgress>({
-    id,
+    ...job,
     topics: {
       progress: 'download.progress',
       done: 'download.done',
       error: 'download.error',
     },
-    onProgress,
-    start: () => call('download.start', { ...spec, id }),
+    start: () => call('download.start', { ...spec, id: job.id }),
   });
 }
