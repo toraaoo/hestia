@@ -40,6 +40,9 @@ pub struct ServerCreateSpec {
     pub loader_version: Option<String>,
     pub port: Option<u16>,
     pub config: Vec<ConfigEntry>,
+    /// The caller confirms the user accepted the Minecraft EULA. A field rather
+    /// than a doc comment, so the obligation is one a caller must fill in.
+    pub eula: bool,
 }
 
 /// Everything a server update needs from the caller — the engine-side input to

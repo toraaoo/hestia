@@ -21,7 +21,6 @@ impl Engine {
     /// Create a fully provisioned server: resolve the profile, register the
     /// record, ensure the Java runtime, and download its files. A failure after
     /// registration removes the record so nothing half-built is left behind.
-    /// The caller is responsible for having obtained the user's EULA acceptance.
     /// Returns the record with any degraded outcome of the pipeline — a create
     /// can succeed while a best-effort step did not.
     pub async fn provision_server(
@@ -29,6 +28,9 @@ impl Engine {
         spec: ServerCreateSpec,
         on_progress: OnProgress<'_>,
     ) -> Result<(ServerRecord, Vec<WarningInfo>)> {
+        if !spec.eula {
+            anyhow::bail!(proto::error::ErrorInfo::EulaRequired);
+        }
         on_progress.report(&phase_progress(ProvisionPhase::Resolving));
         let profile = self
             .minecraft
@@ -293,7 +295,41 @@ fn jvm_args_source(
 
 #[cfg(test)]
 mod tests {
+    use proto::error::ErrorInfo;
+
     use super::*;
+
+    #[tokio::test]
+    async fn a_create_without_eula_acceptance_is_refused_before_any_work() {
+        let home = tempfile::tempdir().expect("temp home");
+        let engine = Engine::new(Some(home.path()));
+        let cancel = crate::Cancel::new();
+        let report = |_: &proto::minecraft::ProvisionProgress| {};
+        let job = crate::Job::new(&report, &cancel);
+
+        let refused = engine
+            .provision_server(
+                ServerCreateSpec {
+                    name: "smp".into(),
+                    flavor: "vanilla".into(),
+                    version: "1.21".into(),
+                    eula: false,
+                    ..ServerCreateSpec::default()
+                },
+                &job as OnProgress<'_>,
+            )
+            .await
+            .expect_err("no eula, no server");
+
+        assert!(matches!(
+            crate::error_info(refused),
+            ErrorInfo::EulaRequired
+        ));
+        assert!(
+            engine.servers().list().is_empty(),
+            "the refusal must land before the record is registered"
+        );
+    }
 
     fn settings(args: &[&str]) -> JavaSettings {
         JavaSettings {

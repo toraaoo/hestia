@@ -80,6 +80,7 @@ impl ServerCreateManager {
                     loader_version: params.loader_version,
                     port: params.port,
                     config: params.config,
+                    eula: params.eula,
                 };
                 let outcome = engine.provision_server(create, &reporter.job()).await?;
                 Ok(provisioned(engine, outcome))

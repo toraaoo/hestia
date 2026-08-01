@@ -119,9 +119,6 @@ impl Engine {
         let (resolved, project, mut archive) = self.fetch_pack(reference, job).await?;
         let entry = match target {
             ModpackTarget::Create { name } => {
-                if !eula {
-                    anyhow::bail!(ErrorInfo::EulaRequired);
-                }
                 let flavor = self.pack_flavor(&resolved, EntrySide::Server)?;
                 job.check()?;
                 self.provision_server(
@@ -132,6 +129,7 @@ impl Engine {
                         loader_version: resolved.loader_version.clone(),
                         port,
                         config: Vec::new(),
+                        eula,
                     },
                     job,
                 )
