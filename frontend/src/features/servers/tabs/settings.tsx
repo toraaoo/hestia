@@ -1,27 +1,8 @@
-import { ArrowsClockwiseIcon, TrashIcon } from '@phosphor-icons/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { ConfigEntry, ServerInfo } from '@/api';
-import { errorMessage } from '@/api';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-  FieldSeparator,
-} from '@/components/ui/field';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -30,17 +11,75 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { memGb } from '@/lib/format';
+import {
+  configValue,
+  EntrySettingsTab,
+  useDraft,
+} from '@/features/entries/settings';
 import { m } from '@/paraglide/messages.js';
-import { configQueries } from '@/queries/config';
+import { configQueries, launcherDefaults } from '@/queries/config';
 import { useJobMutation } from '@/queries/jobs';
 import { serverMutations, serverQueries } from '@/queries/server';
 
 const INTERVALS = ['off', '6h', '12h', '1d'];
 
-function configValue(config: ConfigEntry[] | undefined, key: string): string {
-  return config?.find((e) => e.key === key)?.value ?? '';
+/** Scheduled backups — the one setting an instance has no equivalent for. */
+function useBackupSchedule(config?: ConfigEntry[]) {
+  const loaded = config !== undefined;
+  const storedInterval = configValue(config, 'backup-interval') || 'off';
+  const storedRetention = configValue(config, 'backup-retention') || '10';
+
+  const [interval, setInterval] = useDraft(
+    storedInterval,
+    `${loaded}:${storedInterval}`,
+  );
+  const [retention, setRetention] = useDraft(
+    storedRetention,
+    `${loaded}:${storedRetention}`,
+  );
+
+  const fields = (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field>
+        <FieldLabel htmlFor="backup-interval">
+          {m['entry.settings.backup_schedule']()}
+        </FieldLabel>
+        <Select value={interval} onValueChange={(v) => setInterval(v ?? 'off')}>
+          <SelectTrigger id="backup-interval" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {INTERVALS.map((iv) => (
+              <SelectItem key={iv} value={iv}>
+                {iv === 'off'
+                  ? m['app.label.off']()
+                  : m['entry.settings.every_interval']({ interval: iv })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="backup-retention">
+          {m['entry.settings.keep_backups']()}
+        </FieldLabel>
+        <Input
+          id="backup-retention"
+          type="number"
+          min={1}
+          value={retention}
+          onChange={(e) => setRetention(e.target.value)}
+        />
+      </Field>
+    </div>
+  );
+
+  const entries: ConfigEntry[] = [
+    { key: 'backup-interval', value: interval === 'off' ? '' : interval },
+    { key: 'backup-retention', value: retention },
+  ];
+
+  return { fields, entries };
 }
 
 export function ServerSettingsTab({
@@ -52,314 +91,34 @@ export function ServerSettingsTab({
   config?: ConfigEntry[];
   running: boolean;
 }) {
-  const navigate = useNavigate();
   const globalConfig = useQuery(configQueries.list());
   const rename = useMutation(serverMutations.rename(server.id));
   const setConfig = useMutation(serverMutations.setConfig(server.id));
   const remove = useMutation(serverMutations.remove(server.id));
-
-  const defaults =
-    (globalConfig.data as
-      | { defaults?: { memory?: string; 'jvm-args'?: string } }
-      | undefined) ?? {};
-  const defaultMemory = defaults.defaults?.memory ?? '';
-  const defaultMemoryGb = defaultMemory ? memGb(defaultMemory) : 4;
-  const defaultJvmArgs = defaults.defaults?.['jvm-args'] ?? '';
-  const memoryOverride = configValue(config, 'memory');
-  const inheritsMemory = memoryOverride === '' && defaultMemory !== '';
-
-  const [name, setName] = useState(server.name);
-  const [memory, setMemory] = useState(4);
-  const [jvmArgs, setJvmArgs] = useState('');
-  const [interval, setInterval] = useState('off');
-  const [retention, setRetention] = useState('10');
-  const [changing, setChanging] = useState(false);
-
-  useEffect(() => {
-    setName(server.name);
-  }, [server.name]);
-
-  useEffect(() => {
-    if (!config) return;
-    setMemory(memoryOverride ? memGb(memoryOverride) : defaultMemoryGb);
-    setJvmArgs(configValue(config, 'jvm-args'));
-    setInterval(configValue(config, 'backup-interval') || 'off');
-    setRetention(configValue(config, 'backup-retention') || '10');
-  }, [config, memoryOverride, defaultMemoryGb]);
-
-  const saveConfig = async () => {
-    // Match the launcher default → clear the override so it keeps inheriting.
-    const memoryValue =
-      defaultMemory !== '' && memory === defaultMemoryGb ? '' : `${memory}G`;
-    try {
-      await setConfig.mutateAsync({ key: 'memory', value: memoryValue });
-      await setConfig.mutateAsync({ key: 'jvm-args', value: jvmArgs });
-      await setConfig.mutateAsync({
-        key: 'backup-interval',
-        value: interval === 'off' ? '' : interval,
-      });
-      await setConfig.mutateAsync({
-        key: 'backup-retention',
-        value: retention,
-      });
-      toast.success(m['app.toast.saved']());
-    } catch (error) {
-      toast.error(errorMessage(error));
-    }
-  };
-
-  const doRename = () => {
-    const trimmed = name.trim();
-    if (!trimmed || trimmed === server.name) return;
-    rename.mutate(trimmed, {
-      onSuccess: (updated) =>
-        toast.success(m['app.toast.renamed']({ name: updated.name })),
-    });
-  };
-
-  return (
-    <div className="max-w-lg">
-      <FieldGroup>
-        <Field>
-          <FieldLabel htmlFor="server-name">
-            {m['entry.settings.server_name']()}
-          </FieldLabel>
-          <div className="flex gap-2">
-            <Input
-              id="server-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={running}
-            />
-            <Button
-              variant="outline"
-              onClick={doRename}
-              disabled={running || rename.isPending || name === server.name}
-            >
-              {m['app.action.apply']()}
-            </Button>
-          </div>
-        </Field>
-
-        <Field>
-          <FieldLabel>
-            {m['entry.settings.allocated_memory']()}
-            <span className="ml-2 font-mono text-muted-foreground">
-              {m['entry.create.gb']({ value: memory })}
-              {inheritsMemory && ` (${m['entry.settings.inherits_default']()})`}
-            </span>
-          </FieldLabel>
-          <Slider
-            value={[memory]}
-            min={2}
-            max={32}
-            step={1}
-            onValueChange={(v) => setMemory(Array.isArray(v) ? v[0] : v)}
-            className="max-w-md"
-          />
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="jvm-args">
-            {m['entry.settings.java_arguments']()}
-          </FieldLabel>
-          <Input
-            id="jvm-args"
-            value={jvmArgs}
-            onChange={(e) => setJvmArgs(e.target.value)}
-            placeholder={defaultJvmArgs || '-XX:+UseG1GC'}
-            className="font-mono"
-          />
-        </Field>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="backup-interval">
-              {m['entry.settings.backup_schedule']()}
-            </FieldLabel>
-            <Select
-              value={interval}
-              onValueChange={(v) => setInterval(v ?? 'off')}
-            >
-              <SelectTrigger id="backup-interval" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {INTERVALS.map((iv) => (
-                  <SelectItem key={iv} value={iv}>
-                    {iv === 'off'
-                      ? m['app.label.off']()
-                      : m['entry.settings.every_interval']({ interval: iv })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="backup-retention">
-              {m['entry.settings.keep_backups']()}
-            </FieldLabel>
-            <Input
-              id="backup-retention"
-              type="number"
-              min={1}
-              value={retention}
-              onChange={(e) => setRetention(e.target.value)}
-            />
-          </Field>
-        </div>
-
-        <div>
-          <Button onClick={saveConfig} disabled={setConfig.isPending}>
-            {m['app.action.apply']()}
-          </Button>
-        </div>
-
-        <FieldSeparator />
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            data-icon="inline-start"
-            disabled={running}
-            onClick={() => setChanging(true)}
-          >
-            <ArrowsClockwiseIcon />
-            {m['entry.settings.change_version']()}
-          </Button>
-          <ConfirmDialog
-            trigger={
-              <Button
-                variant="destructive"
-                size="sm"
-                data-icon="inline-start"
-                disabled={running}
-              >
-                <TrashIcon />
-                {m['entry.settings.remove.server']()}
-              </Button>
-            }
-            title={m['entry.settings.remove.server_title']()}
-            description={m['entry.settings.remove.description']({
-              name: server.name,
-            })}
-            destructive
-            confirmLabel={m['entry.settings.remove.server']()}
-            onConfirm={() =>
-              remove.mutate(undefined, {
-                onSuccess: () => {
-                  toast.success(m['app.toast.removed']({ name: server.name }));
-                  navigate({ to: '/servers' });
-                },
-              })
-            }
-          />
-        </div>
-      </FieldGroup>
-
-      <ChangeVersionDialog
-        server={server}
-        open={changing}
-        onOpenChange={setChanging}
-      />
-    </div>
-  );
-}
-
-function ChangeVersionDialog({
-  server,
-  open,
-  onOpenChange,
-}: {
-  server: ServerInfo;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const versions = useQuery(serverQueries.versions(server.flavor));
   const update = useJobMutation(serverMutations.update(server.id));
-  const [version, setVersion] = useState('');
-  const [downgrade, setDowngrade] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setVersion('');
-      setDowngrade(false);
-    }
-  }, [open]);
-
-  const options = useMemo(
-    () => (versions.data ?? []).filter((v) => v.id !== server.gameVersion),
-    [versions.data, server.gameVersion],
-  );
-
-  const pending = update.isPending;
-
-  const apply = async () => {
-    if (!version) return;
-    try {
-      await update.mutateAsync({
-        version,
-        allowDowngrade: downgrade,
-      });
-      toast.success(m['app.toast.updated']({ name: server.name }));
-      onOpenChange(false);
-    } catch (error) {
-      toast.error(errorMessage(error));
-    }
-  };
+  const backups = useBackupSchedule(config);
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{m['entry.settings.change_version']()}</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-4">
-          <Select
-            value={version}
-            onValueChange={(v) => setVersion(v ?? '')}
-            disabled={pending}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={m['app.label.version']()} />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((v) => (
-                <SelectItem key={v.id} value={v.id} className="font-mono">
-                  {v.id}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <label
-            htmlFor="allow-downgrade"
-            className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"
-          >
-            <Checkbox
-              id="allow-downgrade"
-              checked={downgrade}
-              onCheckedChange={(c) => setDowngrade(c === true)}
-              disabled={pending}
-            />
-            {m['entry.settings.allow_downgrade']()}
-          </label>
-        </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={pending}
-          >
-            {m['app.action.cancel']()}
-          </Button>
-          <Button onClick={apply} disabled={!version || pending}>
-            {pending
-              ? m['app.status.preparing']()
-              : m['entry.settings.change_version']()}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <EntrySettingsTab
+      kind="server"
+      entry={server}
+      config={config}
+      defaults={launcherDefaults(globalConfig.data)}
+      running={running}
+      rename={{
+        mutate: (name) =>
+          rename.mutate(name, {
+            onSuccess: (updated) =>
+              toast.success(m['app.toast.renamed']({ name: updated.name })),
+          }),
+        isPending: rename.isPending,
+      }}
+      setConfig={setConfig}
+      remove={remove}
+      update={update}
+      versionsQuery={serverQueries.versions(server.flavor)}
+      extraFields={backups.fields}
+      extraConfig={backups.entries}
+    />
   );
 }

@@ -17,6 +17,24 @@ export const configQueries = {
     }),
 };
 
+/**
+ * The launcher-wide fallbacks an entry inherits when it sets no override. The
+ * settings document is an opaque tree on the wire, so this is the one place
+ * that knows its shape.
+ */
+export interface LauncherDefaults {
+  memory?: string;
+  'jvm-args'?: string;
+}
+
+export function launcherDefaults(
+  config: Record<string, unknown> | undefined,
+): LauncherDefaults {
+  return (
+    (config as { defaults?: LauncherDefaults } | undefined)?.defaults ?? {}
+  );
+}
+
 export const configMutations = {
   set: () =>
     mutation<void, { key: string; value: unknown }>({

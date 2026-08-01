@@ -33,7 +33,7 @@ import { useAppForm } from '@/hooks/form';
 import { memGb } from '@/lib/format';
 import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
-import { configQueries } from '@/queries/config';
+import { configQueries, launcherDefaults } from '@/queries/config';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
 import { backgroundJob, foregroundJob, useJobMutation } from '@/queries/jobs';
 import { serverMutations, serverQueries } from '@/queries/server';
@@ -86,9 +86,7 @@ export function CreateEntryModal({
   );
 
   const config = useQuery(configQueries.list());
-  const defaultMemory =
-    (config.data as { defaults?: { memory?: string } } | undefined)?.defaults
-      ?.memory ?? '';
+  const defaultMemory = launcherDefaults(config.data).memory ?? '';
   const defaultMemoryGb = defaultMemory ? memGb(defaultMemory) : 4;
   const defaultMemoryRef = useRef(defaultMemoryGb);
   defaultMemoryRef.current = defaultMemoryGb;

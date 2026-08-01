@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router';
 import { render, type RenderResult } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
+import { Toaster } from '@/components/ui/sonner';
 import { LocaleProvider } from '@/hooks/locale';
 import { queryClient } from '@/queries';
 import { installFakeDaemon } from './daemon';
@@ -21,7 +22,10 @@ export interface RenderOptions {
 function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <LocaleProvider>{children}</LocaleProvider>
+      <LocaleProvider>
+        {children}
+        <Toaster />
+      </LocaleProvider>
     </QueryClientProvider>
   );
 }
