@@ -27,12 +27,16 @@ flowchart LR
     A["--home flag"] --> B["$HESTIA_HOME"] --> C["persisted pointer<br/><i>config set home</i>"] --> D["platform default"]
     D --> D1["~/.hestia"]
     D --> D2["%APPDATA%\Hestia"]
-    D --> D3["&lt;workspace&gt;/.hestia<br/><i>debug builds only</i>"]
+    D --> D3["&lt;layout root&gt;/data<br/><i>portable and debug builds</i>"]
 ```
 
-Debug builds anchor at `<workspace>/.hestia` so development never populates your
-real per-user directory. The module also provides `config_path`, `log_dir` and
-`set_persisted_home`.
+Portable and debug builds anchor at a `data/` directory inside the build's own
+layout — `target/<profile>/data` in development — so neither ever populates your
+real per-user directory. The anchor is the layout *root*, stepping out of `bin/`
+(where a shipped build puts the CLI and the daemon) and `deps/` (where cargo puts
+test binaries), so every binary of one build agrees on one home.
+`sibling_binary` resolves the others in that layout by the same rule. The module
+also provides `config_path`, `log_dir` and `set_persisted_home`.
 
 The data home's layout is in the [architecture overview](../architecture.md#where-things-live-on-disk).
 Its organising rule: what you would recognise as *yours* sits at the top level,

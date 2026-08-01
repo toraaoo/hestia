@@ -5,23 +5,14 @@
 //! means no tray. The tray itself enforces one instance per endpoint, so
 //! spawning on every serve needs no duplicate check here.
 
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 fn tray_name() -> &'static str {
     if cfg!(windows) {
-        "tray.exe"
+        "hestiatray.exe"
     } else {
-        "tray"
+        "hestiatray"
     }
-}
-
-fn find_tray() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let dir = exe.parent()?;
-    [dir.join(tray_name()), dir.join("bin").join(tray_name())]
-        .into_iter()
-        .find(|candidate| candidate.exists())
 }
 
 fn suppressed() -> bool {
@@ -49,8 +40,8 @@ pub fn spawn() {
         tracing::debug!("no interactive display; not spawning the tray");
         return;
     }
-    let Some(program) = find_tray() else {
-        tracing::debug!("tray binary not found beside hestiad; not spawning");
+    let Some(program) = common::paths::sibling_binary(tray_name()) else {
+        tracing::debug!("tray binary not found in this layout; not spawning");
         return;
     };
 

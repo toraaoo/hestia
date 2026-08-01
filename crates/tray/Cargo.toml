@@ -7,8 +7,12 @@ rust-version.workspace = true
 publish.workspace = true
 
 [[bin]]
-name = "tray"
+name = "hestiatray"
 path = "src/main.rs"
+
+[features]
+# Build the portable archive's binaries: data lives inside the install.
+portable = ["common/portable"]
 
 [dependencies]
 client = { workspace = true }

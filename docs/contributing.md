@@ -471,7 +471,7 @@ cargo test --workspace
 ```
 
 Iterate interactively with `scripts/dev.sh` — it opens a subshell with `hestia`
-and `hestiad` on `PATH` (debug builds keep data in `<repo>/.hestia`), or
+and `hestiad` on `PATH` (debug builds keep data in `target/<profile>/data`), or
 `scripts/dev.sh java list` for a one-shot. The daemon is never auto-spawned — start it with `hestia daemon start` (or
 login autostart); commands error pointing there when it is down. `hestia daemon status|start|stop|restart`
 manages it explicitly.

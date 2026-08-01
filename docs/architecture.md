@@ -61,7 +61,7 @@ them:
 |---|---|---|---|
 | CLI | `hestia` | clap + ratatui | scripting and terminal use; the fully-wired reference front-end |
 | Desktop | `hestia-desktop` | Tauri v2 + React/Vite | the visual surface — library, entries, content browse, skins |
-| Tray | `tray` | tray-icon + tao | status and quick actions beside every serving daemon |
+| Tray | `hestiatray` | tray-icon + tao | status and quick actions beside every serving daemon |
 
 ## The crate graph
 
@@ -78,7 +78,7 @@ flowchart TD
     cli["<b>cli</b> → hestia"]
     daemon["<b>daemon</b> → hestiad"]
     desktop["<b>desktop</b> → hestia-desktop"]
-    tray["<b>tray</b> → tray"]
+    tray["<b>tray</b> → hestiatray"]
 
     client --> proto & ipc & common
     engine --> proto & common
@@ -141,7 +141,7 @@ sequenceDiagram
 The data home separates what is *yours* from what the launcher can regenerate.
 It resolves as `--home` → `$HESTIA_HOME` → a persisted pointer (`config set
 home`) → the platform default (`~/.hestia`, `%APPDATA%\Hestia` on Windows).
-Debug builds anchor at `<workspace>/.hestia` so development never touches your
+Debug builds anchor at `target/<profile>/data` so development never touches your
 real directory.
 
 ```

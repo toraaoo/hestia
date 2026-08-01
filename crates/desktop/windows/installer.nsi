@@ -7,7 +7,9 @@
 ;   - a components page: core (hestiad + tray, required), the desktop app,
 ;     and the CLI — selections persisted in the registry and restored on
 ;     update/silent installs
-;   - the CLI component adds $INSTDIR to PATH (per-user or per-machine,
+;   - the shell and the tray install to $INSTDIR, the CLI and the daemon to
+;     $INSTDIR\bin, matching the portable archive's layout
+;   - the CLI component adds $INSTDIR\bin to PATH (per-user or per-machine,
 ;     matching the chosen install mode) and removes it on uninstall
 ;   - the running daemon/tray are stopped gracefully before files are
 ;     swapped (supervised game servers keep running, by design) and the
@@ -84,8 +86,12 @@ ${UnStrRep}
 !define STARTMENUFOLDER "{{start_menu_folder}}"
 
 !define DAEMONBINARY "hestiad.exe"
-!define TRAYBINARY "tray.exe"
+!define TRAYBINARY "hestiatray.exe"
 !define CLIBINARY "hestia.exe"
+; The two binaries a user launches sit at the install root; the two reached by
+; a shell or by each other sit below it. common::paths resolves the data home
+; from the root either way.
+!define BINDIR "$INSTDIR\bin"
 ; Must match the daemon's autostart registration (crates/daemon/src/autostart.rs)
 !define AUTOSTARTTASK "${PRODUCTNAME} Daemon"
 !define MACHINEENVKEY "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
@@ -184,9 +190,9 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
   ${If} $R0 = 0
     StrCpy ${wasRunningVar} 1
     !if "${graceful}" == "1"
-      ${If} ${FileExists} "$INSTDIR\${DAEMONBINARY}"
+      ${If} ${FileExists} "${BINDIR}\${DAEMONBINARY}"
         DetailPrint "Stopping ${executable}"
-        nsExec::ExecToStack '"$INSTDIR\${DAEMONBINARY}" stop'
+        nsExec::ExecToStack '"${BINDIR}\${DAEMONBINARY}" stop'
         Pop $R0
         Pop $R1
         StrCpy $R1 0
@@ -649,7 +655,6 @@ SectionEnd
 
 Section "Hestia core (daemon & tray)" SecCore
   SectionIn RO
-  SetOutPath $INSTDIR
 
   !ifmacrodef NSIS_HOOK_PREINSTALL
     !insertmacro NSIS_HOOK_PREINSTALL
@@ -660,9 +665,16 @@ Section "Hestia core (daemon & tray)" SecCore
   !insertmacro StopHestiaProcess "${DAEMONBINARY}" $DaemonWasRunning 1
   !insertmacro StopHestiaProcess "${TRAYBINARY}" $TrayWasRunning 0
 
-  ; Copy external binaries — everything except the optional CLI
+  SetOutPath $INSTDIR
   {{#each binaries}}
-    !if "{{this}}" != "hestia.exe"
+    !if "{{this}}" == "hestiatray.exe"
+      File /a "/oname={{this}}" "{{no-escape @key}}"
+    !endif
+  {{/each}}
+
+  SetOutPath "${BINDIR}"
+  {{#each binaries}}
+    !if "{{this}}" == "hestiad.exe"
       File /a "/oname={{this}}" "{{no-escape @key}}"
     !endif
   {{/each}}
@@ -796,7 +808,7 @@ Section "-WebView2"
 SectionEnd
 
 Section "Command-line interface" SecCli
-  SetOutPath $INSTDIR
+  SetOutPath "${BINDIR}"
 
   !insertmacro CheckIfAppIsRunning "${CLIBINARY}" "${PRODUCTNAME} CLI"
 
@@ -806,19 +818,23 @@ Section "Command-line interface" SecCli
     !endif
   {{/each}}
 
-  Call AddInstDirToPath
+  Call AddBinDirToPath
 SectionEnd
 
 Section "-Post"
+  ; Shortcuts take their working directory from $OUTDIR, which the CLI section
+  ; leaves on bin\.
+  SetOutPath $INSTDIR
+
   ; A deselected component that a previous installation had put on disk is
   ; removed, so an update honors a changed selection.
   ${IfNot} ${SectionIsSelected} ${SecDesktop}
     Delete "$INSTDIR\${MAINBINARYNAME}.exe"
   ${EndIf}
   ${IfNot} ${SectionIsSelected} ${SecCli}
-    ${If} ${FileExists} "$INSTDIR\${CLIBINARY}"
-      Delete "$INSTDIR\${CLIBINARY}"
-      Call RemoveInstDirFromPath
+    ${If} ${FileExists} "${BINDIR}\${CLIBINARY}"
+      Delete "${BINDIR}\${CLIBINARY}"
+      Call RemoveBinDirFromPath
     ${EndIf}
   ${EndIf}
 
@@ -902,7 +918,7 @@ Section "-Post"
   ; running as admin) and Start-Process so the console window stays hidden.
   ${If} $DaemonWasRunning = 1
     DetailPrint "Restarting ${DAEMONBINARY}"
-    nsis_tauri_utils::RunAsUser "powershell.exe" `-NoProfile -WindowStyle Hidden -Command "Start-Process -FilePath '$INSTDIR\${DAEMONBINARY}' -ArgumentList 'serve' -WindowStyle Hidden"`
+    nsis_tauri_utils::RunAsUser "powershell.exe" `-NoProfile -WindowStyle Hidden -Command "Start-Process -FilePath '${BINDIR}\${DAEMONBINARY}' -ArgumentList 'serve' -WindowStyle Hidden"`
   ${EndIf}
   ${If} $TrayWasRunning = 1
     DetailPrint "Restarting ${TRAYBINARY}"
@@ -943,25 +959,27 @@ Function RestoreComponentSelection
   ${EndIf}
 FunctionEnd
 
-Function AddInstDirToPath
+; Only bin\ goes on PATH, so `hestia` is reachable without also exposing the
+; daemon, the tray and the shell.
+Function AddBinDirToPath
   !insertmacro ReadEnvPath $0
   StrCpy $1 "$0;"
-  ${StrLoc} $2 "$1" "$INSTDIR;" ">"
+  ${StrLoc} $2 "$1" "${BINDIR};" ">"
   ${If} $2 == ""
     ${If} $0 == ""
-      StrCpy $0 "$INSTDIR"
+      StrCpy $0 "${BINDIR}"
     ${Else}
-      StrCpy $0 "$0;$INSTDIR"
+      StrCpy $0 "$0;${BINDIR}"
     ${EndIf}
     !insertmacro WriteEnvPath $0
   ${EndIf}
 FunctionEnd
 
-Function RemoveInstDirFromPath
+Function RemoveBinDirFromPath
   !insertmacro ReadEnvPath $0
   ${If} $0 != ""
     StrCpy $0 "$0;"
-    ${StrRep} $0 $0 "$INSTDIR;" ""
+    ${StrRep} $0 $0 "${BINDIR};" ""
     StrCpy $1 $0 1 -1
     ${If} $1 == ";"
       StrCpy $0 $0 -1
@@ -970,11 +988,11 @@ Function RemoveInstDirFromPath
   ${EndIf}
 FunctionEnd
 
-Function un.RemoveInstDirFromPath
+Function un.RemoveBinDirFromPath
   !insertmacro ReadEnvPath $0
   ${If} $0 != ""
     StrCpy $0 "$0;"
-    ${UnStrRep} $0 $0 "$INSTDIR;" ""
+    ${UnStrRep} $0 $0 "${BINDIR};" ""
     StrCpy $1 $0 1 -1
     ${If} $1 == ";"
       StrCpy $0 $0 -1
@@ -1040,9 +1058,10 @@ Section Uninstall
   {{/each}}
 
   ; Delete external binaries
-  {{#each binaries}}
-    Delete "$INSTDIR\\{{this}}"
-  {{/each}}
+  Delete "$INSTDIR\${TRAYBINARY}"
+  Delete "${BINDIR}\${DAEMONBINARY}"
+  Delete "${BINDIR}\${CLIBINARY}"
+  RMDir "${BINDIR}"
 
   ; Delete app associations
   {{#each file_associations as |association| ~}}
@@ -1097,7 +1116,7 @@ Section Uninstall
     ${EndIf}
 
     ; Remove the CLI from PATH
-    Call un.RemoveInstDirFromPath
+    Call un.RemoveBinDirFromPath
 
     ; Remove the daemon's autostart scheduled task; its target is gone
     nsExec::Exec 'schtasks /Delete /F /TN "${AUTOSTARTTASK}"'

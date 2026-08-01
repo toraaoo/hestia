@@ -3,7 +3,7 @@
 # `cargo tauri build` bundles them into every desktop installer.
 #
 # Release is the default (what installers ship). `--debug` stages debug builds
-# instead: the daemon's `debug_assertions` then keep dev data under <repo>/.hestia
+# instead: the daemon's `debug_assertions` then keep dev data under target/debug/data
 # rather than the real ~/.hestia — used by `scripts/dev.sh --desktop`.
 #
 # Tauri's externalBin requires each binary to carry the target-triple suffix
@@ -51,7 +51,7 @@ log "building $profile sidecars for $triple"
 cargo build "${build_args[@]}" "${target_args[@]}" -p cli -p daemon -p tray
 
 mkdir -p "$dest"
-for bin in hestia hestiad tray; do
+for bin in hestia hestiad hestiatray; do
   cp "$srcdir/$bin$ext" "$dest/$bin-$triple$ext"
   echo "  staged $dest/$bin-$triple$ext"
 done

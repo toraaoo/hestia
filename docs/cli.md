@@ -505,7 +505,7 @@ other setting. Nothing else changes when it is unset; `hestia sources` simply do
 The data directory is resolved as: `--home` → `$HESTIA_HOME` → a persisted pointer (`config set home`) → the platform
 default (`~/.hestia`, or
 `%APPDATA%\Hestia` on Windows). **Debug builds** anchor the default at
-`<workspace>/.hestia` so development never populates the real per-user directory.
+`target/<profile>/data` so development never populates the real per-user directory.
 
 ### Modpack corrections
 

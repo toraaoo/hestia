@@ -6,6 +6,11 @@ license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+# A build that carries its own data directory, for the portable archives. Off
+# for anything an installer ships. See crates/common/src/paths.rs.
+portable = []
+
 [dependencies]
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
