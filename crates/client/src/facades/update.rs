@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ipc::errors::IpcError;
 use ipc::protocol::Event;
@@ -16,8 +16,7 @@ impl Update<'_> {
             .await
     }
 
-    /// Download the latest installer through the daemon, forwarding byte
-    /// progress. Resolves to the staged path and the version it carries.
+    /// Resolves to the staged path and the version it carries.
     pub async fn download(
         &self,
         on_progress: impl Fn(&proto::download::DownloadProgress) + Send + Sync + 'static,
@@ -53,4 +52,18 @@ impl Update<'_> {
             serde_json::from_value(payload).map_err(|e| IpcError::Malformed(e.to_string()))?;
         Ok((done.path, done.version))
     }
+
+    pub async fn apply(&self, path: &Path) -> Result<proto::update::UpdateApplyResult, IpcError> {
+        self.session
+            .call_with_timeout::<proto::update::UpdateApply>(
+                &proto::update::UpdateApplyParams {
+                    path: path.to_path_buf(),
+                },
+                APPLY_TIMEOUT,
+            )
+            .await
+    }
 }
+
+/// A package install waits on an interactive elevation prompt.
+const APPLY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
