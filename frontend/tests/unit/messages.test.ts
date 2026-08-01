@@ -16,6 +16,7 @@ const MESSAGES = join(ROOT, 'messages');
 const BASE_LOCALE = 'en';
 
 const DYNAMIC_PREFIXES = [
+  'app.crash.',
   'error.kind.',
   'error.code.',
   'error.token.',

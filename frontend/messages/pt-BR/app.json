@@ -39,6 +39,11 @@
       "switch_to_grid": "Mudar para visualização em grade",
       "switch_to_list": "Mudar para visualização em lista"
     },
+    "crash": {
+      "body": "Um relatório de falha foi salvo no diretório de logs do Hestia.",
+      "retry": "Tentar novamente",
+      "title": "Algo quebrou."
+    },
     "daemon": {
       "connected": "hestiad conectado",
       "connected_label": "Daemon conectado",

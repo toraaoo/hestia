@@ -51,6 +51,6 @@ fi
 # failure is most often a commit-time slip, so it earns its place here.
 if [ -n "$(git diff --cached --name-only --diff-filter=ACM -- 'frontend/messages/')" ]; then
     if [ -d frontend/node_modules ]; then
-        (cd frontend && bun run test -- tests/messages.test.ts)
+        (cd frontend && bun run test -- tests/unit/messages.test.ts)
     fi
 fi

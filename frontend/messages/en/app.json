@@ -39,6 +39,11 @@
       "switch_to_grid": "Switch to grid view",
       "switch_to_list": "Switch to list view"
     },
+    "crash": {
+      "body": "A crash report was saved to the Hestia log directory.",
+      "retry": "Try again",
+      "title": "Something broke."
+    },
     "daemon": {
       "connected": "hestiad connected",
       "connected_label": "Daemon connected",

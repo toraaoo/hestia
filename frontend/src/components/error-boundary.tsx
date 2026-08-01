@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { report } from '@/lib/crash';
+import { m } from '@/paraglide/messages.js';
 
 interface Props {
   children: ReactNode;
@@ -9,6 +10,18 @@ interface Props {
 
 interface State {
   error: Error | null;
+}
+
+/**
+ * The last surface standing, so it cannot assume the message runtime survived
+ * whatever it is reporting: each string is looked up behind a literal fallback.
+ */
+function say(key: 'title' | 'body' | 'retry', fallback: string): string {
+  try {
+    return m[`app.crash.${key}`]() || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -29,16 +42,21 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 p-8 text-center">
         <div className="space-y-1">
-          <p className="font-medium text-sm">Something broke.</p>
+          <p className="font-medium text-sm">
+            {say('title', 'Something broke.')}
+          </p>
           <p className="text-muted-foreground text-xs">
-            A crash report was saved to the Hestia log directory.
+            {say(
+              'body',
+              'A crash report was saved to the Hestia log directory.',
+            )}
           </p>
         </div>
         <pre className="max-h-40 max-w-lg overflow-auto border border-border p-3 text-left text-[11px] text-muted-foreground">
           {error.message}
         </pre>
         <Button size="sm" onClick={() => this.setState({ error: null })}>
-          Try again
+          {say('retry', 'Try again')}
         </Button>
       </div>
     );
