@@ -1,18 +1,198 @@
-//! Preconditions shared by the domain registrars: resolving an entry by
-//! reference, and refusing an operation that would race a running process or an
-//! in-flight job.
+//! Preconditions shared by the domain registrars.
+//!
+//! Resolving an entry and refusing an operation that would race it are one act,
+//! not a checklist each handler assembles: [`Intent`] names what the handler is
+//! about to do and the table below decides which exclusions apply. A handler
+//! that spells its own guards out is free to drift from its siblings — which is
+//! how an instance content update came to race an export while an add could not.
 
 use proto::error::{EntryKind, ErrorInfo};
 use proto::process::ProcessState;
 
-use crate::runtime::HandlerContext;
+use crate::runtime::{instance_process_id, server_process_id, HandlerContext};
 
-fn entry_kind(noun: &str) -> EntryKind {
-    if noun == "instance" {
-        EntryKind::Instance
-    } else {
-        EntryKind::Server
+/// What a handler is about to do to an entry.
+pub(super) enum Intent {
+    /// Reads it. Nothing is in the way.
+    Read,
+    /// Starts it. A server admits one process; an instance admits many
+    /// sessions, so a running instance is not in its own way.
+    Start,
+    /// Rewrites its content pool or game directory.
+    Mutate,
+    /// Archives it. The one mutation that may run on a live entry — a backup
+    /// flushes the world over rcon first — so it waits only on the jobs that
+    /// write the tree it reads.
+    Backup,
+    /// Changes the entry itself — rename, remove, a version change.
+    Lifecycle,
+}
+
+/// The exclusions one intent implies. Each is a job or process that owns the
+/// entry's tree while it runs.
+#[derive(Default, Clone, Copy)]
+struct Exclusions {
+    /// The entry must not be running: the JVM holds its jars open (locked on
+    /// Windows), and changes only apply at the next start anyway.
+    stopped: bool,
+    provisioning: bool,
+    update: bool,
+    backup: bool,
+    content: bool,
+    modpack: bool,
+    transfer: bool,
+}
+
+impl Exclusions {
+    fn of(side: EntryKind, intent: &Intent) -> Exclusions {
+        let base = Exclusions::default();
+        match (side, intent) {
+            (_, Intent::Read) => base,
+            (EntryKind::Server, Intent::Start) => Exclusions {
+                stopped: true,
+                backup: true,
+                ..base
+            },
+            (EntryKind::Server, Intent::Backup) => Exclusions {
+                update: true,
+                content: true,
+                modpack: true,
+                ..base
+            },
+            // Instances have no backups; `instance.export` is what they have.
+            (EntryKind::Instance, Intent::Backup) => Exclusions {
+                content: true,
+                modpack: true,
+                transfer: true,
+                ..base
+            },
+            (EntryKind::Server, Intent::Mutate) => Exclusions {
+                stopped: true,
+                backup: true,
+                update: true,
+                content: true,
+                modpack: true,
+                ..base
+            },
+            (EntryKind::Server, Intent::Lifecycle) => Exclusions {
+                stopped: true,
+                provisioning: true,
+                backup: true,
+                update: true,
+                content: true,
+                modpack: true,
+                ..base
+            },
+            // A launch re-mirrors the pool into `data/`, which is exactly the
+            // tree an export is reading.
+            (EntryKind::Instance, Intent::Start) => Exclusions {
+                transfer: true,
+                ..base
+            },
+            (EntryKind::Instance, Intent::Mutate | Intent::Lifecycle) => Exclusions {
+                stopped: true,
+                content: true,
+                modpack: true,
+                transfer: true,
+                ..base
+            },
+        }
     }
+}
+
+/// Resolve a server and refuse anything `intent` may not race.
+pub(super) fn server_for(
+    ctx: &HandlerContext,
+    reference: &str,
+    intent: Intent,
+) -> Result<engine::ServerRecord, ErrorInfo> {
+    let record = find_server(ctx, reference)?;
+    let process_id = server_process_id(&record.id);
+    let running = is_running(ctx, &process_id);
+    gate(
+        ctx,
+        Exclusions::of(EntryKind::Server, &intent),
+        Gated {
+            side: EntryKind::Server,
+            id: &record.id,
+            name: &record.name,
+            key: &process_id,
+            running,
+        },
+    )?;
+    Ok(record)
+}
+
+/// Resolve an instance and refuse anything `intent` may not race.
+pub(super) fn instance_for(
+    ctx: &HandlerContext,
+    reference: &str,
+    intent: Intent,
+) -> Result<engine::InstanceRecord, ErrorInfo> {
+    let record = find_instance(ctx, reference)?;
+    let key = instance_process_id(&record.id);
+    // An instance runs its sessions under `instance-<id>_<seq>`, never under
+    // the entry key itself — so "is it running" is a question about its
+    // sessions, and asking the supervisor for the entry key always says no.
+    let running = ctx.runtime.instance_running(&record.id);
+    gate(
+        ctx,
+        Exclusions::of(EntryKind::Instance, &intent),
+        Gated {
+            side: EntryKind::Instance,
+            id: &record.id,
+            name: &record.name,
+            key: &key,
+            running,
+        },
+    )?;
+    Ok(record)
+}
+
+struct Gated<'a> {
+    side: EntryKind,
+    id: &'a str,
+    name: &'a str,
+    /// The entry key every job manager is keyed by (`server-<id>` /
+    /// `instance-<id>`).
+    key: &'a str,
+    running: bool,
+}
+
+fn gate(ctx: &HandlerContext, what: Exclusions, entry: Gated<'_>) -> Result<(), ErrorInfo> {
+    let named = || entry.name.to_string();
+    if what.stopped && entry.running {
+        return Err(ErrorInfo::EntryRunning {
+            entry: entry.side,
+            name: named(),
+        });
+    }
+    if what.provisioning && ctx.runtime.server_creates().in_flight(entry.name) {
+        return Err(ErrorInfo::Provisioning { name: named() });
+    }
+    if what.update && ctx.runtime.server_updates().in_flight(entry.id) {
+        return Err(ErrorInfo::UpdateInProgress { name: named() });
+    }
+    if what.backup && ctx.runtime.backups().in_flight(entry.key) {
+        return Err(ErrorInfo::BackupInProgress { name: named() });
+    }
+    if what.content && ctx.runtime.content_jobs().in_flight(entry.key) {
+        return Err(ErrorInfo::ContentInProgress { name: named() });
+    }
+    // A pack rewrites both the pool and the game directory, so it is held apart
+    // from everything else the same way a content job is.
+    if what.modpack && ctx.runtime.modpack_jobs().in_flight(entry.key) {
+        return Err(ErrorInfo::ContentInProgress { name: named() });
+    }
+    // An export reads the whole entry tree, so anything that rewrites it would
+    // put a state in the archive that never existed on disk. An *import* is
+    // never in the way: it creates the entry it fills.
+    if what.transfer && ctx.runtime.transfers().in_flight(entry.key) {
+        return Err(ErrorInfo::Busy {
+            detail: format!("'{}' is being exported", entry.name),
+        });
+    }
+    Ok(())
 }
 
 pub(super) fn find_server(
@@ -48,102 +228,6 @@ pub(super) fn is_running(ctx: &HandlerContext, process_id: &str) -> bool {
         .processes()
         .status(process_id)
         .is_some_and(|info| info.state == ProcessState::Running)
-}
-
-/// Refuse content changes on a running entry: the JVM holds its jars open
-/// (locked on Windows), and changes only apply at the next start anyway.
-pub(super) fn ensure_stopped(
-    ctx: &HandlerContext,
-    process_id: &str,
-    noun: &str,
-    name: &str,
-) -> Result<(), ErrorInfo> {
-    if is_running(ctx, process_id) {
-        return Err(ErrorInfo::EntryRunning {
-            entry: entry_kind(noun),
-            name: name.to_string(),
-        });
-    }
-    Ok(())
-}
-
-pub(super) fn ensure_no_update(
-    ctx: &HandlerContext,
-    server_id: &str,
-    name: &str,
-) -> Result<(), ErrorInfo> {
-    if ctx.runtime.server_updates().in_flight(server_id) {
-        return Err(ErrorInfo::UpdateInProgress {
-            name: name.to_string(),
-        });
-    }
-    Ok(())
-}
-
-/// Refuse operations that would race an in-flight content install/update; the
-/// entry's process id doubles as the content in-flight key.
-pub(super) fn ensure_no_content(
-    ctx: &HandlerContext,
-    key: &str,
-    name: &str,
-) -> Result<(), ErrorInfo> {
-    if ctx.runtime.content_jobs().in_flight(key) {
-        return Err(ErrorInfo::ContentInProgress {
-            name: name.to_string(),
-        });
-    }
-    Ok(())
-}
-
-/// Refuse operations that would race an in-flight pack install or update. A
-/// pack rewrites both the pool and the game directory, so it is held apart from
-/// everything else the same way a content job is.
-pub(super) fn ensure_no_modpack(
-    ctx: &HandlerContext,
-    key: &str,
-    name: &str,
-) -> Result<(), ErrorInfo> {
-    if ctx.runtime.modpack_jobs().in_flight(key) {
-        return Err(ErrorInfo::ContentInProgress {
-            name: name.to_string(),
-        });
-    }
-    Ok(())
-}
-
-/// Refuse operations that would race an instance export. An export reads the
-/// whole entry tree, so anything that rewrites it — a launch's content mirror,
-/// a content install, a remove — would put a state in the archive that never
-/// existed on disk. The entry's process id doubles as the transfer in-flight
-/// key. An *import* is never in the way: it creates the entry it fills, so
-/// there is nothing yet to race.
-pub(super) fn ensure_no_transfer(
-    ctx: &HandlerContext,
-    key: &str,
-    name: &str,
-) -> Result<(), ErrorInfo> {
-    if ctx.runtime.transfers().in_flight(key) {
-        return Err(ErrorInfo::Busy {
-            detail: format!("'{name}' is being exported"),
-        });
-    }
-    Ok(())
-}
-
-/// Refuse lifecycle changes (start, update, remove) while an archive is being
-/// written or restored — they would race the file tree it is reading. The
-/// entry's process id doubles as the backup in-flight key.
-pub(super) fn ensure_no_backup(
-    ctx: &HandlerContext,
-    key: &str,
-    name: &str,
-) -> Result<(), ErrorInfo> {
-    if ctx.runtime.backups().in_flight(key) {
-        return Err(ErrorInfo::BackupInProgress {
-            name: name.to_string(),
-        });
-    }
-    Ok(())
 }
 
 pub(super) fn require_content_items(
@@ -190,8 +274,9 @@ pub(super) fn require_backup(
 #[cfg(test)]
 mod tests {
     use proto::content::{ContentAddItem, ContentAddSpec, ContentKind};
+    use proto::error::EntryKind;
 
-    use super::require_content_items;
+    use super::{require_content_items, Exclusions, Intent};
 
     fn project_item(project: &str) -> ContentAddItem {
         ContentAddItem {
@@ -248,5 +333,51 @@ mod tests {
             ..ContentAddSpec::default()
         };
         assert!(require_content_items(&spec).is_ok());
+    }
+
+    #[test]
+    fn a_backup_runs_on_a_live_entry_but_waits_for_the_jobs_that_write_it() {
+        let what = Exclusions::of(EntryKind::Server, &Intent::Backup);
+        assert!(!what.stopped, "a backup flushes the world over rcon first");
+        assert!(what.content && what.modpack && what.update);
+    }
+
+    #[test]
+    fn a_read_excludes_nothing() {
+        for side in [EntryKind::Server, EntryKind::Instance] {
+            let what = Exclusions::of(side, &Intent::Read);
+            assert!(!what.stopped && !what.backup && !what.content && !what.transfer);
+        }
+    }
+
+    #[test]
+    fn every_mutation_waits_for_the_jobs_that_own_the_tree() {
+        for intent in [Intent::Mutate, Intent::Lifecycle] {
+            let server = Exclusions::of(EntryKind::Server, &intent);
+            assert!(server.stopped && server.content && server.modpack && server.backup);
+            let instance = Exclusions::of(EntryKind::Instance, &intent);
+            assert!(instance.stopped && instance.content && instance.modpack);
+            assert!(
+                instance.transfer,
+                "an export reads the tree a mutation rewrites"
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_server_is_in_its_own_way_when_starting() {
+        assert!(Exclusions::of(EntryKind::Server, &Intent::Start).stopped);
+        assert!(
+            !Exclusions::of(EntryKind::Instance, &Intent::Start).stopped,
+            "an instance runs several sessions at once"
+        );
+    }
+
+    #[test]
+    fn backups_and_updates_are_a_server_concern_and_transfers_an_instance_one() {
+        let server = Exclusions::of(EntryKind::Server, &Intent::Lifecycle);
+        assert!(server.backup && server.update && server.provisioning && !server.transfer);
+        let instance = Exclusions::of(EntryKind::Instance, &Intent::Lifecycle);
+        assert!(instance.transfer && !instance.backup && !instance.update);
     }
 }

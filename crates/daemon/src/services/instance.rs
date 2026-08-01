@@ -19,8 +19,8 @@ use proto::minecraft::{ConfigEntry, FlavorsResult, LoadersResult, VersionsResult
 use proto::process::ProcessLogsResult;
 use proto::Empty;
 
-use super::guards::{ensure_no_content, ensure_no_transfer, ensure_stopped, find_instance};
-use crate::runtime::{instance_process_id, Channels, LaunchOrder};
+use super::guards::{instance_for, Intent};
+use crate::runtime::{Channels, LaunchOrder};
 
 /// The shared shape of a multiplayer-list write: the list as it now stands,
 /// carrying whatever the write could not guarantee.
@@ -99,13 +99,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 field: Field::Version,
             });
         }
-        let record = find_instance(&ctx, &p.instance)?;
-        if ctx.runtime.instance_running(&record.id) {
-            return Err(ErrorInfo::EntryRunning {
-                entry: EntryKind::Instance,
-                name: record.name.clone(),
-            });
-        }
+        let record = instance_for(&ctx, &p.instance, Intent::Lifecycle)?;
         let record = ctx
             .runtime
             .engine()
@@ -135,7 +129,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceInfoQuery, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         ctx.runtime
             .engine()
             .instance_detail(&record.id)
@@ -199,14 +193,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceRemove, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        ensure_no_transfer(&ctx, &instance_process_id(&record.id), &record.name)?;
-        if ctx.runtime.instance_running(&record.id) {
-            return Err(ErrorInfo::EntryRunning {
-                entry: EntryKind::Instance,
-                name: record.name.clone(),
-            });
-        }
+        let record = instance_for(&ctx, &p.instance, Intent::Lifecycle)?;
         ctx.runtime
             .engine()
             .instances()
@@ -221,16 +208,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         if p.name.trim().is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Name });
         }
-        let record = find_instance(&ctx, &p.instance)?;
-        let process_id = instance_process_id(&record.id);
-        if ctx.runtime.instance_running(&record.id) {
-            return Err(ErrorInfo::EntryRunning {
-                entry: EntryKind::Instance,
-                name: record.name.clone(),
-            });
-        }
-        ensure_no_content(&ctx, &process_id, &record.name)?;
-        ensure_no_transfer(&ctx, &process_id, &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Lifecycle)?;
         let renamed = ctx
             .runtime
             .engine()
@@ -242,10 +220,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceLaunch, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        // A launch re-mirrors the content pool into `data/`, which is exactly
-        // the tree an export is reading.
-        ensure_no_transfer(&ctx, &instance_process_id(&record.id), &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Start)?;
         // The account's tokens can no longer be refreshed: block up front so a
         // dead sign-in prompts re-login instead of failing mid-launch.
         if ctx.runtime.engine().accounts().needs_reauth(&p.account) {
@@ -309,7 +284,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceStop, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         let sessions = ctx.runtime.instance_sessions(&record.id);
         match p.session {
             // Stop one named session, refusing an id that is not this instance's.
@@ -335,7 +310,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceLogs, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         // A specific session, else the newest running one, else the newest.
         let sessions = ctx.runtime.instance_sessions(&record.id);
         let target = match &p.session {
@@ -356,7 +331,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceConfigGet, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         match ctx
             .runtime
             .engine()
@@ -370,7 +345,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceConfigSet, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         ctx.runtime
             .engine()
             .instances()
@@ -381,7 +356,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceConfigList, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         let entries = ctx
             .runtime
             .engine()
@@ -398,7 +373,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     // at the next launch); only seeding reads the pool, so only create guards
     // against an in-flight content job.
     on.handle::<InstanceProfileList, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         let (active, profiles) = ctx
             .runtime
             .engine()
@@ -408,11 +383,13 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceProfileCreate, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        if p.seed_from_pool {
-            ensure_no_content(&ctx, &instance_process_id(&record.id), &record.name)?;
-            ensure_no_transfer(&ctx, &instance_process_id(&record.id), &record.name)?;
-        }
+        // Seeding copies the pool, so it waits on whatever is writing it; a
+        // metadata-only create waits on nothing.
+        let intent = match p.seed_from_pool {
+            true => Intent::Backup,
+            false => Intent::Read,
+        };
+        let record = instance_for(&ctx, &p.instance, intent)?;
         let profile = ctx
             .runtime
             .engine()
@@ -423,7 +400,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceProfileRemove, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         ctx.runtime
             .engine()
             .remove_instance_profile(&record.id, &p.name)
@@ -436,7 +413,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceProfileRename, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         ctx.runtime
             .engine()
             .rename_instance_profile(&record.id, &p.name, &p.new_name)
@@ -444,7 +421,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceProfileUse, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         ctx.runtime
             .engine()
             .use_instance_profile(&record.id, &p.name)
@@ -454,7 +431,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceProfileEdit, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         ctx.runtime
             .engine()
             .edit_instance_profile(&record.id, &p.name, &p.add, &p.remove)
@@ -465,13 +442,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     // what a live session's `config` link writes through), so both require a
     // stopped instance — unlike the metadata-only CRUD above.
     on.handle::<InstanceProfileCapture, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        ensure_stopped(
-            &ctx,
-            &instance_process_id(&record.id),
-            "instance",
-            &record.name,
-        )?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         ctx.runtime
             .engine()
             .capture_instance_profile(&record.id, &p.name)
@@ -481,13 +452,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceProfileRelease, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        ensure_stopped(
-            &ctx,
-            &instance_process_id(&record.id),
-            "instance",
-            &record.name,
-        )?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         ctx.runtime
             .engine()
             .release_instance_profile(&record.id, &p.name)

@@ -11,19 +11,12 @@ use proto::transfer::{
     InstanceImportInspect, TransferJobResult,
 };
 
-use super::guards::{
-    ensure_no_backup, ensure_no_content, ensure_no_modpack, ensure_stopped, find_instance,
-};
-use crate::runtime::{instance_process_id, Channels, TransferJob};
+use super::guards::{instance_for, Intent};
+use crate::runtime::{Channels, TransferJob};
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<InstanceExport, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        let key = instance_process_id(&record.id);
-        ensure_stopped(&ctx, &key, "instance", &record.name)?;
-        ensure_no_content(&ctx, &key, &record.name)?;
-        ensure_no_modpack(&ctx, &key, &record.name)?;
-        ensure_no_backup(&ctx, &key, &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         let started = ctx.runtime.transfers().start(
             TransferJob::Export {
                 instance_id: record.id,
@@ -41,7 +34,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceExportContents, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         let entries = ctx
             .runtime
             .engine()

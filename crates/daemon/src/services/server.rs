@@ -14,9 +14,7 @@ use proto::server::{
 };
 use proto::Empty;
 
-use super::guards::{
-    ensure_no_backup, ensure_no_content, ensure_no_update, find_server, is_running,
-};
+use super::guards::{is_running, server_for, Intent};
 use crate::runtime::{server_process_id, Channels, StartError};
 
 pub(super) fn register(on: &mut Channels<'_>) {
@@ -80,19 +78,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 field: Field::Version,
             });
         }
-        let record = find_server(&ctx, &p.server)?;
-        if is_running(&ctx, &server_process_id(&record.id)) {
-            return Err(ErrorInfo::EntryRunning {
-                entry: EntryKind::Server,
-                name: record.name.clone(),
-            });
-        }
-        if ctx.runtime.server_creates().in_flight(&record.name) {
-            return Err(ErrorInfo::Provisioning {
-                name: record.name.clone(),
-            });
-        }
-        ensure_no_backup(&ctx, &server_process_id(&record.id), &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Lifecycle)?;
         match ctx.runtime.server_updates().start(record.id, p) {
             Some(id) => Ok(ServerUpdateResult { id }),
             None => Err(ErrorInfo::UpdateInProgress {
@@ -114,12 +100,12 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerStatus, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         Ok(ctx.runtime.server_view(record))
     });
 
     on.handle::<ServerDetail, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         ctx.runtime
             .engine()
             .server_detail(&record.id)
@@ -127,7 +113,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerPing, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         ctx.runtime
             .engine()
             .server_ping(&record.id)
@@ -136,14 +122,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerRemove, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
-        if is_running(&ctx, &server_process_id(&record.id)) {
-            return Err(ErrorInfo::EntryRunning {
-                entry: EntryKind::Server,
-                name: record.name.clone(),
-            });
-        }
-        ensure_no_backup(&ctx, &server_process_id(&record.id), &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Lifecycle)?;
         ctx.runtime
             .engine()
             .servers()
@@ -160,22 +139,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         if p.name.trim().is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Name });
         }
-        let record = find_server(&ctx, &p.server)?;
-        let process_id = server_process_id(&record.id);
-        if is_running(&ctx, &process_id) {
-            return Err(ErrorInfo::EntryRunning {
-                entry: EntryKind::Server,
-                name: record.name.clone(),
-            });
-        }
-        if ctx.runtime.server_creates().in_flight(&record.name) {
-            return Err(ErrorInfo::Provisioning {
-                name: record.name.clone(),
-            });
-        }
-        ensure_no_update(&ctx, &record.id, &record.name)?;
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
-        ensure_no_content(&ctx, &process_id, &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Lifecycle)?;
         let renamed = ctx
             .runtime
             .engine()
@@ -187,15 +151,8 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerStart, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Start)?;
         let process_id = server_process_id(&record.id);
-        if is_running(&ctx, &process_id) {
-            return Err(ErrorInfo::EntryRunning {
-                entry: EntryKind::Server,
-                name: record.name.clone(),
-            });
-        }
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
         tracing::info!(server = %record.id, name = %record.name, "starting server");
         let (_, plan) = ctx
             .runtime
@@ -226,7 +183,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerStop, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         let process_id = server_process_id(&record.id);
         if !is_running(&ctx, &process_id) {
             return Err(ErrorInfo::NotRunning {
@@ -244,7 +201,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 field: Field::Command,
             });
         }
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         if !is_running(&ctx, &server_process_id(&record.id)) {
             return Err(ErrorInfo::NotRunning {
                 entry: EntryKind::Server,
@@ -261,7 +218,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerLogs, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         let lines = ctx
             .runtime
             .processes()
@@ -271,7 +228,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerConfigGet, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         match ctx
             .runtime
             .engine()
@@ -285,7 +242,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerConfigSet, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         ctx.runtime
             .engine()
             .servers()
@@ -296,7 +253,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerConfigList, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         let entries = ctx
             .runtime
             .engine()

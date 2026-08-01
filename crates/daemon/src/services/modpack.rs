@@ -12,13 +12,8 @@ use proto::modpack::{
     ServerModpackRemove, ServerModpackStatus, ServerModpackUpdate,
 };
 
-use super::guards::{
-    ensure_no_backup, ensure_no_content, ensure_no_modpack, ensure_no_transfer, ensure_no_update,
-    ensure_stopped, find_instance, find_server,
-};
-use crate::runtime::{
-    instance_process_id, server_process_id, Channels, HandlerContext, ModpackJob,
-};
+use super::guards::{instance_for, server_for, Intent};
+use crate::runtime::{Channels, ModpackJob};
 
 pub(super) fn register(on: &mut Channels<'_>) {
     register_instance(on);
@@ -31,8 +26,7 @@ fn register_instance(on: &mut Channels<'_>) {
         let target = match &p.target {
             ModpackTarget::Create { name } => ModpackTarget::Create { name: name.clone() },
             ModpackTarget::Existing { entry } => {
-                let record = find_instance(&ctx, entry)?;
-                guard_instance(&ctx, &record.id, &record.name)?;
+                let record = instance_for(&ctx, entry, Intent::Mutate)?;
                 ModpackTarget::Existing {
                     entry: record.id.clone(),
                 }
@@ -52,8 +46,7 @@ fn register_instance(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceModpackUpdate, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        guard_instance(&ctx, &record.id, &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         start(
             ctx.runtime.modpack_jobs().start(
                 ModpackJob::UpdateInstance {
@@ -68,7 +61,7 @@ fn register_instance(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceModpackStatus, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         let pack = ctx
             .runtime
             .engine()
@@ -78,8 +71,7 @@ fn register_instance(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceModpackRemove, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        guard_instance(&ctx, &record.id, &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         ctx.runtime
             .engine()
             .remove_instance_modpack(&record.id)
@@ -98,8 +90,7 @@ fn register_server(on: &mut Channels<'_>) {
                 ModpackTarget::Create { name: name.clone() }
             }
             ModpackTarget::Existing { entry } => {
-                let record = find_server(&ctx, entry)?;
-                guard_server(&ctx, &record.id, &record.name)?;
+                let record = server_for(&ctx, entry, Intent::Mutate)?;
                 ModpackTarget::Existing {
                     entry: record.id.clone(),
                 }
@@ -121,8 +112,7 @@ fn register_server(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerModpackUpdate, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
-        guard_server(&ctx, &record.id, &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         start(
             ctx.runtime.modpack_jobs().start(
                 ModpackJob::UpdateServer {
@@ -137,7 +127,7 @@ fn register_server(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerModpackStatus, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         let pack = ctx
             .runtime
             .engine()
@@ -147,8 +137,7 @@ fn register_server(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerModpackRemove, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
-        guard_server(&ctx, &record.id, &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         ctx.runtime
             .engine()
             .remove_server_modpack(&record.id)
@@ -172,24 +161,6 @@ fn require_pack_ref(pack: &ModpackRef) -> Result<(), ErrorInfo> {
             options: vec!["a project".into(), "a url".into(), "a file".into()],
         }),
     }
-}
-
-fn guard_instance(ctx: &HandlerContext, id: &str, name: &str) -> Result<(), ErrorInfo> {
-    let process_id = instance_process_id(id);
-    ensure_stopped(ctx, &process_id, "instance", name)?;
-    ensure_no_backup(ctx, &process_id, name)?;
-    ensure_no_content(ctx, &process_id, name)?;
-    ensure_no_transfer(ctx, &process_id, name)?;
-    ensure_no_modpack(ctx, &process_id, name)
-}
-
-fn guard_server(ctx: &HandlerContext, id: &str, name: &str) -> Result<(), ErrorInfo> {
-    let process_id = server_process_id(id);
-    ensure_stopped(ctx, &process_id, "server", name)?;
-    ensure_no_backup(ctx, &process_id, name)?;
-    ensure_no_update(ctx, id, name)?;
-    ensure_no_content(ctx, &process_id, name)?;
-    ensure_no_modpack(ctx, &process_id, name)
 }
 
 /// What a busy refusal names — the entry for an install into one, the pack

@@ -9,19 +9,17 @@ use proto::backup::{
 use proto::error::ErrorInfo;
 use proto::Empty;
 
-use super::guards::{ensure_no_content, find_server, is_running, require_backup};
+use super::guards::{is_running, require_backup, server_for, Intent};
 use crate::runtime::{server_process_id, BackupJob, Channels};
 
 pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<ServerBackupCreate, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        // A backup is the one mutation that may run on a live server: it
+        // flushes the world over rcon first. So it gates on the jobs that own
+        // the tree, not on the process.
+        let record = server_for(&ctx, &p.server, Intent::Backup)?;
         if !record.ready() {
             return Err(ErrorInfo::Provisioning {
-                name: record.name.clone(),
-            });
-        }
-        if ctx.runtime.server_updates().in_flight(&record.id) {
-            return Err(ErrorInfo::UpdateInProgress {
                 name: record.name.clone(),
             });
         }
@@ -41,7 +39,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerBackupList, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         let backups = ctx
             .runtime
             .engine()
@@ -56,19 +54,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 field: proto::error::Field::Backup,
             });
         }
-        let record = find_server(&ctx, &p.server)?;
-        if is_running(&ctx, &server_process_id(&record.id)) {
-            return Err(ErrorInfo::EntryRunning {
-                entry: proto::error::EntryKind::Server,
-                name: record.name.clone(),
-            });
-        }
-        if ctx.runtime.server_updates().in_flight(&record.id) {
-            return Err(ErrorInfo::UpdateInProgress {
-                name: record.name.clone(),
-            });
-        }
-        ensure_no_content(&ctx, &server_process_id(&record.id), &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         require_backup(ctx.runtime.engine().server_backups(&record.id), &p.backup)?;
         match ctx.runtime.backups().start(
             BackupJob::ServerRestore {
@@ -85,7 +71,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerBackupRemove, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         match ctx
             .runtime
             .engine()

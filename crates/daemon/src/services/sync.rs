@@ -3,15 +3,14 @@
 //! instance launch flow; these channels read and edit the target set, report
 //! each instance's per-target link state, and run the adopt migration.
 
-use proto::error::{EntryKind, ErrorInfo};
 use proto::sync::{
     SyncAdopt, SyncAdoptResult, SyncConfig, SyncGet, SyncSet, SyncSetParams, SyncStatus,
     SyncStatusResult,
 };
 use proto::Empty;
 
-use super::guards::{ensure_no_content, ensure_no_transfer, find_instance};
-use crate::runtime::{instance_process_id, Channels};
+use super::guards::{instance_for, Intent};
+use crate::runtime::Channels;
 
 fn config(engine: &engine::Engine) -> SyncConfig {
     SyncConfig {
@@ -45,15 +44,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     });
 
     on.handle::<SyncAdopt, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        if ctx.runtime.instance_running(&record.id) {
-            return Err(ErrorInfo::EntryRunning {
-                entry: EntryKind::Instance,
-                name: record.name.clone(),
-            });
-        }
-        ensure_no_content(&ctx, &instance_process_id(&record.id), &record.name)?;
-        ensure_no_transfer(&ctx, &instance_process_id(&record.id), &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         let adopted = ctx
             .runtime
             .engine()

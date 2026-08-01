@@ -12,11 +12,8 @@ use proto::content::{
 use proto::error::{ErrorInfo, Field};
 use proto::Empty;
 
-use super::guards::{
-    ensure_no_backup, ensure_no_content, ensure_no_transfer, ensure_no_update, ensure_stopped,
-    find_instance, find_server, require_content_items,
-};
-use crate::runtime::{instance_process_id, server_process_id, Channels, ContentJob};
+use super::guards::{instance_for, require_content_items, server_for, Intent};
+use crate::runtime::{Channels, ContentJob};
 
 pub(super) fn register(on: &mut Channels<'_>) {
     register_sources(on);
@@ -107,11 +104,7 @@ fn register_sources(on: &mut Channels<'_>) {
 fn register_server(on: &mut Channels<'_>) {
     on.handle::<ServerContentAdd, _, _>(|p, ctx| async move {
         require_content_items(&p.spec)?;
-        let record = find_server(&ctx, &p.server)?;
-        let process_id = server_process_id(&record.id);
-        ensure_stopped(&ctx, &process_id, "server", &record.name)?;
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
-        ensure_no_update(&ctx, &record.id, &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::ServerAdd {
                 server_id: record.id,
@@ -127,7 +120,7 @@ fn register_server(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerContentList, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         let (items, untracked) = ctx
             .runtime
             .engine()
@@ -140,11 +133,7 @@ fn register_server(on: &mut Channels<'_>) {
         if p.item.is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
-        let record = find_server(&ctx, &p.server)?;
-        let process_id = server_process_id(&record.id);
-        ensure_stopped(&ctx, &process_id, "server", &record.name)?;
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
-        ensure_no_content(&ctx, &process_id, &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         match ctx
             .runtime
             .engine()
@@ -159,11 +148,7 @@ fn register_server(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerContentUpdate, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
-        let process_id = server_process_id(&record.id);
-        ensure_stopped(&ctx, &process_id, "server", &record.name)?;
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
-        ensure_no_update(&ctx, &record.id, &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::ServerUpdate {
                 server_id: record.id,
@@ -183,12 +168,7 @@ fn register_server(on: &mut Channels<'_>) {
         if p.item.is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
-        let record = find_server(&ctx, &p.server)?;
-        let process_id = server_process_id(&record.id);
-        ensure_stopped(&ctx, &process_id, "server", &record.name)?;
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
-        ensure_no_content(&ctx, &process_id, &record.name)?;
-        ensure_no_update(&ctx, &record.id, &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         match ctx
             .runtime
             .engine()
@@ -203,7 +183,7 @@ fn register_server(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerContentCheckUpdates, _, _>(|p, ctx| async move {
-        let record = find_server(&ctx, &p.server)?;
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         let updates = ctx
             .runtime
             .engine()
@@ -219,11 +199,7 @@ fn register_server(on: &mut Channels<'_>) {
                 fields: vec![Field::Item, Field::Version],
             });
         }
-        let record = find_server(&ctx, &p.server)?;
-        let process_id = server_process_id(&record.id);
-        ensure_stopped(&ctx, &process_id, "server", &record.name)?;
-        ensure_no_backup(&ctx, &process_id, &record.name)?;
-        ensure_no_update(&ctx, &record.id, &record.name)?;
+        let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::ServerSetVersion {
                 server_id: record.id,
@@ -244,10 +220,7 @@ fn register_server(on: &mut Channels<'_>) {
 fn register_instance(on: &mut Channels<'_>) {
     on.handle::<InstanceContentAdd, _, _>(|p, ctx| async move {
         require_content_items(&p.spec)?;
-        let record = find_instance(&ctx, &p.instance)?;
-        let process_id = instance_process_id(&record.id);
-        ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
-        ensure_no_transfer(&ctx, &process_id, &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::InstanceAdd {
                 instance_id: record.id,
@@ -263,7 +236,7 @@ fn register_instance(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceContentList, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         let (items, untracked) = ctx
             .runtime
             .engine()
@@ -276,11 +249,7 @@ fn register_instance(on: &mut Channels<'_>) {
         if p.item.is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
-        let record = find_instance(&ctx, &p.instance)?;
-        let process_id = instance_process_id(&record.id);
-        ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
-        ensure_no_content(&ctx, &process_id, &record.name)?;
-        ensure_no_transfer(&ctx, &process_id, &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         match ctx
             .runtime
             .engine()
@@ -295,9 +264,7 @@ fn register_instance(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceContentUpdate, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
-        let process_id = instance_process_id(&record.id);
-        ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::InstanceUpdate {
                 instance_id: record.id,
@@ -317,11 +284,7 @@ fn register_instance(on: &mut Channels<'_>) {
         if p.item.is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
-        let record = find_instance(&ctx, &p.instance)?;
-        let process_id = instance_process_id(&record.id);
-        ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
-        ensure_no_content(&ctx, &process_id, &record.name)?;
-        ensure_no_transfer(&ctx, &process_id, &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         match ctx
             .runtime
             .engine()
@@ -336,7 +299,7 @@ fn register_instance(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceContentCheckUpdates, _, _>(|p, ctx| async move {
-        let record = find_instance(&ctx, &p.instance)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
         let updates = ctx
             .runtime
             .engine()
@@ -352,9 +315,7 @@ fn register_instance(on: &mut Channels<'_>) {
                 fields: vec![Field::Item, Field::Version],
             });
         }
-        let record = find_instance(&ctx, &p.instance)?;
-        let process_id = instance_process_id(&record.id);
-        ensure_stopped(&ctx, &process_id, "instance", &record.name)?;
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::InstanceSetVersion {
                 instance_id: record.id,
