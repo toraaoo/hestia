@@ -34,7 +34,6 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(Bridge::default())
         .manage(commands::open::PendingArchive::default())
@@ -73,8 +72,6 @@ pub fn run() {
             commands::diagnostics::crash_list,
             commands::diagnostics::crash_read,
             commands::diagnostics::crash_clear,
-            commands::update::update_check,
-            commands::update::update_install,
             commands::update::changelog
         ])
         .run(tauri::generate_context!())

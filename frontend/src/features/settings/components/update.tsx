@@ -14,7 +14,11 @@ import {
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { appQueries } from '@/queries/app';
-import { useInstallUpdate, useUpdateCheck } from '@/queries/update';
+import {
+  useApplyUpdate,
+  useDownloadUpdate,
+  useUpdateCheck,
+} from '@/queries/update';
 
 /**
  * Self-update. The check runs only when asked — it reaches the network, and an
@@ -24,10 +28,24 @@ export function UpdatePanel() {
   const app = useQuery(appQueries.info());
   const [asked, setAsked] = useState(false);
   const check = useUpdateCheck(asked);
-  const install = useInstallUpdate();
+  const download = useDownloadUpdate();
+  const apply = useApplyUpdate();
 
-  const update = check.data;
+  const update = check.data?.available;
   const version = app.data?.version ?? '';
+  const working = download.isPending || apply.isPending;
+
+  const install = async () => {
+    try {
+      const staged = await download.mutateAsync();
+      const applied = await apply.mutateAsync(staged.path);
+      if (!applied.relaunches) {
+        toast.success(m['settings.update.restart_required']());
+      }
+    } catch (e) {
+      toast.error(m['settings.update.failed'](), { description: String(e) });
+    }
+  };
 
   return (
     <>
@@ -40,9 +58,13 @@ export function UpdatePanel() {
             <FieldDescription>
               {check.isError
                 ? m['settings.update.check_failed']()
-                : update
-                  ? m['settings.update.available']({ version: update.version })
-                  : m['settings.update.up_to_date']()}
+                : !update
+                  ? m['settings.update.up_to_date']()
+                  : update.applicable
+                    ? m['settings.update.available']({
+                        version: update.version,
+                      })
+                    : m['settings.update.manual']({ version: update.version })}
             </FieldDescription>
           )}
         </FieldContent>
@@ -64,26 +86,19 @@ export function UpdatePanel() {
               ? m['settings.update.checking']()
               : m['settings.update.check']()}
           </Button>
-          {update && (
+          {update?.applicable && (
             <Button
               size="sm"
               data-icon="inline-start"
-              onClick={() =>
-                install.mutate(undefined, {
-                  // Success never resolves here — the app restarts into the
-                  // new build — so only the failure path needs reporting.
-                  onError: (e) =>
-                    toast.error(m['settings.update.failed'](), {
-                      description: String(e),
-                    }),
-                })
-              }
-              disabled={install.isPending}
+              onClick={() => void install()}
+              disabled={working}
             >
               <DownloadSimpleIcon className="size-4" />
-              {install.isPending
-                ? m['settings.update.installing']()
-                : m['settings.update.install']()}
+              {download.isPending
+                ? m['settings.update.downloading']()
+                : apply.isPending
+                  ? m['settings.update.installing']()
+                  : m['settings.update.install']()}
             </Button>
           )}
         </div>

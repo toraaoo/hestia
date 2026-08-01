@@ -1,15 +1,19 @@
 /**
- * Self-update — the shell's own updater, not a daemon channel.
- *
- * The check is deliberately **not** automatic on mount: it reaches the network,
- * and an update is not something the app should nag about before the user asks.
- * The Settings surface triggers it.
+ * `update.*` — the check is deliberately **not** automatic on mount: it reaches
+ * the network, and an update is not something the app should nag about before
+ * the user asks. The Settings surface triggers it.
  */
 import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
 
-import type { DesktopUpdate } from '../api/update';
+import type { DownloadProgress } from '../api/types/download';
+import type {
+  UpdateApplyResult,
+  UpdateCheckResult,
+  UpdateDoneEvent,
+} from '../api/types/update';
 import * as api from '../api/update';
 import { mutation } from './core';
+import { jobMutation, useJobMutation } from './jobs';
 import { keys } from './keys';
 
 export const updateQueries = {
@@ -33,10 +37,16 @@ export const changelogQuery = () =>
   });
 
 export const updateMutations = {
-  install: () =>
-    mutation<void, void>({
-      mutationKey: [...keys.update.all, 'install'],
-      mutationFn: () => api.install(),
+  download: () =>
+    jobMutation<UpdateDoneEvent, void, DownloadProgress>({
+      mutationKey: [...keys.update.all, 'download'],
+      meta: () => ({ kind: 'update.download', label: 'download update' }),
+      run: (_variables, job) => api.download(job),
+    }),
+  apply: () =>
+    mutation<UpdateApplyResult, string>({
+      mutationKey: [...keys.update.all, 'apply'],
+      mutationFn: (path) => api.apply(path),
       invalidates: () => [keys.update.all],
     }),
 };
@@ -46,8 +56,12 @@ export function useUpdateCheck(enabled: boolean) {
   return useQuery({ ...updateQueries.check(), enabled });
 }
 
-export function useInstallUpdate() {
-  return useMutation(updateMutations.install());
+export function useDownloadUpdate() {
+  return useJobMutation(updateMutations.download());
 }
 
-export type { DesktopUpdate };
+export function useApplyUpdate() {
+  return useMutation(updateMutations.apply());
+}
+
+export type { UpdateCheckResult };

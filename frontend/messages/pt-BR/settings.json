@@ -126,10 +126,13 @@
       "check_failed": "Não foi possível verificar atualizações",
       "checking": "Verificando…",
       "current": "Versão {version}",
+      "downloading": "Baixando…",
       "failed": "Falha na atualização",
       "install": "Atualizar e reiniciar",
       "installing": "Atualizando…",
+      "manual": "Esta cópia do Hestia se atualiza por outro caminho — baixe a versão {version} na página de lançamentos",
       "notes": "Novidades",
+      "restart_required": "Atualização instalada — reinicie o Hestia para usá-la",
       "title": "Atualizações",
       "up_to_date": "O Hestia está atualizado",
       "whats_new": "Novidades da versão {version}"

@@ -126,10 +126,13 @@
       "check_failed": "Couldn't check for updates",
       "checking": "Checking…",
       "current": "Version {version}",
+      "downloading": "Downloading…",
       "failed": "Update failed",
       "install": "Update and restart",
       "installing": "Updating…",
+      "manual": "This copy of Hestia updates itself elsewhere — download {version} from the release page",
       "notes": "What's new",
+      "restart_required": "Update installed — restart Hestia to run it",
       "title": "Updates",
       "up_to_date": "Hestia is up to date",
       "whats_new": "What's new in {version}"

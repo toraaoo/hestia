@@ -21,6 +21,7 @@ import { channels as server } from './server';
 import { channels as skin } from './skin';
 import { channels as sync } from './sync';
 import { channels as transfer } from './transfer';
+import { channels as update } from './update';
 
 export const channels: Handlers = {
   ...app,
@@ -40,4 +41,5 @@ export const channels: Handlers = {
   ...skin,
   ...sync,
   ...transfer,
+  ...update,
 };

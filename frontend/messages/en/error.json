@@ -33,6 +33,7 @@
       "content_not_found": "No installed content matches '{reference}'.",
       "content_source_unavailable": "{source} needs an API key before it can be used — add one in Settings.",
       "download_failed": "Download failed: {detail}",
+      "elevation_required": "Installing this update needs administrator rights — run: {command}",
       "entry_not_found": "No {entry} matches '{reference}'.",
       "entry_running": "{name} is running — stop it first.",
       "eula_required": "Accept the EULA to create a server.",

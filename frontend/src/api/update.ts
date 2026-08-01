@@ -1,31 +1,42 @@
 /**
- * Self-update. Unlike every other domain this does **not** go over the daemon
- * bridge: the desktop updates itself through `tauri-plugin-updater`, which
- * verifies the installer signature and restarts the app — both things only the
- * shell can do. So these are the shell's own commands, like `prefs.*`.
- *
- * The daemon has its own `update.*` channels for the CLI; the two are separate
- * paths to the same release feed, and the shell's is the one that can replace a
- * running binary.
+ * The `update.*` channels. `changelog` is the one part that stays in the shell,
+ * because it is compiled into this binary rather than fetched.
  */
-import { invokeCommand } from './core/ipc';
 
-export interface DesktopUpdate {
-  version: string;
-  notes: string | null;
+import { call, invokeCommand } from './core/ipc';
+import { type JobRun, runJob } from './core/jobs';
+import type { DownloadProgress } from './types/download';
+import type {
+  UpdateApplyResult,
+  UpdateCheckResult,
+  UpdateDoneEvent,
+} from './types/update';
+
+export function check(): Promise<UpdateCheckResult> {
+  return call<UpdateCheckResult>('update.check');
 }
 
-/** The newer version on the release feed, or null when up to date. */
-export function check(): Promise<DesktopUpdate | null> {
-  return invokeCommand('update_check');
+export function download(
+  job: JobRun<DownloadProgress>,
+): Promise<UpdateDoneEvent> {
+  return runJob<UpdateDoneEvent, DownloadProgress>({
+    ...job,
+    topics: {
+      progress: 'update.progress',
+      done: 'update.done',
+      error: 'update.error',
+    },
+    start: () => call('update.download', { id: job.id }),
+  });
 }
 
-/**
- * Download, verify, install, and restart into the new version. Resolves only
- * if the install failed — on success the app is replaced and restarted.
- */
-export function install(): Promise<void> {
-  return invokeCommand('update_install');
+/** Waits on an interactive elevation prompt on Linux, so the timeout is long. */
+export function apply(path: string): Promise<UpdateApplyResult> {
+  return call<UpdateApplyResult>(
+    'update.apply',
+    { path },
+    { timeoutMs: 300_000 },
+  );
 }
 
 /**
