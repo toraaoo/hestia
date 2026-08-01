@@ -37,6 +37,7 @@ pub use backup::BackupSettings;
 pub use cache::{Cache, CacheEntry, CacheUsage};
 pub use cancel::{is_cancelled, Cancel, Job};
 pub use config::{Config, ConfigError, Settings};
+pub use content::provider::{ContentProvider, UrlRef};
 pub use content::Content;
 pub use download::Downloader;
 pub use engine::{
@@ -47,7 +48,9 @@ pub use error::error_info;
 pub use instances::{InstanceRecord, Instances};
 pub use java::{Java, JavaInstallOutcome};
 pub use minecraft::launch::{JavaSettings, LaunchPlan};
-pub use minecraft::{Minecraft, REQUIRED_JAVA_MAJORS};
+pub use minecraft::{
+    InstanceProvider, Loads, Minecraft, ResolveRequest, ServerProvider, REQUIRED_JAVA_MAJORS,
+};
 pub use process::{ExitObserver, ProcessEvents, ProcessSupervisor, StartError};
 pub use profiles::Profiles;
 pub use schema::notices as quarantined;

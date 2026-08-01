@@ -56,6 +56,12 @@ impl Content {
         Self::default()
     }
 
+    /// Build over a given registry rather than the shipped one. The seam a test
+    /// crosses to install content without reaching a platform.
+    pub fn with_providers(providers: Vec<Box<dyn ContentProvider>>) -> Self {
+        Content { providers }
+    }
+
     /// Hand each source the settings it needs. Called at startup and after
     /// every `config set`, so a key takes effect on the running daemon.
     pub fn configure(&self, settings: &ContentSettings) {

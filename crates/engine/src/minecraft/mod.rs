@@ -21,7 +21,7 @@ use anyhow::{Context, Result};
 use proto::minecraft::{Flavor, GameVersion, InstanceProfile, ServerProfile};
 
 pub use provider::{accepted_kinds, unmet, InstallRequest, Prerequisite, Side};
-use provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
+pub use provider::{InstanceProvider, Loads, ResolveRequest, ServerProvider};
 
 /// The Java majors Minecraft launch profiles ever require: 8 (pre-1.17),
 /// 16 (1.17), 17 (1.18–1.20.4), 21 (1.20.5+). Catalogue surfaces (the
@@ -57,6 +57,15 @@ impl Default for Minecraft {
 impl Minecraft {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Build over a given registry rather than the shipped one. The seam a test
+    /// crosses to resolve a profile without reaching upstream.
+    pub fn with_providers(
+        servers: Vec<Box<dyn ServerProvider>>,
+        instances: Vec<Box<dyn InstanceProvider>>,
+    ) -> Self {
+        Minecraft { servers, instances }
     }
 
     pub fn server_flavors(&self) -> Vec<Flavor> {

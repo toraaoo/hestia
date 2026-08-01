@@ -78,6 +78,13 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(override_home: Option<&Path>) -> Self {
+        Engine::over(override_home, Minecraft::new(), Content::new())
+    }
+
+    /// Build over a given provider registry. The seam a test crosses to drive
+    /// the cross-subsystem flows — provisioning, launching, content, packs —
+    /// against fixtures rather than upstream.
+    pub fn over(override_home: Option<&Path>, minecraft: Minecraft, content: Content) -> Self {
         let data_home = common::paths::data_home(override_home);
         tracing::info!(home = %data_home.display(), "engine data home");
         let config = Config::new(common::paths::config_path(Some(&data_home)));
@@ -89,7 +96,6 @@ impl Engine {
         let skins = Skins::new(data_home.join("skins"));
         let sync = Sync::new(data_home.join("shared"));
         let profiles = Profiles::new(data_home.join("profiles"));
-        let content = Content::new();
         content.configure(&config.settings().content);
         let update = Update::new(data_home.join("updates"));
         let announce = Announce::new(data_home.join("announce"));
@@ -100,7 +106,7 @@ impl Engine {
             cache,
             java,
             accounts,
-            minecraft: Minecraft::new(),
+            minecraft,
             content,
             servers,
             instances,
