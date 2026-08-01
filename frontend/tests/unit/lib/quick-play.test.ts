@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { supportsQuickPlay } from '../src/lib/quick-play';
+import { supportsQuickPlay } from '@/lib/quick-play';
 
 describe('supportsQuickPlay', () => {
   it('admits 1.20 and everything after it', () => {

@@ -4,6 +4,7 @@ import pino from 'pino';
 const FORWARD_FROM = 'warn';
 
 const dev = import.meta.env.DEV;
+const testing = import.meta.env.MODE === 'test';
 
 function forward(level: string, logEvent: pino.LogEvent) {
   const [first, ...rest] = logEvent.messages;
@@ -17,7 +18,7 @@ function forward(level: string, logEvent: pino.LogEvent) {
 }
 
 export const log = pino({
-  level: dev ? 'debug' : FORWARD_FROM,
+  level: testing ? 'silent' : dev ? 'debug' : FORWARD_FROM,
   browser: {
     asObject: false,
     transmit: { level: FORWARD_FROM, send: forward },

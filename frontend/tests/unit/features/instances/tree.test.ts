@@ -5,12 +5,12 @@
  * up as a type error.
  */
 import { describe, expect, it } from 'vitest';
-import type { ArchiveEntry } from '../src/api';
+import type { ArchiveEntry } from '@/api';
 import {
   buildTree,
   excludedRoots,
   selectedBytes,
-} from '../src/features/instances/tree';
+} from '@/features/instances/tree';
 
 function entry(path: string, sizeBytes: number, directory = false): ArchiveEntry {
   return {
