@@ -89,8 +89,11 @@ export function ModpackCard({
           />
         </div>
 
-        {update.progress && (
-          <ProvisionProgressView progress={update.progress} />
+        {update.isPending && (
+          <ProvisionProgressView
+            progress={update.progress}
+            fallbackLabel={m['content.modpack.update']()}
+          />
         )}
         <WarningNotice warnings={update.data?.warnings} />
 
