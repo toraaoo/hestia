@@ -5,6 +5,8 @@
 //! action. One tray runs per user session — a duplicate exits at startup, so
 //! the daemon can spawn unconditionally on every start.
 
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod desktop;
 mod icon;
 mod lock;
