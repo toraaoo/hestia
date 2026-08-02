@@ -86,7 +86,7 @@ Carries bytes and nothing domain-specific.
 |---|---|
 | `transport.rs` | the platform socket (Unix domain socket / Windows named pipe), `bind`/`connect`, a length-framed `FrameReader`/`FrameWriter`, and `Peer` — the connection's verified identity (`uid` and `authorized()` on POSIX via peer credentials) |
 | `protocol.rs` | the JSON envelope, encoded and decoded in exactly one place. Request `{v, channel, payload, id?}`, response `{v, ok, payload \| error, id?}`, event `{event, payload}` |
-| `endpoint.rs` | where the socket lives — `$XDG_RUNTIME_DIR/hestia/hestiad.sock`, else `/tmp/hestia-<uid>/…`; a named pipe on Windows. `HESTIA_SOCK` overrides it so tests and side-by-side daemons never collide |
+| `endpoint.rs` | where the socket lives — `$XDG_RUNTIME_DIR/hestia/hestiad.sock`, else `/tmp/hestia-<uid>/…`; a named pipe on Windows. A build carrying its own data home takes a name scoped to it (`common::paths::install_scope`), so a portable copy never meets an installed daemon on one socket ([0067](../decisions/0067-an-endpoint-is-scoped-like-its-data-home.md)). `HESTIA_SOCK` overrides it so tests and side-by-side daemons never collide |
 | `errors.rs` | the error-code vocabulary (`BAD_REQUEST`, `NOT_FOUND`, `UNKNOWN_CHANNEL`, `HANDLER_ERROR`, `VERSION_MISMATCH`, `UNAUTHORIZED`, …) and the client-facing `IpcError` |
 
 The **runtime directory** holding the ephemeral socket is deliberately distinct

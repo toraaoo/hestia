@@ -19,13 +19,8 @@ pub fn acquire() -> Option<Lock> {
 }
 
 fn lock_name() -> String {
-    let endpoint = ipc::endpoint::default_endpoint();
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for byte in endpoint.to_string_lossy().as_bytes() {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0100_0000_01b3);
-    }
-    format!("tray-{hash:016x}.lock")
+    let tag = common::paths::path_tag(&ipc::endpoint::default_endpoint());
+    format!("tray-{tag}.lock")
 }
 
 #[cfg(unix)]

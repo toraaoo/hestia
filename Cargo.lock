@@ -2488,6 +2488,7 @@ dependencies = [
 name = "ipc"
 version = "0.0.1"
 dependencies = [
+ "common",
  "libc",
  "serde",
  "serde_json",

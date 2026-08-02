@@ -81,6 +81,7 @@ flowchart TD
     tray["<b>tray</b> → hestia-tray"]
 
     client --> proto & ipc & common
+    ipc --> common
     engine --> proto & common
     cli --> client & common & proto
     daemon --> engine & proto & ipc & common & client
@@ -95,7 +96,9 @@ flowchart TD
 
 - **`proto`** is the *what* — typed payloads, one definition per channel, shared
   verbatim by both sides. **`ipc`** is the *how* — framing, the envelope, where
-  the socket lives. Neither knows anything launcher-specific.
+  the socket lives. Neither knows anything launcher-specific; `ipc` reads
+  `common` only to scope the endpoint to the running install
+  ([0067](decisions/0067-an-endpoint-is-scoped-like-its-data-home.md)).
 - **`client`** re-exports `proto`, so a front-end takes one dependency and gets
   both the SDK and the domain types.
 - **`engine`** never links `ipc` or `client`. It does not know a socket exists —

@@ -38,6 +38,12 @@ test binaries), so every binary of one build agrees on one home.
 `sibling_binary` resolves the others in that layout by the same rule. The module
 also provides `config_path`, `log_dir` and `set_persisted_home`.
 
+`install_scope` names that same anchor for anything a *different* install must
+not share — the daemon endpoint above all, which `ipc` scopes with it
+([0067](../decisions/0067-an-endpoint-is-scoped-like-its-data-home.md)). A build
+using the per-user platform directory answers `None`: it is the session's one
+install, with nothing to tell apart.
+
 The data home's layout is in the [architecture overview](../architecture.md#where-things-live-on-disk).
 Its organising rule: what you would recognise as *yours* sits at the top level,
 and everything the launcher can regenerate sits under `meta/` and `cache/`

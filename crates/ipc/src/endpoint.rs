@@ -34,14 +34,25 @@ fn endpoint_override() -> Option<PathBuf> {
     }
 }
 
+/// An endpoint is scoped exactly as the data home behind it is: a build that
+/// resolves its own `data/` must resolve its own socket, or it reaches whichever
+/// daemon bound the shared one first and drives *that* daemon's data home.
+fn scope_suffix() -> String {
+    common::paths::install_scope()
+        .map(|scope| format!("-{scope}"))
+        .unwrap_or_default()
+}
+
 /// The default daemon endpoint. Both the daemon (bind) and clients (connect)
 /// resolve the same path here.
 #[cfg(unix)]
 pub fn default_endpoint() -> PathBuf {
-    endpoint_override().unwrap_or_else(|| runtime_dir().join("hestiad.sock"))
+    endpoint_override()
+        .unwrap_or_else(|| runtime_dir().join(format!("hestiad{}.sock", scope_suffix())))
 }
 
 #[cfg(windows)]
 pub fn default_endpoint() -> PathBuf {
-    endpoint_override().unwrap_or_else(|| PathBuf::from(r"\\.\pipe\hestia-hestiad"))
+    endpoint_override()
+        .unwrap_or_else(|| PathBuf::from(format!(r"\\.\pipe\hestia-hestiad{}", scope_suffix())))
 }

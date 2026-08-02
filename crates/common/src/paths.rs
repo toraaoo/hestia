@@ -54,6 +54,34 @@ fn contained_data_home() -> Option<PathBuf> {
     Some(layout_root(exe.parent()?).join("data"))
 }
 
+/// A short, stable tag for a path. A per-install name must fit inside a unix
+/// socket path (~108 bytes) and a pipe name, so it carries a hash rather than
+/// the path. FNV-1a, not `DefaultHasher`, whose output is unstable across Rust
+/// releases.
+pub fn path_tag(path: &Path) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in path.to_string_lossy().as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0100_0000_01b3);
+    }
+    format!("{hash:016x}")
+}
+
+/// Which install the running build is, for anything that must not be shared
+/// with a different one — the daemon endpoint above all. A build carrying its
+/// own data directory (the portable archives, every debug build) is tagged by
+/// that directory; `None` is a build using the per-user platform directory,
+/// where there is nothing to tell apart.
+#[cfg(any(feature = "portable", debug_assertions))]
+pub fn install_scope() -> Option<String> {
+    contained_data_home().map(|dir| path_tag(&dir))
+}
+
+#[cfg(not(any(feature = "portable", debug_assertions)))]
+pub fn install_scope() -> Option<String> {
+    None
+}
+
 /// The platform default data directory. Portable and debug builds keep their
 /// data inside the build's own layout, so neither ever touches the real
 /// per-user directory.
@@ -166,5 +194,18 @@ mod tests {
     fn an_ordinary_directory_name_is_the_root_itself() {
         let dir = Path::new("/opt/hestia/binaries");
         assert_eq!(layout_root(dir), dir);
+    }
+
+    #[test]
+    fn two_layouts_tag_differently() {
+        assert_ne!(
+            path_tag(Path::new("/opt/hestia/data")),
+            path_tag(Path::new("/home/user/hestia/data"))
+        );
+    }
+
+    #[test]
+    fn a_contained_build_is_scoped_by_the_data_home_it_resolves() {
+        assert_eq!(install_scope(), Some(path_tag(&anchor_dir())));
     }
 }

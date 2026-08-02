@@ -25,6 +25,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0031** — [Everything serialized is camelCase, except the `config.*` key vocabulary and upstream DTOs](0031-camelcase-except-the-config-vocabulary.md)
 - **0035** — [A job is cancelled by asking, at safe checkpoints — never by disconnecting](0035-jobs-are-cancelled-by-asking.md)
 - **0048** — [One event-callback slot per client `Session`](0048-one-event-callback-per-session.md)
+- **0067** — [An endpoint is scoped exactly as the data home behind it](0067-an-endpoint-is-scoped-like-its-data-home.md)
 
 ### [Cross-cutting foundations](../architecture/common.md)
 
