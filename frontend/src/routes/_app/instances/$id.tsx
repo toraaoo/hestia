@@ -7,13 +7,14 @@ import {
 import { isContentKind } from '@/features/shared/content/lib';
 import { ensureSignedIn } from '@/queries';
 
-const tabs: InstanceTab[] = [
-  'content',
-  'profiles',
-  'worlds',
-  'logs',
-  'settings',
-];
+const tabs: Record<Exclude<InstanceTab, 'overview'>, true> = {
+  content: true,
+  profiles: true,
+  worlds: true,
+  servers: true,
+  logs: true,
+  settings: true,
+};
 
 export const Route = createFileRoute('/_app/instances/$id')({
   beforeLoad: async ({ context }) => {
@@ -24,7 +25,7 @@ export const Route = createFileRoute('/_app/instances/$id')({
   validateSearch: (
     search: Record<string, unknown>,
   ): { tab?: InstanceTab; kind?: ContentKind } => {
-    const tab = tabs.includes(search.tab as InstanceTab)
+    const tab = Object.hasOwn(tabs, search.tab as string)
       ? (search.tab as InstanceTab)
       : undefined;
     return {

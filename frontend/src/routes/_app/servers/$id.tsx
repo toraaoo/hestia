@@ -3,13 +3,18 @@ import type { ContentKind } from '@/api';
 import { ServerDetailPage, type ServerTab } from '@/features/servers/detail';
 import { isContentKind } from '@/features/shared/content/lib';
 
-const tabs: ServerTab[] = ['console', 'content', 'backups', 'settings'];
+const tabs: Record<Exclude<ServerTab, 'overview'>, true> = {
+  console: true,
+  content: true,
+  backups: true,
+  settings: true,
+};
 
 export const Route = createFileRoute('/_app/servers/$id')({
   validateSearch: (
     search: Record<string, unknown>,
   ): { tab?: ServerTab; kind?: ContentKind } => {
-    const tab = tabs.includes(search.tab as ServerTab)
+    const tab = Object.hasOwn(tabs, search.tab as string)
       ? (search.tab as ServerTab)
       : undefined;
     return {
