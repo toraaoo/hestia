@@ -30,7 +30,7 @@ export function AppLayout() {
                   variants={fade}
                   initial="hidden"
                   animate="show"
-                  className="min-h-full"
+                  className="h-full"
                 >
                   <Outlet />
                 </motion.div>
