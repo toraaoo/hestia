@@ -1,8 +1,10 @@
 import {
   FolderOpenIcon,
+  GlobeIcon,
   PlayIcon,
   PlusIcon,
   UploadSimpleIcon,
+  WarningCircleIcon,
 } from '@phosphor-icons/react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -131,7 +133,7 @@ export function InstanceDetailPage({
   if (!instance) {
     return (
       <div className="p-6">
-        <Empty>{m['instance.missing']()}</Empty>
+        <Empty icon={WarningCircleIcon}>{m['instance.missing']()}</Empty>
       </div>
     );
   }
@@ -406,7 +408,7 @@ export function InstanceDetailPage({
               <Bone className="h-10" />
             </div>
           ) : worldList.length === 0 ? (
-            <Empty>{m['instance.no_worlds']()}</Empty>
+            <Empty icon={GlobeIcon}>{m['instance.no_worlds']()}</Empty>
           ) : (
             <div className="divide-y divide-border border border-border">
               {worldList.map((world) => (

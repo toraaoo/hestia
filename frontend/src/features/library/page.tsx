@@ -1,4 +1,4 @@
-import { FileArrowUpIcon, PlusIcon, SignInIcon } from '@phosphor-icons/react';
+import { FileArrowUpIcon, PlusIcon } from '@phosphor-icons/react';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -6,6 +6,7 @@ import { useSearch } from '@/components/app-shell/search-context';
 import { FilterMenu } from '@/components/filter-menu';
 import { entryIcon } from '@/components/icons';
 import { Page, Section } from '@/components/page';
+import { SignInGate } from '@/components/sign-in-gate';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -295,24 +296,11 @@ export function LibraryPage({
 
 /** Instances need a signed-in account, so their section blocks until sign-in. */
 function InstancesSignInPrompt() {
-  const { login, signingIn } = useAccounts();
   return (
-    <div className="flex flex-col items-center gap-4 border border-dashed border-border px-4 py-10 text-center">
-      <div className="space-y-1">
-        <p className="text-sm font-medium">{m['account.sign_in_to_play']()}</p>
-        <p className="text-xs text-muted-foreground">
-          {m['instance.sign_in_hint']()}
-        </p>
-      </div>
-      <Button
-        size="sm"
-        data-icon="inline-start"
-        disabled={signingIn}
-        onClick={() => login.mutate()}
-      >
-        <SignInIcon weight="bold" />
-        {signingIn ? m['account.signing_in']() : m['account.sign_in']()}
-      </Button>
-    </div>
+    <SignInGate
+      className="h-auto py-10"
+      title={m['account.sign_in_to_play']()}
+      hint={m['instance.sign_in_hint']()}
+    />
   );
 }

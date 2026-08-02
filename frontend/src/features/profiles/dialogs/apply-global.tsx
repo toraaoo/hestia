@@ -72,7 +72,7 @@ export function ApplyGlobalDialog({
             className="min-h-24"
           />
         ) : list.length === 0 ? (
-          <Empty>{m['profile.global.empty']()}</Empty>
+          <Empty icon={StackIcon}>{m['profile.global.empty']()}</Empty>
         ) : (
           <div className="grid gap-2 p-1">
             {list.map((profile) => (

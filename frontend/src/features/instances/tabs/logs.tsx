@@ -1,3 +1,5 @@
+import { FileTextIcon } from '@phosphor-icons/react';
+
 import type { ProcessInfo } from '@/api';
 import { Empty } from '@/components/empty';
 import { LogView } from '@/components/log-view';
@@ -73,7 +75,9 @@ export function InstanceLogsTab({
       )}
 
       {logs.lines.length === 0 ? (
-        <Empty className="h-full">{m['instance.logs_empty']()}</Empty>
+        <Empty className="h-full" icon={FileTextIcon}>
+          {m['instance.logs_empty']()}
+        </Empty>
       ) : (
         <LogView
           aria-label={name}

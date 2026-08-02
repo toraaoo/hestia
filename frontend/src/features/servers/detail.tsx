@@ -3,6 +3,7 @@ import {
   PlayIcon,
   PlusIcon,
   PowerIcon,
+  WarningCircleIcon,
 } from '@phosphor-icons/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
@@ -95,7 +96,7 @@ export function ServerDetailPage({
   if (!server) {
     return (
       <div className="p-6">
-        <Empty>{m['server.missing']()}</Empty>
+        <Empty icon={WarningCircleIcon}>{m['server.missing']()}</Empty>
       </div>
     );
   }

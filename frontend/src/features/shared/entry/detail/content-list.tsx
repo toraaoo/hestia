@@ -4,6 +4,7 @@ import {
   GlobeIcon,
   PackageIcon,
   ProhibitIcon,
+  PuzzlePieceIcon,
   StackIcon,
   SwapIcon,
   TrashIcon,
@@ -60,7 +61,9 @@ export function ContentListResult({
   const [changing, setChanging] = useState<InstalledContent | null>(null);
 
   if (items.length === 0) {
-    return <Empty>{m['content.none_installed']()}</Empty>;
+    return (
+      <Empty icon={PuzzlePieceIcon}>{m['content.none_installed']()}</Empty>
+    );
   }
   return (
     <>

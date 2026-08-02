@@ -1,7 +1,12 @@
-import { RowsIcon, SquaresFourIcon } from '@phosphor-icons/react';
+import {
+  MagnifyingGlassIcon,
+  RowsIcon,
+  SquaresFourIcon,
+} from '@phosphor-icons/react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import type { InstanceInfo, ServerInfo } from '@/api';
+import { Empty } from '@/components/empty';
 import type { FilterGroup } from '@/components/filter-menu';
 import { Button } from '@/components/ui/button';
 import { agoLabel } from '@/lib/format';
@@ -164,11 +169,7 @@ export function EntryCollection({
   empty: string;
 }) {
   if (cards.length === 0) {
-    return (
-      <p className="border border-dashed border-border px-4 py-10 text-center text-xs text-muted-foreground">
-        {empty}
-      </p>
-    );
+    return <Empty icon={MagnifyingGlassIcon}>{empty}</Empty>;
   }
   return (
     <motion.div

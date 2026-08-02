@@ -1,4 +1,4 @@
-import { DownloadSimpleIcon, PlusIcon } from '@phosphor-icons/react';
+import { DownloadSimpleIcon, PlusIcon, StackIcon } from '@phosphor-icons/react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -98,7 +98,7 @@ export function ProfilesPanel({
       </div>
 
       {profiles.length === 0 ? (
-        <Empty>{m['profile.empty']()}</Empty>
+        <Empty icon={StackIcon}>{m['profile.empty']()}</Empty>
       ) : (
         <div className="divide-y divide-border border border-border">
           {profiles.map((profile) => (

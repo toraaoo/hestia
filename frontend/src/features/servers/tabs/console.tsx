@@ -1,3 +1,4 @@
+import { TerminalWindowIcon } from '@phosphor-icons/react';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -30,7 +31,11 @@ export function ServerConsoleTab({
   const entries = useConsoleHistory(id);
 
   if (!running && logs.lines.length === 0 && entries.length === 0) {
-    return <Empty className="h-full">{m['server.console.empty']()}</Empty>;
+    return (
+      <Empty className="h-full" icon={TerminalWindowIcon}>
+        {m['server.console.empty']()}
+      </Empty>
+    );
   }
 
   const push = (entry: ConsoleEntry) => pushConsoleEntry(id, entry);

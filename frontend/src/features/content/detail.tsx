@@ -1,4 +1,10 @@
-import { DownloadSimpleIcon, HeartIcon, PlusIcon } from '@phosphor-icons/react';
+import {
+  ClockCounterClockwiseIcon,
+  DownloadSimpleIcon,
+  HeartIcon,
+  PlusIcon,
+  WarningCircleIcon,
+} from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -47,7 +53,9 @@ export function ProjectDetailPage({
   if (!project.data || project.data.kind !== kind) {
     return (
       <div className="p-6">
-        <Empty>{m['content.browse.project_missing']()}</Empty>
+        <Empty icon={WarningCircleIcon}>
+          {m['content.browse.project_missing']()}
+        </Empty>
       </div>
     );
   }
@@ -140,7 +148,9 @@ export function ProjectDetailPage({
           {versions.isPending ? (
             <p className="text-xs text-muted-foreground">…</p>
           ) : (versions.data ?? []).length === 0 ? (
-            <Empty>{m['content.no_versions']()}</Empty>
+            <Empty icon={ClockCounterClockwiseIcon}>
+              {m['content.no_versions']()}
+            </Empty>
           ) : (
             <div className="divide-y divide-border border border-border">
               {(versions.data ?? []).map((v) => (

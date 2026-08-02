@@ -1,4 +1,12 @@
-import { PlusIcon, StackIcon, TrashIcon, XIcon } from '@phosphor-icons/react';
+import {
+  MagnifyingGlassIcon,
+  PlusIcon,
+  PuzzlePieceIcon,
+  StackIcon,
+  TrashIcon,
+  WarningCircleIcon,
+  XIcon,
+} from '@phosphor-icons/react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -77,7 +85,7 @@ export function ProfileDetailPage({
   if (!profile) {
     return (
       <div className="p-6">
-        <Empty>{m['profile.missing']()}</Empty>
+        <Empty icon={WarningCircleIcon}>{m['profile.missing']()}</Empty>
       </div>
     );
   }
@@ -165,7 +173,15 @@ export function ProfileDetailPage({
           </Button>
         </div>
         {filtered.length === 0 ? (
-          <Empty>
+          <Empty
+            icon={
+              q
+                ? MagnifyingGlassIcon
+                : kind
+                  ? contentIcon(kind)
+                  : PuzzlePieceIcon
+            }
+          >
             {q
               ? m['content.browse.nothing_matches']()
               : kind

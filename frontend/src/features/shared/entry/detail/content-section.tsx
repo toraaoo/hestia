@@ -2,6 +2,7 @@ import {
   ArrowsClockwiseIcon,
   FileIcon,
   FolderOpenIcon,
+  MagnifyingGlassIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
@@ -12,6 +13,7 @@ import type { ContentKind, UntrackedFile } from '@/api';
 import { errorMessage, system } from '@/api';
 import { Empty } from '@/components/empty';
 import { FilterMenu } from '@/components/filter-menu';
+import { contentIcon } from '@/components/icons';
 import { SearchInput } from '@/components/search-input';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -240,9 +242,11 @@ function ContentSectionView({
         </div>
       </div>
       {filtered.length === 0 && search.trim() ? (
-        <Empty>{m['content.browse.nothing_matches']()}</Empty>
+        <Empty icon={MagnifyingGlassIcon}>
+          {m['content.browse.nothing_matches']()}
+        </Empty>
       ) : filtered.length === 0 && kind ? (
-        <Empty>
+        <Empty icon={contentIcon(kind)}>
           {m['content.none_of_kind']({
             kind: kindInfo[kind].label().toLowerCase(),
           })}

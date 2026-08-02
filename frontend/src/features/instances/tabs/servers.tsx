@@ -1,4 +1,9 @@
-import { PlayIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react';
+import {
+  HardDrivesIcon,
+  PlayIcon,
+  PlusIcon,
+  TrashIcon,
+} from '@phosphor-icons/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -71,7 +76,7 @@ export function InstanceServersTab({ instance }: { instance: InstanceInfo }) {
           <Bone className="h-10" />
         </div>
       ) : list.length === 0 ? (
-        <Empty>{m['instance.servers.empty']()}</Empty>
+        <Empty icon={HardDrivesIcon}>{m['instance.servers.empty']()}</Empty>
       ) : (
         <div className="divide-y divide-border border border-border">
           {list.map((server) => (

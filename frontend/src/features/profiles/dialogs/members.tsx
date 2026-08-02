@@ -1,3 +1,4 @@
+import { PuzzlePieceIcon } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import type { InstalledContent, Profile } from '@/api';
@@ -48,7 +49,7 @@ export function MembersDialog({
           </DialogDescription>
         </DialogHeader>
         {pool.length === 0 ? (
-          <Empty>{m['profile.members.empty']()}</Empty>
+          <Empty icon={PuzzlePieceIcon}>{m['profile.members.empty']()}</Empty>
         ) : (
           <div className="grid max-h-72 gap-2 overflow-y-auto p-1">
             {pool.map((item) => {

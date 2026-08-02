@@ -31,7 +31,7 @@ export function Page({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3">
         <div className="min-w-0">
           <h1 className="truncate font-heading text-base font-semibold">
@@ -50,12 +50,13 @@ export function Page({
           {actions}
         </div>
       </div>
-      <div className="flex-1 p-5">
+      <div className="flex flex-1 flex-col p-5">
         <motion.div
           key={loading && skeleton ? 'skeleton' : 'content'}
           variants={fade}
           initial="hidden"
           animate="show"
+          className="flex-1"
         >
           {loading && skeleton ? skeleton : children}
         </motion.div>

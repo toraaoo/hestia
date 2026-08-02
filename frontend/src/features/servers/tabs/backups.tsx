@@ -1,4 +1,4 @@
-import { PlusIcon, TrashIcon } from '@phosphor-icons/react';
+import { ArchiveIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -70,7 +70,7 @@ export function ServerBackupsTab({
       </div>
 
       {list.length === 0 ? (
-        <Empty>{m['server.backup.none']()}</Empty>
+        <Empty icon={ArchiveIcon}>{m['server.backup.none']()}</Empty>
       ) : (
         <div className="divide-y divide-border border border-border">
           {list.map((backup: BackupInfo) => (

@@ -1,4 +1,4 @@
-import { PlusIcon } from '@phosphor-icons/react';
+import { PlusIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 
@@ -129,7 +129,9 @@ export function SkinsPage() {
       hint={m['skin.sign_in_hint']()}
     />
   ) : list.isError && !list.data ? (
-    <Empty>{m['skin.load_failed']()}</Empty>
+    <Empty icon={WarningCircleIcon} tone="destructive">
+      {m['skin.load_failed']()}
+    </Empty>
   ) : (
     <div className="flex items-start gap-6">
       {selected && (

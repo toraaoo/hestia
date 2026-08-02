@@ -1,22 +1,28 @@
 import { SignInIcon } from '@phosphor-icons/react';
 
+import { Empty } from '@/components/empty';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
 
-export function SignInGate({ title, hint }: { title: string; hint: string }) {
+export function SignInGate({
+  title,
+  hint,
+  className,
+}: {
+  title: string;
+  hint: string;
+  className?: string;
+}) {
   const { login, signingIn } = useAccounts();
 
   return (
-    <div className="grid h-full min-h-full place-items-center px-4">
-      <div className="flex max-w-sm flex-col items-center gap-5 text-center">
-        <span className="grid size-14 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
-          <SignInIcon className="size-7" />
-        </span>
-        <div className="space-y-1.5">
-          <h2 className="text-lg font-medium">{title}</h2>
-          <p className="text-sm text-muted-foreground">{hint}</p>
-        </div>
+    <Empty
+      icon={SignInIcon}
+      description={hint}
+      className={cn('h-full', className)}
+      action={
         <Button
           data-icon="inline-start"
           disabled={signingIn}
@@ -25,7 +31,9 @@ export function SignInGate({ title, hint }: { title: string; hint: string }) {
           <SignInIcon weight="bold" />
           {signingIn ? m['account.signing_in']() : m['account.sign_in']()}
         </Button>
-      </div>
-    </div>
+      }
+    >
+      {title}
+    </Empty>
   );
 }

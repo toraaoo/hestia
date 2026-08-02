@@ -1,4 +1,9 @@
-import { CaretRightIcon, PlusIcon, StackIcon } from '@phosphor-icons/react';
+import {
+  CaretRightIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+  StackIcon,
+} from '@phosphor-icons/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -81,7 +86,7 @@ export function ProfilesPage({
       }
     >
       {filtered.length === 0 ? (
-        <Empty>
+        <Empty icon={profiles.length === 0 ? StackIcon : MagnifyingGlassIcon}>
           {profiles.length === 0
             ? m['profile.global.empty']()
             : m['profile.none_match']()}

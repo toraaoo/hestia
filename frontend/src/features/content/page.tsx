@@ -1,3 +1,4 @@
+import { MagnifyingGlassIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useIntersectionObserver } from '@uidotdev/usehooks';
@@ -5,6 +6,7 @@ import { useEffect, useMemo } from 'react';
 
 import { type ContentKind, errorMessage } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
+import { Empty } from '@/components/empty';
 import { FilterMenu } from '@/components/filter-menu';
 import { Page } from '@/components/page';
 import { CardGridSkeleton } from '@/components/skeleton';
@@ -117,9 +119,9 @@ export function BrowsePage({
             />
           </div>
         ) : (
-          <p className="border border-dashed border-border px-4 py-10 text-center text-xs text-destructive">
+          <Empty icon={WarningCircleIcon} tone="destructive">
             {errorMessage(link.error)}
-          </p>
+          </Empty>
         )
       ) : search.isPending ? (
         <CardGridSkeleton
@@ -128,9 +130,9 @@ export function BrowsePage({
           card="h-28"
         />
       ) : hits.length === 0 ? (
-        <p className="border border-dashed border-border px-4 py-10 text-center text-xs text-muted-foreground">
+        <Empty icon={MagnifyingGlassIcon}>
           {m['content.browse.nothing_matches']()}
-        </p>
+        </Empty>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
