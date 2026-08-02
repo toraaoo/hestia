@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/toraaoo/hestia/releases/latest"><img alt="Download" src="https://img.shields.io/badge/download-latest%20release-e8873d?style=flat-square"></a>
-  <a href="https://github.com/toraaoo/hestia/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/toraaoo/hestia/ci.yml?style=flat-square&label=ci"></a>
+  <a href="https://github.com/prytaneum/hestia/releases/latest"><img alt="Download" src="https://img.shields.io/badge/download-latest%20release-e8873d?style=flat-square"></a>
+  <a href="https://github.com/prytaneum/hestia/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/prytaneum/hestia/ci.yml?style=flat-square&label=ci"></a>
   <img alt="Platforms" src="https://img.shields.io/badge/linux%20%C2%B7%20windows-x86__64-lightgrey?style=flat-square">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square"></a>
 </p>
@@ -104,7 +104,7 @@ correctly.
 
 ## Install
 
-Grab an installer from the [latest release](https://github.com/toraaoo/hestia/releases/latest). One download installs
+Grab an installer from the [latest release](https://github.com/prytaneum/hestia/releases/latest). One download installs
 everything: the desktop app, the daemon, the tray, and the
 `hestia` CLI.
 
@@ -122,7 +122,7 @@ release feed.
 The daemon and CLI need nothing but a Rust toolchain:
 
 ```bash
-git clone https://github.com/toraaoo/hestia && cd hestia
+git clone https://github.com/prytaneum/hestia && cd hestia
 cargo build --release -p cli -p daemon
 ```
 

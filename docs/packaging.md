@@ -34,12 +34,12 @@ Two names per binary, and which one ships depends on the platform — the source
 (`DESKTOP_BIN`, `TRAY_BIN`, `DAEMON_BIN`), which lists them most-preferred first so `common::paths::sibling_binary`
 resolves a sibling in any layout, including a dev build under cargo's names.
 
-| | Windows | Linux |
-|---|---|---|
-| desktop shell | `Hestia.exe` | `hestia-desktop` |
-| tray | `Hestia Tray.exe` | `hestia-tray` |
-| CLI | `hestia.exe` | `hestia` |
-| daemon | `hestiad.exe` | `hestiad` |
+|               | Windows           | Linux            |
+|---------------|-------------------|------------------|
+| desktop shell | `Hestia.exe`      | `hestia-desktop` |
+| tray          | `Hestia Tray.exe` | `hestia-tray`    |
+| CLI           | `hestia.exe`      | `hestia`         |
+| daemon        | `hestiad.exe`     | `hestiad`        |
 
 Windows names the two a user meets — in Program Files, in Task Manager — after the product, via `mainBinaryName` in
 [`tauri.windows.conf.json`](../crates/desktop/tauri.windows.conf.json) for the shell and an `/oname=` rename in the NSIS
@@ -53,9 +53,9 @@ case-insensitive — they cannot share a directory.
 ## The NSIS installer
 
 NSIS is the **only** Windows installer. The WiX `.msi` was dropped: it installs every binary into one flat directory,
-which the names above cannot survive — `Hestia.exe` and `hestia.exe` would collide — and fixing it meant a second
-forked bundler template to re-diff on every tauri-cli bump. It bought nothing the NSIS installer does not already do
-better; `installMode: both` covers per-user and per-machine, which was the MSI's only real advantage.
+which the names above cannot survive — `Hestia.exe` and `hestia.exe` would collide — and fixing it meant a second forked
+bundler template to re-diff on every tauri-cli bump. It bought nothing the NSIS installer does not already do better;
+`installMode: both` covers per-user and per-machine, which was the MSI's only real advantage.
 
 Windows uses a **custom NSIS template**
 ([`crates/desktop/windows/installer.nsi`](../crates/desktop/windows/installer.nsi)), a fork of tauri-bundler's stock
@@ -65,14 +65,15 @@ and in [`release.yml`](../.github/workflows/release.yml)) — re-diff the fork a
 
 What it adds over stock:
 
-- **Components page** — *Hestia core* (`hestiad` + the tray, required), *Desktop app*, and *CLI* (both checked by default,
-  deselectable). Choices are persisted in the uninstall registry key and become the defaults for the next run — and the
-  effective selection for silent/passive updates. Deselecting a previously installed component on an update removes it.
+- **Components page** — *Hestia core* (`hestiad` + the tray, required), *Desktop app*, and *CLI* (both checked by
+  default, deselectable). Choices are persisted in the uninstall registry key and become the defaults for the next run —
+  and the effective selection for silent/passive updates. Deselecting a previously installed component on an update
+  removes it.
 - **Install mode `both`** — per-user or all-users, chosen at install time (`bundle.windows.nsis.installMode` in
   `tauri.conf.json`), remembered for updates and uninstall.
 - **A split layout** — `Hestia.exe` and `Hestia Tray.exe` install to `$INSTDIR`, because a user launches them;
-  `hestia.exe` and `hestiad.exe` to `$INSTDIR\bin`, because a shell or another binary reaches them. The portable
-  archive lays down the same split.
+  `hestia.exe` and `hestiad.exe` to `$INSTDIR\bin`, because a shell or another binary reaches them. The portable archive
+  lays down the same split.
 - **CLI on PATH** — the CLI component appends `$INSTDIR\bin` to the user or machine `PATH` (matching the install mode)
   and removes it on uninstall or deselection, so `hestia` is reachable without also exposing the daemon, the tray and
   the shell.
@@ -93,20 +94,30 @@ The **daemon** owns self-update — `engine/src/update/`, reached over `update.c
 `update.download` and `update.apply`. Every front-end is a caller; none reads the manifest, holds a key, or runs an
 installer ([decision 0066](decisions/0066-the-daemon-owns-self-update.md)).
 
-It polls `https://github.com/toraaoo/hestia/releases/latest/download/latest.json`.
-On a `v*` tag the release workflow's `manifest` job composes `latest.json` and attaches it to the Release:
+It polls `https://github.com/prytaneum/hestia/releases/latest/download/latest.json`. On a `v*` tag the release
+workflow's `manifest` job composes `latest.json` and attaches it to the Release:
 
 ```json
 {
   "version": "0.1.0",
   "notes": "…",
   "platforms": {
-    "windows-x86_64": { "url": "…-setup.exe", "signature": "…" },
+    "windows-x86_64": {
+      "url": "…-setup.exe",
+      "signature": "…"
+    },
     "linux-x86_64": {
-      "url": "….AppImage", "signature": "…",
+      "url": "….AppImage",
+      "signature": "…",
       "formats": {
-        "deb": { "url": "….deb", "signature": "…" },
-        "rpm": { "url": "….rpm", "signature": "…" }
+        "deb": {
+          "url": "….deb",
+          "signature": "…"
+        },
+        "rpm": {
+          "url": "….rpm",
+          "signature": "…"
+        }
       }
     }
   }
@@ -119,12 +130,12 @@ additive: a build that predates a format never asks for it and reads the same ma
 How a copy was installed is **detected, not recorded** (`update/install.rs`), and decides both which artifact is asked
 for and how it is applied:
 
-| Install | Detected by | Applied with |
-|---|---|---|
-| NSIS | `uninstall.exe` at the layout root | the setup, `/P /UPDATE`, via `ShellExecuteW` so UAC can prompt |
-| AppImage | `$APPIMAGE` | staged beside the image, renamed over it |
-| deb / rpm | the binary is under a system prefix and `dpkg-query -S` / `rpm -qf` owns it | `dpkg -i` / `rpm -U`, escalated |
-| portable, `target/` | anything else, and always under the `portable` feature | nothing — the front-end offers the download URL |
+| Install             | Detected by                                                                 | Applied with                                                   |
+|---------------------|-----------------------------------------------------------------------------|----------------------------------------------------------------|
+| NSIS                | `uninstall.exe` at the layout root                                          | the setup, `/P /UPDATE`, via `ShellExecuteW` so UAC can prompt |
+| AppImage            | `$APPIMAGE`                                                                 | staged beside the image, renamed over it                       |
+| deb / rpm           | the binary is under a system prefix and `dpkg-query -S` / `rpm -qf` owns it | `dpkg -i` / `rpm -U`, escalated                                |
+| portable, `target/` | anything else, and always under the `portable` feature                      | nothing — the front-end offers the download URL                |
 
 Escalation on Linux tries `pkexec` first (the one step that can *prompt*), then passwordless `sudo`. When neither can
 even ask, the daemon returns `ElevationRequired` carrying the exact command — `hestia update` then offers to run it,
@@ -160,10 +171,10 @@ which the same lookup handles.
 
 Two independent signatures, often confused. Only one of them is mandatory.
 
-|                                          | What it proves                   | Who checks it             | Required?                                    |
-|------------------------------------------|----------------------------------|---------------------------|----------------------------------------------|
-| **Update signature** (minisign/Ed25519)  | this download came from us       | `engine/src/signature.rs`  | **yes** — the updater cannot work without it |
-| **Authenticode** (code signing cert)     | Windows knows who published this | Windows SmartScreen + UAC | no — costs a warning, not a failure          |
+|                                         | What it proves                   | Who checks it             | Required?                                    |
+|-----------------------------------------|----------------------------------|---------------------------|----------------------------------------------|
+| **Update signature** (minisign/Ed25519) | this download came from us       | `engine/src/signature.rs` | **yes** — the updater cannot work without it |
+| **Authenticode** (code signing cert)    | Windows knows who published this | Windows SmartScreen + UAC | no — costs a warning, not a failure          |
 
 ### The update key
 
@@ -172,8 +183,8 @@ One minisign keypair. The **public** half lives in exactly one place —
 `crates/common/tests/updater.rs` fails the build if a second copy reappears in `tauri.conf.json`.
 
 The **private** half signs releases through [`scripts/sign.sh`](../scripts/sign.sh), either as the
-`RELEASE_SIGNING_KEY` repository secret (with `RELEASE_SIGNING_KEY_PASSWORD`) or locally by whoever cuts the release.
-CI signs the finished artifacts itself rather than letting the bundler do it: the bundler never signed `.deb` or `.rpm`
+`RELEASE_SIGNING_KEY` repository secret (with `RELEASE_SIGNING_KEY_PASSWORD`) or locally by whoever cuts the release. CI
+signs the finished artifacts itself rather than letting the bundler do it: the bundler never signed `.deb` or `.rpm`
 at all, and those are exactly what the `formats` map needs. Offline is the safer default, because:
 
 > **A build trusts only the keys compiled into it.** Nothing sent later changes
@@ -212,9 +223,9 @@ Testing the update path locally never means editing these constants:
 nothing to paste in and nothing to put back. A release build reads neither.
 
 `scripts/package.sh` builds unsigned, since signing is a separate step. CI refuses a **tagged** release with no key
-configured — the guard is in the `preflight` job, which runs before anything is built, because a tag attaches
-installers to the Release as each platform finishes and builds published without a `latest.json` would poll an
-endpoint that never answers.
+configured — the guard is in the `preflight` job, which runs before anything is built, because a tag attaches installers
+to the Release as each platform finishes and builds published without a `latest.json` would poll an endpoint that never
+answers.
 
 ### Authenticode — the path, not the requirement
 
@@ -264,8 +275,8 @@ scripts/package.sh portable
 ```
 
 `cargo tauri build` runs the frontend build itself (via `beforeBuildCommand`), so only `bun install` (in `frontend/`)
-and a staged sidecar set are prerequisites. Bundles land in `target/release/bundle/{deb,rpm,appimage,nsis}/`;
-portable archives in `target/package/`. On Windows use `scripts\win.ps1 package`.
+and a staged sidecar set are prerequisites. Bundles land in `target/release/bundle/{deb,rpm,appimage,nsis}/`; portable
+archives in `target/package/`. On Windows use `scripts\win.ps1 package`.
 
 **`HESTIA_CURSEFORGE_API_KEY`** is read at compile time by the `engine` crate: a distributor that has registered for a
 [CurseForge key](https://console.curseforge.com/) sets it in the build environment and the CurseForge content source

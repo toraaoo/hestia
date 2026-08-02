@@ -55,7 +55,7 @@
     "shortDescription": "Fast, lightweight Minecraft launcher",
     "longDescription": "Hestia is a cross-platform Minecraft launcher. The desktop app is a thin client that drives the bundled hestiad daemon over a local socket.",
     "publisher": "prytaneum",
-    "homepage": "https://github.com/toraaoo/hestia",
+    "homepage": "https://github.com/prytaneum/hestia",
     "copyright": "Copyright © 2026 toraaoo. Published by prytaneum.",
     "license": "GPL-3.0-only",
     "licenseFile": "../../LICENSE",

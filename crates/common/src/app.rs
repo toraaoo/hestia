@@ -38,7 +38,7 @@ pub const DAEMON_BIN: &[&str] = &["hestiad"];
 /// through `update.check`, so these two constants are the only place either is
 /// written down.
 pub const UPDATE_ENDPOINT: &str =
-    "https://github.com/toraaoo/hestia/releases/latest/download/latest.json";
+    "https://github.com/prytaneum/hestia/releases/latest/download/latest.json";
 pub const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJDNjM3NzcxQUEwRTdDQUQKUldTdGZBNnFjWGRqTERoaEIzaXFJcU1ZdU1YdXBVUk16cFdGVFQzYmZtT3ZVRC9mbjdYU0dOQlkK";
 
 /// The rotation spare. A binary trusts only the keys compiled into it, so a
