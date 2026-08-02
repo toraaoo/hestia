@@ -22,6 +22,8 @@ path = "src/main.rs"
 [features]
 # Build the portable archive's binaries: data lives inside the install.
 portable = ["common/portable"]
+# Serve the embedded frontend, not `devUrl`. `cargo tauri build` sets it.
+custom-protocol = ["tauri/custom-protocol"]
 
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
