@@ -74,7 +74,7 @@ export function ContentCard({
                 </Badge>
               </div>
 
-              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+              <p className="mt-1 truncate text-xs text-muted-foreground">
                 {project.description}
               </p>
 
