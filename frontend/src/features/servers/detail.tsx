@@ -279,7 +279,7 @@ export function ServerDetailPage({
           <ServerConsoleTab id={id} running={running} name={server.name} />
         </TabsContent>
 
-        <TabsContent value="content" className="p-5">
+        <TabsContent value="content" className="flex flex-col p-5">
           <ContentSection
             entry={{
               kind: 'server',
@@ -304,7 +304,7 @@ export function ServerDetailPage({
           />
         </TabsContent>
 
-        <TabsContent value="backups" className="p-5">
+        <TabsContent value="backups" className="flex flex-col p-5">
           <ServerBackupsTab id={id} running={running} config={config.data} />
         </TabsContent>
 

@@ -64,7 +64,7 @@ export function ProjectDetailPage({
   const parent = kindInfo[kind];
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full flex-col">
       <DetailHero
         parentLabel={parent.label()}
         parentTo="/browse/$kind"
@@ -97,7 +97,7 @@ export function ProjectDetailPage({
       <Tabs
         value={tab}
         onValueChange={(value) => onTabChange(value as ProjectTab)}
-        className="gap-0 p-0"
+        className="min-h-0 flex-1 gap-0 p-0"
       >
         <TabsList variant="line" className="h-auto gap-6 px-5">
           <TabsTrigger value="description">
@@ -144,11 +144,11 @@ export function ProjectDetailPage({
           </div>
         </TabsContent>
 
-        <TabsContent value="versions" className="p-5">
+        <TabsContent value="versions" className="flex flex-col p-5">
           {versions.isPending ? (
             <p className="text-xs text-muted-foreground">…</p>
           ) : (versions.data ?? []).length === 0 ? (
-            <Empty icon={ClockCounterClockwiseIcon}>
+            <Empty className="flex-1" icon={ClockCounterClockwiseIcon}>
               {m['content.no_versions']()}
             </Empty>
           ) : (

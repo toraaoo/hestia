@@ -98,7 +98,9 @@ export function ProfilesPanel({
       </div>
 
       {profiles.length === 0 ? (
-        <Empty icon={StackIcon}>{m['profile.empty']()}</Empty>
+        <Empty className="flex-1" icon={StackIcon}>
+          {m['profile.empty']()}
+        </Empty>
       ) : (
         <div className="divide-y divide-border border border-border">
           {profiles.map((profile) => (

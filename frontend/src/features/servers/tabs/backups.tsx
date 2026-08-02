@@ -70,7 +70,9 @@ export function ServerBackupsTab({
       </div>
 
       {list.length === 0 ? (
-        <Empty icon={ArchiveIcon}>{m['server.backup.none']()}</Empty>
+        <Empty className="flex-1" icon={ArchiveIcon}>
+          {m['server.backup.none']()}
+        </Empty>
       ) : (
         <div className="divide-y divide-border border border-border">
           {list.map((backup: BackupInfo) => (

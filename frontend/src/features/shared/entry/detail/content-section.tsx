@@ -242,11 +242,11 @@ function ContentSectionView({
         </div>
       </div>
       {filtered.length === 0 && search.trim() ? (
-        <Empty icon={MagnifyingGlassIcon}>
+        <Empty className="flex-1" icon={MagnifyingGlassIcon}>
           {m['content.browse.nothing_matches']()}
         </Empty>
       ) : filtered.length === 0 && kind ? (
-        <Empty icon={contentIcon(kind)}>
+        <Empty className="flex-1" icon={contentIcon(kind)}>
           {m['content.none_of_kind']({
             kind: kindInfo[kind].label().toLowerCase(),
           })}

@@ -55,7 +55,7 @@ export function InstanceServersTab({ instance }: { instance: InstanceInfo }) {
   const list = (servers.data ?? []).filter((server) => !server.hidden);
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-1 flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {m['instance.servers.summary']()}
@@ -76,7 +76,9 @@ export function InstanceServersTab({ instance }: { instance: InstanceInfo }) {
           <Bone className="h-10" />
         </div>
       ) : list.length === 0 ? (
-        <Empty icon={HardDrivesIcon}>{m['instance.servers.empty']()}</Empty>
+        <Empty className="flex-1" icon={HardDrivesIcon}>
+          {m['instance.servers.empty']()}
+        </Empty>
       ) : (
         <div className="divide-y divide-border border border-border">
           {list.map((server) => (

@@ -372,7 +372,7 @@ export function InstanceDetailPage({
           </div>
         </TabsContent>
 
-        <TabsContent value="content" className="p-5">
+        <TabsContent value="content" className="flex flex-col p-5">
           <ContentSection
             entry={{
               kind: 'instance',
@@ -397,18 +397,20 @@ export function InstanceDetailPage({
           />
         </TabsContent>
 
-        <TabsContent value="profiles" className="p-5">
+        <TabsContent value="profiles" className="flex flex-col p-5">
           <ProfilesPanel instance={instance} running={running} />
         </TabsContent>
 
-        <TabsContent value="worlds" className="p-5">
+        <TabsContent value="worlds" className="flex flex-col p-5">
           {worlds.isPending ? (
             <div className="space-y-2">
               <Bone className="h-10" />
               <Bone className="h-10" />
             </div>
           ) : worldList.length === 0 ? (
-            <Empty icon={GlobeIcon}>{m['instance.no_worlds']()}</Empty>
+            <Empty className="flex-1" icon={GlobeIcon}>
+              {m['instance.no_worlds']()}
+            </Empty>
           ) : (
             <div className="divide-y divide-border border border-border">
               {worldList.map((world) => (
@@ -440,7 +442,7 @@ export function InstanceDetailPage({
           )}
         </TabsContent>
 
-        <TabsContent value="servers" className="p-5">
+        <TabsContent value="servers" className="flex flex-col p-5">
           <InstanceServersTab instance={instance} />
         </TabsContent>
 

@@ -62,7 +62,9 @@ export function ContentListResult({
 
   if (items.length === 0) {
     return (
-      <Empty icon={PuzzlePieceIcon}>{m['content.none_installed']()}</Empty>
+      <Empty className="flex-1" icon={PuzzlePieceIcon}>
+        {m['content.none_installed']()}
+      </Empty>
     );
   }
   return (
