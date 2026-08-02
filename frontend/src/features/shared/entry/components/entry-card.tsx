@@ -9,12 +9,12 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
-import { EntryRunControl } from '@/features/shared/entry/components';
 import { duration, layoutMorph, listItem } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { usePinned } from '@/queries/pinned';
 import type { View } from './collection';
+import { EntryRunControl } from './run-control';
 
 export interface EntryCardModel {
   id: string;

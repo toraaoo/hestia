@@ -26,11 +26,11 @@ import {
   ServerConsoleTab,
   ServerSettingsTab,
 } from '@/features/servers/tabs';
+import { EntryIconMenu } from '@/features/shared/entry/components';
 import {
-  EntryIconMenu,
   type LiveResources,
   ResourceCards,
-} from '@/features/shared/entry/components';
+} from '@/features/shared/entry/components/resource-panel';
 import {
   ContentSection,
   ModpackCard,

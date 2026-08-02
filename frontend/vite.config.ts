@@ -13,6 +13,12 @@ import { defineConfig } from 'vitest/config';
 // runtime, so this is a plain client SPA.
 const host = process.env.TAURI_DEV_HOST;
 
+const SEP = '[\\\\/]';
+const pkg = (...names: string[]) => {
+  const alt = names.join('|').replaceAll('.', '\\.').replaceAll('/', SEP);
+  return new RegExp(`${SEP}node_modules${SEP}(?:${alt})(?:${SEP}|$)`);
+};
+
 const config = defineConfig({
   plugins: [
     devtools(),
@@ -29,16 +35,35 @@ const config = defineConfig({
   build: {
     rolldownOptions: {
       output: {
-        advancedChunks: {
+        codeSplitting: {
+          // On, a group also swallows react/clsx, so every chunk imports it.
+          includeDependenciesRecursively: false,
           groups: [
             {
-              name: 'three-core',
-              test: /[\\/]node_modules[\\/]three[\\/]build[\\/]three\.core\.js/,
+              name: 'charts',
+              test: pkg(
+                'recharts',
+                'victory-vendor',
+                'd3-[a-z]+',
+                'internmap',
+                'decimal.js-light',
+                '@reduxjs/toolkit',
+                'redux(-thunk)?',
+                'react-redux',
+                'reselect',
+                'immer',
+              ),
             },
             {
-              name: 'three',
-              test: /[\\/]node_modules[\\/]three[\\/]build[\\/]three\.module\.js/,
+              name: 'motion',
+              test: pkg('motion(-dom|-utils)?', 'framer-motion'),
             },
+            {
+              name: 'base-ui',
+              test: pkg('@base-ui/[a-z]+', '@floating-ui/[a-z-]+'),
+            },
+            { name: 'three-core', test: pkg('three/build/three.core.js') },
+            { name: 'three', test: pkg('three/build/three.module.js') },
           ],
         },
       },

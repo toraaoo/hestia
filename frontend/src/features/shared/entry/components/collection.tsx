@@ -4,15 +4,12 @@ import { AnimatePresence, motion } from 'motion/react';
 import type { InstanceInfo, ServerInfo } from '@/api';
 import type { FilterGroup } from '@/components/filter-menu';
 import { Button } from '@/components/ui/button';
-import {
-  type EntryCardModel,
-  EntryTile,
-} from '@/features/shared/entry/components';
 import { agoLabel } from '@/lib/format';
 import { layoutMorph, listContainer } from '@/lib/motion';
 import { runningSessions } from '@/lib/sessions';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+import { type EntryCardModel, EntryTile } from './entry-card';
 
 export type View = 'grid' | 'list';
 

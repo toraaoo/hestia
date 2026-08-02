@@ -17,11 +17,6 @@ export {
   ProvisionProgressView,
   phaseLabel,
 } from './provision-progress';
-export {
-  type LiveResources,
-  ResourceCards,
-  type Sample,
-} from './resource-panel';
 export { EntryRunControl } from './run-control';
 export { EntryGridSkeleton } from './skeleton';
 export { WorldIcon } from './world-icon';

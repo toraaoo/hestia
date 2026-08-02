@@ -37,9 +37,11 @@ import { ProfilesPanel } from '@/features/profiles/components';
 import {
   EntryIconMenu,
   EntryRunControl,
+} from '@/features/shared/entry/components';
+import {
   type LiveResources,
   ResourceCards,
-} from '@/features/shared/entry/components';
+} from '@/features/shared/entry/components/resource-panel';
 import {
   ContentSection,
   ModpackCard,
