@@ -8,6 +8,8 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import viteReact from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
+import { acyclicChunks } from './build/acyclic-chunks';
+
 // Tauri drives the frontend: it opens a webview at `server` in dev and bundles
 // the static `build.outDir` (dist) in release. There is no Node server at
 // runtime, so this is a plain client SPA.
@@ -30,15 +32,15 @@ const config = defineConfig({
     tanstackRouter({ target: 'react', autoCodeSplitting: true }),
     viteReact(),
     tailwindcss(),
+    acyclicChunks(),
   ],
 
   build: {
     rolldownOptions: {
       output: {
         codeSplitting: {
-          // On, a group also swallows react/clsx, so every chunk imports it.
-          includeDependenciesRecursively: false,
           groups: [
+            { name: 'react', test: pkg('react', 'react-dom', 'scheduler') },
             {
               name: 'charts',
               test: pkg(
