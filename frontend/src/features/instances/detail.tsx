@@ -70,52 +70,27 @@ export type InstanceTab =
   | 'logs'
   | 'settings';
 
-export function InstanceDetailPage({
-  id,
-  tab,
-  onTabChange,
-  contentKind,
-  onContentKindChange,
-}: {
-  id: string;
+/** The record as the hook serves it — joined with its icon URL. */
+type Instance = NonNullable<ReturnType<typeof useInstance>['data']>;
+
+interface DetailProps {
   tab: InstanceTab;
   onTabChange: (tab: InstanceTab) => void;
   contentKind?: ContentKind;
   onContentKindChange: (kind?: ContentKind) => void;
-}) {
+}
+
+/**
+ * Resolves the entry before anything reads from it: every per-instance query
+ * below is keyed by an id the daemon may no longer have (removed here, from
+ * the CLI, or by the tray), so the body only mounts while the list still
+ * carries it — an id that is gone asks the daemon nothing.
+ */
+export function InstanceDetailPage({
+  id,
+  ...props
+}: DetailProps & { id: string }) {
   const query = useInstance(id);
-  const info = useQuery(instanceQueries.info(id));
-  const config = useQuery(instanceQueries.config(id));
-  const worlds = useQuery(instanceQueries.worlds(id));
-  const profiles = useQuery(instanceQueries.profiles(id));
-  const [addingContent, setAddingContent] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [focus, setFocus] = useState<string | null>(null);
-  const [logSession, setLogSession] = useState<string | null>(null);
-  const { launch, isLaunching } = useLaunchDialog();
-  const stop = useMutation(instanceMutations.stop(id));
-  const instance = query.data;
-  const accepts = instance?.accepts ?? [];
-  // Shared with the content tab's own per-kind queries (cached), just for the
-  // headline count.
-  const contentLists = useQueries({
-    queries: accepts.map((k) => instanceQueries.content(id, k)),
-  });
-  const contentCount = contentLists.reduce(
-    (n, q) => n + (q.data?.items.length ?? 0),
-    0,
-  );
-
-  const sessions = instance ? runningSessions(instance) : [];
-  const running = sessions.length > 0;
-  const liveSession =
-    sessions.find((s) => s.id === focus) ?? sessions[sessions.length - 1];
-  const metrics = useProcessMetrics(liveSession?.id ?? null);
-
-  const memoryLimitGb = (() => {
-    const value = config.data?.find((e) => e.key === 'memory')?.value;
-    return value ? memGb(value) : 4;
-  })();
 
   if (query.isPending) {
     return (
@@ -126,13 +101,56 @@ export function InstanceDetailPage({
     );
   }
 
-  if (!instance) {
+  if (!query.data) {
     return (
       <div className="p-6">
         <Empty icon={WarningCircleIcon}>{m['instance.missing']()}</Empty>
       </div>
     );
   }
+
+  return <InstanceDetail instance={query.data} {...props} />;
+}
+
+function InstanceDetail({
+  instance,
+  tab,
+  onTabChange,
+  contentKind,
+  onContentKindChange,
+}: DetailProps & { instance: Instance }) {
+  const id = instance.id;
+  const info = useQuery(instanceQueries.info(id));
+  const config = useQuery(instanceQueries.config(id));
+  const worlds = useQuery(instanceQueries.worlds(id));
+  const profiles = useQuery(instanceQueries.profiles(id));
+  const [addingContent, setAddingContent] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [focus, setFocus] = useState<string | null>(null);
+  const [logSession, setLogSession] = useState<string | null>(null);
+  const { launch, isLaunching } = useLaunchDialog();
+  const stop = useMutation(instanceMutations.stop(id));
+  const accepts = instance.accepts;
+  // Shared with the content tab's own per-kind queries (cached), just for the
+  // headline count.
+  const contentLists = useQueries({
+    queries: accepts.map((k) => instanceQueries.content(id, k)),
+  });
+  const contentCount = contentLists.reduce(
+    (n, q) => n + (q.data?.items.length ?? 0),
+    0,
+  );
+
+  const sessions = runningSessions(instance);
+  const running = sessions.length > 0;
+  const liveSession =
+    sessions.find((s) => s.id === focus) ?? sessions[sessions.length - 1];
+  const metrics = useProcessMetrics(liveSession?.id ?? null);
+
+  const memoryLimitGb = (() => {
+    const value = config.data?.find((e) => e.key === 'memory')?.value;
+    return value ? memGb(value) : 4;
+  })();
 
   const live: LiveResources = {
     running,

@@ -16,10 +16,12 @@ import {
   CONNECTION_LOST,
   errorMessage,
   type HestiaError,
+  NOT_FOUND,
   TIMEOUT,
   TRANSPORT,
   UNAUTHORIZED,
 } from '../api';
+import { scopedToEntry } from './keys';
 
 const log = logger('query');
 
@@ -28,6 +30,11 @@ const log = logger('query');
 const TRANSPORT_CODES = new Set([TRANSPORT, CONNECTION_LOST, TIMEOUT]);
 const silent = (error: HestiaError) =>
   error.code === UNAUTHORIZED || TRANSPORT_CODES.has(error.code);
+
+// A read racing a removal — the entry went while the read was in flight, or a
+// view still held its id — is absence, not a failure the user can act on.
+const vanished = (error: HestiaError, key: QueryKey) =>
+  error.code === NOT_FOUND && scopedToEntry(key);
 
 declare module '@tanstack/react-query' {
   interface Register {
@@ -40,13 +47,14 @@ export const queryClient = new QueryClient({
   // a retriggering refetch replacing its own toast rather than stacking.
   queryCache: new QueryCache({
     onError: (error, query) => {
-      log[silent(error) ? 'debug' : 'warn'](
+      const quiet = silent(error) || vanished(error, query.queryKey);
+      log[quiet ? 'debug' : 'warn'](
         { key: query.queryHash, code: error.code },
         `query failed: ${error.message}`,
       );
       // A query may opt out of the toast (e.g. a ping a stopped server can't
       // answer) via meta.silent.
-      if (query.meta?.silent || silent(error)) return;
+      if (query.meta?.silent || quiet) return;
       toast.error(errorMessage(error), { id: query.queryHash });
     },
   }),

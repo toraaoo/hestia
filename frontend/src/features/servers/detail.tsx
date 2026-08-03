@@ -54,35 +54,27 @@ function isRunning(server: ServerInfo): boolean {
   return server.process?.state === 'running';
 }
 
-export function ServerDetailPage({
-  id,
-  tab,
-  onTabChange,
-  contentKind,
-  onContentKindChange,
-}: {
-  id: string;
+/** The record as the hook serves it — joined with its icon URL. */
+type Server = NonNullable<ReturnType<typeof useServer>['data']>;
+
+interface DetailProps {
   tab: ServerTab;
   onTabChange: (tab: ServerTab) => void;
   contentKind?: ContentKind;
   onContentKindChange: (kind?: ContentKind) => void;
-}) {
+}
+
+/**
+ * Resolves the entry before anything reads from it: every per-server query
+ * below is keyed by an id the daemon may no longer have (removed here, from
+ * the CLI, or by the tray), so the body only mounts while the list still
+ * carries it — an id that is gone asks the daemon nothing.
+ */
+export function ServerDetailPage({
+  id,
+  ...props
+}: DetailProps & { id: string }) {
   const query = useServer(id);
-  const info = useQuery(serverQueries.info(id));
-  const config = useQuery(serverQueries.config(id));
-  const [addingContent, setAddingContent] = useState(false);
-  const start = useMutation(serverMutations.start(id));
-  const stop = useMutation(serverMutations.stop(id));
-
-  const server = query.data;
-  const running = server ? isRunning(server) : false;
-  const ping = useQuery({ ...serverQueries.ping(id), enabled: running });
-  const metrics = useProcessMetrics(server?.process?.id ?? null);
-
-  const memoryLimitGb = useMemo(() => {
-    const value = config.data?.find((e) => e.key === 'memory')?.value;
-    return value ? memGb(value) : 4;
-  }, [config.data]);
 
   if (query.isPending) {
     return (
@@ -93,13 +85,39 @@ export function ServerDetailPage({
     );
   }
 
-  if (!server) {
+  if (!query.data) {
     return (
       <div className="p-6">
         <Empty icon={WarningCircleIcon}>{m['server.missing']()}</Empty>
       </div>
     );
   }
+
+  return <ServerDetail server={query.data} {...props} />;
+}
+
+function ServerDetail({
+  server,
+  tab,
+  onTabChange,
+  contentKind,
+  onContentKindChange,
+}: DetailProps & { server: Server }) {
+  const id = server.id;
+  const info = useQuery(serverQueries.info(id));
+  const config = useQuery(serverQueries.config(id));
+  const [addingContent, setAddingContent] = useState(false);
+  const start = useMutation(serverMutations.start(id));
+  const stop = useMutation(serverMutations.stop(id));
+
+  const running = isRunning(server);
+  const ping = useQuery({ ...serverQueries.ping(id), enabled: running });
+  const metrics = useProcessMetrics(server.process?.id ?? null);
+
+  const memoryLimitGb = useMemo(() => {
+    const value = config.data?.find((e) => e.key === 'memory')?.value;
+    return value ? memGb(value) : 4;
+  }, [config.data]);
 
   const statusTone = !server.ready ? 'warn' : running ? 'on' : 'off';
   const statusLabel = !server.ready

@@ -5,6 +5,7 @@
  * sweep refreshes the whole entry. Entries are keyed by their **stable id**
  * (never the renameable display name), so a rename cannot strand a cache key.
  */
+import type { QueryKey } from '@tanstack/react-query';
 import type {
   ContentKind,
   ResolveParams,
@@ -169,3 +170,17 @@ export const keys = {
     check: () => [...keys.update.all, 'check'] as const,
   },
 };
+
+/**
+ * Is the key a read scoped to one entry, session or process — something the
+ * daemon can drop while a view still holds its id (removed here, from the CLI,
+ * or by the tray)? Such a read answering `not_found` is that id going away,
+ * which the surface renders as absence itself, so ./client keeps it out of the
+ * toaster rather than stacking one per query.
+ */
+export function scopedToEntry(key: QueryKey): boolean {
+  const [root, second] = key;
+  if (root === FOOTPRINT) return true;
+  if (root === 'processes') return second === 'status' || second === 'logs';
+  return (root === 'servers' || root === 'instances') && second === 'detail';
+}

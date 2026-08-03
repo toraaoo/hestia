@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOOTPRINT, keys } from '@/queries/keys';
+import { FOOTPRINT, keys, scopedToEntry } from '@/queries/keys';
 
 const startsWith = (key: readonly unknown[], prefix: readonly unknown[]) =>
   prefix.every((part, i) => Object.is(key[i], part));
@@ -71,5 +71,43 @@ describe('the query-key hierarchy', () => {
     expect(startsWith(keys.transfer.archive('/tmp/x.hestia'), ['transfer'])).toBe(
       true,
     );
+  });
+});
+
+describe('the reads that own a vanishing id', () => {
+  it('covers everything keyed to one entry, session or process', () => {
+    for (const key of [
+      keys.servers.detail('smp'),
+      keys.servers.config('smp'),
+      keys.servers.backups('smp'),
+      keys.servers.contentList('smp', 'mod'),
+      keys.servers.modpack('smp'),
+      keys.servers.info('smp'),
+      keys.instances.detail('modded'),
+      keys.instances.worlds('modded'),
+      keys.instances.profiles('modded'),
+      keys.instances.logs('modded', 'instance-modded_1'),
+      keys.instances.info('modded'),
+      keys.processes.status('instance-modded_1'),
+      keys.processes.logs('instance-modded_1'),
+    ]) {
+      expect(scopedToEntry(key)).toBe(true);
+    }
+  });
+
+  it('leaves the lists and catalogues alone — a miss there is a real failure', () => {
+    for (const key of [
+      keys.servers.list(),
+      keys.instances.list(),
+      keys.instances.flavors(),
+      keys.instances.serverStatus('a:25565'),
+      keys.processes.list(),
+      keys.profiles.list(),
+      keys.content.project('modrinth', 'sodium'),
+      keys.content.url('https://modrinth.com/mod/sodium'),
+      keys.transfer.archive('/tmp/x.hestia'),
+    ]) {
+      expect(scopedToEntry(key)).toBe(false);
+    }
   });
 });
