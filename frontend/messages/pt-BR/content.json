@@ -90,6 +90,8 @@
       "show_more": "Mostrar mais",
       "summary": "{count} arquivo(s) não rastreado(s) na pasta do jogo"
     },
+    "update_all": "Atualizar tudo ({count})",
+    "update_count": "Atualizar ({count})",
     "update_to_latest": "Atualizar para a mais recente",
     "world_datapacks": "datapacks do mundo"
   }

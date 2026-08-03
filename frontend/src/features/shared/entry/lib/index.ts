@@ -1,5 +1,8 @@
 export {
+  type ContentBatch,
+  type ContentHandlers,
   type ContentOrigin,
+  contentBatches,
   contentBusy,
   type EntryTarget,
   filterContent,
@@ -9,7 +12,6 @@ export {
   type ListResult,
   packWorlds,
   parseOrigin,
-  type RowHandlers,
   rowKey,
   type SectionProps,
   type UpdatesResult,

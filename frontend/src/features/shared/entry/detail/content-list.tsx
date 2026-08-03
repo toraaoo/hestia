@@ -278,7 +278,7 @@ function ContentRow({
                       {m['content.update_to_latest']()}
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={onChangeVersion}>
+                  <DropdownMenuItem disabled={busy} onClick={onChangeVersion}>
                     <SwapIcon />
                     {m['content.change_version.action']()}
                   </DropdownMenuItem>

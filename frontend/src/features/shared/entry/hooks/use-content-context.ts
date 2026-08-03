@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { EntryTarget, RowHandlers } from '../lib';
+import type { ContentHandlers, EntryTarget } from '../lib';
 
 /**
  * What every row in a content list needs but none of the layers between it and
@@ -8,7 +8,7 @@ import type { EntryTarget, RowHandlers } from '../lib';
  */
 export interface ContentContext {
   entry: EntryTarget;
-  handlers: RowHandlers;
+  handlers: ContentHandlers;
   /** The name of the pack the entry runs, empty when it runs none. */
   packName: string;
   /** The entry's save worlds, for a datapack that names none of its own. */

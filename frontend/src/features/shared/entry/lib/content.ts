@@ -108,7 +108,24 @@ export const kindLoader = (
       ? 'datapack'
       : undefined;
 
-export interface RowHandlers {
+/** One call's worth of work: the wire takes a batch of items of one kind. */
+export interface ContentBatch {
+  kind: ContentKind;
+  items: string[];
+}
+
+/** Split rows into one batch per kind, in the order the kinds first appear. */
+export const contentBatches = (rows: InstalledContent[]): ContentBatch[] => {
+  const batches: ContentBatch[] = [];
+  for (const row of rows) {
+    const batch = batches.find((candidate) => candidate.kind === row.kind);
+    if (batch) batch.items.push(installedRef(row));
+    else batches.push({ kind: row.kind, items: [installedRef(row)] });
+  }
+  return batches;
+};
+
+export interface ContentHandlers {
   /** `worlds` narrows a datapack to those saves; omitted covers every one. */
   onEnable: (
     item: InstalledContent,
@@ -118,6 +135,9 @@ export interface RowHandlers {
   onRemove: (item: InstalledContent, worlds?: string[]) => void;
   onUpdate: (item: InstalledContent) => void;
   onSetVersion: (item: InstalledContent, version: ContentVersion) => void;
+  /** The batch verbs, run one kind at a time. */
+  onRemoveMany: (rows: InstalledContent[]) => void;
+  onUpdateMany: (rows: InstalledContent[]) => void;
 }
 
 export interface SectionProps {

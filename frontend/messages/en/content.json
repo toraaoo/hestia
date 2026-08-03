@@ -90,6 +90,8 @@
       "show_more": "Show more",
       "summary": "{count} untracked file(s) in the game dir"
     },
+    "update_all": "Update all ({count})",
+    "update_count": "Update ({count})",
     "update_to_latest": "Update to latest",
     "world_datapacks": "world datapacks"
   }

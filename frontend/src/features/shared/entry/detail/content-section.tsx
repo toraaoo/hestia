@@ -9,7 +9,7 @@ import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import type { ContentKind, UntrackedFile } from '@/api';
+import type { ContentKind, InstalledContent, UntrackedFile } from '@/api';
 import { errorMessage, system } from '@/api';
 import { Empty } from '@/components/empty';
 import { FilterMenu } from '@/components/filter-menu';
@@ -26,12 +26,14 @@ import { modpackQueries } from '@/queries/modpack';
 import { serverMutations, serverQueries } from '@/queries/server';
 import { type ContentContext, ContentCtx, useContent } from '../hooks';
 import {
+  type ContentBatch,
+  type ContentHandlers,
+  contentBatches,
   contentBusy,
   filterContent,
   filterUntracked,
   installedRef,
   type ListResult,
-  type RowHandlers,
   rowKey,
   type SectionProps,
   type UpdatesResult,
@@ -78,7 +80,18 @@ export function ContentSection({
   const remove = useMutation(content.remove(id));
   const update = useJobMutation(content.update(id));
   const setVersion = useJobMutation(content.setVersion(id));
-  const handlers: RowHandlers = {
+  // One kind per call, in sequence: the daemon admits one content job per
+  // entry, and two removals racing would rewrite the same index.
+  const runBatches = async (
+    rows: InstalledContent[],
+    run: (batch: ContentBatch) => Promise<unknown>,
+  ) => {
+    for (const batch of contentBatches(rows)) {
+      await run(batch).catch(() => undefined);
+    }
+  };
+
+  const handlers: ContentHandlers = {
     // An omitted `worlds` covers every world the item targets — how the wire
     // reads an empty scope.
     onEnable: (item, enabled, worlds) =>
@@ -102,6 +115,8 @@ export function ContentSection({
         item: installedRef(item),
         version: version.id,
       }),
+    onRemoveMany: (rows) => void runBatches(rows, remove.mutateAsync),
+    onUpdateMany: (rows) => void runBatches(rows, update.mutateAsync),
   };
 
   // Read off the job store rather than these mutations: a content job started
@@ -142,7 +157,7 @@ function ContentSectionView({
   lists: ListResult[];
   updates: UpdatesResult[];
 }) {
-  const { handlers } = useContent();
+  const { handlers, busy } = useContent();
   const items = lists.flatMap((q) => q.data?.items ?? []);
   const updatable = new Set(
     updates.flatMap((q) =>
@@ -176,6 +191,20 @@ function ContentSectionView({
     setSearch(next);
   };
 
+  // A disabled item is not in the game's load dirs, so it is not what an update
+  // is for; the rows in view are the ones a bulk action may touch.
+  const updatableRows = filtered.filter(
+    (c) => c.enabled && updatable.has(c.filename),
+  );
+  const selectedRows = items.filter((c) => selected?.has(rowKey(c)));
+  const selectedUpdatable = selectedRows.filter(
+    (c) => c.enabled && updatable.has(c.filename),
+  );
+  const updateRows = (rows: typeof items) => {
+    setSelected(null);
+    handlers.onUpdateMany(rows);
+  };
+
   return (
     <>
       <div className="mb-5 flex items-center gap-2">
@@ -204,6 +233,18 @@ function ContentSectionView({
                 onClick={() => setSelected(null)}
               >
                 {m['app.action.cancel']()}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                data-icon="inline-start"
+                disabled={busy || selectedUpdatable.length === 0}
+                onClick={() => updateRows(selectedUpdatable)}
+              >
+                <ArrowsClockwiseIcon weight="bold" />
+                {m['content.update_count']({
+                  count: selectedUpdatable.length,
+                })}
               </Button>
               <Button
                 size="sm"
@@ -241,6 +282,19 @@ function ContentSectionView({
                       ? m['content.checking_updates']()
                       : m['content.check_updates']()}
                   </Button>
+                  {updatableRows.length > 0 && (
+                    <Button
+                      size="sm"
+                      data-icon="inline-start"
+                      disabled={busy}
+                      onClick={() => updateRows(updatableRows)}
+                    >
+                      <ArrowsClockwiseIcon weight="bold" />
+                      {m['content.update_all']({
+                        count: updatableRows.length,
+                      })}
+                    </Button>
+                  )}
                 </>
               )}
               {action}
@@ -284,9 +338,7 @@ function ContentSectionView({
         confirmLabel={m['app.action.remove']()}
         onConfirm={() => {
           setConfirming(false);
-          for (const item of items) {
-            if (selected?.has(rowKey(item))) handlers.onRemove(item);
-          }
+          handlers.onRemoveMany(selectedRows);
           setSelected(null);
         }}
       />
