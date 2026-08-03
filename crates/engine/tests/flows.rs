@@ -284,6 +284,103 @@ async fn disabling_an_item_keeps_it_installed() {
     assert!(!listed[0].enabled);
 }
 
+/// An instance with `sodium` installed at the older of two published versions,
+/// so the next `update` has somewhere to move it.
+async fn updatable(home: &std::path::Path, icon: &str) -> (engine::Engine, String, fixture::Files) {
+    let files = fixture::Files::serve().await;
+    let mut sodium = fixture::project("sodium", ContentKind::Mod);
+    sodium.icon_url = icon.to_string();
+    let older = fixture::version("sodium", &files, "1.21", &[]);
+    let mut newer = fixture::version("sodium", &files, "1.21", &[]);
+    newer.id = "sodium-2".into();
+    newer.version_number = "2.0.0".into();
+    let source = fixture::Source {
+        projects: vec![sodium],
+        versions: vec![newer, older.clone()],
+    };
+    let (engine, id) = instance(home, source).await;
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+
+    let mut spec = add(&["sodium"]);
+    spec.items[0].version = older.id.clone();
+    engine
+        .add_entry_content(EntryRef::Instance(&id), &spec, &job(&cancel, &report))
+        .await
+        .expect("install the older version");
+    (engine, id, files)
+}
+
+#[tokio::test]
+async fn an_update_moves_the_version_and_leaves_the_project_alone() {
+    let home = tempfile::tempdir().expect("temp home");
+    let icon = "https://example.invalid/sodium.png";
+    let (engine, id, _files) = updatable(home.path(), icon).await;
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+
+    let updated = engine
+        .update_entry_content(
+            EntryRef::Instance(&id),
+            ContentKind::Mod,
+            "sodium",
+            &job(&cancel, &report),
+        )
+        .await
+        .expect("update");
+
+    assert_eq!(updated.len(), 1, "the item moves to the newer version");
+    assert_eq!(updated[0].version_id, "sodium-2");
+    let (listed, _) = engine
+        .entry_content(EntryRef::Instance(&id), ContentKind::Mod)
+        .expect("list");
+    assert_eq!(listed[0].icon_url, icon);
+    assert_eq!(listed[0].title, "sodium");
+    assert_eq!(listed[0].project_id, "sodium");
+}
+
+#[tokio::test]
+async fn updating_a_disabled_item_leaves_it_out_of_the_load_dir() {
+    let home = tempfile::tempdir().expect("temp home");
+    let (engine, id, _files) = updatable(home.path(), "").await;
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+    let entry_dir = home.path().join("instances").join("modded");
+    let mirrored = entry_dir.join("data").join("mods").join("sodium.jar");
+
+    engine
+        .enable_entry_content(
+            EntryRef::Instance(&id),
+            ContentKind::Mod,
+            "sodium",
+            false,
+            &[],
+        )
+        .expect("disable");
+    assert!(!mirrored.exists(), "disabling takes it out of the load dir");
+
+    engine
+        .update_entry_content(
+            EntryRef::Instance(&id),
+            ContentKind::Mod,
+            "sodium",
+            &job(&cancel, &report),
+        )
+        .await
+        .expect("update");
+
+    let (listed, _) = engine
+        .entry_content(EntryRef::Instance(&id), ContentKind::Mod)
+        .expect("list");
+    assert_eq!(listed[0].version_id, "sodium-2");
+    assert!(!listed[0].enabled, "the index keeps it disabled");
+    assert!(
+        entry_dir.join("mods").join("sodium.jar").is_file(),
+        "the managed copy moves to the new version"
+    );
+    assert!(
+        !mirrored.exists(),
+        "an update must not put a disabled item back where the game loads it"
+    );
+}
+
 /// An instance ready to launch: a fixture flavor, a Java runtime already on
 /// disk, and a signed-in account whose token has not expired.
 async fn launchable(home: &std::path::Path) -> (engine::Engine, String) {

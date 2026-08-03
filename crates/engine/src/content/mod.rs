@@ -14,6 +14,7 @@ mod modrinth;
 pub(crate) mod pack;
 pub(crate) mod profiles;
 pub(crate) mod provider;
+pub(crate) mod record;
 
 use std::path::Path;
 

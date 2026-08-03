@@ -15,10 +15,9 @@ use proto::minecraft::{ProvisionPhase, ProvisionProgress};
 
 use super::entry::{content_loader, content_target, datapack_worlds, side_gate, EntryContent};
 use super::phase_progress;
-use crate::content::{inspect, install};
+use crate::content::{inspect, install, record};
 use crate::engine::Engine;
 use crate::minecraft::materialize::{self, OnProgress};
-use crate::registry;
 
 /// One platform selector of a batch, resolved from its item: where it came
 /// from (`given`, for failure reporting), which source serves it, and the
@@ -334,10 +333,6 @@ impl Engine {
         (items, failures)
     }
 
-    /// Download a version's primary file into the managed directory and mirror
-    /// it into the game's load dirs. `kind` is the *requested* kind, not the
-    /// project's: Modrinth types datapacks as mod projects, so `project.kind`
-    /// would route a datapack into `mods/`.
     pub(super) async fn install_version_file(
         &self,
         ctx: &EntryContent,
@@ -347,11 +342,40 @@ impl Engine {
         worlds: &[String],
         on_progress: OnProgress<'_>,
     ) -> Result<InstalledContent> {
+        let release = self
+            .fetch_release(ctx, kind, &project.title, version, on_progress)
+            .await?;
+        let item = record::assemble(
+            record::Project {
+                kind,
+                project_id: project.id.clone(),
+                slug: project.slug.clone(),
+                title: project.title.clone(),
+                icon_url: project.icon_url.clone(),
+            },
+            release,
+            record::Holding::fresh(worlds),
+        );
+        install::apply_files(&ctx.entry_dir, &ctx.data_dir, &item, &ctx.worlds())?;
+        Ok(item)
+    }
+
+    /// `kind` is the *requested* kind, not the project's: Modrinth types
+    /// datapacks as mod projects, so `project.kind` would route a datapack into
+    /// `mods/`.
+    pub(super) async fn fetch_release(
+        &self,
+        ctx: &EntryContent,
+        kind: ContentKind,
+        title: &str,
+        version: &proto::content::ContentVersion,
+        on_progress: OnProgress<'_>,
+    ) -> Result<record::Release> {
         let file = install::primary_file(version)?;
         // CurseForge lists files whose author opted out of distribution.
         if file.artifact.url.is_empty() {
             bail!(ErrorInfo::ContentDownloadBlocked {
-                title: project.title.clone(),
+                title: title.to_string(),
                 source: version.source.clone(),
             });
         }
@@ -365,12 +389,8 @@ impl Engine {
             on_progress,
         )
         .await?;
-        let item = InstalledContent {
-            kind,
+        Ok(record::Release {
             source: version.source.clone(),
-            project_id: project.id.clone(),
-            slug: project.slug.clone(),
-            title: project.title.clone(),
             version_id: version.id.clone(),
             version_number: version.version_number.clone(),
             filename: file.artifact.filename.clone(),
@@ -381,15 +401,7 @@ impl Engine {
                 .map(|c| c.hex.clone())
                 .unwrap_or_default(),
             url: file.artifact.url.clone(),
-            icon_url: project.icon_url.clone(),
-            installed_unix: registry::now_unix(),
-            worlds: worlds.to_vec(),
-            origin: String::new(),
-            enabled: true,
-            disabled_worlds: Vec::new(),
-        };
-        install::apply_files(&ctx.entry_dir, &ctx.data_dir, &item, &ctx.worlds())?;
-        Ok(item)
+        })
     }
 }
 
@@ -432,17 +444,11 @@ fn add_file_content(
     }
     std::fs::copy(source, &managed)
         .with_context(|| format!("cannot import {}", source.display()))?;
-    let installed = InstalledContent {
-        kind,
-        source: "file".to_string(),
-        title: filename.clone(),
-        sha1: install::sha1_file(&managed)?,
-        filename,
-        installed_unix: registry::now_unix(),
-        worlds: worlds.to_vec(),
-        enabled: true,
-        ..InstalledContent::default()
-    };
+    let installed = record::assemble(
+        record::Project::untracked(kind, filename.clone()),
+        record::Release::local(filename, install::sha1_file(&managed)?),
+        record::Holding::fresh(worlds),
+    );
     install::apply_files(&ctx.entry_dir, &ctx.data_dir, &installed, &ctx.worlds())?;
     Ok(installed)
 }

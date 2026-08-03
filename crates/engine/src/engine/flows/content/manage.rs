@@ -2,12 +2,12 @@
 //! another version, checking whether one exists, toggling it, and removing it.
 
 use anyhow::{bail, Context, Result};
-use proto::content::{ContentKind, ContentProject, InstalledContent, UntrackedFile, VersionQuery};
+use proto::content::{ContentKind, InstalledContent, UntrackedFile, VersionQuery};
 use proto::minecraft::ProvisionPhase;
 
 use super::entry::{content_loader, EntryContent};
 use super::phase_progress;
-use crate::content::install;
+use crate::content::{install, record};
 use crate::engine::Engine;
 use crate::minecraft::materialize::OnProgress;
 
@@ -67,26 +67,14 @@ impl Engine {
             if version.id == item.version_id {
                 continue;
             }
-            let project = ContentProject {
-                id: item.project_id.clone(),
-                slug: item.slug.clone(),
-                title: item.title.clone(),
-                kind: item.kind,
-                ..ContentProject::default()
-            };
-            let new_item = self
-                .install_version_file(
-                    ctx,
-                    item.kind,
-                    &project,
-                    &version,
-                    &item.worlds,
-                    on_progress,
-                )
+            let release = self
+                .fetch_release(ctx, item.kind, &item.title, &version, on_progress)
                 .await?;
+            let new_item = record::repin(&item, release);
             if new_item.filename != item.filename {
                 install::remove_files(&ctx.entry_dir, &ctx.data_dir, &item, &ctx.worlds());
             }
+            install::apply_files(&ctx.entry_dir, &ctx.data_dir, &new_item, &ctx.worlds())?;
             tracing::info!(
                 title = %item.title,
                 from = %item.version_number,
@@ -103,16 +91,7 @@ impl Engine {
                     .iter_mut()
                     .find(|i| i.kind == new_item.kind && i.project_id == new_item.project_id)
                 {
-                    Some(entry) => {
-                        // An update moves the version, not the ownership or the
-                        // enabled state: a profile-tagged, disabled item keeps
-                        // both.
-                        let origin = std::mem::take(&mut entry.origin);
-                        let enabled = entry.enabled;
-                        *entry = new_item.clone();
-                        entry.origin = origin;
-                        entry.enabled = enabled;
-                    }
+                    Some(entry) => *entry = new_item.clone(),
                     None => index.push(new_item.clone()),
                 }
             }

@@ -18,7 +18,7 @@ use super::super::phase_progress;
 use super::{pack_display_name, FileIdentity};
 use crate::cancel::Job;
 use crate::config::ModpackSettings;
-use crate::content::{exclude, install, modpack, pack};
+use crate::content::{exclude, install, modpack, pack, record};
 use crate::engine::Engine;
 use crate::minecraft::materialize;
 use crate::registry;
@@ -269,35 +269,35 @@ impl Engine {
 
         let reference = identity.reference.as_ref();
         let project = identity.project.as_ref();
-        let item = InstalledContent {
-            kind,
-            // A file the source does not recognise came from somewhere else;
-            // recording it as that source's would let `update` re-pin it to a
-            // project it never belonged to.
-            source: match reference {
-                Some(_) => source.to_string(),
-                None => "file".to_string(),
+        let item = record::assemble(
+            record::Project {
+                kind,
+                project_id: reference.map(|r| r.project_id.clone()).unwrap_or_default(),
+                slug: project.map(|p| p.slug.clone()).unwrap_or_default(),
+                title: identity.label(file),
+                icon_url: project.map(|p| p.icon_url.clone()).unwrap_or_default(),
             },
-            project_id: reference.map(|r| r.project_id.clone()).unwrap_or_default(),
-            slug: project.map(|p| p.slug.clone()).unwrap_or_default(),
-            title: identity.label(file),
-            version_id: reference.map(|r| r.version_id.clone()).unwrap_or_default(),
-            version_number: identity.version.clone(),
-            filename: file.artifact.filename.clone(),
-            sha1: file
-                .artifact
-                .checksum
-                .as_ref()
-                .map(|c| c.hex.clone())
-                .unwrap_or_default(),
-            url: file.artifact.url.clone(),
-            icon_url: project.map(|p| p.icon_url.clone()).unwrap_or_default(),
-            installed_unix: registry::now_unix(),
-            worlds: Vec::new(),
-            origin: String::new(),
-            enabled: true,
-            disabled_worlds: Vec::new(),
-        };
+            record::Release {
+                // A file the source does not recognise came from somewhere else;
+                // recording it as that source's would let `update` re-pin it to
+                // a project it never belonged to.
+                source: match reference {
+                    Some(_) => source.to_string(),
+                    None => "file".to_string(),
+                },
+                version_id: reference.map(|r| r.version_id.clone()).unwrap_or_default(),
+                version_number: identity.version.clone(),
+                filename: file.artifact.filename.clone(),
+                sha1: file
+                    .artifact
+                    .checksum
+                    .as_ref()
+                    .map(|c| c.hex.clone())
+                    .unwrap_or_default(),
+                url: file.artifact.url.clone(),
+            },
+            record::Holding::fresh(&[]),
+        );
         install::apply_files(&ctx.entry_dir, &ctx.data_dir, &item, &ctx.worlds())?;
         Ok(item)
     }
@@ -406,9 +406,17 @@ impl Engine {
                     }
                     // A user-installed copy keeps its own (untagged) ownership:
                     // the pack supplying the same file does not take it over.
-                    if old.origin.is_empty() {
-                        item.origin = String::new();
-                    }
+                    let item = record::rehold(
+                        &item,
+                        record::Holding {
+                            origin: match old.origin.is_empty() {
+                                true => String::new(),
+                                false => origin.clone(),
+                            },
+                            ..record::Holding::from(&old)
+                        },
+                    );
+                    install::apply_files(&ctx.entry_dir, &ctx.data_dir, &item, &worlds)?;
                     index.push(item);
                 }
                 None => index.push(item),

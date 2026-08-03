@@ -16,10 +16,9 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use proto::content::{ContentKind, InstalledContent};
+use proto::content::ContentKind;
 
-use crate::content::install;
-use crate::registry;
+use crate::content::{install, record};
 
 /// How another launcher marks a mod as turned off. hestia has a flag for it, so
 /// the name comes back and the flag carries the meaning.
@@ -71,16 +70,14 @@ pub(crate) fn adopt(entry_dir: &Path, data_dir: &Path) -> Result<Vec<String>> {
             let managed = managed_dir.join(&filename);
             std::fs::rename(&path, &managed)
                 .with_context(|| format!("cannot adopt {}", path.display()))?;
-            items.push(InstalledContent {
-                kind: *kind,
-                source: "file".to_string(),
-                title: filename.clone(),
-                sha1: install::sha1_file(&managed)?,
-                filename: filename.clone(),
-                installed_unix: registry::now_unix(),
-                enabled,
-                ..InstalledContent::default()
-            });
+            items.push(record::assemble(
+                record::Project::untracked(*kind, filename.clone()),
+                record::Release::local(filename.clone(), install::sha1_file(&managed)?),
+                record::Holding {
+                    enabled,
+                    ..record::Holding::fresh(&[])
+                },
+            ));
             adopted.push(filename);
         }
     }
