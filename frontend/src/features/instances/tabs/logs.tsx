@@ -47,11 +47,20 @@ export function InstanceLogsTab({
     session: selected ?? undefined,
   });
 
+  const options = [
+    { value: ALL, label: m['instance.logs.all_sessions']() },
+    ...sessions.map((entry) => ({
+      value: entry.id,
+      label: m['entry.session.name']({ seq: sessionSeq(entry.id) }),
+    })),
+  ];
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {sessions.length > 1 && (
         <div className="flex justify-end">
           <Select
+            items={options}
             value={selected ?? ALL}
             onValueChange={(value) =>
               onSessionChange(value === ALL ? null : String(value))
@@ -61,12 +70,9 @@ export function InstanceLogsTab({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>
-                {m['instance.logs.all_sessions']()}
-              </SelectItem>
-              {sessions.map((entry) => (
-                <SelectItem key={entry.id} value={entry.id}>
-                  {m['entry.session.name']({ seq: sessionSeq(entry.id) })}
+              {options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -198,6 +198,7 @@ export function SelectField({
       {label && <FieldLabel htmlFor={field.name}>{label}</FieldLabel>}
       <Select
         disabled={disabled}
+        items={options}
         value={field.state.value}
         onValueChange={(v) => {
           // Base UI can emit null on clear; never overwrite with it.

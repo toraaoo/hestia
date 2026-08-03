@@ -33,6 +33,12 @@ import { buildTree, excludedRoots, selectedBytes, type TreeNode } from '../lib';
 
 const FORMATS: ExportFormat[] = ['hestia', 'mrpack'];
 
+const formatOptions = () =>
+  FORMATS.map((value) => ({
+    value,
+    label: m[`domain.export_format.${value}`](),
+  }));
+
 /**
  * Export one instance to an archive. The tree is what the daemon says the
  * archive *would* carry, so unchecking a node is a decision made against the
@@ -55,6 +61,7 @@ export function ExportInstanceDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [format, setFormat] = useState<ExportFormat>('hestia');
+  const formats = formatOptions();
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['data']));
 
@@ -140,6 +147,7 @@ export function ExportInstanceDialog({
             {m['instance.export.format']()}
           </span>
           <Select
+            items={formats}
             value={format}
             onValueChange={(value) => setFormat(value as ExportFormat)}
           >
@@ -147,9 +155,9 @@ export function ExportInstanceDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {FORMATS.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {m[`domain.export_format.${value}`]()}
+              {formats.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -23,6 +23,15 @@ import { serverMutations, serverQueries } from '@/queries/server';
 
 const INTERVALS = ['off', '6h', '12h', '1d'];
 
+const intervalOptions = () =>
+  INTERVALS.map((iv) => ({
+    value: iv,
+    label:
+      iv === 'off'
+        ? m['app.label.off']()
+        : m['entry.settings.every_interval']({ interval: iv }),
+  }));
+
 /** Scheduled backups — the one setting an instance has no equivalent for. */
 function useBackupSchedule(config?: ConfigEntry[]) {
   const loaded = config !== undefined;
@@ -38,22 +47,26 @@ function useBackupSchedule(config?: ConfigEntry[]) {
     `${loaded}:${storedRetention}`,
   );
 
+  const intervals = intervalOptions();
+
   const fields = (
     <div className="grid gap-4 sm:grid-cols-2">
       <Field>
         <FieldLabel htmlFor="backup-interval">
           {m['entry.settings.backup_schedule']()}
         </FieldLabel>
-        <Select value={interval} onValueChange={(v) => setInterval(v ?? 'off')}>
+        <Select
+          items={intervals}
+          value={interval}
+          onValueChange={(v) => setInterval(v ?? 'off')}
+        >
           <SelectTrigger id="backup-interval" className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {INTERVALS.map((iv) => (
-              <SelectItem key={iv} value={iv}>
-                {iv === 'off'
-                  ? m['app.label.off']()
-                  : m['entry.settings.every_interval']({ interval: iv })}
+            {intervals.map((iv) => (
+              <SelectItem key={iv.value} value={iv.value}>
+                {iv.label}
               </SelectItem>
             ))}
           </SelectContent>

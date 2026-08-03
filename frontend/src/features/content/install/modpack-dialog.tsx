@@ -77,6 +77,12 @@ export function ModpackInstallDialog({
       kind: 'server' as const,
     })),
   ];
+  const modes = [
+    { value: 'instance', label: m['instance.new']() },
+    { value: 'server', label: m['server.new']() },
+    { value: 'existing', label: m['content.modpack.target.existing']() },
+  ];
+  const entryOptions = entries.map((e) => ({ value: e.id, label: e.name }));
   const target = entries.find((e) => e.id === entry);
   // Installing into an existing entry follows that entry's own side, so the
   // server/instance choice is the target's, not the radio's.
@@ -127,18 +133,20 @@ export function ModpackInstallDialog({
           <div className="space-y-4">
             <Field>
               <FieldLabel>{m['content.modpack.target.label']()}</FieldLabel>
-              <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
+              <Select
+                items={modes}
+                value={mode}
+                onValueChange={(v) => setMode(v as Mode)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="instance">
-                    {m['instance.new']()}
-                  </SelectItem>
-                  <SelectItem value="server">{m['server.new']()}</SelectItem>
-                  <SelectItem value="existing">
-                    {m['content.modpack.target.existing']()}
-                  </SelectItem>
+                  {modes.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>
@@ -149,6 +157,7 @@ export function ModpackInstallDialog({
                   {m['content.modpack.target.existing']()}
                 </FieldLabel>
                 <Select
+                  items={entryOptions}
                   value={entry}
                   onValueChange={(value) => setEntry(value ?? '')}
                 >
@@ -156,9 +165,9 @@ export function ModpackInstallDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {entries.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.name}
+                    {entryOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
