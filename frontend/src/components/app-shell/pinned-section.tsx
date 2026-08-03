@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StatusDot } from '@/components/ui/status-dot';
+import { Thumbnail } from '@/components/ui/thumbnail';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useInstances } from '@/queries/instance';
@@ -338,13 +339,7 @@ function PinnedLinkContent({
   const Icon = entry.kind === 'server' ? HardDrivesIcon : CubeIcon;
   return (
     <>
-      <span className="grid size-6 shrink-0 place-items-center overflow-hidden bg-muted ring-1 ring-border">
-        {entry.iconUrl ? (
-          <img src={entry.iconUrl} alt="" className="size-full object-cover" />
-        ) : (
-          <Icon className="size-3.5" />
-        )}
-      </span>
+      <Thumbnail src={entry.iconUrl} icon={Icon} size="xs" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs text-foreground">
           {entry.name}

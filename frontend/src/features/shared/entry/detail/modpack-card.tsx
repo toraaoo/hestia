@@ -6,6 +6,7 @@ import { errorMessage } from '@/api';
 import { Stat } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Thumbnail } from '@/components/ui/thumbnail';
 import { WarningNotice } from '@/components/warning-notice';
 import { m } from '@/paraglide/messages.js';
 import type { JobEntryKind } from '@/queries';
@@ -15,7 +16,6 @@ import {
   useRemoveModpack,
   useUpdateModpack,
 } from '@/queries';
-
 import { ProvisionProgressView } from '../components/provision-progress';
 import { SideCard } from './cards';
 
@@ -72,15 +72,7 @@ export function ModpackCard({
     <SideCard title={m['content.modpack.title']()}>
       <div className="space-y-3">
         <div className="flex items-start gap-2.5">
-          {installed.iconUrl ? (
-            <img
-              src={installed.iconUrl}
-              alt=""
-              className="size-9 shrink-0 border border-border object-cover"
-            />
-          ) : (
-            <PackageIcon className="size-9 shrink-0 p-2 text-muted-foreground" />
-          )}
+          <Thumbnail src={installed.iconUrl} icon={PackageIcon} size="md" />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{installed.name}</p>
             <p className="truncate text-xs text-muted-foreground">

@@ -6,6 +6,7 @@ import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Thumbnail } from '@/components/ui/thumbnail';
 import {
   ContentInstallDialog,
   ModpackInstallDialog,
@@ -49,17 +50,7 @@ export function ContentCard({
       >
         <Card size="sm" className="transition-colors group-hover:bg-muted/40">
           <div className="flex gap-3 px-3">
-            <span className="grid size-12 shrink-0 place-items-center overflow-hidden bg-muted text-muted-foreground ring-1 ring-border">
-              {project.iconUrl ? (
-                <img
-                  src={project.iconUrl}
-                  alt=""
-                  className="size-full object-cover"
-                />
-              ) : (
-                <Icon className="size-6" />
-              )}
-            </span>
+            <Thumbnail src={project.iconUrl} icon={Icon} size="lg" />
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
