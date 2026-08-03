@@ -327,9 +327,16 @@ the launch a success ([0062](../decisions/0062-joining-directly-is-a-launch-para
 
 `instance.servers` reads the instance's own `servers.dat` — uncompressed NBT,
 one row per server the in-game list shows — and `instance.server.edit` /
-`.remove` write it back whole. `minecraft.ping` gives one address's status over
-the same Server List Ping the game's list uses, so a row can say what the server
-is answering right now.
+`.remove` / `.move` write it back whole. `minecraft.ping` gives one address's
+status over the same Server List Ping the game's list uses, so a row can say
+what the server is answering right now, down to the icon: the status reply's
+`favicon` is carried back as bare base64, which is what a front-end shows for an
+entry the game has never connected to and therefore cached no icon for.
+
+The file's order *is* the order the game shows, so `instance.server.move` is the
+player arranging their own list. Its `position` counts over the visible entries
+only — the rows a caller was shown — because the game keeps hidden scratch rows
+of its own (direct-connect) that belong to no list anyone arranges.
 
 That file belongs to the running game, which holds the list in memory and
 rewrites it wholesale when it exits. An edit made underneath a live session is
