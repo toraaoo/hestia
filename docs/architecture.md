@@ -185,7 +185,7 @@ obvious unit to reclaim ([0057](decisions/0057-meta-root-for-materialised-files.
 
 ## Project status
 
-Hestia is in early development (`v0.0.1`), but the vertical slice is complete:
+Hestia is at its first release (`v1.0.0`), and the vertical slice is complete:
 every capability below works end to end, from the wire contract to at least one
 front-end.
 
@@ -197,11 +197,12 @@ fabric, neoforge on both sides; paper, folia, spigot, bukkit for servers) ·
 server management with an RCON console · instance management with concurrent
 sessions · joining a world or a listed server straight from a launch · in-place
 version updates both ways · server backups, on demand and
-scheduled · content install and management from Modrinth, a URL or a local file ·
-modpacks into a new or existing entry · per-instance content profiles and global
-profiles · instance import and export (hestia, `.mrpack`, Prism/MultiMC) ·
-shared instance settings and worlds (`sync`) · self-update · the CLI over all of it · the desktop shell and its pages · the
-system tray.
+scheduled · content install and management from Modrinth, CurseForge, a URL or a
+local file · modpacks into a new or existing entry · per-instance content
+profiles and global profiles · instance import and export (hestia, `.mrpack`,
+Prism/MultiMC) · shared instance settings and worlds (`sync`) · self-update and
+the announcement feed · the CLI over all of it · the desktop shell and its
+pages · the system tray.
 
 **Not built yet:**
 
