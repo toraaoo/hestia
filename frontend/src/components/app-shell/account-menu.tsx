@@ -33,7 +33,7 @@ function SwitchAvatar({ uuid, name }: { uuid: string; name: string }) {
     <AccountAvatar
       uuid={uuid}
       name={name}
-      size={20}
+      size={16}
       texture={skin?.texture}
       bust={skin?.key}
       className="text-[9px]"
@@ -62,7 +62,7 @@ export function AccountMenu() {
   if (isPending) {
     return (
       <div className="flex w-full items-center gap-2.5 px-3 py-2">
-        <Bone className="size-7 shrink-0" />
+        <Bone className="size-6 shrink-0" />
         <span className="min-w-0 flex-1 space-y-1.5">
           <Bone className="h-3.5 w-24" />
           <Bone className="h-2.5 w-16" />
@@ -79,8 +79,8 @@ export function AccountMenu() {
         onClick={() => login.mutate()}
         className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset disabled:opacity-60"
       >
-        <span className="grid size-7 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
-          <PlusIcon className="size-4" />
+        <span className="grid size-6 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
+          <PlusIcon className="size-3.5" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm">
@@ -108,7 +108,7 @@ export function AccountMenu() {
               <AccountAvatar
                 uuid={active.uuid}
                 name={active.name}
-                size={28}
+                size={24}
                 texture={equippedSkin?.texture}
                 bust={equippedSkin?.key}
                 className="text-[11px]"

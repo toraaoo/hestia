@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { drawHead, HEAD, loadTexture } from '@/features/skins/lib';
 import { cn } from '@/lib/utils';
 
-/** The face render is 8×8 pixels before scaling, and mineatar caps `scale`. */
+/** The face is 8×8; only a whole-number scale renders every pixel the same size. */
 const FACE = 8;
 const MAX_SCALE = 16;
 
@@ -18,14 +18,14 @@ const MAX_SCALE = 16;
 export function AccountAvatar({
   uuid,
   name,
-  size = 28,
+  size = 24,
   texture,
   bust,
   className,
 }: {
   uuid: string;
   name: string;
-  /** Rendered edge length in pixels. */
+  /** Rendered edge length in pixels, snapped to a multiple of the 8px face. */
   size?: number;
   /**
    * The equipped skin's texture (url or data url). Preferred over mineatar so a
@@ -64,8 +64,10 @@ export function AccountAvatar({
     };
   }, [texture]);
 
+  const scale = Math.min(MAX_SCALE, Math.max(1, Math.round(size / FACE)));
+  const edge = scale * FACE;
   const box = cn('shrink-0 overflow-hidden ring-1 ring-border', className);
-  const style = { width: size, height: size };
+  const style = { width: edge, height: edge };
 
   if (texture && !textureFailed) {
     return (
@@ -94,16 +96,14 @@ export function AccountAvatar({
     );
   }
 
-  const scale = Math.min(MAX_SCALE, Math.max(1, Math.ceil((size * 2) / FACE)));
-
   return (
     <img
-      src={`https://api.mineatar.io/face/${uuid}?scale=${scale}${
+      src={`https://api.mineatar.io/face/${uuid}?scale=${Math.min(MAX_SCALE, scale * 2)}${
         bust ? `&v=${encodeURIComponent(bust)}` : ''
       }`}
       alt=""
-      width={size}
-      height={size}
+      width={edge}
+      height={edge}
       style={style}
       onError={() => setFailedId(id)}
       className={cn(box, 'bg-muted [image-rendering:pixelated]')}
