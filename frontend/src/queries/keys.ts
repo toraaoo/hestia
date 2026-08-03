@@ -112,7 +112,9 @@ export const keys = {
     servers: (id: string) => [...keys.instances.detail(id), 'servers'] as const,
     // Keyed by address, not by entry: the same server can sit in several
     // instances' lists, and its status is the same one either way.
-    serverStatus: (address: string) => ['minecraft', 'ping', address] as const,
+    serverStatuses: () => ['minecraft', 'ping'] as const,
+    serverStatus: (address: string) =>
+      [...keys.instances.serverStatuses(), address] as const,
     logs: (id: string, session?: string, tail?: number) =>
       [
         ...keys.instances.detail(id),

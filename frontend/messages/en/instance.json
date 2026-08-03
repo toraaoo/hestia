@@ -44,22 +44,24 @@
       "unsupported": "Joining on start needs Minecraft 1.20 or newer."
     },
     "servers": {
-      "summary": "The servers in this instance’s multiplayer list.",
-      "empty": "No servers in this instance’s list yet.",
-      "offline": "Offline",
-      "players": "{online}/{max} online",
-      "textures": "Resource packs",
       "add": {
         "action": "Add server",
         "title": "Add a server"
       },
+      "checking": "Checking…",
+      "copy_address": "Copy address",
       "edit": {
         "title": "Edit “{name}”"
       },
+      "empty": "No servers in this instance’s list yet.",
+      "offline": "Offline",
+      "players": "{online}/{max} online",
       "remove": {
         "title": "Remove “{name}”?",
         "description": "The server is removed from this instance’s multiplayer list. Nothing on the server itself changes."
-      }
+      },
+      "summary": "The servers in this instance’s multiplayer list.",
+      "textures": "Resource packs"
     }
   }
 }
