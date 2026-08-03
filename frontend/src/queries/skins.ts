@@ -49,7 +49,7 @@ function equipSkinInList(list: SkinListResult, key: string): SkinListResult {
 /**
  * The equipped skin for `account` (empty = default). Its `texture` lets the
  * avatar render the head locally (reflecting a change at once); its `key`
- * cache-busts the mc-heads fallback, whose url is otherwise uuid-only and so
+ * cache-busts the mineatar fallback, whose url is otherwise uuid-only and so
  * pinned in the browser image cache across a skin change. Pass `enabled` to
  * fetch it eagerly (the avatar wants the equipped skin before the picker is
  * ever opened); left off, it only reads what the picker has already loaded.

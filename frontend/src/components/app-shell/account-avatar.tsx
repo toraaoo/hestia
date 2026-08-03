@@ -3,13 +3,17 @@ import { useEffect, useRef, useState } from 'react';
 import { drawHead, HEAD, loadTexture } from '@/features/skins/lib';
 import { cn } from '@/lib/utils';
 
+/** The face render is 8×8 pixels before scaling, and mineatar caps `scale`. */
+const FACE = 8;
+const MAX_SCALE = 16;
+
 /**
  * A Minecraft player-head avatar. When the account's equipped skin texture is
  * known locally it is blitted head-on, so a skin change reflects instantly —
- * the uuid-keyed mc-heads head is cached by the browser (and the service)
- * across an equip and lags behind. Without a texture it falls back to mc-heads
- * by uuid, and to the name's initials when neither renders (offline, unknown
- * profile).
+ * the uuid-keyed mineatar face is cached by the browser (and for 12 hours by
+ * the service) across an equip and lags behind. Without a texture it falls back
+ * to mineatar by uuid, and to the name's initials when neither renders
+ * (offline, unknown profile).
  */
 export function AccountAvatar({
   uuid,
@@ -24,14 +28,14 @@ export function AccountAvatar({
   /** Rendered edge length in pixels. */
   size?: number;
   /**
-   * The equipped skin's texture (url or data url). Preferred over mc-heads so a
-   * change is reflected without waiting on the cached service head.
+   * The equipped skin's texture (url or data url). Preferred over mineatar so a
+   * change is reflected without waiting on the cached service face.
    */
   texture?: string;
   /**
-   * Cache-bust token for the mc-heads fallback. The mc-heads url is uuid-only,
-   * so a skin change reuses it and the browser serves the stale head; pass the
-   * equipped skin's key here to force a re-fetch when it changes.
+   * Cache-bust token for the mineatar fallback. Its url is uuid-only, so a skin
+   * change reuses it and the browser serves the stale face; pass the equipped
+   * skin's key here to force a re-fetch when it changes.
    */
   bust?: string;
   className?: string;
@@ -90,10 +94,12 @@ export function AccountAvatar({
     );
   }
 
+  const scale = Math.min(MAX_SCALE, Math.max(1, Math.ceil((size * 2) / FACE)));
+
   return (
     <img
-      src={`https://mc-heads.net/avatar/${uuid}/${size * 2}${
-        bust ? `?v=${encodeURIComponent(bust)}` : ''
+      src={`https://api.mineatar.io/face/${uuid}?scale=${scale}${
+        bust ? `&v=${encodeURIComponent(bust)}` : ''
       }`}
       alt=""
       width={size}

@@ -59,9 +59,10 @@ never sees one.
   implementation rather than an OpenSSL/CNG split.
 
 `account.switch` picks the default account launches run as; `account.list`
-reports it. The desktop renders each account's player head from the public
-`mc-heads.net/avatar/<uuid>` service, derived from the uuid rather than
-round-tripped over the wire.
+reports it. The desktop renders each account's player head from that account's
+equipped skin texture — blitted locally, so an equip shows at once — and falls
+back to the public `api.mineatar.io/face/<uuid>` service, derived from the uuid
+rather than round-tripped over the wire, when no texture is loaded yet.
 
 ## The skin library
 

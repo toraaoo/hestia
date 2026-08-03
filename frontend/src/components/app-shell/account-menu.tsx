@@ -22,6 +22,25 @@ import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries/accounts';
 import { useEquippedSkin } from '@/queries/skins';
 
+/**
+ * A switch target's head. The active account's skin already rides on the
+ * default-account `skin.list`; every other account needs its own, so this is
+ * fetched per row — only once the dropdown (and with it this component) mounts.
+ */
+function SwitchAvatar({ uuid, name }: { uuid: string; name: string }) {
+  const skin = useEquippedSkin(uuid, { enabled: true });
+  return (
+    <AccountAvatar
+      uuid={uuid}
+      name={name}
+      size={20}
+      texture={skin?.texture}
+      bust={skin?.key}
+      className="text-[9px]"
+    />
+  );
+}
+
 export function AccountMenu() {
   const {
     accounts,
@@ -132,12 +151,7 @@ export function AccountMenu() {
                   a.needsReauth ? login.mutate() : switchAccount.mutate(a.uuid)
                 }
               >
-                <AccountAvatar
-                  uuid={a.uuid}
-                  name={a.name}
-                  size={20}
-                  className="text-[9px]"
-                />
+                <SwitchAvatar uuid={a.uuid} name={a.name} />
                 <span className="min-w-0 flex-1 truncate">
                   {m['account.switch_to']({ name: a.name })}
                 </span>

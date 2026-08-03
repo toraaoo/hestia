@@ -20,7 +20,7 @@ external sign-in page needs no Tauri IPC; only Rust touches it. The device code
 flow keeps its plain `account.login.*` path over the generic bridge for the CLI
 — the webview dance is a desktop-only affordance layered over the same
 contracts, adding no wire surface. The player-head avatar the shell shows for
-each account is rendered from the public `mc-heads.net/avatar/<uuid>` service
-(helm overlay included, initials fallback), the same source Modrinth uses — the
-account list carries only `{uuid, name}`, so the head is derived from the uuid
-rather than round-tripped.
+each account is blitted from that account's equipped skin texture, falling back
+to the public `api.mineatar.io/face/<uuid>` service (helm overlay included,
+initials fallback) — the account list carries only `{uuid, name}`, so the head
+is derived from the uuid rather than round-tripped.
