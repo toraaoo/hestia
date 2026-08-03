@@ -1,9 +1,9 @@
 //! Behaviour-parity tests for the pure-filesystem engine stores (config, cache,
 //! servers, instances).
 
-use engine::{Cache, Config, Instances, ServerPhase, Servers};
+use engine::{Cache, Cancel, Config, Instances, Job, ServerPhase, Servers};
 use proto::download::{Checksum, HashAlgorithm};
-use proto::minecraft::{InstanceProfile, ServerProfile};
+use proto::minecraft::{InstanceProfile, ProvisionProgress, ServerProfile};
 
 /// A directory that removes itself when the test ends, named after the test so
 /// a leftover under a debugger says which one left it.
@@ -350,6 +350,65 @@ fn instance_update_swaps_profile_and_keeps_settings() {
     assert!(instances
         .update("missing", InstanceProfile::default())
         .is_err());
+}
+
+/// A server's own settings outlive a version change. The profile is the only
+/// thing an update resolves upstream, so it must be the only thing it writes —
+/// see [decision 0068](../../../docs/decisions/0068-a-record-is-mutated-not-rebuilt.md).
+#[tokio::test]
+async fn server_update_swaps_profile_and_keeps_settings() {
+    let dir = temp_dir("server-update");
+    let servers = Servers::new(dir.path().join("servers"));
+    let profile = |version: &str| ServerProfile {
+        flavor: "paper".into(),
+        game_version: version.into(),
+        primary: proto::minecraft::Artifact {
+            filename: "server.jar".into(),
+            ..Default::default()
+        },
+        ..ServerProfile::default()
+    };
+    let record = servers.create("SMP", profile("1.21"), None).unwrap();
+    servers.config_set(&record.id, "memory", "4G").unwrap();
+    servers
+        .config_set(&record.id, "backup-interval", "6h")
+        .unwrap();
+    let claimed = servers.get(&record.id).unwrap().game_port;
+
+    let (cancel, report) = (Cancel::new(), |_: &ProvisionProgress| {});
+    let updated = servers
+        .update(
+            &record.id,
+            profile("1.21.4"),
+            None,
+            &Job::new(&report, &cancel),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(updated.profile.game_version, "1.21.4");
+    assert_eq!(updated.name, "SMP");
+    assert_eq!(updated.phase, ServerPhase::Ready);
+    assert_eq!(
+        updated.game_port, claimed,
+        "the claimed port is what players connect to; an update must not move it"
+    );
+
+    let reread = servers.get(&record.id).unwrap();
+    assert_eq!(reread.profile.game_version, "1.21.4");
+    assert_eq!(
+        servers.config_get(&record.id, "memory").unwrap().as_deref(),
+        Some("4G"),
+        "JVM settings survive an update"
+    );
+    assert_eq!(
+        servers
+            .config_get(&record.id, "backup-interval")
+            .unwrap()
+            .as_deref(),
+        Some("6h"),
+        "the backup schedule survives an update"
+    );
 }
 
 #[test]
