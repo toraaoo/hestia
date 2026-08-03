@@ -88,6 +88,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0017** — [A content profile is a selection, not a copy](0017-content-profile-is-a-selection.md)
 - **0018** — [A global profile stores project references, never jars](0018-global-profile-stores-references.md)
 - **0019** — [Settings capture is opt-in per profile, and scopes only settings](0019-profile-settings-capture.md)
+- **0068** — [A record of the user's is mutated, never rebuilt](0068-a-record-is-mutated-not-rebuilt.md)
 
 ### [Accounts & skins](../architecture/accounts.md)
 

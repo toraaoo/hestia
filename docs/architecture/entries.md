@@ -192,6 +192,13 @@ newest-first catalogue rather than by parsing version strings.
 An update refuses a running or still-creating entry. A front-end that wants to
 update a running server stops and restarts it explicitly around the job.
 
+Both flows *mutate* the loaded record — they assign `profile` (and, for a server,
+`phase`) onto the document read from disk and write it back. Nothing else is
+assigned, so a server keeps its JVM tuning, its backup schedule, and the game
+port players connect to across a version change, for no reason other than that
+an update never rebuilds the record
+([0068](../decisions/0068-a-record-is-mutated-not-rebuilt.md)).
+
 ## Backups
 
 Server backups are gzipped tar archives of `data/` under the server's
@@ -344,3 +351,4 @@ refused: the daemon cannot make the write durable, but it can say so
 - [0042 — Per-session logs come from a generated Log4j2 config](../decisions/0042-per-session-log4j-config.md)
 - [0056 — Server provisioning is front-loaded by design](../decisions/0056-server-provisioning-is-front-loaded.md)
 - [0059 — The server console is RCON, not a stdin pipe](../decisions/0059-the-console-is-rcon-not-a-pipe.md)
+- [0068 — A record of the user's is mutated, never rebuilt](../decisions/0068-a-record-is-mutated-not-rebuilt.md)

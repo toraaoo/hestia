@@ -77,7 +77,7 @@ like a slug.
 > download URL. The `ContentDownloadBlocked` refusal says so and names the source,
 > the rest of the batch installs, and local-file import is the documented way
 > through — Hestia deliberately does not reconstruct the CDN path to download it
-> anyway. The check lives in `install_version_file` rather than the provider,
+> anyway. The check lives in `fetch_release` rather than the provider,
 > because an artifact with no URL is unusable whoever produced it — and in the
 > pack installer for the same reason, where a blocked file is routine rather than
 > odd: a CurseForge pack listing one still installs, minus that file, naming it.
@@ -135,6 +135,30 @@ A platform install picks the newest compatible version — filtered by the entry
 game version and, for mods, its loader — and resolves required dependencies
 breadth-first. A direct URL or local file import records `source: "file"` with no
 version to update against: it installs, it is simply not updatable.
+
+### Who owns which field of a record
+
+An `InstalledContent` mixes three independently-owned groups, and no flow owns
+all of them: an install has a project and a version but no prior record, an
+update has a record and a version but no project, a modpack re-supply has both
+over an item the entry is already holding a particular way.
+
+| Group | Fields | Who writes it |
+|---|---|---|
+| `Project` | id, slug, title, icon | the install; carried unchanged by everything after |
+| `Release` | source, version, filename, sha1, url | an install, an update, a re-supply |
+| `Holding` | origin, `enabled`, per-world disables, world targeting | the entry alone — never anything upstream |
+
+`content::record::assemble` is the only place those fields are written, so a
+flow cannot reset a group it does not own: an update is `repin(item, release)`
+and a modpack re-supply is `rehold(item, holding)`. The assembler is exhaustive,
+so a new field on the record does not compile until it has been classified
+([0068](../decisions/0068-a-record-is-mutated-not-rebuilt.md)).
+
+This matters beyond bookkeeping: the launch-time mirror reads `enabled` and the
+per-world disables straight off the record, so a group lost in a rebuild does
+not merely misreport an item — it puts a disabled one back where the game loads
+it.
 
 ### Beyond add and remove
 
