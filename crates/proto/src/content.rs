@@ -439,16 +439,18 @@ pub struct InstanceContentListParams {
     pub kind: ContentKind,
 }
 
-/// `worlds` narrows a datapack removal to those save worlds — the pack stops
-/// loading in them and its copies there go; it is uninstalled outright when no
-/// world is left targeting it. Rejected for the kinds that have no worlds.
+/// `items` names what to uninstall, resolved together so a reference matching
+/// nothing removes none of them. `worlds` narrows a datapack removal to those
+/// save worlds — the pack stops loading in them and its copies there go; it is
+/// uninstalled outright when no world is left targeting it. Rejected for the
+/// kinds that have no worlds.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerContentRemoveParams {
     pub server: String,
     pub kind: ContentKind,
-    pub item: String,
+    pub items: Vec<String>,
     pub worlds: Vec<String>,
 }
 
@@ -458,18 +460,19 @@ pub struct ServerContentRemoveParams {
 pub struct InstanceContentRemoveParams {
     pub instance: String,
     pub kind: ContentKind,
-    pub item: String,
+    pub items: Vec<String>,
     pub worlds: Vec<String>,
 }
 
-/// `item` empty updates every platform-sourced item of the kind.
+/// `items` empty updates every platform-sourced item of the kind; naming
+/// several updates exactly those, in one job.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerContentUpdateParams {
     pub server: String,
     pub kind: ContentKind,
-    pub item: String,
+    pub items: Vec<String>,
     pub id: String,
 }
 
@@ -479,7 +482,7 @@ pub struct ServerContentUpdateParams {
 pub struct InstanceContentUpdateParams {
     pub instance: String,
     pub kind: ContentKind,
-    pub item: String,
+    pub items: Vec<String>,
     pub id: String,
 }
 

@@ -91,11 +91,11 @@ export function ContentSection({
     onRemove: (item, worlds) =>
       remove.mutate({
         kind: item.kind,
-        item: installedRef(item),
+        items: [installedRef(item)],
         worlds,
       }),
     onUpdate: (item) =>
-      update.mutate({ kind: item.kind, item: installedRef(item) }),
+      update.mutate({ kind: item.kind, items: [installedRef(item)] }),
     onSetVersion: (item, version) =>
       setVersion.mutate({
         kind: item.kind,

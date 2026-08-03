@@ -9,7 +9,7 @@ import type { ContentKind, InstalledContent } from '@/api/types';
 import { jobIdOf, startJob } from '../job';
 import * as content from '../state/content';
 import * as entries from '../state/entries';
-import { type Handler, type Handlers, ok, str } from '../support';
+import { type Handler, type Handlers, ok, str, strings } from '../support';
 
 /** Resolves the entry a payload names to its stable id. */
 export type Resolve = (payload: Record<string, unknown>) => string;
@@ -76,7 +76,7 @@ export function contentChannels(prefix: string, resolve: Resolve): Handlers {
     [`${prefix}.content.add`]: add,
 
     [`${prefix}.content.remove`]: (p) => {
-      content.remove(resolve(p), kindOf(p), str(p, 'item'));
+      content.remove(resolve(p), kindOf(p), strings(p, 'items'));
       return ok();
     },
 
@@ -92,7 +92,7 @@ export function contentChannels(prefix: string, resolve: Resolve): Handlers {
 
     [`${prefix}.content.update`]: (p) =>
       contentJob(p, () =>
-        content.update(resolve(p), kindOf(p), str(p, 'item')),
+        content.update(resolve(p), kindOf(p), strings(p, 'items')),
       ),
 
     [`${prefix}.content.set_version`]: (p) =>

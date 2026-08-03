@@ -138,10 +138,11 @@ async fn run_install(
     let mut removed = Vec::new();
     let mut failures = Vec::new();
     for removal in removals {
-        match handle.remove(kind, &removal.key, &removal.worlds).await {
+        let key = removal.key.clone();
+        match handle.remove(kind, &[removal.key], &removal.worlds).await {
             Ok(()) => removed.extend(removal.record),
             Err(e) => failures.push(ContentFailure {
-                item: removal.key,
+                item: key,
                 title: removal.record.map(|r| r.title).unwrap_or_default(),
                 error: client::error_info(&e),
             }),

@@ -237,9 +237,17 @@ async fn what_a_batch_installed_is_what_the_entry_then_lists() {
     assert!(listed[0].enabled);
 
     // The index and the disk agree: removing it takes the file with it.
-    assert!(engine
-        .remove_entry_content(EntryRef::Instance(&id), ContentKind::Mod, "sodium", &[])
-        .expect("remove"));
+    assert_eq!(
+        engine
+            .remove_entry_content(
+                EntryRef::Instance(&id),
+                ContentKind::Mod,
+                &["sodium".to_string()],
+                &[]
+            )
+            .expect("remove"),
+        1
+    );
     let (after, _) = engine
         .entry_content(EntryRef::Instance(&id), ContentKind::Mod)
         .expect("list");
@@ -321,7 +329,7 @@ async fn an_update_moves_the_version_and_leaves_the_project_alone() {
         .update_entry_content(
             EntryRef::Instance(&id),
             ContentKind::Mod,
-            "sodium",
+            &["sodium".to_string()],
             &job(&cancel, &report),
         )
         .await
@@ -360,7 +368,7 @@ async fn updating_a_disabled_item_leaves_it_out_of_the_load_dir() {
         .update_entry_content(
             EntryRef::Instance(&id),
             ContentKind::Mod,
-            "sodium",
+            &["sodium".to_string()],
             &job(&cancel, &report),
         )
         .await

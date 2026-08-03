@@ -14,40 +14,26 @@ use crate::minecraft::materialize::OnProgress;
 impl Engine {
     /// Move matched platform items to a newer version — the newest compatible
     /// when `pin` is empty, or that exact version (id or number) when pinned.
+    /// `references` empty takes every item of the kind; naming several takes
+    /// exactly those, resolved before the first one moves.
     pub(super) async fn update_content(
         &self,
         ctx: &EntryContent,
         kind: ContentKind,
-        reference: &str,
+        references: &[String],
         pin: &str,
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
         let index = install::load(&ctx.entry_dir);
-        let targets: Vec<InstalledContent> = index
-            .iter()
-            .filter(|i| i.kind == kind && (reference.is_empty() || install::matches(i, reference)))
-            .cloned()
-            .collect();
+        let targets = update_targets(&index, kind, references)?;
         if targets.is_empty() {
-            match reference.is_empty() {
-                true => bail!("nothing is installed"),
-                false => bail!(proto::error::ErrorInfo::ContentNotFound {
-                    reference: reference.to_string()
-                }),
-            }
+            bail!("nothing is installed");
         }
         let loader = content_loader(kind, &ctx.flavor);
 
         let mut updated = Vec::new();
         for item in targets {
             if item.project_id.is_empty() {
-                if !reference.is_empty() {
-                    bail!(
-                        "'{}' was installed from a {} and cannot be updated",
-                        item.filename,
-                        item.source
-                    );
-                }
                 continue;
             }
             on_progress.report(&phase_progress(ProvisionPhase::Resolving));
@@ -147,6 +133,39 @@ impl Engine {
     }
 }
 
+/// The items an update acts on: every one of the kind for an empty batch, or
+/// exactly the named ones — each resolved before the first one moves, so a bad
+/// reference changes nothing.
+fn update_targets(
+    index: &[InstalledContent],
+    kind: ContentKind,
+    references: &[String],
+) -> Result<Vec<InstalledContent>> {
+    if references.is_empty() {
+        return Ok(index.iter().filter(|i| i.kind == kind).cloned().collect());
+    }
+    super::resolve_all(index, kind, references)?;
+    let mut targets: Vec<InstalledContent> = Vec::new();
+    for reference in references {
+        let matched = index
+            .iter()
+            .filter(|i| i.kind == kind && install::matches(i, reference));
+        for item in matched {
+            if item.project_id.is_empty() {
+                bail!(
+                    "'{}' was installed from a {} and cannot be updated",
+                    item.filename,
+                    item.source
+                );
+            }
+            if !targets.iter().any(|t| t.filename == item.filename) {
+                targets.push(item.clone());
+            }
+        }
+    }
+    Ok(targets)
+}
+
 pub(super) fn list_content(
     ctx: &EntryContent,
     kind: ContentKind,
@@ -159,13 +178,14 @@ pub(super) fn list_content(
     (items, untracked)
 }
 
-/// Uninstall matching items: the managed copy and every mirror of it. A
-/// non-empty `worlds` (datapacks only) instead drops those worlds from the
-/// item's selection, uninstalling it only when none is left.
+/// Uninstall every item matching one of `references`: the managed copy and
+/// every mirror of it. A non-empty `worlds` (datapacks only) instead drops
+/// those worlds from each item's selection, uninstalling it only when none is
+/// left.
 pub(super) fn remove_content(
     ctx: &EntryContent,
     kind: ContentKind,
-    reference: &str,
+    references: &[String],
     worlds: &[String],
 ) -> Result<Vec<InstalledContent>> {
     if !worlds.is_empty() && kind != ContentKind::DataPack {
@@ -174,9 +194,13 @@ pub(super) fn remove_content(
         });
     }
     let entry_worlds = ctx.worlds();
-    let (matched, mut kept): (Vec<_>, Vec<_>) = install::load(&ctx.entry_dir)
-        .into_iter()
-        .partition(|i| i.kind == kind && install::matches(i, reference));
+    let (matched, mut kept): (Vec<_>, Vec<_>) =
+        install::load(&ctx.entry_dir).into_iter().partition(|i| {
+            i.kind == kind
+                && references
+                    .iter()
+                    .any(|reference| install::matches(i, reference))
+        });
     if matched.is_empty() {
         return Ok(matched);
     }
@@ -310,6 +334,96 @@ fn scope_enabled(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn mod_item(project: &str, filename: &str) -> InstalledContent {
+        InstalledContent {
+            kind: ContentKind::Mod,
+            project_id: project.to_string(),
+            slug: project.to_string(),
+            filename: filename.to_string(),
+            ..InstalledContent::default()
+        }
+    }
+
+    #[test]
+    fn a_batch_takes_each_named_item_once() {
+        let index = vec![
+            mod_item("sodium", "sodium-1.jar"),
+            mod_item("iris", "iris-1.jar"),
+            mod_item("lithium", "lithium-1.jar"),
+        ];
+        let targets = update_targets(
+            &index,
+            ContentKind::Mod,
+            &["sodium".to_string(), "iris-1.jar".to_string()],
+        )
+        .expect("resolve");
+        assert_eq!(
+            targets.iter().map(|i| &i.project_id).collect::<Vec<_>>(),
+            vec!["sodium", "iris"]
+        );
+
+        let deduped = update_targets(
+            &index,
+            ContentKind::Mod,
+            &["sodium".to_string(), "sodium-1.jar".to_string()],
+        )
+        .expect("resolve");
+        assert_eq!(deduped.len(), 1, "one item named twice is one target");
+    }
+
+    #[test]
+    fn an_empty_batch_takes_every_item_of_the_kind() {
+        let index = vec![
+            mod_item("sodium", "sodium-1.jar"),
+            InstalledContent {
+                kind: ContentKind::Shader,
+                ..InstalledContent::default()
+            },
+        ];
+        let targets = update_targets(&index, ContentKind::Mod, &[]).expect("resolve");
+        assert_eq!(targets.len(), 1);
+    }
+
+    #[test]
+    fn a_batch_naming_one_bad_item_moves_none_of_them() {
+        let index = vec![mod_item("sodium", "sodium-1.jar")];
+        assert!(
+            update_targets(
+                &index,
+                ContentKind::Mod,
+                &["sodium".to_string(), "nope".to_string()]
+            )
+            .is_err(),
+            "a reference matching nothing refuses the whole batch"
+        );
+
+        let with_file = vec![
+            mod_item("sodium", "sodium-1.jar"),
+            InstalledContent {
+                kind: ContentKind::Mod,
+                filename: "hand-dropped.jar".to_string(),
+                source: "file".to_string(),
+                ..InstalledContent::default()
+            },
+        ];
+        assert!(
+            update_targets(
+                &with_file,
+                ContentKind::Mod,
+                &["sodium".to_string(), "hand-dropped.jar".to_string()]
+            )
+            .is_err(),
+            "a local file has no version to move to"
+        );
+        assert_eq!(
+            update_targets(&with_file, ContentKind::Mod, &[])
+                .expect("sweep")
+                .len(),
+            2,
+            "the whole-kind sweep still skips it later, rather than refusing"
+        );
+    }
 
     #[test]
     fn scoping_a_world_off_leaves_the_rest_loaded() {

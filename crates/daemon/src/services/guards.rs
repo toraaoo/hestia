@@ -6,7 +6,7 @@
 //! that spells its own guards out is free to drift from its siblings — which is
 //! how an instance content update came to race an export while an add could not.
 
-use proto::error::{EntryKind, ErrorInfo};
+use proto::error::{EntryKind, ErrorInfo, Field};
 use proto::process::ProcessState;
 
 use crate::runtime::{instance_process_id, server_process_id, HandlerContext};
@@ -257,6 +257,16 @@ pub(super) fn require_content_items(
     Ok(())
 }
 
+/// A blank reference compares equal to every local-file item's empty project
+/// id, so it would silently select those; it is never a name. An empty batch is
+/// legal — it means every item of the kind.
+pub(super) fn require_item_names(items: &[String]) -> Result<(), ErrorInfo> {
+    match items.iter().any(|item| item.is_empty()) {
+        true => Err(ErrorInfo::FieldRequired { field: Field::Item }),
+        false => Ok(()),
+    }
+}
+
 pub(super) fn require_backup(
     backups: anyhow::Result<Vec<proto::backup::BackupInfo>>,
     reference: &str,
@@ -276,7 +286,14 @@ mod tests {
     use proto::content::{ContentAddItem, ContentAddSpec, ContentKind};
     use proto::error::EntryKind;
 
-    use super::{require_content_items, Exclusions, Intent};
+    use super::{require_content_items, require_item_names, Exclusions, Intent};
+
+    #[test]
+    fn a_blank_reference_in_a_batch_is_refused() {
+        assert!(require_item_names(&["sodium".to_string()]).is_ok());
+        assert!(require_item_names(&[]).is_ok(), "empty means every item");
+        assert!(require_item_names(&["sodium".to_string(), String::new()]).is_err());
+    }
 
     fn project_item(project: &str) -> ContentAddItem {
         ContentAddItem {

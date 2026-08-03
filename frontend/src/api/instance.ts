@@ -321,20 +321,21 @@ export const content = {
     return call('instance.content.list', { instance, kind });
   },
 
+  /** Uninstalls the named items in one call; a name matching nothing takes none. */
   async remove(
     instance: string,
     kind: ContentKind,
-    item: string,
+    items: string[],
     worlds: string[] = [],
   ): Promise<void> {
-    await call('instance.content.remove', { instance, kind, item, worlds });
+    await call('instance.content.remove', { instance, kind, items, worlds });
   },
 
-  /** `item` empty updates every platform-sourced item of the kind. */
+  /** `items` empty updates every platform-sourced item of the kind. */
   update(
     instance: string,
     kind: ContentKind,
-    item = '',
+    items: string[],
     job: JobRun,
   ): Promise<ContentDoneEvent> {
     return runJob<ContentDoneEvent>({
@@ -345,7 +346,7 @@ export const content = {
         error: 'content.error',
       },
       start: () =>
-        call('instance.content.update', { instance, kind, item, id: job.id }),
+        call('instance.content.update', { instance, kind, items, id: job.id }),
     });
   },
 

@@ -56,8 +56,8 @@ pub enum ContentCmd {
     /// Uninstall content (prompts to pick when omitted)
     #[command(visible_alias = "rm")]
     Remove {
-        /// Installed item (project id, slug, filename, or title)
-        item: Option<String>,
+        /// Installed items (project id, slug, filename, or title)
+        items: Vec<String>,
         #[arg(
             long,
             help = "For a datapack: stop loading it in this save world only (repeatable)"
@@ -66,8 +66,8 @@ pub enum ContentCmd {
     },
     /// Update platform content to its newest compatible version
     Update {
-        /// One installed item, or every one of this kind when omitted
-        item: Option<String>,
+        /// Installed items, or every one of this kind when omitted
+        items: Vec<String>,
         #[arg(
             long,
             help = "Only report which items have an update, without applying"
@@ -120,14 +120,14 @@ pub async fn run_entry(
             .await
         }
         ContentCmd::List => list(client, entry, kind, reference).await,
-        ContentCmd::Remove { item, world } => {
-            remove(client, entry, kind, reference, item, world).await
+        ContentCmd::Remove { items, world } => {
+            remove(client, entry, kind, reference, items, world).await
         }
-        ContentCmd::Update { item, check } => {
+        ContentCmd::Update { items, check } => {
             if check {
                 check_updates(client, entry, kind, reference).await
             } else {
-                update(client, entry, kind, reference, item).await
+                update(client, entry, kind, reference, items).await
             }
         }
         ContentCmd::Enable { item, world } => {
@@ -368,25 +368,28 @@ async fn remove(
     entry: EntryKind,
     kind: ContentKind,
     reference: &str,
-    item: Option<String>,
+    items: Vec<String>,
     world: Vec<String>,
 ) -> Result<()> {
     let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
     let handle = ContentEntry::new(client, entry, id);
     let worlds: Vec<String> = world.into_iter().filter(|w| !w.is_empty()).collect();
-    let item = match item {
-        Some(item) => item,
-        None => {
-            let (items, _) = handle.list(kind).await?;
-            pick_installed(items)?
+    let items = match items.is_empty() {
+        false => items,
+        true => {
+            let (installed, _) = handle.list(kind).await?;
+            vec![pick_installed(installed)?]
         }
     };
-    handle.remove(kind, &item, &worlds).await?;
+    handle.remove(kind, &items, &worlds).await?;
     let where_ = match worlds.is_empty() {
         true => format!("'{name}'"),
         false => format!("'{name}' ({})", worlds.join(", ")),
     };
-    ui::show(View::line(format!("removed '{item}' from {where_}")))
+    for item in &items {
+        ui::show(View::line(format!("removed '{item}' from {where_}")))?;
+    }
+    Ok(())
 }
 
 async fn update(
@@ -394,17 +397,16 @@ async fn update(
     entry: EntryKind,
     kind: ContentKind,
     reference: &str,
-    item: Option<String>,
+    items: Vec<String>,
 ) -> Result<()> {
     let EntryInfo { id, name, .. } = resolve_entry(client, entry, reference).await?;
     let handle = ContentEntry::new(client, entry, id);
-    let target = item.unwrap_or_default();
 
     let reporter = Arc::new(ProvisionReporter::new());
     let progress = reporter.clone();
     let updated = {
         let result = handle
-            .update(kind, &target, move |p| progress.update(p))
+            .update(kind, &items, move |p| progress.update(p))
             .await;
         reporter.finish();
         result?

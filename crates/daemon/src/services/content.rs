@@ -12,7 +12,7 @@ use proto::content::{
 use proto::error::{ErrorInfo, Field};
 use proto::Empty;
 
-use super::guards::{instance_for, require_content_items, server_for, Intent};
+use super::guards::{instance_for, require_content_items, require_item_names, server_for, Intent};
 use crate::runtime::{Channels, ContentJob, JobEntry};
 
 pub(super) fn register(on: &mut Channels<'_>) {
@@ -130,31 +130,31 @@ fn register_server(on: &mut Channels<'_>) {
     });
 
     on.handle::<ServerContentRemove, _, _>(|p, ctx| async move {
-        if p.item.is_empty() {
+        if p.items.is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
+        require_item_names(&p.items)?;
         let record = server_for(&ctx, &p.server, Intent::Mutate)?;
-        match ctx.runtime.engine().remove_entry_content(
-            engine::EntryRef::Server(&record.id),
-            p.kind,
-            &p.item,
-            &p.worlds,
-        ) {
-            Ok(true) => Ok(Empty {}),
-            Ok(false) => Err(ErrorInfo::ContentNotFound {
-                reference: p.item.clone(),
-            }),
-            Err(e) => Err(crate::runtime::engine_error(e)),
-        }
+        ctx.runtime
+            .engine()
+            .remove_entry_content(
+                engine::EntryRef::Server(&record.id),
+                p.kind,
+                &p.items,
+                &p.worlds,
+            )
+            .map(|_| Empty {})
+            .map_err(crate::runtime::engine_error)
     });
 
     on.handle::<ServerContentUpdate, _, _>(|p, ctx| async move {
+        require_item_names(&p.items)?;
         let record = server_for(&ctx, &p.server, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::Update {
                 entry: JobEntry::server(record.id),
                 kind: p.kind,
-                item: p.item,
+                items: p.items,
             },
             p.id,
         ) {
@@ -249,31 +249,31 @@ fn register_instance(on: &mut Channels<'_>) {
     });
 
     on.handle::<InstanceContentRemove, _, _>(|p, ctx| async move {
-        if p.item.is_empty() {
+        if p.items.is_empty() {
             return Err(ErrorInfo::FieldRequired { field: Field::Item });
         }
+        require_item_names(&p.items)?;
         let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
-        match ctx.runtime.engine().remove_entry_content(
-            engine::EntryRef::Instance(&record.id),
-            p.kind,
-            &p.item,
-            &p.worlds,
-        ) {
-            Ok(true) => Ok(Empty {}),
-            Ok(false) => Err(ErrorInfo::ContentNotFound {
-                reference: p.item.clone(),
-            }),
-            Err(e) => Err(crate::runtime::engine_error(e)),
-        }
+        ctx.runtime
+            .engine()
+            .remove_entry_content(
+                engine::EntryRef::Instance(&record.id),
+                p.kind,
+                &p.items,
+                &p.worlds,
+            )
+            .map(|_| Empty {})
+            .map_err(crate::runtime::engine_error)
     });
 
     on.handle::<InstanceContentUpdate, _, _>(|p, ctx| async move {
+        require_item_names(&p.items)?;
         let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
         match ctx.runtime.content_jobs().start(
             ContentJob::Update {
                 entry: JobEntry::instance(record.id),
                 kind: p.kind,
-                item: p.item,
+                items: p.items,
             },
             p.id,
         ) {

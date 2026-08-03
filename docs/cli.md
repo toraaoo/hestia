@@ -310,8 +310,10 @@ hestia instance modded mod add jei -S curseforge     # from another source (a
 hestia instance modded mod add --file ./my-mod.jar   # import a local file
 hestia instance modded mod list  # installed mods (+ any untracked jars in the
                                  #   game dir)
-hestia instance modded mod update [sodium]   # newest compatible (all, or one)
-hestia instance modded mod remove sodium
+hestia instance modded mod update [sodium ...]   # newest compatible (all, or
+                                 #   the ones you name — one job either way)
+hestia instance modded mod remove sodium [iris ...]   # one call; a name that
+                                 #   matches nothing removes none of them
 hestia instance modded resourcepack add <slug>   # same verbs for packs/shaders
 hestia instance modded shader add <slug>
 ```
@@ -328,7 +330,7 @@ hestia instance modded datapack add --file ./pack.zip --world Alpha
 hestia instance modded datapack list      # installed datapacks, with their world
 hestia instance modded datapack remove terralith   # removes it from every world
 hestia instance modded datapack remove terralith --world Alpha   # only that world's copy
-hestia instance modded datapack update [item]      # updates it in each world
+hestia instance modded datapack update [item ...]  # updates it in each world
 ```
 
 Worlds are shared across instances (linked `saves/` — see below), so a datapack installed into a world is active for

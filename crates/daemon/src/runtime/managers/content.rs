@@ -18,10 +18,11 @@ pub enum ContentJob {
         entry: Entry,
         spec: ContentAddSpec,
     },
+    /// `items` empty updates every platform-sourced item of the kind.
     Update {
         entry: Entry,
         kind: ContentKind,
-        item: String,
+        items: Vec<String>,
     },
     /// Re-pin one item to a specific published version.
     SetVersion {
@@ -117,8 +118,8 @@ impl ContentJob {
                     .add_entry_content(entry.as_ref(), &spec, on_progress)
                     .await
             }
-            ContentJob::Update { entry, kind, item } => engine
-                .update_entry_content(entry.as_ref(), kind, &item, on_progress)
+            ContentJob::Update { entry, kind, items } => engine
+                .update_entry_content(entry.as_ref(), kind, &items, on_progress)
                 .await
                 .map(|items| (items, Vec::new())),
             ContentJob::SetVersion {

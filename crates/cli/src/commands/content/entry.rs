@@ -60,20 +60,20 @@ impl<'a> ContentEntry<'a> {
     pub(super) async fn remove(
         &self,
         kind: ContentKind,
-        item: &str,
+        items: &[String],
         worlds: &[String],
     ) -> Result<(), IpcError> {
         match self.kind {
             EntryKind::Server => {
                 self.client
                     .server()
-                    .content_remove(&self.id, kind, item, worlds)
+                    .content_remove(&self.id, kind, items, worlds)
                     .await
             }
             EntryKind::Instance => {
                 self.client
                     .instance()
-                    .content_remove(&self.id, kind, item, worlds)
+                    .content_remove(&self.id, kind, items, worlds)
                     .await
             }
         }
@@ -82,20 +82,20 @@ impl<'a> ContentEntry<'a> {
     pub(super) async fn update(
         &self,
         kind: ContentKind,
-        item: &str,
+        items: &[String],
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
     ) -> Result<Vec<InstalledContent>, IpcError> {
         match self.kind {
             EntryKind::Server => {
                 self.client
                     .server()
-                    .content_update(&self.id, kind, item, on_progress)
+                    .content_update(&self.id, kind, items, on_progress)
                     .await
             }
             EntryKind::Instance => {
                 self.client
                     .instance()
-                    .content_update(&self.id, kind, item, on_progress)
+                    .content_update(&self.id, kind, items, on_progress)
                     .await
             }
         }

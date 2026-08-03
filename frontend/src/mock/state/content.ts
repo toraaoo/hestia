@@ -402,10 +402,14 @@ const isItem = (item: InstalledContent, ref: string): boolean =>
   item.slug === ref ||
   item.title === ref;
 
-export function remove(id: string, kind: ContentKind, ref: string): void {
+export function remove(id: string, kind: ContentKind, refs: string[]): void {
   const items = pool(id);
-  const at = items.findIndex((item) => item.kind === kind && isItem(item, ref));
-  if (at >= 0) items.splice(at, 1);
+  for (const ref of refs) {
+    const at = items.findIndex(
+      (item) => item.kind === kind && isItem(item, ref),
+    );
+    if (at >= 0) items.splice(at, 1);
+  }
 }
 
 export function setEnabled(
@@ -440,17 +444,17 @@ export function setVersion(
   return [item];
 }
 
-/** Move every platform-sourced item of the kind (or one) to its newest pin. */
+/** Move every platform-sourced item of the kind (or the named ones) to its newest pin. */
 export function update(
   id: string,
   kind: ContentKind,
-  ref: string,
+  refs: string[],
 ): InstalledContent[] {
   const items = pool(id).filter(
     (item) =>
       item.kind === kind &&
       item.source !== 'file' &&
-      (!ref || isItem(item, ref)),
+      (refs.length === 0 || refs.some((ref) => isItem(item, ref))),
   );
   for (const item of items) {
     const latest = versionsOf(item.projectId)[0];

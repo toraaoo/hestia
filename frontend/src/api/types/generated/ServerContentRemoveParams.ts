@@ -2,8 +2,10 @@
 import type { ContentKind } from "./ContentKind";
 
 /**
- * `worlds` narrows a datapack removal to those save worlds — the pack stops
- * loading in them and its copies there go; it is uninstalled outright when no
- * world is left targeting it. Rejected for the kinds that have no worlds.
+ * `items` names what to uninstall, resolved together so a reference matching
+ * nothing removes none of them. `worlds` narrows a datapack removal to those
+ * save worlds — the pack stops loading in them and its copies there go; it is
+ * uninstalled outright when no world is left targeting it. Rejected for the
+ * kinds that have no worlds.
  */
-export type ServerContentRemoveParams = { server: string, kind: ContentKind, item: string, worlds: Array<string>, };
+export type ServerContentRemoveParams = { server: string, kind: ContentKind, items: Array<string>, worlds: Array<string>, };

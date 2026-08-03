@@ -51,25 +51,30 @@ impl Engine {
         Ok(list_content(&ctx, kind))
     }
 
-    /// Uninstall one item (matched by project id, slug, filename, or title) —
-    /// its managed copy and every mirror of it. A non-empty `worlds` instead
-    /// narrows a datapack to the worlds it keeps loading in. False when nothing
-    /// matches.
+    /// Uninstall the named items (each matched by project id, slug, filename,
+    /// or title) — their managed copies and every mirror of them. A non-empty
+    /// `worlds` instead narrows a datapack to the worlds it keeps loading in.
+    /// Returns how many items were uninstalled outright, which a world-narrowed
+    /// removal leaves at zero.
     pub fn remove_entry_content(
         &self,
         entry: EntryRef<'_>,
         kind: ContentKind,
-        item: &str,
+        items: &[String],
         worlds: &[String],
-    ) -> Result<bool> {
+    ) -> Result<usize> {
         let (_, ctx) = self.content_ctx(entry)?;
+        let index = install::load(&ctx.entry_dir);
+        resolve_all(&index, kind, items)?;
         // Content something else installed is owned by that thing: removing it
         // locally would silently reappear at the next apply or pack update, so
         // the removal is refused (there is no local-exclusion mechanism) and the
         // user is pointed at whatever owns it.
-        let tagged = install::load(&ctx.entry_dir)
-            .into_iter()
-            .find(|i| i.kind == kind && install::matches(i, item) && !i.origin.is_empty());
+        let tagged = index.into_iter().find(|i| {
+            i.kind == kind
+                && items.iter().any(|item| install::matches(i, item))
+                && !i.origin.is_empty()
+        });
         if let Some(tagged) = tagged {
             bail!(
                 "'{}' was installed by {}; remove it there instead",
@@ -77,7 +82,7 @@ impl Engine {
                 origin_owner(&tagged.origin),
             );
         }
-        let removed = remove_content(&ctx, kind, item, worlds)?;
+        let removed = remove_content(&ctx, kind, items, worlds)?;
         // Content profiles are an instance concern, so only that side has
         // selections to prune.
         if ctx.side == EntrySide::Client {
@@ -88,20 +93,20 @@ impl Engine {
                 .collect();
             profiles::prune(&ctx.entry_dir, &gone)?;
         }
-        Ok(!removed.is_empty())
+        Ok(removed.len())
     }
 
-    /// Move platform-sourced items to their newest compatible version — one
-    /// named item, or every item of the kind when `item` is empty. Returns
+    /// Move platform-sourced items to their newest compatible version — the
+    /// named items, or every item of the kind when `items` is empty. Returns
     /// what actually changed.
     pub async fn update_entry_content(
         &self,
         entry: EntryRef<'_>,
         kind: ContentKind,
-        item: &str,
+        items: &[String],
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
-        self.change_version(entry, kind, item, "", on_progress)
+        self.change_version(entry, kind, items, "", on_progress)
             .await
     }
 
@@ -120,7 +125,8 @@ impl Engine {
                 fields: vec![proto::error::Field::Item, proto::error::Field::Version]
             });
         }
-        self.change_version(entry, kind, item, version, on_progress)
+        let items = [item.to_string()];
+        self.change_version(entry, kind, &items, version, on_progress)
             .await
     }
 
@@ -131,14 +137,14 @@ impl Engine {
         &self,
         entry: EntryRef<'_>,
         kind: ContentKind,
-        item: &str,
+        items: &[String],
         pin: &str,
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
         let (_, ctx) = self.content_ctx(entry)?;
         let before = install::load(&ctx.entry_dir);
         let updated = self
-            .update_content(&ctx, kind, item, pin, on_progress)
+            .update_content(&ctx, kind, items, pin, on_progress)
             .await?;
         if ctx.side == EntrySide::Client {
             for new_item in &updated {
@@ -237,6 +243,26 @@ impl Engine {
             }
         }
     }
+}
+
+/// Check every reference names something installed, before any of them is
+/// acted on. An empty batch means "all of the kind" and has nothing to check.
+pub(in crate::engine::flows) fn resolve_all(
+    index: &[InstalledContent],
+    kind: ContentKind,
+    items: &[String],
+) -> Result<()> {
+    for item in items {
+        if !index
+            .iter()
+            .any(|i| i.kind == kind && install::matches(i, item))
+        {
+            bail!(proto::error::ErrorInfo::ContentNotFound {
+                reference: item.clone()
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Who an `origin` tag says installed an item, for a refusal that names where

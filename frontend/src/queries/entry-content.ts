@@ -25,13 +25,13 @@ export interface EntryContentApi {
   remove(
     id: string,
     kind: ContentKind,
-    item: string,
+    items: string[],
     worlds?: string[],
   ): Promise<void>;
   update(
     id: string,
     kind: ContentKind,
-    item: string | undefined,
+    items: string[],
     job: JobRun,
   ): Promise<ContentDoneEvent>;
   enable(
@@ -82,23 +82,26 @@ export function entryContentFactories(cfg: EntryContentConfig) {
         run: (spec, job) => cfg.api.add(id, spec, job),
         invalidates: () => invalidates(id),
       }),
+    /** One call for the whole batch; a name matching nothing removes none. */
     remove: (id: string) =>
-      mutation<void, { kind: ContentKind; item: string; worlds?: string[] }>({
-        mutationKey: [...cfg.contentKey(id), 'remove'],
-        mutationFn: ({ kind, item, worlds }) =>
-          cfg.api.remove(id, kind, item, worlds),
-        invalidates: () => invalidates(id),
-      }),
-    /** `item` empty updates every platform-sourced item of the kind. */
+      mutation<void, { kind: ContentKind; items: string[]; worlds?: string[] }>(
+        {
+          mutationKey: [...cfg.contentKey(id), 'remove'],
+          mutationFn: ({ kind, items, worlds }) =>
+            cfg.api.remove(id, kind, items, worlds),
+          invalidates: () => invalidates(id),
+        },
+      ),
+    /** `items` empty updates every platform-sourced item of the kind. */
     update: (id: string) =>
-      jobMutation<ContentDoneEvent, { kind: ContentKind; item?: string }>({
+      jobMutation<ContentDoneEvent, { kind: ContentKind; items: string[] }>({
         mutationKey: [...cfg.contentKey(id), 'update'],
         meta: ({ kind }) => ({
           kind: 'content.update',
           label: `update ${kind}s`,
           entry: { kind: cfg.kind, id },
         }),
-        run: ({ kind, item }, job) => cfg.api.update(id, kind, item, job),
+        run: ({ kind, items }, job) => cfg.api.update(id, kind, items, job),
         invalidates: () => invalidates(id),
       }),
     enable: (id: string) =>

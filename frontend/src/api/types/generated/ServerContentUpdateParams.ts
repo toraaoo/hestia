@@ -2,6 +2,7 @@
 import type { ContentKind } from "./ContentKind";
 
 /**
- * `item` empty updates every platform-sourced item of the kind.
+ * `items` empty updates every platform-sourced item of the kind; naming
+ * several updates exactly those, in one job.
  */
-export type ServerContentUpdateParams = { server: string, kind: ContentKind, item: string, id: string, };
+export type ServerContentUpdateParams = { server: string, kind: ContentKind, items: Array<string>, id: string, };

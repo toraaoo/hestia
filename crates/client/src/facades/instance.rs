@@ -478,39 +478,40 @@ impl Instance<'_> {
         Ok((result.items, result.untracked))
     }
 
-    /// Uninstall one item and every mirror of it. A non-empty `worlds` instead
-    /// narrows a datapack to the save worlds it keeps loading in.
+    /// Uninstall the named items and every mirror of them, in one call. A
+    /// non-empty `worlds` instead narrows a datapack to the save worlds it
+    /// keeps loading in.
     pub async fn content_remove(
         &self,
         instance: &str,
         kind: ContentKind,
-        item: &str,
+        items: &[String],
         worlds: &[String],
     ) -> Result<(), IpcError> {
         let params = InstanceContentRemoveParams {
             instance: instance.to_string(),
             kind,
-            item: item.to_string(),
+            items: items.to_vec(),
             worlds: worlds.to_vec(),
         };
         self.session.call::<InstanceContentRemove>(&params).await?;
         Ok(())
     }
 
-    /// Update platform-sourced content to its newest compatible version — one
-    /// named item, or every item of the kind when `item` is empty.
+    /// Update platform-sourced content to its newest compatible version — the
+    /// named items in one job, or every item of the kind when `items` is empty.
     pub async fn content_update(
         &self,
         instance: &str,
         kind: ContentKind,
-        item: &str,
+        items: &[String],
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
     ) -> Result<Vec<InstalledContent>, IpcError> {
         let id = job_id("instance-content-update");
         let params = InstanceContentUpdateParams {
             instance: instance.to_string(),
             kind,
-            item: item.to_string(),
+            items: items.to_vec(),
             id: id.clone(),
         };
         let session = self.session;

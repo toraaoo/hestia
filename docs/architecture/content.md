@@ -166,6 +166,7 @@ it.
 |---|---|
 | `enable` | flips a flag in `content.json`. Enforced at the single point it needs — the launch-time mirror keeps a disabled item out of `data/`, so it can never be resurrected by a restore. A datapack has no mirror, so it uses the standard `.disabled` rename inside its world |
 | `check_updates` | a *separate* on-demand call, not baked into `list`, so `list` stays fast and offline |
+| `update` / `remove` | take a *batch* of references — one job, one call. Named items are resolved before the first one moves, so a batch naming something that does not exist changes nothing; an empty batch means every item of the kind (`update`) and is refused (`remove`) |
 | `set_version` | re-pins one item to a chosen published version — the update path with an explicit pin instead of "newest" |
 
 All of them refuse a running or busy entry: open jars lock on Windows, and
