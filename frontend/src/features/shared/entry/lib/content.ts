@@ -5,6 +5,7 @@ import type {
   InstalledContent,
   UntrackedFile,
 } from '@/api';
+import type { Job } from '@/queries';
 
 /** The entry a content tab acts on. */
 export interface EntryTarget {
@@ -13,6 +14,19 @@ export interface EntryTarget {
   flavor: string;
   gameVersion: string;
 }
+
+/**
+ * The job kinds that hold the daemon's per-entry content lock — one content
+ * change per entry at a time, so anything started beside one of these is
+ * refused as busy rather than queued.
+ */
+const CONTENT_JOBS = ['content.add', 'content.update', 'profile.apply'];
+
+/** Whether one of an entry's jobs is a content change still running. */
+export const contentBusy = (jobs: Job[]): boolean =>
+  jobs.some(
+    (job) => job.status === 'running' && CONTENT_JOBS.includes(job.kind),
+  );
 
 /** How the daemon matches an item: its project id, else its filename. */
 export const installedRef = (i: InstalledContent) => i.projectId || i.filename;

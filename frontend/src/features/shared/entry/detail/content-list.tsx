@@ -152,7 +152,7 @@ function ContentRow({
   checked?: boolean;
   onToggle: () => void;
 }) {
-  const { handlers, packName } = useContent();
+  const { handlers, packName, busy } = useContent();
   const [removing, setRemoving] = useState(false);
   const [iconBroken, setIconBroken] = useState(false);
   const selecting = checked !== undefined;
@@ -239,6 +239,7 @@ function ContentRow({
               size="sm"
               variant="outline"
               data-icon="inline-start"
+              disabled={busy}
               onClick={() => handlers.onUpdate(item)}
             >
               <ArrowsClockwiseIcon weight="bold" />
@@ -269,7 +270,10 @@ function ContentRow({
               {platform && (
                 <>
                   {updatable && (
-                    <DropdownMenuItem onClick={() => handlers.onUpdate(item)}>
+                    <DropdownMenuItem
+                      disabled={busy}
+                      onClick={() => handlers.onUpdate(item)}
+                    >
                       <ArrowsClockwiseIcon />
                       {m['content.update_to_latest']()}
                     </DropdownMenuItem>

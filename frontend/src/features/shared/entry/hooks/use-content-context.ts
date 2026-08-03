@@ -13,6 +13,11 @@ export interface ContentContext {
   packName: string;
   /** The entry's save worlds, for a datapack that names none of its own. */
   entryWorlds: string[];
+  /**
+   * A content job is in flight on this entry. The daemon admits one content
+   * change per entry at a time, so a second one is refused rather than queued.
+   */
+  busy: boolean;
 }
 
 export const ContentCtx = createContext<ContentContext | null>(null);

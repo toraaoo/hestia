@@ -21,11 +21,12 @@ import { kindGroup } from '@/features/shared/content/components';
 import { kindInfo } from '@/features/shared/content/lib';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
-import { useJobMutation } from '@/queries/jobs';
+import { useEntryJobs, useJobMutation } from '@/queries/jobs';
 import { modpackQueries } from '@/queries/modpack';
 import { serverMutations, serverQueries } from '@/queries/server';
 import { type ContentContext, ContentCtx, useContent } from '../hooks';
 import {
+  contentBusy,
   filterContent,
   filterUntracked,
   installedRef,
@@ -103,11 +104,17 @@ export function ContentSection({
       }),
   };
 
+  // Read off the job store rather than these mutations: a content job started
+  // from another surface (a browse install, a profile apply) holds the same
+  // per-entry lock, and it outlives the component that fired it.
+  const jobs = useEntryJobs(entry.kind, id);
+
   const context: ContentContext = {
     entry,
     handlers,
     packName: pack.data?.name ?? '',
     entryWorlds: (worlds.data ?? []).map((world) => world.folder),
+    busy: contentBusy(jobs),
   };
 
   return (
