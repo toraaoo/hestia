@@ -335,8 +335,7 @@ The only named hooks. Everything else is a factory passed to `useQuery`/`useMuta
 | `.create()`                                          | `instance.create`                     | `Partial<InstanceCreateParams>`                |
 | `.update(id)`                                        | `instance.update`                     | `{ version, loaderVersion?, allowDowngrade? }` |
 | `.rename(id)` / `.remove(id)`                        | `instance.rename\|remove`             | `name: string` / —                             |
-| `.launchAny()` *(job)*                               | `instance.launch`                     | `{ id, newSession? }`                          |
-| `.launchQuick()` *(job)*                             | `instance.launch`                     | `{ id, quickPlay, newSession? }`               |
+| `.launchAny()` *(job)*                               | `instance.launch`                     | `{ id, newSession?, quickPlay? }`              |
 | `.stop(id)` / `.stopAny()`                           | `instance.stop`                       | `{ session? }` / `{ id, session? }`            |
 | `.setConfig(id)`                                     | `instance.config.set`                 | `{ key, value }`                               |
 | `.profiles.create(id)`                               | `instance.profile.create`             | `{ name, seedFromPool? }`                      |

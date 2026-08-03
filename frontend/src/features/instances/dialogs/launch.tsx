@@ -7,7 +7,7 @@ import {
   useState,
 } from 'react';
 
-import type { InstanceInfo } from '@/api';
+import type { InstanceInfo, QuickPlay } from '@/api';
 import {
   Dialog,
   DialogContent,
@@ -19,15 +19,21 @@ import { ProvisionProgressView } from '@/features/shared/entry/components';
 import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations } from '@/queries/instance';
-import { backgroundJob, foregroundJob, useJobMutation } from '@/queries/jobs';
+import { useJobDisplay, useJobMutation } from '@/queries/jobs';
 
-interface LaunchDialog {
+interface LaunchOptions {
   /**
    * `newSession` launches alongside whatever is already running; without it a
    * running instance is refused by the daemon.
    */
-  launch: (instance: InstanceInfo, options?: { newSession?: boolean }) => void;
-  isLaunching: (id: string) => boolean;
+  newSession?: boolean;
+  quickPlay?: QuickPlay;
+}
+
+interface LaunchDialog {
+  launch: (instance: InstanceInfo, options?: LaunchOptions) => void;
+  /** A Quick Play matches only its own `target`, so one row spins, not all. */
+  isLaunching: (id: string, target?: string) => boolean;
 }
 
 const Ctx = createContext<LaunchDialog | null>(null);
@@ -41,10 +47,11 @@ export function useLaunchDialog(): LaunchDialog {
 }
 
 /**
- * Owns the single launch mutation and the first-launch progress modal. An
- * instance that has never been played (`lastPlayedUnix` unset) shows the modal
- * while it materialises; a re-launch runs silently as a backgrounded job. The
- * modal can be dismissed to push the job to the status bar and keep working.
+ * Owns the single launch mutation and the first-launch progress modal. Every
+ * way of starting an instance goes through it, Quick Play included. An instance
+ * that has never been played (`lastPlayedUnix` unset) shows the modal while it
+ * materialises; a re-launch runs silently as a backgrounded job. The modal can
+ * be dismissed to push the job to the status bar and keep working.
  */
 export function LaunchDialogProvider({
   children,
@@ -61,12 +68,16 @@ export function LaunchDialogProvider({
   // changes, not when a byte count does.
   const { mutate, isPending, variables } = mutation;
   const launch = useCallback(
-    (instance: InstanceInfo, options?: { newSession?: boolean }) => {
+    (instance: InstanceInfo, options?: LaunchOptions) => {
       // The session is running either way; the warnings say what it runs
       // against (an unshared saves folder, say), so they follow a backgrounded
       // launch too.
       mutate(
-        { id: instance.id, newSession: options?.newSession },
+        {
+          id: instance.id,
+          newSession: options?.newSession,
+          quickPlay: options?.quickPlay,
+        },
         { onSuccess: (done) => toastWarnings(done.warnings) },
       );
       if (instance.lastPlayedUnix == null) {
@@ -76,17 +87,15 @@ export function LaunchDialogProvider({
     [mutate],
   );
   const isLaunching = useCallback(
-    (id: string) => isPending && variables?.id === id,
+    (id: string, join?: string) =>
+      isPending && variables?.id === id && variables.quickPlay?.target === join,
     [isPending, variables],
   );
   const value = useMemo(() => ({ launch, isLaunching }), [launch, isLaunching]);
 
   const job = mutation.job;
   const open = target != null;
-
-  useEffect(() => {
-    if (open && job?.status === 'running') foregroundJob(job.id);
-  }, [open, job?.id, job?.status]);
+  useJobDisplay(job, open);
 
   useEffect(() => {
     if (
@@ -99,18 +108,13 @@ export function LaunchDialogProvider({
     }
   }, [target, job]);
 
-  const close = () => {
-    if (job?.status === 'running') backgroundJob(job.id);
-    setTarget(null);
-  };
-
   return (
     <Ctx.Provider value={value}>
       {children}
       <Dialog
         open={open}
         onOpenChange={(next) => {
-          if (!next) close();
+          if (!next) setTarget(null);
         }}
       >
         <DialogContent className="sm:max-w-lg">

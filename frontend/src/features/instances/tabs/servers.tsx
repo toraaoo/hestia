@@ -18,13 +18,15 @@ import { Bone } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ServerRow } from '@/features/instances/components';
-import { ServerEntryDialog } from '@/features/instances/dialogs';
+import {
+  ServerEntryDialog,
+  useLaunchDialog,
+} from '@/features/instances/dialogs';
 import { supportsQuickPlay } from '@/lib/quick-play';
 import { runningSessions } from '@/lib/sessions';
 import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
-import { useJobMutation } from '@/queries/jobs';
 import { keys } from '@/queries/keys';
 
 /** The identity a row is dragged and referenced by; the daemon takes either half. */
@@ -42,7 +44,7 @@ const keyOf = (server: ServerEntry) => `${server.name}:${server.address}`;
 export function InstanceServersTab({ instance }: { instance: InstanceInfo }) {
   const client = useQueryClient();
   const servers = useQuery(instanceQueries.servers(instance.id));
-  const launch = useJobMutation(instanceMutations.launchQuick());
+  const { launch, isLaunching } = useLaunchDialog();
   const remove = useMutation(instanceMutations.serverRemove(instance.id));
   const move = useMutation(instanceMutations.serverMove(instance.id));
   const [editing, setEditing] = useState<ServerEntry | null | undefined>(
@@ -130,21 +132,14 @@ export function InstanceServersTab({ instance }: { instance: InstanceInfo }) {
               key={keyOf(server)}
               server={server}
               joinable={joinable}
-              playing={
-                launch.isPending &&
-                launch.variables?.quickPlay.target === server.address
-              }
+              playing={isLaunching(instance.id, server.address)}
               first={index === 0}
               last={index === order.rows.length - 1}
               onPlay={() =>
-                launch.mutate(
-                  {
-                    id: instance.id,
-                    quickPlay: { kind: 'server', target: server.address },
-                    newSession: running,
-                  },
-                  { onSuccess: (done) => toastWarnings(done.warnings) },
-                )
+                launch(instance, {
+                  quickPlay: { kind: 'server', target: server.address },
+                  newSession: running,
+                })
               }
               onEdit={() => setEditing(server)}
               onRemove={() => setRemoving(server)}

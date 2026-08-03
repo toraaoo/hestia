@@ -32,6 +32,7 @@ import { type LogsOptions, type LogsResult, useFollowedLogs } from './logs';
 export interface LaunchVars {
   id: string;
   newSession?: boolean;
+  quickPlay?: QuickPlay;
 }
 
 /** A stop aimed at one session of an instance, or at all of them. */
@@ -214,7 +215,8 @@ export const instanceMutations = {
   /**
    * Id-by-variable variants for list rows, which can't call a per-id hook. A
    * launch materialises files, so it streams provisioning progress through the
-   * job store like the per-id `launch` above.
+   * job store like the per-id `launch` above. Quick Play is this same job
+   * carrying what to join, not a second one.
    *
    * `newSession` is the daemon's concurrency opt-in — without it a launch of a
    * running instance is refused.
@@ -227,8 +229,8 @@ export const instanceMutations = {
         label: 'launch',
         entry: { kind: 'instance', id },
       }),
-      run: ({ id, newSession }, job) =>
-        api.launch({ instance: id, newSession }, job),
+      run: ({ id, newSession, quickPlay }, job) =>
+        api.launch({ instance: id, newSession, quickPlay }, job),
       invalidates: ({ id }) => [
         keys.instances.list(),
         keys.instances.detail(id),
@@ -236,29 +238,6 @@ export const instanceMutations = {
         keys.accounts.all,
       ],
     }),
-  /**
-   * Launch straight into a world or a server (Quick Play) — the same job as
-   * `launchAny`, carrying what the session should join on start.
-   */
-  launchQuick: () =>
-    jobMutation<InstanceLaunchDoneEvent, LaunchVars & { quickPlay: QuickPlay }>(
-      {
-        mutationKey: [...keys.instances.all, 'launch', 'quick'],
-        meta: ({ id }) => ({
-          kind: 'instance.launch',
-          label: 'launch',
-          entry: { kind: 'instance', id },
-        }),
-        run: ({ id, quickPlay, newSession }, job) =>
-          api.launch({ instance: id, quickPlay, newSession }, job),
-        invalidates: ({ id }) => [
-          keys.instances.list(),
-          keys.instances.detail(id),
-          keys.processes.list(),
-          keys.accounts.all,
-        ],
-      },
-    ),
   /** `session` stops just that one; absent stops every session. */
   stopAny: () =>
     mutation<void, StopVars>({

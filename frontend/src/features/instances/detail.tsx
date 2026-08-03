@@ -53,14 +53,12 @@ import {
 import { agoLabel, bytes, memGb, uptime } from '@/lib/format';
 import { supportsQuickPlay } from '@/lib/quick-play';
 import { runningSessions } from '@/lib/sessions';
-import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import {
   instanceMutations,
   instanceQueries,
   useInstance,
 } from '@/queries/instance';
-import { useJobMutation } from '@/queries/jobs';
 import { useProcessMetrics } from '@/queries/metrics';
 
 export type InstanceTab =
@@ -95,8 +93,6 @@ export function InstanceDetailPage({
   const [focus, setFocus] = useState<string | null>(null);
   const [logSession, setLogSession] = useState<string | null>(null);
   const { launch, isLaunching } = useLaunchDialog();
-  // Joining a world or a server is the same launch job, carrying what to join.
-  const launchQuick = useJobMutation(instanceMutations.launchQuick());
   const stop = useMutation(instanceMutations.stop(id));
   const instance = query.data;
   const accepts = instance?.accepts ?? [];
@@ -417,24 +413,17 @@ export function InstanceDetailPage({
                 <WorldRow
                   key={world.folder}
                   world={world}
-                  playing={
-                    launchQuick.isPending &&
-                    launchQuick.variables?.quickPlay.target === world.folder
-                  }
+                  playing={isLaunching(id, world.folder)}
                   disabledReason={
                     joinable
                       ? undefined
                       : m['instance.quick_play.unsupported']()
                   }
                   onPlay={() =>
-                    launchQuick.mutate(
-                      {
-                        id,
-                        quickPlay: { kind: 'world', target: world.folder },
-                        newSession: running,
-                      },
-                      { onSuccess: (done) => toastWarnings(done.warnings) },
-                    )
+                    launch(instance, {
+                      quickPlay: { kind: 'world', target: world.folder },
+                      newSession: running,
+                    })
                   }
                 />
               ))}
