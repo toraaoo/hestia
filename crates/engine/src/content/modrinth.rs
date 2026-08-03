@@ -20,6 +20,8 @@ use super::pack;
 use super::provider::{ContentProvider, FileRef, UrlRef};
 
 const API: &str = "https://api.modrinth.com/v2";
+/// Only for an organization's name: v2 has no organization route.
+const API_V3: &str = "https://api.modrinth.com/v3";
 const SITE: &str = "modrinth.com";
 /// Where Modrinth serves project files from. The path carries both ids, so a
 /// pack index's bare download URL is enough to make its file a tracked item.
@@ -164,7 +166,9 @@ impl ContentProvider for Modrinth {
 
     async fn project(&self, project: &str, kind: Option<ContentKind>) -> Result<ContentProject> {
         let body = get_json(&format!("{API}/project/{project}"), &[]).await?;
-        Ok(parse_project(self.id(), &body, kind))
+        let mut detail = parse_project(self.id(), &body, kind);
+        detail.author = author(&body, project).await;
+        Ok(detail)
     }
 
     /// One `GET /projects?ids=[…]` for the lot. A pack index resolves to a
@@ -270,6 +274,45 @@ impl ContentProvider for Modrinth {
     }
 }
 
+/// Who a project detail is "by": the organization that owns it, else the team
+/// member holding the `Owner` role. It is presentation only, so a lookup that
+/// fails leaves the byline empty rather than failing the project.
+async fn author(body: &Value, project: &str) -> String {
+    let organization = str_field(body, "organization");
+    if !organization.is_empty() {
+        match get_json(&format!("{API_V3}/organization/{organization}"), &[]).await {
+            Ok(org) => {
+                let name = str_field(&org, "name");
+                if !name.is_empty() {
+                    return name;
+                }
+            }
+            Err(e) => {
+                tracing::debug!(organization, error = %format!("{e:#}"), "no modrinth organization")
+            }
+        }
+    }
+    match get_json(&format!("{API}/project/{project}/members"), &[]).await {
+        Ok(members) => owner(&members),
+        Err(e) => {
+            tracing::debug!(project, error = %format!("{e:#}"), "no modrinth team members");
+            String::new()
+        }
+    }
+}
+
+/// The member holding `Owner`, falling back to the first listed — a team owned
+/// by an organization has no owning member at all.
+fn owner(members: &Value) -> String {
+    let members = members.as_array().map(Vec::as_slice).unwrap_or_default();
+    members
+        .iter()
+        .find(|m| str_field(m, "role") == "Owner")
+        .or_else(|| members.first())
+        .map(|m| str_field(m.get("user").unwrap_or(&Value::Null), "username"))
+        .unwrap_or_default()
+}
+
 fn parse_hit(source: &str, hit: &Value, requested: ContentKind) -> ContentProject {
     ContentProject {
         source: source.to_string(),
@@ -318,10 +361,12 @@ fn parse_project(source: &str, body: &Value, requested: Option<ContentKind>) -> 
         title: str_field(body, "title"),
         description: str_field(body, "description"),
         body: str_field(body, "body"),
+        // A project payload names no author — only the search index does.
         author: String::new(),
         categories: categories(body),
         downloads: u64_field(body, "downloads"),
-        follows: u64_field(body, "follows"),
+        // The search index calls this `follows`; a project payload does not.
+        follows: u64_field(body, "followers"),
         icon_url: str_field(body, "icon_url"),
         gallery: body
             .get("gallery")
@@ -751,6 +796,37 @@ mod tests {
             parse_project("modrinth", &body, None).kind,
             ContentKind::Mod
         );
+    }
+
+    #[test]
+    fn project_detail_counts_followers() {
+        let body = json!({
+            "id": "AANobbMI",
+            "project_type": "mod",
+            "downloads": 71_000_000,
+            "followers": 39_396,
+        });
+        let parsed = parse_project("modrinth", &body, None);
+        assert_eq!(parsed.downloads, 71_000_000);
+        assert_eq!(parsed.follows, 39_396);
+    }
+
+    #[test]
+    fn the_byline_is_the_owning_member() {
+        let members = json!([
+            { "role": "Lead Developer", "user": { "username": "IMS" } },
+            { "role": "Owner", "user": { "username": "coderbot" } },
+        ]);
+        assert_eq!(owner(&members), "coderbot");
+
+        let organization_owned = json!([
+            { "role": "Maintainer", "user": { "username": "IMS" } },
+            { "role": "Project Lead", "user": { "username": "jellysquid3" } },
+        ]);
+        assert_eq!(owner(&organization_owned), "IMS");
+
+        assert_eq!(owner(&json!([])), "");
+        assert_eq!(owner(&Value::Null), "");
     }
 
     #[test]

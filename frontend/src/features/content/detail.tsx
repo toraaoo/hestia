@@ -77,9 +77,11 @@ export function ProjectDetailPage({
           <>
             <Badge variant="secondary">{contentKindLabel[p.kind]()}</Badge>
             <SourceBadge source={p.source} />
-            <span className="text-xs text-muted-foreground">
-              {m['content.browse.by_author']({ name: p.author })}
-            </span>
+            {p.author && (
+              <span className="text-xs text-muted-foreground">
+                {m['content.browse.by_author']({ name: p.author })}
+              </span>
+            )}
           </>
         }
         actions={
