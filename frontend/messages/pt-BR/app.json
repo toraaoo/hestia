@@ -30,8 +30,7 @@
       "select": "Selecionar",
       "start": "Iniciar",
       "stop": "Parar",
-      "uninstall": "Desinstalar",
-      "update": "Atualizar"
+      "uninstall": "Desinstalar"
     },
     "collection": {
       "filter": "Filtrar",

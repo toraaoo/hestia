@@ -236,14 +236,14 @@ function ContentRow({
 
           {updatable && item.enabled && (
             <Button
-              size="sm"
+              size="icon-sm"
               variant="outline"
-              data-icon="inline-start"
+              aria-label={m['content.update_to_latest']()}
+              title={m['content.update_to_latest']()}
               disabled={busy}
               onClick={() => handlers.onUpdate(item)}
             >
               <ArrowsClockwiseIcon weight="bold" />
-              {m['app.action.update']()}
             </Button>
           )}
           {worlds.length > 0 && (
