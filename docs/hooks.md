@@ -181,6 +181,15 @@ A component that fires a job but renders no inline progress can use plain
 `useMutation(serverMutations.backup.create(id))` — the run is tracked globally either way; `useJobMutation` only adds
 the local `progress` view.
 
+**A job is on screen once.** The status bar carries the *backgrounded* jobs, so a dialog that renders progress claims
+its job with `useJobDisplay(job, shown)` for as long as it shows it. Dismissing the dialog (or unmounting it) releases
+the claim, which is what hands the job to the status bar:
+
+```tsx
+const create = useJobMutation(serverMutations.create());
+useJobDisplay(create.job, open && create.isPending);
+```
+
 ## Live data
 
 **Connection state** — the shell's watcher, as a hook. On reconnect the layer invalidates every query itself; the banner
@@ -268,6 +277,7 @@ The only named hooks. Everything else is a factory passed to `useQuery`/`useMuta
 | `useDaemonEvent(topic, handler)`                        | one daemon topic, for the component's lifetime                |
 | `useJobs()` / `useJob(id)` / `useEntryJobs(kind, id)`   | the global job store                                          |
 | `useJobMutation(factory)`                               | a job mutation plus its local `progress`/`job`                |
+| `useJobDisplay(job, shown)`                             | claim a job's display while a dialog renders its progress     |
 | `dismissJob(id)` / `clearSettledJobs()` / `getJobs()`   | store maintenance (not hooks)                                 |
 | `useServers()` / `useServer(id)`                        | the list, and one server seeded from it                       |
 | `useInstances()` / `useInstance(id)`                    | the list, and one instance selected out of it                 |

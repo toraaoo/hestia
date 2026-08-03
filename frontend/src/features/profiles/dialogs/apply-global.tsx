@@ -17,7 +17,7 @@ import { PickRow } from '@/features/shared/content/components';
 import { ProvisionProgressView } from '@/features/shared/entry/components';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations } from '@/queries/instance';
-import { useJobMutation } from '@/queries/jobs';
+import { useJobDisplay, useJobMutation } from '@/queries/jobs';
 import { profileQueries } from '@/queries/profile';
 
 export function ApplyGlobalDialog({
@@ -33,6 +33,7 @@ export function ApplyGlobalDialog({
 }) {
   const globals = useQuery(profileQueries.list());
   const apply = useJobMutation(instanceMutations.profiles.apply(instanceId));
+  useJobDisplay(apply.job, open);
   const [picked, setPicked] = useState<string | null>(null);
 
   const list = globals.data ?? [];

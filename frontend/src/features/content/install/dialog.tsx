@@ -25,7 +25,7 @@ import {
 import { projectKey, projectRef } from '@/features/content/components';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations } from '@/queries/instance';
-import { useJobMutation } from '@/queries/jobs';
+import { useJobDisplay, useJobMutation } from '@/queries/jobs';
 import { profileMutations } from '@/queries/profile';
 import { serverMutations } from '@/queries/server';
 import { TargetCtx, useInstallWizard } from './hooks';
@@ -81,6 +81,8 @@ export function ContentInstallDialog({
   const addServer = useJobMutation(serverMutations.content.add(targetId));
   const addInstance = useJobMutation(instanceMutations.content.add(targetId));
   const editProfile = useMutation(profileMutations.edit());
+  useJobDisplay(addServer.job, open);
+  useJobDisplay(addInstance.job, open);
 
   const target = targets.find((t) => t.id === targetId) ?? entry ?? null;
   const selectedCount = picked.length + files.length;

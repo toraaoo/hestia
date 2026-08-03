@@ -25,6 +25,7 @@ import { ProvisionProgressView } from '@/features/shared/entry/components';
 import { m } from '@/paraglide/messages.js';
 import { useInstallModpack } from '@/queries';
 import { useInstances } from '@/queries/instance';
+import { useJobDisplay } from '@/queries/jobs';
 import { useServers } from '@/queries/server';
 
 /**
@@ -54,6 +55,7 @@ export function ModpackInstallDialog({
   const servers = useServers();
   const instances = useInstances();
   const install = useInstallModpack(mode === 'server' ? 'server' : 'instance');
+  useJobDisplay(install.job, open);
 
   useEffect(() => {
     if (!open) return;

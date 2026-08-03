@@ -35,7 +35,7 @@ import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import { configQueries, launcherDefaults } from '@/queries/config';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
-import { backgroundJob, foregroundJob, useJobMutation } from '@/queries/jobs';
+import { useJobDisplay, useJobMutation } from '@/queries/jobs';
 import { serverMutations, serverQueries } from '@/queries/server';
 
 import {
@@ -97,14 +97,7 @@ export function CreateEntryDialog({
   const progress = createServer.progress;
   const job = createServer.job;
 
-  useEffect(() => {
-    if (creating && job?.status === 'running') foregroundJob(job.id);
-  }, [creating, job?.id, job?.status]);
-
-  const close = () => {
-    if (job?.status === 'running') backgroundJob(job.id);
-    onOpenChange(false);
-  };
+  useJobDisplay(job, open && creating);
 
   const form = useAppForm({
     defaultValues: createWizardDefaults('', defaultMemoryGb),
@@ -195,10 +188,7 @@ export function CreateEntryDialog({
   );
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => (o ? onOpenChange(true) : close())}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

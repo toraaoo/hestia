@@ -38,6 +38,7 @@ export {
   startJob,
   useEntryJobs,
   useJob,
+  useJobDisplay,
   useJobMutation,
   useJobs,
 } from './jobs';

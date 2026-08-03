@@ -13,7 +13,7 @@ import {
   type UseMutationResult,
   useMutation,
 } from '@tanstack/react-query';
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { logger } from '@/lib/log';
 import type { JobRun, ProvisionProgress } from '../api';
 import { HestiaError, job as jobApi, jobId, TRANSPORT } from '../api';
@@ -175,6 +175,20 @@ export function foregroundJob(id: string): void {
 export function backgroundJob(id: string): void {
   if (jobs.get(id)?.background === true) return;
   patch(id, { background: true });
+}
+
+/**
+ * Claim a job's display while a surface shows its progress, so it is never on
+ * screen twice. The release on cleanup is what hands a dismissed dialog's job
+ * back to the status bar.
+ */
+export function useJobDisplay(job: Job | null, shown: boolean): void {
+  const id = shown && job?.status === 'running' ? job.id : null;
+  useEffect(() => {
+    if (!id) return;
+    foregroundJob(id);
+    return () => backgroundJob(id);
+  }, [id]);
 }
 
 /** Ask the daemon to stop a running job; it settles on its cancelled event. */
