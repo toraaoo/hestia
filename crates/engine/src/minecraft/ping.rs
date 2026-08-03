@@ -25,6 +25,10 @@ const IO_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_PAYLOAD: usize = 256 * 1024;
 const STATUS_INTENT: i32 = 1;
 const ANY_PROTOCOL: i32 = -1;
+const FAVICON_PREFIX: &str = "data:image/png;base64,";
+/// The protocol's icon is a 64×64 PNG — around 8 KB base64. The cap is what
+/// stops a hostile status reply from inlining a megabyte into every row.
+const MAX_FAVICON: usize = 64 * 1024;
 pub const DEFAULT_PORT: u16 = 25565;
 
 /// Ping a managed server on loopback.
@@ -117,7 +121,33 @@ fn parse_status(json: &str) -> Result<ServerPingResult> {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string(),
+        favicon: parse_favicon(&status),
     })
+}
+
+/// The status reply's icon, reduced to the bare base64 an entry's cached icon
+/// already carries. This is unvalidated input from a host the player typed,
+/// and a front-end inlines it into an `img`, so only a PNG data URI whose
+/// payload is base64 of a plausible size travels any further.
+fn parse_favicon(status: &Value) -> String {
+    let Some(encoded) = status
+        .get("favicon")
+        .and_then(Value::as_str)
+        .and_then(|icon| icon.trim().strip_prefix(FAVICON_PREFIX))
+    else {
+        return String::new();
+    };
+    // Servers older than 1.13 wrapped the payload in newlines.
+    let encoded: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
+    let usable = (1..=MAX_FAVICON).contains(&encoded.len())
+        && encoded
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='));
+    if !usable {
+        tracing::debug!(bytes = encoded.len(), "ignoring an unusable server favicon");
+        return String::new();
+    }
+    encoded
 }
 
 fn flatten_text(component: &Value) -> String {
@@ -299,5 +329,31 @@ mod tests {
 
         let component = r#"{"description":{"text":"§aA cozy ","extra":[{"text":"server"}]}}"#;
         assert_eq!(parse_status(component).unwrap().motd, "A cozy server");
+    }
+
+    #[test]
+    fn a_favicon_arrives_as_bare_base64() {
+        let png = r#"{"favicon":"data:image/png;base64,iVBORw0K\nGgo="}"#;
+        assert_eq!(parse_status(png).unwrap().favicon, "iVBORw0KGgo=");
+    }
+
+    #[test]
+    fn a_favicon_that_is_not_an_inlinable_png_is_dropped() {
+        let oversized = format!(
+            r#"{{"favicon":"{FAVICON_PREFIX}{}"}}"#,
+            "A".repeat(MAX_FAVICON + 1)
+        );
+        for status in [
+            r#"{"favicon":""}"#,
+            r#"{"favicon":"https://example.net/icon.png"}"#,
+            r#"{"favicon":"data:image/svg+xml;base64,PHN2Zz4="}"#,
+            &format!(r#"{{"favicon":"{FAVICON_PREFIX}<script>"}}"#),
+            &oversized,
+        ] {
+            assert!(
+                parse_status(status).unwrap().favicon.is_empty(),
+                "{status} should not carry an icon"
+            );
+        }
     }
 }

@@ -288,6 +288,12 @@ pub struct ServerPingResult {
     pub players_max: u32,
     pub motd: String,
     pub version: String,
+    /// The server's icon as the ping answered it: base64-encoded PNG with the
+    /// `data:` prefix stripped, so it reads the same as a cached
+    /// [`crate::instance::ServerEntry::icon`]. Empty when the server sends
+    /// none, or sends one this build will not inline.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub favicon: String,
 }
 
 pub struct ServerPing;
