@@ -110,6 +110,26 @@ pub fn find(servers: &[ServerEntry], reference: &str) -> Option<usize> {
         })
 }
 
+/// Move the entry at `index` to `position`, counted over the visible entries
+/// only — the rows a person was shown. The game's hidden scratch rows are not
+/// part of the list anyone arranges, so they keep the slots they are in.
+/// `false` when the position is past the end, which leaves the list untouched.
+pub fn reposition(servers: &mut Vec<ServerEntry>, index: usize, position: usize) -> bool {
+    let entry = servers.remove(index);
+    let slots: Vec<usize> = servers
+        .iter()
+        .enumerate()
+        .filter(|(_, entry)| !entry.hidden)
+        .map(|(index, _)| index)
+        .collect();
+    if position > slots.len() {
+        servers.insert(index, entry);
+        return false;
+    }
+    servers.insert(slots.get(position).copied().unwrap_or(servers.len()), entry);
+    true
+}
+
 fn into_proto(entry: Entry) -> ServerEntry {
     ServerEntry {
         name: entry.name,
@@ -170,6 +190,41 @@ mod tests {
         std::fs::write(path(dir.path()), b"not nbt at all").unwrap();
         assert!(read(dir.path()).is_empty());
         assert!(read_strict(dir.path()).is_err());
+    }
+
+    #[test]
+    fn an_entry_moves_to_a_visible_position() {
+        let mut servers = vec![
+            entry("A", "a.net"),
+            entry("B", "b.net"),
+            entry("C", "c.net"),
+        ];
+        assert!(reposition(&mut servers, 2, 0));
+        assert_eq!(names(&servers), ["C", "A", "B"]);
+        assert!(reposition(&mut servers, 0, 2));
+        assert_eq!(names(&servers), ["A", "B", "C"]);
+    }
+
+    #[test]
+    fn a_hidden_row_is_not_counted_as_a_position() {
+        let hidden = ServerEntry {
+            hidden: true,
+            ..entry("scratch", "direct.example.net")
+        };
+        let mut servers = vec![entry("A", "a.net"), hidden, entry("B", "b.net")];
+        assert!(reposition(&mut servers, 2, 0));
+        assert_eq!(names(&servers), ["B", "A", "scratch"]);
+    }
+
+    #[test]
+    fn a_position_past_the_end_leaves_the_list_alone() {
+        let mut servers = vec![entry("A", "a.net"), entry("B", "b.net")];
+        assert!(!reposition(&mut servers, 0, 2));
+        assert_eq!(names(&servers), ["A", "B"]);
+    }
+
+    fn names(servers: &[ServerEntry]) -> Vec<&str> {
+        servers.iter().map(|s| s.name.as_str()).collect()
     }
 
     #[test]

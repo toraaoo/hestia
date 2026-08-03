@@ -10,10 +10,10 @@ use proto::instance::{
     InstanceListResult, InstanceLoaders, InstanceLogs, InstanceProfileCapture,
     InstanceProfileCreate, InstanceProfileEdit, InstanceProfileList, InstanceProfileListResult,
     InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename, InstanceProfileUse,
-    InstanceRemove, InstanceRename, InstanceResolve, InstanceServerEdit, InstanceServerRemove,
-    InstanceServers, InstanceServersResult, InstanceServersWriteResult, InstanceStop,
-    InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds, InstanceWorldsResult,
-    ServerEntry,
+    InstanceRemove, InstanceRename, InstanceResolve, InstanceServerEdit, InstanceServerMove,
+    InstanceServerRemove, InstanceServers, InstanceServersResult, InstanceServersWriteResult,
+    InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds,
+    InstanceWorldsResult, ServerEntry,
 };
 use proto::minecraft::{ConfigEntry, FlavorsResult, LoadersResult, VersionsResult};
 use proto::process::ProcessLogsResult;
@@ -180,6 +180,15 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .runtime
             .engine()
             .remove_instance_server(&p.instance, &p.server)
+            .map_err(crate::runtime::engine_error)?;
+        Ok(server_list_result(written))
+    });
+
+    on.handle::<InstanceServerMove, _, _>(|p, ctx| async move {
+        let written = ctx
+            .runtime
+            .engine()
+            .move_instance_server(&p.instance, &p.server, p.position)
             .map_err(crate::runtime::engine_error)?;
         Ok(server_list_result(written))
     });

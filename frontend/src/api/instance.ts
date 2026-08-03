@@ -141,6 +141,18 @@ export function serverRemove(
   return call('instance.server.remove', { instance, server });
 }
 
+/**
+ * Move an entry within the multiplayer list. `position` counts over the
+ * visible entries — the rows that were listed — from zero.
+ */
+export function serverMove(
+  instance: string,
+  server: string,
+  position: number,
+): Promise<InstanceServersWriteResult> {
+  return call('instance.server.move', { instance, server, position });
+}
+
 /** Status of a multiplayer address, over the Server List Ping. */
 export function pingAddress(address: string): Promise<ServerPingResult> {
   return call('minecraft.ping', { address });

@@ -26,6 +26,7 @@ export type { InstanceProfileRenameParams } from "./generated/InstanceProfileRen
 export type { InstanceRef } from "./generated/InstanceRef";
 export type { InstanceRenameParams } from "./generated/InstanceRenameParams";
 export type { InstanceServerEditParams } from "./generated/InstanceServerEditParams";
+export type { InstanceServerMoveParams } from "./generated/InstanceServerMoveParams";
 export type { InstanceServerRef } from "./generated/InstanceServerRef";
 export type { InstanceServersResult } from "./generated/InstanceServersResult";
 export type { InstanceServersWriteResult } from "./generated/InstanceServersWriteResult";

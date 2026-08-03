@@ -96,6 +96,7 @@ pub enum Field {
     BackupInterval,
     BackupRetention,
     JavaVersion,
+    Position,
 }
 
 impl fmt::Display for Field {
@@ -117,6 +118,7 @@ impl fmt::Display for Field {
             Field::JvmArgs => "jvm arguments",
             Field::Port => "a port",
             Field::Players => "players",
+            Field::Position => "a list position",
             Field::BackupInterval => "backup-interval",
             Field::BackupRetention => "backup-retention",
             Field::JavaVersion => "a java version",
@@ -142,6 +144,7 @@ pub enum Reason {
     JavaMajor,
     AbsolutePath,
     ServerAddress,
+    ListPosition,
 }
 
 impl fmt::Display for Reason {
@@ -163,6 +166,7 @@ impl fmt::Display for Reason {
                  your working directory"
             }
             Reason::ServerAddress => "a server address looks like host or host:port",
+            Reason::ListPosition => "that position is past the end of the list",
         })
     }
 }

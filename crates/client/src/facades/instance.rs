@@ -20,9 +20,10 @@ use proto::instance::{
     InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename,
     InstanceProfileRenameParams, InstanceProfileUse, InstanceRef, InstanceRemove, InstanceRename,
     InstanceRenameParams, InstanceResolve, InstanceServerEdit, InstanceServerEditParams,
-    InstanceServerRef, InstanceServerRemove, InstanceServers, InstanceServersWriteResult,
-    InstanceStop, InstanceStopParams, InstanceUpdate, InstanceUpdateParams, InstanceVersions,
-    InstanceWorlds, Profile, QuickPlay, ServerEntry, WorldInfo,
+    InstanceServerMove, InstanceServerMoveParams, InstanceServerRef, InstanceServerRemove,
+    InstanceServers, InstanceServersWriteResult, InstanceStop, InstanceStopParams, InstanceUpdate,
+    InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile, QuickPlay, ServerEntry,
+    WorldInfo,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, LoadersParams, ProvisionProgress,
@@ -194,6 +195,23 @@ impl Instance<'_> {
             .call::<InstanceServerRemove>(&InstanceServerRef {
                 instance: instance.to_string(),
                 server: target.to_string(),
+            })
+            .await
+    }
+
+    /// Move an entry to another slot of the multiplayer list; `position`
+    /// counts over the visible entries, which is what a caller has listed.
+    pub async fn server_move(
+        &self,
+        instance: &str,
+        target: &str,
+        position: u32,
+    ) -> Result<InstanceServersWriteResult, IpcError> {
+        self.session
+            .call::<InstanceServerMove>(&InstanceServerMoveParams {
+                instance: instance.to_string(),
+                server: target.to_string(),
+                position,
             })
             .await
     }

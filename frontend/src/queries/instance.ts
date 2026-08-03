@@ -203,6 +203,14 @@ export const instanceMutations = {
       mutationFn: (server) => api.serverRemove(id, server),
       invalidates: () => [keys.instances.servers(id)],
     }),
+  /** Arranges the list; `position` counts over the visible rows, from zero. */
+  serverMove: (id: string) =>
+    mutation<InstanceServersWriteResult, { server: string; position: number }>({
+      mutationKey: [...keys.instances.servers(id), 'move'],
+      mutationFn: ({ server, position }) =>
+        api.serverMove(id, server, position),
+      invalidates: () => [keys.instances.servers(id)],
+    }),
   /**
    * Id-by-variable variants for list rows, which can't call a per-id hook. A
    * launch materialises files, so it streams provisioning progress through the

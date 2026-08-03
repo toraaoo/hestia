@@ -249,11 +249,15 @@ hestia instance modded server play "Mock SMP"   # by list name — or by any add
 The list is the game's own `servers.dat`, and it can be edited from here:
 
 ```bash
-hestia instance modded servers                       # name, address, and live status
+hestia instance modded servers                       # position, name, address, live status
 hestia instance modded server add smp smp.example.net
 hestia instance modded server edit smp --address smp.example.net:25566
+hestia instance modded server move smp 1             # to the top of the in-game list
 hestia instance modded server remove smp
 ```
+
+The list's order is the order the game shows, so `move` takes the position a
+`servers` listing printed, counting from 1.
 
 One caveat, and hestia says so on the result rather than refusing: a **running game owns that file** and rewrites it
 whole when it exits, so an edit made while a session is open is lost with it. Close the game, or add the server from the

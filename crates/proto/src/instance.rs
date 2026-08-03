@@ -356,6 +356,27 @@ impl Contract for InstanceServerRemove {
     type Result = InstanceServersWriteResult;
 }
 
+/// Move an entry to another slot in the multiplayer list. The file's order is
+/// the order the game shows, so this is the player arranging their own list.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct InstanceServerMoveParams {
+    pub instance: String,
+    /// The entry to move, by name or address.
+    pub server: String,
+    /// Where it lands, counted over the *visible* entries only — the rows a
+    /// caller was shown. The game's own hidden scratch rows keep their slots.
+    pub position: u32,
+}
+
+pub struct InstanceServerMove;
+impl Contract for InstanceServerMove {
+    const CHANNEL: &'static str = "instance.server.move";
+    type Params = InstanceServerMoveParams;
+    type Result = InstanceServersWriteResult;
+}
+
 /// Status of an arbitrary multiplayer address, over the Server List Ping the
 /// in-game list uses. Separate from `server.ping`, which reaches a *managed*
 /// server on loopback and takes an entry reference rather than an address.

@@ -80,6 +80,31 @@ impl Engine {
         self.commit_server_list(&record, list)
     }
 
+    /// Move an entry to another slot. `position` counts over the visible
+    /// entries — the rows the caller was shown — because the game's hidden
+    /// scratch rows are not part of the list anyone arranges. Those rows keep
+    /// their own slots, so a move relocates one entry and nothing else.
+    pub fn move_instance_server(
+        &self,
+        reference: &str,
+        target: &str,
+        position: u32,
+    ) -> Result<ServerListWrite> {
+        let record = self.instance_record(reference)?;
+        let data_dir = self.instances.data_dir(&record);
+        let mut list = servers::read_strict(&data_dir)?;
+        let index = servers::find(&list, target).ok_or(ErrorInfo::ServerListEntryNotFound {
+            reference: target.to_string(),
+        })?;
+        if !servers::reposition(&mut list, index, position as usize) {
+            bail!(ErrorInfo::InvalidValue {
+                field: Field::Position,
+                reason: Reason::ListPosition,
+            });
+        }
+        self.commit_server_list(&record, list)
+    }
+
     /// The status of an arbitrary multiplayer address, over the same Server
     /// List Ping the in-game list uses.
     pub async fn ping_address(&self, address: &str) -> Result<ServerPingResult> {

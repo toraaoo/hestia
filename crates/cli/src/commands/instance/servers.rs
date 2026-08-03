@@ -60,6 +60,13 @@ pub enum ServerCmd {
         /// The entry to remove, by name or address
         server: String,
     },
+    /// Move a server to another position in the list
+    Move {
+        /// The entry to move, by name or address
+        server: String,
+        /// Its new position, counting from 1
+        position: u32,
+    },
 }
 
 pub(super) async fn run(client: &Client, instance: &str, cmd: ServerCmd) -> Result<()> {
@@ -121,6 +128,17 @@ pub(super) async fn run(client: &Client, instance: &str, cmd: ServerCmd) -> Resu
             ui::show(View::line(format!("'{server}' removed from {instance}")))?;
             ui::show_warnings(&written.warnings)
         }
+        ServerCmd::Move { server, position } => {
+            if position == 0 {
+                bail!("positions start at 1");
+            }
+            let written = client
+                .instance()
+                .server_move(instance, &server, position - 1)
+                .await?;
+            ui::show(View::line(format!("'{server}' moved to #{position}")))?;
+            ui::show_warnings(&written.warnings)
+        }
     }
 }
 
@@ -137,15 +155,21 @@ pub(super) async fn list(client: &Client, instance: &str) -> Result<()> {
     let rows = servers
         .iter()
         .zip(statuses)
-        .map(|(server, status)| {
+        .enumerate()
+        .map(|(index, (server, status))| {
             vec![
+                (index + 1).to_string(),
                 server.name.clone(),
                 server.address.clone(),
                 status.unwrap_or_else(|| "offline".to_string()),
             ]
         })
         .collect();
-    ui::show(View::table("Servers", ["NAME", "ADDRESS", "STATUS"], rows))
+    ui::show(View::table(
+        "Servers",
+        ["#", "NAME", "ADDRESS", "STATUS"],
+        rows,
+    ))
 }
 
 /// Ping every entry at once, bounded — an unreachable entry costs its own
