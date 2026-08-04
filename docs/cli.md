@@ -257,7 +257,9 @@ hestia instance modded server remove smp
 ```
 
 The list's order is the order the game shows, so `move` takes the position a
-`servers` listing printed, counting from 1.
+`servers` listing printed, counting from 1. It resolves to the whole
+arrangement, which is what the daemon commits — one rewrite of the game's file
+rather than one per move.
 
 One caveat, and hestia says so on the result rather than refusing: a **running game owns that file** and rewrites it
 whole when it exits, so an edit made while a session is open is lost with it. Close the game, or add the server from the
