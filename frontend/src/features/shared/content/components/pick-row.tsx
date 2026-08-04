@@ -45,7 +45,7 @@ export function PickRow({
           : 'border-border hover:border-foreground/20 hover:bg-muted/60',
       )}
     >
-      <Thumbnail src={imageUrl} icon={RowIcon} />
+      <Thumbnail src={imageUrl} icon={RowIcon} size="md" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="min-w-0 truncate text-sm font-medium">{title}</span>

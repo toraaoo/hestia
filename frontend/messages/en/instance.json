@@ -60,6 +60,10 @@
         "title": "Remove “{name}”?",
         "description": "The server is removed from this instance’s multiplayer list. Nothing on the server itself changes."
       },
+      "reorder": {
+        "hint": "Drag a server, or use the arrows, to set the order the game shows.",
+        "moved": "{name} moved to {position} of {total}"
+      },
       "summary": "The servers in this instance’s multiplayer list.",
       "textures": "Resource packs"
     }

@@ -5,17 +5,13 @@ import { cn } from '@/lib/utils';
 
 const sizes = {
   xs: { box: 'size-6', glyph: 'size-3.5' },
-  sm: { box: 'size-8', glyph: 'size-4.5' },
-  md: { box: 'size-9', glyph: 'size-5' },
-  lg: { box: 'size-12', glyph: 'size-6' },
-  xl: { box: 'size-16', glyph: 'size-7' },
+  sm: { box: 'size-7', glyph: 'size-4' },
+  md: { box: 'size-8', glyph: 'size-4.5' },
+  lg: { box: 'size-9', glyph: 'size-5' },
+  xl: { box: 'size-12', glyph: 'size-6' },
 } as const;
 
-/**
- * The square image-or-glyph tile a list row or card leads with. The image and
- * its fallback share one box, so a row keeps its layout whether or not an icon
- * exists — and whether or not it loads.
- */
+/** The square image-or-glyph tile a list row or card leads with. */
 export function Thumbnail({
   src,
   icon: Glyph,
@@ -28,8 +24,8 @@ export function Thumbnail({
   size?: keyof typeof sizes;
   className?: string;
 }) {
-  // By source, not a flag: a tile whose image changes underneath it — a live
-  // favicon replacing a cached one — must get a fresh attempt.
+  // By source, not a flag: a tile whose image changes underneath it must get
+  // a fresh attempt.
   const [broken, setBroken] = useState<string | null>(null);
   const { box, glyph } = sizes[size];
 
@@ -58,9 +54,9 @@ export function Thumbnail({
 }
 
 /**
- * The first of `sources` that carries anything, as an inline PNG. Icons the
- * daemon read locally travel as bare base64 rather than as a path, so that the
- * webview's asset protocol never has to reach into the data home.
+ * The first of `sources` that carries anything, as an inline PNG. Locally-read
+ * icons travel as bare base64 rather than as a path, so the webview's asset
+ * protocol never has to reach into the data home.
  */
 export function pngSource(...sources: (string | undefined)[]) {
   const source = sources.find((candidate) => !!candidate);

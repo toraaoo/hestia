@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
+import { Thumbnail } from '@/components/ui/thumbnail';
 import { ContentVersionDialog } from '@/features/shared/content/dialogs';
 import { kindInfo } from '@/features/shared/content/lib';
 import { cn } from '@/lib/utils';
@@ -154,30 +155,17 @@ function ContentRow({
 }) {
   const { handlers, packName, busy } = useContent();
   const [removing, setRemoving] = useState(false);
-  const [iconBroken, setIconBroken] = useState(false);
   const selecting = checked !== undefined;
   const Icon = contentIcon(item.kind);
   // A local-file import has no project page to open and no versions to move
   // between — its only action is enable/disable and removal.
   const platform = item.source !== 'file' && !!item.projectId;
-  const showImage = !!item.iconUrl && !iconBroken;
   const loadedWorlds = worlds.filter((world) =>
     worldEnabled(item, world),
   ).length;
   const body = (
     <>
-      {showImage ? (
-        <img
-          src={item.iconUrl}
-          alt=""
-          onError={() => setIconBroken(true)}
-          className="size-7 shrink-0 object-cover ring-1 ring-border"
-        />
-      ) : (
-        <span className="grid size-7 shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border">
-          <Icon className="size-4" />
-        </span>
-      )}
+      <Thumbnail src={item.iconUrl} icon={Icon} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm group-hover/item:underline group-hover/item:underline-offset-2">

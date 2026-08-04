@@ -60,6 +60,10 @@
         "title": "Remover “{name}”?",
         "description": "O servidor sai da lista multijogador desta instância. Nada muda no servidor em si."
       },
+      "reorder": {
+        "hint": "Arraste um servidor, ou use as setas, para definir a ordem que o jogo mostra.",
+        "moved": "{name} movido para {position} de {total}"
+      },
       "summary": "Os servidores na lista multijogador desta instância.",
       "textures": "Pacotes de recursos"
     }

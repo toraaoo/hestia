@@ -72,7 +72,7 @@ export function ModpackCard({
     <SideCard title={m['content.modpack.title']()}>
       <div className="space-y-3">
         <div className="flex items-start gap-2.5">
-          <Thumbnail src={installed.iconUrl} icon={PackageIcon} size="md" />
+          <Thumbnail src={installed.iconUrl} icon={PackageIcon} size="lg" />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{installed.name}</p>
             <p className="truncate text-xs text-muted-foreground">

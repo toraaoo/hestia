@@ -15,6 +15,7 @@ export function WorldIcon({
     <Thumbnail
       src={pngSource(world.icon)}
       icon={GlobeHemisphereWestIcon}
+      size="md"
       className={className}
     />
   );

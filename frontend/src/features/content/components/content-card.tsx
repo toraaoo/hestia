@@ -50,7 +50,7 @@ export function ContentCard({
       >
         <Card size="sm" className="transition-colors group-hover:bg-muted/40">
           <div className="flex gap-3 px-3">
-            <Thumbnail src={project.iconUrl} icon={Icon} size="lg" />
+            <Thumbnail src={project.iconUrl} icon={Icon} size="xl" />
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
