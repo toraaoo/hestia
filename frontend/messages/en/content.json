@@ -7,7 +7,6 @@
       "by_author": "by {name}",
       "downloads": "{count} downloads",
       "followers": "{count} followers",
-      "loading_more": "Loading more…",
       "nothing_matches": "Nothing matches your search.",
       "project_missing": "That project could not be found.",
       "source": "Source",
@@ -80,7 +79,6 @@
       "title": "Remove content?"
     },
     "remove_count": "Remove ({count})",
-    "resolving_link": "Reading the link…",
     "select_version": "Select version",
     "selected_count": "{count} selected",
     "stop_to_install": "Stop to install",

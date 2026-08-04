@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import type { ContentVersion, InstalledContent } from '@/api';
 import { SearchInput } from '@/components/search-input';
+import { CardGridSkeleton } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -87,9 +88,11 @@ export function ContentVersionDialog({
 
           <div className="max-h-64 divide-y divide-border overflow-y-auto border border-border">
             {versions.isPending ? (
-              <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                …
-              </p>
+              <CardGridSkeleton
+                grid="divide-y divide-border"
+                count={4}
+                card="h-14"
+              />
             ) : shown.length === 0 ? (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
                 {m['entry.create.no_versions_match']()}

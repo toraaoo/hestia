@@ -18,7 +18,11 @@ import {
   sourceGroup,
   useSourceOptions,
 } from '@/features/content/components';
-import { kindGroup, PickRow } from '@/features/shared/content/components';
+import {
+  kindGroup,
+  PickRow,
+  PickRowSkeleton,
+} from '@/features/shared/content/components';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
 import { instanceQueries } from '@/queries/instance';
@@ -126,9 +130,7 @@ export function ContentStep({
           onToggle={onToggle}
         />
       ) : results.isPending ? (
-        <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-          {m['content.installing']()}
-        </p>
+        <PickRowSkeleton count={5} />
       ) : hits.length === 0 ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
           {m['content.browse.nothing_matches']()}
@@ -172,11 +174,7 @@ function LinkResult({
   onToggle: (p: ContentProject, versionId?: string) => void;
 }) {
   if (query.isPending) {
-    return (
-      <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-        {m['content.resolving_link']()}
-      </p>
-    );
+    return <PickRowSkeleton count={1} />;
   }
   if (query.error || !query.data) {
     return (

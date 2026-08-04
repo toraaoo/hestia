@@ -150,11 +150,10 @@ export function BrowsePage({
             ))}
           </ResultGrid>
           {hasNextPage && (
-            <div
-              ref={sentinelRef}
-              className="mt-5 flex justify-center py-4 text-xs text-muted-foreground"
-            >
-              {isFetchingNextPage ? m['content.browse.loading_more']() : null}
+            <div ref={sentinelRef} className="mt-3">
+              {isFetchingNextPage && (
+                <CardGridSkeleton grid={GRID} count={2} card="h-28" />
+              )}
             </div>
           )}
         </>

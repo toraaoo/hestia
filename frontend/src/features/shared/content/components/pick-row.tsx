@@ -1,6 +1,7 @@
 import type { Icon } from '@phosphor-icons/react';
 import { CheckIcon } from '@phosphor-icons/react';
 
+import { CardGridSkeleton } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Thumbnail } from '@/components/ui/thumbnail';
 import { cn } from '@/lib/utils';
@@ -61,5 +62,15 @@ export function PickRow({
       </div>
       {selected && <CheckIcon weight="bold" className="size-4 text-ember" />}
     </button>
+  );
+}
+
+export function PickRowSkeleton({ count }: { count: number }) {
+  return (
+    <CardGridSkeleton
+      grid="grid gap-2 p-0.5"
+      count={count}
+      card="h-[4.25rem]"
+    />
   );
 }

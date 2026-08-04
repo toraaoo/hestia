@@ -13,6 +13,7 @@ import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Markdown } from '@/components/markdown';
+import { CardGridSkeleton } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -148,7 +149,11 @@ export function ProjectDetailPage({
 
         <TabsContent value="versions" className="flex flex-col p-5">
           {versions.isPending ? (
-            <p className="text-xs text-muted-foreground">…</p>
+            <CardGridSkeleton
+              grid="divide-y divide-border border border-border"
+              count={6}
+              card="h-14"
+            />
           ) : (versions.data ?? []).length === 0 ? (
             <Empty className="flex-1" icon={ClockCounterClockwiseIcon}>
               {m['content.no_versions']()}
