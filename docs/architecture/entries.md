@@ -327,7 +327,7 @@ the launch a success ([0062](../decisions/0062-joining-directly-is-a-launch-para
 
 `instance.servers` reads the instance's own `servers.dat` — uncompressed NBT,
 one row per server the in-game list shows — and `instance.server.edit` /
-`.remove` / and `instance.servers.arrange` write it back whole. `minecraft.ping` gives one address's
+`.remove` and `instance.servers.arrange` write it back whole. `minecraft.ping` gives one address's
 status over the same Server List Ping the game's list uses, so a row can say
 what the server is answering right now, down to the icon: the status reply's
 `favicon` is carried back as bare base64, which is what a front-end shows for an
