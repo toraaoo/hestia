@@ -3,7 +3,12 @@
  * (instance-only): files copied, folders linked into the shared store.
  */
 import { call } from './core/ipc';
-import type { InstanceSyncStatus, SyncConfig, SyncTargets } from './types/sync';
+import type {
+  InstanceSyncStatus,
+  SyncConfig,
+  SyncShareResult,
+  SyncTargets,
+} from './types/sync';
 
 export function get(): Promise<SyncConfig> {
   return call('sync.get');
@@ -34,4 +39,16 @@ export async function adopt(
     targets,
   });
   return result.adopted;
+}
+
+/**
+ * Put a stopped instance in or out of shared settings. Leaving copies every
+ * folder it shares out of the store; rejoining folds it back in with the store
+ * winning anything the two both have. The warnings say what that cost.
+ */
+export function share(
+  instance: string,
+  enabled: boolean,
+): Promise<SyncShareResult> {
+  return call('instance.sync.share', { instance, enabled });
 }

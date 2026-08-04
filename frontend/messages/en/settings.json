@@ -96,6 +96,18 @@
       "files_hint": "Copied into each instance at launch and back out after — the newest wins, and options.txt merges key by key.",
       "folders": "Linked folders",
       "folders_hint": "Linked into one shared store, so every instance sees the same folder.",
+      "instance": {
+        "join_action": "Share it",
+        "join_description": "The shared copies replace anything of this instance's they clash with — its own copies of those worlds and settings are deleted. Everything else it has joins the store.",
+        "join_title": "Share {name} again?",
+        "leave_action": "Stop sharing",
+        "leave_description": "Every folder it shares is copied out of the store, so that data will exist twice and the two copies drift apart from here. Nothing is deleted.",
+        "leave_title": "Stop sharing {name}?",
+        "now_alone": "{name} keeps its settings to itself",
+        "now_sharing": "{name} shares its settings again",
+        "opted_out": "Not sharing",
+        "share_label": "Share {name}"
+      },
       "no_folder_targets": "No folder targets configured.",
       "section": "Shared between instances",
       "status_title": "Instance link status",

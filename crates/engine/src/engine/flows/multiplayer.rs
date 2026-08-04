@@ -135,8 +135,8 @@ impl Engine {
     }
 
     /// How many of the instance's sessions are still running — the sessions
-    /// that hold the multiplayer list in memory.
-    fn running_sessions(&self, id: &str) -> u32 {
+    /// that hold its shared files open.
+    pub(crate) fn running_sessions(&self, id: &str) -> u32 {
         let prefix = proto::naming::instance_session_prefix(id);
         self.processes()
             .list()

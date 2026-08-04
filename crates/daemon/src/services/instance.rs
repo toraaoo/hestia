@@ -205,8 +205,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
         let record = instance_for(&ctx, &p.instance, Intent::Lifecycle)?;
         ctx.runtime
             .engine()
-            .instances()
-            .remove(&record.id)
+            .remove_instance(&record.id)
             .map_err(crate::runtime::engine_error)?;
         ctx.runtime.discard_instance_sessions(&record.id);
         tracing::info!(instance = %record.id, name = %record.name, "instance removed");

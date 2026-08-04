@@ -190,6 +190,7 @@ mod tests {
             last_played_unix: Some(1_800_000_000),
             playtime_seconds: 3600,
             jvm: Default::default(),
+            sync: None,
             profile: InstanceProfile {
                 flavor: "fabric".to_string(),
                 game_version: "1.21.1".to_string(),

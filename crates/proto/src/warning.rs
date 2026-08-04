@@ -61,6 +61,17 @@ pub enum WarningInfo {
     /// A sync target could not be reconciled at all. `detail` is operational
     /// English, shown as secondary text.
     SyncTargetSkipped { target: String, detail: String },
+    /// Leaving sharing gave the instance its own copy of a folder it used to
+    /// share. Nothing was lost, but the data now exists twice and the two
+    /// copies diverge from here.
+    SyncTargetDuplicated { target: String, bytes: u64 },
+    /// Rejoining sharing kept the store's copy of these names and discarded the
+    /// instance's own — the store is what the other instances are already
+    /// playing, so it is the one that survives a clash.
+    SyncEntriesReplaced {
+        target: String,
+        entries: Vec<String>,
+    },
     /// Game-directory files the pack owns were left as the user edited them, so
     /// this entry is not running the pack's own configuration for them.
     /// `count` alongside `paths` so the headline is one interpolation rather
@@ -125,6 +136,14 @@ impl WarningInfo {
             SyncTargetSkipped { target, .. } => {
                 format!("check permissions on `data/{target}`, then launch again")
             }
+            SyncTargetDuplicated { target, .. } => format!(
+                "`data/{target}` is this instance's alone now — sharing it again keeps the \
+                 shared copy, not this one"
+            ),
+            SyncEntriesReplaced { target, .. } => format!(
+                "the discarded copies are gone; export an instance before sharing it again if \
+                 `data/{target}` held anything you still want"
+            ),
             ModpackOverridesKept { .. } => {
                 "delete a file under `data/` to take the pack's version of it at the next update"
                     .to_string()
@@ -170,6 +189,16 @@ impl fmt::Display for WarningInfo {
             SyncTargetSkipped { target, detail } => {
                 write!(f, "'{target}' could not be synced: {detail}")
             }
+            SyncTargetDuplicated { target, bytes } => write!(
+                f,
+                "'{target}' was copied out of the shared store ({bytes} bytes) and is now this \
+                 instance's alone"
+            ),
+            SyncEntriesReplaced { target, entries } => write!(
+                f,
+                "the shared copies of {} replaced this instance's under '{target}'",
+                entries.join(", ")
+            ),
             ModpackOverridesKept { count, .. } => write!(
                 f,
                 "{count} file(s) you had edited were kept instead of the modpack's"

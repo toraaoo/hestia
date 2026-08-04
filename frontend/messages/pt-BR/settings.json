@@ -96,6 +96,18 @@
       "files_hint": "Copiados para cada instância ao iniciar e de volta ao sair — o mais novo vence, e o options.txt é mesclado chave a chave.",
       "folders": "Pastas vinculadas",
       "folders_hint": "Vinculadas a um único armazenamento compartilhado, então toda instância vê a mesma pasta.",
+      "instance": {
+        "join_action": "Compartilhar",
+        "join_description": "As cópias compartilhadas substituem tudo o que colidir com as desta instância — suas próprias cópias desses mundos e configurações são apagadas. Todo o resto que ela tem passa a integrar o armazenamento.",
+        "join_title": "Voltar a compartilhar {name}?",
+        "leave_action": "Parar de compartilhar",
+        "leave_description": "Cada pasta compartilhada é copiada para fora do armazenamento, então esses dados passarão a existir em duplicidade e as duas cópias divergem daqui em diante. Nada é apagado.",
+        "leave_title": "Parar de compartilhar {name}?",
+        "now_alone": "{name} mantém suas configurações só para si",
+        "now_sharing": "{name} voltou a compartilhar suas configurações",
+        "opted_out": "Não compartilha",
+        "share_label": "Compartilhar {name}"
+      },
       "no_folder_targets": "Nenhuma pasta configurada.",
       "section": "Compartilhado entre instâncias",
       "status_title": "Estado dos vínculos por instância",

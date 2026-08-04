@@ -20,19 +20,25 @@ const config = (): SyncConfig => ({
   targets,
 });
 
+/** Instances that opted out, by id. */
+const opted_out = new Set<string>();
+
 const status = (): InstanceSyncStatus[] =>
   entries.listInstances().map((instance, index) => ({
     id: instance.id,
     name: instance.name,
-    targets: targets.folders.map((target, position) => ({
-      target,
-      state:
-        index === 0 || position === 0
-          ? 'linked'
-          : index === 1
-            ? 'pending'
-            : 'cannot_link',
-    })),
+    enabled: !opted_out.has(instance.id),
+    targets: opted_out.has(instance.id)
+      ? []
+      : targets.folders.map((target, position) => ({
+          target,
+          state:
+            index === 0 || position === 0
+              ? 'linked'
+              : index === 1
+                ? 'pending'
+                : 'cannot_link',
+        })),
   }));
 
 export const channels: Handlers = {
@@ -55,5 +61,13 @@ export const channels: Handlers = {
     const wanted = strings(p, 'targets');
     entries.findInstance(str(p, 'instance'));
     return { adopted: wanted.length > 0 ? wanted : targets.folders };
+  },
+
+  'instance.sync.share': (p) => {
+    const instance = entries.findInstance(str(p, 'instance'));
+    const enabled = p.enabled === true;
+    if (enabled) opted_out.delete(instance.id);
+    else opted_out.add(instance.id);
+    return { enabled, warnings: [] };
   },
 };

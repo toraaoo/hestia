@@ -48,4 +48,19 @@ impl Sync<'_> {
             .await?
             .adopted)
     }
+
+    /// Put a stopped instance in or out of shared settings. Leaving copies the
+    /// folders it shares out of the store; rejoining lets the store win
+    /// whatever the two both have. The warnings say what that cost.
+    pub async fn share(
+        &self,
+        instance: &str,
+        enabled: bool,
+    ) -> Result<proto::sync::SyncShareResult, IpcError> {
+        let params = proto::sync::SyncShareParams {
+            instance: instance.to_string(),
+            enabled,
+        };
+        self.session.call::<proto::sync::SyncShare>(&params).await
+    }
 }

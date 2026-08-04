@@ -87,13 +87,16 @@ pub struct TargetLinkState {
     pub state: LinkState,
 }
 
-/// One instance's per-folder-target link states.
+/// One instance's per-folder-target link states. An instance that opted out
+/// (`instance config set sync off`) reports `enabled: false` and no targets:
+/// none of them describe it, and its folders are left exactly as they are.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceSyncStatus {
     pub id: String,
     pub name: String,
+    pub enabled: bool,
     pub targets: Vec<TargetLinkState>,
 }
 
@@ -139,4 +142,33 @@ impl Contract for SyncAdopt {
     const CHANNEL: &'static str = "instance.sync.adopt";
     type Params = SyncAdoptParams;
     type Result = SyncAdoptResult;
+}
+
+/// Put one instance in or out of shared settings. Not a preference — files move
+/// either way, so the instance must be stopped: leaving copies every folder it
+/// shares out of the store, and rejoining folds it back in with the **store**
+/// winning anything the two both have.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncShareParams {
+    /// Instance name or id.
+    pub instance: String,
+    pub enabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncShareResult {
+    pub enabled: bool,
+    /// What was duplicated on the way out, or discarded on the way in.
+    pub warnings: Vec<crate::warning::WarningInfo>,
+}
+
+pub struct SyncShare;
+impl Contract for SyncShare {
+    const CHANNEL: &'static str = "instance.sync.share";
+    type Params = SyncShareParams;
+    type Result = SyncShareResult;
 }

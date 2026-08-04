@@ -5,7 +5,7 @@ import type { NotSharedReason } from "./NotSharedReason";
  * One degraded outcome. The `kind` tag is the wire discriminant; front-ends
  * switch on it exhaustively.
  */
-export type WarningInfo = { "kind": "properties_schema_missing", name: string, } | { "kind": "sync_target_not_shared", instance: string, target: string, reason: NotSharedReason, } | { "kind": "sync_target_skipped", target: string, detail: string, } | { "kind": "modpack_overrides_kept", count: number, paths: Array<string>, } | { "kind": "modpack_files_excluded", count: number, files: Array<string>, } | { "kind": "export_files_embedded", count: number, files: Array<string>, } | { "kind": "import_files_untracked", count: number, files: Array<string>, } | { "kind": "document_quarantined", document: string, path: string, 
+export type WarningInfo = { "kind": "properties_schema_missing", name: string, } | { "kind": "sync_target_not_shared", instance: string, target: string, reason: NotSharedReason, } | { "kind": "sync_target_skipped", target: string, detail: string, } | { "kind": "sync_target_duplicated", target: string, bytes: number, } | { "kind": "sync_entries_replaced", target: string, entries: Array<string>, } | { "kind": "modpack_overrides_kept", count: number, paths: Array<string>, } | { "kind": "modpack_files_excluded", count: number, files: Array<string>, } | { "kind": "export_files_embedded", count: number, files: Array<string>, } | { "kind": "import_files_untracked", count: number, files: Array<string>, } | { "kind": "document_quarantined", document: string, path: string, 
 /**
  * Operational English naming the schema problem, shown as secondary
  * text: the version it declared, or why it would not parse.

@@ -108,7 +108,7 @@ impl Engine {
         if outcome.is_err() && matches!(target, ModpackTarget::Create { .. }) {
             // A create that could not be filled leaves nothing, exactly as a
             // failed or cancelled plain create does.
-            let _ = self.instances.remove(&entry);
+            let _ = self.remove_instance(&entry);
         }
         outcome
     }

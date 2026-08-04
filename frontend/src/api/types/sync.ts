@@ -5,6 +5,8 @@ export type { SyncAdoptParams } from "./generated/SyncAdoptParams";
 export type { SyncAdoptResult } from "./generated/SyncAdoptResult";
 export type { SyncConfig } from "./generated/SyncConfig";
 export type { SyncSetParams } from "./generated/SyncSetParams";
+export type { SyncShareParams } from "./generated/SyncShareParams";
+export type { SyncShareResult } from "./generated/SyncShareResult";
 export type { SyncStatusResult } from "./generated/SyncStatusResult";
 export type { SyncTargets } from "./generated/SyncTargets";
 export type { TargetLinkState } from "./generated/TargetLinkState";

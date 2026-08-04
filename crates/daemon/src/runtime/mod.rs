@@ -122,18 +122,19 @@ impl Runtime {
         let java_installs =
             JavaInstallManager::new(engine.clone(), hub.clone(), cancellations.clone());
         let downloads = DownloadManager::new(engine.clone(), hub.clone(), cancellations.clone());
-        let playtime_engine = engine.clone();
+        let session_engine = engine.clone();
         let on_exit: ExitObserver = Arc::new(move |info: &proto::process::ProcessInfo| {
             let Some(instance_id) = instance_id_of_session(&info.id) else {
                 return;
             };
             let elapsed = now_unix() - info.started_unix;
-            if let Err(e) = playtime_engine
+            if let Err(e) = session_engine
                 .instances()
                 .add_playtime(&instance_id, elapsed)
             {
                 tracing::warn!(instance = %instance_id, error = %e, "failed to record playtime");
             }
+            session_engine.finish_instance_sync(&info.id);
         });
         let processes = engine.processes().clone();
         processes.attach(hub.clone(), Some(on_exit));

@@ -271,21 +271,36 @@ flowchart LR
 - **Folders are linked** (`saves`, `config`, `screenshots`) — a symlink on POSIX,
   a junction on Windows. A world is stored **once** and shared live, rather than
   duplicating gigabytes per instance.
-- **Files are copied** (`options.txt` key-merged, `servers.dat` newest-wins) —
-  file symlinks need elevation on Windows, and merge semantics need a real copy.
+- **Files are copied** (`options.txt` key-merged, `servers.dat` whole) — file
+  symlinks need elevation on Windows, and merge semantics need a real copy. Each
+  instance's copy reconciles against a **baseline**, the content it and the store
+  last agreed on: only a side that moved since then wins, and the clock breaks a
+  tie no other way settles
+  ([0069](../decisions/0069-sync-reconciles-against-a-baseline.md)).
 
-`apply` runs at every launch and once at create, before anything can fill a
-folder. A folder holding only the instance's own files is **adopted** into the
+`apply` runs at every launch, once more when each session **exits** — so what
+the player changed in game reaches the store then rather than at their next
+launch — and once at create, before anything can fill a folder. A folder holding only the instance's own files is **adopted** into the
 store automatically, since moving it can destroy nothing; only a name the store
 already has stops it, and that is what you get warned about. Hestia never breaks
 a link it did not make, and only ever touches links pointing into its own store
 ([0022](../decisions/0022-sync-links-folders-copies-files.md),
 [0030](../decisions/0030-warnings-the-user-did-not-cause.md)).
 
-A `Settings` scope decides where settings-class targets reconcile: the global
-store, a [captured profile's](content.md#content-profiles), or nowhere — a
-modpack owns its own config tree. Sharing is switchable wholesale with
-`sync.enabled`; off, no pass runs and existing links are left where they are.
+A `Scope` decides where settings-class targets reconcile: the global store, a
+[captured profile's](content.md#content-profiles), or nowhere — a modpack owns
+its own config tree. A launch records its scope against the session id, so the
+exit pass uses the profile it launched under rather than whichever is active by
+then.
+
+Sharing is switchable wholesale with `sync.enabled`, and **per instance**
+(`instance.sync.share`); off either way, no pass runs and existing links are
+left where they are. The per-instance switch is a transition, not a preference:
+leaving copies every folder that instance shares out of the store, so it keeps
+playing the same worlds while the two copies diverge; rejoining folds it back in
+with the **store** winning anything the two both have, since the other instances
+are already playing that copy. Both directions need the instance stopped, both
+confirm first, and what was duplicated or discarded comes back as a warning.
 
 The managed content directories are rejected as sync targets at the edge:
 per-instance content selection is impossible over a shared directory.

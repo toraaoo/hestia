@@ -2,6 +2,8 @@
 import type { TargetLinkState } from "./TargetLinkState";
 
 /**
- * One instance's per-folder-target link states.
+ * One instance's per-folder-target link states. An instance that opted out
+ * (`instance config set sync off`) reports `enabled: false` and no targets:
+ * none of them describe it, and its folders are left exactly as they are.
  */
-export type InstanceSyncStatus = { id: string, name: string, targets: Array<TargetLinkState>, };
+export type InstanceSyncStatus = { id: string, name: string, enabled: boolean, targets: Array<TargetLinkState>, };

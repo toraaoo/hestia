@@ -4,8 +4,8 @@
 //! each instance's per-target link state, and run the adopt migration.
 
 use proto::sync::{
-    SyncAdopt, SyncAdoptResult, SyncConfig, SyncGet, SyncSet, SyncSetParams, SyncStatus,
-    SyncStatusResult,
+    SyncAdopt, SyncAdoptResult, SyncConfig, SyncGet, SyncSet, SyncSetParams, SyncShare,
+    SyncShareResult, SyncStatus, SyncStatusResult,
 };
 use proto::Empty;
 
@@ -56,5 +56,15 @@ pub(super) fn register(on: &mut Channels<'_>) {
             "sync folders adopted into the shared store"
         );
         Ok(SyncAdoptResult { adopted })
+    });
+
+    on.handle::<SyncShare, _, _>(|p, ctx| async move {
+        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
+        let (enabled, warnings) = ctx
+            .runtime
+            .engine()
+            .set_instance_sharing(&record.id, p.enabled)
+            .map_err(crate::runtime::engine_error)?;
+        Ok(SyncShareResult { enabled, warnings })
     });
 }

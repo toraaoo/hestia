@@ -77,6 +77,18 @@ impl Engine {
         })
     }
 
+    /// Delete an instance and everything the launcher kept *about* it: the
+    /// directory, and its sync baselines in the shared store, which nothing
+    /// else would ever collect. Returns false when no instance matches.
+    pub fn remove_instance(&self, reference: &str) -> Result<bool> {
+        let Some(record) = self.instances.get(reference) else {
+            return Ok(false);
+        };
+        let removed = self.instances.remove(&record.id)?;
+        self.sync.forget(&record.id);
+        Ok(removed)
+    }
+
     /// Move an instance to another version of its flavor. A downgrade must be
     /// allowed explicitly — Minecraft cannot load saves written by a newer
     /// version, and **nothing is backed up first**: an instance is kept by
@@ -135,20 +147,23 @@ impl Engine {
                 .config_set(&record.id, &entry.key, &entry.value)
         });
         if let Err(e) = applied {
-            let _ = self.instances.remove(&record.id);
+            let _ = self.remove_instance(&record.id);
             return Err(e);
         }
 
+        // Re-read before linking: the config entries above may have opted this
+        // instance out of sharing, and the create-time record predates them.
+        let record = self
+            .instances
+            .get(&record.id)
+            .with_context(|| format!("instance '{}' vanished after create", record.id))?;
         let data_dir = self.instances.data_dir(&record);
         if let Err(e) = std::fs::create_dir_all(&data_dir) {
             tracing::warn!(id = %record.id, error = %e, "cannot create the game directory");
         } else {
-            self.link_new_instance(&record.name, &data_dir);
+            self.link_new_instance(&record, &data_dir);
         }
-
-        self.instances
-            .get(&record.id)
-            .with_context(|| format!("instance '{}' vanished after create", record.id))
+        Ok(record)
     }
 
     /// Materialise everything an instance launch needs — the Java runtime, the
@@ -260,8 +275,11 @@ impl Engine {
                 .as_ref()
                 .filter(|p| p.captured)
                 .map(|p| profiles::store_dir(&entry_dir, &p.name));
-            warnings =
-                self.apply_instance_sync(&record.name, &entry_dir, &game_dir, store.as_deref());
+            if let Some(pass) = self.instance_pass(&record, &entry_dir, &game_dir, store.as_deref())
+            {
+                let session = proto::naming::instance_session_id(&record.id, session_seq);
+                warnings = self.begin_instance_sync(&session, pass);
+            }
             let selection: Option<std::collections::HashSet<String>> =
                 launch_profile.map(|p| p.members.into_iter().collect());
             let worlds = crate::instances::save_worlds(&game_dir);

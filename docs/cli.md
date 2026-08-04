@@ -451,6 +451,8 @@ hestia sync status               # sharing on/off, store path, targets, link sta
 
 hestia instance modded sync adopt        # move existing folders into the store
 hestia instance modded sync adopt saves  # …or just one target
+hestia instance modded sync off          # leave sharing: its folders are copied out
+hestia instance modded sync on           # rejoin: the shared copies win any clash
 ```
 
 An instance running a **modpack** keeps its own `config/`: the pack ships that tree, so it is not folded into what every
@@ -462,6 +464,11 @@ Sharing can be switched off entirely; folders already linked stay linked.
 hestia config set sync.enabled false    # every instance keeps its own settings
 hestia config get sync.enabled
 ```
+
+One instance can leave on its own. That one is not a setting but a move: `sync off` copies every folder it shares out of
+the store, so it plays exactly what it played before while the two copies drift apart from then on, and `sync on` folds
+it back in with the **shared** copy winning anything both have — its own clashing worlds are deleted. Both need the
+instance stopped and both confirm first (`-y` skips the prompt), and both report what it cost.
 
 Sync is **instance-only**: a server's configuration is per-server infrastructure, managed through
 `server <name> config …` and

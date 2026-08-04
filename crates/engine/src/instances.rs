@@ -35,7 +35,20 @@ pub struct InstanceRecord {
     /// Per-entry JVM tuning (memory, extra flags) injected at each launch.
     #[serde(default)]
     pub jvm: JavaSettings,
+    /// Whether this instance takes part in shared settings; unset follows the
+    /// launcher-wide `sync.enabled`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync: Option<bool>,
     pub profile: InstanceProfile,
+}
+
+impl InstanceRecord {
+    /// Whether the instance reconciles against the shared store at all. An
+    /// instance that opted out is left alone entirely — no copy, no link, and
+    /// no unlinking of what it already shares.
+    pub fn shares_settings(&self) -> bool {
+        self.sync.unwrap_or(true)
+    }
 }
 
 impl Document for InstanceRecord {
@@ -97,6 +110,7 @@ impl Instances {
                 last_played_unix: None,
                 playtime_seconds: 0,
                 jvm: JavaSettings::default(),
+                sync: None,
                 profile,
             },
         )
@@ -202,6 +216,17 @@ impl Instances {
         Ok(record.jvm.entries())
     }
 
+    /// Record whether this instance takes part in shared settings. The file
+    /// work that a change implies is the sync flow's — this only persists the
+    /// answer.
+    pub fn set_sharing(&self, id: &str, on: bool) -> Result<()> {
+        let mut record = self
+            .get(id)
+            .with_context(|| format!("unknown instance: {id}"))?;
+        record.sync = Some(on);
+        registry::write_record(&self.instance_dir(&record), &record)
+    }
+
     /// Rename an instance: rewrite the display name and move its directory to
     /// the new slug. The id is stable, so JVM settings and game data are
     /// untouched. The caller guarantees the instance is stopped and not busy.
@@ -261,4 +286,23 @@ pub(crate) fn save_worlds(data_dir: &Path) -> Vec<String> {
         .collect();
     worlds.sort();
     worlds
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An instance shares unless it says otherwise — including one recorded
+    /// before the field existed, which has no `sync` at all.
+    #[test]
+    fn sharing_is_on_until_opted_out() {
+        let mut record = InstanceRecord::default();
+        assert!(record.shares_settings());
+
+        record.sync = Some(false);
+        assert!(!record.shares_settings());
+
+        record.sync = None;
+        assert!(record.shares_settings(), "clearing returns to the default");
+    }
 }

@@ -9,6 +9,8 @@
       "modpack_overrides_kept": "Delete a file under the game directory to take the pack's version of it at the next update.",
       "properties_schema_missing": "Any key is accepted until it can be derived again, so check spelling yourself. Updating the server re-derives it.",
       "server_list_in_use": "Close the game and make the change again, or add the server from the in-game multiplayer screen instead.",
+      "sync_entries_replaced": "The discarded copies are gone — export an instance before sharing it again if it held anything you still want.",
+      "sync_target_duplicated": "Sharing '{target}' again keeps the shared copy, not this one.",
       "sync_target_not_shared": "Rename or delete the clashing files in the instance’s folder, then launch again to share it.",
       "sync_target_skipped": "Check the folder's permissions, then launch again."
     },
@@ -20,6 +22,8 @@
       "modpack_overrides_kept": "{count} file(s) you had edited were kept instead of the modpack's.",
       "properties_schema_missing": "'{name}' has no property schema, so its server.properties keys cannot be checked.",
       "server_list_in_use": "“{instance}” has {sessions} session(s) open, so the running game will overwrite this change to the multiplayer list when it exits.",
+      "sync_entries_replaced": "The shared copies of {entries} replaced this instance's under '{target}'",
+      "sync_target_duplicated": "'{target}' was copied out of the shared store and is now this instance's alone",
       "sync_target_not_shared": "'{target}' is not shared with your other instances: {reason}.",
       "sync_target_skipped": "'{target}' could not be synced: {detail}"
     },

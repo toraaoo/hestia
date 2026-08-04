@@ -193,7 +193,7 @@ impl Engine {
         let mut warnings = landed.warnings;
         warnings.extend(quarantined_under(mark, &entry_dir));
 
-        self.link_new_instance(&record.name, &data_dir);
+        self.link_new_instance(&record, &data_dir);
         Ok(ImportOutcome {
             format,
             record,
@@ -234,6 +234,7 @@ impl Engine {
                     last_played_unix: None,
                     playtime_seconds: 0,
                     jvm,
+                    sync: None,
                     profile,
                 }
             }
@@ -297,7 +298,7 @@ impl Engine {
     /// user did not ask for it.
     fn unwind_on_failure<T>(&self, record: &InstanceRecord, outcome: Result<T>) -> Result<T> {
         if outcome.is_err() {
-            if let Err(e) = self.instances.remove(&record.id) {
+            if let Err(e) = self.remove_instance(&record.id) {
                 tracing::warn!(id = %record.id, error = %e, "cannot remove a half-imported instance");
             }
         }

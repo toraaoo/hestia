@@ -1,7 +1,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
-import type { LinkState, SyncTargets } from '@/api';
+import type { InstanceSyncStatus, LinkState, SyncTargets } from '@/api';
 import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import {
   ValueRow,
 } from '@/features/settings/components';
 import { cn } from '@/lib/utils';
+import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import { syncMutations, syncQueries } from '@/queries/sync';
 
@@ -223,42 +225,126 @@ function LinkStatus({ hasFolderTargets }: { hasFolderTargets: boolean }) {
       ) : (
         <div className="divide-y divide-border border border-border">
           {(status.data ?? []).map((instance) => (
-            <div
-              key={instance.id}
-              className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2"
-            >
-              <span className="min-w-0 flex-1 truncate text-sm">
-                {instance.name}
-              </span>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                {instance.targets.map((target) => (
-                  <span
-                    key={target.target}
-                    className="flex items-center gap-1.5 text-xs"
-                  >
-                    <StatusDot tone={stateTone[target.state]} />
-                    <span className="font-mono">{target.target}</span>
-                    {target.state !== 'linked' && (
-                      <span
-                        className={cn(
-                          'text-muted-foreground',
-                          target.state === 'cannot_link' && 'text-destructive',
-                        )}
-                      >
-                        {stateLabel[target.state]()}
-                      </span>
-                    )}
-                  </span>
-                ))}
-              </div>
-              {instance.targets.some((t) => t.state === 'cannot_link') && (
-                <AdoptButton id={instance.id} name={instance.name} />
-              )}
-            </div>
+            <InstanceRow key={instance.id} instance={instance} />
           ))}
         </div>
       )}
     </Field>
+  );
+}
+
+/**
+ * One instance's row: whether it takes part at all, and where each of its
+ * folder targets stands when it does.
+ */
+function InstanceRow({ instance }: { instance: InstanceSyncStatus }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
+      <span className="min-w-0 flex-1 truncate text-sm">{instance.name}</span>
+      {instance.enabled ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {instance.targets.map((target) => (
+            <span
+              key={target.target}
+              className="flex items-center gap-1.5 text-xs"
+            >
+              <StatusDot tone={stateTone[target.state]} />
+              <span className="font-mono">{target.target}</span>
+              {target.state !== 'linked' && (
+                <span
+                  className={cn(
+                    'text-muted-foreground',
+                    target.state === 'cannot_link' && 'text-destructive',
+                  )}
+                >
+                  {stateLabel[target.state]()}
+                </span>
+              )}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span className="text-xs text-muted-foreground">
+          {m['settings.sync.instance.opted_out']()}
+        </span>
+      )}
+      {instance.enabled &&
+        instance.targets.some((t) => t.state === 'cannot_link') && (
+          <AdoptButton id={instance.id} name={instance.name} />
+        )}
+      <ShareToggle
+        id={instance.id}
+        name={instance.name}
+        enabled={instance.enabled}
+      />
+    </div>
+  );
+}
+
+/**
+ * Taking one instance in or out of sharing. Files move either way — folders are
+ * copied out on the way out, and the shared copies replace clashing ones on the
+ * way in — so both directions confirm first and report what it cost.
+ */
+function ShareToggle({
+  id,
+  name,
+  enabled,
+}: {
+  id: string;
+  name: string;
+  enabled: boolean;
+}) {
+  const share = useMutation(syncMutations.share(id));
+  const [pending, setPending] = useState<boolean | null>(null);
+  const next = pending !== null;
+
+  const apply = () => {
+    if (pending === null) return;
+    share.mutate(pending, {
+      onSuccess: (result) => {
+        toastWarnings(result.warnings);
+        toast.success(
+          result.enabled
+            ? m['settings.sync.instance.now_sharing']({ name })
+            : m['settings.sync.instance.now_alone']({ name }),
+        );
+      },
+      onSettled: () => setPending(null),
+    });
+  };
+
+  return (
+    <ConfirmDialog
+      open={next}
+      onOpenChange={(open) => !open && setPending(null)}
+      trigger={
+        <Switch
+          size="sm"
+          aria-label={m['settings.sync.instance.share_label']({ name })}
+          checked={enabled}
+          disabled={share.isPending}
+          onCheckedChange={(checked) => setPending(checked === true)}
+        />
+      }
+      title={
+        pending
+          ? m['settings.sync.instance.join_title']({ name })
+          : m['settings.sync.instance.leave_title']({ name })
+      }
+      description={
+        pending
+          ? m['settings.sync.instance.join_description']()
+          : m['settings.sync.instance.leave_description']()
+      }
+      confirmLabel={
+        pending
+          ? m['settings.sync.instance.join_action']()
+          : m['settings.sync.instance.leave_action']()
+      }
+      destructive={pending === true}
+      onConfirm={apply}
+    />
   );
 }
 

@@ -3,7 +3,7 @@
  * copied, folders linked into the shared store.
  */
 import { queryOptions } from '@tanstack/react-query';
-import type { SyncConfig, SyncTargets } from '../api';
+import type { SyncConfig, SyncShareResult, SyncTargets } from '../api';
 import * as api from '../api/sync';
 import { mutation } from './core';
 import { keys } from './keys';
@@ -29,6 +29,16 @@ export const syncMutations = {
       mutationKey: [...keys.sync.all, 'set'],
       mutationFn: (targets) => api.set(targets),
       invalidates: () => [keys.sync.all],
+    }),
+  /**
+   * Whether one instance takes part at all. Files move either way, so the
+   * instance must be stopped and the result carries what it cost.
+   */
+  share: (id: string) =>
+    mutation<SyncShareResult, boolean>({
+      mutationKey: [...keys.instances.detail(id), 'sync', 'share'],
+      mutationFn: (enabled) => api.share(id, enabled),
+      invalidates: () => [keys.sync.all, keys.instances.detail(id)],
     }),
   /** Adopt a stopped instance's folders into the store; empty = all. */
   adopt: (id: string) =>

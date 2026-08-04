@@ -262,7 +262,7 @@ enum InstanceAction {
         /// The new display name
         new_name: String,
     },
-    /// Link the instance's shared folders (see `hestia sync status`)
+    /// Share this instance's settings with the others (see `hestia sync status`)
     Sync {
         #[command(subcommand)]
         cmd: SyncAction,
@@ -274,6 +274,20 @@ enum InstanceAction {
 
 #[derive(Subcommand)]
 pub enum SyncAction {
+    /// Share this instance's settings again (the default). The shared copies
+    /// win anything both have — this instance's clashing worlds are discarded
+    On {
+        /// Skip the confirmation
+        #[arg(long, short)]
+        yes: bool,
+    },
+    /// Keep this instance's settings to itself. Its shared folders are copied
+    /// out of the store, so the data exists twice from then on
+    Off {
+        /// Skip the confirmation
+        #[arg(long, short)]
+        yes: bool,
+    },
     /// Move existing folder contents into the shared store and link them
     /// (all-or-nothing per folder; a name already in the store refuses it)
     Adopt {
@@ -422,11 +436,47 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             exclude,
         } => transfer::export(client, name, format, output, exclude).await,
         InstanceAction::Rename { new_name } => lifecycle::rename(client, &name, &new_name).await,
-        InstanceAction::Sync {
-            cmd: SyncAction::Adopt { targets },
-        } => adopt(client, &name, targets).await,
+        InstanceAction::Sync { cmd } => match cmd {
+            SyncAction::Adopt { targets } => adopt(client, &name, targets).await,
+            SyncAction::On { yes } => share(client, &name, true, yes).await,
+            SyncAction::Off { yes } => share(client, &name, false, yes).await,
+        },
         InstanceAction::Remove => lifecycle::remove(client, &name).await,
     }
+}
+
+async fn share(client: &Client, name: &str, on: bool, yes: bool) -> Result<()> {
+    let info = entry::pick_instance(client.instance().list().await?, Some(name.to_string()))?;
+    if !yes {
+        let accepted = crate::ui::confirm(
+            &match on {
+                true => format!(
+                    "Share '{}' again? The shared copies replace anything of its own they clash \
+                     with — those are deleted.",
+                    info.name
+                ),
+                false => format!(
+                    "Stop sharing '{}'? Every folder it shares is copied out of the store, so \
+                     that data will exist twice.",
+                    info.name
+                ),
+            },
+            if on { "share" } else { "stop sharing" },
+            "cancel",
+        )?;
+        if !accepted {
+            return crate::ui::show(crate::ui::View::note("nothing changed"));
+        }
+    }
+    let result = client.sync().share(&info.id, on).await?;
+    crate::ui::show(crate::ui::View::line(match result.enabled {
+        true => format!(
+            "'{}' shares its settings with your other instances",
+            info.name
+        ),
+        false => format!("'{}' keeps its settings to itself", info.name),
+    }))?;
+    crate::ui::show_warnings(&result.warnings)
 }
 
 async fn adopt(client: &Client, name: &str, targets: Vec<String>) -> Result<()> {

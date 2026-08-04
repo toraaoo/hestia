@@ -80,6 +80,14 @@ fn render_status(instances: Vec<InstanceSyncStatus>) -> Result<()> {
     let mut blocked = Vec::new();
     let mut rows: Vec<Vec<String>> = Vec::new();
     for instance in instances {
+        if !instance.enabled {
+            rows.push(vec![
+                instance.name,
+                "—".to_string(),
+                "opted out (instance <name> sync on)".to_string(),
+            ]);
+            continue;
+        }
         for target in instance.targets {
             if target.state == LinkState::CannotLink {
                 blocked.push((instance.name.clone(), target.target.clone()));
