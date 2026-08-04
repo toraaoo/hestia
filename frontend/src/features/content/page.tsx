@@ -2,7 +2,8 @@ import { MagnifyingGlassIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useIntersectionObserver } from '@uidotdev/usehooks';
-import { useEffect, useMemo } from 'react';
+import { motion } from 'motion/react';
+import { type ReactNode, useEffect, useMemo } from 'react';
 
 import { type ContentKind, errorMessage } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
@@ -18,8 +19,30 @@ import {
 import { mergeHits, projectKey } from '@/features/content/lib';
 import { kindGroup } from '@/features/shared/content/components';
 import { contentKinds, kindInfo } from '@/features/shared/content/lib';
+import { listContainer } from '@/lib/motion';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
+
+const GRID = 'grid grid-cols-1 gap-3 xl:grid-cols-2';
+
+function ResultGrid({
+  count,
+  children,
+}: {
+  count: number;
+  children: ReactNode;
+}) {
+  return (
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={listContainer(count)}
+      className={GRID}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 export function BrowsePage({
   kind,
@@ -96,50 +119,36 @@ export function BrowsePage({
           ]}
         />
       }
-      skeleton={
-        <CardGridSkeleton
-          grid="grid grid-cols-1 gap-3 xl:grid-cols-2"
-          count={8}
-          card="h-28"
-        />
-      }
+      skeleton={<CardGridSkeleton grid={GRID} count={8} card="h-28" />}
     >
       {url ? (
         link.isPending ? (
-          <CardGridSkeleton
-            grid="grid grid-cols-1 gap-3 xl:grid-cols-2"
-            count={1}
-            card="h-28"
-          />
+          <CardGridSkeleton grid={GRID} count={1} card="h-28" />
         ) : link.data ? (
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <ResultGrid count={1}>
             <ContentCard
               project={link.data.project}
               pinnedVersion={link.data.versionId || undefined}
             />
-          </div>
+          </ResultGrid>
         ) : (
           <Empty icon={WarningCircleIcon} tone="destructive">
             {errorMessage(link.error)}
           </Empty>
         )
       ) : search.isPending ? (
-        <CardGridSkeleton
-          grid="grid grid-cols-1 gap-3 xl:grid-cols-2"
-          count={8}
-          card="h-28"
-        />
+        <CardGridSkeleton grid={GRID} count={8} card="h-28" />
       ) : hits.length === 0 ? (
         <Empty icon={MagnifyingGlassIcon}>
           {m['content.browse.nothing_matches']()}
         </Empty>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <ResultGrid count={hits.length}>
             {hits.map((project) => (
               <ContentCard key={projectKey(project)} project={project} />
             ))}
-          </div>
+          </ResultGrid>
           {hasNextPage && (
             <div
               ref={sentinelRef}

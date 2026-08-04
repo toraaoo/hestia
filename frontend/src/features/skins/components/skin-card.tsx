@@ -4,6 +4,8 @@ import {
   PencilSimpleIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
+import { motion } from 'motion/react';
+import { Children } from 'react';
 
 import type { Skin } from '@/api';
 import { Button } from '@/components/ui/button';
@@ -15,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SkinPose } from '@/features/skins/components';
+import { listContainer, listItem } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 
@@ -30,9 +33,14 @@ export function skinVariantLabel(skin: Skin): string {
 
 export function SkinGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3">
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={listContainer(Children.count(children))}
+      className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3"
+    >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -54,7 +62,8 @@ export function SkinCard({
   onRemove?: () => void;
 }) {
   return (
-    <div
+    <motion.div
+      variants={listItem}
       className={cn(
         'group relative border transition-colors',
         equipped
@@ -122,6 +131,6 @@ export function SkinCard({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    </motion.div>
   );
 }

@@ -1,13 +1,21 @@
 import { CheckIcon, XIcon } from '@phosphor-icons/react';
+import { motion } from 'motion/react';
+import { Children } from 'react';
 
 import { CapeFront } from '@/features/skins/components';
+import { listContainer, listItem } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
 export function CapeGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5">
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={listContainer(Children.count(children))}
+      className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5"
+    >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -30,7 +38,8 @@ export function CapeCard({
   onEquip: () => void;
 }) {
   return (
-    <button
+    <motion.button
+      variants={listItem}
       type="button"
       disabled={disabled || equipped}
       onClick={onEquip}
@@ -58,6 +67,6 @@ export function CapeCard({
       <span className="w-full truncate text-center text-[10px] text-muted-foreground">
         {label}
       </span>
-    </button>
+    </motion.button>
   );
 }

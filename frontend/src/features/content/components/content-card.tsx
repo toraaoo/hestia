@@ -1,5 +1,6 @@
 import { DownloadSimpleIcon, HeartIcon, PlusIcon } from '@phosphor-icons/react';
-import { Link } from '@tanstack/react-router';
+import { createLink } from '@tanstack/react-router';
+import { motion } from 'motion/react';
 import { useState } from 'react';
 import type { ContentProject } from '@/api';
 import { contentIcon, contentKindLabel } from '@/components/icons';
@@ -13,7 +14,10 @@ import {
 } from '@/features/content/install';
 import { kindInfo } from '@/features/shared/content/lib';
 import { compact } from '@/lib/format';
+import { listItem } from '@/lib/motion';
 import { m } from '@/paraglide/messages.js';
+
+const MotionLink = createLink(motion.a);
 
 /** A project reads by slug when it has one (nicer URL), else its id. */
 export const projectRef = (p: Pick<ContentProject, 'slug' | 'id'>) =>
@@ -39,7 +43,8 @@ export function ContentCard({
 
   return (
     <>
-      <Link
+      <MotionLink
+        variants={listItem}
         to="/browse/$kind/$id"
         params={{ kind: kindInfo[project.kind].slug, id: projectRef(project) }}
         search={{
@@ -98,7 +103,7 @@ export function ContentCard({
             </div>
           </div>
         </Card>
-      </Link>
+      </MotionLink>
 
       {/* A modpack builds an entry rather than going into one, so it gets its
           own dialog instead of the shared content one. */}

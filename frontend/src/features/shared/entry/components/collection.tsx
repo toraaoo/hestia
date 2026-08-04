@@ -176,7 +176,7 @@ export function EntryCollection({
       layout
       initial="hidden"
       animate="show"
-      variants={listContainer}
+      variants={listContainer(cards.length)}
       transition={layoutMorph}
       className={cn(
         view === 'list'

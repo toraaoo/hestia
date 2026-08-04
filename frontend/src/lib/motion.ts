@@ -13,24 +13,24 @@ export const spring = {
   track: { type: 'spring', stiffness: 180, damping: 30, mass: 0.7 },
 } satisfies Record<string, Transition>;
 
-export const STAGGER_STEP = 0.025;
+const STAGGER_STEP = 0.025;
+const STAGGER_WINDOW = 0.25;
 
-export const listContainer: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: STAGGER_STEP } },
-};
+export function listContainer(count: number): Variants {
+  return {
+    hidden: {},
+    show: {
+      transition: {
+        staggerChildren: Math.min(
+          STAGGER_STEP,
+          STAGGER_WINDOW / Math.max(count, 1),
+        ),
+      },
+    },
+  };
+}
 
 export const listItem: Variants = {
-  hidden: { opacity: 0, y: 6 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: duration.base, ease: EASE_OUT },
-  },
-  exit: { opacity: 0, transition: { duration: duration.fast } },
-};
-
-export const fade: Variants = {
   hidden: { opacity: 0, y: 4 },
   show: {
     opacity: 1,

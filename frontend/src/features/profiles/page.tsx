@@ -5,7 +5,8 @@ import {
   StackIcon,
 } from '@phosphor-icons/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { createLink, useNavigate } from '@tanstack/react-router';
+import { motion } from 'motion/react';
 import { useState } from 'react';
 import type { ContentKind, GlobalProfile } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
@@ -26,8 +27,11 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { type View, ViewToggle } from '@/features/shared/entry/components';
+import { listContainer, listItem } from '@/lib/motion';
 import { m } from '@/paraglide/messages.js';
 import { profileMutations, profileQueries } from '@/queries/profile';
+
+const MotionLink = createLink(motion.a);
 
 /** The kinds a global profile can reference — the selectable pool kinds. */
 export const profileFilterKinds: ContentKind[] = [
@@ -92,17 +96,27 @@ export function ProfilesPage({
             : m['profile.none_match']()}
         </Empty>
       ) : view === 'grid' ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={listContainer(filtered.length)}
+          className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3"
+        >
           {filtered.map((profile) => (
             <ProfileCard key={profile.name} profile={profile} />
           ))}
-        </div>
+        </motion.div>
       ) : (
-        <div className="divide-y divide-border border border-border">
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={listContainer(filtered.length)}
+          className="divide-y divide-border border border-border"
+        >
           {filtered.map((profile) => (
             <ProfileRow key={profile.name} profile={profile} />
           ))}
-        </div>
+        </motion.div>
       )}
 
       <CreateGlobalDialog
@@ -138,7 +152,8 @@ function entrySummary(profile: GlobalProfile): string {
 /** Grid tile mirroring `EntryCard`: art banner + name + chip + footer. */
 function ProfileCard({ profile }: { profile: GlobalProfile }) {
   return (
-    <Link
+    <MotionLink
+      variants={listItem}
       to="/profiles/$name"
       params={{ name: profile.name }}
       className="group block outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -160,14 +175,15 @@ function ProfileCard({ profile }: { profile: GlobalProfile }) {
           </div>
         </div>
       </Card>
-    </Link>
+    </MotionLink>
   );
 }
 
 /** List row mirroring `EntryRow`: icon tile + name + summary + count. */
 function ProfileRow({ profile }: { profile: GlobalProfile }) {
   return (
-    <Link
+    <MotionLink
+      variants={listItem}
       to="/profiles/$name"
       params={{ name: profile.name }}
       className="flex items-center gap-3 px-3 py-2.5 transition-colors outline-none hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
@@ -185,7 +201,7 @@ function ProfileRow({ profile }: { profile: GlobalProfile }) {
         {m['profile.global.entries_count']({ count: profile.entries.length })}
       </Badge>
       <CaretRightIcon className="size-4 shrink-0 text-muted-foreground" />
-    </Link>
+    </MotionLink>
   );
 }
 
