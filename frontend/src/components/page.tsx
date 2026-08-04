@@ -48,8 +48,8 @@ export function Page({
           {actions}
         </div>
       </div>
-      <div className="flex flex-1 flex-col p-5">
-        <div className="flex-1">
+      <div className="flex min-h-0 flex-1 flex-col p-5">
+        <div className="min-h-0 flex-1">
           {loading && skeleton ? skeleton : children}
         </div>
       </div>

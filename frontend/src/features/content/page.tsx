@@ -1,9 +1,7 @@
 import { MagnifyingGlassIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useIntersectionObserver } from '@uidotdev/usehooks';
-import { motion } from 'motion/react';
-import { type ReactNode, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { type ContentKind, errorMessage } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
@@ -13,36 +11,17 @@ import { Page } from '@/components/page';
 import { CardGridSkeleton } from '@/components/skeleton';
 import {
   ContentCard,
+  ResultGrid,
   sourceGroup,
   useSourceOptions,
 } from '@/features/content/components';
-import { mergeHits, projectKey } from '@/features/content/lib';
+import { mergeHits } from '@/features/content/lib';
 import { kindGroup } from '@/features/shared/content/components';
 import { contentKinds, kindInfo } from '@/features/shared/content/lib';
-import { listContainer } from '@/lib/motion';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
 
 const GRID = 'grid grid-cols-1 gap-3 xl:grid-cols-2';
-
-function ResultGrid({
-  count,
-  children,
-}: {
-  count: number;
-  children: ReactNode;
-}) {
-  return (
-    <motion.div
-      initial="hidden"
-      animate="show"
-      variants={listContainer(count)}
-      className={GRID}
-    >
-      {children}
-    </motion.div>
-  );
-}
 
 export function BrowsePage({
   kind,
@@ -88,16 +67,9 @@ export function BrowsePage({
     [search.data?.pages],
   );
 
-  // Grow the page when the sentinel scrolls into view (infinite scroll).
-  const [sentinelRef, sentinel] = useIntersectionObserver({
-    threshold: 0,
-    rootMargin: '600px',
-  });
-  useEffect(() => {
-    if (sentinel?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-    }
-  }, [sentinel, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const growFeed = useCallback(() => {
+    fetchNextPage();
+  }, [fetchNextPage]);
 
   return (
     <Page
@@ -119,44 +91,36 @@ export function BrowsePage({
           ]}
         />
       }
-      skeleton={<CardGridSkeleton grid={GRID} count={8} card="h-28" />}
+      skeleton={<CardGridSkeleton grid={GRID} count={8} card="h-24" />}
     >
       {url ? (
         link.isPending ? (
-          <CardGridSkeleton grid={GRID} count={1} card="h-28" />
+          <CardGridSkeleton grid={GRID} count={1} card="h-24" />
         ) : link.data ? (
-          <ResultGrid count={1}>
+          <div className={GRID}>
             <ContentCard
               project={link.data.project}
               pinnedVersion={link.data.versionId || undefined}
             />
-          </ResultGrid>
+          </div>
         ) : (
           <Empty icon={WarningCircleIcon} tone="destructive">
             {errorMessage(link.error)}
           </Empty>
         )
       ) : search.isPending ? (
-        <CardGridSkeleton grid={GRID} count={8} card="h-28" />
+        <CardGridSkeleton grid={GRID} count={8} card="h-24" />
       ) : hits.length === 0 ? (
         <Empty icon={MagnifyingGlassIcon}>
           {m['content.browse.nothing_matches']()}
         </Empty>
       ) : (
-        <>
-          <ResultGrid count={hits.length}>
-            {hits.map((project) => (
-              <ContentCard key={projectKey(project)} project={project} />
-            ))}
-          </ResultGrid>
-          {hasNextPage && (
-            <div ref={sentinelRef} className="mt-3">
-              {isFetchingNextPage && (
-                <CardGridSkeleton grid={GRID} count={2} card="h-28" />
-              )}
-            </div>
-          )}
-        </>
+        <ResultGrid
+          hits={hits}
+          hasMore={hasNextPage}
+          loadingMore={isFetchingNextPage}
+          onReachEnd={growFeed}
+        />
       )}
     </Page>
   );
