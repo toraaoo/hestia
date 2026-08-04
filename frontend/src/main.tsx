@@ -1,5 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
+import { MotionConfig } from 'motion/react';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -36,7 +37,11 @@ if (rootElement && !rootElement.innerHTML) {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <LocaleProvider>
-            <RouterProvider router={router} />
+            {/* Honour the OS "reduce motion" setting: transforms are dropped
+                app-wide, opacity is kept, so nothing ever only-moves. */}
+            <MotionConfig reducedMotion="user">
+              <RouterProvider router={router} />
+            </MotionConfig>
           </LocaleProvider>
         </QueryClientProvider>
       </ErrorBoundary>
