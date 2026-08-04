@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import type { ConfigEntry, InstanceInfo } from '@/api';
+import { InstanceSyncField } from '@/features/instances/components';
 import { EntrySettingsTab } from '@/features/shared/entry/settings';
 import { m } from '@/paraglide/messages.js';
 import { configQueries, launcherDefaults } from '@/queries/config';
@@ -41,6 +42,13 @@ export function InstanceSettingsTab({
       remove={remove}
       update={update}
       versionsQuery={instanceQueries.versions(instance.flavor)}
+      extraFields={
+        <InstanceSyncField
+          id={instance.id}
+          name={instance.name}
+          running={running}
+        />
+      }
     />
   );
 }

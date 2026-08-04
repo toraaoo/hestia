@@ -301,6 +301,8 @@ playing the same worlds while the two copies diverge; rejoining folds it back in
 with the **store** winning anything the two both have, since the other instances
 are already playing that copy. Both directions need the instance stopped, both
 confirm first, and what was duplicated or discarded comes back as a warning.
+The switch is per instance, so it lives on that instance's own settings — the
+launcher-wide page owns only `sync.enabled` and the target set.
 
 The managed content directories are rejected as sync targets at the edge:
 per-instance content selection is impossible over a shared directory.

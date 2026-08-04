@@ -66,6 +66,27 @@
       },
       "summary": "The servers in this instance’s multiplayer list.",
       "textures": "Resource packs"
+    },
+    "sync": {
+      "adopt": {
+        "action": "Adopt",
+        "description": "Moves this instance's existing '{target}' into the shared store and links it. The instance must be stopped.",
+        "done": "Adopted: {targets}"
+      },
+      "description": "Worlds, mod config and keybinds are shared with your other instances.",
+      "join_action": "Share it",
+      "join_description": "The shared copies replace anything of this instance's they clash with — its own copies of those worlds and settings are deleted. Everything else it has joins the store.",
+      "join_title": "Share {name} again?",
+      "leave_action": "Stop sharing",
+      "leave_description": "Every folder it shares is copied out of the store, so that data will exist twice and the two copies drift apart from here. Nothing is deleted.",
+      "leave_title": "Stop sharing {name}?",
+      "no_targets": "No folders are shared — add some under Settings › Instances.",
+      "now_alone": "This instance keeps its settings to itself",
+      "now_sharing": "This instance shares its settings again",
+      "off_launcher_wide": "Sharing is off for every instance — turn it on under Settings › Instances.",
+      "opted_out": "This instance keeps its own settings, configs and worlds.",
+      "share_label": "Share this instance's settings",
+      "title": "Shared settings"
     }
   }
 }

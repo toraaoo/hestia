@@ -168,15 +168,6 @@ const INDEX: Entry[] = [
     ),
   },
   {
-    id: 'sync-status',
-    tab: 'instances',
-    group: 'sync',
-    text: text(
-      m['settings.sync.status_title'],
-      m['settings.sync.adopt.action'],
-    ),
-  },
-  {
     id: 'cache',
     tab: 'storage',
     group: 'storage',

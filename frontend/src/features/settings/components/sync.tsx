@@ -1,14 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { toast } from 'sonner';
 
-import type { InstanceSyncStatus, LinkState, SyncTargets } from '@/api';
+import type { SyncTargets } from '@/api';
 import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
-import { StatusDot } from '@/components/ui/status-dot';
 import { Switch } from '@/components/ui/switch';
 import {
   AddRow,
@@ -16,22 +11,8 @@ import {
   SwitchRow,
   ValueRow,
 } from '@/features/settings/components';
-import { cn } from '@/lib/utils';
-import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import { syncMutations, syncQueries } from '@/queries/sync';
-
-const stateLabel: Record<LinkState, () => string> = {
-  linked: () => m['domain.sync_state.linked'](),
-  pending: () => m['domain.sync_state.pending'](),
-  cannot_link: () => m['domain.sync_state.cannot_link'](),
-};
-
-const stateTone: Record<LinkState, 'on' | 'off' | 'warn'> = {
-  linked: 'on',
-  pending: 'off',
-  cannot_link: 'warn',
-};
 
 interface Known {
   name: string;
@@ -56,9 +37,9 @@ const KNOWN_FOLDERS: Known[] = [
 ];
 
 /**
- * The instance-sync settings: whether instances share at all, the shared target
- * set (files copied, folders linked), and every instance's per-folder link
- * state — with adopt for a folder whose names clash with the store.
+ * The launcher-wide sync settings: whether instances share at all and which
+ * targets they share. Where one instance stands — and whether it takes part —
+ * belongs to that instance's own settings, not here.
  */
 export function SyncSettings({
   onCommit,
@@ -115,12 +96,6 @@ export function SyncSettings({
               />
             </div>
           )}
-        </Setting>
-      )}
-
-      {enabled && (
-        <Setting id="sync-status">
-          <LinkStatus hasFolderTargets={targets.folders.length > 0} />
         </Setting>
       )}
     </>
@@ -206,168 +181,5 @@ function TargetGroup({
         />
       </div>
     </Field>
-  );
-}
-
-/** Where each instance stands against the store, and what to do about it. */
-function LinkStatus({ hasFolderTargets }: { hasFolderTargets: boolean }) {
-  const status = useQuery(syncQueries.status());
-
-  return (
-    <Field>
-      <FieldLabel>{m['settings.sync.status_title']()}</FieldLabel>
-      {status.isPending ? (
-        <Bone className="h-10" />
-      ) : !hasFolderTargets ? (
-        <FieldDescription>
-          {m['settings.sync.no_folder_targets']()}
-        </FieldDescription>
-      ) : (
-        <div className="divide-y divide-border border border-border">
-          {(status.data ?? []).map((instance) => (
-            <InstanceRow key={instance.id} instance={instance} />
-          ))}
-        </div>
-      )}
-    </Field>
-  );
-}
-
-/**
- * One instance's row: whether it takes part at all, and where each of its
- * folder targets stands when it does.
- */
-function InstanceRow({ instance }: { instance: InstanceSyncStatus }) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
-      <span className="min-w-0 flex-1 truncate text-sm">{instance.name}</span>
-      {instance.enabled ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {instance.targets.map((target) => (
-            <span
-              key={target.target}
-              className="flex items-center gap-1.5 text-xs"
-            >
-              <StatusDot tone={stateTone[target.state]} />
-              <span className="font-mono">{target.target}</span>
-              {target.state !== 'linked' && (
-                <span
-                  className={cn(
-                    'text-muted-foreground',
-                    target.state === 'cannot_link' && 'text-destructive',
-                  )}
-                >
-                  {stateLabel[target.state]()}
-                </span>
-              )}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <span className="text-xs text-muted-foreground">
-          {m['settings.sync.instance.opted_out']()}
-        </span>
-      )}
-      {instance.enabled &&
-        instance.targets.some((t) => t.state === 'cannot_link') && (
-          <AdoptButton id={instance.id} name={instance.name} />
-        )}
-      <ShareToggle
-        id={instance.id}
-        name={instance.name}
-        enabled={instance.enabled}
-      />
-    </div>
-  );
-}
-
-/**
- * Taking one instance in or out of sharing. Files move either way — folders are
- * copied out on the way out, and the shared copies replace clashing ones on the
- * way in — so both directions confirm first and report what it cost.
- */
-function ShareToggle({
-  id,
-  name,
-  enabled,
-}: {
-  id: string;
-  name: string;
-  enabled: boolean;
-}) {
-  const share = useMutation(syncMutations.share(id));
-  const [pending, setPending] = useState<boolean | null>(null);
-  const next = pending !== null;
-
-  const apply = () => {
-    if (pending === null) return;
-    share.mutate(pending, {
-      onSuccess: (result) => {
-        toastWarnings(result.warnings);
-        toast.success(
-          result.enabled
-            ? m['settings.sync.instance.now_sharing']({ name })
-            : m['settings.sync.instance.now_alone']({ name }),
-        );
-      },
-      onSettled: () => setPending(null),
-    });
-  };
-
-  return (
-    <ConfirmDialog
-      open={next}
-      onOpenChange={(open) => !open && setPending(null)}
-      trigger={
-        <Switch
-          size="sm"
-          aria-label={m['settings.sync.instance.share_label']({ name })}
-          checked={enabled}
-          disabled={share.isPending}
-          onCheckedChange={(checked) => setPending(checked === true)}
-        />
-      }
-      title={
-        pending
-          ? m['settings.sync.instance.join_title']({ name })
-          : m['settings.sync.instance.leave_title']({ name })
-      }
-      description={
-        pending
-          ? m['settings.sync.instance.join_description']()
-          : m['settings.sync.instance.leave_description']()
-      }
-      confirmLabel={
-        pending
-          ? m['settings.sync.instance.join_action']()
-          : m['settings.sync.instance.leave_action']()
-      }
-      destructive={pending === true}
-      onConfirm={apply}
-    />
-  );
-}
-
-function AdoptButton({ id, name }: { id: string; name: string }) {
-  const adopt = useMutation(syncMutations.adopt(id));
-  return (
-    <ConfirmDialog
-      trigger={
-        <Button variant="outline" size="xs" disabled={adopt.isPending}>
-          {m['settings.sync.adopt.action']()}
-        </Button>
-      }
-      title={`${m['settings.sync.adopt.action']()} — ${name}`}
-      description={m['settings.sync.adopt.description']()}
-      confirmLabel={m['settings.sync.adopt.action']()}
-      onConfirm={() =>
-        adopt.mutate(undefined, {
-          onSuccess: (adopted) =>
-            toast.success(
-              m['settings.sync.adopt.done']({ targets: adopted.join(', ') }),
-            ),
-        })
-      }
-    />
   );
 }
