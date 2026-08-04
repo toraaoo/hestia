@@ -18,12 +18,17 @@ describe('mergeHits', () => {
     expect(mergeHits([])).toEqual([]);
   });
 
-  it('orders by downloads across every page', () => {
+  it('orders by downloads within a page', () => {
+    const merged = mergeHits([page(project('a', 10), project('b', 300))]);
+    expect(merged.map((p) => p.id)).toEqual(['b', 'a']);
+  });
+
+  it('appends a later page instead of reranking what is on screen', () => {
     const merged = mergeHits([
       page(project('a', 10), project('b', 300)),
       page(project('c', 200)),
     ]);
-    expect(merged.map((p) => p.id)).toEqual(['b', 'c', 'a']);
+    expect(merged.map((p) => p.id)).toEqual(['b', 'a', 'c']);
   });
 
   it('lists a project once when pages overlap', () => {
