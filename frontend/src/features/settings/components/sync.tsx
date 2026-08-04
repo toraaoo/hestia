@@ -19,7 +19,11 @@ interface Known {
   description: () => string;
 }
 
-/** What Minecraft writes into an instance — offered rather than remembered. */
+/**
+ * What Minecraft writes into an instance — offered rather than remembered. The
+ * launcher-managed content directories are deliberately absent: the daemon
+ * refuses them as targets, so offering one is offering an error.
+ */
 const KNOWN_FILES: Known[] = [
   { name: 'options.txt', description: m['settings.sync.target.options_txt'] },
   { name: 'servers.dat', description: m['settings.sync.target.servers_dat'] },
@@ -29,11 +33,6 @@ const KNOWN_FOLDERS: Known[] = [
   { name: 'saves', description: m['settings.sync.target.saves'] },
   { name: 'config', description: m['settings.sync.target.config'] },
   { name: 'screenshots', description: m['settings.sync.target.screenshots'] },
-  {
-    name: 'resourcepacks',
-    description: m['settings.sync.target.resourcepacks'],
-  },
-  { name: 'shaderpacks', description: m['settings.sync.target.shaderpacks'] },
 ];
 
 /**

@@ -95,11 +95,9 @@
       "target": {
         "config": "Mod configuration",
         "options_txt": "Keybinds, video and audio settings",
-        "resourcepacks": "Resource packs",
         "saves": "Worlds",
         "screenshots": "Screenshots",
-        "servers_dat": "The multiplayer server list",
-        "shaderpacks": "Shader packs"
+        "servers_dat": "The multiplayer server list"
       }
     },
     "tabs": {

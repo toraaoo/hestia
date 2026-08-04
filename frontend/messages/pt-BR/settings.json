@@ -95,11 +95,9 @@
       "target": {
         "config": "Configuração de mods",
         "options_txt": "Teclas, vídeo e áudio",
-        "resourcepacks": "Pacotes de recursos",
         "saves": "Mundos",
         "screenshots": "Capturas de tela",
-        "servers_dat": "A lista de servidores multijogador",
-        "shaderpacks": "Pacotes de shaders"
+        "servers_dat": "A lista de servidores multijogador"
       }
     },
     "tabs": {
