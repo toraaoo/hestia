@@ -206,12 +206,11 @@ export const instanceMutations = {
       mutationFn: (server) => api.serverRemove(id, server),
       invalidates: () => [keys.instances.servers(id)],
     }),
-  /** Arranges the list; `position` counts over the visible rows, from zero. */
-  serverMove: (id: string) =>
-    mutation<InstanceServersWriteResult, { server: string; position: number }>({
-      mutationKey: [...keys.instances.servers(id), 'move'],
-      mutationFn: ({ server, position }) =>
-        api.serverMove(id, server, position),
+  /** Commits an arrangement of the whole list, in one write. */
+  serversArrange: (id: string) =>
+    mutation<InstanceServersWriteResult, string[]>({
+      mutationKey: [...keys.instances.servers(id), 'arrange'],
+      mutationFn: (order) => api.serversArrange(id, order),
       invalidates: () => [keys.instances.servers(id)],
     }),
   /**

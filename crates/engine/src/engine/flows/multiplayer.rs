@@ -80,29 +80,23 @@ impl Engine {
         self.commit_server_list(&record, list)
     }
 
-    /// Move an entry to another slot. `position` counts over the visible
-    /// entries — the rows the caller was shown — because the game's hidden
-    /// scratch rows are not part of the list anyone arranges. Those rows keep
-    /// their own slots, so a move relocates one entry and nothing else.
-    pub fn move_instance_server(
+    /// Rewrite the list into the order `order` names — the arrangement a
+    /// caller made against the rows it was shown, committed as one write.
+    pub fn arrange_instance_servers(
         &self,
         reference: &str,
-        target: &str,
-        position: u32,
+        order: &[String],
     ) -> Result<ServerListWrite> {
         let record = self.instance_record(reference)?;
         let data_dir = self.instances.data_dir(&record);
-        let mut list = servers::read_strict(&data_dir)?;
-        let index = servers::find(&list, target).ok_or(ErrorInfo::ServerListEntryNotFound {
-            reference: target.to_string(),
-        })?;
-        if !servers::reposition(&mut list, index, position as usize) {
+        let list = servers::read_strict(&data_dir)?;
+        let Some(arranged) = servers::rearrange(&list, order) else {
             bail!(ErrorInfo::InvalidValue {
-                field: Field::Position,
-                reason: Reason::ListPosition,
+                field: Field::Order,
+                reason: Reason::ListOrder,
             });
-        }
-        self.commit_server_list(&record, list)
+        };
+        self.commit_server_list(&record, arranged)
     }
 
     /// The status of an arbitrary multiplayer address, over the same Server

@@ -110,24 +110,52 @@ pub fn find(servers: &[ServerEntry], reference: &str) -> Option<usize> {
         })
 }
 
-/// Move the entry at `index` to `position`, counted over the visible entries
-/// only — the rows a person was shown. The game's hidden scratch rows are not
-/// part of the list anyone arranges, so they keep the slots they are in.
-/// `false` when the position is past the end, which leaves the list untouched.
-pub fn reposition(servers: &mut Vec<ServerEntry>, index: usize, position: usize) -> bool {
-    let entry = servers.remove(index);
-    let slots: Vec<usize> = servers
+/// Rewrite the list into the order `order` names, each entry by name or
+/// address. The visible entries are dealt back into their own slots in that
+/// order; the game's hidden scratch rows are not part of the list anyone
+/// arranges, so they stay exactly where they are.
+///
+/// `None` when `order` does not name each visible entry exactly once — the
+/// list moved underneath the caller, and guessing at the intended arrangement
+/// would silently reorder rows the caller never saw.
+pub fn rearrange(servers: &[ServerEntry], order: &[String]) -> Option<Vec<ServerEntry>> {
+    let mut slots: Vec<usize> = servers
         .iter()
         .enumerate()
         .filter(|(_, entry)| !entry.hidden)
         .map(|(index, _)| index)
         .collect();
-    if position > slots.len() {
-        servers.insert(index, entry);
-        return false;
+    if order.len() != slots.len() {
+        return None;
     }
-    servers.insert(slots.get(position).copied().unwrap_or(servers.len()), entry);
-    true
+
+    let mut arranged = servers.to_vec();
+    let mut taken = vec![false; servers.len()];
+    for (slot, reference) in slots.drain(..).zip(order) {
+        let found = find_available(servers, reference, &taken)?;
+        taken[found] = true;
+        arranged[slot] = servers[found].clone();
+    }
+    Some(arranged)
+}
+
+/// [`find`] over the visible entries not yet placed — two entries may carry the
+/// same name, and each reference in an arrangement claims one of them.
+fn find_available(servers: &[ServerEntry], reference: &str, taken: &[bool]) -> Option<usize> {
+    let reference = reference.trim();
+    let available =
+        |index: usize, entry: &ServerEntry| !taken[index] && !entry.hidden && !reference.is_empty();
+    servers
+        .iter()
+        .enumerate()
+        .position(|(index, entry)| {
+            available(index, entry) && entry.name.eq_ignore_ascii_case(reference)
+        })
+        .or_else(|| {
+            servers.iter().enumerate().position(|(index, entry)| {
+                available(index, entry) && entry.address.eq_ignore_ascii_case(reference)
+            })
+        })
 }
 
 fn into_proto(entry: Entry) -> ServerEntry {
@@ -193,34 +221,61 @@ mod tests {
     }
 
     #[test]
-    fn an_entry_moves_to_a_visible_position() {
-        let mut servers = vec![
+    fn a_list_takes_the_order_it_is_given() {
+        let servers = vec![
             entry("A", "a.net"),
             entry("B", "b.net"),
             entry("C", "c.net"),
         ];
-        assert!(reposition(&mut servers, 2, 0));
-        assert_eq!(names(&servers), ["C", "A", "B"]);
-        assert!(reposition(&mut servers, 0, 2));
-        assert_eq!(names(&servers), ["A", "B", "C"]);
+        let order = ["C".to_string(), "a.net".to_string(), "B".to_string()];
+        assert_eq!(
+            names(&rearrange(&servers, &order).unwrap()),
+            ["C", "A", "B"]
+        );
     }
 
     #[test]
-    fn a_hidden_row_is_not_counted_as_a_position() {
+    fn a_hidden_row_keeps_its_slot_and_is_never_named() {
         let hidden = ServerEntry {
             hidden: true,
             ..entry("scratch", "direct.example.net")
         };
-        let mut servers = vec![entry("A", "a.net"), hidden, entry("B", "b.net")];
-        assert!(reposition(&mut servers, 2, 0));
-        assert_eq!(names(&servers), ["B", "A", "scratch"]);
+        let servers = vec![entry("A", "a.net"), hidden, entry("B", "b.net")];
+        let arranged =
+            rearrange(&servers, &["B".to_string(), "A".to_string()]).expect("visible order");
+        assert_eq!(names(&arranged), ["B", "scratch", "A"]);
+        assert!(arranged[1].hidden);
+        assert!(rearrange(&servers, &["scratch".to_string(), "A".to_string()]).is_none());
     }
 
     #[test]
-    fn a_position_past_the_end_leaves_the_list_alone() {
-        let mut servers = vec![entry("A", "a.net"), entry("B", "b.net")];
-        assert!(!reposition(&mut servers, 0, 2));
-        assert_eq!(names(&servers), ["A", "B"]);
+    fn an_order_naming_a_different_set_is_refused() {
+        let servers = vec![entry("A", "a.net"), entry("B", "b.net")];
+        for order in [
+            vec!["A".to_string()],
+            vec!["A".to_string(), "A".to_string()],
+            vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            vec!["A".to_string(), "gone".to_string()],
+        ] {
+            assert!(rearrange(&servers, &order).is_none(), "{order:?}");
+        }
+    }
+
+    #[test]
+    fn two_entries_sharing_a_name_each_claim_one_slot() {
+        let servers = vec![
+            entry("SMP", "one.example.net"),
+            entry("SMP", "two.example.net"),
+        ];
+        let order = ["SMP".to_string(), "two.example.net".to_string()];
+        let arranged = rearrange(&servers, &order).expect("both placed");
+        assert_eq!(
+            arranged
+                .iter()
+                .map(|s| s.address.as_str())
+                .collect::<Vec<_>>(),
+            ["one.example.net", "two.example.net"]
+        );
     }
 
     fn names(servers: &[ServerEntry]) -> Vec<&str> {

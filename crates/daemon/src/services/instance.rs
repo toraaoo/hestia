@@ -10,8 +10,8 @@ use proto::instance::{
     InstanceListResult, InstanceLoaders, InstanceLogs, InstanceProfileCapture,
     InstanceProfileCreate, InstanceProfileEdit, InstanceProfileList, InstanceProfileListResult,
     InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename, InstanceProfileUse,
-    InstanceRemove, InstanceRename, InstanceResolve, InstanceServerEdit, InstanceServerMove,
-    InstanceServerRemove, InstanceServers, InstanceServersResult, InstanceServersWriteResult,
+    InstanceRemove, InstanceRename, InstanceResolve, InstanceServerEdit, InstanceServerRemove,
+    InstanceServers, InstanceServersArrange, InstanceServersResult, InstanceServersWriteResult,
     InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds,
     InstanceWorldsResult, ServerEntry,
 };
@@ -184,11 +184,11 @@ pub(super) fn register(on: &mut Channels<'_>) {
         Ok(server_list_result(written))
     });
 
-    on.handle::<InstanceServerMove, _, _>(|p, ctx| async move {
+    on.handle::<InstanceServersArrange, _, _>(|p, ctx| async move {
         let written = ctx
             .runtime
             .engine()
-            .move_instance_server(&p.instance, &p.server, p.position)
+            .arrange_instance_servers(&p.instance, &p.order)
             .map_err(crate::runtime::engine_error)?;
         Ok(server_list_result(written))
     });

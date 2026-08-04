@@ -356,24 +356,28 @@ impl Contract for InstanceServerRemove {
     type Result = InstanceServersWriteResult;
 }
 
-/// Move an entry to another slot in the multiplayer list. The file's order is
-/// the order the game shows, so this is the player arranging their own list.
+/// Rewrite the order of the multiplayer list. The file's order is the order
+/// the game shows, so this is the player arranging their own list.
+///
+/// The whole arrangement travels at once rather than one move at a time: the
+/// game's file is rewritten wholesale on every write, so a sequence of moves
+/// would be a sequence of rewrites, each with its own in-use warning.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
-pub struct InstanceServerMoveParams {
+pub struct InstanceServersArrangeParams {
     pub instance: String,
-    /// The entry to move, by name or address.
-    pub server: String,
-    /// Where it lands, counted over the *visible* entries only — the rows a
-    /// caller was shown. The game's own hidden scratch rows keep their slots.
-    pub position: u32,
+    /// Every *visible* entry, by name or address, in the order it should sit —
+    /// the rows a caller was shown. Naming anything else, or naming one twice,
+    /// is refused rather than guessed at: the list moved underneath the caller.
+    /// The game's own hidden scratch rows are not named and keep their slots.
+    pub order: Vec<String>,
 }
 
-pub struct InstanceServerMove;
-impl Contract for InstanceServerMove {
-    const CHANNEL: &'static str = "instance.server.move";
-    type Params = InstanceServerMoveParams;
+pub struct InstanceServersArrange;
+impl Contract for InstanceServersArrange {
+    const CHANNEL: &'static str = "instance.servers.arrange";
+    type Params = InstanceServersArrangeParams;
     type Result = InstanceServersWriteResult;
 }
 

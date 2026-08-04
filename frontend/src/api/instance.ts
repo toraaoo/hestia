@@ -142,15 +142,14 @@ export function serverRemove(
 }
 
 /**
- * Move an entry within the multiplayer list. `position` counts over the
- * visible entries — the rows that were listed — from zero.
+ * Rewrite the order of the multiplayer list. `order` names every visible entry
+ * — the rows that were listed — in the order it should sit.
  */
-export function serverMove(
+export function serversArrange(
   instance: string,
-  server: string,
-  position: number,
+  order: string[],
 ): Promise<InstanceServersWriteResult> {
-  return call('instance.server.move', { instance, server, position });
+  return call('instance.servers.arrange', { instance, order });
 }
 
 /** Status of a multiplayer address, over the Server List Ping. */

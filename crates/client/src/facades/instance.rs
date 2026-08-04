@@ -20,10 +20,10 @@ use proto::instance::{
     InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename,
     InstanceProfileRenameParams, InstanceProfileUse, InstanceRef, InstanceRemove, InstanceRename,
     InstanceRenameParams, InstanceResolve, InstanceServerEdit, InstanceServerEditParams,
-    InstanceServerMove, InstanceServerMoveParams, InstanceServerRef, InstanceServerRemove,
-    InstanceServers, InstanceServersWriteResult, InstanceStop, InstanceStopParams, InstanceUpdate,
-    InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile, QuickPlay, ServerEntry,
-    WorldInfo,
+    InstanceServerRef, InstanceServerRemove, InstanceServers, InstanceServersArrange,
+    InstanceServersArrangeParams, InstanceServersWriteResult, InstanceStop, InstanceStopParams,
+    InstanceUpdate, InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile, QuickPlay,
+    ServerEntry, WorldInfo,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, LoadersParams, ProvisionProgress,
@@ -199,19 +199,17 @@ impl Instance<'_> {
             .await
     }
 
-    /// Move an entry to another slot of the multiplayer list; `position`
-    /// counts over the visible entries, which is what a caller has listed.
-    pub async fn server_move(
+    /// Rewrite the order of the multiplayer list. `order` names every visible
+    /// entry — the rows the caller listed — in the order they should sit.
+    pub async fn servers_arrange(
         &self,
         instance: &str,
-        target: &str,
-        position: u32,
+        order: Vec<String>,
     ) -> Result<InstanceServersWriteResult, IpcError> {
         self.session
-            .call::<InstanceServerMove>(&InstanceServerMoveParams {
+            .call::<InstanceServersArrange>(&InstanceServersArrangeParams {
                 instance: instance.to_string(),
-                server: target.to_string(),
-                position,
+                order,
             })
             .await
     }

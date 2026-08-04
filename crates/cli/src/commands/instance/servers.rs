@@ -5,7 +5,7 @@
 //! open is answered with a warning rather than refused — the daemon says so on
 //! the result and it is shown like any other degraded outcome.
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use client::proto::instance::{QuickPlay, ServerEntry};
 use client::Client;
@@ -129,13 +129,12 @@ pub(super) async fn run(client: &Client, instance: &str, cmd: ServerCmd) -> Resu
             ui::show_warnings(&written.warnings)
         }
         ServerCmd::Move { server, position } => {
-            if position == 0 {
-                bail!("positions start at 1");
-            }
-            let written = client
-                .instance()
-                .server_move(instance, &server, position - 1)
-                .await?;
+            let order = moved(
+                &visible(client.instance().servers(instance).await?),
+                &server,
+                position,
+            )?;
+            let written = client.instance().servers_arrange(instance, order).await?;
             ui::show(View::line(format!("'{server}' moved to #{position}")))?;
             ui::show_warnings(&written.warnings)
         }
@@ -170,6 +169,35 @@ pub(super) async fn list(client: &Client, instance: &str) -> Result<()> {
         ["#", "NAME", "ADDRESS", "STATUS"],
         rows,
     ))
+}
+
+/// The list's order with `server` lifted to `position`, counting from 1. The
+/// whole arrangement is what the daemon takes, so the move is resolved here
+/// against the list that was just read.
+fn moved(servers: &[ServerEntry], server: &str, position: u32) -> Result<Vec<String>> {
+    if position == 0 || position as usize > servers.len() {
+        bail!("positions run from 1 to {}", servers.len());
+    }
+    let index = servers
+        .iter()
+        .position(|s| {
+            s.name.eq_ignore_ascii_case(server.trim())
+                || s.address.eq_ignore_ascii_case(server.trim())
+        })
+        .with_context(|| format!("no server named '{server}' in the list"))?;
+    let mut order: Vec<String> = servers
+        .iter()
+        .map(|s| {
+            if s.name.is_empty() {
+                s.address.clone()
+            } else {
+                s.name.clone()
+            }
+        })
+        .collect();
+    let entry = order.remove(index);
+    order.insert(position as usize - 1, entry);
+    Ok(order)
 }
 
 /// Ping every entry at once, bounded — an unreachable entry costs its own
