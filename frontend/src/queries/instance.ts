@@ -93,12 +93,14 @@ export const instanceQueries = {
     }),
   /**
    * What a server answers right now. Its own key so a row refreshes without
-   * re-reading the list, and short-lived because a player count is.
+   * re-reading the list, and short-lived because a player count is. An address
+   * that does not answer is the row's offline state, not an error to report.
    */
   serverStatus: (address: string) =>
     queryOptions({
       queryKey: keys.instances.serverStatus(address),
       queryFn: () => api.pingAddress(address),
+      meta: { silent: true },
       staleTime: 30_000,
       retry: false,
     }),
