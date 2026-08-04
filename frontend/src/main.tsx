@@ -37,8 +37,6 @@ if (rootElement && !rootElement.innerHTML) {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <LocaleProvider>
-            {/* Honour the OS "reduce motion" setting: transforms are dropped
-                app-wide, opacity is kept, so nothing ever only-moves. */}
             <MotionConfig reducedMotion="user">
               <RouterProvider router={router} />
             </MotionConfig>
