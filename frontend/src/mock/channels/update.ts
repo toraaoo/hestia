@@ -10,6 +10,7 @@ export const channels: Handlers = {
   'update.check': (): UpdateCheckResult => ({
     current: '0.0.1-mock',
     install: 'unmanaged',
+    channel: 'stable',
     available: undefined,
   }),
 };

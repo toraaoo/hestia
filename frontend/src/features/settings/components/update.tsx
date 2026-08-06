@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import type { UpdateChannel } from '@/api/types/update';
 import { Markdown } from '@/components/markdown';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +12,15 @@ import {
   FieldDescription,
   FieldLabel,
 } from '@/components/ui/field';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useConfig } from '@/features/settings/use-config';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { appQueries } from '@/queries/app';
@@ -19,6 +29,48 @@ import {
   useDownloadUpdate,
   useUpdateCheck,
 } from '@/queries/update';
+
+const CHANNELS: UpdateChannel[] = ['stable', 'beta'];
+
+const CHANNEL_LABELS: Record<UpdateChannel, () => string> = {
+  stable: m['domain.update_channel.stable'],
+  beta: m['domain.update_channel.beta'],
+};
+
+/** Which feed {@link UpdatePanel} checks — a daemon setting, not a preference. */
+export function UpdateChannelField() {
+  const { entries, save } = useConfig();
+
+  return (
+    <Field>
+      <FieldLabel htmlFor="update-channel">
+        {m['settings.update.channel_label']()}
+      </FieldLabel>
+      <Select
+        value={entries.update?.channel ?? 'stable'}
+        onValueChange={(value) => {
+          if (value) save('update.channel', value);
+        }}
+      >
+        <SelectTrigger id="update-channel" className="w-full max-w-md">
+          <SelectValue>
+            {(value: string) => CHANNEL_LABELS[value as UpdateChannel]()}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent align="start">
+          <SelectGroup>
+            {CHANNELS.map((channel) => (
+              <SelectItem key={channel} value={channel}>
+                {CHANNEL_LABELS[channel]()}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <FieldDescription>{m['settings.update.channel_hint']()}</FieldDescription>
+    </Field>
+  );
+}
 
 /**
  * Self-update. The check runs only when asked — it reaches the network, and an

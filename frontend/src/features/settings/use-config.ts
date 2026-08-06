@@ -2,6 +2,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import type { UpdateChannel } from '@/api/types/update';
+
 import { m } from '@/paraglide/messages.js';
 import { configMutations, configQueries } from '@/queries/config';
 
@@ -20,6 +22,7 @@ export interface ConfigEntries {
   discord?: { enabled?: boolean };
   instance?: { 'multi-session'?: boolean };
   modpack?: ModpackConfig;
+  update?: { channel?: UpdateChannel };
 }
 
 /**

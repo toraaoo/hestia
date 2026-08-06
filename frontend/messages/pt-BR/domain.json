@@ -85,6 +85,10 @@
       "cannot_link": "conflita com o armazenamento",
       "linked": "vinculada",
       "pending": "compartilha no próximo início"
+    },
+    "update_channel": {
+      "beta": "Beta",
+      "stable": "Estável"
     }
   }
 }

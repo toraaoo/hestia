@@ -8,4 +8,4 @@ export {
 export { ModpackSettings } from './modpack';
 export { RuntimeList } from './runtimes';
 export { SyncSettings } from './sync';
-export { UpdatePanel } from './update';
+export { UpdateChannelField, UpdatePanel } from './update';

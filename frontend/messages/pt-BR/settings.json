@@ -109,6 +109,8 @@
     },
     "update": {
       "available": "A versão {version} está disponível",
+      "channel_hint": "As versões beta chegam primeiro e podem ser instáveis. Ao voltar para o estável, é preciso esperar o próximo lançamento estável ultrapassar a beta em uso.",
+      "channel_label": "Canal de lançamento",
       "check": "Verificar atualizações",
       "check_failed": "Não foi possível verificar atualizações",
       "checking": "Verificando…",

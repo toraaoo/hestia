@@ -109,6 +109,8 @@
     },
     "update": {
       "available": "Version {version} is available",
+      "channel_hint": "Beta builds arrive first and can be unstable. Switching back to stable waits for the next stable release to overtake the beta you are on.",
+      "channel_label": "Release channel",
       "check": "Check for updates",
       "check_failed": "Couldn't check for updates",
       "checking": "Checking…",

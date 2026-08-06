@@ -12,6 +12,7 @@ import {
   Setting,
   SettingsSection,
   SwitchRow,
+  UpdateChannelField,
   UpdatePanel,
 } from '@/features/settings/components';
 import { useConfig } from '@/features/settings/use-config';
@@ -134,6 +135,10 @@ export function GeneralTab() {
       </SettingsSection>
 
       <SettingsSection group="updates" legend={m['settings.update.title']()}>
+        <Setting id="update-channel">
+          <UpdateChannelField />
+        </Setting>
+
         <Setting id="update">
           <UpdatePanel />
         </Setting>

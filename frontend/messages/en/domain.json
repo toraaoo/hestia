@@ -85,6 +85,10 @@
       "cannot_link": "clashes with the store",
       "linked": "linked",
       "pending": "shares at next launch"
+    },
+    "update_channel": {
+      "beta": "Beta",
+      "stable": "Stable"
     }
   }
 }
