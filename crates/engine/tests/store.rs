@@ -36,6 +36,23 @@ fn config_gates_multi_session_off_until_asked_for() {
 }
 
 #[test]
+fn config_takes_only_a_channel_it_knows() {
+    let dir = temp_dir("config-channel");
+    let path = dir.path().join("config");
+    let cfg = Config::new(path.clone());
+
+    cfg.set("update.channel", serde_json::json!("beta"))
+        .unwrap();
+    assert_eq!(
+        Config::new(path).settings().update.channel,
+        proto::update::UpdateChannel::Beta
+    );
+    assert!(cfg
+        .set("update.channel", serde_json::json!("nightly"))
+        .is_err());
+}
+
+#[test]
 fn config_jvm_defaults_validate_and_normalise() {
     let dir = temp_dir("config-defaults");
     let cfg = Config::new(dir.path().join("config"));
