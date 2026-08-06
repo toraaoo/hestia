@@ -88,6 +88,20 @@ jobs:
             exit 1
           fi
 
+      # A release nobody is told about is not a release: the feed is what every
+      # installed copy polls, so a missing token fails here rather than after
+      # the installers are already public.
+      - name: The update feed is configured
+        if: github.ref_type == 'tag'
+        env:
+          FEED_URL: ${{ vars.UPDATE_FEED_URL }}
+          FEED_TOKEN: ${{ secrets.UPDATE_FEED_TOKEN }}
+        run: |
+          if [ -z "${FEED_URL:-}" ] || [ -z "${FEED_TOKEN:-}" ]; then
+            echo "::error::UPDATE_FEED_URL (variable) and UPDATE_FEED_TOKEN (secret) must both be set. See docs/update-feed.md."
+            exit 1
+          fi
+
       # Not fatal: without it the CurseForge source stays hidden until a user
       # sets `content.curseforge-key` themselves.
       - name: The CurseForge key is configured
@@ -211,9 +225,10 @@ jobs:
             target/package/*.tar.gz
             target/package/*.zip
 
-  # Every release carries the same `latest.json`, composed from both platforms'
-  # signed installers. Which channel it serves is the Release's own prerelease
-  # flag, which is what the feed API reads to pick a release per channel.
+  # Compose `latest.json` from both platforms' signed installers and publish it
+  # to the feed API for this tag's channel. The Release keeps a copy purely as
+  # provenance — nothing reads it, since the feed is the record of what is
+  # current (docs/update-feed.md).
   manifest:
     needs: [preflight, package]
     if: startsWith(github.ref, 'refs/tags/')
@@ -286,3 +301,26 @@ jobs:
         with:
           prerelease: ${{ needs.preflight.outputs.prerelease }}
           files: latest.json
+
+      # The publish is a PUT: the body replaces the channel's manifest, so a
+      # re-run of this job is harmless and a rollback is a re-publish of the
+      # older document. Last step of the release on purpose — it is what makes
+      # the version visible to every installed copy.
+      - name: Publish to the feed
+        shell: bash
+        env:
+          FEED_URL: ${{ vars.UPDATE_FEED_URL }}
+          FEED_TOKEN: ${{ secrets.UPDATE_FEED_TOKEN }}
+          CHANNEL: ${{ needs.preflight.outputs.channel }}
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o response.txt -w '%{http_code}' \
+            -X PUT "${FEED_URL%/}/$CHANNEL" \
+            -H "authorization: Bearer $FEED_TOKEN" \
+            -H 'content-type: application/json' \
+            --data-binary @latest.json)"
+          if [ "$code" != "204" ]; then
+            echo "::error::the feed refused the manifest ($code): $(cat response.txt)"
+            exit 1
+          fi
+          echo "published ${GITHUB_REF_NAME#v} to the $CHANNEL channel"

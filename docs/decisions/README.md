@@ -42,6 +42,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0040** — [Following logs is scoped to the entry, not to one run of it](0040-following-logs-is-entry-scoped.md)
 - **0064** — [A managed document carries its own schema version, and an unreadable one is set aside](0064-a-managed-document-carries-its-schema-version.md)
 - **0066** — [The daemon owns self-update; the shell asks like everything else](0066-the-daemon-owns-self-update.md)
+- **0070** — [A channel picks the feed, not an entry inside one](0070-a-channel-picks-the-feed-not-the-entry.md)
 
 ### [The daemon](../architecture/daemon.md)
 

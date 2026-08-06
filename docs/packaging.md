@@ -94,8 +94,15 @@ The **daemon** owns self-update — `engine/src/update/`, reached over `update.c
 `update.download` and `update.apply`. Every front-end is a caller; none reads the manifest, holds a key, or runs an
 installer ([decision 0066](decisions/0066-the-daemon-owns-self-update.md)).
 
-It polls `https://github.com/prytaneum/hestia/releases/latest/download/latest.json`. On a `v*` tag the release
-workflow's `manifest` job composes `latest.json` and attaches it to the Release:
+It polls the feed API, one manifest per release channel — `…/updates/stable` or `…/updates/beta`, chosen by the
+`update.channel` setting ([decision 0070](decisions/0070-a-channel-picks-the-feed-not-the-entry.md)). On a `v*` tag the
+release workflow's `manifest` job composes `latest.json`, attaches it to the Release as provenance, and **publishes** it
+to the channel the tag names — a prerelease suffix (`v1.3.0-beta.1`) is beta, a plain `v1.3.0` is stable. Nothing reads
+the repository's releases to decide what is current. The full HTTP contract, both directions, is in
+[update-feed.md](update-feed.md).
+
+Publishing needs the `UPDATE_FEED_URL` variable and the `UPDATE_FEED_TOKEN` secret; the `preflight` job refuses a tagged
+release without them. The manifest itself:
 
 ```json
 {
