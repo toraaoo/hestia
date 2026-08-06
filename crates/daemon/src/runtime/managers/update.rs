@@ -40,7 +40,7 @@ impl UpdateManager {
             .start(spec, move |engine, reporter| {
                 Box::pin(async move {
                     let report = reporter.checked();
-                    engine.update().download(&report).await
+                    engine.download_update(&report).await
                 })
             })
             .expect("a keyless job is never refused")

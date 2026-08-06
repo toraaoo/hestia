@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use anyhow::{anyhow, bail, Context, Result};
-use proto::update::{UpdateCheckResult, UpdateInfo, UpdateInstall};
+use proto::update::{UpdateChannel, UpdateCheckResult, UpdateInfo, UpdateInstall};
 
 use crate::download::{http_client, Downloader, ProgressFn};
 use crate::signature::verify_file;
@@ -70,12 +70,13 @@ impl Update {
         *self.dir.lock().unwrap() = dir;
     }
 
-    pub async fn check(&self) -> Result<UpdateCheckResult> {
-        let manifest = fetch_manifest().await?;
+    pub async fn check(&self, channel: UpdateChannel) -> Result<UpdateCheckResult> {
+        let manifest = fetch_manifest(channel).await?;
         let install = install::detect();
         Ok(UpdateCheckResult {
             current: common::app::VERSION.to_string(),
             install,
+            channel,
             available: available(&manifest).map(|entry| {
                 let artifact = artifact_for(entry, install);
                 UpdateInfo {
@@ -93,8 +94,12 @@ impl Update {
 
     /// Download the artifact matching how this copy was installed, discarding
     /// one whose signature does not verify. Returns the path and its version.
-    pub async fn download(&self, on_progress: &ProgressFn<'_>) -> Result<(PathBuf, String)> {
-        let manifest = fetch_manifest().await?;
+    pub async fn download(
+        &self,
+        channel: UpdateChannel,
+        on_progress: &ProgressFn<'_>,
+    ) -> Result<(PathBuf, String)> {
+        let manifest = fetch_manifest(channel).await?;
         let install = install::detect();
         let entry = available(&manifest)
             .ok_or_else(|| anyhow!("{} is already the latest version", common::app::VERSION))?;
@@ -136,22 +141,27 @@ impl Update {
     }
 }
 
-/// `HESTIA_UPDATE_ENDPOINT` points a **debug** build at a local feed. The
-/// signature is still checked against the compiled-in keys, so a local test
-/// signs with a key this build trusts.
-fn endpoint() -> String {
+/// `HESTIA_UPDATE_ENDPOINT` points a **debug** build at a local feed, standing
+/// in for the whole URL — channel segment included, so one served file drives
+/// either channel. The signature is still checked against the compiled-in keys,
+/// so a local test signs with a key this build trusts.
+fn endpoint(channel: UpdateChannel) -> String {
     #[cfg(debug_assertions)]
     if let Ok(url) = std::env::var("HESTIA_UPDATE_ENDPOINT") {
         if !url.trim().is_empty() {
             return url;
         }
     }
-    common::app::UPDATE_ENDPOINT.to_string()
+    format!(
+        "{}/{}",
+        common::app::UPDATE_ENDPOINT.trim_end_matches('/'),
+        channel.as_str()
+    )
 }
 
-async fn fetch_manifest() -> Result<Manifest> {
+async fn fetch_manifest(channel: UpdateChannel) -> Result<Manifest> {
     http_client()
-        .get(endpoint())
+        .get(endpoint(channel))
         .send()
         .await
         .context("cannot reach the update endpoint")?

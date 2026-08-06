@@ -2,6 +2,7 @@
 export type { UpdateApplyParams } from "./generated/UpdateApplyParams";
 export type { UpdateApplyResult } from "./generated/UpdateApplyResult";
 export type { UpdateCancelledEvent } from "./generated/UpdateCancelledEvent";
+export type { UpdateChannel } from "./generated/UpdateChannel";
 export type { UpdateCheckResult } from "./generated/UpdateCheckResult";
 export type { UpdateDoneEvent } from "./generated/UpdateDoneEvent";
 export type { UpdateDownloadParams } from "./generated/UpdateDownloadParams";

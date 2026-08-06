@@ -15,8 +15,9 @@ pub async fn run(yes: bool) -> Result<()> {
     };
     let Some(info) = status.available else {
         return ui::show(View::line(format!(
-            "hestia {} is up to date",
-            status.current
+            "hestia {} is up to date on the {} channel",
+            status.current,
+            status.channel.as_str()
         )));
     };
 

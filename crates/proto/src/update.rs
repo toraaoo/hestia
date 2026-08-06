@@ -9,6 +9,35 @@ use serde::{Deserialize, Serialize};
 use crate::contract::{Contract, Empty, Topic};
 use crate::download::DownloadProgress;
 
+/// Which release feed a build follows. One manifest per channel: the channel
+/// picks the document, version precedence decides whether it is an upgrade.
+#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "snake_case")]
+pub enum UpdateChannel {
+    #[default]
+    Stable,
+    Beta,
+}
+
+impl UpdateChannel {
+    /// Also the last path segment of the feed this channel is served from.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            UpdateChannel::Stable => "stable",
+            UpdateChannel::Beta => "beta",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<UpdateChannel> {
+        match value {
+            "stable" => Some(UpdateChannel::Stable),
+            "beta" => Some(UpdateChannel::Beta),
+            _ => None,
+        }
+    }
+}
+
 /// How this copy of Hestia was installed, which decides both the artifact the
 /// manifest is asked for and how it is applied.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,6 +76,8 @@ pub struct UpdateInfo {
 pub struct UpdateCheckResult {
     pub current: String,
     pub install: UpdateInstall,
+    /// The feed this answer came from.
+    pub channel: UpdateChannel,
     pub available: Option<UpdateInfo>,
 }
 

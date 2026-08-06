@@ -14,7 +14,14 @@ pub const TRAY_ID: &str = "org.prytaneum.hestia.tray";
 /// the running instance routes it through single-instance and exits.
 pub const DESKTOP_QUIT_ARG: &str = "--quit";
 pub const VENDOR: &str = "prytaneum";
-pub const CHANNEL: &str = "dev";
+/// The release channel this build was shipped on, stamped at compile time by
+/// the release workflow. It seeds the self-update feed (`update.channel`), so a
+/// beta build looks for betas without the user having to ask — an untagged
+/// local build is `dev`, which is no channel and falls back to stable.
+pub const CHANNEL: &str = match option_env!("HESTIA_CHANNEL") {
+    Some(channel) => channel,
+    None => "dev",
+};
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Shipped name first, cargo's output last, so a dev build still resolves.
@@ -33,12 +40,15 @@ pub const DAEMON_BIN: &[&str] = &["hestiad.exe"];
 #[cfg(not(windows))]
 pub const DAEMON_BIN: &[&str] = &["hestiad"];
 
-/// The release manifest the daemon checks for a newer version, and the minisign
+/// The release feed the daemon checks for a newer version, and the minisign
 /// public key its artifacts are verified against. Every front-end reaches this
 /// through `update.check`, so these two constants are the only place either is
 /// written down.
-pub const UPDATE_ENDPOINT: &str =
-    "https://github.com/prytaneum/hestia/releases/latest/download/latest.json";
+///
+/// The channel is the last path segment (`…/updates/stable`), because GitHub's
+/// own `releases/latest/download/` resolves only to the newest *non*-prerelease
+/// release — it can serve the stable feed and has no way to name the beta one.
+pub const UPDATE_ENDPOINT: &str = "https://api.hestia.prytaneum.dev/updates";
 pub const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJDNjM3NzcxQUEwRTdDQUQKUldTdGZBNnFjWGRqTERoaEIzaXFJcU1ZdU1YdXBVUk16cFdGVFQzYmZtT3ZVRC9mbjdYU0dOQlkK";
 
 /// The rotation spare. A binary trusts only the keys compiled into it, so a

@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use proto::naming;
+use proto::update::UpdateChannel;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -32,6 +33,26 @@ pub struct Settings {
     pub modpack: ModpackSettings,
     /// What the launcher publishes to a local Discord client.
     pub discord: DiscordSettings,
+    /// Which release feed self-update follows.
+    pub update: UpdateSettings,
+}
+
+/// The self-update feed, keyed `update.channel`. It defaults to the channel
+/// this build was shipped on rather than to stable: a beta build pointed at the
+/// stable feed is stranded, since a release never outranks the prerelease that
+/// precedes it until the *next* one ships.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct UpdateSettings {
+    pub channel: UpdateChannel,
+}
+
+impl Default for UpdateSettings {
+    fn default() -> Self {
+        UpdateSettings {
+            channel: UpdateChannel::parse(common::app::CHANNEL).unwrap_or_default(),
+        }
+    }
 }
 
 /// Discord Rich Presence, keyed `discord.enabled`. On, the daemon publishes

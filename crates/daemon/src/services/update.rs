@@ -12,8 +12,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<UpdateCheck, _, _>(|_: Empty, ctx| async move {
         ctx.runtime
             .engine()
-            .update()
-            .check()
+            .check_update()
             .await
             .map_err(crate::runtime::engine_error)
     });
