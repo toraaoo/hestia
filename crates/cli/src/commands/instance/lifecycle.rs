@@ -17,15 +17,10 @@ use crate::ui::{self, MonitorSample, ProvisionReporter, Spinner, View};
 /// `hestia play`. Attaching prints its outcome only after the session ends,
 /// so nothing lands in the shell between the prompt and the alternate screen
 /// (which some terminals duplicate into scrollback).
-pub async fn launch(
-    client: &Client,
-    reference: &str,
-    account: &str,
-    new_session: bool,
-    detach: bool,
-    quick_play: Option<QuickPlay>,
-) -> Result<()> {
-    let launched = launch_once(client, reference, account, new_session, quick_play).await?;
+pub async fn launch(client: &Client, options: Launch<'_>) -> Result<()> {
+    let reference = options.reference;
+    let detach = options.detach;
+    let launched = launch_once(client, &options).await?;
     let process_id = launched.process_id;
     if detach || !ui::interactive_output() {
         ui::show(View::line(format!(
@@ -49,14 +44,20 @@ pub async fn launch(
         .await
 }
 
+/// One launch's inputs. Named fields: `new_session`, `detach` and `offline` are
+/// adjacent bools a positional call could swap without the compiler noticing.
+#[derive(Default)]
+pub struct Launch<'a> {
+    pub reference: &'a str,
+    pub account: &'a str,
+    pub new_session: bool,
+    pub detach: bool,
+    pub quick_play: Option<QuickPlay>,
+    pub offline: bool,
+}
+
 /// Launch; on an `unauthorized` (expired sign-in) offer to re-auth and retry once.
-async fn launch_once(
-    client: &Client,
-    reference: &str,
-    account: &str,
-    new_session: bool,
-    quick_play: Option<QuickPlay>,
-) -> Result<InstanceLaunchDoneEvent> {
+async fn launch_once(client: &Client, options: &Launch<'_>) -> Result<InstanceLaunchDoneEvent> {
     let mut retried = false;
     loop {
         let reporter = Arc::new(ProvisionReporter::new());
@@ -64,11 +65,14 @@ async fn launch_once(
         let result = client
             .instance()
             .launch(
-                reference,
-                account,
-                new_session,
-                "",
-                quick_play.clone(),
+                client::LaunchOptions {
+                    instance: options.reference,
+                    account: options.account,
+                    new_session: options.new_session,
+                    profile: "",
+                    quick_play: options.quick_play.clone(),
+                    offline: options.offline,
+                },
                 move |p| progress.update(p),
             )
             .await;
@@ -130,7 +134,17 @@ pub(crate) async fn restart(
     }
     // Restarting one session leaves the others running, so its relaunch must opt
     // into a concurrent session; a full restart stopped everything first.
-    launch(client, instance, account, target.is_some(), detach, None).await
+    launch(
+        client,
+        Launch {
+            reference: instance,
+            account,
+            new_session: target.is_some(),
+            detach,
+            ..Launch::default()
+        },
+    )
+    .await
 }
 
 /// Resolve an optional `--session` handle to a full process id against the live

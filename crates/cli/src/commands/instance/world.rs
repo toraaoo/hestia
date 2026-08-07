@@ -25,6 +25,11 @@ pub enum WorldCmd {
                     instance.multi-session true')"
         )]
         new_session: bool,
+        #[arg(
+            long,
+            help = "Play without signing in: singleplayer only, on the last known account"
+        )]
+        offline: bool,
     },
 }
 
@@ -35,6 +40,7 @@ pub(super) async fn run(client: &Client, instance: &str, cmd: WorldCmd) -> Resul
             account,
             detach,
             new_session,
+            offline,
         } => {
             let folder = match world {
                 Some(folder) => folder,
@@ -42,11 +48,14 @@ pub(super) async fn run(client: &Client, instance: &str, cmd: WorldCmd) -> Resul
             };
             super::launch(
                 client,
-                instance,
-                account.as_deref().unwrap_or_default(),
-                new_session,
-                detach,
-                Some(QuickPlay::World(folder)),
+                super::Launch {
+                    reference: instance,
+                    account: account.as_deref().unwrap_or_default(),
+                    new_session,
+                    detach,
+                    quick_play: Some(QuickPlay::World(folder)),
+                    offline,
+                },
             )
             .await
         }

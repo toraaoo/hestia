@@ -14,6 +14,7 @@ pub async fn run(
     account: Option<String>,
     new_session: bool,
     detach: bool,
+    offline: bool,
     world: Option<String>,
     server: Option<String>,
 ) -> Result<()> {
@@ -24,11 +25,14 @@ pub async fn run(
     };
     instance::launch(
         &client,
-        &reference,
-        account.as_deref().unwrap_or_default(),
-        new_session,
-        detach,
-        instance::quick_play(world, server),
+        instance::Launch {
+            reference: &reference,
+            account: account.as_deref().unwrap_or_default(),
+            new_session,
+            detach,
+            quick_play: instance::quick_play(world, server),
+            offline,
+        },
     )
     .await
 }

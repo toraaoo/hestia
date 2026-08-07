@@ -42,18 +42,25 @@ async fn resolve(client: &Client, name: &str) -> Result<Target> {
     }
 }
 
-pub async fn start(name: String, account: Option<String>, detach: bool) -> Result<()> {
+pub async fn start(
+    name: String,
+    account: Option<String>,
+    detach: bool,
+    offline: bool,
+) -> Result<()> {
     let client = connect().await?;
     match resolve(&client, &name).await? {
         Target::Server => server::console::start_attached(client, &name, detach).await,
         Target::Instance => {
             instance::launch(
                 &client,
-                &name,
-                account.as_deref().unwrap_or_default(),
-                false,
-                detach,
-                None,
+                instance::Launch {
+                    reference: &name,
+                    account: account.as_deref().unwrap_or_default(),
+                    detach,
+                    offline,
+                    ..instance::Launch::default()
+                },
             )
             .await
         }

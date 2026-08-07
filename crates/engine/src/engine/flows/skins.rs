@@ -27,7 +27,7 @@ impl Engine {
     async fn skin_session(&self, account: &str) -> Result<(String, String)> {
         let reference = self.skin_reference(account)?;
         let token = self.accounts().access_token(&reference).await?;
-        Ok((reference, token))
+        Ok((reference, token.token))
     }
 
     /// Open a session for a change that replaces the equipped texture, having

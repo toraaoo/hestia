@@ -39,6 +39,24 @@ pub struct Instance<'a> {
     pub(crate) session: &'a Session,
 }
 
+/// One launch's options. A struct rather than a parameter list — `new_session`
+/// and `offline` are adjacent bools a caller could otherwise swap silently.
+#[derive(Default)]
+pub struct LaunchOptions<'a> {
+    pub instance: &'a str,
+    /// Account name or uuid; empty picks the sole signed-in account.
+    pub account: &'a str,
+    /// Launch another session even when one is already running.
+    pub new_session: bool,
+    /// Overrides the active content profile for this launch: empty keeps it,
+    /// the literal `none` launches with no profile.
+    pub profile: &'a str,
+    /// Join a world or server on start instead of opening to the title screen.
+    pub quick_play: Option<QuickPlay>,
+    /// Skip Microsoft entirely and run unauthenticated.
+    pub offline: bool,
+}
+
 impl Instance<'_> {
     pub async fn flavors(&self) -> Result<Vec<Flavor>, IpcError> {
         Ok(self
@@ -300,29 +318,23 @@ impl Instance<'_> {
 
     /// Launch an instance, blocking until the game process has spawned (or the
     /// preparation failed) and forwarding each progress event to `on_progress`.
-    /// `profile` overrides the active content profile for this launch (empty
-    /// keeps it; `none` launches with no profile); `quick_play` joins a world or
-    /// server on start instead of opening to the title screen. Returns the
-    /// supervised process id and pid, plus anything the preparation could not do
-    /// properly (a sync target left unshared, for instance).
+    /// Returns the supervised process id and pid, plus anything the preparation
+    /// could not do properly (a sync target left unshared, for instance).
     pub async fn launch(
         &self,
-        instance: &str,
-        account: &str,
-        new_session: bool,
-        profile: &str,
-        quick_play: Option<QuickPlay>,
+        options: LaunchOptions<'_>,
         on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
     ) -> Result<InstanceLaunchDoneEvent, IpcError> {
         let id = job_id("instance-launch");
         let session = self.session;
         let params = InstanceLaunchParams {
-            instance: instance.to_string(),
-            account: account.to_string(),
+            instance: options.instance.to_string(),
+            account: options.account.to_string(),
             id: id.clone(),
-            new_session,
-            profile: profile.to_string(),
-            quick_play,
+            new_session: options.new_session,
+            profile: options.profile.to_string(),
+            quick_play: options.quick_play,
+            offline: options.offline,
         };
         let payload = self
             .session

@@ -57,6 +57,11 @@ enum Command {
                     instance.multi-session true')"
         )]
         new_session: bool,
+        #[arg(
+            long,
+            help = "Play without signing in: singleplayer only, on the last known account"
+        )]
+        offline: bool,
         #[arg(long, help = "Open a save world on start, by folder (Minecraft 1.20+)")]
         world: Option<String>,
         #[arg(
@@ -98,6 +103,11 @@ enum Command {
         account: Option<String>,
         #[arg(short, long, help = "Return immediately instead of attaching")]
         detach: bool,
+        #[arg(
+            long,
+            help = "Play without signing in: singleplayer only, on the last known account"
+        )]
+        offline: bool,
     },
     /// Stop a running server or instance by name
     Stop {
@@ -296,9 +306,21 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
             account,
             detach,
             new_session,
+            offline,
             world,
             server,
-        } => commands::play::run(instance, account, new_session, detach, world, server).await,
+        } => {
+            commands::play::run(
+                instance,
+                account,
+                new_session,
+                detach,
+                offline,
+                world,
+                server,
+            )
+            .await
+        }
         Command::Account { cmd } => commands::account::run(cmd).await,
         Command::Java { cmd } => commands::java::run(cmd).await,
         Command::Instance { cmd } => commands::instance::run(cmd).await,
@@ -306,7 +328,8 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
             target,
             account,
             detach,
-        } => commands::lifecycle::start(target, account, detach).await,
+            offline,
+        } => commands::lifecycle::start(target, account, detach, offline).await,
         Command::Stop { target, session } => commands::lifecycle::stop(target, session).await,
         Command::Restart {
             target,
