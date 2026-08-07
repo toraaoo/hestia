@@ -8,7 +8,8 @@
 mod reach;
 mod retry;
 
-pub use reach::{network, Network};
+pub(crate) use reach::network;
+pub use reach::Network;
 
 use std::sync::OnceLock;
 use std::time::Duration;
