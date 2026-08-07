@@ -96,7 +96,9 @@ impl Engine {
         let skins = Skins::new(data_home.join("skins"));
         let sync = Sync::new(data_home.join("shared"));
         let profiles = Profiles::new(data_home.join("profiles"));
-        content.configure(&config.settings().content);
+        let settings = config.settings();
+        content.configure(&settings.content);
+        crate::net::network().set_offline_mode(settings.network.offline);
         let update = Update::new(data_home.join("updates"));
         let processes = Arc::new(ProcessSupervisor::new(data_home.join("processes")));
         Engine {
@@ -157,7 +159,9 @@ impl Engine {
         let resolved = common::paths::data_home(None);
         self.config
             .reload(common::paths::config_path(Some(&resolved)));
-        self.content.configure(&self.config.settings().content);
+        let settings = self.config.settings();
+        self.content.configure(&settings.content);
+        crate::net::network().set_offline_mode(settings.network.offline);
         self.cache.reload(resolved.join("cache"));
         self.java.reload(resolved.join("java"));
         self.accounts.reload(resolved.join("accounts.json"));
@@ -188,8 +192,15 @@ impl Engine {
         value: serde_json::Value,
     ) -> Result<(), crate::config::ConfigError> {
         self.config.set(key, value)?;
-        self.content.configure(&self.config.settings().content);
+        let settings = self.config.settings();
+        self.content.configure(&settings.content);
+        crate::net::network().set_offline_mode(settings.network.offline);
         Ok(())
+    }
+
+    /// Reachability, as the daemon reads and publishes it.
+    pub fn network(&self) -> &'static crate::net::Network {
+        crate::net::network()
     }
 
     pub fn cache(&self) -> &Cache {

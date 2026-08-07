@@ -35,6 +35,17 @@ pub struct Settings {
     pub discord: DiscordSettings,
     /// Which release feed self-update follows.
     pub update: UpdateSettings,
+    /// Whether the launcher may reach the network at all.
+    pub network: NetworkSettings,
+}
+
+/// Outbound network policy, keyed `network.offline`. Pinned offline, nothing is
+/// attempted at all: a metered or deliberately-disconnected machine gets an
+/// immediate typed refusal rather than a connect timeout per call.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct NetworkSettings {
+    pub offline: bool,
 }
 
 /// The self-update feed, keyed `update.channel`. It defaults to the channel
