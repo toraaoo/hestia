@@ -15,11 +15,32 @@ artifacts themselves still live wherever the manifest's `url` points, and the
 daemon verifies every one against its compiled-in minisign keys, so the API is
 trusted to say *which* version, never to be the source of the bytes.
 
+The API is the `apps/api` workspace of
+[hestia-web](https://github.com/prytaneum/hestia-web); its live reference is at
+`/docs` and its OpenAPI document at `/openapi.json`.
+
+## The envelope
+
+Every response that API produces — success or failure, this endpoint or any
+other — is wrapped:
+
+```json
+{ "success": true, "message": "Current release", "data": { … } }
+```
+
+```json
+{ "success": false, "message": "…", "code": "SERVICE_UNAVAILABLE" }
+```
+
+So the manifest arrives under `data`, which is where `engine::update` reads it
+from. A failure carries no `data` at all; the daemon never gets that far,
+because it rejects on the status line first.
+
 ## Channels
 
-`stable` and `beta`, and the set is closed — an unknown channel is a 404, not an
-empty feed. The channel is the last path segment; there is one manifest per
-channel and they are independent documents.
+`stable` and `beta`, and the set is closed — an unknown channel is rejected, not
+served as an empty feed. The channel is the last path segment; there is one
+manifest per channel and they are independent documents.
 
 Which channel a release belongs to is decided by its tag: a semver prerelease
 suffix (`v1.3.0-beta.1`) is `beta`, a plain `v1.3.0` is `stable`.
@@ -29,17 +50,17 @@ suffix (`v1.3.0-beta.1`) is `beta`, a plain `v1.3.0` is `stable`.
 Public, unauthenticated, cacheable. Answers the manifest most recently published
 to that channel.
 
-| Status | When | Body |
+| Status | `code` | When |
 |---|---|---|
-| `200` | a manifest has been published | the manifest |
-| `404` | `{channel}` is not `stable` or `beta` | `{ "error": "unknown_channel" }` |
-| `503` | the channel exists but nothing has been published yet | `{ "error": "no_release" }` |
+| `200` | — | a manifest has been published; it is in `data` |
+| `422` | `VALIDATION_FAILED` | `{channel}` is not `stable` or `beta` |
+| `503` | `SERVICE_UNAVAILABLE` | the channel exists but nothing has been published yet |
 
 The daemon treats every non-200 as "cannot check for updates" and never as "you
 are up to date", so an empty channel must not answer `200` with a null version.
 
-A `Cache-Control: public, max-age=300` is expected; the daemon does not depend on
-it, but every installed copy polls this.
+The answer carries `Cache-Control: public, max-age=300`. The daemon does not
+depend on it, but every installed copy polls this.
 
 ## `PUT /updates/{channel}`
 
@@ -48,26 +69,30 @@ so a re-run of a release job is harmless and a rollback is a re-publish of the
 older document.
 
 ```
-Authorization: Bearer <token>
+x-api-key: <token>
 Content-Type: application/json
 ```
 
-| Status | When |
-|---|---|
-| `204` | published |
-| `400` | the body is not a valid manifest (see below) |
-| `401` | missing or unrecognised bearer token |
-| `404` | `{channel}` is not `stable` or `beta` |
+| Status | `code` | When |
+|---|---|---|
+| `200` | — | published; `data` is `{channel, version, publishedAt}` |
+| `401` | `UNAUTHORIZED` | missing or unrecognised token |
+| `403` | `FORBIDDEN` | the caller is not an admin, or presented a session instead of a token |
+| `422` | `VALIDATION_FAILED` | `{channel}` is unknown, or the body is not a valid manifest |
 
-Publishing is the only privileged operation, and it is write-only: there is no
-route that reads back a token, and no route that deletes a channel. A channel is
-emptied by publishing over it, never by removing it.
+The credential is an API token minted for an admin account — `UPDATE_FEED_TOKEN`
+in the release workflow. A browser session is deliberately refused: publishing is
+a machine operation, and scoping it to a revocable token keeps a stolen cookie
+from moving what every install downloads.
+
+Publishing is the only privileged operation, and there is no route that deletes a
+channel. A channel is emptied by publishing over it, never by removing it.
 
 ## The manifest
 
 Unchanged from what the release workflow already composes, and unchanged from
-what the daemon already parses — the channel work added nothing to it. Fields
-the daemon does not know are ignored, so the document is additive.
+what the daemon already parses. Fields neither side knows are **preserved**, not
+stripped, so the document is additive in both directions.
 
 ```json
 {
@@ -95,8 +120,8 @@ the daemon does not know are ignored, so the document is additive.
 | Field | Required | Meaning |
 |---|---|---|
 | `version` | yes | semver. The daemon compares it against its own by full semver precedence, prerelease included |
-| `channel` | no | which feed this document belongs to. Informational — the URL already decided |
-| `notes` | no | markdown, rendered by the desktop after an upgrade |
+| `channel` | no | which feed this document belongs to. The path decides it; a body that disagrees is overwritten |
+| `notes` | no | markdown, rendered by the desktop after an upgrade. Defaults to `""`, never null |
 | `pub_date` | no | RFC 3339. Not read by the daemon |
 | `platforms` | yes | keyed `{os}-{arch}` in Rust's `consts` spelling (`linux-x86_64`, `windows-x86_64`) |
 
@@ -106,9 +131,18 @@ setup, the AppImage. `formats` carries the rest, keyed by install shape (`deb`,
 substitutes: a deb install offered no `deb` entry reports "no artifact for this
 install" rather than downloading something it cannot apply.
 
-**Validation worth doing at publish**, because a bad manifest is only noticed by
-users otherwise: `version` parses as semver, `platforms` is non-empty, and every
-entry has both a `url` and a `signature`.
+### What publishing rejects
+
+A bad manifest is otherwise only noticed by users, so the API refuses one:
+
+- `version` is not semver
+- `platforms` is empty, or a key is not `{os}-{arch}`
+- an artifact is missing `url` or `signature`, at either level
+- a `url` is not `https` — the signature makes an install safe, but plaintext
+  still exposes which version every machine is on
+- a `signature` is not base64 — `scripts/sign.sh` writes base64 around the whole
+  minisign document, which is the only form
+  `engine::signature::verify_bytes` decodes
 
 ## What is *not* in the contract
 
@@ -125,5 +159,6 @@ entry has both a `url` and a `signature`.
 
 The daemon takes `HESTIA_UPDATE_ENDPOINT` in **debug** builds, standing in for
 the whole URL — channel segment included — alongside `HESTIA_UPDATE_PUBKEY` for
-the key to trust. `scripts/update.sh --serve` compiles a signed fake manifest and
-serves it, so the client half is exercisable with no API at all.
+the key to trust. `scripts/update.sh --serve` compiles a signed fake manifest,
+wraps it in the same envelope the API answers with, and serves it, so the client
+half is exercisable with no API at all.

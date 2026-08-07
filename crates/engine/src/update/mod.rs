@@ -24,6 +24,14 @@ pub struct Update {
     dir: Mutex<PathBuf>,
 }
 
+/// Every response the feed API produces is wrapped in one envelope, success or
+/// failure alike, so the manifest arrives one level down. A failure carries no
+/// `data` at all — which is why an error status is caught before this is read.
+#[derive(serde::Deserialize)]
+struct Envelope {
+    data: Manifest,
+}
+
 #[derive(serde::Deserialize)]
 struct Manifest {
     version: String,
@@ -160,7 +168,7 @@ fn endpoint(channel: UpdateChannel) -> String {
 }
 
 async fn fetch_manifest(channel: UpdateChannel) -> Result<Manifest> {
-    http_client()
+    let envelope: Envelope = http_client()
         .get(endpoint(channel))
         .send()
         .await
@@ -169,7 +177,8 @@ async fn fetch_manifest(channel: UpdateChannel) -> Result<Manifest> {
         .context("update endpoint answered an error")?
         .json()
         .await
-        .context("malformed update manifest")
+        .context("malformed update manifest")?;
+    Ok(envelope.data)
 }
 
 fn available(manifest: &Manifest) -> Option<&PlatformEntry> {
@@ -237,6 +246,17 @@ mod tests {
     #[test]
     fn an_unmanaged_build_is_offered_nothing_to_apply() {
         assert!(artifact_for(&entry(), UpdateInstall::Unmanaged).is_none());
+    }
+
+    #[test]
+    fn the_manifest_is_read_out_of_the_response_envelope() {
+        let envelope: Envelope = serde_json::from_str(
+            r#"{"success": true, "message": "Current release",
+                "data": {"version": "1.3.0", "channel": "stable", "platforms": {}}}"#,
+        )
+        .unwrap();
+        assert_eq!(envelope.data.version, "1.3.0");
+        assert!(envelope.data.notes.is_empty());
     }
 
     #[test]

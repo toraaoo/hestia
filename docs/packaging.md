@@ -101,8 +101,9 @@ to the channel the tag names — a prerelease suffix (`v1.3.0-beta.1`) is beta, 
 the repository's releases to decide what is current. The full HTTP contract, both directions, is in
 [update-feed.md](update-feed.md).
 
-Publishing needs the `UPDATE_FEED_URL` variable and the `UPDATE_FEED_TOKEN` secret; the `preflight` job refuses a tagged
-release without them. The manifest itself:
+Publishing needs the `UPDATE_FEED_URL` variable and the `UPDATE_FEED_TOKEN` secret — an API token minted for an admin
+account on the feed API, sent as `x-api-key`; the `preflight` job refuses a tagged release without them. The manifest
+itself, which the API answers wrapped in its `{success, message, data}` envelope:
 
 ```json
 {

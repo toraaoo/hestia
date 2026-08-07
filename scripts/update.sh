@@ -62,8 +62,11 @@ compile() {
   local url="http://127.0.0.1:$port/$(basename "$artifact")"
   local sig
   sig="$(base64 -w0 < "$dir/artifact.sig")"
+  # Wrapped exactly as the feed API answers, envelope included — the daemon reads
+  # the manifest out of `data`, so a bare document would not parse here either.
   jq -n --arg v "$version" --arg t "$target" --arg url "$url" --arg sig "$sig" \
-    '{version: $v, notes: "A local test release.", platforms: {($t): {url: $url, signature: $sig}}}' \
+    '{success: true, message: "Current release", data: {version: $v, channel: "stable",
+      notes: "A local test release.", platforms: {($t): {url: $url, signature: $sig}}}}' \
     > "$dir/latest.json"
   cat "$dir/latest.json"
 }

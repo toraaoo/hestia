@@ -306,6 +306,10 @@ jobs:
       # re-run of this job is harmless and a rollback is a re-publish of the
       # older document. Last step of the release on purpose — it is what makes
       # the version visible to every installed copy.
+      #
+      # UPDATE_FEED_TOKEN is an API token minted for an admin account on the feed
+      # API, presented in the header that API authenticates keys with. A browser
+      # session is refused there, so a token is the only credential CI can hold.
       - name: Publish to the feed
         shell: bash
         env:
@@ -316,10 +320,10 @@ jobs:
           set -euo pipefail
           code="$(curl -sS -o response.txt -w '%{http_code}' \
             -X PUT "${FEED_URL%/}/$CHANNEL" \
-            -H "authorization: Bearer $FEED_TOKEN" \
+            -H "x-api-key: $FEED_TOKEN" \
             -H 'content-type: application/json' \
             --data-binary @latest.json)"
-          if [ "$code" != "204" ]; then
+          if [ "$code" != "200" ]; then
             echo "::error::the feed refused the manifest ($code): $(cat response.txt)"
             exit 1
           fi
