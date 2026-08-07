@@ -19,6 +19,7 @@ pub mod job;
 pub mod minecraft;
 pub mod modpack;
 pub mod naming;
+pub mod net;
 pub mod process;
 pub mod profile;
 pub mod server;

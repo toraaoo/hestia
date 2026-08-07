@@ -205,11 +205,15 @@ pub enum Service {
     Adoptium,
     Mojang,
     Fabric,
+    NeoForge,
     Paper,
+    Spigot,
     Modrinth,
     CurseForge,
     Microsoft,
     Xbox,
+    /// The release feed self-update follows.
+    Release,
 }
 
 impl fmt::Display for Service {
@@ -218,11 +222,14 @@ impl fmt::Display for Service {
             Service::Adoptium => "Adoptium",
             Service::Mojang => "Mojang",
             Service::Fabric => "Fabric",
+            Service::NeoForge => "NeoForge",
             Service::Paper => "PaperMC",
+            Service::Spigot => "SpigotMC",
             Service::Modrinth => "Modrinth",
             Service::CurseForge => "CurseForge",
             Service::Microsoft => "Microsoft",
             Service::Xbox => "Xbox",
+            Service::Release => "the release feed",
         })
     }
 }
@@ -488,6 +495,9 @@ pub enum ErrorInfo {
     /// The entry is not named: the caller named it in the request, and a fifth
     /// string here would make `ErrorInfo` large enough to be worth boxing at
     /// every call site that returns one.
+    // The enum's `rename_all` renames variants, not the fields inside one, so a
+    // multi-word field here needs its own attribute or it ships snake_case.
+    #[serde(rename_all = "camelCase")]
     ModpackEntryMismatch {
         entry: EntryKind,
         flavor: String,
@@ -575,6 +585,15 @@ pub enum ErrorInfo {
         operation: IoOp,
         detail: String,
     },
+    /// The request never left the machine. Distinct from `Upstream`, where the
+    /// service answered and the answer was a failure: only this one means "try
+    /// again when you are back online".
+    Offline {
+        /// Absent for a plain file download, aimed at whatever URL a profile named.
+        service: Option<Service>,
+        /// Pinned by `network.offline` rather than observed.
+        pinned: bool,
+    },
     Upstream {
         service: Service,
         detail: String,
@@ -622,6 +641,7 @@ impl ErrorInfo {
             }
             UnknownChannel { .. } => "unknown_channel",
             IncompatibleVersion { .. } => "version_mismatch",
+            Offline { .. } => "offline",
             ElevationRequired { .. }
             | Io { .. }
             | Upstream { .. }
@@ -805,6 +825,18 @@ impl fmt::Display for ErrorInfo {
                 "installing this update needs administrator rights — run: {command}"
             ),
             Io { operation, detail } => write!(f, "could not {operation}: {detail}"),
+            Offline { service, pinned } => match (service, pinned) {
+                (Some(service), true) => {
+                    write!(f, "hestia is in offline mode, so {service} was not called")
+                }
+                (None, true) => write!(f, "hestia is in offline mode"),
+                (Some(service), false) => {
+                    write!(f, "{service} is unreachable — you appear to be offline")
+                }
+                (None, false) => {
+                    write!(f, "the download could not start — you appear to be offline")
+                }
+            },
             Upstream { service, detail } => write!(f, "{service} request failed: {detail}"),
             DownloadFailed { detail } => write!(f, "download failed: {detail}"),
             RconFailed { detail } => write!(f, "server console command failed: {detail}"),

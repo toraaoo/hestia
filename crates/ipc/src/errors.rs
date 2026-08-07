@@ -7,6 +7,9 @@ pub const HANDLER_ERROR: &str = "handler_error";
 pub const UNKNOWN_CHANNEL: &str = "unknown_channel";
 pub const VERSION_MISMATCH: &str = "version_mismatch";
 pub const UNAUTHORIZED: &str = "unauthorized";
+/// The daemon could not reach upstream at all — the one failure a front-end
+/// answers with a retry affordance rather than with the error text.
+pub const OFFLINE: &str = "offline";
 
 use thiserror::Error;
 
