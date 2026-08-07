@@ -12,9 +12,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use anyhow::{anyhow, bail, Context, Result};
+use proto::error::Service;
 use proto::update::{UpdateChannel, UpdateCheckResult, UpdateInfo, UpdateInstall};
 
-use crate::download::{http_client, Downloader, ProgressFn};
+use crate::download::{Downloader, ProgressFn};
 use crate::signature::verify_file;
 use crate::version::is_newer;
 
@@ -168,16 +169,9 @@ fn endpoint(channel: UpdateChannel) -> String {
 }
 
 async fn fetch_manifest(channel: UpdateChannel) -> Result<Manifest> {
-    let envelope: Envelope = http_client()
-        .get(endpoint(channel))
-        .send()
+    let envelope: Envelope = crate::net::get_json(Service::Release, &endpoint(channel))
         .await
-        .context("cannot reach the update endpoint")?
-        .error_for_status()
-        .context("update endpoint answered an error")?
-        .json()
-        .await
-        .context("malformed update manifest")?;
+        .context("cannot read the update manifest")?;
     Ok(envelope.data)
 }
 

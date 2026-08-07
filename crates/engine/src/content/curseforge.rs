@@ -398,13 +398,14 @@ impl CurseForge {
         }
         let url = format!("{API}{path}");
         tracing::debug!(url, "curseforge GET");
-        let response = crate::download::http_client()
-            .get(&url)
-            .query(query)
-            .header("x-api-key", key)
-            .send()
-            .await
-            .map_err(|e| upstream(format!("{path}: {e}")))?;
+        let response = crate::net::send(
+            Some(Service::CurseForge),
+            crate::net::client()
+                .get(&url)
+                .query(query)
+                .header("x-api-key", key),
+        )
+        .await?;
         json(path, response).await
     }
 
@@ -417,23 +418,21 @@ impl CurseForge {
         }
         let url = format!("{API}{path}");
         tracing::debug!(url, "curseforge POST");
-        let response = crate::download::http_client()
-            .post(&url)
-            .header("x-api-key", key)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| upstream(format!("{path}: {e}")))?;
+        let response = crate::net::send(
+            Some(Service::CurseForge),
+            crate::net::client()
+                .post(&url)
+                .header("x-api-key", key)
+                .json(&body),
+        )
+        .await?;
         json(path, response).await
     }
 
     async fn download(&self, url: &str) -> Result<Vec<u8>> {
         tracing::debug!(url, "curseforge modpack GET");
-        let response = crate::download::http_client()
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| upstream(format!("{url}: {e}")))?;
+        let response =
+            crate::net::send(Some(Service::CurseForge), crate::net::client().get(url)).await?;
         if !response.status().is_success() {
             return Err(upstream(format!(
                 "{url}: HTTP {}",

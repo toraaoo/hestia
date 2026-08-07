@@ -16,6 +16,7 @@ mod error;
 mod instances;
 mod java;
 mod minecraft;
+mod net;
 mod process;
 mod profiles;
 mod reclaim;
@@ -49,6 +50,7 @@ pub use minecraft::launch::{JavaSettings, LaunchPlan};
 pub use minecraft::{
     InstanceProvider, Loads, Minecraft, ResolveRequest, ServerProvider, REQUIRED_JAVA_MAJORS,
 };
+pub use net::Network;
 pub use process::{ExitObserver, ProcessEvents, ProcessSupervisor, StartError};
 pub use profiles::Profiles;
 pub use schema::notices as quarantined;

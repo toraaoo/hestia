@@ -9,6 +9,7 @@
 //! as Modrinth's implementation.
 
 use anyhow::{bail, Context, Result};
+use proto::error::Service;
 use proto::skins::SkinVariant;
 use serde_json::{json, Value};
 
@@ -47,19 +48,22 @@ impl Profile {
     }
 }
 
-fn http() -> reqwest::Client {
-    reqwest::Client::new()
+/// Every call goes through the shared client so a sign-in or skin change that
+/// starts while the network is dropping fails as offline rather than hanging.
+async fn send(service: Service, request: reqwest::RequestBuilder) -> Result<reqwest::Response> {
+    crate::net::send(Some(service), request).await
 }
 
 pub async fn fetch_profile(token: &str) -> Result<Profile> {
-    let response = http()
-        .get(PROFILE_URL)
-        .bearer_auth(token)
-        .header("Accept", "application/json")
-        .header("User-Agent", USER_AGENT)
-        .send()
-        .await
-        .context("Minecraft profile fetch failed")?;
+    let response = send(
+        Service::Mojang,
+        crate::net::client()
+            .get(PROFILE_URL)
+            .bearer_auth(token)
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT),
+    )
+    .await?;
     let body = read(response, "Minecraft profile fetch").await?;
     Ok(parse_profile(&body))
 }
@@ -80,15 +84,16 @@ pub async fn upload_skin(
                 .expect("static mime type parses")
                 .file_name("skin.png"),
         );
-    let response = http()
-        .post(SKIN_URL)
-        .bearer_auth(token)
-        .header("Accept", "application/json")
-        .header("User-Agent", USER_AGENT)
-        .multipart(form)
-        .send()
-        .await
-        .context("Minecraft skin upload failed")?;
+    let response = send(
+        Service::Mojang,
+        crate::net::client()
+            .post(SKIN_URL)
+            .bearer_auth(token)
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT)
+            .multipart(form),
+    )
+    .await?;
     let body = read(response, "Minecraft skin upload").await?;
     Ok(profile_when_present(&body))
 }
@@ -96,56 +101,60 @@ pub async fn upload_skin(
 /// Point the skin at a Mojang-hosted texture URL (how a vanilla default skin
 /// is equipped without bundling its PNG).
 pub async fn set_skin_url(token: &str, url: &str, variant: SkinVariant) -> Result<Option<Profile>> {
-    let response = http()
-        .post(SKIN_URL)
-        .bearer_auth(token)
-        .header("Accept", "application/json")
-        .header("User-Agent", USER_AGENT)
-        .json(&json!({ "variant": variant_name(variant), "url": url }))
-        .send()
-        .await
-        .context("Minecraft skin change failed")?;
+    let response = send(
+        Service::Mojang,
+        crate::net::client()
+            .post(SKIN_URL)
+            .bearer_auth(token)
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT)
+            .json(&json!({ "variant": variant_name(variant), "url": url })),
+    )
+    .await?;
     let body = read(response, "Minecraft skin change").await?;
     Ok(profile_when_present(&body))
 }
 
 /// Reset the skin to the account's uuid-derived default.
 pub async fn reset_skin(token: &str) -> Result<()> {
-    let response = http()
-        .delete(ACTIVE_SKIN_URL)
-        .bearer_auth(token)
-        .header("Accept", "application/json")
-        .header("User-Agent", USER_AGENT)
-        .send()
-        .await
-        .context("Minecraft skin reset failed")?;
+    let response = send(
+        Service::Mojang,
+        crate::net::client()
+            .delete(ACTIVE_SKIN_URL)
+            .bearer_auth(token)
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT),
+    )
+    .await?;
     read(response, "Minecraft skin reset").await?;
     Ok(())
 }
 
 pub async fn set_cape(token: &str, cape_id: &str) -> Result<()> {
-    let response = http()
-        .put(ACTIVE_CAPE_URL)
-        .bearer_auth(token)
-        .header("Accept", "application/json")
-        .header("User-Agent", USER_AGENT)
-        .json(&json!({ "capeId": cape_id }))
-        .send()
-        .await
-        .context("Minecraft cape change failed")?;
+    let response = send(
+        Service::Mojang,
+        crate::net::client()
+            .put(ACTIVE_CAPE_URL)
+            .bearer_auth(token)
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT)
+            .json(&json!({ "capeId": cape_id })),
+    )
+    .await?;
     read(response, "Minecraft cape change").await?;
     Ok(())
 }
 
 pub async fn clear_cape(token: &str) -> Result<()> {
-    let response = http()
-        .delete(ACTIVE_CAPE_URL)
-        .bearer_auth(token)
-        .header("Accept", "application/json")
-        .header("User-Agent", USER_AGENT)
-        .send()
-        .await
-        .context("Minecraft cape clear failed")?;
+    let response = send(
+        Service::Mojang,
+        crate::net::client()
+            .delete(ACTIVE_CAPE_URL)
+            .bearer_auth(token)
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT),
+    )
+    .await?;
     read(response, "Minecraft cape clear").await?;
     Ok(())
 }
@@ -153,12 +162,13 @@ pub async fn clear_cape(token: &str) -> Result<()> {
 /// Download a texture PNG (used to preserve the current skin before it is
 /// replaced by a change).
 pub async fn fetch_texture(url: &str) -> Result<Vec<u8>> {
-    let response = http()
-        .get(url)
-        .header("User-Agent", USER_AGENT)
-        .send()
-        .await
-        .with_context(|| format!("skin texture fetch from {url} failed"))?;
+    let response = send(
+        Service::Mojang,
+        crate::net::client()
+            .get(url)
+            .header("User-Agent", USER_AGENT),
+    )
+    .await?;
     if !response.status().is_success() {
         bail!(
             "skin texture fetch from {url} failed (HTTP {})",

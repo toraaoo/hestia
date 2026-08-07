@@ -3,6 +3,7 @@
 
 use anyhow::{bail, Context, Result};
 use proto::download::{Checksum, HashAlgorithm};
+use proto::error::Service;
 use proto::java::JavaRelease;
 use serde_json::Value;
 
@@ -21,18 +22,12 @@ pub struct JavaPackage {
 
 async fn fetch_json(url: &str, query: &[(&str, &str)]) -> Result<Value> {
     tracing::debug!(url, "adoptium GET");
-    let response = crate::download::http_client()
-        .get(url)
-        .query(query)
-        .send()
-        .await
-        .with_context(|| "adoptium request failed")?;
-    if !response.status().is_success() {
-        bail!(
-            "adoptium request failed: HTTP {}",
-            response.status().as_u16()
-        );
-    }
+    let response = crate::net::send(
+        Some(Service::Adoptium),
+        crate::net::client().get(url).query(query),
+    )
+    .await?;
+    let response = crate::net::require_success(Service::Adoptium, response)?;
     response
         .json()
         .await

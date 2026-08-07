@@ -6,6 +6,8 @@ use proto::download::{Checksum, HashAlgorithm};
 use proto::minecraft::{Artifact, AssetIndex, GameVersion, Library, VersionKind};
 use serde_json::Value;
 
+use proto::error::Service;
+
 use super::{fetch_json, rules_allow};
 
 const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
@@ -17,7 +19,7 @@ struct Entry {
 }
 
 async fn manifest() -> Result<Vec<Entry>> {
-    let j = fetch_json(MANIFEST).await?;
+    let j = fetch_json(Service::Mojang, MANIFEST).await?;
     let versions = j
         .get("versions")
         .and_then(Value::as_array)
@@ -61,7 +63,7 @@ pub async fn version_json(id: &str) -> Result<Value> {
         .ok_or_else(|| proto::error::ErrorInfo::VersionNotFound {
             reference: id.to_string(),
         })?;
-    fetch_json(&entry.url).await
+    fetch_json(Service::Mojang, &entry.url).await
 }
 
 pub fn client_artifact(version: &Value) -> Result<Artifact> {

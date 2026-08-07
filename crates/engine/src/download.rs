@@ -4,7 +4,6 @@
 //! and feeds it after a successful download.
 
 use std::path::Path;
-use std::sync::OnceLock;
 
 use anyhow::{anyhow, bail, Context, Result};
 use futures_util::StreamExt;
@@ -13,22 +12,9 @@ use tokio::io::AsyncWriteExt;
 
 use crate::cache::Cache;
 use crate::checksum::Hasher;
+use crate::net;
 
 pub type ProgressFn<'a> = dyn Fn(&DownloadProgress) -> Result<()> + Send + Sync + 'a;
-
-/// The engine-wide HTTP client. One pooled client keeps connections alive
-/// across requests — a fresh client per request (what `reqwest::get` does)
-/// pays a TCP + TLS handshake for every one of the thousands of small fetches
-/// an asset materialisation makes.
-pub(crate) fn http_client() -> &'static reqwest::Client {
-    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
-            .user_agent(common::app::user_agent())
-            .build()
-            .expect("default reqwest client builds")
-    })
-}
 
 pub struct Downloader<'a> {
     cache: Option<&'a Cache>,
@@ -104,16 +90,11 @@ impl<'a> Downloader<'a> {
         checksum: Option<&Checksum>,
         on_progress: &ProgressFn<'_>,
     ) -> Result<()> {
-        let response = http_client()
-            .get(url)
-            .send()
-            .await
-            .with_context(|| format!("download of {url} failed"))?;
+        let response = net::send(None, net::client().get(url)).await?;
         if !response.status().is_success() {
-            bail!(
-                "download of {url} failed: HTTP {}",
-                response.status().as_u16()
-            );
+            bail!(proto::error::ErrorInfo::DownloadFailed {
+                detail: format!("{url}: HTTP {}", response.status().as_u16()),
+            });
         }
         let total = response.content_length().unwrap_or(0);
 
@@ -126,7 +107,7 @@ impl<'a> Downloader<'a> {
         let stream = response.bytes_stream();
         futures_util::pin_mut!(stream);
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.context("download stream interrupted")?;
+            let chunk = chunk.map_err(|e| net::stream_failure(None, &e))?;
             file.write_all(&chunk).await?;
             if let Some(h) = hasher.as_mut() {
                 h.update(&chunk);

@@ -9,6 +9,8 @@
 use anyhow::Result;
 use serde_json::Value;
 
+use proto::error::Service;
+
 use super::{fetch_json, fetch_text};
 
 const HUB: &str = "https://hub.spigotmc.org";
@@ -30,7 +32,9 @@ const CLASS_FILE_OFFSET: i64 = 44;
 /// rather than game versions. The caller filters the set against Mojang's
 /// manifest, which is what leaves the game versions behind.
 pub async fn versions() -> Result<Vec<String>> {
-    Ok(names(&fetch_text(&format!("{HUB}/versions/")).await?))
+    Ok(names(
+        &fetch_text(Service::Spigot, &format!("{HUB}/versions/")).await?,
+    ))
 }
 
 fn names(index: &str) -> Vec<String> {
@@ -48,7 +52,7 @@ fn names(index: &str) -> Vec<String> {
 /// for a version predating the field (the 1.8 line and older), which the caller
 /// reads as "whatever the era used".
 pub async fn java_versions(version: &str) -> Result<Vec<i32>> {
-    let body = fetch_json(&format!("{HUB}/versions/{version}.json")).await?;
+    let body = fetch_json(Service::Spigot, &format!("{HUB}/versions/{version}.json")).await?;
     let mut majors: Vec<i32> = body
         .get("javaVersions")
         .and_then(Value::as_array)

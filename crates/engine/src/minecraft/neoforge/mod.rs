@@ -254,13 +254,15 @@ impl InstanceProvider for NeoForgeInstance {
             // Resolution is a catalogue read with nowhere to cache to, so the
             // installer is fetched into memory here and again (from disk) at
             // install time.
-            let bytes = crate::download::http_client()
-                .get(neoforge::installer_url(&loader))
-                .send()
-                .await
-                .with_context(|| format!("cannot fetch the neoforge {loader} installer"))?
-                .bytes()
-                .await?;
+            let response = crate::net::get(
+                proto::error::Service::NeoForge,
+                &neoforge::installer_url(&loader),
+            )
+            .await
+            .with_context(|| format!("cannot fetch the neoforge {loader} installer"))?;
+            let bytes = response.bytes().await.map_err(|e| {
+                crate::net::stream_failure(Some(proto::error::Service::NeoForge), &e)
+            })?;
             neoforge::read_installer(&bytes)?
         };
 

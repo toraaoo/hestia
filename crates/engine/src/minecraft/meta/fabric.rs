@@ -7,6 +7,8 @@ use proto::download::{Checksum, HashAlgorithm};
 use proto::minecraft::{Artifact, Library};
 use serde_json::Value;
 
+use proto::error::Service;
+
 use super::{fetch_json, filename_of, maven_path};
 
 const META: &str = "https://meta.fabricmc.net/v2";
@@ -14,7 +16,7 @@ const DEFAULT_MAVEN: &str = "https://maven.fabricmc.net/";
 
 /// The game versions Fabric supports, paired with their stability flag.
 pub async fn game_versions() -> Result<Vec<(String, bool)>> {
-    let j = fetch_json(&format!("{META}/versions/game")).await?;
+    let j = fetch_json(Service::Fabric, &format!("{META}/versions/game")).await?;
     let arr = j
         .as_array()
         .context("fabric game-versions response is not an array")?;
@@ -30,7 +32,7 @@ pub async fn game_versions() -> Result<Vec<(String, bool)>> {
 
 /// Every loader build published for a game version, newest first.
 pub async fn loader_versions(game: &str) -> Result<Vec<String>> {
-    let j = fetch_json(&format!("{META}/versions/loader/{game}")).await?;
+    let j = fetch_json(Service::Fabric, &format!("{META}/versions/loader/{game}")).await?;
     let arr = j
         .as_array()
         .context("fabric loader response is not an array")?;
@@ -42,7 +44,7 @@ pub async fn loader_versions(game: &str) -> Result<Vec<String>> {
 
 /// The newest loader for a game version: the first stable build, else the newest.
 pub async fn latest_loader(game: &str) -> Result<String> {
-    let j = fetch_json(&format!("{META}/versions/loader/{game}")).await?;
+    let j = fetch_json(Service::Fabric, &format!("{META}/versions/loader/{game}")).await?;
     let arr = j
         .as_array()
         .context("fabric loader response is not an array")?;
@@ -64,7 +66,7 @@ pub async fn latest_loader(game: &str) -> Result<String> {
 /// The newest installer: the first stable build, else the newest. The server
 /// launcher endpoint is keyed by it.
 pub async fn latest_installer() -> Result<String> {
-    let j = fetch_json(&format!("{META}/versions/installer")).await?;
+    let j = fetch_json(Service::Fabric, &format!("{META}/versions/installer")).await?;
     let arr = j
         .as_array()
         .context("fabric installer response is not an array")?;
@@ -80,9 +82,10 @@ pub async fn latest_installer() -> Result<String> {
 }
 
 pub async fn profile_json(game: &str, loader: &str) -> Result<Value> {
-    fetch_json(&format!(
-        "{META}/versions/loader/{game}/{loader}/profile/json"
-    ))
+    fetch_json(
+        Service::Fabric,
+        &format!("{META}/versions/loader/{game}/{loader}/profile/json"),
+    )
     .await
 }
 

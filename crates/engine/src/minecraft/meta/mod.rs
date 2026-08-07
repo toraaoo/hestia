@@ -8,47 +8,20 @@ pub mod neoforge;
 pub mod paper;
 pub mod spigot;
 
-use anyhow::{bail, Context, Result};
+use anyhow::Result;
+use proto::error::Service;
 use serde_json::Value;
 
-async fn fetch_json(url: &str) -> Result<Value> {
-    tracing::debug!(url, "minecraft meta GET");
-    let response = crate::download::http_client()
-        .get(url)
-        .send()
-        .await
-        .with_context(|| format!("request to {url} failed"))?;
-    if !response.status().is_success() {
-        bail!(
-            "request to {url} failed: HTTP {}",
-            response.status().as_u16()
-        );
-    }
-    response
-        .json()
-        .await
-        .with_context(|| format!("{url} returned malformed JSON"))
+use crate::net;
+
+async fn fetch_json(service: Service, url: &str) -> Result<Value> {
+    net::get_json(service, url).await
 }
 
 /// The same fetch for a document that is not JSON — NeoForge's
 /// `maven-metadata.xml` is the only one.
-async fn fetch_text(url: &str) -> Result<String> {
-    tracing::debug!(url, "minecraft meta GET");
-    let response = crate::download::http_client()
-        .get(url)
-        .send()
-        .await
-        .with_context(|| format!("request to {url} failed"))?;
-    if !response.status().is_success() {
-        bail!(
-            "request to {url} failed: HTTP {}",
-            response.status().as_u16()
-        );
-    }
-    response
-        .text()
-        .await
-        .with_context(|| format!("{url} returned an unreadable body"))
+async fn fetch_text(service: Service, url: &str) -> Result<String> {
+    net::get_text(service, url).await
 }
 
 /// Host OS in Mojang's rule vocabulary (`os.name`).

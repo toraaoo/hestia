@@ -13,6 +13,7 @@ use proto::content::{
     SideSupport, VersionQuery,
 };
 use proto::download::{Checksum, HashAlgorithm};
+use proto::error::Service;
 use proto::minecraft::Artifact;
 use serde_json::Value;
 
@@ -582,18 +583,12 @@ fn json_array(value: &str) -> String {
 
 async fn get_json(url: &str, query: &[(&str, String)]) -> Result<Value> {
     tracing::debug!(url, "modrinth GET");
-    let response = crate::download::http_client()
-        .get(url)
-        .query(query)
-        .send()
-        .await
-        .with_context(|| format!("request to {url} failed"))?;
-    if !response.status().is_success() {
-        bail!(
-            "request to {url} failed: HTTP {}",
-            response.status().as_u16()
-        );
-    }
+    let response = crate::net::send(
+        Some(Service::Modrinth),
+        crate::net::client().get(url).query(query),
+    )
+    .await?;
+    let response = crate::net::require_success(Service::Modrinth, response)?;
     response
         .json()
         .await
@@ -602,21 +597,11 @@ async fn get_json(url: &str, query: &[(&str, String)]) -> Result<Value> {
 
 async fn download_bytes(url: &str) -> Result<Vec<u8>> {
     tracing::debug!(url, "modrinth modpack GET");
-    let response = crate::download::http_client()
-        .get(url)
-        .send()
-        .await
-        .with_context(|| format!("download of {url} failed"))?;
-    if !response.status().is_success() {
-        bail!(
-            "download of {url} failed: HTTP {}",
-            response.status().as_u16()
-        );
-    }
+    let response = crate::net::get(Service::Modrinth, url).await?;
     Ok(response
         .bytes()
         .await
-        .with_context(|| format!("reading {url} failed"))?
+        .map_err(|e| crate::net::stream_failure(Some(Service::Modrinth), &e))?
         .to_vec())
 }
 

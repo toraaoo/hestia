@@ -5,6 +5,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, bail, Context, Result};
+use proto::error::Service;
 use reqwest::header::HeaderMap;
 use serde_json::{json, Value};
 
@@ -77,8 +78,10 @@ fn now_seconds() -> i64 {
         .unwrap_or(0)
 }
 
-fn http() -> reqwest::Client {
-    reqwest::Client::new()
+/// Every step goes through the shared client, so a sign-in started while the
+/// network is dropping fails as offline instead of hanging on a dead socket.
+async fn send(service: Service, request: reqwest::RequestBuilder) -> Result<reqwest::Response> {
+    crate::net::send(Some(service), request).await
 }
 
 struct Parsed {
@@ -194,7 +197,7 @@ async fn signed_post(
     let payload = body.to_string();
     let signature =
         xbox_signature_header(key, url_path, "", &payload, now_seconds() + clock_offset);
-    let mut request = http()
+    let mut request = crate::net::client()
         .post(url)
         .header("Content-Type", "application/json; charset=utf-8")
         .header("Accept", "application/json")
@@ -202,11 +205,7 @@ async fn signed_post(
     if contract_version {
         request = request.header("x-xbl-contract-version", "1");
     }
-    request
-        .body(payload)
-        .send()
-        .await
-        .with_context(|| format!("request to {url} failed"))
+    send(Service::Xbox, request.body(payload)).await
 }
 
 pub async fn request_device_token(key: &ProofKey) -> Result<DeviceToken> {
@@ -276,13 +275,15 @@ pub async fn sisu_authenticate(
 }
 
 async fn exchange_oauth(form: &[(&str, &str)], what: &str, rejection: &str) -> Result<OAuthTokens> {
-    let response = http()
-        .post(OAUTH_TOKEN_URL)
-        .header("Accept", "application/json")
-        .form(form)
-        .send()
-        .await
-        .with_context(|| format!("{what} failed"))?;
+    let response = send(
+        Service::Microsoft,
+        crate::net::client()
+            .post(OAUTH_TOKEN_URL)
+            .header("Accept", "application/json")
+            .form(form),
+    )
+    .await
+    .with_context(|| format!("{what} failed"))?;
     let parsed = read(response, what).await?;
     if let Some(error) = parsed.body.get("error").and_then(Value::as_str) {
         let description = parsed
@@ -310,17 +311,19 @@ async fn exchange_oauth(form: &[(&str, &str)], what: &str, rejection: &str) -> R
 }
 
 pub async fn request_device_code() -> Result<DeviceCodeChallenge> {
-    let response = http()
-        .post(DEVICE_CODE_URL)
-        .header("Accept", "application/json")
-        .form(&[
-            ("client_id", CLIENT_ID),
-            ("scope", SCOPE),
-            ("response_type", "device_code"),
-        ])
-        .send()
-        .await
-        .context("device sign-in request failed")?;
+    let response = send(
+        Service::Microsoft,
+        crate::net::client()
+            .post(DEVICE_CODE_URL)
+            .header("Accept", "application/json")
+            .form(&[
+                ("client_id", CLIENT_ID),
+                ("scope", SCOPE),
+                ("response_type", "device_code"),
+            ]),
+    )
+    .await
+    .context("device sign-in request failed")?;
     let parsed = read(response, "device sign-in request").await?;
     if let Some(error) = parsed.body.get("error").and_then(Value::as_str) {
         let description = parsed
@@ -354,17 +357,19 @@ pub async fn request_device_code() -> Result<DeviceCodeChallenge> {
 /// Poll the device-code grant. `Ok(None)` means "keep waiting"
 /// (authorization_pending / slow_down).
 pub async fn poll_device_code(device_code: &str) -> Result<Option<OAuthTokens>> {
-    let response = http()
-        .post(OAUTH_TOKEN_URL)
-        .header("Accept", "application/json")
-        .form(&[
-            ("client_id", CLIENT_ID),
-            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-            ("device_code", device_code),
-        ])
-        .send()
-        .await
-        .context("device sign-in poll failed")?;
+    let response = send(
+        Service::Microsoft,
+        crate::net::client()
+            .post(OAUTH_TOKEN_URL)
+            .header("Accept", "application/json")
+            .form(&[
+                ("client_id", CLIENT_ID),
+                ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+                ("device_code", device_code),
+            ]),
+    )
+    .await
+    .context("device sign-in poll failed")?;
     let parsed = read(response, "device sign-in poll").await?;
     let error = parsed
         .body
@@ -523,15 +528,17 @@ pub async fn launcher_login(xsts: &XstsToken) -> Result<MinecraftToken> {
         "platform": "PC_LAUNCHER",
         "xtoken": format!("XBL3.0 x={};{}", xsts.user_hash, xsts.token),
     });
-    let response = http()
-        .post(LAUNCHER_LOGIN_URL)
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json")
-        .header("User-Agent", USER_AGENT)
-        .body(body.to_string())
-        .send()
-        .await
-        .context("Minecraft services sign-in failed")?;
+    let response = send(
+        Service::Mojang,
+        crate::net::client()
+            .post(LAUNCHER_LOGIN_URL)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT)
+            .body(body.to_string()),
+    )
+    .await
+    .context("Minecraft services sign-in failed")?;
     if response.status().as_u16() != 200 {
         bail!(
             "Minecraft services sign-in failed (HTTP {})",
@@ -550,14 +557,16 @@ pub async fn launcher_login(xsts: &XstsToken) -> Result<MinecraftToken> {
 }
 
 pub async fn minecraft_profile(minecraft_access_token: &str) -> Result<MinecraftProfile> {
-    let response = http()
-        .get(PROFILE_URL)
-        .header("Authorization", format!("Bearer {minecraft_access_token}"))
-        .header("Accept", "application/json")
-        .header("User-Agent", USER_AGENT)
-        .send()
-        .await
-        .context("Minecraft profile fetch failed")?;
+    let response = send(
+        Service::Mojang,
+        crate::net::client()
+            .get(PROFILE_URL)
+            .header("Authorization", format!("Bearer {minecraft_access_token}"))
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT),
+    )
+    .await
+    .context("Minecraft profile fetch failed")?;
     if response.status().as_u16() == 404 {
         bail!(
             "this Microsoft account owns no Minecraft profile; buy Minecraft: Java Edition or \
