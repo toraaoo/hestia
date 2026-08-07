@@ -415,6 +415,7 @@ fn launch<'a>(instance: &'a str, quick_play: Option<QuickPlay>) -> LaunchRequest
         profile: "",
         reconcile: true,
         quick_play,
+        offline: false,
     }
 }
 

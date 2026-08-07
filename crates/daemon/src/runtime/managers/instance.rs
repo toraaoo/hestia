@@ -49,6 +49,7 @@ impl InstanceLaunchManager {
             profile,
             reconcile,
             quick_play,
+            offline,
             id,
         } = order;
         let (session_id, seq) = self.reserve_session(&instance_id);
@@ -91,6 +92,7 @@ impl InstanceLaunchManager {
                         profile: &profile,
                         reconcile,
                         quick_play,
+                        offline,
                     },
                     &reporter.job(),
                 )
@@ -182,6 +184,8 @@ pub struct LaunchOrder {
     pub reconcile: bool,
     /// Join a world or server on start instead of the title screen.
     pub quick_play: Option<QuickPlay>,
+    /// Run unauthenticated instead of contacting Microsoft.
+    pub offline: bool,
     /// Client-supplied job id; empty asks for an allocated one.
     pub id: String,
 }

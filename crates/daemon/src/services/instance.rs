@@ -230,8 +230,9 @@ pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<InstanceLaunch, _, _>(|p, ctx| async move {
         let record = instance_for(&ctx, &p.instance, Intent::Start)?;
         // The account's tokens can no longer be refreshed: block up front so a
-        // dead sign-in prompts re-login instead of failing mid-launch.
-        if ctx.runtime.engine().accounts().needs_reauth(&p.account) {
+        // dead sign-in prompts re-login instead of failing mid-launch. An
+        // offline launch never presents a token, so the gate does not apply.
+        if !p.offline && ctx.runtime.engine().accounts().needs_reauth(&p.account) {
             return Err(ErrorInfo::SessionExpired {
                 reference: p.account.clone(),
             });
@@ -282,6 +283,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             profile: p.profile,
             reconcile: !running,
             quick_play: p.quick_play,
+            offline: p.offline,
             id: p.id,
         }) {
             Some(id) => Ok(InstanceLaunchResult { id }),

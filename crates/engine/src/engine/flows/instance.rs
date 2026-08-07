@@ -184,6 +184,7 @@ impl Engine {
             profile,
             reconcile,
             quick_play,
+            offline,
         } = request;
         let record = self
             .instances
@@ -202,7 +203,7 @@ impl Engine {
         } else {
             None
         };
-        let account = self.launch_account(account).await?;
+        let (account, mut warnings) = self.launch_account(account, offline).await?;
 
         let java = self
             .ensure_java(record.profile.java_major, on_progress)
@@ -267,7 +268,6 @@ impl Engine {
         let game_dir = self.instances.data_dir(&record);
         std::fs::create_dir_all(&game_dir)
             .with_context(|| format!("cannot create {}", game_dir.display()))?;
-        let mut warnings = Vec::new();
         if reconcile {
             // A captured profile scopes the settings-class sync targets to its
             // own store; an uncaptured one inherits the global store.
@@ -278,7 +278,7 @@ impl Engine {
             if let Some(pass) = self.instance_pass(&record, &entry_dir, &game_dir, store.as_deref())
             {
                 let session = proto::naming::instance_session_id(&record.id, session_seq);
-                warnings = self.begin_instance_sync(&session, pass);
+                warnings.extend(self.begin_instance_sync(&session, pass));
             }
             let selection: Option<std::collections::HashSet<String>> =
                 launch_profile.map(|p| p.members.into_iter().collect());
@@ -326,7 +326,14 @@ impl Engine {
         })
     }
 
-    async fn launch_account(&self, reference: &str) -> Result<LaunchAccount> {
+    /// Resolve the account a launch runs as, and say what is less than ideal
+    /// about it. An offline launch never asks Microsoft at all; an online one
+    /// falls back to the stored token when it cannot.
+    async fn launch_account(
+        &self,
+        reference: &str,
+        offline: bool,
+    ) -> Result<(LaunchAccount, Vec<WarningInfo>)> {
         let account = if reference.is_empty() {
             self.accounts
                 .default_account()
@@ -338,12 +345,34 @@ impl Engine {
                 .find(|a| a.name.eq_ignore_ascii_case(reference) || a.uuid == reference)
                 .with_context(|| format!("no account matches '{reference}'"))?
         };
-        let access_token = self.accounts.access_token(&account.uuid).await?;
-        Ok(LaunchAccount {
-            name: account.name,
-            uuid: account.uuid,
-            access_token,
-        })
+        if offline {
+            return Ok((
+                LaunchAccount {
+                    access_token: launch::OFFLINE_TOKEN.to_string(),
+                    name: account.name.clone(),
+                    uuid: account.uuid,
+                },
+                vec![WarningInfo::LaunchedOffline {
+                    account: account.name,
+                }],
+            ));
+        }
+        let token = self.accounts.access_token(&account.uuid).await?;
+        let warnings = if token.stale {
+            vec![WarningInfo::SessionNotVerified {
+                account: account.name.clone(),
+            }]
+        } else {
+            Vec::new()
+        };
+        Ok((
+            LaunchAccount {
+                name: account.name,
+                uuid: account.uuid,
+                access_token: token.token,
+            },
+            warnings,
+        ))
     }
 }
 
@@ -364,6 +393,8 @@ pub struct LaunchRequest<'a> {
     pub reconcile: bool,
     /// Join a world or server on start instead of opening to the title screen.
     pub quick_play: Option<QuickPlay>,
+    /// Run without contacting Microsoft, on an unusable token.
+    pub offline: bool,
 }
 
 /// Refuse a quick-play target the launch could not honour: a client too old for

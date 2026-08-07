@@ -27,7 +27,7 @@ pub use cache::Cache;
 pub use config::Config;
 pub use content::Content;
 pub use daemon::Daemon;
-pub use instance::Instance;
+pub use instance::{Instance, LaunchOptions};
 pub use java::Java;
 pub use modpack::Modpack;
 pub use process::{Process, ProcessEvent};

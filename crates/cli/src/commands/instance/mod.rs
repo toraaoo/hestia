@@ -29,7 +29,7 @@ use crate::commands::mc;
 use crate::commands::modpack::EntryModpackCmd;
 use crate::ui::Spinner;
 
-pub use lifecycle::launch;
+pub use lifecycle::{launch, Launch};
 
 /// The launch target a `--world` / `--server` pair names — the grammar's own
 /// translation of the two flags into the one thing the wire carries. clap has
@@ -126,6 +126,11 @@ enum InstanceAction {
                     instance.multi-session true')"
         )]
         new_session: bool,
+        #[arg(
+            long,
+            help = "Play without signing in: singleplayer only, on the last known account"
+        )]
+        offline: bool,
         #[arg(long, help = "Open a save world on start, by folder (Minecraft 1.20+)")]
         world: Option<String>,
         #[arg(
@@ -352,16 +357,20 @@ async fn run_action(client: &Client, name: String, action: InstanceAction) -> Re
             account,
             detach,
             new_session,
+            offline,
             world,
             server,
         } => {
             launch(
                 client,
-                &name,
-                account.as_deref().unwrap_or_default(),
-                new_session,
-                detach,
-                quick_play(world, server),
+                lifecycle::Launch {
+                    reference: &name,
+                    account: account.as_deref().unwrap_or_default(),
+                    new_session,
+                    detach,
+                    quick_play: quick_play(world, server),
+                    offline,
+                },
             )
             .await
         }

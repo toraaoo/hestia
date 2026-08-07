@@ -109,6 +109,12 @@ pub enum WarningInfo {
     /// memory and writes the whole file back when it exits — so that copy wins
     /// and this edit is lost with it.
     ServerListInUse { instance: String, sessions: u32 },
+    /// The session was launched offline on purpose, so it carries no usable
+    /// token.
+    LaunchedOffline { account: String },
+    /// The account's token was due for rotation and Microsoft could not be
+    /// reached, so the session runs on the last one the launcher holds.
+    SessionNotVerified { account: String },
 }
 
 impl WarningInfo {
@@ -166,6 +172,11 @@ impl WarningInfo {
                  multiplayer screen instead"
                     .to_string()
             }
+            LaunchedOffline { .. } | SessionNotVerified { .. } => {
+                "singleplayer works as usual; launch again once you are back online to play \
+                 multiplayer"
+                    .to_string()
+            }
             DocumentQuarantined { path, .. } => format!(
                 "nothing was deleted — the file is at `{path}`; update hestia if it came from a \
                  newer version, or delete it once you have what you need from it"
@@ -219,6 +230,17 @@ impl fmt::Display for WarningInfo {
                 f,
                 "'{instance}' has {sessions} session(s) open: the running game will overwrite this \
                  change to the multiplayer list when it exits"
+            ),
+            LaunchedOffline { account } => {
+                write!(
+                    f,
+                    "playing offline as '{account}' — this session is not signed in"
+                )
+            }
+            SessionNotVerified { account } => write!(
+                f,
+                "could not reach Microsoft to refresh '{account}', so this session runs on the \
+                 stored sign-in"
             ),
             DocumentQuarantined {
                 document, detail, ..

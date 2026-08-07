@@ -44,6 +44,13 @@ impl ReauthRequired {
     }
 }
 
+/// A token for a launch, and whether the launcher could confirm it is current.
+/// A stale one still opens singleplayer; the game refuses multiplayer with it.
+pub struct AccessToken {
+    pub token: String,
+    pub stale: bool,
+}
+
 /// What the user must act on to finish a sign-in.
 pub struct LoginChallenge {
     pub id: String,
@@ -335,10 +342,14 @@ impl Accounts {
         })
     }
 
-    /// A currently-valid Minecraft access token for `reference` (uuid or name),
-    /// rotating the stored tokens through Microsoft when they are at or near
-    /// expiry.
-    pub async fn access_token(&self, reference: &str) -> Result<String> {
+    /// A Minecraft access token for `reference` (uuid or name), rotating the
+    /// stored tokens through Microsoft when they are at or near expiry.
+    ///
+    /// A rotation that cannot reach Microsoft answers with the stored token
+    /// marked stale rather than failing: everything else about the launch is
+    /// already on disk, so a dropped connection should not be what stops
+    /// someone playing singleplayer.
+    pub async fn access_token(&self, reference: &str) -> Result<AccessToken> {
         let path = self.path();
         let mut account = {
             let file = load(&path);
@@ -356,7 +367,10 @@ impl Accounts {
             return Err(ReauthRequired::new(reference).into());
         }
         if account.expires_at - now_seconds() > REFRESH_MARGIN_SECONDS {
-            return Ok(account.access_token);
+            return Ok(AccessToken {
+                token: account.access_token,
+                stale: false,
+            });
         }
 
         if let Err(e) = rotate_tokens(&mut account).await {
@@ -364,6 +378,16 @@ impl Accounts {
             if e.downcast_ref::<OAuthRejected>().is_some() {
                 self.flag_reauth(&account.uuid)?;
                 return Err(ReauthRequired::new(reference).into());
+            }
+            if unreachable(&e) && !account.access_token.is_empty() {
+                tracing::warn!(
+                    uuid = %account.uuid,
+                    "cannot reach microsoft to refresh; using the stored token"
+                );
+                return Ok(AccessToken {
+                    token: account.access_token,
+                    stale: true,
+                });
             }
             return Err(e);
         }
@@ -374,7 +398,10 @@ impl Accounts {
             file.accounts.push(account.clone());
         }
         save(&path, &file)?;
-        Ok(account.access_token)
+        Ok(AccessToken {
+            token: account.access_token,
+            stale: false,
+        })
     }
 
     fn flag_reauth(&self, uuid: &str) -> Result<()> {
@@ -445,6 +472,13 @@ async fn rotate_tokens(account: &mut StoredAccount) -> Result<()> {
     account.expires_at = now_seconds() + minecraft.expires_in;
     account.needs_reauth = false;
     Ok(())
+}
+
+/// Whether the failure was the network rather than the account.
+fn unreachable(error: &anyhow::Error) -> bool {
+    error
+        .downcast_ref::<proto::error::ErrorInfo>()
+        .is_some_and(|info| matches!(info, proto::error::ErrorInfo::Offline { .. }))
 }
 
 fn now_seconds() -> i64 {

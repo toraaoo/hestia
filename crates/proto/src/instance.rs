@@ -665,6 +665,11 @@ pub struct InstanceLaunchParams {
     /// older instance refuses rather than silently ignoring it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quick_play: Option<QuickPlay>,
+    /// Launch without contacting Microsoft, using the signed-in account's name
+    /// and uuid with an unusable token. Singleplayer works; the game refuses
+    /// multiplayer, which is what an unauthenticated session is entitled to.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub offline: bool,
 }
 
 /// What a launch joins directly. One target or none — a launch cannot open a

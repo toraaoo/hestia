@@ -181,6 +181,11 @@ pub struct LaunchAccount {
     pub access_token: String,
 }
 
+/// The token an offline launch runs on. Deliberately not a real one: the game
+/// opens singleplayer with it and is refused by every authenticated service,
+/// which is exactly the entitlement an unverified session should have.
+pub const OFFLINE_TOKEN: &str = "0";
+
 /// Where the materialised instance pieces live.
 pub struct InstancePaths<'a> {
     pub game_dir: &'a Path,

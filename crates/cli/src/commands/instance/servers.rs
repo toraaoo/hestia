@@ -34,6 +34,11 @@ pub enum ServerCmd {
                     instance.multi-session true')"
         )]
         new_session: bool,
+        #[arg(
+            long,
+            help = "Play without signing in: singleplayer only, on the last known account"
+        )]
+        offline: bool,
     },
     /// Add a server to the instance's multiplayer list
     Add {
@@ -76,6 +81,7 @@ pub(super) async fn run(client: &Client, instance: &str, cmd: ServerCmd) -> Resu
             account,
             detach,
             new_session,
+            offline,
         } => {
             let address = match server {
                 Some(server) => resolve_address(client, instance, &server).await?,
@@ -83,11 +89,14 @@ pub(super) async fn run(client: &Client, instance: &str, cmd: ServerCmd) -> Resu
             };
             super::launch(
                 client,
-                instance,
-                account.as_deref().unwrap_or_default(),
-                new_session,
-                detach,
-                Some(QuickPlay::Server(address)),
+                super::Launch {
+                    reference: instance,
+                    account: account.as_deref().unwrap_or_default(),
+                    new_session,
+                    detach,
+                    quick_play: Some(QuickPlay::Server(address)),
+                    offline,
+                },
             )
             .await
         }
