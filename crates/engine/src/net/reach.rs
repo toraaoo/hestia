@@ -159,3 +159,62 @@ fn now() -> i64 {
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn network() -> Network {
+        Network::new()
+    }
+
+    #[test]
+    fn nothing_attempted_yet_is_unknown_not_offline() {
+        assert_eq!(network().status().state, NetworkState::Unknown);
+    }
+
+    #[test]
+    fn a_failed_request_marks_offline_and_a_later_success_clears_it() {
+        let net = network();
+        net.observe_unreachable();
+        assert_eq!(net.status().state, NetworkState::Offline);
+        net.observe_reachable();
+        assert_eq!(net.status().state, NetworkState::Online);
+        assert!(net.status().last_online_unix > 0);
+    }
+
+    #[test]
+    fn pinning_offline_survives_an_observation() {
+        let net = network();
+        net.set_offline_mode(true);
+        assert!(net.pinned());
+        // A request in flight when the pin landed must not un-pin it.
+        net.observe_reachable();
+        assert_eq!(net.status().state, NetworkState::Offline);
+        assert!(net.status().offline_mode);
+    }
+
+    #[test]
+    fn releasing_the_pin_returns_to_unknown_until_something_confirms() {
+        let net = network();
+        net.set_offline_mode(true);
+        net.set_offline_mode(false);
+        assert_eq!(net.status().state, NetworkState::Unknown);
+    }
+
+    #[tokio::test]
+    async fn only_a_transition_is_published() {
+        let net = network();
+        let mut states = net.subscribe();
+        net.observe_unreachable();
+        assert_eq!(
+            states.borrow_and_update().state,
+            NetworkState::Offline,
+            "the first observation is a change"
+        );
+        // A second identical observation would otherwise wake every front-end
+        // once per request on a busy download.
+        net.observe_unreachable();
+        assert!(states.has_changed().is_ok_and(|changed| !changed));
+    }
+}
