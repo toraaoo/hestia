@@ -14,6 +14,7 @@ mod instance;
 mod java;
 mod lifecycle;
 mod modpack;
+mod net;
 mod process;
 mod profile;
 mod server;
@@ -32,6 +33,7 @@ pub fn make_router() -> Router {
     config::register(&mut on);
     cache::register(&mut on);
     java::register(&mut on);
+    net::register(&mut on);
     download::register(&mut on);
     accounts::register(&mut on);
     skins::register(&mut on);
