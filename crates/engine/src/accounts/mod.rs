@@ -379,7 +379,7 @@ impl Accounts {
                 self.flag_reauth(&account.uuid)?;
                 return Err(ReauthRequired::new(reference).into());
             }
-            if unreachable(&e) && !account.access_token.is_empty() {
+            if crate::net::is_offline(&e) && !account.access_token.is_empty() {
                 tracing::warn!(
                     uuid = %account.uuid,
                     "cannot reach microsoft to refresh; using the stored token"
@@ -472,13 +472,6 @@ async fn rotate_tokens(account: &mut StoredAccount) -> Result<()> {
     account.expires_at = now_seconds() + minecraft.expires_in;
     account.needs_reauth = false;
     Ok(())
-}
-
-/// Whether the failure was the network rather than the account.
-fn unreachable(error: &anyhow::Error) -> bool {
-    error
-        .downcast_ref::<proto::error::ErrorInfo>()
-        .is_some_and(|info| matches!(info, proto::error::ErrorInfo::Offline { .. }))
 }
 
 fn now_seconds() -> i64 {

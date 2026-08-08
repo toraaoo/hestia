@@ -7,6 +7,7 @@
 
 mod reach;
 mod retry;
+pub(crate) mod store;
 
 pub(crate) use reach::network;
 pub use reach::Network;
@@ -149,6 +150,13 @@ pub fn stream_failure(service: Option<Service>, error: &reqwest::Error) -> anyho
 
 pub fn offline(service: Option<Service>, pinned: bool) -> anyhow::Error {
     ErrorInfo::Offline { service, pinned }.into()
+}
+
+/// Whether a failure was the network rather than the answer.
+pub fn is_offline(error: &anyhow::Error) -> bool {
+    error
+        .downcast_ref::<ErrorInfo>()
+        .is_some_and(|info| matches!(info, ErrorInfo::Offline { .. }))
 }
 
 fn upstream(service: Option<Service>, error: &reqwest::Error) -> anyhow::Error {
