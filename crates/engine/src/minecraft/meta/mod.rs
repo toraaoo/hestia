@@ -8,20 +8,36 @@ pub mod neoforge;
 pub mod paper;
 pub mod spigot;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use proto::error::Service;
 use serde_json::Value;
 
 use crate::net;
 
 async fn fetch_json(service: Service, url: &str) -> Result<Value> {
-    net::get_json(service, url).await
+    let body = fetch_text(service, url).await?;
+    serde_json::from_str(&body).with_context(|| format!("{url} returned malformed JSON"))
 }
 
-/// The same fetch for a document that is not JSON — NeoForge's
-/// `maven-metadata.xml` is the only one.
+/// Fetch a catalogue document, falling back to the last good copy when the
+/// network is gone. A version list changes rarely and a stale one is far more
+/// useful than a failed page — front-ends report the offline state alongside,
+/// so a cached answer is never mistaken for a live one.
 async fn fetch_text(service: Service, url: &str) -> Result<String> {
-    net::get_text(service, url).await
+    match net::get_text(service, url).await {
+        Ok(body) => {
+            net::store::save(url, &body);
+            Ok(body)
+        }
+        Err(error) if net::is_offline(&error) => match net::store::load(url) {
+            Some(body) => {
+                tracing::info!(url, "offline: serving the cached catalogue");
+                Ok(body)
+            }
+            None => Err(error),
+        },
+        Err(error) => Err(error),
+    }
 }
 
 /// Host OS in Mojang's rule vocabulary (`os.name`).

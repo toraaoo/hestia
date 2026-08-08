@@ -56,6 +56,12 @@ pub struct ServerUpdateSpec {
     pub allow_downgrade: bool,
 }
 
+/// Where the catalogue cache lives — under `meta/`, with the rest of the files
+/// a reclaim is free to delete.
+fn catalogue_dir(home: &Path) -> PathBuf {
+    home.join("meta").join("catalogue")
+}
+
 pub struct Engine {
     data_home: Mutex<PathBuf>,
     config: Config,
@@ -99,6 +105,7 @@ impl Engine {
         let settings = config.settings();
         content.configure(&settings.content);
         crate::net::network().set_offline_mode(settings.network.offline);
+        crate::net::store::set_root(catalogue_dir(&data_home));
         let update = Update::new(data_home.join("updates"));
         let processes = Arc::new(ProcessSupervisor::new(data_home.join("processes")));
         Engine {
@@ -162,6 +169,7 @@ impl Engine {
         let settings = self.config.settings();
         self.content.configure(&settings.content);
         crate::net::network().set_offline_mode(settings.network.offline);
+        crate::net::store::set_root(catalogue_dir(&resolved));
         self.cache.reload(resolved.join("cache"));
         self.java.reload(resolved.join("java"));
         self.accounts.reload(resolved.join("accounts.json"));
