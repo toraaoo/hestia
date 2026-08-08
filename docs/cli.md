@@ -265,6 +265,27 @@ One caveat, and hestia says so on the result rather than refusing: a **running g
 whole when it exits, so an edit made while a session is open is lost with it. Close the game, or add the server from the
 in-game multiplayer screen.
 
+### Playing offline
+
+Everything a launch needs is on disk after the first one, so a dropped connection should not be what stops you playing.
+Two things follow from that.
+
+A sign-in that is due for rotation and **cannot reach Microsoft** does not fail the launch: the session runs on the
+stored token and says so on the result. Singleplayer works; the game refuses multiplayer, which is what an unverified
+session is entitled to. A refresh token that Microsoft actively *rejects* is still fatal — that is an expired sign-in,
+not a network problem, and it prompts a re-login.
+
+`--offline` asks for that deliberately, and never contacts Microsoft at all:
+
+```bash
+hestia play modded --offline     # singleplayer, as the last signed-in account
+hestia start modded --offline    # the same, through the entry-agnostic verb
+```
+
+Both cases print a warning naming the account, so a session that cannot join a server is never a mystery. An offline
+launch needs an account to have been signed in once — it borrows that account's name and uuid so worlds and
+per-player data still match.
+
 ### Multiple sessions
 
 An instance can run **more than one session at a time**, gated twice. The capability is switched off launcher-wide until
@@ -505,7 +526,15 @@ hestia config set instance.multi-session true # allow an instance to run several
 hestia config set sync.enabled false          # stop sharing settings across instances
 hestia config set discord.enabled false       # stop publishing Discord presence
 hestia config set content.curseforge-key <key> # unlock the CurseForge source
+hestia config set network.offline true        # stop reaching the network at all
 ```
+
+`network.offline` pins the launcher offline. Nothing is attempted while it is set, so anything that needs upstream
+refuses immediately with a typed error naming the service instead of waiting out a connect timeout. Version catalogues
+already fetched are still answered from their cached copy, so creating an instance on a version you have picked before
+keeps working. `hestia daemon status` reports the current state on its `network` line — `online`, `checking`,
+`offline — upstream is unreachable`, or `offline (pinned by network.offline)`. The unpinned states are observed from the
+requests the daemon actually makes, so the line never disagrees with what a command is about to do.
 
 While `discord.enabled` is on, a running Discord client is told which instance is being played, its flavor and game
 version, and how long the session has run — and that the launcher is open at all, as an idle presence, since the daemon

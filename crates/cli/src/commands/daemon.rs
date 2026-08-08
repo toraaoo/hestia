@@ -41,6 +41,7 @@ pub async fn run(cmd: DaemonCmd) -> Result<ExitStatus> {
                     ui::show(View::detail([
                         ("pid", s.pid.to_string()),
                         ("uptime", format!("{}s", s.uptime_seconds)),
+                        ("network", network_line(client.net().status().await.ok())),
                         ("home", s.home.display().to_string()),
                         ("log", s.log.display().to_string()),
                     ]))?;
@@ -153,5 +154,20 @@ fn summarize(running: &[String]) -> String {
         "1 supervised process".to_string()
     } else {
         format!("{} supervised processes", running.len())
+    }
+}
+
+fn network_line(status: Option<client::proto::net::NetworkStatus>) -> String {
+    use client::proto::net::NetworkState;
+    let Some(status) = status else {
+        return "unknown".to_string();
+    };
+    match status.state {
+        NetworkState::Online => "online".to_string(),
+        NetworkState::Offline if status.offline_mode => {
+            "offline (pinned by network.offline)".to_string()
+        }
+        NetworkState::Offline => "offline — upstream is unreachable".to_string(),
+        NetworkState::Unknown => "checking".to_string(),
     }
 }
