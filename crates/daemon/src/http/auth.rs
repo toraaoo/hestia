@@ -1,10 +1,8 @@
-//! Who is calling, and whether they may.
-//!
-//! Two separate questions, answered separately. The extractor answers the first
-//! and yields nothing but a [`Grant`]; every route answers the second by naming
-//! the scope it costs. A valid key is never taken as permission for whatever the
-//! route happens to be — that inference is exactly what Wings' CVE-2026-54593
-//! did ([0075](../../../../docs/decisions/0075-the-remote-surface-is-an-allowlist.md)).
+//! Who is calling, and whether they may — two questions, answered separately.
+//! The extractor answers the first; every route answers the second by naming the
+//! scope it costs. A valid key is never permission for whatever route it reached,
+//! which is what Wings' CVE-2026-54593 got wrong
+//! ([0075](../../../../docs/decisions/0075-the-remote-surface-is-an-allowlist.md)).
 
 use std::net::{IpAddr, SocketAddr};
 
@@ -22,8 +20,8 @@ use super::Api;
 pub struct Key(pub Grant);
 
 impl Key {
-    /// The one line a route spends to be safe. Returns the grant so a handler
-    /// that also needs the narrowing can reach it without a second lookup.
+    /// The one line a route spends to be safe. Yields the grant, so a handler
+    /// needing the narrowing too reaches it without a second lookup.
     pub fn require(&self, scope: Scope) -> Result<&Grant, Failure> {
         if !self.0.holds(scope) {
             tracing::warn!(key = %self.0.prefix, %scope, "rejected: key does not hold the scope");
@@ -61,8 +59,7 @@ impl FromRequestParts<Api> for Key {
             }
             None => {
                 api.throttle.rejected(caller);
-                // By prefix only, and only when there is one: a rejected key is
-                // still a key, and the existing rule holds without exception.
+                // By prefix only: a rejected key is still a key.
                 tracing::warn!(
                     key = %super::redact(presented),
                     %caller,
@@ -74,12 +71,9 @@ impl FromRequestParts<Api> for Key {
     }
 }
 
-/// Who to hold the rate limit against.
-///
-/// `X-Forwarded-For` is believed only when `remote.trusted-proxy` says a proxy
-/// we control sets it — a client can otherwise write any address it likes into
-/// that header and spend somebody else's budget instead of its own. The
-/// left-most entry is the original client; the rest are the proxies between.
+/// Who to hold the rate limit against. `X-Forwarded-For` is believed only when
+/// `remote.trusted-proxy` says a proxy we control sets it — a client can
+/// otherwise spend somebody else's budget. Left-most entry is the client.
 fn caller(parts: &Parts, trusts_proxy: bool) -> IpAddr {
     let socket = parts
         .extensions

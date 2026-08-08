@@ -9,8 +9,8 @@ use proto::server::{
     ServerCommand, ServerCommandResult, ServerConfigGet, ServerConfigGetResult, ServerConfigList,
     ServerConfigListResult, ServerConfigSet, ServerCreate, ServerCreateResult, ServerDetail,
     ServerFlavors, ServerList, ServerListResult, ServerLoaders, ServerLogs, ServerPing,
-    ServerRemove, ServerRename, ServerResolve, ServerStart, ServerStartResult, ServerStatus,
-    ServerStop, ServerUpdate, ServerUpdateResult, ServerVersions,
+    ServerRemove, ServerRename, ServerResolve, ServerRestart, ServerStart, ServerStartResult,
+    ServerStatus, ServerStop, ServerUpdate, ServerUpdateResult, ServerVersions,
 };
 use proto::Empty;
 
@@ -152,34 +152,23 @@ pub(super) fn register(on: &mut Channels<'_>) {
 
     on.handle::<ServerStart, _, _>(|p, ctx| async move {
         let record = server_for(&ctx, &p.server, Intent::Start)?;
+        start(&ctx, &record).await
+    });
+
+    on.handle::<ServerRestart, _, _>(|p, ctx| async move {
+        let record = server_for(&ctx, &p.server, Intent::Read)?;
         let process_id = server_process_id(&record.id);
-        tracing::info!(server = %record.id, name = %record.name, "starting server");
-        let (_, plan) = ctx
-            .runtime
-            .engine()
-            .server_launch_plan(&record.id)
-            .map_err(crate::runtime::engine_error)?;
-        let spec = ProcessSpec {
-            id: process_id,
-            program: plan.program.to_string_lossy().into_owned(),
-            args: plan.args,
-            log: LogSource::File(plan.cwd.join("logs").join("latest.log")),
-            cwd: Some(plan.cwd),
-            env: Default::default(),
-            restart: RestartPolicy::Never,
-        };
-        match ctx.runtime.processes().start(spec).await {
-            Ok(info) => Ok(ServerStartResult {
-                process_id: info.id,
-                pid: info.pid,
-            }),
-            Err(StartError::EmptyProgram | StartError::InvalidId(_)) => Err(ErrorInfo::Internal {
-                detail: "invalid launch plan".into(),
-            }),
-            Err(e @ StartError::Spawn { .. }) => Err(ErrorInfo::Internal {
-                detail: format!("cannot spawn the server: {e}"),
-            }),
+        if is_running(&ctx, &process_id)
+            && !ctx.runtime.processes().stop_and_wait(&process_id).await
+        {
+            return Err(ErrorInfo::Busy {
+                detail: format!("'{}' did not stop in time", record.name),
+            });
         }
+        // Re-resolved now that it is down: a start excludes more than a read
+        // does, and the entry may have picked up a backup in the meantime.
+        let record = server_for(&ctx, &p.server, Intent::Start)?;
+        start(&ctx, &record).await
     });
 
     on.handle::<ServerStop, _, _>(|p, ctx| async move {
@@ -265,4 +254,39 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .collect();
         Ok(ServerConfigListResult { entries })
     });
+}
+
+/// Build the server's launch plan and hand it to the supervisor. Shared by
+/// `server.start` and `server.restart` so the two cannot start it differently.
+async fn start(
+    ctx: &crate::runtime::HandlerContext,
+    record: &engine::ServerRecord,
+) -> crate::runtime::router::ServiceResult<ServerStartResult> {
+    tracing::info!(server = %record.id, name = %record.name, "starting server");
+    let (_, plan) = ctx
+        .runtime
+        .engine()
+        .server_launch_plan(&record.id)
+        .map_err(crate::runtime::engine_error)?;
+    let spec = ProcessSpec {
+        id: server_process_id(&record.id),
+        program: plan.program.to_string_lossy().into_owned(),
+        args: plan.args,
+        log: LogSource::File(plan.cwd.join("logs").join("latest.log")),
+        cwd: Some(plan.cwd),
+        env: Default::default(),
+        restart: RestartPolicy::Never,
+    };
+    match ctx.runtime.processes().start(spec).await {
+        Ok(info) => Ok(ServerStartResult {
+            process_id: info.id,
+            pid: info.pid,
+        }),
+        Err(StartError::EmptyProgram | StartError::InvalidId(_)) => Err(ErrorInfo::Internal {
+            detail: "invalid launch plan".into(),
+        }),
+        Err(e @ StartError::Spawn { .. }) => Err(ErrorInfo::Internal {
+            detail: format!("cannot spawn the server: {e}"),
+        }),
+    }
 }

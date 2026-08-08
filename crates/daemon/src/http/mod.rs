@@ -1,16 +1,10 @@
-//! The second front door.
+//! The second front door: HTTP onto the router the socket already uses
+//! ([0072](../../../../docs/decisions/0072-http-is-a-second-door.md)). A route
+//! serializes a contract's params, dispatches on its channel, and re-envelopes
+//! the answer; no handler is duplicated.
 //!
-//! `hestiad` already holds every business rule and answers a local socket; this
-//! is one more way to reach the router it already has. Nothing below `Router`
-//! knows the difference — a route serializes a contract's params, dispatches on
-//! its channel, and re-envelopes the answer, so the account gate, the tracing
-//! span and the timing log all still apply and no handler is duplicated
-//! ([0072](../../../../docs/decisions/0072-http-is-a-second-door.md)).
-//!
-//! What is new sits entirely above that: mounting, auth, scope, and the
-//! envelope. The mount table *is* the security boundary — a channel that is not
-//! in it has no path at all, so adding one to `services/` never widens this
-//! surface
+//! The mount table is the security boundary — an unlisted channel has no path,
+//! so adding one to `services/` never widens this surface
 //! ([0075](../../../../docs/decisions/0075-the-remote-surface-is-an-allowlist.md)).
 
 mod auth;
@@ -79,13 +73,11 @@ impl Api {
     }
 
     /// Serialize `C::Params`, dispatch on `C::CHANNEL` through the router the
-    /// socket uses, and decode `C::Result` back out. The generic seam — a route
-    /// names a contract and nothing else.
+    /// socket uses, and decode `C::Result` back out.
     async fn call<C: Contract>(&self, params: C::Params) -> Result<C::Result, ErrorInfo> {
         let payload = serde_json::to_value(params).unwrap_or(Value::Null);
-        // Nothing mounted here streams over the socket's outbound channel
-        // (`events.subscribe` is not a route), so the sink is a well-formed
-        // place for a frame to go and nobody drains it.
+        // No mounted channel writes to `out` — `events.subscribe` is not a
+        // route — so nothing is lost by dropping the receiver.
         let (out, _drain) = tokio::sync::mpsc::unbounded_channel();
         let ctx = HandlerContext {
             runtime: self.runtime.clone(),
@@ -113,14 +105,12 @@ impl Api {
         )
     }
 
-    /// Turn the `{id}` in a path into the id of the server it names, refusing
-    /// anything this key was not issued for.
+    /// Resolve the `{id}` in a path to a server id, refusing anything this key
+    /// was not issued for.
     ///
-    /// A key narrowed to some servers is answered **404** for the others, never
-    /// 403: a refusal that distinguishes "not yours" from "not there" is an
-    /// enumeration oracle for every server on the node. The path may name a
-    /// server by its slug, so the narrowing is checked against the resolved id
-    /// rather than against whatever the caller typed.
+    /// A narrowed key gets **404** for the servers it does not cover, never 403:
+    /// telling "not yours" from "not there" enumerates the node. The check is
+    /// against the resolved id, since a path may name a server by its slug.
     fn server(&self, grant: &engine::Grant, reference: &str) -> Result<String, envelope::Failure> {
         self.runtime
             .engine()
@@ -138,18 +128,15 @@ impl Api {
     }
 }
 
-/// HTTP requests share the id space with socket connections so a log line's
-/// `conn` is unambiguous across both doors.
+/// Connection ids, shared with the socket so a log line's `conn` is unambiguous.
 fn next_conn_id() -> u64 {
-    // Counted down from the top so the two doors cannot collide in a log even
-    // over a very long-lived daemon.
+    // Counts down; the socket's counter counts up, so the two never collide.
     static COUNTER: AtomicU64 = AtomicU64::new(u64::MAX);
     COUNTER.fetch_sub(1, Ordering::Relaxed)
 }
 
 /// As much of a presented credential as may be written down: the readable head,
-/// which identifies a key without being one. A string too short to have a head
-/// is reported as absent rather than printed.
+/// which identifies a key without being one.
 fn redact(presented: &str) -> &str {
     match presented.len() {
         0 => "<none>",
@@ -165,9 +152,9 @@ pub fn spawn(runtime: Arc<Runtime>, router: Arc<Router>) {
 
 /// Open the door, if it is configured to be open at all.
 ///
-/// A refusal is loud and local: the listener does not open and the daemon keeps
-/// serving its socket, so the launcher stays usable and the misconfiguration is
-/// fixable with `hestia config set` rather than by editing JSON by hand.
+/// A refusal takes down the listener and nothing else: the daemon keeps serving
+/// its socket, so the misconfiguration is fixable with `hestia config set`
+/// rather than by editing JSON by hand.
 async fn serve(runtime: Arc<Runtime>, router: Arc<Router>) {
     let remote = runtime.engine().config().settings().remote;
     if !remote.enabled {
@@ -203,8 +190,6 @@ async fn serve(runtime: Arc<Runtime>, router: Arc<Router>) {
         keys = runtime.engine().remote().count(),
         "remote surface listening on http://{bound}"
     );
-    // What an operator checking the node reads back: where it actually opened,
-    // which is not always where the settings asked for (port 0 picks its own).
     runtime.set_remote_door(Door {
         address: bound,
         refusal: String::new(),
@@ -214,8 +199,7 @@ async fn serve(runtime: Arc<Runtime>, router: Arc<Router>) {
     }
 }
 
-/// Serve on an already-bound listener. Split out so a test drives the real
-/// stack on an ephemeral port rather than a stand-in for it.
+/// Serve on an already-bound listener.
 pub(crate) async fn run(listener: TcpListener, api: Api) -> std::io::Result<()> {
     axum::serve(
         listener,
@@ -227,9 +211,8 @@ pub(crate) async fn run(listener: TcpListener, api: Api) -> std::io::Result<()> 
 pub(crate) fn app(api: Api) -> axum::Router {
     axum::Router::new()
         .merge(routes::mount())
-        // The stream routes are mounted apart from the timeout: an event stream
-        // is supposed to stay open, and a two-minute deadline would close every
-        // console the moment it went quiet.
+        // Mounted outside `routes`, which carries the request timeout: an
+        // event stream is meant to stay open.
         .merge(stream::mount())
         .layer(axum::middleware::from_fn(envelope::stamp))
         .layer(DefaultBodyLimit::disable())

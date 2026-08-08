@@ -24,9 +24,9 @@ use proto::server::{
     ServerConfigSet, ServerConfigSetParams, ServerCreate, ServerCreateDoneEvent,
     ServerCreateParams, ServerDetail, ServerDetails, ServerFlavors, ServerInfo, ServerList,
     ServerLoaders, ServerLogs, ServerLogsParams, ServerPing, ServerPingResult, ServerRef,
-    ServerRemove, ServerRename, ServerRenameParams, ServerResolve, ServerStart, ServerStartResult,
-    ServerStatus, ServerStop, ServerUpdate, ServerUpdateDoneEvent, ServerUpdateParams,
-    ServerVersions,
+    ServerRemove, ServerRename, ServerRenameParams, ServerResolve, ServerRestart, ServerStart,
+    ServerStartResult, ServerStatus, ServerStop, ServerUpdate, ServerUpdateDoneEvent,
+    ServerUpdateParams, ServerVersions,
 };
 
 pub struct Server<'a> {
@@ -173,6 +173,18 @@ impl Server<'_> {
     pub async fn stop(&self, server: &str) -> Result<(), IpcError> {
         self.session.call::<ServerStop>(&server_ref(server)).await?;
         Ok(())
+    }
+
+    /// Stop it, wait for it to be gone, and start it again. The daemon owns the
+    /// waiting: it is the only party that knows when the process is really down.
+    /// Longer than the default timeout because a stop has its own grace period.
+    pub async fn restart(&self, server: &str) -> Result<ServerStartResult, IpcError> {
+        self.session
+            .call_with_timeout::<ServerRestart>(
+                &server_ref(server),
+                std::time::Duration::from_secs(60),
+            )
+            .await
     }
 
     pub async fn logs(

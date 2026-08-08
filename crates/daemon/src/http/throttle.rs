@@ -1,10 +1,6 @@
-//! A budget for getting the key wrong.
-//!
-//! Only the *failure* path is counted. A key that authenticates costs nothing,
-//! so a busy operator is never slowed down by their own dashboard — while an
-//! address working through the keyspace runs out of attempts long before it
-//! finishes. The window is fixed rather than sliding: the point is a ceiling on
-//! guesses per minute, not a precise one.
+//! A budget for getting the key wrong. Only the failure path is counted, so a
+//! busy operator is never throttled by their own dashboard. The window is fixed
+//! rather than sliding — the point is a ceiling on guesses per minute.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -17,11 +13,8 @@ const BUDGET: u32 = 10;
 /// How long a budget lasts, and how long an exhausted one takes to refill.
 const WINDOW: Duration = Duration::from_secs(60);
 
-/// How many addresses are tracked at once. A bounded map, because the key is
-/// attacker-chosen: an unbounded one is a way to spend the daemon's memory from
-/// off the machine. Full, the oldest window is evicted — an attacker can push
-/// their own entry out, but only by making the requests the budget is counting
-/// in the first place.
+/// How many addresses are tracked at once. Bounded because the key is
+/// attacker-chosen; full, the oldest window is evicted.
 const TRACKED: usize = 4096;
 
 #[derive(Default)]

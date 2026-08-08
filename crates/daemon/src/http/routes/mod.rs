@@ -1,10 +1,7 @@
-//! The allowlist. Every path the door answers is here, and a channel that is not
-//! named is not merely refused — it has no route, so it 404s on an unmounted
-//! path. Adding a channel to `services/` therefore never widens this surface
+//! The allowlist: every path the door answers, one file per resource. An
+//! unnamed channel is not refused — it has no route at all
 //! ([0075](../../../../../docs/decisions/0075-the-remote-surface-is-an-allowlist.md)).
-//!
-//! Grouped one file per resource. `meta` is the unversioned discovery pair; the
-//! rest mount under `/api/v1`.
+//! `meta` is the unversioned discovery pair; the rest mount under `/api/v1`.
 
 mod backup;
 mod meta;

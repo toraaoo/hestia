@@ -36,12 +36,14 @@ pub(crate) async fn stop(client: &Client, server: &str) -> Result<()> {
 }
 
 pub(crate) async fn restart(client: &Client, server: &str) -> Result<()> {
-    {
-        let _spinner = Spinner::start(format!("stopping '{server}'"));
-        client.server().stop(server).await?;
-        wait_until_stopped(client, server).await?;
-    }
-    start(client, server).await
+    let started = {
+        let _spinner = Spinner::start(format!("restarting '{server}'"));
+        client.server().restart(server).await?
+    };
+    ui::show(View::line(format!(
+        "server '{server}' restarted (pid {})",
+        started.pid
+    )))
 }
 
 pub(super) async fn remove(client: &Client, server: &str) -> Result<()> {

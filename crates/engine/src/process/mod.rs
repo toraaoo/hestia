@@ -374,6 +374,29 @@ impl ProcessSupervisor {
         }
     }
 
+    /// Stop one process and wait for it to actually be gone. `false` when there
+    /// was nothing to stop or it outlasted the grace period — a caller about to
+    /// start it again must not do so while it still holds its jars open.
+    pub async fn stop_and_wait(&self, id: &str) -> bool {
+        let entry = self.table.lock().unwrap().get(id).cloned();
+        let Some(entry) = entry else {
+            return false;
+        };
+        if !entry.is_running() {
+            return true;
+        }
+        self.stop(id);
+        let deadline = tokio::time::Instant::now() + STOP_GRACE + Duration::from_secs(5);
+        while tokio::time::Instant::now() < deadline {
+            if !entry.is_running() {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        tracing::warn!(id, "timed out waiting for the process to stop");
+        false
+    }
+
     pub async fn stop_all_and_wait(&self) {
         let running: Vec<Arc<Entry>> = self
             .table

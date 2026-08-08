@@ -1,9 +1,7 @@
-//! The keys that open the node's second door.
-//!
-//! One document in the data home, owner-only, holding a digest per key and never
-//! a key. Minting is deliberately a *local* act — these are reachable over the
-//! socket and nowhere else — so a stolen key can never mint its replacement
-//! ([0075](../../../docs/decisions/0075-the-remote-surface-is-an-allowlist.md)).
+//! The keys that open the node's second door: one owner-only document holding a
+//! digest per key and never a key. Minting is a local act — these are reachable
+//! over the socket and nowhere else — so a stolen key cannot mint its
+//! replacement ([0075](../../../docs/decisions/0075-the-remote-surface-is-an-allowlist.md)).
 
 mod key;
 
@@ -126,8 +124,8 @@ impl Remote {
         self.inner.lock().unwrap().stored.keys.len()
     }
 
-    /// Mint a key. The plaintext is returned once, here, and is not recoverable
-    /// afterwards — only its digest is written.
+    /// Mint a key. The plaintext is returned once, here; only its digest is
+    /// written.
     pub fn create(
         &self,
         name: &str,
@@ -185,10 +183,8 @@ impl Remote {
 
     /// Recognise a presented token, and record that it was used.
     ///
-    /// Every stored digest is compared even after one matches: returning as soon
-    /// as a key is found would make the answer's timing depend on where in the
-    /// store the match sits, which is a slow enumeration of how many keys a node
-    /// holds.
+    /// Every stored digest is compared even after one matches: returning early
+    /// would make the timing depend on where in the store the match sits.
     pub fn verify(&self, token: &str) -> Option<Grant> {
         if !key::looks_like_a_key(token) {
             return None;
@@ -210,8 +206,7 @@ impl Remote {
             scopes: stored.scopes.clone(),
             servers: stored.servers.clone(),
         };
-        // A last-used stamp is worth losing rather than failing a request that
-        // is otherwise perfectly authorized.
+        // A lost stamp must not fail an otherwise-authorized request.
         if let Err(e) = save(&mut inner) {
             tracing::warn!(error = %e, "could not record remote key use");
         }
@@ -220,9 +215,8 @@ impl Remote {
 }
 
 fn save(inner: &mut Inner) -> Result<(), RemoteError> {
-    // Owner-only: the digests are not usable as keys, but the file also names
-    // every scope every key holds, which is a map of the door for anyone
-    // deciding where to push.
+    // Owner-only: the digests are not keys, but the scopes beside them map
+    // the door for anyone deciding where to push.
     schema::save_private(&inner.path, &inner.stored).map_err(RemoteError::Save)
 }
 

@@ -265,6 +265,15 @@ impl Contract for ServerStart {
     type Result = ServerStartResult;
 }
 
+/// Stop, wait for it to be gone, and start again. One channel rather than a
+/// stop-poll-start dance per front-end: only the daemon knows when it is down.
+pub struct ServerRestart;
+impl Contract for ServerRestart {
+    const CHANNEL: &'static str = "server.restart";
+    type Params = ServerRef;
+    type Result = ServerStartResult;
+}
+
 pub struct ServerStop;
 impl Contract for ServerStop {
     const CHANNEL: &'static str = "server.stop";

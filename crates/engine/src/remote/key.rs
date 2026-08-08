@@ -1,10 +1,7 @@
-//! The credential vocabulary: what a key looks like, how one is minted, and how
-//! a presented one is recognised.
-//!
-//! The format is `hestia-web`'s verbatim — `hst_` plus 32 random bytes as
-//! base64url, stored only as a SHA-256 digest, with the first twelve characters
-//! kept so a listing can name a key without holding one. Sharing the namespace
-//! means automated secret scanning recognises a leaked key from either project.
+//! The credential vocabulary, in `hestia-web`'s format verbatim: `hst_` plus 32
+//! random bytes as base64url, stored only as a SHA-256 digest, with the first
+//! twelve characters kept for listings. The shared namespace means secret
+//! scanning recognises a leaked key from either project.
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
@@ -50,11 +47,8 @@ pub fn prefix(token: &str) -> String {
     token.chars().take(PREFIX_LENGTH).collect()
 }
 
-/// Whether a presented token's digest is the stored one.
-///
-/// Constant-time on purpose: a byte-by-byte comparison that returns early leaks
-/// how much of a digest a guess got right, which is the shape of attack this
-/// whole scheme exists to make pointless.
+/// Whether a presented token's digest is the stored one. Constant-time: an
+/// early return leaks how much of a digest a guess got right.
 pub fn matches(stored: &str, presented: &str) -> bool {
     stored.as_bytes().ct_eq(presented.as_bytes()).into()
 }

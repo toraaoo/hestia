@@ -1,20 +1,15 @@
 //! The remote (HTTP) surface as the socket sees it: the scope vocabulary a key
-//! carries, and the channels that mint, list and revoke one.
-//!
-//! These channels are deliberately **not** part of the HTTP allowlist — you
-//! cannot mint a key with a key, so provisioning a node is something you do on
-//! the node ([0075](../../docs/decisions/0075-the-remote-surface-is-an-allowlist.md)).
+//! carries, and the channels that mint, list and revoke one. These are not in
+//! the HTTP allowlist — you cannot mint a key with a key
+//! ([0075](../../docs/decisions/0075-the-remote-surface-is-an-allowlist.md)).
 
 use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty};
 
-/// What a key is allowed to reach. A route declares the one it costs and the key
-/// declares what it holds; the two are compared per route, never inferred from
-/// the key being valid.
-///
-/// The serialized form is the `server:read` vocabulary a user types and a
-/// listing prints, so the enum names it explicitly rather than deriving it.
+/// What a key is allowed to reach, compared per route and never inferred from
+/// the key being valid. The serialized form is the `server:read` vocabulary a
+/// user types, so each variant names it rather than deriving it.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum Scope {
@@ -101,8 +96,7 @@ pub struct RemoteKeyCreateParams {
     pub servers: Vec<String>,
 }
 
-/// The one response that carries the secret. It is not stored, so this is the
-/// only time it exists anywhere but the holder's hands.
+/// The one response that carries the secret; it is not stored anywhere.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
@@ -127,8 +121,8 @@ pub struct RemoteKeyRef {
     pub key: String,
 }
 
-/// Whether the door is open, and where. Reported over the socket so an operator
-/// can check a node without a key.
+/// Whether the door is open, and where — over the socket, so an operator can
+/// check a node without a key.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]

@@ -1,11 +1,7 @@
 //! What each daemon failure becomes over HTTP, and what a remote caller is not
-//! allowed to learn on the way.
-//!
-//! The match is exhaustive on purpose: adding a variant to `ErrorInfo` fails the
-//! build here until somebody decides what it means to a caller who is not on
-//! this machine. `code` is the nine-value closed set `hestia-web`'s
-//! `API_ERROR_CODES` defines, which a generic integrator switches on; the full
-//! `ErrorInfo` still rides in `data` for a client that knows Hestia.
+//! allowed to learn on the way. The match is exhaustive on purpose: a new
+//! `ErrorInfo` variant fails the build until somebody decides what it means off
+//! this machine. `code` is the nine-value closed set of `API_ERROR_CODES`.
 
 use axum::http::StatusCode;
 use proto::error::ErrorInfo;
@@ -20,15 +16,12 @@ pub const TOO_MANY_REQUESTS: &str = "TOO_MANY_REQUESTS";
 pub const INTERNAL_ERROR: &str = "INTERNAL_ERROR";
 pub const SERVICE_UNAVAILABLE: &str = "SERVICE_UNAVAILABLE";
 
-/// What a remote caller is told instead of a path. Every variant whose `detail`
-/// is an `io::Error` string routinely names the absolute path it failed on:
-/// useful over a trusted socket, filesystem disclosure over a network.
+/// What a remote caller is told instead of a path.
 const REDACTED: &str = "redacted — see the daemon log on the node";
 
 pub fn of(info: &ErrorInfo) -> (StatusCode, &'static str) {
     use ErrorInfo::*;
     match info {
-        // --- the request was understood and is wrong ---
         FieldRequired { .. }
         | FieldsRequired { .. }
         | InvalidValue { .. }
@@ -49,12 +42,8 @@ pub fn of(info: &ErrorInfo) -> (StatusCode, &'static str) {
         | ArchiveInvalid { .. }
         | ArchiveUnsupported { .. }
         | SyncTargetInvalid { .. } => (StatusCode::UNPROCESSABLE_ENTITY, VALIDATION_FAILED),
-
-        // --- the request could not be read at all ---
         MalformedRequest { .. } => (StatusCode::BAD_REQUEST, BAD_REQUEST),
         IncompatibleVersion { .. } => (StatusCode::BAD_REQUEST, BAD_REQUEST),
-
-        // --- something is in the way ---
         EulaRequired
         | Busy { .. }
         | ReservedName { .. }
@@ -73,8 +62,6 @@ pub fn of(info: &ErrorInfo) -> (StatusCode, &'static str) {
         | ProfileAlreadyCaptured { .. }
         | ProfileNotCaptured { .. }
         | SyncLinkConflict { .. } => (StatusCode::CONFLICT, CONFLICT),
-
-        // --- there is no such thing ---
         EntryNotFound { .. }
         | ProcessNotFound { .. }
         | BackupNotFound { .. }
@@ -89,32 +76,19 @@ pub fn of(info: &ErrorInfo) -> (StatusCode, &'static str) {
         | ConfigKeyUnset { .. }
         | ModpackNotInstalled { .. }
         | RemoteKeyNotFound { .. }
-        // An unmounted channel has no path, so this can only mean a route was
-        // wired to a contract the daemon does not serve — indistinguishable
-        // from a wrong URL as far as the caller is concerned.
+        // Unreachable unless a route names a channel the daemon does not
+        // serve, which the caller cannot tell from a wrong URL.
         | UnknownChannel { .. } => (StatusCode::NOT_FOUND, NOT_FOUND),
-
-        // --- who are you ---
         RemoteKeyRejected => (StatusCode::UNAUTHORIZED, UNAUTHORIZED),
         SessionExpired { .. } => (StatusCode::UNAUTHORIZED, UNAUTHORIZED),
-
-        // --- come back later ---
         TooManyAttempts { .. } => (StatusCode::TOO_MANY_REQUESTS, TOO_MANY_REQUESTS),
-
-        // --- you, but not for this ---
         RemoteScopeRequired { .. } => (StatusCode::FORBIDDEN, FORBIDDEN),
-        // The account-gated channels are unrouted, and `update.*` is never
-        // mounted; both are here so the match stays exhaustive rather than
-        // because a remote caller can reach them.
+        // Unreachable over HTTP; present so the match stays exhaustive.
         SignInRequired | LoginDeclined | LoginTimedOut | ElevationRequired { .. } => {
             (StatusCode::FORBIDDEN, FORBIDDEN)
         }
-
-        // --- the node cannot do this right now ---
-        // A dependency the node is missing rather than one the request got
-        // wrong: 424 says the failure is upstream of the request.
+        // 424: the node is missing a dependency, not the request.
         MissingRequirement { .. } => (StatusCode::FAILED_DEPENDENCY, BAD_REQUEST),
-        // The author opted out of third-party distribution. Nothing to retry.
         ContentDownloadBlocked { .. } => (
             StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS,
             SERVICE_UNAVAILABLE,
@@ -123,21 +97,15 @@ pub fn of(info: &ErrorInfo) -> (StatusCode, &'static str) {
             (StatusCode::SERVICE_UNAVAILABLE, SERVICE_UNAVAILABLE)
         }
         Upstream { .. } => (StatusCode::BAD_GATEWAY, SERVICE_UNAVAILABLE),
-
-        // --- it broke ---
         Io { .. } | DownloadFailed { .. } | RconFailed { .. } | Internal { .. } => {
             (StatusCode::INTERNAL_SERVER_ERROR, INTERNAL_ERROR)
         }
     }
 }
 
-/// Strip what a remote caller must not see.
-///
-/// The variants below carry an unbounded English `detail` built from an
-/// `io::Error`, which names the absolute path it failed on. Over the local
-/// socket that is exactly what an operator wants; to a caller who is not on this
-/// machine it is a map of the filesystem. The variant and its status survive —
-/// only the prose is replaced, and the daemon's own log still has it in full.
+/// Strip what a remote caller must not see: these variants carry an `io::Error`
+/// string, which names the absolute path it failed on. The variant and its
+/// status survive — only the prose goes, and the daemon's log still has it.
 pub fn sanitize(info: ErrorInfo) -> ErrorInfo {
     match info {
         ErrorInfo::Io { operation, .. } => ErrorInfo::Io {
@@ -416,8 +384,6 @@ mod tests {
 
     #[test]
     fn a_failure_never_answers_with_a_success_status() {
-        // Guards the whole table against a typo that would make a client treat
-        // an error body as a result.
         assert!(every_variant().iter().all(|i| of(i).0.as_u16() >= 400));
     }
 

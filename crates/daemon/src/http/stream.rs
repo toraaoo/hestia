@@ -1,13 +1,7 @@
-//! Server-sent events, not WebSocket.
-//!
-//! The need here is one-way: the daemon pushes, and the single client-to-server
-//! case — console input — is an ordinary POST. SSE is plain HTTP, survives
-//! proxies and CDNs without special configuration, and reconnects natively, so
-//! Wings' WebSocket token-refresh problem does not arise.
-//!
-//! The SSE `event:` field **is** the topic name and `data:` **is** the topic
-//! payload verbatim — the same vocabulary the socket carries, with no
-//! translation table to keep in step.
+//! Server-sent events rather than WebSocket: the need is one-way, and console
+//! input is an ordinary POST. The SSE `event:` field **is** the topic name and
+//! `data:` **is** the topic payload verbatim, so there is no translation table
+//! to keep in step with `proto`.
 
 use std::sync::Arc;
 
@@ -26,10 +20,9 @@ use super::auth::Key;
 use super::envelope::Failure;
 use super::{next_conn_id, Api, CURRENT};
 
-/// Topics a `server:read` key may see. Everything else the daemon publishes —
-/// an instance launch, a skin, a self-update — belongs to the machine's owner
-/// rather than to a node operator, and a stream is not a way around the
-/// allowlist the routes enforce.
+/// Topics a `server:read` key may see. Everything else the daemon publishes
+/// belongs to the machine's owner, not to a node operator — a stream is not a
+/// way around the allowlist the routes enforce.
 const SERVER_TOPICS: &[&str] = &[
     "server.create.progress",
     "server.create.done",
@@ -77,9 +70,8 @@ async fn events(State(api): State<Api>, key: Key) -> Result<impl IntoResponse, F
     Ok(open(&api, grant.id.clone(), None))
 }
 
-/// One server's captured output, live. The filter is the entry key, which also
-/// covers the process keys beneath it — so a console survives a restart of the
-/// server it is following.
+/// One server's captured output, live. The filter is the entry key, which covers
+/// the process keys beneath it, so a console survives a restart.
 async fn console(
     State(api): State<Api>,
     key: Key,
@@ -100,9 +92,8 @@ fn open(
     api.runtime
         .hub()
         .subscribe_stream(next_conn_id(), out, filter, key_id);
-    // A keep-alive comment every fifteen seconds: an idle server publishes
-    // nothing for hours, and an intermediary proxy will close a connection that
-    // has gone quiet long before that.
+    // Keep-alive comments; an intermediary proxy drops a connection that goes
+    // quiet, and an idle server publishes nothing for hours.
     Sse::new(frames(rx)).keep_alive(KeepAlive::default())
 }
 

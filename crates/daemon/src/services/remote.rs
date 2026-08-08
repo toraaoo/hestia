@@ -1,8 +1,6 @@
-//! The keys that open the HTTP door, and the state of the door itself.
-//!
-//! Every channel here is reachable over the socket and over nothing else: they
-//! are absent from the HTTP allowlist by construction, so a key can never mint,
-//! list or revoke a key
+//! The keys that open the HTTP door, and the state of the door itself. Absent
+//! from the HTTP allowlist by construction, so a key can never mint, list or
+//! revoke a key
 //! ([0075](../../../../docs/decisions/0075-the-remote-surface-is-an-allowlist.md)).
 
 use engine::RemoteError;
@@ -33,9 +31,6 @@ pub(super) fn register(on: &mut Channels<'_>) {
     on.handle::<RemoteStatus, _, _>(|_: Empty, ctx| async move {
         let engine = ctx.runtime.engine();
         let remote = engine.config().settings().remote;
-        // Where the listener actually opened, not where the settings asked it
-        // to: a refused bind and a port the OS picked both differ, and an
-        // operator checking a node needs the truth rather than the intent.
         let door = ctx.runtime.remote_door();
         Ok(RemoteStatusResult {
             enabled: remote.enabled,
@@ -70,8 +65,7 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .remote()
             .revoke(&p.key)
             .map_err(remote_err)?;
-        // Revocation is immediate: a stream opened with this key is dropped
-        // rather than left running until its client happens to disconnect.
+        // Revocation is immediate, including streams already open on this key.
         ctx.runtime.hub().drop_key(&revoked.id);
         Ok(Empty {})
     });

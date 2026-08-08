@@ -1,8 +1,6 @@
-//! `hestia remote …` — the node's HTTP door and the keys that open it.
-//!
-//! Every command here goes over the unix socket, because that is the whole
-//! point: a key is minted by someone who is already on the node, so a stolen one
-//! can never mint its replacement.
+//! `hestia remote …` — the node's HTTP door and the keys that open it. Every
+//! command here goes over the unix socket, which is the point: a key is minted
+//! by someone already on the node.
 
 use anyhow::{bail, Result};
 use clap::Subcommand;
@@ -102,9 +100,7 @@ async fn create(name: String, scope: Vec<String>, server: Vec<String>) -> Result
     let scopes = parse_scopes(&scope)?;
     let client = super::connect().await?;
 
-    // Narrowing is stored by id, so a name typed here is resolved before the
-    // key is minted — a key that outlived a rename would otherwise silently
-    // widen or narrow itself.
+    // Narrowing is stored by id: a key holding a name would follow a rename.
     let mut servers = Vec::with_capacity(server.len());
     for reference in &server {
         match client.server().status(reference).await {

@@ -61,8 +61,8 @@ pub struct RemoteSettings {
     pub trusted_proxy: bool,
 }
 
-/// Loopback, and a port with nothing else on it. Not 25565-adjacent on purpose —
-/// nothing about this door is a Minecraft port.
+/// Loopback, and a port with nothing else on it — deliberately nowhere near
+/// 25565, since nothing about this door is a Minecraft port.
 impl Default for RemoteSettings {
     fn default() -> Self {
         RemoteSettings {
@@ -75,9 +75,8 @@ impl Default for RemoteSettings {
     }
 }
 
-/// The daemon refuses to serve a door that would answer the world in plaintext.
-/// Naming the fix in the error is the point: a message that only says "refused"
-/// gets worked around with the flag it is warning about.
+/// A door that would answer the world in plaintext. The error names the fix on
+/// purpose: a bare "refused" gets worked around with the flag it warns about.
 #[derive(Debug, thiserror::Error)]
 #[error(
     "remote.bind is {bind}, which is reachable from off this machine, and hestiad terminates no \

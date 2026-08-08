@@ -1,9 +1,7 @@
-//! The door driven end to end, in process: a real `Runtime` over a temp data
-//! home, the real service router underneath, and the real axum stack on top.
-//!
-//! Nothing here stubs the layer it is checking. A test that mounted its own
-//! routes would pass while the allowlist was wrong, which is the one thing this
-//! surface cannot afford to get wrong.
+//! The door driven in process: a real `Runtime` over a temp data home, the real
+//! service router underneath, the real axum stack on top. Nothing here stubs the
+//! layer it checks — a test that mounted its own routes would pass while the
+//! allowlist was wrong.
 
 use std::sync::Arc;
 
@@ -13,7 +11,7 @@ use axum::response::Response;
 use engine::ServerRecord;
 use proto::minecraft::ServerProfile;
 use proto::remote::Scope;
-use serde_json::Value;
+use serde_json::{json, Value};
 use tower::ServiceExt;
 
 use super::{Api, CURRENT};
@@ -65,10 +63,12 @@ impl Node {
             .1
     }
 
+    /// A registered, provisioned server. Marked ready because a half-created one
+    /// is refused by the guards for reasons that have nothing to do with this
+    /// surface.
     fn server(&self, name: &str) -> ServerRecord {
-        self.runtime
-            .engine()
-            .servers()
+        let servers = self.runtime.engine().servers();
+        let record = servers
             .create(
                 name,
                 ServerProfile {
@@ -78,16 +78,34 @@ impl Node {
                 },
                 None,
             )
-            .expect("register a server")
+            .expect("register a server");
+        servers.mark_ready(&record.id).expect("mark ready")
     }
 
     async fn get(&self, path: &str, token: Option<&str>) -> Response {
-        let mut request = Request::builder().uri(path);
+        self.send("GET", path, token, None).await
+    }
+
+    async fn send(
+        &self,
+        method: &str,
+        path: &str,
+        token: Option<&str>,
+        json: Option<Value>,
+    ) -> Response {
+        let mut request = Request::builder().method(method).uri(path);
         if let Some(token) = token {
             request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
         }
+        let body = match json {
+            Some(json) => {
+                request = request.header(header::CONTENT_TYPE, "application/json");
+                Body::from(json.to_string())
+            }
+            None => Body::empty(),
+        };
         super::app(self.api.clone())
-            .oneshot(request.body(Body::empty()).unwrap())
+            .oneshot(request.body(body).unwrap())
             .await
             .expect("the router answers")
     }
@@ -103,8 +121,6 @@ async fn body(response: Response) -> Value {
 fn v1(path: &str) -> String {
     format!("/api/{CURRENT}{path}")
 }
-
-// --- discovery -----------------------------------------------------------
 
 #[tokio::test]
 async fn discovery_needs_no_key_and_names_both_version_lines() {
@@ -138,8 +154,6 @@ async fn every_answer_says_which_api_and_which_daemon_produced_it() {
         );
     }
 }
-
-// --- auth ----------------------------------------------------------------
 
 #[tokio::test]
 async fn a_request_with_no_key_is_refused() {
@@ -238,8 +252,6 @@ async fn every_read_route_costs_the_read_scope() {
     }
 }
 
-// --- the allowlist -------------------------------------------------------
-
 /// The channels 0075 names as never routable. A valid, maximally-scoped key
 /// reaches none of them, because there is no path — 404 on an unmounted route,
 /// not 403 on a mounted one.
@@ -292,8 +304,6 @@ async fn a_key_cannot_be_used_to_mint_list_or_revoke_a_key() {
     assert_eq!(node.runtime.engine().remote().count(), before);
 }
 
-// --- narrowing -----------------------------------------------------------
-
 #[tokio::test]
 async fn a_narrowed_key_never_learns_the_other_servers_exist() {
     let node = Node::new();
@@ -310,8 +320,6 @@ async fn a_narrowed_key_never_learns_the_other_servers_exist() {
         .collect();
     assert_eq!(names, ["mine"]);
 
-    // Refused as absent, never as forbidden: telling the two apart would
-    // enumerate every server on the node.
     let response = node
         .get(&v1(&format!("/servers/{}", theirs.id)), Some(&token))
         .await;
@@ -329,8 +337,6 @@ async fn narrowing_is_checked_against_the_id_not_the_name_in_the_path() {
     let theirs = node.server("theirs");
     let token = node.key_for(vec![Scope::ServerRead], vec![mine.id.clone()]);
 
-    // A path may name a server by its slug, so a check against the raw
-    // reference would be bypassed by using the other spelling.
     assert_eq!(
         node.get(&v1("/servers/mine"), Some(&token)).await.status(),
         StatusCode::OK
@@ -343,8 +349,6 @@ async fn narrowing_is_checked_against_the_id_not_the_name_in_the_path() {
     );
     assert_ne!(theirs.id, "theirs");
 }
-
-// --- the envelope --------------------------------------------------------
 
 #[tokio::test]
 async fn a_result_arrives_in_the_shape_the_web_sdk_already_reads() {
@@ -376,14 +380,10 @@ async fn a_missing_server_is_the_daemons_own_error_under_an_http_status() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let body = body(response).await;
     assert_eq!(body["code"], Value::from("NOT_FOUND"));
-    // The coarse code is for a generic integrator; the whole ErrorInfo is still
-    // there for a client that localizes from `kind`.
     assert_eq!(body["data"]["kind"], Value::from("entry_not_found"));
     assert_eq!(body["data"]["entry"], Value::from("server"));
     assert_eq!(body["data"]["reference"], Value::from("nosuch"));
 }
-
-// --- streams -------------------------------------------------------------
 
 #[tokio::test]
 async fn a_stream_answers_as_an_event_stream() {
@@ -422,8 +422,6 @@ async fn a_console_stream_needs_a_server_the_key_can_reach() {
         StatusCode::NOT_FOUND
     );
 }
-
-// --- rate limiting -------------------------------------------------------
 
 #[tokio::test]
 async fn guessing_runs_out_of_attempts_and_says_when_to_come_back() {
@@ -465,4 +463,270 @@ async fn a_key_that_works_never_spends_the_budget() {
             StatusCode::OK
         );
     }
+}
+
+#[tokio::test]
+async fn a_read_key_cannot_touch_anything() {
+    let node = Node::new();
+    let server = node.server("smp");
+    let read = node.key(vec![Scope::ServerRead]);
+    let id = &server.id;
+
+    let mutations: Vec<(&str, String, Option<Value>)> = vec![
+        ("POST", v1(&format!("/servers/{id}/start")), None),
+        ("POST", v1(&format!("/servers/{id}/stop")), None),
+        ("POST", v1(&format!("/servers/{id}/restart")), None),
+        (
+            "POST",
+            v1(&format!("/servers/{id}/console")),
+            Some(json!({ "command": "stop" })),
+        ),
+        (
+            "PATCH",
+            v1(&format!("/servers/{id}")),
+            Some(json!({ "name": "renamed" })),
+        ),
+        (
+            "PUT",
+            v1(&format!("/servers/{id}/config/memory")),
+            Some(json!({ "value": "4G" })),
+        ),
+        ("POST", v1(&format!("/servers/{id}/backups")), None),
+        ("DELETE", v1(&format!("/servers/{id}/backups/b1")), None),
+        (
+            "POST",
+            v1(&format!("/servers/{id}/backups/b1/restore")),
+            None,
+        ),
+    ];
+
+    for (method, path, body) in mutations {
+        let response = node.send(method, &path, Some(&read), body).await;
+        assert_eq!(
+            response.status(),
+            StatusCode::FORBIDDEN,
+            "{method} {path} answered a read-only key"
+        );
+    }
+    assert_eq!(
+        node.runtime.engine().servers().get(id).unwrap().name,
+        "smp",
+        "a refused rename must not have landed"
+    );
+}
+
+#[tokio::test]
+async fn each_mutation_costs_its_own_scope() {
+    let node = Node::new();
+    let server = node.server("smp");
+    let id = &server.id;
+    let control = node.key(vec![Scope::ServerControl]);
+    let write = node.key(vec![Scope::ServerWrite]);
+    let backup = node.key(vec![Scope::ServerBackup]);
+
+    // Control drives it and nothing else.
+    assert_ne!(
+        node.send(
+            "POST",
+            &v1(&format!("/servers/{id}/stop")),
+            Some(&control),
+            None
+        )
+        .await
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        node.send(
+            "PATCH",
+            &v1(&format!("/servers/{id}")),
+            Some(&control),
+            Some(json!({ "name": "nope" })),
+        )
+        .await
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        node.send(
+            "POST",
+            &v1(&format!("/servers/{id}/backups")),
+            Some(&control),
+            None,
+        )
+        .await
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+
+    // Write changes it and cannot drive it.
+    assert_ne!(
+        node.send(
+            "PUT",
+            &v1(&format!("/servers/{id}/config/memory")),
+            Some(&write),
+            Some(json!({ "value": "4G" })),
+        )
+        .await
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        node.send(
+            "POST",
+            &v1(&format!("/servers/{id}/stop")),
+            Some(&write),
+            None
+        )
+        .await
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+
+    // Backup archives it and cannot read the rest.
+    assert_eq!(
+        node.get(&v1(&format!("/servers/{id}/logs")), Some(&backup))
+            .await
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+}
+
+#[tokio::test]
+async fn a_setting_written_over_http_lands_on_the_record() {
+    let node = Node::new();
+    let server = node.server("smp");
+    let write = node.key(vec![Scope::ServerWrite]);
+
+    let response = node
+        .send(
+            "PUT",
+            &v1(&format!("/servers/{}/config/memory", server.id)),
+            Some(&write),
+            Some(json!({ "value": "4G" })),
+        )
+        .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        node.runtime
+            .engine()
+            .servers()
+            .config_get(&server.id, "memory")
+            .unwrap()
+            .as_deref(),
+        Some("4G")
+    );
+}
+
+#[tokio::test]
+async fn a_rename_over_http_lands_on_the_record() {
+    let node = Node::new();
+    let server = node.server("smp");
+    let write = node.key(vec![Scope::ServerWrite]);
+
+    let response = node
+        .send(
+            "PATCH",
+            &v1(&format!("/servers/{}", server.id)),
+            Some(&write),
+            Some(json!({ "name": "survival" })),
+        )
+        .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        node.runtime
+            .engine()
+            .servers()
+            .get(&server.id)
+            .unwrap()
+            .name,
+        "survival"
+    );
+}
+
+#[tokio::test]
+async fn a_long_operation_answers_202_and_points_at_the_stream() {
+    let node = Node::new();
+    let server = node.server("smp");
+    let backup = node.key(vec![Scope::ServerBackup]);
+
+    let response = node
+        .send(
+            "POST",
+            &v1(&format!("/servers/{}/backups", server.id)),
+            Some(&backup),
+            None,
+        )
+        .await;
+
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    assert_eq!(
+        response.headers().get(header::LOCATION).unwrap(),
+        v1("/events").as_str()
+    );
+    let body = body(response).await;
+    assert!(
+        body["data"]["id"].as_str().is_some_and(|id| !id.is_empty()),
+        "a 202 must name the job to watch"
+    );
+}
+
+#[tokio::test]
+async fn a_narrowed_key_cannot_mutate_a_server_it_does_not_cover() {
+    let node = Node::new();
+    let mine = node.server("mine");
+    let theirs = node.server("theirs");
+    let token = node.key_for(
+        vec![Scope::ServerControl, Scope::ServerWrite],
+        vec![mine.id.clone()],
+    );
+
+    let response = node
+        .send(
+            "PATCH",
+            &v1(&format!("/servers/{}", theirs.id)),
+            Some(&token),
+            Some(json!({ "name": "hijacked" })),
+        )
+        .await;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        node.runtime
+            .engine()
+            .servers()
+            .get(&theirs.id)
+            .unwrap()
+            .name,
+        "theirs"
+    );
+}
+
+#[tokio::test]
+async fn a_body_bigger_than_the_limit_is_refused_before_a_handler_sees_it() {
+    let node = Node::new();
+    let server = node.server("smp");
+    let write = node.key(vec![Scope::ServerWrite]);
+
+    let response = node
+        .send(
+            "PATCH",
+            &v1(&format!("/servers/{}", server.id)),
+            Some(&write),
+            Some(json!({ "name": "x".repeat(super::MAX_BODY + 1) })),
+        )
+        .await;
+
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(
+        node.runtime
+            .engine()
+            .servers()
+            .get(&server.id)
+            .unwrap()
+            .name,
+        "smp"
+    );
 }

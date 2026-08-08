@@ -1,11 +1,7 @@
-//! The HTTP envelope. Every response the door produces has this shape — success
-//! or failure — mirroring `hestia-web`'s `ApiResponse` so one SDK covers both
-//! services ([0072](../../../../docs/decisions/0072-http-is-a-second-door.md)).
-//!
-//! The socket envelope is deliberately *not* reused: HTTP already has status
-//! codes and headers for what `v` and `ok` carry, and tunnelling everything as
-//! 200 would break caching, proxies, monitoring and `curl` — which is a
-//! first-class client here.
+//! The HTTP envelope, mirroring `hestia-web`'s `ApiResponse` so one SDK covers
+//! both services. The socket envelope is deliberately not reused — HTTP already
+//! has status codes for what `v` and `ok` carry
+//! ([0072](../../../../docs/decisions/0072-http-is-a-second-door.md)).
 
 use axum::http::{header, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -52,6 +48,21 @@ impl Answer {
             location: None,
         }
     }
+
+    /// The work is running; its progress arrives on the event stream. 202 so a
+    /// client knows to watch without inspecting the body.
+    pub fn accepted(message: impl Into<String>, data: Value) -> Answer {
+        Answer {
+            status: StatusCode::ACCEPTED,
+            ..Answer::new(message, data)
+        }
+    }
+
+    /// Where the thing that was just started can be followed.
+    pub fn at(mut self, location: impl Into<String>) -> Answer {
+        self.location = Some(location.into());
+        self
+    }
 }
 
 impl IntoResponse for Answer {
@@ -71,8 +82,7 @@ impl IntoResponse for Answer {
 }
 
 /// A failure, carried whole: the coarse `code` a generic integrator switches on,
-/// and the full `ErrorInfo` in `data` that a Hestia-aware client localizes
-/// through the same `error.*` tables it uses over the socket.
+/// and the full `ErrorInfo` in `data` a Hestia-aware client localizes.
 pub struct Failure(pub ErrorInfo);
 
 impl From<ErrorInfo> for Failure {
@@ -85,8 +95,6 @@ impl IntoResponse for Failure {
     fn into_response(self) -> Response {
         let info = status::sanitize(self.0);
         let (status, code) = status::of(&info);
-        // The one failure whose remedy is a wait says how long, in the header a
-        // generic client already knows to read.
         let retry = match &info {
             ErrorInfo::TooManyAttempts {
                 retry_after_seconds,
@@ -107,12 +115,12 @@ impl IntoResponse for Failure {
     }
 }
 
-/// What a route returns. The error arm is the whole failure vocabulary, so a
+/// What a route returns; the error arm is the whole failure vocabulary, so a
 /// handler never chooses a status code.
 pub type ApiResult = Result<Answer, Failure>;
 
 /// Stamp both version headers on every answer, including the ones the framework
-/// produced on its own — a 404 for an unmounted path, a 405, a body-limit 413.
+/// produced itself — a 404 for an unmounted path, a 405, a body-limit 413.
 pub async fn stamp(request: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
