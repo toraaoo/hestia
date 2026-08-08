@@ -171,6 +171,7 @@ fn pass(record: &InstanceRecord, data_dir: &Path, scope: Scope) -> Pass {
     Pass {
         id: record.id.clone(),
         name: record.name.clone(),
+        game_version: record.profile.game_version.clone(),
         data_dir: data_dir.to_path_buf(),
         scope,
     }

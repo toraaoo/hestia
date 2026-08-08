@@ -17,9 +17,9 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-/// Why a folder target stayed instance-local instead of being linked into the
+/// Why a sync target stayed instance-local instead of reconciling against the
 /// shared store. A folder holding only the instance's own files is adopted
-/// automatically, so both of these are cases where a move would have destroyed
+/// automatically, so a reason here always means sharing would have destroyed
 /// something.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
@@ -31,6 +31,9 @@ pub enum NotSharedReason {
     /// The folder is a symlink the user made, pointing somewhere that is not a
     /// hestia store. Only hestia's own links are ever touched.
     ForeignLink,
+    /// The instance predates 1.13, whose `options.txt` keybinds and world format
+    /// neither era reads from the other. Refused in both directions.
+    GameEra,
 }
 
 impl fmt::Display for NotSharedReason {
@@ -38,6 +41,7 @@ impl fmt::Display for NotSharedReason {
         f.write_str(match self {
             NotSharedReason::Collides => "files of the same name are already shared",
             NotSharedReason::ForeignLink => "the folder is a link you made",
+            NotSharedReason::GameEra => "this version is too old to share it safely",
         })
     }
 }
@@ -135,6 +139,14 @@ impl WarningInfo {
             } => format!(
                 "rename or delete the clashing files under `data/{target}`, then launch again to \
                  share it"
+            ),
+            SyncTargetNotShared {
+                target,
+                reason: NotSharedReason::GameEra,
+                ..
+            } => format!(
+                "`data/{target}` stays this instance's own — a pre-1.13 instance and a current one \
+                 cannot read each other's copy"
             ),
             SyncTargetNotShared { target, .. } => format!(
                 "remove or repoint the link at `data/{target}`, then launch again to share it"

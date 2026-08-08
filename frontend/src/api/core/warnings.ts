@@ -39,7 +39,17 @@ export function warningMessage(info: WarningInfo): string {
   return msg[`warning.kind.${info.kind}`]?.(params(info)) ?? '';
 }
 
-/** The localized hint: what the user can do about it. */
+/**
+ * The localized hint: what the user can do about it. A variant whose remedy
+ * depends on its `reason` may key a hint per reason; the bare kind is the
+ * fallback, so most variants define only that one.
+ */
 export function warningHint(info: WarningInfo): string {
-  return msg[`warning.hint.${info.kind}`]?.(params(info)) ?? '';
+  const reason = 'reason' in info ? info.reason : undefined;
+  const resolved = params(info);
+  return (
+    (reason && msg[`warning.hint.${info.kind}.${reason}`]?.(resolved)) ??
+    msg[`warning.hint.${info.kind}`]?.(resolved) ??
+    ''
+  );
 }

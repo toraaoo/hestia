@@ -62,6 +62,20 @@ const RESERVED_ROOTS: &[&str] = &["mods", "resourcepacks", "shaderpacks", "backu
 const CAPTURE_FILES: &[&str] = &[OPTIONS_TXT];
 const CAPTURE_FOLDERS: &[&str] = &["config"];
 
+/// 1.13 renamed every `options.txt` keybind from an LWJGL key code to a
+/// `key.keyboard.*` name, and is the oldest world format a current client opens
+/// without converting.
+pub const SHARED_FORMATS_SINCE: (u64, u64, u64) = (1, 13, 0);
+
+/// The targets whose on-disk format is bound to the game's era.
+const ERA_BOUND: &[&str] = &[OPTIONS_TXT, "saves"];
+
+/// An id that is not a release triple answers yes: nearly all of them are
+/// modern snapshots.
+pub fn shares_era_bound(game_version: &str) -> bool {
+    crate::version::parse(game_version).is_none_or(|v| v >= SHARED_FORMATS_SINCE)
+}
+
 /// Where an instance's settings-class targets reconcile for one pass.
 #[derive(Clone, Default, PartialEq, Eq)]
 pub enum Scope {
@@ -91,8 +105,15 @@ impl Scope {
 pub struct Pass {
     pub id: String,
     pub name: String,
+    pub game_version: String,
     pub data_dir: PathBuf,
     pub scope: Scope,
+}
+
+impl Pass {
+    fn may_share(&self, raw: &str) -> bool {
+        !ERA_BOUND.contains(&raw) || shares_era_bound(&self.game_version)
+    }
 }
 
 pub struct Sync {
@@ -168,6 +189,10 @@ impl Sync {
 
         for raw in &targets.files {
             let Some(rel) = safe_rel(raw) else { continue };
+            if !pass.may_share(raw) {
+                warnings.push(era_warning(pass, raw));
+                continue;
+            }
             let store = scope_root(&shared, &pass.scope, raw, CAPTURE_FILES);
             let baseline = baseline_path(&store, &pass.id, &rel);
             let store = store.join(&rel);
@@ -188,6 +213,27 @@ impl Sync {
 
         for raw in &targets.folders {
             let Some(rel) = safe_rel(raw) else { continue };
+            if !pass.may_share(raw) {
+                // A link made before this instance was known to be era-bound is
+                // live and unsafe, so it is taken back to the instance's own
+                // copy rather than left pointing at the store the warning says
+                // it does not share.
+                let store = scope_root(&shared, &pass.scope, raw, CAPTURE_FOLDERS).join(&rel);
+                let at = pass.data_dir.join(&rel);
+                match folders::materialize(&store, &at, &rel) {
+                    Ok(Some(bytes)) => warnings.push(WarningInfo::SyncTargetDuplicated {
+                        target: raw.clone(),
+                        bytes,
+                    }),
+                    Ok(None) => {}
+                    Err(e) => warnings.push(WarningInfo::SyncTargetSkipped {
+                        target: raw.clone(),
+                        detail: format!("{e:#}"),
+                    }),
+                }
+                warnings.push(era_warning(pass, raw));
+                continue;
+            }
             let store = scope_root(&shared, &pass.scope, raw, CAPTURE_FOLDERS);
             let at = pass.data_dir.join(&rel);
             if pass.scope.owns_locally(raw) && !folders::links_into_a_store(&at, &rel) {
@@ -434,6 +480,20 @@ fn scope_root(shared: &Path, scope: &Scope, raw: &str, scoped: &[&str]) -> PathB
 
 /// A baseline lives in the store it describes an agreement with, so a profile's
 /// captured store carries its own and `release` takes them with it.
+fn era_warning(pass: &Pass, target: &str) -> WarningInfo {
+    tracing::info!(
+        instance = %pass.name,
+        version = %pass.game_version,
+        target,
+        "sync skipped an era-bound target"
+    );
+    WarningInfo::SyncTargetNotShared {
+        instance: pass.name.clone(),
+        target: target.to_string(),
+        reason: proto::warning::NotSharedReason::GameEra,
+    }
+}
+
 fn baseline_path(store: &Path, instance: &str, rel: &Path) -> PathBuf {
     store.join(BASELINES).join(instance).join(rel)
 }
@@ -497,8 +557,16 @@ mod tests {
         Pass {
             id: name.to_string(),
             name: name.to_string(),
+            game_version: "1.21.4".to_string(),
             data_dir: data_dir.to_path_buf(),
             scope: Scope::Shared,
+        }
+    }
+
+    fn legacy_pass(name: &str, data_dir: &Path) -> Pass {
+        Pass {
+            game_version: "1.12.2".to_string(),
+            ..pass(name, data_dir)
         }
     }
 
@@ -550,6 +618,89 @@ mod tests {
         let mut targets = SyncTargets::default();
         targets.files.insert("saves".to_string());
         assert!(sync.set_targets(targets).is_err());
+    }
+
+    #[test]
+    fn a_legacy_instance_shares_neither_options_nor_saves() {
+        let base = temp_dir("era");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        fs::create_dir_all(&shared).unwrap();
+        fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
+
+        let warnings = Sync::new(shared.clone()).apply(&legacy_pass("old", &data));
+
+        assert!(
+            !data.join("options.txt").exists(),
+            "a pre-1.13 client cannot read the store's keybinds"
+        );
+        assert!(!data.join("saves").exists());
+        let era: Vec<&str> = warnings
+            .iter()
+            .filter_map(|w| match w {
+                WarningInfo::SyncTargetNotShared {
+                    target,
+                    reason: proto::warning::NotSharedReason::GameEra,
+                    ..
+                } => Some(target.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(era.len(), 2, "both era-bound targets are reported: {era:?}");
+    }
+
+    #[test]
+    fn a_legacy_launch_takes_back_a_link_made_before_the_gate() {
+        let base = temp_dir("era-unlink");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        fs::create_dir_all(&data).unwrap();
+        fs::create_dir_all(shared.join("saves").join("World")).unwrap();
+        fs::write(shared.join("saves").join("World").join("level.dat"), "w").unwrap();
+
+        let sync = Sync::new(shared.clone());
+        sync.apply(&pass("modern", &data));
+        assert!(
+            folders::links_into_a_store(&data.join("saves"), Path::new("saves")),
+            "a modern instance links as before"
+        );
+
+        let warnings = sync.apply(&legacy_pass("modern", &data));
+
+        assert!(
+            !folders::links_into_a_store(&data.join("saves"), Path::new("saves")),
+            "the link is taken back once the instance is era-bound"
+        );
+        assert!(data.join("saves").join("World").join("level.dat").is_file());
+        assert!(warnings
+            .iter()
+            .any(|w| matches!(w, WarningInfo::SyncTargetDuplicated { .. })));
+    }
+
+    #[test]
+    fn a_legacy_instance_still_shares_the_era_agnostic_targets() {
+        let base = temp_dir("era-keeps");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        fs::create_dir_all(&shared).unwrap();
+        fs::write(shared.join("servers.dat"), b"\x0a\x00\x00").unwrap();
+
+        Sync::new(shared).apply(&legacy_pass("old", &data));
+
+        assert!(data.join("servers.dat").exists());
+        assert!(data.join("screenshots").exists());
+    }
+
+    #[test]
+    fn the_era_boundary_is_the_1_13_format_break() {
+        assert!(!shares_era_bound("1.6.4"));
+        assert!(!shares_era_bound("1.12.2"));
+        assert!(shares_era_bound("1.13"));
+        assert!(shares_era_bound("1.21.4"));
+        assert!(
+            shares_era_bound("23w14a"),
+            "an unparseable id is treated as modern"
+        );
     }
 
     #[test]

@@ -287,6 +287,17 @@ a link it did not make, and only ever touches links pointing into its own store
 ([0022](../decisions/0022-sync-links-folders-copies-files.md),
 [0030](../decisions/0030-warnings-the-user-did-not-cause.md)).
 
+**A pre-1.13 instance shares neither `options.txt` nor `saves`.** 1.13 renamed
+every keybind from an LWJGL key code to a `key.keyboard.*` name and moved the
+world format on, so the two eras cannot read each other's copy in either
+direction — an old client silently drops the keybinds it cannot parse, and
+writing back degrades every modern instance in the store. The gate is
+bidirectional and applies to those two targets only; `servers.dat`, `config/`
+and `screenshots/` are era-agnostic and stay shared. A link made before an
+instance was known to be era-bound is taken back to that instance's own copy at
+the next launch — the one case where hestia undoes a link it made, because
+leaving it live would contradict the warning it reports beside it.
+
 A `Scope` decides where settings-class targets reconcile: the global store, a
 [captured profile's](content.md#content-profiles), or nowhere — a modpack owns
 its own config tree. A launch records its scope against the session id, so the

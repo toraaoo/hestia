@@ -14,6 +14,8 @@
       "sync_entries_replaced": "As cópias descartadas foram perdidas — exporte uma instância antes de voltar a compartilhá-la se ela tiver algo que você ainda queira.",
       "sync_target_duplicated": "Compartilhar '{target}' novamente mantém a cópia compartilhada, não esta.",
       "sync_target_not_shared": "Renomeie ou apague os arquivos em conflito na pasta da instância e inicie novamente para compartilhá-la.",
+      "sync_target_not_shared.foreign_link": "Remova ou aponte o link na pasta da instância para outro lugar e inicie novamente para compartilhá-la.",
+      "sync_target_not_shared.game_era": "Esta instância mantém seus próprios controles e mundos. Uma versão anterior à 1.13 e uma atual não conseguem ler a cópia uma da outra.",
       "sync_target_skipped": "Verifique as permissões da pasta e inicie novamente."
     },
     "kind": {
@@ -33,7 +35,8 @@
     },
     "token": {
       "collides": "arquivos com o mesmo nome já são compartilhados",
-      "foreign_link": "a pasta é um vínculo criado por você"
+      "foreign_link": "a pasta é um vínculo criado por você",
+      "game_era": "esta versão é antiga demais para compartilhá-la com segurança"
     }
   }
 }
