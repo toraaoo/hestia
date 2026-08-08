@@ -32,6 +32,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 p256 = { version = "0.14.0", features = ["ecdsa"] }
 getrandom = "0.4"
+subtle = "2.6.1"
 base64 = "0.22.1"
 minisign-verify = "0.2"
 

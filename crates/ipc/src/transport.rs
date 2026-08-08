@@ -100,6 +100,17 @@ pub struct Peer {
 }
 
 impl Peer {
+    /// A caller that did not arrive over the local socket. It has no uid to
+    /// check, and `authorized()` is false for it on purpose: a remote request is
+    /// authenticated by the transport that accepted it, never by peer
+    /// credentials it does not have.
+    pub fn remote() -> Peer {
+        Peer {
+            local: false,
+            uid: 0,
+        }
+    }
+
     /// Only the user running the daemon may drive it.
     #[cfg(unix)]
     pub fn authorized(&self) -> bool {

@@ -8,6 +8,7 @@
 //! loop lives in server.rs; every channel lives in services.rs.
 
 mod autostart;
+mod http;
 mod runtime;
 mod server;
 mod services;

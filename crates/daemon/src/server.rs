@@ -43,6 +43,10 @@ pub async fn run_daemon(log_path: std::path::PathBuf) -> i32 {
 
     tracing::info!("hestiad listening on {}", endpoint.display());
     crate::tray::spawn();
+    // The second door, if it is configured to be open. Spawned rather than
+    // selected on: a remote surface must never be what keeps the daemon alive,
+    // nor what brings it down when it closes.
+    crate::http::spawn(runtime.clone(), router.clone());
     tokio::select! {
         _ = accept_loop(listener, router, runtime.clone()) => {}
         _ = runtime.stopped() => tracing::info!("stop requested"),

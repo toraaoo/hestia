@@ -7,8 +7,8 @@ mod spawn;
 
 pub use facades::{
     Accounts, App, Cache, Config, Content, Daemon, Exported, Imported, Instance, Java,
-    LaunchOptions, Modpack, Net, Process, ProcessEvent, Profiles, Server, Skins, Sync, Transfer,
-    Update,
+    LaunchOptions, Modpack, Net, Process, ProcessEvent, Profiles, Remote, Server, Skins, Sync,
+    Transfer, Update,
 };
 pub use ipc::errors::{self, IpcError};
 pub use session::{job_id, Session};
@@ -124,6 +124,14 @@ impl Client {
 
     pub fn net(&self) -> Net<'_> {
         Net {
+            session: &self.session,
+        }
+    }
+
+    /// The node's HTTP door and the keys that open it. Reachable over the socket
+    /// only — minting a key is a local act by construction.
+    pub fn remote(&self) -> Remote<'_> {
+        Remote {
             session: &self.session,
         }
     }

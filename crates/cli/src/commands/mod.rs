@@ -12,6 +12,7 @@ mod mc;
 pub mod modpack;
 pub mod play;
 pub mod process;
+pub mod remote;
 pub mod server;
 pub mod sync;
 pub mod update;

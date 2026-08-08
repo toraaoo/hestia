@@ -52,10 +52,14 @@ impl Router {
 
     pub async fn route(&self, request: Request, ctx: HandlerContext) -> Response {
         let polled = is_polled(&request.channel);
+        // Which door the request came through is on every line it fans out,
+        // because "who could have done this" is the first question asked of a
+        // log once the daemon answers more than one transport.
         let span = tracing::info_span!(
             "req",
             channel = %request.channel,
-            id = request.id.unwrap_or_default()
+            id = request.id.unwrap_or_default(),
+            remote = !ctx.peer.local
         );
         async move {
             match self.handlers.get(&request.channel) {

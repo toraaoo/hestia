@@ -7,6 +7,11 @@ pub const HANDLER_ERROR: &str = "handler_error";
 pub const UNKNOWN_CHANNEL: &str = "unknown_channel";
 pub const VERSION_MISMATCH: &str = "version_mismatch";
 pub const UNAUTHORIZED: &str = "unauthorized";
+/// Authenticated, and not allowed to do this. Distinct from `UNAUTHORIZED`,
+/// where the caller has not been recognised at all — the remedy differs.
+pub const FORBIDDEN: &str = "forbidden";
+/// Refused for now, not on the merits. The only failure whose remedy is to wait.
+pub const TOO_MANY_ATTEMPTS: &str = "too_many_attempts";
 /// The daemon could not reach upstream at all — the one failure a front-end
 /// answers with a retry affordance rather than with the error text.
 pub const OFFLINE: &str = "offline";

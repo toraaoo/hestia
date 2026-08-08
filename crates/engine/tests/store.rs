@@ -53,6 +53,58 @@ fn config_takes_only_a_channel_it_knows() {
 }
 
 #[test]
+fn config_leaves_the_remote_door_shut_on_loopback() {
+    let dir = temp_dir("config-remote-default");
+    let remote = Config::new(dir.path().join("config")).settings().remote;
+
+    assert!(!remote.enabled, "the door is off until asked for");
+    assert!(!remote.exposed(), "and bound where nothing else can reach");
+    assert!(!remote.allow_insecure);
+    assert!(!remote.trusted_proxy);
+    assert!(remote.admissible().is_ok());
+}
+
+#[test]
+fn config_refuses_an_exposed_bind_until_it_is_acknowledged() {
+    let dir = temp_dir("config-remote-bind");
+    let cfg = Config::new(dir.path().join("config"));
+
+    cfg.set("remote.bind", serde_json::json!("0.0.0.0"))
+        .unwrap();
+    let refusal = cfg
+        .settings()
+        .remote
+        .admissible()
+        .expect_err("an exposed bind is refused");
+    assert!(
+        refusal.to_string().contains("reverse proxy"),
+        "the refusal must name the fix, got: {refusal}"
+    );
+
+    cfg.set("remote.allow-insecure", serde_json::json!(true))
+        .unwrap();
+    assert!(cfg.settings().remote.admissible().is_ok());
+}
+
+#[test]
+fn config_takes_only_a_bind_address_it_could_bind() {
+    let dir = temp_dir("config-remote-address");
+    let cfg = Config::new(dir.path().join("config"));
+
+    for good in ["127.0.0.1", "0.0.0.0", "::1", "::"] {
+        cfg.set("remote.bind", serde_json::json!(good)).unwrap();
+        assert_eq!(cfg.get("remote.bind").unwrap(), serde_json::json!(good));
+    }
+    assert!(cfg
+        .set("remote.bind", serde_json::json!("example.com"))
+        .is_err());
+    assert!(cfg.set("remote.port", serde_json::json!(70_000)).is_err());
+    // Cleared reverts to loopback rather than to "everywhere".
+    cfg.set("remote.bind", serde_json::json!("  ")).unwrap();
+    assert!(!cfg.settings().remote.exposed());
+}
+
+#[test]
 fn config_jvm_defaults_validate_and_normalise() {
     let dir = temp_dir("config-defaults");
     let cfg = Config::new(dir.path().join("config"));

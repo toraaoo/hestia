@@ -37,6 +37,83 @@ pub struct Settings {
     pub update: UpdateSettings,
     /// Whether the launcher may reach the network at all.
     pub network: NetworkSettings,
+    /// The HTTP door onto this node, for remote server management.
+    pub remote: RemoteSettings,
+}
+
+/// The second front door, keyed `remote.*`. Off by default and bound to loopback
+/// by default: the single most-scanned-for misconfiguration on the internet is a
+/// daemon that answered the world because someone changed a bind address without
+/// realising what else that changed
+/// ([0075](../../../docs/decisions/0075-the-remote-surface-is-an-allowlist.md)).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct RemoteSettings {
+    pub enabled: bool,
+    pub bind: String,
+    pub port: u16,
+    /// Acknowledge that a non-loopback bind is deliberate. Without it the daemon
+    /// refuses to start rather than serving where it was not meant to.
+    pub allow_insecure: bool,
+    /// Whether a `X-Forwarded-For` may be believed. Only true behind a proxy you
+    /// control: a client can otherwise write its own client address into the log
+    /// and the rate limiter.
+    pub trusted_proxy: bool,
+}
+
+/// Loopback, and a port with nothing else on it. Not 25565-adjacent on purpose —
+/// nothing about this door is a Minecraft port.
+impl Default for RemoteSettings {
+    fn default() -> Self {
+        RemoteSettings {
+            enabled: false,
+            bind: "127.0.0.1".to_string(),
+            port: 4670,
+            allow_insecure: false,
+            trusted_proxy: false,
+        }
+    }
+}
+
+/// The daemon refuses to serve a door that would answer the world in plaintext.
+/// Naming the fix in the error is the point: a message that only says "refused"
+/// gets worked around with the flag it is warning about.
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "remote.bind is {bind}, which is reachable from off this machine, and hestiad terminates no \
+     TLS of its own. Put a reverse proxy (Caddy or nginx) in front of 127.0.0.1:{port} and leave \
+     the bind on loopback, or set remote.allow-insecure true if this network is genuinely trusted."
+)]
+pub struct ExposedBind {
+    pub bind: String,
+    pub port: u16,
+}
+
+impl RemoteSettings {
+    pub fn address(&self) -> String {
+        format!("{}:{}", self.bind, self.port)
+    }
+
+    /// Whether the bind address is reachable from off this machine. A parse
+    /// failure counts as exposed: an address this build cannot reason about is
+    /// not one it may wave through.
+    pub fn exposed(&self) -> bool {
+        match self.bind.trim().parse::<std::net::IpAddr>() {
+            Ok(ip) => !ip.is_loopback(),
+            Err(_) => true,
+        }
+    }
+
+    /// Whether this door may be opened at all.
+    pub fn admissible(&self) -> Result<(), ExposedBind> {
+        if self.exposed() && !self.allow_insecure {
+            return Err(ExposedBind {
+                bind: self.bind.clone(),
+                port: self.port,
+            });
+        }
+        Ok(())
+    }
 }
 
 /// Outbound network policy, keyed `network.offline`. Pinned offline, nothing is
@@ -171,6 +248,17 @@ impl Settings {
             .map_err(|e| e.to_string())?
             .join(" ");
         self.content.curseforge_key = self.content.curseforge_key.trim().to_string();
+        self.remote.bind = self.remote.bind.trim().to_string();
+        if self.remote.bind.is_empty() {
+            self.remote.bind = RemoteSettings::default().bind;
+        }
+        if self.remote.bind.parse::<std::net::IpAddr>().is_err() {
+            return Err(format!(
+                "{} is not an address this machine can bind — use an IP such as 127.0.0.1 or \
+                 0.0.0.0",
+                self.remote.bind
+            ));
+        }
         Ok(())
     }
 

@@ -218,6 +218,11 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::process::ProcessCmd,
     },
+    /// The node's HTTP door for remote server management, and its API keys
+    Remote {
+        #[command(subcommand)]
+        cmd: commands::remote::RemoteCmd,
+    },
     /// Daemon lifecycle
     Daemon {
         #[command(subcommand)]
@@ -386,6 +391,7 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
         Command::Cache { cmd } => commands::cache::run(cmd).await,
         Command::Config { cmd } => commands::config::run(cmd).await,
         Command::Sync { cmd } => commands::sync::run(cmd).await,
+        Command::Remote { cmd } => commands::remote::run(cmd).await,
         Command::Update { yes } => commands::update::run(yes).await,
         // Handled by `dispatch`: these answer with their own exit status.
         Command::Daemon { .. } | Command::Server { .. } | Command::Process { .. } => {

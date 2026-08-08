@@ -11,7 +11,7 @@ mod scheduler;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use engine::{Engine, InstanceRecord, ServerRecord};
@@ -112,6 +112,19 @@ pub struct Runtime {
     started: Instant,
     stop: Notify,
     stop_processes: AtomicBool,
+    /// Where the HTTP door actually opened, and why it did not when it did not.
+    /// Configuration says what was asked for; this says what happened — which
+    /// is what an operator checking a node needs to see.
+    remote_door: Mutex<Door>,
+}
+
+/// The state of the second door, as the daemon found it at start.
+#[derive(Default, Clone)]
+pub struct Door {
+    /// `host:port` the listener is bound to, empty when it is not open.
+    pub address: String,
+    /// Why it is not open, when that is a refusal rather than a setting.
+    pub refusal: String,
 }
 
 impl Runtime {
@@ -174,6 +187,7 @@ impl Runtime {
             started: Instant::now(),
             stop: Notify::new(),
             stop_processes: AtomicBool::new(false),
+            remote_door: Mutex::new(Door::default()),
         }
     }
 
@@ -223,6 +237,15 @@ impl Runtime {
         for session in self.instance_sessions(id) {
             self.processes.discard(&session.id);
         }
+    }
+
+    /// What became of the HTTP door.
+    pub fn remote_door(&self) -> Door {
+        self.remote_door.lock().unwrap().clone()
+    }
+
+    pub fn set_remote_door(&self, door: Door) {
+        *self.remote_door.lock().unwrap() = door;
     }
 
     pub fn engine(&self) -> &Engine {
@@ -318,8 +341,8 @@ pub struct HandlerContext {
     pub runtime: Arc<Runtime>,
     pub conn_id: u64,
     pub out: UnboundedSender<String>,
-    // The verified peer identity: the seam a future token/cert auth check reads.
-    // Carried on every request even though no handler consumes it yet.
-    #[allow(dead_code)]
+    /// Which door this request came through. The socket vouches for a local
+    /// peer by its credentials; the HTTP surface vouches for a remote one by
+    /// the key it presented, and marks it [`Peer::remote`].
     pub peer: Peer,
 }

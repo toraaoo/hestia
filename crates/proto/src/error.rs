@@ -12,6 +12,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::remote::Scope;
+
 use crate::content::ContentKind;
 
 /// A launcher entry that resolves by reference.
@@ -97,6 +99,7 @@ pub enum Field {
     BackupRetention,
     JavaVersion,
     Order,
+    Scope,
 }
 
 impl fmt::Display for Field {
@@ -119,6 +122,7 @@ impl fmt::Display for Field {
             Field::Port => "a port",
             Field::Players => "players",
             Field::Order => "a list order",
+            Field::Scope => "a scope",
             Field::BackupInterval => "backup-interval",
             Field::BackupRetention => "backup-retention",
             Field::JavaVersion => "a java version",
@@ -419,6 +423,9 @@ pub enum ErrorInfo {
         key: String,
         detail: String,
     },
+    RemoteKeyNotFound {
+        reference: String,
+    },
 
     // --- conflict ---
     AlreadyExists {
@@ -471,6 +478,23 @@ pub enum ErrorInfo {
 
     // --- auth ---
     SignInRequired,
+    /// The request carried no key this node recognises. Deliberately says
+    /// nothing about which part was wrong — absent, malformed and revoked are
+    /// one answer, because distinguishing them is an oracle.
+    RemoteKeyRejected,
+    /// The key is real and does not hold what this route costs. Scope is checked
+    /// against the route, never inferred from the key being valid — the specific
+    /// thing Wings' CVE-2026-54593 got wrong.
+    RemoteScopeRequired {
+        scope: Scope,
+    },
+    /// Too many keys were refused from this address too quickly. The one auth
+    /// failure that is worth telling apart from the others: it says nothing
+    /// about the key and everything about waiting.
+    #[serde(rename_all = "camelCase")]
+    TooManyAttempts {
+        retry_after_seconds: u32,
+    },
     SessionExpired {
         reference: String,
     },
@@ -637,10 +661,15 @@ impl ErrorInfo {
             | AccountNotFound { .. }
             | VersionNotFound { .. }
             | ConfigKeyUnknown { .. }
-            | ConfigKeyUnset { .. } => "not_found",
-            SignInRequired | SessionExpired { .. } | LoginDeclined | LoginTimedOut => {
-                "unauthorized"
-            }
+            | ConfigKeyUnset { .. }
+            | RemoteKeyNotFound { .. } => "not_found",
+            SignInRequired
+            | SessionExpired { .. }
+            | LoginDeclined
+            | LoginTimedOut
+            | RemoteKeyRejected => "unauthorized",
+            RemoteScopeRequired { .. } => "forbidden",
+            TooManyAttempts { .. } => "too_many_attempts",
             UnknownChannel { .. } => "unknown_channel",
             IncompatibleVersion { .. } => "version_mismatch",
             Offline { .. } | OfflineMode => "offline",
@@ -728,6 +757,9 @@ impl fmt::Display for ErrorInfo {
             ConfigKeyUnset { key } => write!(f, "'{key}' is not set"),
             ConfigTypeMismatch { detail } => write!(f, "{detail}"),
             ConfigRejected { key, detail } => write!(f, "invalid value for {key}: {detail}"),
+            RemoteKeyNotFound { reference } => {
+                write!(f, "no remote key matches '{reference}'")
+            }
             AlreadyExists { entry, name } => write!(f, "a {entry} named '{name}' already exists"),
             PortUnavailable { port } => write!(f, "port {port} is unavailable"),
             EntryRunning { name, .. } => write!(f, "{name} is running — stop it first"),
@@ -750,6 +782,16 @@ impl fmt::Display for ErrorInfo {
             }
             ProfileNotCaptured { name } => write!(f, "profile '{name}' has no captured settings"),
             SignInRequired => write!(f, "sign in with a Microsoft account first"),
+            RemoteKeyRejected => write!(f, "no valid API key was presented"),
+            RemoteScopeRequired { scope } => {
+                write!(f, "this key does not hold the {scope} scope")
+            }
+            TooManyAttempts {
+                retry_after_seconds,
+            } => write!(
+                f,
+                "too many rejected keys — try again in {retry_after_seconds}s"
+            ),
             SessionExpired { reference } => {
                 write!(f, "your sign-in for '{reference}' expired — sign in again")
             }
