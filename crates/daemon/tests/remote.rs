@@ -300,3 +300,48 @@ async fn a_console_stream_is_an_event_stream() {
         Some("text/event-stream")
     );
 }
+
+/// The SDK's channel-to-route table against a real mount. A route the SDK knows
+/// and the daemon does not serve is a 404 nobody would see until a front-end
+/// tried it, so the two are pinned against each other here.
+#[tokio::test]
+async fn every_route_the_sdk_knows_is_actually_mounted() {
+    let node = Node::start(&open()).await;
+    let token = node.key(Scope::ALL.to_vec()).await;
+    let http = reqwest::Client::new();
+
+    for route in client::remote::ROUTES {
+        let mut path = route.path.to_string();
+        for param in route.params {
+            path = path.replace(&format!("{{{param}}}"), "probe");
+        }
+        let url = match route.path {
+            "/health" => node.url(&path),
+            _ => node.url(&format!("/api/v1{path}")),
+        };
+        let method = reqwest::Method::from_bytes(route.method.as_str().as_bytes()).unwrap();
+        let response = http
+            .request(method, &url)
+            .bearer_auth(&token)
+            .json(&serde_json::json!({ "command": "list", "name": "probe", "value": "probe" }))
+            .send()
+            .await
+            .expect("the node answers");
+        let named = format!("{} {}", route.method.as_str(), route.path);
+        let status = response.status();
+        let body: Value = response.json().await.unwrap_or(Value::Null);
+
+        assert_ne!(
+            status,
+            reqwest::StatusCode::METHOD_NOT_ALLOWED,
+            "{named} is mounted, but not with that method"
+        );
+        // The probe names a server that does not exist, so most of these are a
+        // 404 — but *our* 404 carries the envelope, and an unmounted path does
+        // not. That is what tells "no such server" from "no such route".
+        assert!(
+            body.get("success").is_some(),
+            "{named} is not mounted (answered {status} with no envelope)"
+        );
+    }
+}

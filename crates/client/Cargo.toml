@@ -6,6 +6,11 @@ license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+# The HTTP transport for a remote node. Off by default so a front-end that only
+# ever talks to the local socket does not link an HTTP stack.
+remote = ["dep:reqwest"]
+
 [dependencies]
 proto = { workspace = true }
 ipc = { workspace = true }
@@ -15,6 +20,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+reqwest = { workspace = true, optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

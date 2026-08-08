@@ -42,4 +42,5 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_
 [dev-dependencies]
 tempfile.workspace = true
 reqwest.workspace = true
+client = { workspace = true, features = ["remote"] }
 tower = { version = "0.5", features = ["util"] }

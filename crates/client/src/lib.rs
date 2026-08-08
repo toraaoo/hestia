@@ -2,6 +2,8 @@
 //! daemon only through here — never by linking the engine.
 
 mod facades;
+#[cfg(feature = "remote")]
+pub mod remote;
 mod session;
 mod spawn;
 
