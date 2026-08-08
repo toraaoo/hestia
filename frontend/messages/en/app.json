@@ -122,19 +122,31 @@
       "skins": "Skins"
     },
     "network": {
+      "blocked_body": "Browsing and installing content, signing in, installing Java runtimes, and checking for updates.",
+      "blocked_title": "Needs a connection",
       "body": "Hestia cannot reach the internet, so anything that needs downloading is unavailable. What is already installed still works.",
       "checking": "checking…",
+      "checking_again": "Checking…",
+      "details": "What still works",
       "label": "Network",
+      "last_online": "Last online {ago}",
       "needs_connection": "Downloads are unavailable while you are offline.",
       "offline": "no connection",
       "offline_label": "No internet connection",
       "online": "online",
+      "open_settings": "Open settings",
+      "page_body": "Hestia cannot reach the internet. It keeps checking on its own, and this page clears as soon as a connection comes back.",
+      "page_pinned_body": "Hestia is not using the network because offline mode is turned on. Turn it off to browse and download again.",
+      "page_pinned_title": "Offline mode is on",
+      "page_title": "No internet connection",
       "pinned": "offline mode",
       "pinned_body": "Offline mode is on, so Hestia is not using the network. Turn it off in Settings to browse and download again.",
       "pinned_label": "Offline mode is on",
       "retry": "Try again",
       "stale": "Showing what was saved the last time you were online.",
-      "title": "You're offline"
+      "title": "You're offline",
+      "works_body": "Launching instances and running servers, the content already installed, worlds, backups, and settings.",
+      "works_title": "Still works"
     },
     "playbar": {
       "all_instances": "All instances",

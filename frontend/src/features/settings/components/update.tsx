@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import type { UpdateChannel } from '@/api/types/update';
 import { Markdown } from '@/components/markdown';
+import { OfflineNotice } from '@/components/offline-state';
 import { Button } from '@/components/ui/button';
 import {
   Field,
@@ -24,6 +25,7 @@ import { useConfig } from '@/features/settings/use-config';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { appQueries } from '@/queries/app';
+import { useOffline } from '@/queries/net';
 import {
   useApplyUpdate,
   useDownloadUpdate,
@@ -79,6 +81,7 @@ export function UpdateChannelField() {
 export function UpdatePanel() {
   const app = useQuery(appQueries.info());
   const [asked, setAsked] = useState(false);
+  const offline = useOffline();
   const check = useUpdateCheck(asked);
   const download = useDownloadUpdate();
   const apply = useApplyUpdate();
@@ -106,6 +109,7 @@ export function UpdatePanel() {
           <FieldLabel className="font-normal">
             {m['settings.update.current']({ version })}
           </FieldLabel>
+          {offline && <OfflineNotice />}
           {asked && !check.isFetching && (
             <FieldDescription>
               {check.isError
@@ -129,7 +133,7 @@ export function UpdatePanel() {
               setAsked(true);
               void check.refetch();
             }}
-            disabled={check.isFetching}
+            disabled={check.isFetching || offline}
           >
             <ArrowClockwiseIcon
               className={cn('size-4', check.isFetching && 'animate-spin')}

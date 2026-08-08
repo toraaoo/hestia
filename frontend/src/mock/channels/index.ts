@@ -14,6 +14,7 @@ import { channels as instance } from './instance';
 import { channels as java } from './java';
 import { channels as job } from './job';
 import { channels as modpack } from './modpack';
+import { channels as net } from './net';
 import { channels as process } from './process';
 import { channels as profile } from './profile';
 import { channels as server } from './server';
@@ -33,6 +34,7 @@ export const channels: Handlers = {
   ...java,
   ...job,
   ...modpack,
+  ...net,
   ...process,
   ...profile,
   ...server,

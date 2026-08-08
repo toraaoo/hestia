@@ -1,8 +1,9 @@
 import { CloudSlashIcon, WifiSlashIcon } from '@phosphor-icons/react';
+import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
 import { Empty } from '@/components/empty';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useNetwork } from '@/queries/net';
@@ -30,7 +31,16 @@ export function OfflineState({
       description={
         pinned ? m['app.network.pinned_body']() : m['app.network.body']()
       }
-      action={action}
+      action={
+        action ?? (
+          <Link
+            to="/offline"
+            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+          >
+            {m['app.network.details']()}
+          </Link>
+        )
+      }
       className={className}
     >
       {pinned ? m['app.network.pinned_label']() : m['app.network.title']()}

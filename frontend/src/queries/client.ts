@@ -27,11 +27,17 @@ import { scopedToEntry } from './keys';
 const log = logger('query');
 
 // Never a toast: `unauthorized` is expected behind the sign-in gate, and
-// connectivity failures — the socket's or the network's — are the status bar's
-// concern, not an error per call. A page that needs upstream says so itself.
+// connectivity failures are the status bar's concern, not an error per
+// background read. A page that needs upstream says so itself.
 const TRANSPORT_CODES = new Set([TRANSPORT, CONNECTION_LOST, TIMEOUT, OFFLINE]);
 const silent = (error: HestiaError) =>
   error.code === UNAUTHORIZED || TRANSPORT_CODES.has(error.code);
+
+// A mutation is something the user asked for, so being offline is an answer
+// they are owed — unlike a background read, where the status bar already says
+// it. Only the daemon-side codes stay quiet.
+const silentMutation = (error: HestiaError) =>
+  error.code !== OFFLINE && silent(error);
 
 // A read racing a removal — the entry went while the read was in flight, or a
 // view still held its id — is absence, not a failure the user can act on.
@@ -66,7 +72,7 @@ export const queryClient = new QueryClient({
         { key: mutation.options.mutationKey?.join('.'), code: error.code },
         `mutation failed: ${error.message}`,
       );
-      if (silent(error)) return;
+      if (silentMutation(error)) return;
       toast.error(errorMessage(error));
     },
   }),

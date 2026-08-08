@@ -128,6 +128,39 @@ and `autostart` to the platform login registration.
 Keys are kebab-case even though the file stores camelCase — a deliberate,
 translated exception ([0031](../decisions/0031-camelcase-except-the-config-vocabulary.md)).
 
+## The network — `net`
+
+Every outbound HTTP request the engine makes crosses one seam. `net` owns the
+pooled `reqwest` client and its timeouts (10s connect, 30s between bytes, and a
+45s total budget for a metadata call — a download sets none, since a large
+artifact on a slow line is not a failure), a bounded retry with jittered backoff
+that honours `Retry-After`, and the classification of what went wrong. A fetch
+written anywhere else would be a request with no timeout, which is the shape
+that turns a dropped connection into a job that hangs until it is cancelled.
+
+Only transport failures are retried — a connect error, a timeout, a body that
+stops arriving — never a 4xx and never a checksum mismatch. A 429 or 5xx is
+retried because the service asked to be.
+
+**`net::Network` is the reachability state** (`Online | Offline | Unknown`),
+derived from those requests rather than from a separate connectivity check: any
+answer marks the network up, and only a transport failure with its retries spent
+marks it down, so one blip cannot flip every front-end. It is process-global for
+the same reason the client is — reachability is a property of that pool's
+traffic, and the catalogue readers are provider impls holding no aggregate
+reference — and `Engine::network()` is the handle the daemon reads and publishes
+it through. `network.offline` pins it, and nothing is attempted while set.
+
+The daemon ticks `Network::refresh`, which probes only when the state has gone
+stale: every 10s while offline, so recovery is noticed without the user acting,
+and while online only once traffic has been quiet for a minute
+([0071](../decisions/0071-reachability-is-observed-not-asked.md)).
+
+**`net::store`** keeps the last good copy of each catalogue response under
+`meta/catalogue/`, keyed by URL. A version list that fails to fetch while
+offline is served from it, so creating an entry on a version picked before still
+works; front-ends label it stale from the network state rather than the wire.
+
 ## Downloads and the cache
 
 **`Downloader`** streams a URL to disk through a `.part` temp file, hashing
@@ -276,3 +309,4 @@ cannot trigger an update.
 - [0037 — Workloads outlive the daemon by design](../decisions/0037-workloads-outlive-the-daemon.md)
 - [0038 — A finished process is labelled, not merely unrecorded](../decisions/0038-a-finished-process-is-tombstoned.md)
 - [0040 — Following logs is scoped to the entry, not to one run of it](../decisions/0040-following-logs-is-entry-scoped.md)
+- [0071 — Reachability is observed from real traffic, and offline is a state the whole system reads](../decisions/0071-reachability-is-observed-not-asked.md)

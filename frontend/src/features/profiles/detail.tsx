@@ -16,6 +16,7 @@ import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { FilterMenu } from '@/components/filter-menu';
 import { contentIcon, contentKindLabel } from '@/components/icons';
+import { OfflineNotice } from '@/components/offline-state';
 import { SearchInput } from '@/components/search-input';
 import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +31,7 @@ import { kindGroup } from '@/features/shared/content/components';
 import { kindInfo } from '@/features/shared/content/lib';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
+import { useOffline } from '@/queries/net';
 import { profileMutations, profileQueries } from '@/queries/profile';
 
 /** A profile reference joined with its resolved project detail. */
@@ -67,6 +69,7 @@ export function ProfileDetailPage({
 
   const profile = (list.data ?? []).find((p) => p.name === name);
 
+  const offline = useOffline();
   const projects = useQueries({
     queries: (profile?.entries ?? []).map((entry) =>
       contentQueries.project(entryRef(entry), entry.source),
@@ -172,6 +175,7 @@ export function ProfileDetailPage({
             {m['content.add']()}
           </Button>
         </div>
+        {offline && <OfflineNotice className="px-1 pb-1" />}
         {filtered.length === 0 ? (
           <Empty
             icon={
