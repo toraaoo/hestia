@@ -112,7 +112,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0046** — [A state query answers through its exit code, not only its stdout](0046-state-queries-answer-through-exit-codes.md)
 - **0047** — [Interaction is fullscreen; bare progress is one line](0047-fullscreen-interaction-inline-progress.md)
 - **0049** — [The desktop bridge is one generic command, not a facade mirror](0049-desktop-bridge-is-one-generic-command.md)
-- **0074** — [The node registry belongs to the desktop shell; no daemon knows about another](0074-the-node-registry-belongs-to-the-shell.md)
+- **0074** — [The node registry belongs to the front-ends, not to any daemon](0074-the-node-registry-belongs-to-the-shell.md)
 - **0050** — [Messages are organised on one axis — where the string is rendered — and split one file per root](0050-messages-organised-by-render-surface.md)
 - **0051** — [Sign-in is the one bespoke shell command — it must be](0051-sisu-sign-in-is-a-shell-command.md)
 - **0052** — [Front-end preferences are desktop-local, in the data home — not the daemon](0052-desktop-prefs-live-in-the-data-home.md)

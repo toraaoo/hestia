@@ -5,47 +5,53 @@
 //! back into the daemon's own `ErrorInfo`, and reports failures as the same
 //! [`IpcError`] a socket call would.
 
+mod http;
+mod registry;
 mod routes;
-
-use std::time::Duration;
+mod secrets;
 
 use ipc::errors::{self, IpcError};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use proto::error::ErrorInfo;
 use proto::Contract;
 use serde_json::{Map, Value};
 
+pub use registry::{NodeEntry, Registry};
 pub use routes::{Route, ROUTES};
+
+/// Which API major this build speaks. Its own constant rather than the socket's
+/// `PROTOCOL_VERSION`: the two contracts change for different reasons.
+pub const API: &str = "v1";
 
 /// A remote node and the key that opens it.
 pub struct Node {
-    http: reqwest::Client,
     /// The node's origin, no trailing slash.
     base: String,
     token: String,
 }
 
 impl Node {
-    pub fn new(url: &str, token: &str) -> Result<Node, IpcError> {
-        let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .map_err(|e| IpcError::Malformed(e.to_string()))?;
-        Ok(Node {
-            http,
+    pub fn new(url: &str, token: &str) -> Node {
+        Node {
             base: url.trim_end_matches('/').to_string(),
             token: token.to_string(),
-        })
+        }
     }
 
-    /// What the node says it is, without spending a key on it.
+    /// What the node says it is, without spending a key on it. The reachability
+    /// probe: an unreachable node fails here rather than on the first real call.
     pub async fn versions(&self) -> Result<Value, IpcError> {
-        let response = self
-            .http
-            .get(format!("{}/api/versions", self.base))
-            .send()
-            .await
-            .map_err(transport)?;
-        let body: Value = response.json().await.map_err(transport)?;
+        let (status, body) = http::send(http::Call {
+            method: "GET",
+            url: format!("{}/api/versions", self.base),
+            token: "",
+            body: None,
+            query: Vec::new(),
+        })
+        .await?;
+        if !status.is_success() {
+            return Err(failure(&body));
+        }
         Ok(body.get("data").cloned().unwrap_or(Value::Null))
     }
 
@@ -58,44 +64,26 @@ impl Node {
     /// Dispatch by channel name — what the desktop bridge forwards, having no
     /// static type for the payload it is carrying.
     pub async fn call_raw(&self, channel: &str, payload: Value) -> Result<Value, IpcError> {
-        let route = routes::of(channel).ok_or_else(|| IpcError::Daemon {
-            code: errors::UNKNOWN_CHANNEL.to_string(),
-            message: format!("'{channel}' is not reachable on a remote node"),
-            info: serde_json::to_value(ErrorInfo::UnknownChannel {
-                channel: channel.to_string(),
-            })
-            .unwrap_or(Value::Null),
-        })?;
-
+        let route = routes::of(channel).ok_or_else(|| unroutable(channel))?;
         let mut fields = match payload {
             Value::Object(map) => map,
             _ => Map::new(),
         };
         let path = fill(route, &mut fields)?;
-        let url = format!("{}/api/{}{path}", self.base, super::remote::API);
 
-        let mut request = self
-            .http
-            .request(
-                reqwest::Method::from_bytes(route.method.as_str().as_bytes())
-                    .map_err(|e| IpcError::Malformed(e.to_string()))?,
-                url,
-            )
-            .bearer_auth(&self.token);
-        if route.method.takes_a_body() {
-            request = request.json(&Value::Object(fields));
-        } else {
-            let query: Vec<(String, String)> = fields
-                .into_iter()
-                .filter(|(_, value)| !value.is_null())
-                .map(|(key, value)| (key, scalar(&value)))
-                .collect();
-            request = request.query(&query);
-        }
+        let takes_a_body = route.method.takes_a_body();
+        let (status, body) = http::send(http::Call {
+            method: route.method.as_str(),
+            url: format!("{}/api/{API}{path}", self.base),
+            token: &self.token,
+            body: takes_a_body.then(|| Value::Object(fields.clone())),
+            query: match takes_a_body {
+                true => Vec::new(),
+                false => query(fields),
+            },
+        })
+        .await?;
 
-        let response = request.send().await.map_err(transport)?;
-        let status = response.status();
-        let body: Value = response.json().await.unwrap_or(Value::Null);
         if status.is_success() {
             return Ok(body.get("data").cloned().unwrap_or(Value::Null));
         }
@@ -103,26 +91,45 @@ impl Node {
     }
 }
 
-/// Which API major this build speaks. Its own constant rather than the socket's
-/// `PROTOCOL_VERSION`: the two contracts change for different reasons.
-pub const API: &str = "v1";
+/// A channel with no route is refused here rather than sent somewhere wrong: the
+/// remote surface is servers only, and the caller gets the same `unknown_channel`
+/// a daemon would answer.
+fn unroutable(channel: &str) -> IpcError {
+    let info = ErrorInfo::UnknownChannel {
+        channel: channel.to_string(),
+    };
+    IpcError::Daemon {
+        code: errors::UNKNOWN_CHANNEL.to_string(),
+        message: format!("'{channel}' is not reachable on a remote node"),
+        info: serde_json::to_value(&info).unwrap_or(Value::Null),
+    }
+}
 
 /// Spend the named payload fields on the path's placeholders. A field the path
 /// needs and the payload does not carry is the caller's mistake, not the node's.
 fn fill(route: &Route, fields: &mut Map<String, Value>) -> Result<String, IpcError> {
     let mut path = route.path.to_string();
     for name in route.params {
-        let value = fields.remove(*name).unwrap_or(Value::Null);
-        let filled = scalar(&value);
+        let filled = scalar(&fields.remove(*name).unwrap_or(Value::Null));
         if filled.is_empty() {
             return Err(IpcError::Malformed(format!(
                 "{} needs a '{name}' to address a route",
                 route.channel
             )));
         }
-        path = path.replace(&format!("{{{name}}}"), &urlencode(&filled));
+        // Encoded so a server named with a slash cannot reach another route.
+        let safe = utf8_percent_encode(&filled, NON_ALPHANUMERIC).to_string();
+        path = path.replace(&format!("{{{name}}}"), &safe);
     }
     Ok(path)
+}
+
+fn query(fields: Map<String, Value>) -> Vec<(String, String)> {
+    fields
+        .into_iter()
+        .filter(|(_, value)| !value.is_null())
+        .map(|(key, value)| (key, scalar(&value)))
+        .collect()
 }
 
 /// A payload field as a path or query segment. Strings pass through unquoted;
@@ -133,21 +140,6 @@ fn scalar(value: &Value) -> String {
         Value::Null => String::new(),
         other => other.to_string(),
     }
-}
-
-/// Percent-encode everything outside the unreserved set, so a server named with
-/// a slash cannot reach a route it was not addressed to.
-fn urlencode(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for byte in value.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(byte as char)
-            }
-            _ => out.push_str(&format!("%{byte:02X}")),
-        }
-    }
-    out
 }
 
 /// Rebuild the daemon's own typed failure from the envelope's `data`, so a
@@ -168,16 +160,6 @@ fn failure(body: &Value) -> IpcError {
     }
 }
 
-fn transport(error: reqwest::Error) -> IpcError {
-    if error.is_timeout() {
-        return IpcError::Timeout("remote".to_string());
-    }
-    if error.is_connect() {
-        return IpcError::ConnectionLost;
-    }
-    IpcError::Malformed(error.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,6 +170,16 @@ mod tests {
             Value::Object(map) => map,
             _ => Map::new(),
         }
+    }
+
+    #[test]
+    fn one_http_client_is_shared_by_every_node() {
+        let first = http::shared();
+        let second = http::shared();
+        assert!(
+            std::ptr::eq(first, second),
+            "each node must not open its own connection pool"
+        );
     }
 
     #[test]
@@ -217,8 +209,8 @@ mod tests {
         let route = routes::of("server.status").expect("routed");
         let mut payload = fields(json!({ "server": "../../accounts" }));
         let path = fill(route, &mut payload).unwrap();
-        assert_eq!(path, "/servers/..%2F..%2Faccounts");
-        assert!(!path.contains("/../"), "a traversal reached the path");
+        assert_eq!(path, "/servers/%2E%2E%2F%2E%2E%2Faccounts");
+        assert!(!path.contains(".."), "a traversal reached the path");
     }
 
     #[test]
@@ -229,6 +221,17 @@ mod tests {
             fill(route, &mut payload),
             Err(IpcError::Malformed(_))
         ));
+    }
+
+    #[test]
+    fn a_channel_off_the_remote_surface_is_refused_here() {
+        match unroutable("instance.launch") {
+            IpcError::Daemon { code, .. } => assert_eq!(code, errors::UNKNOWN_CHANNEL),
+            other => panic!("expected a daemon failure, got {other:?}"),
+        }
+        assert!(routes::of("instance.launch").is_none());
+        assert!(routes::of("account.list").is_none());
+        assert!(routes::of("remote.key.create").is_none());
     }
 
     #[test]
