@@ -186,6 +186,12 @@ Two structured vocabularies, same discipline:
   (`ServerDetails`, so `server info` keeps saying it long after the create
   scrolled past).
 
+`Offline` is the one error a front-end answers with a retry affordance rather
+than with its text, so it has its own `ipc::errors` code — and pinned offline
+(`OfflineMode`) is a separate variant, because the remedy is a setting to turn
+off rather than a connection to wait for
+([0071](../decisions/0071-reachability-is-observed-not-asked.md)).
+
 Every warning variant carries a `hint()` beside its `Display` headline: a
 warning you cannot act on is noise, so the remediation is part of the type
 rather than something each front-end invents. And a warning about something the
@@ -198,6 +204,7 @@ rather than something each front-end invents. And a warning about something the
 - [0001 — The envelope seam fails closed](../decisions/0001-envelope-fails-closed.md)
 - [0029 — A degraded outcome rides on the result](../decisions/0029-degraded-outcomes-ride-on-the-result.md)
 - [0030 — A warning the user did not cause is a bug](../decisions/0030-warnings-the-user-did-not-cause.md)
+- [0071 — Reachability is observed from real traffic, and offline is a state the whole system reads](../decisions/0071-reachability-is-observed-not-asked.md)
 - [0031 — camelCase everywhere, except the `config.*` vocabulary](../decisions/0031-camelcase-except-the-config-vocabulary.md)
 - [0035 — A job is cancelled by asking](../decisions/0035-jobs-are-cancelled-by-asking.md)
 - [0048 — One event-callback slot per session](../decisions/0048-one-event-callback-per-session.md)

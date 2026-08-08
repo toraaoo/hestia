@@ -201,8 +201,9 @@ scheduled · content install and management from Modrinth, CurseForge, a URL or 
 local file · modpacks into a new or existing entry · per-instance content
 profiles and global profiles · instance import and export (hestia, `.mrpack`,
 Prism/MultiMC) · shared instance settings and worlds (`sync`) · self-update and
-the announcement feed · the CLI over all of it · the desktop shell and its
-pages · the system tray.
+the announcement feed · network reachability as a first-class state, with
+offline launch and cached version catalogues · the CLI over all of it · the
+desktop shell and its pages · the system tray.
 
 **Not built yet:**
 

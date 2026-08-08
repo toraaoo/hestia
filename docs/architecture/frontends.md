@@ -261,6 +261,35 @@ Rules that keep it from drifting:
   `instances → content · profiles`, `servers → content` — so the feature graph
   is acyclic.
 
+## Two kinds of offline
+
+The daemon being down and the *internet* being unreachable are separate states
+with separate treatments, and conflating them is the mistake the UI is shaped to
+avoid.
+
+A lost **daemon** covers the window (`OfflineOverlay`): nothing works without it,
+so every page would otherwise render its own empty state
+([0053](../decisions/0053-offline-is-one-state.md)).
+
+A lost **connection** must not block anything — instances still launch, servers
+still run, installed content is still there. So it gets its own light in the
+status bar beside the daemon's, seeded from `net.status` and kept live by the
+`net.state` topic (`queries/net.ts`), and each surface that genuinely needs
+upstream says so itself:
+
+| Surface | Offline treatment |
+|---|---|
+| Content browse, project detail, the install picker, the version dialog | `OfflineState` — the whole surface, since there is nothing local to show |
+| Skin library | `OfflineState` when nothing is cached; Mojang owns the profile |
+| Version pickers in the create wizard | `StaleNotice` — the list answers from the cached catalogue |
+| Java runtimes, update check, entry content updates, profile members, sign-in | `OfflineNotice` and a disabled action — the content is local, only the download is not |
+| `/offline` | the dedicated page: which state, what still works, what does not, and a retry |
+
+The `offline` error code is silenced in the query toast path for the same reason
+a lost socket is — the status bar already reports it — but **not** for
+mutations: a mutation is something the user asked for, so being offline is an
+answer they are owed rather than a silent no-op.
+
 ## Browser dev — the fixture daemon
 
 `frontend/src/mock/` fakes `window.__TAURI_INTERNALS__` so the UI runs under a
@@ -353,5 +382,6 @@ id, or on Linux each would block the other
 - [0051 — Sign-in is the one bespoke shell command](../decisions/0051-sisu-sign-in-is-a-shell-command.md)
 - [0052 — Front-end preferences are desktop-local](../decisions/0052-desktop-prefs-live-in-the-data-home.md)
 - [0053 — Offline is one state, not a failure per read](../decisions/0053-offline-is-one-state.md)
+- [0071 — Reachability is observed from real traffic, and offline is a state the whole system reads](../decisions/0071-reachability-is-observed-not-asked.md)
 - [0054 — The daemon spawns the tray; the tray outlives the daemon](../decisions/0054-the-daemon-spawns-the-tray.md)
 - [0055 — The tray and desktop must not share a GApplication id](../decisions/0055-tray-and-desktop-app-ids.md)
