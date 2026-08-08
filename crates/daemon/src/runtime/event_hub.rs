@@ -75,12 +75,6 @@ impl EventHub {
 /// knowledge of the socket behind it.
 impl engine::ProcessEvents for EventHub {
     fn publish(&self, topic: &str, payload: Value) {
-        EventHub::publish(
-            self,
-            &Event {
-                topic: topic.to_string(),
-                payload,
-            },
-        );
+        EventHub::publish(self, &Event::new(topic, payload));
     }
 }

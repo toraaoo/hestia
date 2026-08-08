@@ -26,6 +26,8 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0035** — [A job is cancelled by asking, at safe checkpoints — never by disconnecting](0035-jobs-are-cancelled-by-asking.md)
 - **0048** — [One event-callback slot per client `Session`](0048-one-event-callback-per-session.md)
 - **0067** — [An endpoint is scoped exactly as the data home behind it](0067-an-endpoint-is-scoped-like-its-data-home.md)
+- **0072** — [HTTP is a second door onto the same router, and carries its own envelope](0072-http-is-a-second-door.md)
+- **0073** — [The HTTP surface is versioned in the path, independently of the wire protocol](0073-the-http-surface-is-versioned-in-the-path.md)
 
 ### [Cross-cutting foundations](../architecture/common.md)
 
@@ -53,6 +55,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0039** — [Stopping the daemon has three meanings; the front-end picks one, the wire carries two](0039-stopping-the-daemon-has-three-meanings.md)
 - **0065** — [A job family declares what differs; the runner owns the rest](0065-a-job-declares-what-differs.md)
 - **0063** — [Discord presence belongs to the daemon, and is a loop rather than a hook](0063-discord-presence-is-a-daemon-loop.md)
+- **0075** — [The remote surface is a positive allowlist, and a scope is checked against the route](0075-the-remote-surface-is-an-allowlist.md)
 
 ### [Minecraft providers](../architecture/minecraft.md)
 
@@ -109,6 +112,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0046** — [A state query answers through its exit code, not only its stdout](0046-state-queries-answer-through-exit-codes.md)
 - **0047** — [Interaction is fullscreen; bare progress is one line](0047-fullscreen-interaction-inline-progress.md)
 - **0049** — [The desktop bridge is one generic command, not a facade mirror](0049-desktop-bridge-is-one-generic-command.md)
+- **0074** — [The node registry belongs to the desktop shell; no daemon knows about another](0074-the-node-registry-belongs-to-the-shell.md)
 - **0050** — [Messages are organised on one axis — where the string is rendered — and split one file per root](0050-messages-organised-by-render-surface.md)
 - **0051** — [Sign-in is the one bespoke shell command — it must be](0051-sisu-sign-in-is-a-shell-command.md)
 - **0052** — [Front-end preferences are desktop-local, in the data home — not the daemon](0052-desktop-prefs-live-in-the-data-home.md)

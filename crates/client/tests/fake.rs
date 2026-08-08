@@ -112,8 +112,5 @@ impl Script {
 }
 
 pub fn event(topic: &str, payload: Value) -> Event {
-    Event {
-        topic: topic.to_string(),
-        payload,
-    }
+    Event::new(topic, payload)
 }

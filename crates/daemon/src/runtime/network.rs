@@ -44,8 +44,7 @@ fn publish(runtime: &Runtime, status: &NetworkStatus) {
     let Ok(payload) = serde_json::to_value(status) else {
         return;
     };
-    runtime.hub().publish(&Event {
-        topic: NetworkStatus::TOPIC.to_string(),
-        payload,
-    });
+    runtime
+        .hub()
+        .publish(&Event::new(NetworkStatus::TOPIC, payload));
 }

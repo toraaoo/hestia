@@ -291,18 +291,23 @@ impl Shared {
             return; // ignore a malformed frame rather than tear down
         };
         if protocol::is_event(&value) {
-            let event = protocol::decode_event(&value);
-            // Unsolicited, so it correlates with no call: the topic is what a
-            // reader needs to see a job's progress arriving (or not).
-            tracing::trace!(
-                direction = "recv",
-                topic = %event.topic,
-                bytes = frame.len(),
-                "event"
-            );
-            let cb = self.event_cb.lock().unwrap().clone();
-            if let Some(cb) = cb {
-                cb(&event);
+            match protocol::decode_event(&value) {
+                Ok(event) => {
+                    // Unsolicited, so it correlates with no call: the topic is
+                    // what a reader needs to see a job's progress arriving (or
+                    // not).
+                    tracing::trace!(
+                        direction = "recv",
+                        topic = %event.topic,
+                        bytes = frame.len(),
+                        "event"
+                    );
+                    let cb = self.event_cb.lock().unwrap().clone();
+                    if let Some(cb) = cb {
+                        cb(&event);
+                    }
+                }
+                Err(e) => self.refuse(e),
             }
             return;
         }
@@ -313,10 +318,18 @@ impl Shared {
                     let _ = tx.send(res);
                 }
             }
-            // A foreign-major daemon is refused, not silently consumed: tear the
-            // connection down so every waiter fails fast rather than timing out,
-            // recording the mismatch so they report why.
-            Err(DecodeError::IncompatibleVersion { got, want }) => {
+            Err(e) => self.refuse(e),
+        }
+    }
+
+    /// What an undecodable frame costs the connection. A foreign-major daemon is
+    /// refused, not silently consumed: tear the connection down so every waiter
+    /// fails fast rather than timing out, recording the mismatch so they report
+    /// why. A junk frame is ignored — one bad frame is not a reason to drop an
+    /// otherwise-compatible connection.
+    fn refuse(&self, error: DecodeError) {
+        match error {
+            DecodeError::IncompatibleVersion { got, want } => {
                 tracing::warn!(
                     got,
                     want,
@@ -325,9 +338,7 @@ impl Shared {
                 *self.mismatch.lock().unwrap() = Some((got, want));
                 self.close();
             }
-            // A junk frame is ignored, as before — one bad frame is not a reason
-            // to drop an otherwise-compatible connection.
-            Err(DecodeError::Malformed(_)) => {}
+            DecodeError::Malformed(_) => {}
         }
     }
 

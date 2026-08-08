@@ -96,11 +96,24 @@ impl Response {
     }
 }
 
-/// An unsolicited push from the daemon to a subscribed client. It carries no id.
+/// An unsolicited push from the daemon to a subscribed client. It carries no id,
+/// but it does carry the envelope version: a push is a frame like any other, and
+/// a client only ever subscribes after a handshake it could still outlive.
 #[derive(Debug, Clone)]
 pub struct Event {
     pub topic: String,
     pub payload: Value,
+    pub version: i64,
+}
+
+impl Event {
+    pub fn new(topic: impl Into<String>, payload: Value) -> Self {
+        Event {
+            topic: topic.into(),
+            payload,
+            version: PROTOCOL_VERSION,
+        }
+    }
 }
 
 pub fn encode_request(req: &Request) -> String {
@@ -129,7 +142,7 @@ pub fn encode_response(res: &Response) -> String {
 }
 
 pub fn encode_event(event: &Event) -> String {
-    json!({ "event": event.topic, "payload": event.payload }).to_string()
+    json!({ "v": event.version, "event": event.topic, "payload": event.payload }).to_string()
 }
 
 pub fn decode_request(frame: &str) -> Result<Request, DecodeError> {
@@ -182,8 +195,9 @@ pub fn decode_response(frame: &Value) -> Result<Response, DecodeError> {
     }
 }
 
-pub fn decode_event(frame: &Value) -> Event {
-    Event {
+pub fn decode_event(frame: &Value) -> Result<Event, DecodeError> {
+    let version = decode_version(frame)?;
+    Ok(Event {
         topic: frame
             .get("event")
             .and_then(Value::as_str)
@@ -193,7 +207,8 @@ pub fn decode_event(frame: &Value) -> Event {
             Some(p) if !p.is_null() => p.clone(),
             _ => json!({}),
         },
-    }
+        version,
+    })
 }
 
 #[cfg(test)]
@@ -246,6 +261,34 @@ mod tests {
         assert!(matches!(
             decode_response(&frame),
             Err(DecodeError::IncompatibleVersion { got: 99, .. })
+        ));
+    }
+
+    #[test]
+    fn event_round_trips_at_current_version() {
+        let encoded = encode_event(&Event::new("process.exit", json!({ "id": "srv" })));
+        let value: Value = serde_json::from_str(&encoded).unwrap();
+        assert!(is_event(&value));
+        let event = decode_event(&value).expect("current-major event decodes");
+        assert_eq!(event.topic, "process.exit");
+        assert_eq!(event.version, PROTOCOL_VERSION);
+    }
+
+    #[test]
+    fn event_with_foreign_major_is_refused() {
+        let frame = json!({ "v": 99, "event": "process.exit", "payload": {} });
+        assert!(matches!(
+            decode_event(&frame),
+            Err(DecodeError::IncompatibleVersion { got: 99, .. })
+        ));
+    }
+
+    #[test]
+    fn event_without_version_is_malformed() {
+        let frame = json!({ "event": "process.exit", "payload": {} });
+        assert!(matches!(
+            decode_event(&frame),
+            Err(DecodeError::Malformed(_))
         ));
     }
 }

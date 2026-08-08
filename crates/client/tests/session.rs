@@ -111,6 +111,27 @@ async fn a_foreign_protocol_version_names_itself() {
     ));
 }
 
+/// A push fails closed exactly like a response: a subscription outlives the
+/// handshake that opened it, so a daemon that changed major underneath one must
+/// not be able to deliver a frame this build would decode by guessing.
+#[tokio::test]
+async fn a_foreign_protocol_version_on_a_push_names_itself_too() {
+    let client = Script::new()
+        .on(
+            "java.list",
+            Reply::Frame(
+                json!({ "v": 999, "event": "java.install.progress", "payload": {} }).to_string(),
+            ),
+        )
+        .serve();
+
+    let error = client.java().list().await.expect_err("mismatch");
+    assert!(matches!(
+        error,
+        IpcError::IncompatibleVersion { got: 999, .. }
+    ));
+}
+
 #[tokio::test]
 async fn a_job_settles_on_its_done_event() {
     let client = Script::new()

@@ -85,7 +85,7 @@ Carries bytes and nothing domain-specific.
 | Module | What it owns |
 |---|---|
 | `transport.rs` | the platform socket (Unix domain socket / Windows named pipe), `bind`/`connect`, a length-framed `FrameReader`/`FrameWriter`, and `Peer` — the connection's verified identity (`uid` and `authorized()` on POSIX via peer credentials) |
-| `protocol.rs` | the JSON envelope, encoded and decoded in exactly one place. Request `{v, channel, payload, id?}`, response `{v, ok, payload \| error, id?}`, event `{event, payload}` |
+| `protocol.rs` | the JSON envelope, encoded and decoded in exactly one place. Request `{v, channel, payload, id?}`, response `{v, ok, payload \| error, id?}`, event `{v, event, payload}` |
 | `endpoint.rs` | where the socket lives — `$XDG_RUNTIME_DIR/hestia/hestiad.sock`, else `/tmp/hestia-<uid>/…`; a named pipe on Windows. A build carrying its own data home takes a name scoped to it (`common::paths::install_scope`), so a portable copy never meets an installed daemon on one socket ([0067](../decisions/0067-an-endpoint-is-scoped-like-its-data-home.md)). `HESTIA_SOCK` overrides it so tests and side-by-side daemons never collide |
 | `errors.rs` | the error-code vocabulary (`BAD_REQUEST`, `NOT_FOUND`, `UNKNOWN_CHANNEL`, `HANDLER_ERROR`, `VERSION_MISMATCH`, `UNAUTHORIZED`, …) and the client-facing `IpcError` |
 
@@ -96,7 +96,10 @@ reached, the other is where your data lives.
 `PROTOCOL_VERSION` is `1`, same-major only, and the decode functions refuse to
 construct a frame at all for a foreign or missing version — the check cannot be
 forgotten at a call site
-([0001](../decisions/0001-envelope-fails-closed.md)).
+([0001](../decisions/0001-envelope-fails-closed.md)). All three frame kinds carry
+it, pushes included: a subscription outlives the handshake that opened it, so a
+foreign-major event tears the connection down exactly as a foreign-major response
+does.
 
 ## `client` — the typed SDK
 

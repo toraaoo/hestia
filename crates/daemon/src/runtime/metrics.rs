@@ -64,8 +64,8 @@ fn sample(runtime: &Runtime, system: &mut System, cores: f32) {
     if samples.is_empty() {
         return;
     }
-    runtime.hub().publish(&Event {
-        topic: ProcessMetricsEvent::TOPIC.to_string(),
-        payload: serde_json::to_value(ProcessMetricsEvent { samples }).unwrap_or_default(),
-    });
+    runtime.hub().publish(&Event::new(
+        ProcessMetricsEvent::TOPIC,
+        serde_json::to_value(ProcessMetricsEvent { samples }).unwrap_or_default(),
+    ));
 }
