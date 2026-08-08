@@ -4,6 +4,7 @@
 mod event_hub;
 mod managers;
 mod metrics;
+mod network;
 mod presence;
 pub mod router;
 mod scheduler;
@@ -29,6 +30,7 @@ pub use managers::{
     ServerCreateManager, ServerUpdateManager, TransferJob, TransferManager, UpdateManager,
 };
 pub use metrics::spawn_metrics_sampler;
+pub use network::spawn_network_watcher;
 pub use presence::spawn_presence_updater;
 pub use router::{error_response, Channels, Router};
 pub use scheduler::spawn_backup_scheduler;

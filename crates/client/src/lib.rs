@@ -7,7 +7,8 @@ mod spawn;
 
 pub use facades::{
     Accounts, App, Cache, Config, Content, Daemon, Exported, Imported, Instance, Java,
-    LaunchOptions, Modpack, Process, ProcessEvent, Profiles, Server, Skins, Sync, Transfer, Update,
+    LaunchOptions, Modpack, Net, Process, ProcessEvent, Profiles, Server, Skins, Sync, Transfer,
+    Update,
 };
 pub use ipc::errors::{self, IpcError};
 pub use session::{job_id, Session};
@@ -117,6 +118,12 @@ impl Client {
 
     pub fn java(&self) -> Java<'_> {
         Java {
+            session: &self.session,
+        }
+    }
+
+    pub fn net(&self) -> Net<'_> {
+        Net {
             session: &self.session,
         }
     }
