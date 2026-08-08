@@ -3,10 +3,10 @@
 //!
 //! Keyed by URL, kept under `meta/` with the rest of the derived files — every
 //! entry is re-downloadable, and reclaiming the directory costs nothing but the
-//! next fetch. Process-global for the same reason the client is: the catalogue
-//! readers are provider impls that hold no aggregate reference.
+//! next fetch. The root is process-global for the same reason the client is:
+//! the catalogue readers are provider impls that hold no aggregate reference.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use sha2::{Digest, Sha256};
@@ -22,35 +22,82 @@ pub fn set_root(dir: PathBuf) {
     *root().lock().unwrap() = Some(dir);
 }
 
-fn entry_path(url: &str) -> Option<PathBuf> {
-    let dir = root().lock().unwrap().clone()?;
-    let digest = hex::encode(Sha256::digest(url.as_bytes()));
-    Some(dir.join(format!("{digest}.json")))
+pub fn save(url: &str, body: &str) {
+    if let Some(dir) = root().lock().unwrap().as_deref() {
+        save_in(dir, url, body);
+    }
 }
 
-pub fn save(url: &str, body: &str) {
-    let Some(path) = entry_path(url) else {
+pub fn load(url: &str) -> Option<String> {
+    load_in(root().lock().unwrap().as_deref()?, url)
+}
+
+fn entry_path(dir: &Path, url: &str) -> PathBuf {
+    let digest: String = Sha256::digest(url.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    dir.join(format!("{digest}.json"))
+}
+
+fn save_in(dir: &Path, url: &str, body: &str) {
+    if std::fs::create_dir_all(dir).is_err() {
         return;
-    };
-    if let Some(parent) = path.parent() {
-        if std::fs::create_dir_all(parent).is_err() {
-            return;
-        }
     }
     // Written through a temp and renamed, so a reader never sees a half-file
     // and a crash mid-write leaves the previous good copy in place.
+    let path = entry_path(dir, url);
     let staging = path.with_extension("part");
     if std::fs::write(&staging, body).is_ok() && std::fs::rename(&staging, &path).is_err() {
         let _ = std::fs::remove_file(&staging);
     }
 }
 
-pub fn load(url: &str) -> Option<String> {
-    std::fs::read_to_string(entry_path(url)?).ok()
+fn load_in(dir: &Path, url: &str) -> Option<String> {
+    std::fs::read_to_string(entry_path(dir, url)).ok()
 }
 
-mod hex {
-    pub fn encode(bytes: impl AsRef<[u8]>) -> String {
-        bytes.as_ref().iter().map(|b| format!("{b:02x}")).collect()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_saved_body_reads_back_and_an_unseen_url_does_not() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+
+        save_in(dir.path(), "https://example.test/versions", r#"{"v":[]}"#);
+        assert_eq!(
+            load_in(dir.path(), "https://example.test/versions").as_deref(),
+            Some(r#"{"v":[]}"#)
+        );
+        assert!(load_in(dir.path(), "https://example.test/never-fetched").is_none());
+    }
+
+    #[test]
+    fn a_second_save_replaces_the_first_and_leaves_no_temp_behind() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+
+        save_in(dir.path(), "https://example.test/catalogue", "old");
+        save_in(dir.path(), "https://example.test/catalogue", "new");
+        assert_eq!(
+            load_in(dir.path(), "https://example.test/catalogue").as_deref(),
+            Some("new")
+        );
+
+        let leftovers = std::fs::read_dir(dir.path())
+            .expect("the dir exists")
+            .flatten()
+            .filter(|e| e.path().extension().is_some_and(|x| x == "part"))
+            .count();
+        assert_eq!(leftovers, 0, "a .part survived the rename");
+    }
+
+    #[test]
+    fn two_urls_never_share_an_entry() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        assert_ne!(
+            entry_path(dir.path(), "https://example.test/a"),
+            entry_path(dir.path(), "https://example.test/b")
+        );
     }
 }
