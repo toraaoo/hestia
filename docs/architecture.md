@@ -202,15 +202,12 @@ local file · modpacks into a new or existing entry · per-instance content
 profiles and global profiles · instance import and export (hestia, `.mrpack`,
 Prism/MultiMC) · shared instance settings and worlds (`sync`) · self-update and
 the announcement feed · network reachability as a first-class state, with
-offline launch and cached version catalogues · the CLI over all of it · the
-desktop shell and its pages · the system tray.
+offline launch and cached version catalogues · the legacy client era, both its
+unpacked natives and its named asset tree · the CLI over all of it · the desktop
+shell and its pages · the system tray.
 
-**Not built yet:**
-
-| Gap | Consequence |
-|---|---|
-| natives-classifier extraction for pre-1.19 clients | old versions launch without their LWJGL natives |
-| the legacy (virtual) asset layout | very old versions have no assets materialized |
+There is no known gap: the oldest launchable versions are covered, down to
+their unpacked natives and their pre-hash asset layout.
 
 ## Conventions that hold everywhere
 

@@ -80,6 +80,7 @@ impl InstanceProvider for VanillaInstance {
             loader_version: None,
             client: mojang::client_artifact(&version)?,
             libraries: mojang::libraries(&version),
+            natives: mojang::natives(&version),
             asset_index: mojang::asset_index(&version)?,
             java_major: mojang::java_major(&version),
             main_class: mojang::main_class(&version),

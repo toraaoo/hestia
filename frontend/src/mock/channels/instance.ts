@@ -88,6 +88,7 @@ export const channels: Handlers = {
         size: 26_000_000,
       },
       libraries: [],
+      natives: [],
       assetIndex: {
         id: version,
         artifact: {

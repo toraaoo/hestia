@@ -281,6 +281,7 @@ impl InstanceProvider for NeoForgeInstance {
             loader_version: Some(loader),
             client: mojang::client_artifact(&base)?,
             libraries,
+            natives: mojang::natives(&base),
             asset_index: mojang::asset_index(&base)?,
             java_major: mojang::java_major(&base),
             main_class: mojang::main_class(&installer.version),

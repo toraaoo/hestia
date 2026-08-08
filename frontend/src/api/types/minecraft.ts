@@ -9,6 +9,7 @@ export type { InstanceProfile } from "./generated/InstanceProfile";
 export type { Library } from "./generated/Library";
 export type { LoadersParams } from "./generated/LoadersParams";
 export type { LoadersResult } from "./generated/LoadersResult";
+export type { Native } from "./generated/Native";
 export type { ProvisionPhase } from "./generated/ProvisionPhase";
 export type { ProvisionProgress } from "./generated/ProvisionProgress";
 export type { Requirement } from "./generated/Requirement";

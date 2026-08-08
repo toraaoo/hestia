@@ -99,8 +99,8 @@ A few more things it does: several concurrent sessions of one instance, starting
 in-place version changes both ways (downgrades warn, and a server is backed up first), settings and worlds shared across
 instances, a system tray, and self-update.
 
-**Not built yet:** natives extraction for pre-1.19 clients, and the legacy asset layout — very old versions won't launch
-correctly.
+Old versions are covered too: a pre-1.19 client's LWJGL natives are unpacked from their classifier jars, and an asset
+index that predates the hashed store is mirrored to the named tree those clients read.
 
 ## Install
 

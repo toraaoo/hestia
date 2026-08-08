@@ -82,6 +82,17 @@ already there:
 | single jars | the entry's `data/`, or `meta/versions/` |
 | libraries | Maven layout under the shared `meta/libraries/` |
 | assets | content-addressed — `meta/assets/indexes/<id>.json` + `meta/assets/objects/<hh>/<hash>` |
+| natives | unpacked into `meta/natives/<version>/`, from jars fetched into the libraries root |
+
+Two shapes belong to the pre-1.19 era. A **native** is a library the JVM loads
+through `java.library.path` rather than the classpath: those manifests ship one
+classifier jar per OS, and `materialize` unpacks the host's into the natives
+directory (the era after them ships the same binaries as ordinary rule-gated
+libraries, so the list is simply empty). An asset index flagged `virtual` or
+`map_to_resources` belongs to a client that reads assets *by path*, so the hashed
+store is mirrored to a named tree — under `meta/assets/virtual/<id>/`, or the
+instance's own `resources/` for the oldest — and `${game_assets}` points the
+game at it.
 
 Everything is SHA-verified through `Downloader`, with a bounded number of
 concurrent fetches. Because the roots are shared, a second instance on the same

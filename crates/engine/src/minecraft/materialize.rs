@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::{bail, Context, Result};
 use futures_util::StreamExt;
 use proto::download::{Checksum, HashAlgorithm};
-use proto::minecraft::{Artifact, AssetIndex, Library, ProvisionPhase, ProvisionProgress};
+use proto::minecraft::{Artifact, AssetIndex, Library, Native, ProvisionPhase, ProvisionProgress};
 use serde_json::Value;
 
 use crate::cache::Cache;
@@ -137,16 +137,88 @@ pub async fn ensure_libraries(
     drain(fetches).await
 }
 
+/// Ensure every native library is downloaded under `libraries_root` and
+/// unpacked into `natives_dir`, which is what `-Djava.library.path` names.
+pub async fn ensure_natives(
+    cache: Option<&Cache>,
+    natives: &[Native],
+    libraries_root: &Path,
+    natives_dir: &Path,
+    on_progress: OnProgress<'_>,
+) -> Result<()> {
+    if natives.is_empty() {
+        return Ok(());
+    }
+    let jars: Vec<Library> = natives.iter().map(|n| n.library.clone()).collect();
+    ensure_libraries(cache, &jars, libraries_root, on_progress).await?;
+
+    std::fs::create_dir_all(natives_dir)
+        .with_context(|| format!("cannot create {}", natives_dir.display()))?;
+    for native in natives {
+        on_progress.check()?;
+        let jar = safe_join(libraries_root, &native.library.path)?;
+        unpack_native(&jar, natives_dir, &native.exclude)
+            .with_context(|| format!("native library {}", native.library.name))?;
+    }
+    Ok(())
+}
+
+/// Unpack one native jar. An entry whose path escapes `dest` is refused.
+fn unpack_native(jar: &Path, dest: &Path, exclude: &[String]) -> Result<()> {
+    let file =
+        std::fs::File::open(jar).with_context(|| format!("cannot open {}", jar.display()))?;
+    let mut archive = zip::ZipArchive::new(file).context("opening the native jar")?;
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index)?;
+        if entry.is_dir() {
+            continue;
+        }
+        let name = entry.name().to_string();
+        if exclude
+            .iter()
+            .any(|prefix| name.starts_with(prefix.as_str()))
+        {
+            continue;
+        }
+        let Some(relative) = entry.enclosed_name() else {
+            bail!("native jar contains an unsafe path: '{name}'");
+        };
+        let out = dest.join(relative);
+        if present(&out, entry.size()) {
+            continue;
+        }
+        if let Some(parent) = out.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        // The natives root is shared by every session on this version, so a
+        // concurrent launch must never open one of these mid-write.
+        let staging = out.with_extension("part");
+        let mut writer = std::fs::File::create(&staging)
+            .with_context(|| format!("cannot write {}", staging.display()))?;
+        std::io::copy(&mut entry, &mut writer)?;
+        drop(writer);
+        std::fs::rename(&staging, &out)
+            .with_context(|| format!("cannot commit {}", out.display()))?;
+    }
+    Ok(())
+}
+
 /// Ensure the asset index and every object it names under `root`
 /// (`indexes/<id>.json` + `objects/<hh>/<hash>`), reporting completed/total
 /// counts. Objects are content-addressed, so the store is shared by every
 /// version and never fetched twice.
+///
+/// Returns the directory the game must be pointed at (`${game_assets}`) when
+/// the index declares a legacy layout — a client too old to read the hashed
+/// store wants a tree named the way the index names it — and `None` when the
+/// modern store is what it reads.
 pub async fn ensure_assets(
     cache: Option<&Cache>,
     index: &AssetIndex,
     root: &Path,
+    game_dir: &Path,
     on_progress: OnProgress<'_>,
-) -> Result<()> {
+) -> Result<Option<PathBuf>> {
     validate_filename(&index.id)?;
     let index_path = root.join("indexes").join(format!("{}.json", index.id));
     if !present(&index_path, index.artifact.size) {
@@ -164,32 +236,41 @@ pub async fn ensure_assets(
     let text = std::fs::read_to_string(&index_path)
         .with_context(|| format!("cannot read {}", index_path.display()))?;
     let parsed: Value = serde_json::from_str(&text).context("asset index is malformed JSON")?;
-    if parsed.get("virtual").and_then(Value::as_bool) == Some(true)
-        || parsed.get("map_to_resources").and_then(Value::as_bool) == Some(true)
-    {
-        tracing::warn!(index = %index.id, "legacy (virtual) asset layout is not supported");
-    }
+    // Two upstream spellings of one requirement: an index flagged either way
+    // names assets its client reads by path, not by hash.
+    let mapped = if parsed.get("map_to_resources").and_then(Value::as_bool) == Some(true) {
+        Some(game_dir.join("resources"))
+    } else if parsed.get("virtual").and_then(Value::as_bool) == Some(true) {
+        Some(root.join("virtual").join(&index.id))
+    } else {
+        None
+    };
     let objects = parsed
         .get("objects")
         .and_then(Value::as_object)
         .context("asset index has no objects map")?;
 
-    let mut todo: Vec<(String, u64)> = Vec::new();
-    let mut seen = HashSet::new();
-    for object in objects.values() {
+    let mut entries: Vec<(&String, String, u64)> = Vec::new();
+    for (name, object) in objects {
         let Some(hash) = object.get("hash").and_then(Value::as_str) else {
             continue;
         };
         if hash.len() != 40 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
             bail!("asset index names an invalid object hash: '{hash}'");
         }
-        if seen.insert(hash) {
-            todo.push((
-                hash.to_string(),
-                object.get("size").and_then(Value::as_u64).unwrap_or(0),
-            ));
-        }
+        entries.push((
+            name,
+            hash.to_string(),
+            object.get("size").and_then(Value::as_u64).unwrap_or(0),
+        ));
     }
+
+    let mut seen = HashSet::new();
+    let todo: Vec<(String, u64)> = entries
+        .iter()
+        .filter(|(_, hash, _)| seen.insert(hash.clone()))
+        .map(|(_, hash, size)| (hash.clone(), *size))
+        .collect();
 
     let total = todo.len() as u64;
     let done = AtomicU64::new(0);
@@ -232,7 +313,22 @@ pub async fn ensure_assets(
             Ok::<(), anyhow::Error>(())
         }
     });
-    drain(fetches).await
+    drain(fetches).await?;
+
+    if let Some(dir) = &mapped {
+        for (name, hash, size) in &entries {
+            let destination = safe_join(dir, name)?;
+            if present(&destination, *size) {
+                continue;
+            }
+            if let Some(parent) = destination.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::copy(objects_root.join(&hash[..2]).join(hash), &destination)
+                .with_context(|| format!("cannot write {}", destination.display()))?;
+        }
+    }
+    Ok(mapped)
 }
 
 fn report_count(
@@ -262,4 +358,63 @@ where
         result?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use super::*;
+
+    fn native_jar(dir: &Path, entries: &[(&str, &[u8])]) -> PathBuf {
+        let path = dir.join("native.jar");
+        let file = std::fs::File::create(&path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        for (name, body) in entries {
+            zip.start_file(*name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(body).unwrap();
+        }
+        zip.finish().unwrap();
+        path
+    }
+
+    #[test]
+    fn unpacking_skips_the_excluded_prefixes() {
+        let temp = tempfile::tempdir().unwrap();
+        let jar = native_jar(
+            temp.path(),
+            &[
+                ("liblwjgl.so", b"binary"),
+                ("META-INF/MANIFEST.MF", b"manifest"),
+                ("META-INF/SIG.RSA", b"signature"),
+            ],
+        );
+        let dest = temp.path().join("natives");
+        unpack_native(&jar, &dest, &["META-INF/".to_string()]).unwrap();
+
+        assert!(dest.join("liblwjgl.so").is_file());
+        assert!(!dest.join("META-INF").exists());
+    }
+
+    #[test]
+    fn unpacking_replaces_a_truncated_file_and_leaves_a_good_one() {
+        let temp = tempfile::tempdir().unwrap();
+        let jar = native_jar(temp.path(), &[("liblwjgl.so", b"binary")]);
+        let dest = temp.path().join("natives");
+        std::fs::create_dir_all(&dest).unwrap();
+        let target = dest.join("liblwjgl.so");
+        std::fs::write(&target, b"tru").unwrap();
+
+        unpack_native(&jar, &dest, &[]).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"binary");
+
+        let before = std::fs::metadata(&target).unwrap().modified().unwrap();
+        unpack_native(&jar, &dest, &[]).unwrap();
+        assert_eq!(
+            std::fs::metadata(&target).unwrap().modified().unwrap(),
+            before,
+            "a file already the right size is not rewritten"
+        );
+    }
 }

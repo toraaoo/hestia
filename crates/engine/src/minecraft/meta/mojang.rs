@@ -3,12 +3,12 @@
 
 use anyhow::{Context, Result};
 use proto::download::{Checksum, HashAlgorithm};
-use proto::minecraft::{Artifact, AssetIndex, GameVersion, Library, VersionKind};
+use proto::minecraft::{Artifact, AssetIndex, GameVersion, Library, Native, VersionKind};
 use serde_json::Value;
 
 use proto::error::Service;
 
-use super::{fetch_json, rules_allow};
+use super::{fetch_json, host_os, rules_allow};
 
 const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 
@@ -99,9 +99,9 @@ pub fn asset_index(version: &Value) -> Result<AssetIndex> {
     })
 }
 
-/// Rule-filtered classpath libraries. Native-classifier libraries (legacy
-/// packaging) are skipped — modern versions ship natives as rule-gated
-/// `downloads.artifact` entries, which are covered.
+/// Rule-filtered classpath libraries. A legacy library's native classifier is
+/// *not* one of these — it is unpacked rather than put on the classpath, and
+/// `natives()` collects it instead.
 pub fn libraries(version: &Value) -> Vec<Library> {
     let mut out = Vec::new();
     let Some(libs) = version.get("libraries").and_then(Value::as_array) else {
@@ -126,6 +126,64 @@ pub fn libraries(version: &Value) -> Vec<Library> {
         });
     }
     out
+}
+
+/// Rule-filtered native libraries, resolved to the classifier this host needs.
+/// Empty for 1.19 and later, whose manifests carry no `natives` block.
+pub fn natives(version: &Value) -> Vec<Native> {
+    let mut out = Vec::new();
+    let Some(libs) = version.get("libraries").and_then(Value::as_array) else {
+        return out;
+    };
+    for lib in libs {
+        if lib.get("rules").is_some_and(|rules| !rules_allow(rules)) {
+            continue;
+        }
+        let Some(classifier) = native_classifier(lib) else {
+            continue;
+        };
+        let Some(download) = lib
+            .get("downloads")
+            .and_then(|d| d.get("classifiers"))
+            .and_then(|c| c.get(&classifier))
+        else {
+            continue;
+        };
+        let Some(artifact) = artifact_from(download) else {
+            continue;
+        };
+        out.push(Native {
+            library: Library {
+                name: format!("{}:{classifier}", str_field(lib, "name")),
+                path: str_field(download, "path"),
+                artifact,
+            },
+            exclude: lib
+                .get("extract")
+                .and_then(|e| e.get("exclude"))
+                .and_then(Value::as_array)
+                .map(|v| {
+                    v.iter()
+                        .filter_map(Value::as_str)
+                        .map(String::from)
+                        .collect()
+                })
+                .unwrap_or_default(),
+        });
+    }
+    out
+}
+
+/// The `natives` key for this host. `${arch}` is the only placeholder Mojang
+/// spells in a classifier name, and it means the JVM's pointer width.
+fn native_classifier(lib: &Value) -> Option<String> {
+    let classifier = lib.get("natives")?.get(host_os())?.as_str()?;
+    let arch = if cfg!(target_pointer_width = "64") {
+        "64"
+    } else {
+        "32"
+    };
+    Some(classifier.replace("${arch}", arch))
 }
 
 pub fn jvm_args(version: &Value) -> Vec<String> {
@@ -203,4 +261,112 @@ fn str_field(obj: &Value, key: &str) -> String {
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn legacy_version() -> Value {
+        serde_json::json!({
+            "libraries": [{
+                "name": "org.lwjgl.lwjgl:lwjgl-platform:2.9.4",
+                "natives": {
+                    "linux": "natives-linux",
+                    "windows": "natives-windows",
+                    "osx": "natives-osx"
+                },
+                "extract": { "exclude": ["META-INF/"] },
+                "downloads": {
+                    "artifact": {
+                        "path": "org/lwjgl/lwjgl/lwjgl-platform/2.9.4/lwjgl-platform-2.9.4.jar",
+                        "url": "https://libraries.minecraft.net/base.jar",
+                        "sha1": "aa",
+                        "size": 10
+                    },
+                    "classifiers": {
+                        "natives-linux": {
+                            "path": "org/lwjgl/natives-linux.jar",
+                            "url": "https://libraries.minecraft.net/natives-linux.jar",
+                            "sha1": "bb",
+                            "size": 20
+                        },
+                        "natives-windows": {
+                            "path": "org/lwjgl/natives-windows.jar",
+                            "url": "https://libraries.minecraft.net/natives-windows.jar",
+                            "sha1": "cc",
+                            "size": 30
+                        },
+                        "natives-osx": {
+                            "path": "org/lwjgl/natives-osx.jar",
+                            "url": "https://libraries.minecraft.net/natives-osx.jar",
+                            "sha1": "dd",
+                            "size": 40
+                        }
+                    }
+                }
+            }]
+        })
+    }
+
+    #[test]
+    fn natives_take_the_host_classifier_and_its_exclusions() {
+        let natives = natives(&legacy_version());
+        assert_eq!(natives.len(), 1);
+        assert_eq!(
+            natives[0].library.path,
+            format!("org/lwjgl/natives-{}.jar", host_os())
+        );
+        assert_eq!(natives[0].exclude, ["META-INF/"]);
+    }
+
+    #[test]
+    fn a_native_classifier_stays_off_the_classpath() {
+        let libraries = libraries(&legacy_version());
+        assert_eq!(libraries.len(), 1, "only the base artifact is a library");
+        assert!(libraries[0].path.ends_with("lwjgl-platform-2.9.4.jar"));
+    }
+
+    #[test]
+    fn a_modern_version_has_no_natives() {
+        let version = serde_json::json!({
+            "libraries": [{
+                "name": "org.lwjgl:lwjgl:3.3.3:natives-linux",
+                "downloads": { "artifact": {
+                    "path": "org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar",
+                    "url": "https://libraries.minecraft.net/x.jar",
+                    "sha1": "ee",
+                    "size": 50
+                }}
+            }]
+        });
+        assert!(natives(&version).is_empty());
+        assert_eq!(libraries(&version).len(), 1);
+    }
+
+    #[test]
+    fn the_arch_placeholder_resolves_to_the_pointer_width() {
+        let version = serde_json::json!({
+            "libraries": [{
+                "name": "tv.twitch:twitch-platform:5.16",
+                "natives": { "linux": "natives-linux-${arch}",
+                             "windows": "natives-windows-${arch}",
+                             "osx": "natives-osx" },
+                "downloads": { "classifiers": {
+                    format!("natives-{}-64", host_os()): {
+                        "path": "tv/twitch/native.jar",
+                        "url": "https://libraries.minecraft.net/native.jar",
+                        "sha1": "ff",
+                        "size": 60
+                    }
+                }}
+            }]
+        });
+        let expected = if cfg!(target_pointer_width = "64") {
+            1
+        } else {
+            0
+        };
+        assert_eq!(natives(&version).len(), expected);
+    }
 }

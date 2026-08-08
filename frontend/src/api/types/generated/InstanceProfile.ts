@@ -2,8 +2,13 @@
 import type { Artifact } from "./Artifact";
 import type { AssetIndex } from "./AssetIndex";
 import type { Library } from "./Library";
+import type { Native } from "./Native";
 
 /**
  * The resolved launch profile for a Minecraft *client* (instance).
  */
-export type InstanceProfile = { flavor: string, gameVersion: string, loaderVersion?: string, client: Artifact, libraries: Array<Library>, assetIndex: AssetIndex, javaMajor: number, mainClass: string, jvmArgs: Array<string>, gameArgs: Array<string>, };
+export type InstanceProfile = { flavor: string, gameVersion: string, loaderVersion?: string, client: Artifact, libraries: Array<Library>, 
+/**
+ * Empty from 1.19 on, where natives are ordinary rule-gated libraries.
+ */
+natives: Array<Native>, assetIndex: AssetIndex, javaMajor: number, mainClass: string, jvmArgs: Array<string>, gameArgs: Array<string>, };

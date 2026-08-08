@@ -100,6 +100,18 @@ pub struct Library {
     pub artifact: Artifact,
 }
 
+/// A library the game loads through `java.library.path` rather than the
+/// classpath: a pre-1.19 manifest ships one classifier jar per OS
+/// (`downloads.classifiers["natives-linux"]`) for the launcher to unpack.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct Native {
+    pub library: Library,
+    /// Archive path prefixes the manifest's `extract.exclude` names.
+    pub exclude: Vec<String>,
+}
+
 /// The asset index a client version pins (`assetIndex` in a vanilla profile).
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
@@ -146,6 +158,9 @@ pub struct InstanceProfile {
     pub loader_version: Option<String>,
     pub client: Artifact,
     pub libraries: Vec<Library>,
+    /// Empty from 1.19 on, where natives are ordinary rule-gated libraries.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub natives: Vec<Native>,
     pub asset_index: AssetIndex,
     pub java_major: i32,
     pub main_class: String,

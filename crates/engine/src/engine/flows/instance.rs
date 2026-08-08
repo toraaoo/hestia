@@ -239,6 +239,16 @@ impl Engine {
         )
         .await?;
 
+        let natives_dir = meta.join("natives").join(&record.profile.game_version);
+        materialize::ensure_natives(
+            Some(&self.cache),
+            &record.profile.natives,
+            &libraries_root,
+            &natives_dir,
+            on_progress,
+        )
+        .await?;
+
         self.minecraft
             .install_instance(
                 &record.profile.flavor,
@@ -255,15 +265,6 @@ impl Engine {
                 on_progress,
             )
             .await?;
-
-        let assets_root = meta.join("assets");
-        materialize::ensure_assets(
-            Some(&self.cache),
-            &record.profile.asset_index,
-            &assets_root,
-            on_progress,
-        )
-        .await?;
 
         let game_dir = self.instances.data_dir(&record);
         std::fs::create_dir_all(&game_dir)
@@ -285,9 +286,17 @@ impl Engine {
             let worlds = crate::instances::save_worlds(&game_dir);
             install::sync(&entry_dir, &game_dir, selection.as_ref(), &worlds)?;
         }
-        let natives_dir = meta.join("natives").join(&record.profile.game_version);
-        std::fs::create_dir_all(&natives_dir)
-            .with_context(|| format!("cannot create {}", natives_dir.display()))?;
+        // After the sync pass: a legacy index mirrors into the game directory,
+        // which that pass reconciles.
+        let assets_root = meta.join("assets");
+        let mapped_assets = materialize::ensure_assets(
+            Some(&self.cache),
+            &record.profile.asset_index,
+            &assets_root,
+            &game_dir,
+            on_progress,
+        )
+        .await?;
 
         // Per-session logging lives under the instance root (not data/, so it is
         // outside backups): each concurrent session gets its own file the
@@ -312,6 +321,7 @@ impl Engine {
                 client_jar: &client_jar,
                 libraries_root: &libraries_root,
                 assets_root: &assets_root,
+                game_assets: mapped_assets.as_deref().unwrap_or(&assets_root),
                 log_config: Some(&log_config),
             },
             &account,

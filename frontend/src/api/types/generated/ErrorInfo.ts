@@ -19,8 +19,4 @@ export type ErrorInfo = { "kind": "field_required", field: Field, } | { "kind": 
 /**
  * Absent for a plain file download, aimed at whatever URL a profile named.
  */
-service: Service | null, 
-/**
- * Pinned by `network.offline` rather than observed.
- */
-pinned: boolean, } | { "kind": "upstream", service: Service, detail: string, } | { "kind": "download_failed", detail: string, } | { "kind": "rcon_failed", detail: string, } | { "kind": "internal", detail: string, };
+service: Service | null, } | { "kind": "offline_mode" } | { "kind": "upstream", service: Service, detail: string, } | { "kind": "download_failed", detail: string, } | { "kind": "rcon_failed", detail: string, } | { "kind": "internal", detail: string, };

@@ -193,6 +193,9 @@ pub struct InstancePaths<'a> {
     pub client_jar: &'a Path,
     pub libraries_root: &'a Path,
     pub assets_root: &'a Path,
+    /// What `${game_assets}` resolves to: the mirrored tree for a legacy index
+    /// (`materialize::ensure_assets`), otherwise `assets_root`.
+    pub game_assets: &'a Path,
     /// A per-session Log4j2 config (`crate::minecraft::log4j`) redirecting the
     /// game's own log to a private file; `None` keeps the version's default
     /// (`logs/latest.log`).
@@ -302,7 +305,12 @@ pub fn instance_plan(
 
     let mut args = Vec::new();
     if profile.jvm_args.is_empty() {
-        // Pre-`arguments` manifests carry no JVM section; supply the classpath.
+        // Pre-`arguments` manifests carry no JVM section; supply what one would
+        // have declared. That era's natives are unpacked, not read from a jar.
+        args.push(format!(
+            "-Djava.library.path={}",
+            paths.natives_dir.to_string_lossy()
+        ));
         args.push("-cp".to_string());
         args.push(vars["classpath"].clone());
     } else {
@@ -366,6 +374,7 @@ fn build_vars(
         ("natives_directory", path_str(paths.natives_dir)),
         ("game_directory", path_str(paths.game_dir)),
         ("assets_root", path_str(paths.assets_root)),
+        ("game_assets", path_str(paths.game_assets)),
         ("assets_index_name", profile.asset_index.id.clone()),
         ("version_name", profile.game_version.clone()),
         ("version_type", "release".to_string()),
@@ -597,6 +606,7 @@ mod tests {
             client_jar: Path::new("/versions/1.21.1/client.jar"),
             libraries_root: Path::new("/libraries"),
             assets_root: Path::new("/assets"),
+            game_assets: Path::new("/assets"),
             log_config: None,
         };
         let plan = instance_plan(
@@ -634,6 +644,7 @@ mod tests {
             client_jar: Path::new("/versions/client.jar"),
             libraries_root: Path::new("/libraries"),
             assets_root: Path::new("/assets"),
+            game_assets: Path::new("/assets"),
             log_config: None,
         };
         let plan_for = |target: QuickPlay| {
@@ -694,6 +705,7 @@ mod tests {
             client_jar: Path::new("/versions/1.21.1/client.jar"),
             libraries_root: Path::new("/libraries"),
             assets_root: Path::new("/assets"),
+            game_assets: Path::new("/assets"),
             log_config: Some(log),
         };
         let plan = instance_plan(
@@ -733,6 +745,7 @@ mod tests {
             client_jar: Path::new("/versions/old/client.jar"),
             libraries_root: Path::new("/libraries"),
             assets_root: Path::new("/assets"),
+            game_assets: Path::new("/assets"),
             log_config: None,
         };
         let plan = instance_plan(
@@ -743,8 +756,43 @@ mod tests {
             &JavaSettings::default(),
             None,
         );
-        assert_eq!(plan.args[0], "-cp");
-        assert!(plan.args[1].contains("client.jar"));
+        assert_eq!(
+            plan.args[0],
+            format!(
+                "-Djava.library.path={}",
+                Path::new("/inst/natives").display()
+            ),
+            "the era with no JVM section still needs its unpacked natives found"
+        );
+        assert_eq!(plan.args[1], "-cp");
+        assert!(plan.args[2].contains("client.jar"));
+    }
+
+    #[test]
+    fn legacy_game_args_point_at_the_mirrored_asset_tree() {
+        let profile = InstanceProfile {
+            game_args: vec!["--assetsDir".into(), "${game_assets}".into()],
+            ..Default::default()
+        };
+        let mirrored = Path::new("/assets/virtual/legacy");
+        let paths = InstancePaths {
+            game_dir: Path::new("/inst"),
+            natives_dir: Path::new("/inst/natives"),
+            client_jar: Path::new("/versions/old/client.jar"),
+            libraries_root: Path::new("/libraries"),
+            assets_root: Path::new("/assets"),
+            game_assets: mirrored,
+            log_config: None,
+        };
+        let plan = instance_plan(
+            &profile,
+            Path::new("java"),
+            &paths,
+            &account(),
+            &JavaSettings::default(),
+            None,
+        );
+        assert_eq!(plan.args.last().unwrap(), &mirrored.display().to_string());
     }
 
     fn settings(memory: Option<&str>, jvm_args: &[&str]) -> JavaSettings {
@@ -808,6 +856,7 @@ mod tests {
             client_jar: Path::new("/versions/1.21.1/client.jar"),
             libraries_root: Path::new("/libraries"),
             assets_root: Path::new("/assets"),
+            game_assets: Path::new("/assets"),
             log_config: None,
         };
         let plan = instance_plan(
