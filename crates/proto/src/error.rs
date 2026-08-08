@@ -591,9 +591,11 @@ pub enum ErrorInfo {
     Offline {
         /// Absent for a plain file download, aimed at whatever URL a profile named.
         service: Option<Service>,
-        /// Pinned by `network.offline` rather than observed.
-        pinned: bool,
     },
+    /// Nothing was attempted: the user pinned `network.offline`. Its own variant
+    /// rather than a flag on `Offline` because the remedy is different — a
+    /// setting to turn off, not a connection to wait for.
+    OfflineMode,
     Upstream {
         service: Service,
         detail: String,
@@ -641,7 +643,7 @@ impl ErrorInfo {
             }
             UnknownChannel { .. } => "unknown_channel",
             IncompatibleVersion { .. } => "version_mismatch",
-            Offline { .. } => "offline",
+            Offline { .. } | OfflineMode => "offline",
             ElevationRequired { .. }
             | Io { .. }
             | Upstream { .. }
@@ -825,18 +827,15 @@ impl fmt::Display for ErrorInfo {
                 "installing this update needs administrator rights — run: {command}"
             ),
             Io { operation, detail } => write!(f, "could not {operation}: {detail}"),
-            Offline { service, pinned } => match (service, pinned) {
-                (Some(service), true) => {
-                    write!(f, "hestia is in offline mode, so {service} was not called")
-                }
-                (None, true) => write!(f, "hestia is in offline mode"),
-                (Some(service), false) => {
-                    write!(f, "{service} is unreachable — you appear to be offline")
-                }
-                (None, false) => {
-                    write!(f, "the download could not start — you appear to be offline")
-                }
-            },
+            Offline {
+                service: Some(service),
+            } => {
+                write!(f, "{service} is unreachable — you appear to be offline")
+            }
+            Offline { service: None } => {
+                write!(f, "the download could not start — you appear to be offline")
+            }
+            OfflineMode => write!(f, "hestia is in offline mode"),
             Upstream { service, detail } => write!(f, "{service} request failed: {detail}"),
             DownloadFailed { detail } => write!(f, "download failed: {detail}"),
             RconFailed { detail } => write!(f, "server console command failed: {detail}"),

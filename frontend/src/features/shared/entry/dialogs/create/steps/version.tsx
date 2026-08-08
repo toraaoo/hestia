@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type { GameVersion } from '@/api';
+import { StaleNotice } from '@/components/offline-state';
 import { SearchInput } from '@/components/search-input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FieldError } from '@/components/ui/field';
 import { m } from '@/paraglide/messages.js';
 import { instanceQueries } from '@/queries/instance';
+import { useOffline } from '@/queries/net';
 import { serverQueries } from '@/queries/server';
 
 import { type Kind, VersionRow, type WizardForm } from '../fields';
@@ -38,6 +40,7 @@ export function VersionStep({
     ...instanceQueries.versions(flavor),
     enabled: kind === 'instance',
   });
+  const offline = useOffline();
   const versionsQuery = kind === 'server' ? serverVersions : instanceVersions;
   const versions: GameVersion[] = versionsQuery.data ?? [];
 
@@ -74,6 +77,9 @@ export function VersionStep({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* The list answers from the cached catalogue while offline, so say so
+          rather than letting a short list read as the whole truth. */}
+      {offline && <StaleNotice />}
       <SearchInput
         value={search}
         onChange={onSearch}

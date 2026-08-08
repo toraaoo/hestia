@@ -31,6 +31,10 @@ export const keys = {
     all: ['daemon'] as const,
     status: () => [...keys.daemon.all, 'status'] as const,
   },
+  net: {
+    all: ['net'] as const,
+    status: () => [...keys.net.all, 'status'] as const,
+  },
   config: {
     all: ['config'] as const,
     list: () => [...keys.config.all, 'list'] as const,

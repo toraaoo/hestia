@@ -26,4 +26,10 @@ profile: string,
  * the title screen; the game only understands this from 1.20 on, so an
  * older instance refuses rather than silently ignoring it.
  */
-quickPlay?: QuickPlay, };
+quickPlay?: QuickPlay, 
+/**
+ * Launch without contacting Microsoft, using the signed-in account's name
+ * and uuid with an unusable token. Singleplayer works; the game refuses
+ * multiplayer, which is what an unauthenticated session is entitled to.
+ */
+offline: boolean, };

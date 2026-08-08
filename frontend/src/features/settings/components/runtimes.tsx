@@ -4,7 +4,7 @@ import {
   TrashIcon,
 } from '@phosphor-icons/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-
+import { OfflineNotice } from '@/components/offline-state';
 import { Bone } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { m } from '@/paraglide/messages.js';
 import { javaMutations, javaQueries } from '@/queries/java';
 import { useJobMutation } from '@/queries/jobs';
+import { useOffline } from '@/queries/net';
 
 /**
  * Every runtime Hestia offers, installed or not, as one list: what is on disk
@@ -21,6 +22,7 @@ import { useJobMutation } from '@/queries/jobs';
  * previous strip of version buttons could not say which of the two a number was.
  */
 export function RuntimeList() {
+  const offline = useOffline();
   const runtimesQuery = useQuery(javaQueries.runtimes());
   const releasesQuery = useQuery(javaQueries.releases());
   const install = useJobMutation(javaMutations.install());
@@ -43,6 +45,7 @@ export function RuntimeList() {
   return (
     <Field>
       <FieldDescription>{m['settings.java.runtimes_hint']()}</FieldDescription>
+      {offline && <OfflineNotice />}
       <div className="divide-y divide-border border border-border">
         {majors.map((major) => {
           const runtime = installed.get(major);
@@ -113,7 +116,7 @@ export function RuntimeList() {
                   variant="outline"
                   size="xs"
                   data-icon="inline-start"
-                  disabled={install.isPending}
+                  disabled={install.isPending || offline}
                   onClick={() => install.mutate({ major })}
                 >
                   <DownloadSimpleIcon className="size-3.5" />

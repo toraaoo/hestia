@@ -49,7 +49,7 @@ pub(crate) fn client() -> &'static reqwest::Client {
 /// status — a 404 is the caller's business, and the network is up either way.
 pub async fn send(service: Option<Service>, request: RequestBuilder) -> Result<Response> {
     if network().pinned() {
-        return Err(offline(service, true));
+        return Err(ErrorInfo::OfflineMode.into());
     }
     let mut next = Some(request);
     for attempt in 1..=retry::MAX_ATTEMPTS {
@@ -87,14 +87,14 @@ pub async fn send(service: Option<Service>, request: RequestBuilder) -> Result<R
                     // flip every front-end to offline and back.
                     None => {
                         network().observe_unreachable();
-                        return Err(offline(service, false));
+                        return Err(offline(service));
                     }
                 }
             }
         }
     }
     network().observe_unreachable();
-    Err(offline(service, false))
+    Err(offline(service))
 }
 
 /// Reject a non-2xx response as an upstream failure.
@@ -132,7 +132,7 @@ fn read_body<T>(service: Service, result: reqwest::Result<T>) -> Result<T> {
     result.map_err(|error| {
         if retry::is_transport(&error) {
             network().observe_unreachable();
-            return offline(Some(service), false);
+            return offline(Some(service));
         }
         upstream(Some(service), &error)
     })
@@ -143,20 +143,21 @@ fn read_body<T>(service: Service, result: reqwest::Result<T>) -> Result<T> {
 pub fn stream_failure(service: Option<Service>, error: &reqwest::Error) -> anyhow::Error {
     if retry::is_transport(error) {
         network().observe_unreachable();
-        return offline(service, false);
+        return offline(service);
     }
     upstream(service, error)
 }
 
-pub fn offline(service: Option<Service>, pinned: bool) -> anyhow::Error {
-    ErrorInfo::Offline { service, pinned }.into()
+pub fn offline(service: Option<Service>) -> anyhow::Error {
+    ErrorInfo::Offline { service }.into()
 }
 
-/// Whether a failure was the network rather than the answer.
+/// Whether a failure was the network rather than the answer — either kind, so
+/// a caller with a cached fallback serves it in offline mode too.
 pub fn is_offline(error: &anyhow::Error) -> bool {
     error
         .downcast_ref::<ErrorInfo>()
-        .is_some_and(|info| matches!(info, ErrorInfo::Offline { .. }))
+        .is_some_and(|info| matches!(info, ErrorInfo::Offline { .. } | ErrorInfo::OfflineMode))
 }
 
 fn upstream(service: Option<Service>, error: &reqwest::Error) -> anyhow::Error {

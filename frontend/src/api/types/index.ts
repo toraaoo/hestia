@@ -14,6 +14,7 @@ export type * from "./java";
 export type * from "./job";
 export type * from "./minecraft";
 export type * from "./modpack";
+export type * from "./net";
 export type * from "./process";
 export type * from "./profile";
 export type * from "./server";

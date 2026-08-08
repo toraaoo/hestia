@@ -17,6 +17,7 @@ import {
   errorMessage,
   type HestiaError,
   NOT_FOUND,
+  OFFLINE,
   TIMEOUT,
   TRANSPORT,
   UNAUTHORIZED,
@@ -26,8 +27,9 @@ import { scopedToEntry } from './keys';
 const log = logger('query');
 
 // Never a toast: `unauthorized` is expected behind the sign-in gate, and
-// connectivity failures are the status bar's concern, not a per-call error.
-const TRANSPORT_CODES = new Set([TRANSPORT, CONNECTION_LOST, TIMEOUT]);
+// connectivity failures — the socket's or the network's — are the status bar's
+// concern, not an error per call. A page that needs upstream says so itself.
+const TRANSPORT_CODES = new Set([TRANSPORT, CONNECTION_LOST, TIMEOUT, OFFLINE]);
 const silent = (error: HestiaError) =>
   error.code === UNAUTHORIZED || TRANSPORT_CODES.has(error.code);
 

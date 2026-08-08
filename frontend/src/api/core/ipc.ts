@@ -23,6 +23,8 @@ export const BAD_REQUEST = 'bad_request';
 export const HANDLER_ERROR = 'handler_error';
 export const UNKNOWN_CHANNEL = 'unknown_channel';
 export const UNAUTHORIZED = 'unauthorized';
+/** The daemon could not reach upstream — distinct from the socket being down. */
+export const OFFLINE = 'offline';
 /** Error codes raised by the shell's bridge for transport failures. */
 export const TIMEOUT = 'timeout';
 export const CONNECTION_LOST = 'connection_lost';
@@ -77,7 +79,7 @@ export async function call<T>(
     return result as T;
   } catch (raw) {
     const error = toHestiaError(raw);
-    log[offline(error) ? 'debug' : 'warn'](
+    log[daemonUnreachable(error) ? 'debug' : 'warn'](
       { channel, code: error.code, ms: elapsed(started) },
       `call failed: ${error.message}`,
     );
@@ -85,7 +87,7 @@ export async function call<T>(
   }
 }
 
-function offline(error: HestiaError): boolean {
+function daemonUnreachable(error: HestiaError): boolean {
   return error.code === CONNECTION_LOST || error.code === TRANSPORT;
 }
 
