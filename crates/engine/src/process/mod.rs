@@ -11,6 +11,7 @@
 
 mod identity;
 mod records;
+mod secrets;
 mod tail;
 mod task;
 
@@ -184,7 +185,7 @@ impl ProcessSupervisor {
                 id: spec.id.clone(),
                 pid,
                 program: spec.program.clone(),
-                args: spec.args.clone(),
+                args: secrets::redact(&spec.args),
                 state: ProcessState::Running,
                 exit_code: None,
                 started_unix,
@@ -248,7 +249,7 @@ impl ProcessSupervisor {
                     id: record.id.clone(),
                     pid: record.pid,
                     program: record.spec.program.clone(),
-                    args: record.spec.args.clone(),
+                    args: secrets::redact(&record.spec.args),
                     state: if alive {
                         ProcessState::Running
                     } else {
@@ -304,7 +305,7 @@ impl ProcessSupervisor {
                         state: ProcessState::Exited,
                         exit_code: None,
                         program: record.spec.program.clone(),
-                        args: record.spec.args.clone(),
+                        args: secrets::redact(&record.spec.args),
                         started_unix: record.started_unix,
                         ended_unix: now_unix(),
                         log_path: entry.log_path.clone(),
@@ -503,11 +504,16 @@ fn resolve_external(path: &Path, spec: &ProcessSpec) -> PathBuf {
     }
 }
 
+// Owner-only: an old client prints its own session id to stdout.
 fn open_log(path: &Path) -> std::io::Result<std::fs::File> {
-    std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
+    let mut options = std::fs::OpenOptions::new();
+    options.create(true).append(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)
 }
 
 fn prepare_stdio(spec: &ProcessSpec, proc_dir: &Path) -> std::io::Result<PreparedIo> {
@@ -633,7 +639,7 @@ async fn supervise(
                     state,
                     exit_code: code,
                     program: spec.program.clone(),
-                    args: spec.args.clone(),
+                    args: secrets::redact(&spec.args),
                     started_unix: snapshot.started_unix,
                     ended_unix: now_unix(),
                     log_path: entry.log_path.clone(),
