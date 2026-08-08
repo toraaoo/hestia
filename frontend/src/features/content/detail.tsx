@@ -13,6 +13,7 @@ import { DetailHero } from '@/components/detail-hero';
 import { Empty } from '@/components/empty';
 import { contentIcon, contentKindLabel } from '@/components/icons';
 import { Markdown } from '@/components/markdown';
+import { OfflineState } from '@/components/offline-state';
 import { CardGridSkeleton } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ import { kindInfo } from '@/features/shared/content/lib';
 import { agoLabel, compact } from '@/lib/format';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
+import { useOffline } from '@/queries/net';
 
 export type ProjectTab = 'description' | 'versions';
 
@@ -44,12 +46,20 @@ export function ProjectDetailPage({
   tab: ProjectTab;
   onTabChange: (tab: ProjectTab) => void;
 }) {
+  const offline = useOffline();
   const project = useQuery(contentQueries.project(id, source));
   const versions = useQuery(contentQueries.versions({ project: id, source }));
   const [installOpen, setInstallOpen] = useState(false);
 
   if (project.isPending) {
     return <div className="p-6 text-xs text-muted-foreground">…</div>;
+  }
+  if (offline && !project.data) {
+    return (
+      <div className="p-6">
+        <OfflineState />
+      </div>
+    );
   }
   if (!project.data || project.data.kind !== kind) {
     return (

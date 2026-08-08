@@ -1,4 +1,5 @@
 import { CaretUpIcon, XIcon } from '@phosphor-icons/react';
+import { Link } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
@@ -103,13 +104,32 @@ function NetworkIndicator() {
         : m['app.network.offline_label']()
       : m['app.network.label']();
 
+  const dot = (
+    <StatusDot
+      tone={state === 'online' ? 'on' : state === 'unknown' ? 'off' : 'warn'}
+    />
+  );
+
+  // Offline is the one state with somewhere to go: the page explains what still
+  // works. Online has nothing to say, so it stays inert text.
+  if (state !== 'offline') {
+    return (
+      <span className="inline-flex items-center gap-1.5" title={title}>
+        {dot}
+        {label}
+      </span>
+    );
+  }
+
   return (
-    <span className="inline-flex items-center gap-1.5" title={title}>
-      <StatusDot
-        tone={state === 'online' ? 'on' : state === 'unknown' ? 'off' : 'warn'}
-      />
+    <Link
+      to="/offline"
+      className="inline-flex items-center gap-1.5 hover:text-foreground"
+      title={title}
+    >
+      {dot}
       {label}
-    </span>
+    </Link>
   );
 }
 

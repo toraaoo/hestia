@@ -14,6 +14,7 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppBrowseIndexRouteImport } from './routes/_app/browse/index'
 import { Route as AppInstancesIndexRouteImport } from './routes/_app/instances/index'
 import { Route as AppInstancesIdRouteImport } from './routes/_app/instances/$id'
+import { Route as AppOfflineIndexRouteImport } from './routes/_app/offline/index'
 import { Route as AppProfilesIndexRouteImport } from './routes/_app/profiles/index'
 import { Route as AppProfilesNameRouteImport } from './routes/_app/profiles/$name'
 import { Route as AppServersIndexRouteImport } from './routes/_app/servers/index'
@@ -45,6 +46,11 @@ const AppInstancesIndexRoute = AppInstancesIndexRouteImport.update({
 const AppInstancesIdRoute = AppInstancesIdRouteImport.update({
   id: '/instances/$id',
   path: '/instances/$id',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppOfflineIndexRoute = AppOfflineIndexRouteImport.update({
+  id: '/offline/',
+  path: '/offline/',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppProfilesIndexRoute = AppProfilesIndexRouteImport.update({
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/servers/$id': typeof AppServersIdRoute
   '/browse/': typeof AppBrowseIndexRoute
   '/instances/': typeof AppInstancesIndexRoute
+  '/offline/': typeof AppOfflineIndexRoute
   '/profiles/': typeof AppProfilesIndexRoute
   '/servers/': typeof AppServersIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/servers/$id': typeof AppServersIdRoute
   '/browse': typeof AppBrowseIndexRoute
   '/instances': typeof AppInstancesIndexRoute
+  '/offline': typeof AppOfflineIndexRoute
   '/profiles': typeof AppProfilesIndexRoute
   '/servers': typeof AppServersIndexRoute
   '/settings': typeof AppSettingsIndexRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/_app/servers/$id': typeof AppServersIdRoute
   '/_app/browse/': typeof AppBrowseIndexRoute
   '/_app/instances/': typeof AppInstancesIndexRoute
+  '/_app/offline/': typeof AppOfflineIndexRoute
   '/_app/profiles/': typeof AppProfilesIndexRoute
   '/_app/servers/': typeof AppServersIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/servers/$id'
     | '/browse/'
     | '/instances/'
+    | '/offline/'
     | '/profiles/'
     | '/servers/'
     | '/settings/'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/servers/$id'
     | '/browse'
     | '/instances'
+    | '/offline'
     | '/profiles'
     | '/servers'
     | '/settings'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '/_app/servers/$id'
     | '/_app/browse/'
     | '/_app/instances/'
+    | '/_app/offline/'
     | '/_app/profiles/'
     | '/_app/servers/'
     | '/_app/settings/'
@@ -217,6 +229,13 @@ declare module '@tanstack/react-router' {
       path: '/instances/$id'
       fullPath: '/instances/$id'
       preLoaderRoute: typeof AppInstancesIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/offline/': {
+      id: '/_app/offline/'
+      path: '/offline'
+      fullPath: '/offline/'
+      preLoaderRoute: typeof AppOfflineIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/profiles/': {
@@ -285,6 +304,7 @@ interface AppRouteRouteChildren {
   AppServersIdRoute: typeof AppServersIdRoute
   AppBrowseIndexRoute: typeof AppBrowseIndexRoute
   AppInstancesIndexRoute: typeof AppInstancesIndexRoute
+  AppOfflineIndexRoute: typeof AppOfflineIndexRoute
   AppProfilesIndexRoute: typeof AppProfilesIndexRoute
   AppServersIndexRoute: typeof AppServersIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
@@ -300,6 +320,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppServersIdRoute: AppServersIdRoute,
   AppBrowseIndexRoute: AppBrowseIndexRoute,
   AppInstancesIndexRoute: AppInstancesIndexRoute,
+  AppOfflineIndexRoute: AppOfflineIndexRoute,
   AppProfilesIndexRoute: AppProfilesIndexRoute,
   AppServersIndexRoute: AppServersIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,

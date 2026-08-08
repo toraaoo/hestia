@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import type { ContentVersion, InstalledContent } from '@/api';
+import { OfflineState } from '@/components/offline-state';
 import { SearchInput } from '@/components/search-input';
 import { CardGridSkeleton } from '@/components/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,7 @@ import { agoLabel } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
+import { useOffline } from '@/queries/net';
 
 /**
  * Pick a specific published version of an installed item — real
@@ -50,6 +52,7 @@ export function ContentVersionDialog({
     }),
   );
   const list = item ? (versions.data ?? []) : [];
+  const offline = useOffline();
   const q = search.trim().toLowerCase();
   const shown = list.filter(
     (v) =>
@@ -87,7 +90,9 @@ export function ContentVersionDialog({
           />
 
           <div className="max-h-64 divide-y divide-border overflow-y-auto border border-border">
-            {versions.isPending ? (
+            {offline && shown.length === 0 ? (
+              <OfflineState />
+            ) : versions.isPending ? (
               <CardGridSkeleton
                 grid="divide-y divide-border"
                 count={4}

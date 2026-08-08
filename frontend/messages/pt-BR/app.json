@@ -122,19 +122,31 @@
       "skins": "Skins"
     },
     "network": {
+      "blocked_body": "Navegar e instalar conteúdo, entrar na conta, instalar versões do Java e verificar atualizações.",
+      "blocked_title": "Precisa de conexão",
       "body": "O Hestia não consegue acessar a internet, então nada que precise de download está disponível. O que já está instalado continua funcionando.",
       "checking": "verificando…",
+      "checking_again": "Verificando…",
+      "details": "O que continua funcionando",
       "label": "Rede",
+      "last_online": "Online pela última vez {ago}",
       "needs_connection": "Downloads não estão disponíveis enquanto você está offline.",
       "offline": "sem conexão",
       "offline_label": "Sem conexão com a internet",
       "online": "online",
+      "open_settings": "Abrir configurações",
+      "page_body": "O Hestia não consegue acessar a internet. Ele continua verificando sozinho, e esta página desaparece assim que a conexão voltar.",
+      "page_pinned_body": "O Hestia não está usando a rede porque o modo offline está ativado. Desative para navegar e baixar novamente.",
+      "page_pinned_title": "O modo offline está ativado",
+      "page_title": "Sem conexão com a internet",
       "pinned": "modo offline",
       "pinned_body": "O modo offline está ativado, então o Hestia não está usando a rede. Desative nas Configurações para navegar e baixar novamente.",
       "pinned_label": "O modo offline está ativado",
       "retry": "Tentar novamente",
       "stale": "Mostrando o que foi salvo da última vez que você esteve online.",
-      "title": "Você está offline"
+      "title": "Você está offline",
+      "works_body": "Iniciar instâncias e executar servidores, o conteúdo já instalado, mundos, backups e configurações.",
+      "works_title": "Continua funcionando"
     },
     "playbar": {
       "all_instances": "Todas as instâncias",

@@ -14,6 +14,7 @@ import { errorMessage, system } from '@/api';
 import { Empty } from '@/components/empty';
 import { FilterMenu } from '@/components/filter-menu';
 import { contentIcon } from '@/components/icons';
+import { OfflineNotice } from '@/components/offline-state';
 import { SearchInput } from '@/components/search-input';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -23,6 +24,7 @@ import { m } from '@/paraglide/messages.js';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
 import { useEntryJobs, useJobMutation } from '@/queries/jobs';
 import { modpackQueries } from '@/queries/modpack';
+import { useOffline } from '@/queries/net';
 import { serverMutations, serverQueries } from '@/queries/server';
 import { type ContentContext, ContentCtx, useContent } from '../hooks';
 import {
@@ -60,6 +62,7 @@ export function ContentSection({
     ? serverMutations.content
     : instanceMutations.content;
 
+  const offline = useOffline();
   const lists = useQueries({
     queries: kinds.map((k) => queries.content(id, k)),
   });
@@ -141,6 +144,7 @@ export function ContentSection({
         action={action}
         lists={lists}
         updates={updates}
+        offline={offline}
       />
     </ContentCtx.Provider>
   );
@@ -153,9 +157,11 @@ function ContentSectionView({
   action,
   lists,
   updates,
+  offline,
 }: Omit<SectionProps, 'entry'> & {
   lists: ListResult[];
   updates: UpdatesResult[];
+  offline: boolean;
 }) {
   const { handlers, busy } = useContent();
   const items = lists.flatMap((q) => q.data?.items ?? []);
@@ -272,7 +278,7 @@ function ContentSectionView({
                     size="sm"
                     variant="outline"
                     data-icon="inline-start"
-                    disabled={checking}
+                    disabled={checking || offline}
                     onClick={() => {
                       for (const q of updates) void q.refetch();
                     }}
@@ -282,6 +288,7 @@ function ContentSectionView({
                       ? m['content.checking_updates']()
                       : m['content.check_updates']()}
                   </Button>
+                  {offline && <OfflineNotice />}
                   {updatableRows.length > 0 && (
                     <Button
                       size="sm"
