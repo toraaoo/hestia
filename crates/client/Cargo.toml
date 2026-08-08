@@ -9,7 +9,7 @@ publish.workspace = true
 [features]
 # The HTTP transport for a remote node. Off by default so a front-end that only
 # ever talks to the local socket does not link an HTTP stack.
-remote = ["dep:reqwest", "dep:keyring", "dep:percent-encoding", "dep:uuid"]
+remote = ["dep:reqwest", "dep:keyring", "dep:percent-encoding", "dep:uuid", "dep:futures-util"]
 
 [dependencies]
 proto = { workspace = true }
@@ -24,6 +24,7 @@ reqwest = { workspace = true, optional = true }
 keyring = { version = "3.6.3", optional = true, features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 percent-encoding = { version = "2.3.2", optional = true }
 uuid = { workspace = true, optional = true }
+futures-util = { workspace = true, optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

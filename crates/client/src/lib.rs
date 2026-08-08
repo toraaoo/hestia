@@ -76,6 +76,20 @@ impl Client {
         Ok(Client::over(ipc::connect(endpoint).await?))
     }
 
+    /// Drive a node from the registry over HTTP. Every facade works unchanged —
+    /// the contracts are the same, only the wire differs.
+    #[cfg(feature = "remote")]
+    pub fn to_node(reference: &str) -> Result<(remote::NodeEntry, Client), IpcError> {
+        let registry = remote::Registry::open(None);
+        let (entry, node) = registry.connect(reference)?;
+        Ok((
+            entry,
+            Client {
+                session: Session::remote(node),
+            },
+        ))
+    }
+
     pub fn session(&self) -> &Session {
         &self.session
     }

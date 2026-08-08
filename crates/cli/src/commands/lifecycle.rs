@@ -25,12 +25,19 @@ async fn resolve(client: &Client, name: &str) -> Result<Target> {
         .await?
         .iter()
         .any(|s| client::proto::naming::reference_matches(name, &s.id, &s.name));
-    let is_instance = client
-        .instance()
-        .list()
-        .await?
-        .iter()
-        .any(|i| client::proto::naming::reference_matches(name, &i.id, &i.name));
+    // A remote node serves servers and nothing else, so it answers
+    // `unknown_channel` here — which means "no instances", not a failure.
+    let is_instance = match client.instance().list().await {
+        Ok(instances) => instances
+            .iter()
+            .any(|i| client::proto::naming::reference_matches(name, &i.id, &i.name)),
+        Err(client::IpcError::Daemon { ref code, .. })
+            if code == client::errors::UNKNOWN_CHANNEL =>
+        {
+            false
+        }
+        Err(e) => return Err(e.into()),
+    };
     match (is_server, is_instance) {
         (true, false) => Ok(Target::Server),
         (false, true) => Ok(Target::Instance),

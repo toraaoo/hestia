@@ -42,6 +42,7 @@ impl Terminal {
     }
 }
 
+#[derive(Default)]
 struct Shared {
     pending: Mutex<HashMap<i64, oneshot::Sender<Response>>>,
     event_cb: Mutex<Option<EventCallback>>,
@@ -51,22 +52,34 @@ struct Shared {
     mismatch: Mutex<Option<(i64, i64)>>,
 }
 
+/// How a session reaches its daemon. Every facade above this is written once and
+/// works either way: the contract is the same, only the wire differs.
+enum Transport {
+    /// The local daemon, over its socket.
+    Socket {
+        writer: tokio::sync::Mutex<FrameWriter>,
+        next_id: AtomicI64,
+        reader: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    },
+    /// A remote node, over HTTP.
+    #[cfg(feature = "remote")]
+    Remote {
+        node: Arc<crate::remote::Node>,
+        /// The event stream, opened on the first subscription rather than at
+        /// connect: a one-shot call has no use for one.
+        stream: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    },
+}
+
 pub struct Session {
     shared: Arc<Shared>,
-    writer: tokio::sync::Mutex<FrameWriter>,
-    next_id: AtomicI64,
-    reader: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    transport: Transport,
 }
 
 impl Session {
     pub fn new(connection: Connection) -> Self {
         let (mut reader, writer) = connection.into_split();
-        let shared = Arc::new(Shared {
-            pending: Mutex::new(HashMap::new()),
-            event_cb: Mutex::new(None),
-            closed: AtomicBool::new(false),
-            mismatch: Mutex::new(None),
-        });
+        let shared = Arc::new(Shared::default());
         let reader_shared = shared.clone();
         tracing::trace!("session opened");
         let handle = tokio::spawn(async move {
@@ -77,9 +90,24 @@ impl Session {
         });
         Session {
             shared,
-            writer: tokio::sync::Mutex::new(writer),
-            next_id: AtomicI64::new(1),
-            reader: Mutex::new(Some(handle)),
+            transport: Transport::Socket {
+                writer: tokio::sync::Mutex::new(writer),
+                next_id: AtomicI64::new(1),
+                reader: Mutex::new(Some(handle)),
+            },
+        }
+    }
+
+    /// Drive a remote node through the same contracts.
+    #[cfg(feature = "remote")]
+    pub fn remote(node: crate::remote::Node) -> Self {
+        tracing::trace!("remote session opened");
+        Session {
+            shared: Arc::new(Shared::default()),
+            transport: Transport::Remote {
+                node: Arc::new(node),
+                stream: Mutex::new(None),
+            },
         }
     }
 
@@ -98,7 +126,16 @@ impl Session {
         if self.is_closed() {
             return Err(self.shared.close_error());
         }
-        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+        let (writer, next_id) = match &self.transport {
+            Transport::Socket {
+                writer, next_id, ..
+            } => (writer, next_id),
+            #[cfg(feature = "remote")]
+            Transport::Remote { node, .. } => {
+                return remote_call(node, channel, payload, timeout).await
+            }
+        };
+        let id = next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = oneshot::channel();
         self.shared.pending.lock().unwrap().insert(id, tx);
 
@@ -117,7 +154,7 @@ impl Session {
             "frame"
         );
         let started = std::time::Instant::now();
-        if let Err(e) = self.writer.lock().await.send(&frame).await {
+        if let Err(e) = writer.lock().await.send(&frame).await {
             self.shared.pending.lock().unwrap().remove(&id);
             tracing::trace!(channel, id, error = %e, "send failed");
             return Err(e);
@@ -188,7 +225,34 @@ impl Session {
     }
 
     pub fn set_event_callback(&self, cb: Option<EventCallback>) {
+        let wanted = cb.is_some();
         *self.shared.event_cb.lock().unwrap() = cb;
+        if wanted {
+            self.open_event_stream();
+        }
+    }
+
+    /// A socket session already has its reader; a remote one opens an SSE stream
+    /// the first time anybody asks for events.
+    fn open_event_stream(&self) {
+        #[cfg(feature = "remote")]
+        if let Transport::Remote { node, stream } = &self.transport {
+            let mut held = stream.lock().unwrap();
+            if held.as_ref().is_some_and(|task| !task.is_finished()) {
+                return;
+            }
+            let node = node.clone();
+            let shared = self.shared.clone();
+            *held = Some(tokio::spawn(async move {
+                node.follow(|event| {
+                    let cb = shared.event_cb.lock().unwrap().clone();
+                    if let Some(cb) = cb {
+                        cb(event);
+                    }
+                })
+                .await;
+            }));
+        }
     }
 
     /// Subscribe to `id`'s events, run `start`, and block until the done or error
@@ -361,9 +425,36 @@ impl Shared {
 
 impl Drop for Session {
     fn drop(&mut self) {
-        if let Some(handle) = self.reader.lock().unwrap().take() {
-            handle.abort();
+        match &self.transport {
+            Transport::Socket { reader, .. } => {
+                if let Some(handle) = reader.lock().unwrap().take() {
+                    handle.abort();
+                }
+            }
+            #[cfg(feature = "remote")]
+            Transport::Remote { stream, .. } => {
+                if let Some(handle) = stream.lock().unwrap().take() {
+                    handle.abort();
+                }
+            }
         }
+    }
+}
+
+/// A remote call, shaped back into the `Response` a socket would have produced —
+/// so `must`, `try_call` and every facade above are unchanged.
+#[cfg(feature = "remote")]
+async fn remote_call(
+    node: &crate::remote::Node,
+    channel: &str,
+    payload: Value,
+    timeout: Duration,
+) -> Result<Response, IpcError> {
+    match tokio::time::timeout(timeout, node.call_raw(channel, payload)).await {
+        Ok(Ok(data)) => Ok(Response::success(data)),
+        Ok(Err(IpcError::Daemon { info, .. })) => Ok(Response::failure(info)),
+        Ok(Err(e)) => Err(e),
+        Err(_) => Err(IpcError::Timeout(channel.to_string())),
     }
 }
 

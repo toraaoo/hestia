@@ -37,6 +37,12 @@ struct Cli {
         help = "Override Hestia's data directory (else $HESTIA_HOME, else the platform default)"
     )]
     home: Option<String>,
+    #[arg(
+        long,
+        global = true,
+        help = "Drive a remote node from `hestia node list` instead of the local daemon"
+    )]
+    node: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -218,6 +224,11 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::process::ProcessCmd,
     },
+    /// The remote nodes this machine can drive
+    Node {
+        #[command(subcommand)]
+        cmd: commands::node::NodeCmd,
+    },
     /// The node's HTTP door for remote server management, and its API keys
     Remote {
         #[command(subcommand)]
@@ -263,6 +274,8 @@ fn main() -> ExitCode {
         }
     }
 
+    commands::target_node(cli.node);
+
     let Some(command) = cli.command else {
         // No subcommand given: show usage.
         let _ = <Cli as clap::CommandFactory>::command().print_help();
@@ -294,6 +307,7 @@ fn is_broken_pipe(error: &anyhow::Error) -> bool {
 /// queries answer anything but [`ExitStatus::Active`] — see `exit.rs` for the
 /// contract.
 async fn dispatch(command: Command) -> anyhow::Result<ExitStatus> {
+    remotable(&command)?;
     match command {
         Command::Daemon { cmd } => return commands::daemon::run(cmd).await,
         Command::Server { cmd } => return commands::server::run(cmd).await,
@@ -301,6 +315,41 @@ async fn dispatch(command: Command) -> anyhow::Result<ExitStatus> {
         _ => {}
     }
     run_command(command).await.map(|()| ExitStatus::Active)
+}
+
+/// Which commands `--node` may be combined with. A remote node serves servers
+/// and nothing else, so anything reaching for an instance, an account, the
+/// launcher's own settings or this machine's daemon is refused here — with a
+/// sentence naming why, rather than an `unknown_channel` from three layers down.
+fn remotable(command: &Command) -> anyhow::Result<()> {
+    match command {
+        Command::Server { .. }
+        | Command::Start { .. }
+        | Command::Stop { .. }
+        | Command::Restart { .. }
+        | Command::Logs { .. }
+        | Command::Rename { .. } => Ok(()),
+        Command::Play { .. } => commands::refuse_remote("play"),
+        Command::Account { .. } => commands::refuse_remote("account"),
+        Command::Java { .. } => commands::refuse_remote("java"),
+        Command::Instance { .. } => commands::refuse_remote("instance"),
+        Command::Mod { .. }
+        | Command::Modpack { .. }
+        | Command::Resourcepack { .. }
+        | Command::Shader { .. }
+        | Command::Datapack { .. }
+        | Command::Plugin { .. }
+        | Command::Search { .. }
+        | Command::Sources => commands::refuse_remote("browse"),
+        Command::Cache { .. } => commands::refuse_remote("cache"),
+        Command::Config { .. } => commands::refuse_remote("config"),
+        Command::Sync { .. } => commands::refuse_remote("sync"),
+        Command::Process { .. } => commands::refuse_remote("process"),
+        Command::Node { .. } => commands::refuse_remote("node"),
+        Command::Remote { .. } => commands::refuse_remote("remote"),
+        Command::Daemon { .. } => commands::refuse_remote("daemon"),
+        Command::Update { .. } => commands::refuse_remote("update"),
+    }
 }
 
 /// Everything that simply succeeds or fails.
@@ -391,11 +440,63 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
         Command::Cache { cmd } => commands::cache::run(cmd).await,
         Command::Config { cmd } => commands::config::run(cmd).await,
         Command::Sync { cmd } => commands::sync::run(cmd).await,
+        Command::Node { cmd } => commands::node::run(cmd).await,
         Command::Remote { cmd } => commands::remote::run(cmd).await,
         Command::Update { yes } => commands::update::run(yes).await,
         // Handled by `dispatch`: these answer with their own exit status.
         Command::Daemon { .. } | Command::Server { .. } | Command::Process { .. } => {
             unreachable!()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    #[test]
+    fn the_grammar_is_well_formed() {
+        Cli::command().debug_assert();
+    }
+
+    /// `--node` is global, so any subcommand field of the same name merges with
+    /// it and silently rewrites the flag — which is how `hestia node rekey prod`
+    /// came to think it was targeting a remote node.
+    #[test]
+    fn no_subcommand_field_collides_with_a_global_flag() {
+        let cli = Cli::command();
+        let globals: Vec<String> = cli
+            .get_arguments()
+            .filter(|arg| arg.is_global_set())
+            .map(|arg| arg.get_id().to_string())
+            .collect();
+        assert!(globals.iter().any(|id| id == "node"), "{globals:?}");
+
+        for sub in cli.get_subcommands() {
+            for nested in std::iter::once(sub).chain(sub.get_subcommands()) {
+                for arg in nested.get_positionals() {
+                    assert!(
+                        !globals.contains(&arg.get_id().to_string()),
+                        "`{} {}` has a positional named '{}', which collides with the global flag",
+                        sub.get_name(),
+                        nested.get_name(),
+                        arg.get_id()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_remote_node_serves_servers_and_refuses_the_rest() {
+        commands::target_node(Some("prod".into()));
+        assert!(remotable(&Command::Sources).is_err());
+        assert!(remotable(&Command::Update { yes: true }).is_err());
+        assert!(remotable(&Command::Stop {
+            target: "smp".into(),
+            session: None
+        })
+        .is_ok());
     }
 }

@@ -9,12 +9,15 @@ use ipc::PROTOCOL_VERSION;
 use serde_json::json;
 
 use crate::http::envelope::{Answer, ApiResult};
-use crate::http::{Api, VERSIONS};
+use crate::http::{Api, CURRENT, VERSIONS};
 
 pub(super) fn mount() -> Router<Api> {
     Router::new()
         .route("/api/versions", get(versions))
+        // Unversioned for a load balancer that wants one fixed path, and
+        // versioned so the SDK reaches it like every other route.
         .route("/health", get(health))
+        .route(&format!("/api/{CURRENT}/health"), get(health))
 }
 
 async fn versions() -> ApiResult {

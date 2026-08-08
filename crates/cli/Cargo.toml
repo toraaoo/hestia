@@ -15,7 +15,7 @@ path = "src/main.rs"
 portable = ["common/portable"]
 
 [dependencies]
-client = { workspace = true }
+client = { workspace = true, features = ["remote"] }
 common = { workspace = true }
 proto = { workspace = true }
 clap = { workspace = true }

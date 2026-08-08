@@ -5,6 +5,7 @@
 //! back into the daemon's own `ErrorInfo`, and reports failures as the same
 //! [`IpcError`] a socket call would.
 
+mod events;
 mod http;
 mod registry;
 mod routes;
@@ -53,6 +54,11 @@ impl Node {
             return Err(failure(&body));
         }
         Ok(body.get("data").cloned().unwrap_or(Value::Null))
+    }
+
+    /// Follow the node's event stream until it ends. The caller owns the task.
+    pub async fn follow(&self, on_event: impl Fn(&ipc::protocol::Event)) {
+        events::follow(&self.base, &self.token, on_event).await
     }
 
     pub async fn call<C: Contract>(&self, params: &C::Params) -> Result<C::Result, IpcError> {
