@@ -7,6 +7,7 @@ import { type ContentKind, errorMessage } from '@/api';
 import { useSearch } from '@/components/app-shell/search-context';
 import { Empty } from '@/components/empty';
 import { FilterMenu } from '@/components/filter-menu';
+import { OfflineState } from '@/components/offline-state';
 import { Page } from '@/components/page';
 import { CardGridSkeleton } from '@/components/skeleton';
 import {
@@ -20,6 +21,7 @@ import { kindGroup } from '@/features/shared/content/components';
 import { contentKinds, kindInfo } from '@/features/shared/content/lib';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
+import { useOffline } from '@/queries/net';
 
 const GRID = 'grid grid-cols-1 gap-3 xl:grid-cols-2';
 
@@ -34,6 +36,7 @@ export function BrowsePage({
 }) {
   const { query } = useSearch();
   const q = query.trim();
+  const offline = useOffline();
   const sources = useSourceOptions(kind, source);
   // The default source is the absence of the param, not an empty one.
   const sourceParam = source ? { source } : {};
@@ -93,7 +96,9 @@ export function BrowsePage({
       }
       skeleton={<CardGridSkeleton grid={GRID} count={8} card="h-24" />}
     >
-      {url ? (
+      {offline ? (
+        <OfflineState />
+      ) : url ? (
         link.isPending ? (
           <CardGridSkeleton grid={GRID} count={1} card="h-24" />
         ) : link.data ? (

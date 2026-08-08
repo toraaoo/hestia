@@ -121,6 +121,21 @@
       "settings": "Configurações",
       "skins": "Skins"
     },
+    "network": {
+      "body": "O Hestia não consegue acessar a internet, então nada que precise de download está disponível. O que já está instalado continua funcionando.",
+      "checking": "verificando…",
+      "label": "Rede",
+      "needs_connection": "Downloads não estão disponíveis enquanto você está offline.",
+      "offline": "sem conexão",
+      "offline_label": "Sem conexão com a internet",
+      "online": "online",
+      "pinned": "modo offline",
+      "pinned_body": "O modo offline está ativado, então o Hestia não está usando a rede. Desative nas Configurações para navegar e baixar novamente.",
+      "pinned_label": "O modo offline está ativado",
+      "retry": "Tentar novamente",
+      "stale": "Mostrando o que foi salvo da última vez que você esteve online.",
+      "title": "Você está offline"
+    },
     "playbar": {
       "all_instances": "Todas as instâncias",
       "quick_play": "Jogo rápido"

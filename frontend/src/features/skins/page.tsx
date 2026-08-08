@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 
 import type { Skin } from '@/api';
 import { Empty } from '@/components/empty';
+import { OfflineState } from '@/components/offline-state';
 import { Page, Section } from '@/components/page';
 import { SignInGate } from '@/components/sign-in-gate';
 import { Button } from '@/components/ui/button';
@@ -22,12 +23,14 @@ import { EditSkinDialog } from '@/features/skins/dialogs';
 import { collapseDefaults, readTextureFile } from '@/features/skins/lib';
 import { m } from '@/paraglide/messages.js';
 import { useAccounts } from '@/queries';
+import { useOffline } from '@/queries/net';
 import { skinMutations, skinQueries } from '@/queries/skins';
 
 const BASE64_PREFIX = /^data:image\/png;base64,/;
 
 export function SkinsPage() {
   const { signedIn, isPending: accountsPending } = useAccounts();
+  const offline = useOffline();
   const list = useQuery({ ...skinQueries.list(''), enabled: signedIn });
 
   const add = useMutation(skinMutations.add());
@@ -128,6 +131,8 @@ export function SkinsPage() {
       title={m['skin.locked_title']()}
       hint={m['skin.sign_in_hint']()}
     />
+  ) : offline && !list.data ? (
+    <OfflineState />
   ) : list.isError && !list.data ? (
     <Empty icon={WarningCircleIcon} tone="destructive">
       {m['skin.load_failed']()}

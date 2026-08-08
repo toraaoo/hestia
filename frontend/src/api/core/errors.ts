@@ -42,6 +42,9 @@ const TOKEN_FIELDS = new Set([
 ]);
 
 function token(value: unknown): string {
+  // An optional token field (a download names no service) still has to read as
+  // a noun in the sentence around it.
+  if (value == null) return token('upstream');
   if (typeof value !== 'string') return String(value);
   for (const table of TOKEN_TABLES) {
     const hit = msg[`${table}${value}`];

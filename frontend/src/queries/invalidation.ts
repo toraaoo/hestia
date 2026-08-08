@@ -89,6 +89,26 @@ export function invalidationKeys(
   return TOPICS[topic]?.(payload) ?? [];
 }
 
+// The queries whose answer depends on reaching upstream. The version lists are
+// named by their own prefix rather than the entry subtree they nest under: a
+// reconnect should refresh the catalogues, not walk every entry's footprint.
+const UPSTREAM_KEYS: QueryKey[] = [
+  keys.content.all,
+  keys.java.all,
+  keys.update.all,
+  keys.skins.all,
+  [...keys.servers.all, 'versions'],
+  [...keys.instances.all, 'versions'],
+];
+
+let wasOffline = false;
+
+function sweepOnReturnToOnline(payload: Record<string, unknown>): void {
+  const offline = payload.state === 'offline';
+  if (wasOffline && !offline) for (const key of UPSTREAM_KEYS) invalidate(key);
+  wasOffline = offline;
+}
+
 let started = false;
 
 /** Install the feed once, at app bootstrap. */
@@ -98,6 +118,9 @@ export function startInvalidation(): void {
   onDaemonEvent((event) => {
     for (const key of invalidationKeys(event.topic, event.payload))
       invalidate(key);
+    // Coming back online is the other reconnect: everything upstream-backed
+    // failed or answered from a cached catalogue while we were out.
+    if (event.topic === 'net.state') sweepOnReturnToOnline(event.payload);
   }).catch(() => {
     // Outside the Tauri shell there are no daemon events to hear.
   });

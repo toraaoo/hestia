@@ -21,6 +21,7 @@ import { m } from '@/paraglide/messages.js';
 import { useDaemon } from '@/queries/daemon';
 import { useInstances } from '@/queries/instance';
 import { cancelJob, type Job, useJobs } from '@/queries/jobs';
+import { useNetwork } from '@/queries/net';
 import { useServers } from '@/queries/server';
 
 export function StatusBar() {
@@ -68,12 +69,47 @@ export function StatusBar() {
           ? m['app.daemon.connected']()
           : m['app.daemon.offline']()}
       </span>
+      {daemon.connected && <NetworkIndicator />}
       {daemon.status && (
         <span className="font-mono">v{daemon.status.version}</span>
       )}
 
       {running.length > 0 && <JobActivity jobs={running} nameOf={nameOf} />}
     </footer>
+  );
+}
+
+/**
+ * Reachability beside the daemon light, and deliberately separate from it: the
+ * daemon can be perfectly healthy with no way out to the internet, and the two
+ * failures need different things from the user.
+ */
+function NetworkIndicator() {
+  const network = useNetwork();
+  const state = network?.state ?? 'unknown';
+  const label =
+    state === 'online'
+      ? m['app.network.online']()
+      : state === 'unknown'
+        ? m['app.network.checking']()
+        : network?.offlineMode
+          ? m['app.network.pinned']()
+          : m['app.network.offline']();
+
+  const title =
+    state === 'offline'
+      ? network?.offlineMode
+        ? m['app.network.pinned_label']()
+        : m['app.network.offline_label']()
+      : m['app.network.label']();
+
+  return (
+    <span className="inline-flex items-center gap-1.5" title={title}>
+      <StatusDot
+        tone={state === 'online' ? 'on' : state === 'unknown' ? 'off' : 'warn'}
+      />
+      {label}
+    </span>
   );
 }
 

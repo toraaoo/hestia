@@ -10,4 +10,4 @@ export type WarningInfo = { "kind": "properties_schema_missing", name: string, }
  * Operational English naming the schema problem, shown as secondary
  * text: the version it declared, or why it would not parse.
  */
-detail: string, } | { "kind": "server_list_in_use", instance: string, sessions: number, };
+detail: string, } | { "kind": "server_list_in_use", instance: string, sessions: number, } | { "kind": "launched_offline", account: string, } | { "kind": "session_not_verified", account: string, };

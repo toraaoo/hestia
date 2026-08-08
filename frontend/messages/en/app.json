@@ -121,6 +121,21 @@
       "settings": "Settings",
       "skins": "Skins"
     },
+    "network": {
+      "body": "Hestia cannot reach the internet, so anything that needs downloading is unavailable. What is already installed still works.",
+      "checking": "checking…",
+      "label": "Network",
+      "needs_connection": "Downloads are unavailable while you are offline.",
+      "offline": "no connection",
+      "offline_label": "No internet connection",
+      "online": "online",
+      "pinned": "offline mode",
+      "pinned_body": "Offline mode is on, so Hestia is not using the network. Turn it off in Settings to browse and download again.",
+      "pinned_label": "Offline mode is on",
+      "retry": "Try again",
+      "stale": "Showing what was saved the last time you were online.",
+      "title": "You're offline"
+    },
     "playbar": {
       "all_instances": "All instances",
       "quick_play": "Quick play"

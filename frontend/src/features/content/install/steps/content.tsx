@@ -12,6 +12,7 @@ import {
 } from '@/api';
 import { FilterMenu } from '@/components/filter-menu';
 import { contentIcon, contentKindLabel } from '@/components/icons';
+import { OfflineState } from '@/components/offline-state';
 import { PickerPanel } from '@/components/picker-panel';
 import {
   projectKey,
@@ -26,6 +27,7 @@ import {
 import { m } from '@/paraglide/messages.js';
 import { contentQueries, isContentUrl } from '@/queries/content';
 import { instanceQueries } from '@/queries/instance';
+import { useOffline } from '@/queries/net';
 
 import { FilterBar } from '../filter-bar';
 import {
@@ -83,6 +85,7 @@ export function ContentStep({
     enabled: !url,
   });
   const hits = results.data?.hits ?? [];
+  const offline = useOffline();
 
   return (
     <PickerPanel
@@ -117,7 +120,9 @@ export function ContentStep({
         </>
       }
     >
-      {datapackBlocked(activeKind) ? (
+      {offline ? (
+        <OfflineState />
+      ) : datapackBlocked(activeKind) ? (
         <p className="px-1 py-8 text-center text-xs text-muted-foreground">
           {m['content.no_worlds_datapack']()}
         </p>

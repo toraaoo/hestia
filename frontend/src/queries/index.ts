@@ -50,6 +50,7 @@ export {
   useProcessMetrics,
 } from './metrics';
 export * from './modpack';
+export * from './net';
 export * from './prefs';
 export * from './process';
 export * from './profile';
