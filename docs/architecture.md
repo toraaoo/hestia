@@ -185,9 +185,9 @@ obvious unit to reclaim ([0057](decisions/0057-meta-root-for-materialised-files.
 
 ## Project status
 
-Hestia is at its first release (`v1.0.0`), and the vertical slice is complete:
-every capability below works end to end, from the wire contract to at least one
-front-end.
+Hestia is at its first beta (`v1.0.0-beta.1`), and the vertical slice is
+complete: every capability below works end to end, from the wire contract to at
+least one front-end.
 
 **Working:** the workspace and its enforced dependency graph · logging, identity
 and path resolution · the wire protocol and typed SDK · config, cache and

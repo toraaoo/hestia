@@ -7,11 +7,12 @@ is what is written here.
 One `## <version>` heading per release. Everything until the next heading is
 that release's notes, rendered as markdown.
 
-## 1.0.0
+## 1.0.0-beta.1
 
-The first release. A resident daemon owns everything, and the desktop app and
-the `hestia` CLI are two views of the same state — so a server keeps running
-when you close the window, and anything one front-end can do, the other can too.
+The first beta of the 1.0 release. A resident daemon owns everything, and the
+desktop app and the `hestia` CLI are two views of the same state — so a server
+keeps running when you close the window, and anything one front-end can do, the
+other can too.
 
 - **Instances** for vanilla, Fabric and NeoForge. Launch several sessions of
   one instance at once, start straight into a world or onto a server, and move
@@ -33,9 +34,11 @@ when you close the window, and anything one front-end can do, the other can too.
   library with a real-time 3D preview, the vanilla characters, and your capes.
 - **Shared settings** across instances: `options.txt` merged, worlds and
   configs linked into one store, and existing instances adopted into it.
+- **Old versions** launch as they should: a pre-1.19 client's LWJGL natives are
+  unpacked from their classifier jars, and an asset index predating the hashed
+  store is mirrored to the named tree those clients read.
 - **Self-update** over a signed release feed, an in-app announcement feed, and
   a system tray beside the running daemon.
 
-Known gaps: pre-1.19 clients launch without their LWJGL natives, and the
-legacy (virtual) asset layout is not materialized — very old versions will not
-launch correctly.
+This build follows the beta feed, and lands on `1.0.0` by itself once that
+ships.
