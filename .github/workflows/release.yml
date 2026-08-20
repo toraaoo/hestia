@@ -88,19 +88,27 @@ jobs:
             exit 1
           fi
 
-      # A release nobody is told about is not a release: the feed is what every
-      # installed copy polls, so a missing token fails here rather than after
-      # the installers are already public.
+      # A stable release nobody is told about is not a release: the feed is what
+      # every installed copy polls, so a missing token fails here rather than
+      # after the installers are already public. A beta is let through without
+      # one — a prerelease is handed to testers as a download, and the feed it
+      # will be served from may not exist yet.
       - name: The update feed is configured
         if: github.ref_type == 'tag'
         env:
           FEED_URL: ${{ vars.UPDATE_FEED_URL }}
           FEED_TOKEN: ${{ secrets.UPDATE_FEED_TOKEN }}
+          CHANNEL: ${{ steps.channel.outputs.channel }}
         run: |
-          if [ -z "${FEED_URL:-}" ] || [ -z "${FEED_TOKEN:-}" ]; then
-            echo "::error::UPDATE_FEED_URL (variable) and UPDATE_FEED_TOKEN (secret) must both be set. See docs/update-feed.md."
+          set -euo pipefail
+          if [ -n "${FEED_URL:-}" ] && [ -n "${FEED_TOKEN:-}" ]; then
+            exit 0
+          fi
+          if [ "$CHANNEL" = stable ]; then
+            echo "::error::UPDATE_FEED_URL (variable) and UPDATE_FEED_TOKEN (secret) must both be set for a stable release. See docs/update-feed.md."
             exit 1
           fi
+          echo "::warning::no feed credentials — this beta ships as a download only, and no installed copy will be offered it."
 
       # Not fatal: without it the CurseForge source stays hidden until a user
       # sets `content.curseforge-key` themselves.
@@ -310,6 +318,8 @@ jobs:
       # UPDATE_FEED_TOKEN is an API token minted for an admin account on the feed
       # API, presented in the header that API authenticates keys with. A browser
       # session is refused there, so a token is the only credential CI can hold.
+      # Unset, only a beta reaches this step (preflight refuses a stable release
+      # without it), and it is skipped rather than failed.
       - name: Publish to the feed
         shell: bash
         env:
@@ -318,6 +328,10 @@ jobs:
           CHANNEL: ${{ needs.preflight.outputs.channel }}
         run: |
           set -euo pipefail
+          if [ -z "${FEED_URL:-}" ] || [ -z "${FEED_TOKEN:-}" ]; then
+            echo "::warning::no feed configured — the $CHANNEL channel keeps whatever it last served. latest.json is on the Release; PUT it once the feed is up."
+            exit 0
+          fi
           code="$(curl -sS -o response.txt -w '%{http_code}' \
             -X PUT "${FEED_URL%/}/$CHANNEL" \
             -H "x-api-key: $FEED_TOKEN" \

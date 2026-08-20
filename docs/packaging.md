@@ -102,8 +102,10 @@ the repository's releases to decide what is current. The full HTTP contract, bot
 [update-feed.md](update-feed.md).
 
 Publishing needs the `UPDATE_FEED_URL` variable and the `UPDATE_FEED_TOKEN` secret — an API token minted for an admin
-account on the feed API, sent as `x-api-key`; the `preflight` job refuses a tagged release without them. The manifest
-itself, which the API answers wrapped in its `{success, message, data}` envelope:
+account on the feed API, sent as `x-api-key`. The `preflight` job refuses a **stable** release without them; a beta is
+warned and ships as a download only, so a prerelease can go out before the feed it will be served from exists. Its
+`latest.json` is still attached to the Release, and publishing it later is that same PUT by hand. The manifest itself,
+which the API answers wrapped in its `{success, message, data}` envelope:
 
 ```json
 {
@@ -310,7 +312,8 @@ A tagged release without the secret warns rather than fails.
   `workflow_call`, so the release can reuse it verbatim.
 - [`release.yml`](../.github/workflows/release.yml) — on a `v*` tag: `preflight` → `gate` → `package` → `manifest`.
   `preflight` refuses the release before anything is compiled if the tag, `Cargo.toml` and `tauri.conf.json` disagree on
-  the version, if `CHANGELOG.md` has no matching section, or if the updater signing key is missing. `gate` calls
+  the version, if `CHANGELOG.md` has no matching section, if the updater signing key is missing, or if a stable release
+  has no feed credentials to publish itself with. `gate` calls
   `ci.yml`, since that workflow's own triggers cover branches but not tags. `package` then verifies `Cargo.lock` is
   current (`cargo fetch --locked`), runs `scripts/package.sh all` on a Linux and a Windows runner, and attaches every
   artifact to the GitHub Release. A manual `workflow_dispatch` is a dry run: the same gates run, but it uploads workflow
