@@ -20,6 +20,7 @@ import {
   useLaunchDialog,
 } from '@/features/instances/dialogs';
 import { useArchiveDrop, useOpenedArchive } from '@/features/instances/hooks';
+import { anchor, TourButton } from '@/features/onboarding';
 import type { EntryCardModel } from '@/features/shared/entry/components';
 import {
   EntryCollection,
@@ -160,11 +161,16 @@ export function LibraryPage({
       searchPlaceholder={m['app.search.library']()}
       actions={
         <>
+          <TourButton id="shell" ready={!loading} />
           <ViewToggle view={view} onView={onViewChange} />
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button size="sm" data-icon="inline-start">
+                <Button
+                  size="sm"
+                  data-icon="inline-start"
+                  {...anchor('library-new')}
+                >
                   <PlusIcon weight="bold" />
                   {m['library.new']()}
                 </Button>

@@ -18,6 +18,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
 import { useLaunchDialog } from '@/features/instances/dialogs';
+import { anchor } from '@/features/onboarding';
 import { EntryRunControl } from '@/features/shared/entry/components';
 import { runningSessions } from '@/lib/sessions';
 import { m } from '@/paraglide/messages.js';
@@ -46,7 +47,10 @@ export function PlayBar() {
   const busy = launching || stopping;
 
   return (
-    <div className="flex h-[76px] items-center gap-3 border-t border-border bg-sidebar px-4">
+    <div
+      className="flex h-[76px] items-center gap-3 border-t border-border bg-sidebar px-4"
+      {...anchor('play-bar')}
+    >
       <DropdownMenu>
         <DropdownMenuTrigger
           render={

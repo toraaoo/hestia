@@ -35,6 +35,7 @@ import {
   InstanceServersTab,
   InstanceSettingsTab,
 } from '@/features/instances/tabs';
+import { anchor, TourButton } from '@/features/onboarding';
 import { ProfilesPanel } from '@/features/profiles/components';
 import {
   EntryIconMenu,
@@ -198,7 +199,8 @@ function InstanceDetail({
           </>
         }
         actions={
-          <>
+          <span className="flex items-center gap-2" {...anchor('entry-run')}>
+            <TourButton id="instance" ready={Boolean(info.data)} />
             <Button
               variant="outline"
               size="icon"
@@ -228,7 +230,7 @@ function InstanceDetail({
                 {m['app.action.play']()}
               </Button>
             )}
-          </>
+          </span>
         }
       />
 
@@ -241,15 +243,15 @@ function InstanceDetail({
           <TabsTrigger value="overview">
             {m['app.label.overview']()}
           </TabsTrigger>
-          <TabsTrigger value="content">
+          <TabsTrigger value="content" {...anchor('instance-content')}>
             {m['app.label.content']()}
             <TabCount n={contentCount} />
           </TabsTrigger>
-          <TabsTrigger value="profiles">
+          <TabsTrigger value="profiles" {...anchor('instance-profiles')}>
             {m['app.nav.profiles']()}
             <TabCount n={profiles.data?.profiles.length ?? 0} />
           </TabsTrigger>
-          <TabsTrigger value="worlds">
+          <TabsTrigger value="worlds" {...anchor('instance-worlds')}>
             {m['app.label.worlds']()}
             <TabCount n={worldList.length} />
           </TabsTrigger>

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { useSearch } from '@/components/app-shell/search-context';
 import { SearchInput } from '@/components/search-input';
+import { anchor } from '@/features/onboarding';
 import { m } from '@/paraglide/messages.js';
 
 /**
@@ -41,11 +42,20 @@ export function Page({
         </div>
         <div className="ml-auto flex items-center gap-2">
           {search && (
-            <PageSearch
-              placeholder={searchPlaceholder ?? m['app.search.placeholder']()}
-            />
+            <span {...anchor('page-search')}>
+              <PageSearch
+                placeholder={searchPlaceholder ?? m['app.search.placeholder']()}
+              />
+            </span>
           )}
-          {actions}
+          {actions && (
+            <span
+              className="flex items-center gap-2"
+              {...anchor('page-actions')}
+            >
+              {actions}
+            </span>
+          )}
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col p-5">

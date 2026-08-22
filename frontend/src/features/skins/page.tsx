@@ -9,6 +9,7 @@ import { Page, Section } from '@/components/page';
 import { SignInGate } from '@/components/sign-in-gate';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { anchor, TourButton } from '@/features/onboarding';
 import {
   CapeCard,
   CapeGrid,
@@ -140,18 +141,20 @@ export function SkinsPage() {
   ) : (
     <div className="flex items-start gap-6">
       {selected && (
-        <PreviewPanel
-          skin={selected}
-          cape={equippedCape}
-          previewing={previewing}
-          onApply={() => equip.mutate({ key: selected.key })}
-          onVariantChange={
-            selected.source === 'default' ? selectVariant : undefined
-          }
-        />
+        <span className="block" {...anchor('skin-preview')}>
+          <PreviewPanel
+            skin={selected}
+            cape={equippedCape}
+            previewing={previewing}
+            onApply={() => equip.mutate({ key: selected.key })}
+            onVariantChange={
+              selected.source === 'default' ? selectVariant : undefined
+            }
+          />
+        </span>
       )}
 
-      <div className="min-w-0 flex-1 space-y-8">
+      <div className="min-w-0 flex-1 space-y-8" {...anchor('skin-library')}>
         <Section title={m['skin.your_skins']()} count={saved.length}>
           {saved.length === 0 ? (
             <p className="text-xs text-muted-foreground">
@@ -232,6 +235,7 @@ export function SkinsPage() {
       loading={accountsPending || (signedIn && list.isPending)}
       actions={
         <>
+          <TourButton id="skins" ready={signedIn && !list.isPending} />
           <input
             ref={fileRef}
             type="file"

@@ -17,6 +17,7 @@ import {
   useSourceOptions,
 } from '@/features/content/components';
 import { mergeHits } from '@/features/content/lib';
+import { TourButton } from '@/features/onboarding';
 import { kindGroup } from '@/features/shared/content/components';
 import { contentKinds, kindInfo } from '@/features/shared/content/lib';
 import { m } from '@/paraglide/messages.js';
@@ -81,18 +82,21 @@ export function BrowsePage({
       search
       searchPlaceholder={m['app.search.content_or_link']()}
       actions={
-        <FilterMenu
-          groups={[
-            kindGroup({
-              kinds: contentKinds,
-              kind,
-              onKindChange: goToKind,
-            }),
-            sourceGroup(sources.list, sources.active, (next) =>
-              onSourceChange?.(next),
-            ),
-          ]}
-        />
+        <>
+          <TourButton id="browse" />
+          <FilterMenu
+            groups={[
+              kindGroup({
+                kinds: contentKinds,
+                kind,
+                onKindChange: goToKind,
+              }),
+              sourceGroup(sources.list, sources.active, (next) =>
+                onSourceChange?.(next),
+              ),
+            ]}
+          />
+        </>
       }
       skeleton={<CardGridSkeleton grid={GRID} count={8} card="h-24" />}
     >

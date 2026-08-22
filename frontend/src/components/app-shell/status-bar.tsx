@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/popover';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
+import { anchor } from '@/features/onboarding';
 import {
   isMeasurable,
   overallRatio,
@@ -64,7 +65,10 @@ export function StatusBar() {
 
   return (
     <footer className="flex h-8 shrink-0 items-center gap-3 border-t border-border bg-sidebar px-4 text-[11px] text-muted-foreground">
-      <span className="inline-flex items-center gap-1.5">
+      <span
+        className="inline-flex items-center gap-1.5"
+        {...anchor('daemon-status')}
+      >
         <StatusDot tone={daemon.connected ? 'on' : 'off'} />
         {daemon.connected
           ? m['app.daemon.connected']()

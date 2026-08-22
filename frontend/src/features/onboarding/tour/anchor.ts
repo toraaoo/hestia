@@ -6,8 +6,6 @@ export type TourAnchor =
   | 'page-search'
   | 'page-actions'
   | 'library-new'
-  | 'browse-kinds'
-  | 'browse-sources'
   | 'entry-run'
   | 'instance-content'
   | 'instance-profiles'

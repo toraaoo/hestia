@@ -22,6 +22,7 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WarningNotice } from '@/components/warning-notice';
 import { ContentInstallDialog, serverTarget } from '@/features/content/install';
+import { anchor, TourButton } from '@/features/onboarding';
 import {
   ServerBackupsTab,
   ServerConsoleTab,
@@ -160,7 +161,8 @@ function ServerDetail({
           </>
         }
         actions={
-          <>
+          <span className="flex items-center gap-2" {...anchor('entry-run')}>
+            <TourButton id="server" ready={Boolean(info.data)} />
             <Button
               variant="outline"
               size="icon"
@@ -203,7 +205,7 @@ function ServerDetail({
                 {m['app.action.start']()}
               </Button>
             )}
-          </>
+          </span>
         }
       />
 
@@ -216,9 +218,13 @@ function ServerDetail({
           <TabsTrigger value="overview">
             {m['app.label.overview']()}
           </TabsTrigger>
-          <TabsTrigger value="console">{m['app.label.console']()}</TabsTrigger>
+          <TabsTrigger value="console" {...anchor('server-console')}>
+            {m['app.label.console']()}
+          </TabsTrigger>
           <TabsTrigger value="content">{m['app.label.content']()}</TabsTrigger>
-          <TabsTrigger value="backups">{m['app.label.backups']()}</TabsTrigger>
+          <TabsTrigger value="backups" {...anchor('server-backups')}>
+            {m['app.label.backups']()}
+          </TabsTrigger>
           <TabsTrigger value="settings">
             {m['app.label.settings']()}
           </TabsTrigger>
@@ -262,27 +268,32 @@ function ServerDetail({
             </div>
 
             <div className="space-y-4">
-              <SideCard title={m['app.label.details']()}>
-                <div className="divide-y divide-border">
-                  <Stat
-                    label={m['app.label.address']()}
-                    value={`localhost:${server.gamePort ?? '—'}`}
-                  />
-                  <Stat label={m['app.label.loader']()} value={server.flavor} />
-                  <Stat
-                    label={m['app.label.version']()}
-                    value={server.gameVersion}
-                  />
-                  <Stat
-                    label={m['app.label.java']()}
-                    value={server.javaMajor}
-                  />
-                  <Stat
-                    label={m['app.label.created']()}
-                    value={agoLabel(server.createdUnix)}
-                  />
-                </div>
-              </SideCard>
+              <span className="block" {...anchor('server-details')}>
+                <SideCard title={m['app.label.details']()}>
+                  <div className="divide-y divide-border">
+                    <Stat
+                      label={m['app.label.address']()}
+                      value={`localhost:${server.gamePort ?? '—'}`}
+                    />
+                    <Stat
+                      label={m['app.label.loader']()}
+                      value={server.flavor}
+                    />
+                    <Stat
+                      label={m['app.label.version']()}
+                      value={server.gameVersion}
+                    />
+                    <Stat
+                      label={m['app.label.java']()}
+                      value={server.javaMajor}
+                    />
+                    <Stat
+                      label={m['app.label.created']()}
+                      value={agoLabel(server.createdUnix)}
+                    />
+                  </div>
+                </SideCard>
+              </span>
               <ModpackCard
                 kind="server"
                 id={server.id}

@@ -4,17 +4,13 @@
     "tour": {
       "back": "Voltar",
       "browse": {
-        "kinds": {
-          "body": "Mods, pacotes de recursos, shaders, data packs e modpacks inteiros têm cada um a sua listagem.",
+        "filters": {
+          "body": "Um menu só filtra por tipo — mods, pacotes de recursos, shaders, data packs, modpacks — e por fonte. O Modrinth funciona de imediato; o CurseForge aparece assim que você adiciona uma chave de API nas Configurações.",
           "title": "Refine a busca"
         },
         "search": {
           "body": "Uma busca cobre todas as fontes ativas. Cole um link de projeto do Modrinth ou do CurseForge e ele abre a página direto.",
           "title": "Busque, ou cole um link"
-        },
-        "sources": {
-          "body": "O Modrinth funciona de imediato. O CurseForge aparece assim que você adiciona uma chave de API nas Configurações.",
-          "title": "Escolha de onde vêm os resultados"
         }
       },
       "done": "Concluir",

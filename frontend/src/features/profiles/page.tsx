@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { TourButton } from '@/features/onboarding';
 import { type View, ViewToggle } from '@/features/shared/entry/components';
 import { listContainer, listItem } from '@/lib/motion';
 import { m } from '@/paraglide/messages.js';
@@ -77,6 +78,7 @@ export function ProfilesPage({
       searchPlaceholder={m['profile.search_placeholder']()}
       actions={
         <>
+          <TourButton id="profiles" ready={!list.isPending} />
           <ViewToggle view={view} onView={onViewChange} />
           <Button
             size="sm"

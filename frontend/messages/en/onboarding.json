@@ -4,17 +4,13 @@
     "tour": {
       "back": "Back",
       "browse": {
-        "kinds": {
-          "body": "Mods, resource packs, shaders, data packs and whole modpacks each have their own listing.",
+        "filters": {
+          "body": "One menu narrows by kind — mods, resource packs, shaders, data packs, modpacks — and by source. Modrinth works out of the box; CurseForge appears once you add an API key in Settings.",
           "title": "Narrow it down"
         },
         "search": {
           "body": "One search covers every enabled source. Paste a Modrinth or CurseForge project link and it resolves straight to the page.",
           "title": "Search, or paste a link"
-        },
-        "sources": {
-          "body": "Modrinth works out of the box. CurseForge appears once you add an API key in Settings.",
-          "title": "Choose where results come from"
         }
       },
       "done": "Done",
