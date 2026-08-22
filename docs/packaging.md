@@ -270,8 +270,8 @@ shipped binary becomes untrusted the day it expires.
 ## Runtime dependency: the system WebView
 
 The desktop binary needs a system WebView — **WebView2** on Windows (present by default on Windows 10/11) and
-**WebKitGTK** on Linux. The `.deb` declares the WebKitGTK/GTK/appindicator packages under `bundle.linux.deb.depends`;
-the AppImage carries what it can. The portable archives assume the WebView is already present.
+**WebKitGTK** on Linux. The `.deb` declares the WebKitGTK/GTK packages under `bundle.linux.deb.depends`;
+the AppImage carries what it can. The tray adds nothing to that list — it reaches the status area over D-Bus. The portable archives assume the WebView is already present.
 
 ## Building locally
 
@@ -310,8 +310,7 @@ A tagged release without the secret warns rather than fails.
 ## CI
 
 - [`ci.yml`](../.github/workflows/ci.yml) — four jobs. `check` runs `fmt` + `clippy` + `test` on Linux and Windows,
-  excluding the `desktop` crate so no webview is needed; the Linux job installs the GTK and appindicator dev packages
-  the `tray` crate links. `frontend` runs the Bun chain — `generate:messages` (`src/paraglide/` is generated and
+  excluding the `desktop` crate so no webview is needed, and needing no system libraries on either platform. `frontend` runs the Bun chain — `generate:messages` (`src/paraglide/` is generated and
   untracked, so it precedes anything resolving those imports), then `check` (biome), `typecheck` (tsc), `test` (vitest)
   and `build`. `desktop` covers what `check` excludes: it installs the WebKitGTK stack, builds the frontend
   (`generate_context!` embeds `frontend/dist`) and stages debug sidecars (tauri-build requires the `externalBin` files
