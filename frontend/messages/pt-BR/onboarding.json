@@ -104,6 +104,25 @@
         }
       },
       "skip": "Pular"
+    },
+    "welcome": {
+      "account": {
+        "body": "Iniciar uma instância exige uma conta Microsoft. Navegar por conteúdo, hospedar servidores e as configurações funcionam sem uma.",
+        "signed_in": "Conectado — tudo pronto",
+        "title": "Entre para jogar"
+      },
+      "explore": "Vou explorar sozinho",
+      "hello": {
+        "body": "Instâncias que você joga e servidores que você hospeda, em uma janela só. Um pequeno serviço em segundo plano cuida dos dois, então um servidor que você inicia continua no ar depois que você fecha o app.",
+        "title": "Boas-vindas ao Hestia"
+      },
+      "next": "Avançar",
+      "ready": {
+        "body": "Faça um tour rápido pelo app, ou vá direto ao ponto. Dá para repetir quando quiser pelo botão ? em qualquer página.",
+        "title": "Quando você quiser"
+      },
+      "skip": "Pular",
+      "take_tour": "Fazer o tour"
     }
   }
 }

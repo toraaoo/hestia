@@ -7,7 +7,6 @@ import { m } from '@/paraglide/messages.js';
 import type { TourId } from './registry';
 import { useTour } from './store';
 
-/** `ready` gates the unprompted first run, so no step points at an unrendered element. */
 export function TourButton({
   id,
   ready = true,

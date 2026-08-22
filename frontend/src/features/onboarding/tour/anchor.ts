@@ -1,4 +1,3 @@
-/** A component spreads `anchor(id)`; the step that highlights it names the same id. */
 export type TourAnchor =
   | 'nav'
   | 'account'

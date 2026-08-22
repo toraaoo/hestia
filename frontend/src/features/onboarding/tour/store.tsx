@@ -26,7 +26,6 @@ export interface TourControls {
   back: () => void;
   stop: () => void;
   seen: (id: TourId) => boolean;
-  /** Nothing else owns the screen, so a page may run its tour unprompted. */
   idle: boolean;
 }
 
@@ -44,7 +43,6 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const { seen, welcomed, toursDisabled, ready, update } = onboarding;
 
-  // Seen on start, not on finish: one abandoned halfway has still been offered.
   const start = useCallback(
     (id: TourId) => {
       setRun({ id, index: 0 });

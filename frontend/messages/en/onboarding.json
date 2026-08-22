@@ -104,6 +104,25 @@
         }
       },
       "skip": "Skip"
+    },
+    "welcome": {
+      "account": {
+        "body": "Launching an instance needs a Microsoft account. Browsing content, hosting servers and settings all work without one.",
+        "signed_in": "Signed in — you're all set",
+        "title": "Sign in to play"
+      },
+      "explore": "I'll look around",
+      "hello": {
+        "body": "Instances you play and servers you host, in one window. A small background service owns them both, so a server you start stays up after you close the app.",
+        "title": "Welcome to Hestia"
+      },
+      "next": "Next",
+      "ready": {
+        "body": "Take a short tour of the app, or dive straight in. You can replay it any time from the ? button on any page.",
+        "title": "Ready when you are"
+      },
+      "skip": "Skip",
+      "take_tour": "Take the tour"
     }
   }
 }

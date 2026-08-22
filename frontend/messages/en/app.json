@@ -196,11 +196,6 @@
       "port_range": "Port is out of range.",
       "whole_number": "Enter a whole number."
     },
-    "welcome": {
-      "body": "Sign in with a Microsoft account to create and play instances. You can browse servers and settings without one.",
-      "dismiss": "Maybe later",
-      "title": "Welcome to Hestia"
-    },
     "window": {
       "close": "Close",
       "maximize": "Maximize",

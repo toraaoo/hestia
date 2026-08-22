@@ -1,7 +1,3 @@
-/**
- * Every tour, as data. Adding one is a `TourId` member, an entry here, and a
- * `<TourButton>` on the page that owns it.
- */
 import { m } from '@/paraglide/messages.js';
 
 import type { TourAnchor } from './anchor';
@@ -15,7 +11,6 @@ export type TourId =
   | 'skins';
 
 export interface TourStep {
-  /** The element to spotlight. A step without one shows a centred card. */
   anchor?: TourAnchor;
   title: () => string;
   body: () => string;

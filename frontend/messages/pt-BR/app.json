@@ -196,11 +196,6 @@
       "port_range": "Porta fora do intervalo.",
       "whole_number": "Digite um número inteiro."
     },
-    "welcome": {
-      "body": "Entre com uma conta Microsoft para criar e jogar instâncias. Você pode navegar por servidores e configurações sem uma.",
-      "dismiss": "Talvez depois",
-      "title": "Bem-vindo ao Hestia"
-    },
     "window": {
       "close": "Fechar",
       "maximize": "Maximizar",

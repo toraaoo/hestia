@@ -46,7 +46,6 @@ function room(target: Box, card: Size, viewport: Size): Record<string, number> {
   };
 }
 
-/** The first side with room wins, falling back to the roomiest. */
 export function placeCard(
   target: Box | null,
   card: Size,

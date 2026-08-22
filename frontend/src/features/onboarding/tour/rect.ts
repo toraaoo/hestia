@@ -7,7 +7,6 @@ const RESOLVE_TIMEOUT_MS = 1500;
 
 export interface AnchorTracking {
   rect: Box | null;
-  /** The element never appeared, so the step has nothing to point at. */
   missing: boolean;
 }
 
@@ -35,8 +34,6 @@ export function useAnchorRect(id: TourAnchor | undefined): AnchorTracking {
     setMissing(false);
     if (!id) return;
 
-    // The box moves with any scroll or layout change inside the app, so a
-    // frame loop covers it without a listener per scroll parent.
     let frame = 0;
     let current: Box | null = null;
     let scrolled = false;
