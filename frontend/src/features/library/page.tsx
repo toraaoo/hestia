@@ -20,7 +20,7 @@ import {
   useLaunchDialog,
 } from '@/features/instances/dialogs';
 import { useArchiveDrop, useOpenedArchive } from '@/features/instances/hooks';
-import { anchor, TourButton } from '@/features/onboarding';
+import { anchor, GettingStarted, TourButton } from '@/features/onboarding';
 import type { EntryCardModel } from '@/features/shared/entry/components';
 import {
   EntryCollection,
@@ -205,6 +205,8 @@ export function LibraryPage({
       }
     >
       <div className="flex flex-col gap-6">
+        <GettingStarted onCreate={openNew} />
+
         <Section
           title={m['app.nav.instances']()}
           count={signedIn ? inst.length : undefined}

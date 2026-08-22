@@ -1,6 +1,28 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
   "onboarding": {
+    "checklist": {
+      "dismiss": "Hide the checklist",
+      "go": "Do it",
+      "instance": {
+        "hint": "Pick a loader and a game version — Hestia downloads the rest",
+        "label": "Create your first instance"
+      },
+      "play": {
+        "hint": "The first launch fetches the game files it needs",
+        "label": "Launch it"
+      },
+      "progress": "{current}/{total}",
+      "server": {
+        "hint": "Provisioned at create, with its own port and console",
+        "label": "Host a server"
+      },
+      "sign_in": {
+        "hint": "A Microsoft account is what playing an instance needs",
+        "label": "Sign in"
+      },
+      "title": "Get started"
+    },
     "tour": {
       "back": "Back",
       "browse": {

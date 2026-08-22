@@ -1,6 +1,28 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
   "onboarding": {
+    "checklist": {
+      "dismiss": "Ocultar a lista",
+      "go": "Fazer",
+      "instance": {
+        "hint": "Escolha um loader e uma versão do jogo — o Hestia baixa o resto",
+        "label": "Crie sua primeira instância"
+      },
+      "play": {
+        "hint": "O primeiro início baixa os arquivos do jogo necessários",
+        "label": "Inicie"
+      },
+      "progress": "{current}/{total}",
+      "server": {
+        "hint": "Já vem pronto na criação, com porta e console próprios",
+        "label": "Hospede um servidor"
+      },
+      "sign_in": {
+        "hint": "Jogar uma instância exige uma conta Microsoft",
+        "label": "Entrar"
+      },
+      "title": "Comece por aqui"
+    },
     "tour": {
       "back": "Voltar",
       "browse": {
