@@ -1,0 +1,109 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "onboarding": {
+    "tour": {
+      "back": "Voltar",
+      "browse": {
+        "kinds": {
+          "body": "Mods, pacotes de recursos, shaders, data packs e modpacks inteiros têm cada um a sua listagem.",
+          "title": "Refine a busca"
+        },
+        "search": {
+          "body": "Uma busca cobre todas as fontes ativas. Cole um link de projeto do Modrinth ou do CurseForge e ele abre a página direto.",
+          "title": "Busque, ou cole um link"
+        },
+        "sources": {
+          "body": "O Modrinth funciona de imediato. O CurseForge aparece assim que você adiciona uma chave de API nas Configurações.",
+          "title": "Escolha de onde vêm os resultados"
+        }
+      },
+      "done": "Concluir",
+      "instance": {
+        "content": {
+          "body": "Tudo o que é instalado vai para um único conjunto que você pode atualizar, desativar ou fixar em uma versão.",
+          "title": "Mods e pacotes"
+        },
+        "play": {
+          "body": "Inicie direto no jogo, em um mundo ou em um servidor. Várias sessões de uma mesma instância podem rodar ao mesmo tempo.",
+          "title": "Jogue"
+        },
+        "profiles": {
+          "body": "Divida o conjunto instalado em grupos nomeados e alterne entre eles sem reinstalar nada.",
+          "title": "Perfis"
+        },
+        "worlds": {
+          "body": "Seus mundos salvos, com a opção de compartilhá-los entre instâncias em vez de copiá-los.",
+          "title": "Mundos"
+        }
+      },
+      "next": "Avançar",
+      "profiles": {
+        "create": {
+          "body": "Crie um aqui e aplique em qualquer instância compatível com a versão do jogo.",
+          "title": "Crie um"
+        },
+        "what": {
+          "body": "Um perfil global é um conjunto nomeado de mods, shaders e pacotes de recursos que você aplica a qualquer instância — um lugar só para o conjunto que você sempre usa.",
+          "title": "Conjuntos reutilizáveis"
+        }
+      },
+      "progress": "Passo {current} de {total}",
+      "replay": "Mostrar o tour desta página",
+      "server": {
+        "address": {
+          "body": "O endereço e a porta que seus amigos usam para entrar, ao lado do loader e da versão em execução.",
+          "title": "Como entrar"
+        },
+        "backups": {
+          "body": "Arquive o mundo e a configuração quando quiser, ou por agendamento. Uma troca de versão faz backup antes.",
+          "title": "Backups"
+        },
+        "console": {
+          "body": "Um console ao vivo por RCON — envie comandos e acompanhe a saída sem sair do app.",
+          "title": "Converse com ele"
+        },
+        "start": {
+          "body": "Inicie por aqui. Ele continua no ar depois que você fecha a janela, então dá para voltar depois.",
+          "title": "Coloque no ar"
+        }
+      },
+      "shell": {
+        "account": {
+          "body": "Alterne entre contas conectadas ou adicione outra. Jogar exige uma; navegar e hospedar não.",
+          "title": "Sua conta"
+        },
+        "create": {
+          "body": "Crie uma instância ou um servidor aqui, ou importe de um arquivo Hestia, um .mrpack ou uma instalação do Prism.",
+          "title": "Crie alguma coisa"
+        },
+        "daemon": {
+          "body": "O Hestia mantém um pequeno serviço em segundo plano que cuida dos seus servidores e sessões — este ponto mostra se ele está ativo.",
+          "title": "Rodando em segundo plano"
+        },
+        "nav": {
+          "body": "A Biblioteca guarda o que você tem. Navegar encontra conteúdo. Instâncias, Servidores, Perfis e Skins têm cada um a sua página.",
+          "title": "Se localizando"
+        },
+        "play": {
+          "body": "Escolha uma instância e inicie sem sair desta página.",
+          "title": "De volta ao jogo"
+        }
+      },
+      "skins": {
+        "add": {
+          "body": "Importe um PNG e dê um nome. Ele entra na sua biblioteca e pode ser aplicado à conta quando quiser.",
+          "title": "Adicione a sua"
+        },
+        "library": {
+          "body": "Suas skins salvas junto dos personagens padrão e das capas da sua conta.",
+          "title": "A biblioteca"
+        },
+        "preview": {
+          "body": "Uma prévia 3D em tempo real da skin e da capa selecionadas. Aplicar define na sua conta Microsoft.",
+          "title": "Veja antes"
+        }
+      },
+      "skip": "Pular"
+    }
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "onboarding": {
+    "tour": {
+      "back": "Back",
+      "browse": {
+        "kinds": {
+          "body": "Mods, resource packs, shaders, data packs and whole modpacks each have their own listing.",
+          "title": "Narrow it down"
+        },
+        "search": {
+          "body": "One search covers every enabled source. Paste a Modrinth or CurseForge project link and it resolves straight to the page.",
+          "title": "Search, or paste a link"
+        },
+        "sources": {
+          "body": "Modrinth works out of the box. CurseForge appears once you add an API key in Settings.",
+          "title": "Choose where results come from"
+        }
+      },
+      "done": "Done",
+      "instance": {
+        "content": {
+          "body": "Everything installed lands in one pool you can update in place, disable, or pin to a version.",
+          "title": "Mods and packs"
+        },
+        "play": {
+          "body": "Launch straight into the game, into a world, or onto a server. Several sessions of one instance can run at once.",
+          "title": "Play it"
+        },
+        "profiles": {
+          "body": "Slice the installed pool into named sets and switch between them without reinstalling anything.",
+          "title": "Profiles"
+        },
+        "worlds": {
+          "body": "Your saves, with the option to share them across instances rather than copying them around.",
+          "title": "Worlds"
+        }
+      },
+      "next": "Next",
+      "profiles": {
+        "create": {
+          "body": "Build one here, then apply it to any instance that matches its game version.",
+          "title": "Make one"
+        },
+        "what": {
+          "body": "A global profile is a named set of mods, shaders and resource packs you can apply to any instance — one place to keep the loadout you always use.",
+          "title": "Loadouts you reuse"
+        }
+      },
+      "progress": "Step {current} of {total}",
+      "replay": "Show the tour for this page",
+      "server": {
+        "address": {
+          "body": "The address and port your friends connect to, beside the loader and version it runs.",
+          "title": "How people join"
+        },
+        "backups": {
+          "body": "Archive the world and config on demand, or on a schedule. A version change backs the server up first.",
+          "title": "Backups"
+        },
+        "console": {
+          "body": "A live console over RCON — send commands and watch the output without leaving the app.",
+          "title": "Talk to it"
+        },
+        "start": {
+          "body": "Start it here. It keeps running once you close the window, so you can come back to it later.",
+          "title": "Bring it up"
+        }
+      },
+      "shell": {
+        "account": {
+          "body": "Switch between signed-in accounts, or add another. Playing needs one; browsing and hosting do not.",
+          "title": "Your account"
+        },
+        "create": {
+          "body": "Start a new instance or server here, or import one from a Hestia archive, an .mrpack, or a Prism install.",
+          "title": "Make something"
+        },
+        "daemon": {
+          "body": "Hestia runs a small background service that owns your servers and sessions — this dot says whether it is up.",
+          "title": "Running in the background"
+        },
+        "nav": {
+          "body": "Library holds what you have. Browse finds content. Instances, Servers, Profiles and Skins each get a page of their own.",
+          "title": "Finding your way"
+        },
+        "play": {
+          "body": "Pick an instance and launch it without leaving this page.",
+          "title": "Straight back in"
+        }
+      },
+      "skins": {
+        "add": {
+          "body": "Import a PNG and name it. It joins your library and can be applied to the account whenever.",
+          "title": "Add your own"
+        },
+        "library": {
+          "body": "Your saved skins alongside the vanilla characters and any capes on your account.",
+          "title": "The library"
+        },
+        "preview": {
+          "body": "A real-time 3D preview of the selected skin and cape. Apply sets it on your Microsoft account.",
+          "title": "See it first"
+        }
+      },
+      "skip": "Skip"
+    }
+  }
+}
