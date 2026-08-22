@@ -346,17 +346,19 @@ unprovable ([0050](../decisions/0050-messages-organised-by-render-surface.md)).
 
 # Tray
 
-A resident helper on Tauri's own tray crates (gtk/StatusNotifier on Linux, native
-on Windows), wearing the desktop app's icon so both front-ends share one face.
+A resident helper wearing the desktop app's icon, so both front-ends share one
+face. It publishes a `org.kde.StatusNotifierItem` over D-Bus on Linux and uses
+Tauri's native tray crates on Windows.
 
 The menu is: **Open Hestia**, a status header (version + running/stopped), a
 start/restart action, a start-at-login toggle bound to the reserved `autostart`
 config key, and a quit that stops the daemon while leaving workloads running.
 
 A worker thread polls the daemon every two seconds over the client SDK and
-reports state changes to the event loop; menu actions travel back over an mpsc
-channel, so the UI thread never blocks on the socket. Left-click launches the
-desktop shell.
+reports state changes through a `Sink` — the event loop on Windows, the tray
+handle on Linux — so the polling loop itself is platform-agnostic. Menu actions
+travel back over an mpsc channel, so nothing rendering the icon blocks on the
+socket. Left-click launches the desktop shell.
 
 **The daemon spawns the tray; the tray outlives the daemon.** A stopped daemon is
 exactly when the tray is most useful — the greyed status plus a start action — so
@@ -364,12 +366,19 @@ only its own Quit removes it. A duplicate spawn after a daemon restart is
 absorbed by an exclusive lock keyed by endpoint, so a dev daemon's tray and the
 session's tray coexist ([0054](../decisions/0054-the-daemon-spawns-the-tray.md)).
 
-**A tray is optional, so its absence is not a failure.** On Linux the status
-area is reached through libappindicator, which `tray-icon` dlopens on first use
-and which *panics* when no variant is installed — a desktop that ships none
-(GNOME without the extension, SteamOS) turned every daemon start into a crash
-report. The tray probes the same library names before it builds anything and
-exits successfully when none loads.
+**The tray speaks the tray protocol, and asks nothing of the machine.** On Linux
+the status area is a D-Bus protocol, `org.kde.StatusNotifierItem`, and the tray
+implements it directly (`ksni`) rather than through libappindicator — a library
+most desktops do not ship, whose absence used to mean no icon and a crash report
+per daemon start. The requirement is now a session bus and a desktop that hosts
+a tray, never a package on the user's machine, which is why the icon appears
+wherever an Electron app's does — Plasma and SteamOS, XFCE, Cinnamon, LXQt, a
+Wayland bar, GNOME with the AppIndicator extension
+([0072](../decisions/0072-the-tray-speaks-the-tray-protocol.md)).
+
+**A session with no host yet is not a failure.** The item stays published and
+registers the moment a watcher appears, so a bar that restarts or an extension
+enabled mid-session finds the tray waiting, with nothing to restart.
 
 Single-instance is enforced deliberately in each front-end: the tray by that
 runtime lock, the desktop by `tauri-plugin-single-instance`, which focuses the
@@ -392,3 +401,4 @@ id, or on Linux each would block the other
 - [0071 — Reachability is observed from real traffic, and offline is a state the whole system reads](../decisions/0071-reachability-is-observed-not-asked.md)
 - [0054 — The daemon spawns the tray; the tray outlives the daemon](../decisions/0054-the-daemon-spawns-the-tray.md)
 - [0055 — The tray and desktop must not share a GApplication id](../decisions/0055-tray-and-desktop-app-ids.md)
+- [0072 — The tray speaks the tray protocol, not a library that might be installed](../decisions/0072-the-tray-speaks-the-tray-protocol.md)

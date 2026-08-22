@@ -9,17 +9,29 @@ that release's notes, rendered as markdown.
 
 ## 1.0.0-beta.2
 
-Two Linux fixes found on SteamOS.
+A guided first run, and two Linux fixes found on SteamOS.
 
-- **The tray no longer crashes** on desktops that ship no appindicator library
-  (GNOME without the extension, SteamOS). It reached the status area through a
-  library that panics when absent, and the daemon spawns it on every start, so
-  each one wrote a crash report. A tray is optional — where none can be shown,
-  it now exits quietly and everything else carries on.
+- **A welcome flow, guided tours and a getting-started checklist.** First launch
+  now opens a short welcome rather than a one-off overlay, and each surface has
+  a spotlight tour anchored to the real controls — the shell, browsing content,
+  an instance, a server, profiles and skins. A tour can be skipped at any point
+  instead of having to be turned down before it starts. The library carries a
+  checklist for the first four things worth doing: sign in, create an instance,
+  play it, host a server. It ticks itself off from your actual state and leaves
+  once you are through.
+- **The tray now appears on every Linux desktop that has one**, SteamOS
+  included. It reached the status area through libappindicator — a library most
+  desktops do not ship — so where it was absent no icon appeared, and the daemon
+  spawning the tray on every start wrote a crash report each time. The tray now
+  speaks the StatusNotifierItem protocol over D-Bus itself, the way Chromium
+  does, so it asks nothing of the machine beyond a desktop that shows a tray at
+  all. A session with no tray host yet keeps the icon waiting and registers it
+  the moment one appears.
 - **The AppImage renders again.** It shipped its own `libwayland-client` and put
   it ahead of the host's, so a system whose graphics stack expects a newer one
   failed to start the webview and the window came up blank. That library now
-  comes from the host, where it belongs.
+  comes from the host, where it belongs, and the image is rebuilt around the
+  corrected AppDir rather than repacked.
 
 ## 1.0.0-beta.1
 

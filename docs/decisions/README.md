@@ -44,6 +44,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0066** — [The daemon owns self-update; the shell asks like everything else](0066-the-daemon-owns-self-update.md)
 - **0070** — [A channel picks the feed, not an entry inside one](0070-a-channel-picks-the-feed-not-the-entry.md)
 - **0071** — [Reachability is observed from real traffic, and offline is a state the whole system reads](0071-reachability-is-observed-not-asked.md)
+- **0072** — [The tray speaks the tray protocol, not a library that might be installed](0072-the-tray-speaks-the-tray-protocol.md)
 
 ### [The daemon](../architecture/daemon.md)
 
