@@ -303,11 +303,16 @@ jobs:
             exit 1
           fi
           jq . <<<"$manifest" | tee latest.json
+          printf '%s\n' "$notes" > release-notes.md
 
+      # The body lands here rather than in `package`, which runs once per
+      # platform and would race itself writing it. This job is single and last,
+      # so the notes are set once, after every installer is attached.
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           prerelease: ${{ needs.preflight.outputs.prerelease }}
+          body_path: release-notes.md
           files: latest.json
 
       # The publish is a PUT: the body replaces the channel's manifest, so a
