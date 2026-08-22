@@ -7,14 +7,12 @@ export const ONBOARDING_KEY = 'onboarding';
 export interface OnboardingState {
   welcomed: boolean;
   seen: TourId[];
-  toursDisabled: boolean;
   checklistDismissed: boolean;
 }
 
 export const FRESH: OnboardingState = {
   welcomed: false,
   seen: [],
-  toursDisabled: false,
   checklistDismissed: false,
 };
 
@@ -26,7 +24,6 @@ function normalize(value: unknown): OnboardingState {
     seen: Array.isArray(raw.seen)
       ? raw.seen.filter((id): id is TourId => typeof id === 'string')
       : [],
-    toursDisabled: raw.toursDisabled === true,
     checklistDismissed: raw.checklistDismissed === true,
   };
 }
@@ -34,7 +31,6 @@ function normalize(value: unknown): OnboardingState {
 export interface Onboarding extends OnboardingState {
   ready: boolean;
   update: (patch: Partial<OnboardingState>) => void;
-  reset: () => void;
 }
 
 export function useOnboarding(): Onboarding {
@@ -45,6 +41,5 @@ export function useOnboarding(): Onboarding {
     ...state,
     ready: prefs.ready,
     update: (patch) => prefs.set(ONBOARDING_KEY, { ...state, ...patch }),
-    reset: () => prefs.set(ONBOARDING_KEY, FRESH),
   };
 }

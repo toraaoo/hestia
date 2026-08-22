@@ -35,9 +35,6 @@ export function WelcomeDialog() {
     if (tour) start('shell');
   };
 
-  const optOut = () =>
-    onboarding.update({ welcomed: true, toursDisabled: true });
-
   return (
     <Dialog open={open}>
       <DialogContent showCloseButton={false} className="gap-0 p-0 sm:max-w-md">
@@ -95,7 +92,7 @@ export function WelcomeDialog() {
               </>
             ) : (
               <>
-                <Button variant="ghost" size="sm" onClick={optOut}>
+                <Button variant="ghost" size="sm" onClick={() => finish(false)}>
                   {m['onboarding.welcome.skip']()}
                 </Button>
                 <Button size="sm" onClick={() => setIndex(index + 1)}>

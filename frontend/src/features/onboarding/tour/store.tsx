@@ -41,7 +41,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const onboarding = useOnboarding();
   const [run, setRun] = useState<TourRun | null>(null);
 
-  const { seen, welcomed, toursDisabled, ready, update } = onboarding;
+  const { seen, welcomed, ready, update } = onboarding;
 
   const start = useCallback(
     (id: TourId) => {
@@ -69,9 +69,9 @@ export function TourProvider({ children }: { children: ReactNode }) {
       back: () => go((run?.index ?? 0) - 1),
       stop,
       seen: (id) => seen.includes(id),
-      idle: ready && welcomed && !toursDisabled && run === null,
+      idle: ready && welcomed && run === null,
     };
-  }, [run, start, seen, ready, welcomed, toursDisabled]);
+  }, [run, start, seen, ready, welcomed]);
 
   return (
     <TourContext.Provider value={controls}>
