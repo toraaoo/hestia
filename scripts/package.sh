@@ -36,32 +36,40 @@ bundle() {
   fi
 }
 
-# linuxdeploy's gtk plugin drags libwayland-client into the AppDir and AppRun
-# puts it ahead of the host's. The host's Mesa then loads *that* copy, EGL
-# init fails ("Could not create default EGL display: EGL_BAD_PARAMETER"), the
-# web process aborts and the window comes up blank. It is on the AppImage
-# project's excludelist for exactly this reason — a library the host graphics
-# stack owns is never safe to ship — so drop it and repack.
+# The linuxdeploy tauri pins (git 659c9db, built 2024-07-26) predates
+# libwayland-client.so.0 joining the AppImage excludelist, and that list is
+# compiled into the binary — so it deploys the library, AppRun puts that copy
+# ahead of the host's, and the host Mesa then fails EGL init against it
+# ("Could not create default EGL display: EGL_BAD_PARAMETER"): the web process
+# aborts and the window comes up blank. Tauri exposes no way to exclude a
+# library (tauri-apps/tauri#15665), so drop it from the AppDir the bundler
+# leaves behind and rebuild the image around it.
 unbundle_host_libraries() {
-  local dir=target/release/bundle/appimage name
-  local packer=linuxdeploy-plugin-appimage-x86_64.AppImage
+  local dir=target/release/bundle/appimage
+  local name appdir offset
 
   name="$(basename "$(find "$dir" -maxdepth 1 -name '*.AppImage' -print -quit)")"
   [ -n "$name" ] || die "no AppImage in $dir"
-  [ -x "$dir/$packer" ] || die "$dir/$packer is missing; cannot repack"
+  appdir="$(find "$dir" -maxdepth 1 -name '*.AppDir' -print -quit)"
+  [ -n "$appdir" ] || die "no AppDir in $dir; cannot rebuild the AppImage"
+
+  if [ ! -e "$appdir/usr/lib/libwayland-client.so.0" ]; then
+    log "no bundled libwayland-client; leaving $name as bundled"
+    return 0
+  fi
+  command -v mksquashfs > /dev/null || die "mksquashfs (squashfs-tools) is required"
 
   log "unbundling host libraries from $name"
-  # APPIMAGE_EXTRACT_AND_RUN because CI runners have no FUSE, which is also
-  # why the bundler itself sets it.
-  (
-    cd "$dir"
-    rm -rf squashfs-root
-    APPIMAGE_EXTRACT_AND_RUN=1 "./$name" --appimage-extract > /dev/null
-    rm -f squashfs-root/usr/lib/libwayland-client.so.0
-    APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 OUTPUT="$name" \
-      "./$packer" --appdir squashfs-root > /dev/null
-    rm -rf squashfs-root
-  )
+  rm -f "$appdir/usr/lib/libwayland-client.so.0"
+  # An AppImage is its runtime ELF with the squashfs appended; the runtime
+  # reports where that split is, so the original's runtime is reused verbatim.
+  offset="$("$dir/$name" --appimage-offset)"
+  head -c "$offset" "$dir/$name" > "$dir/runtime.bin"
+  mksquashfs "$appdir" "$dir/payload.squashfs" \
+    -root-owned -noappend -no-progress -comp gzip -b 128K > /dev/null
+  cat "$dir/runtime.bin" "$dir/payload.squashfs" > "$dir/$name"
+  chmod +x "$dir/$name"
+  rm -f "$dir/runtime.bin" "$dir/payload.squashfs"
 }
 
 portable() {

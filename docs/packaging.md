@@ -288,6 +288,13 @@ scripts/package.sh portable
 and a staged sidecar set are prerequisites. Bundles land in `target/release/bundle/{deb,rpm,appimage,nsis}/`; portable
 archives in `target/package/`. On Windows use `scripts\win.ps1 package`.
 
+On Linux the AppImage is rebuilt after the bundler runs, so **`squashfs-tools`** is a prerequisite there. The
+linuxdeploy that Tauri pins predates `libwayland-client.so.0` joining the AppImage excludelist and bundles the library,
+which breaks EGL init against a newer host Mesa — a blank window. Tauri exposes no way to exclude a library
+([tauri-apps/tauri#15665](https://github.com/tauri-apps/tauri/issues/15665)), so
+[`scripts/package.sh`](../scripts/package.sh) drops it from the `.AppDir` the bundler leaves behind and repacks the
+image around the original's runtime.
+
 **`HESTIA_CURSEFORGE_API_KEY`** is read at compile time by the `engine` crate: a distributor that has registered for a
 [CurseForge key](https://console.curseforge.com/) sets it in the build environment and the CurseForge content source
 works out of the box. Built without it, the source stays hidden until a user sets `content.curseforge-key` themselves,
