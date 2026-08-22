@@ -17,7 +17,6 @@ ignore = [
     "RUSTSEC-2024-0418", # gtk-rs GTK3 bindings
     "RUSTSEC-2024-0419", # gtk-rs GTK3 bindings
     "RUSTSEC-2024-0420", # gtk-rs GTK3 bindings
-    "RUSTSEC-2024-0429", # glib VariantStrIter unsoundness (fixed in 0.20; Tauri v2 pins 0.18)
     "RUSTSEC-2025-0075", # unic-common (tauri-utils)
     "RUSTSEC-2025-0080", # unic-ucd-ident (tauri-utils)
     "RUSTSEC-2025-0081", # unic-char-range (tauri-utils)
@@ -40,6 +39,10 @@ allow = [
     "Zlib",
     "MPL-2.0",
     "CDLA-Permissive-2.0",
+    # A public-domain dedication: OSI-approved, FSF Free/Libre, and imposing
+    # strictly less than the MIT terms already allowed above, so it carries
+    # nothing into a GPL-3.0-only distribution (ksni, the tray's D-Bus stack).
+    "Unlicense",
 ]
 confidence-threshold = 0.9
 
