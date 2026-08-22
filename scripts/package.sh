@@ -31,6 +31,37 @@ bundle() {
   # Signatures are minisign, applied to the finished artifacts by
   # scripts/sign.sh — the bundler never signs anything.
   (cd crates/desktop && cargo tauri build --bundles "$targets")
+  if [ "$os" = linux ]; then
+    unbundle_host_libraries
+  fi
+}
+
+# linuxdeploy's gtk plugin drags libwayland-client into the AppDir and AppRun
+# puts it ahead of the host's. The host's Mesa then loads *that* copy, EGL
+# init fails ("Could not create default EGL display: EGL_BAD_PARAMETER"), the
+# web process aborts and the window comes up blank. It is on the AppImage
+# project's excludelist for exactly this reason — a library the host graphics
+# stack owns is never safe to ship — so drop it and repack.
+unbundle_host_libraries() {
+  local dir=target/release/bundle/appimage name
+  local packer=linuxdeploy-plugin-appimage-x86_64.AppImage
+
+  name="$(basename "$(find "$dir" -maxdepth 1 -name '*.AppImage' -print -quit)")"
+  [ -n "$name" ] || die "no AppImage in $dir"
+  [ -x "$dir/$packer" ] || die "$dir/$packer is missing; cannot repack"
+
+  log "unbundling host libraries from $name"
+  # APPIMAGE_EXTRACT_AND_RUN because CI runners have no FUSE, which is also
+  # why the bundler itself sets it.
+  (
+    cd "$dir"
+    rm -rf squashfs-root
+    APPIMAGE_EXTRACT_AND_RUN=1 "./$name" --appimage-extract > /dev/null
+    rm -f squashfs-root/usr/lib/libwayland-client.so.0
+    APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 OUTPUT="$name" \
+      "./$packer" --appdir squashfs-root > /dev/null
+    rm -rf squashfs-root
+  )
 }
 
 portable() {
