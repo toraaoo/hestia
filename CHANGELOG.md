@@ -7,6 +7,20 @@ is what is written here.
 One `## <version>` heading per release. Everything until the next heading is
 that release's notes, rendered as markdown.
 
+## 1.0.0-beta.2
+
+Two Linux fixes found on SteamOS.
+
+- **The tray no longer crashes** on desktops that ship no appindicator library
+  (GNOME without the extension, SteamOS). It reached the status area through a
+  library that panics when absent, and the daemon spawns it on every start, so
+  each one wrote a crash report. A tray is optional — where none can be shown,
+  it now exits quietly and everything else carries on.
+- **The AppImage renders again.** It shipped its own `libwayland-client` and put
+  it ahead of the host's, so a system whose graphics stack expects a newer one
+  failed to start the webview and the window came up blank. That library now
+  comes from the host, where it belongs.
+
 ## 1.0.0-beta.1
 
 The first beta of the 1.0 release. A resident daemon owns everything, and the
