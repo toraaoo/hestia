@@ -1,89 +1,36 @@
-//! The tray menu: a status header, the daemon quick actions, and quit.
+//! The tray menu's vocabulary: what each entry reads as for a given daemon
+//! state. The entries themselves are built per platform — Linux rebuilds the
+//! menu from state on every render, Windows mutates persistent widgets — so
+//! only the text and the enablement rules live here, where both read them.
 
-use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
+use crate::worker::DaemonState;
 
-use crate::worker::{Action, DaemonState};
+/// Autostart is a login-item registration, which a debug build must not make.
+pub const AUTOSTART_SUPPORTED: bool = !cfg!(debug_assertions);
 
-const AUTOSTART_SUPPORTED: bool = !cfg!(debug_assertions);
+pub const AUTOSTART_LABEL: &str = "Start at login";
 
-pub struct TrayMenu {
-    menu: Menu,
-    open: MenuItem,
-    status: MenuItem,
-    daemon: MenuItem,
-    autostart: CheckMenuItem,
-    quit: MenuItem,
+pub fn open_label() -> String {
+    format!("Open {}", common::app::NAME)
 }
 
-impl TrayMenu {
-    pub fn new() -> Self {
-        let initial = DaemonState::default();
-        let open = MenuItem::new(format!("Open {}", common::app::NAME), true, None);
-        let status = MenuItem::new(status_text(&initial), false, None);
-        let daemon = MenuItem::new("Start daemon", false, None);
-        let autostart = CheckMenuItem::new("Start at login", false, false, None);
-        let quit = MenuItem::new(format!("Quit {}", common::app::NAME), true, None);
+pub fn quit_label() -> String {
+    format!("Quit {}", common::app::NAME)
+}
 
-        let menu = Menu::new();
-        let _ = menu.append_items(&[
-            &open,
-            &PredefinedMenuItem::separator(),
-            &status,
-            &PredefinedMenuItem::separator(),
-            &daemon,
-            &autostart,
-            &PredefinedMenuItem::separator(),
-            &quit,
-        ]);
-
-        TrayMenu {
-            menu,
-            open,
-            status,
-            daemon,
-            autostart,
-            quit,
-        }
-    }
-
-    pub fn menu(&self) -> &Menu {
-        &self.menu
-    }
-
-    pub fn apply(&self, state: &DaemonState) {
-        self.status.set_text(status_text(state));
-        self.daemon.set_text(if state.running {
-            "Restart daemon"
-        } else {
-            "Start daemon"
-        });
-        self.daemon.set_enabled(true);
-        self.autostart
-            .set_enabled(state.running && AUTOSTART_SUPPORTED);
-        self.autostart.set_checked(state.autostart);
-    }
-
-    pub fn action_for(&self, event: &MenuEvent, state: &DaemonState) -> Option<Action> {
-        let id = event.id();
-        if id == self.open.id() {
-            Some(Action::OpenDesktop)
-        } else if id == self.daemon.id() {
-            Some(if state.running {
-                Action::Restart
-            } else {
-                Action::Start
-            })
-        } else if id == self.autostart.id() {
-            Some(Action::SetAutostart(self.autostart.is_checked()))
-        } else if id == self.quit.id() {
-            Some(Action::Quit)
-        } else {
-            None
-        }
+pub fn daemon_label(state: &DaemonState) -> &'static str {
+    if state.running {
+        "Restart daemon"
+    } else {
+        "Start daemon"
     }
 }
 
-fn status_text(state: &DaemonState) -> String {
+pub fn autostart_enabled(state: &DaemonState) -> bool {
+    state.running && AUTOSTART_SUPPORTED
+}
+
+pub fn status_text(state: &DaemonState) -> String {
     match &state.version {
         Some(version) => format!("{} {version} — running", common::app::NAME),
         None => format!("{} — stopped", common::app::NAME),

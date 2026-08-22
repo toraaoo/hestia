@@ -1,15 +1,12 @@
 //! The daemon-facing side of the tray: a background thread that polls the
 //! daemon over the client SDK, executes menu actions, and reports state
-//! changes to the event loop through its proxy.
+//! changes to whatever renders the icon.
 
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 
 use client::Client;
-use tao::event_loop::EventLoopProxy;
 use tokio::runtime::Runtime;
-
-use crate::UserEvent;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const RESTART_GRACE: Duration = Duration::from_millis(500);
@@ -30,13 +27,20 @@ pub enum Action {
     Quit,
 }
 
-pub fn spawn(proxy: EventLoopProxy<UserEvent>) -> Sender<Action> {
-    let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || run(rx, proxy));
-    tx
+/// Where the worker reports to — the platform's rendering of the icon.
+/// Implemented over the event loop on Windows and over the tray handle on
+/// Linux, so the polling loop itself is platform-agnostic.
+pub trait Sink: Send + 'static {
+    fn state(&self, state: DaemonState);
+    /// Tear the icon down and end the process.
+    fn exit(&self);
 }
 
-fn run(rx: Receiver<Action>, proxy: EventLoopProxy<UserEvent>) {
+pub fn spawn<S: Sink>(rx: Receiver<Action>, sink: S) {
+    std::thread::spawn(move || run(rx, sink));
+}
+
+fn run<S: Sink>(rx: Receiver<Action>, sink: S) {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -48,21 +52,21 @@ fn run(rx: Receiver<Action>, proxy: EventLoopProxy<UserEvent>) {
     };
     let mut last: Option<DaemonState> = None;
 
-    worker.push_state(&mut last, &proxy);
+    worker.push_state(&mut last, &sink);
     loop {
         match rx.recv_timeout(POLL_INTERVAL) {
             Ok(Action::Quit) => {
                 crate::desktop::quit();
                 worker.stop_daemon();
-                let _ = proxy.send_event(UserEvent::Exit);
+                sink.exit();
                 return;
             }
             Ok(action) => {
                 worker.perform(action);
-                worker.push_state(&mut last, &proxy);
+                worker.push_state(&mut last, &sink);
             }
             Err(RecvTimeoutError::Timeout) => {
-                worker.push_state(&mut last, &proxy);
+                worker.push_state(&mut last, &sink);
             }
             Err(RecvTimeoutError::Disconnected) => return,
         }
@@ -166,11 +170,11 @@ impl Worker {
         }
     }
 
-    fn push_state(&mut self, last: &mut Option<DaemonState>, proxy: &EventLoopProxy<UserEvent>) {
+    fn push_state<S: Sink>(&mut self, last: &mut Option<DaemonState>, sink: &S) {
         let state = self.poll();
         if last.as_ref() != Some(&state) {
             *last = Some(state.clone());
-            let _ = proxy.send_event(UserEvent::State(state));
+            sink.state(state);
         }
     }
 }
