@@ -364,6 +364,13 @@ only its own Quit removes it. A duplicate spawn after a daemon restart is
 absorbed by an exclusive lock keyed by endpoint, so a dev daemon's tray and the
 session's tray coexist ([0054](../decisions/0054-the-daemon-spawns-the-tray.md)).
 
+**A tray is optional, so its absence is not a failure.** On Linux the status
+area is reached through libappindicator, which `tray-icon` dlopens on first use
+and which *panics* when no variant is installed — a desktop that ships none
+(GNOME without the extension, SteamOS) turned every daemon start into a crash
+report. The tray probes the same library names before it builds anything and
+exits successfully when none loads.
+
 Single-instance is enforced deliberately in each front-end: the tray by that
 runtime lock, the desktop by `tauri-plugin-single-instance`, which focuses the
 existing window rather than opening another. They must not share a GApplication

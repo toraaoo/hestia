@@ -8,6 +8,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod desktop;
+mod host;
 mod icon;
 mod lock;
 mod menu;
@@ -34,6 +35,11 @@ fn main() -> ExitCode {
     let level = common::LogLevel::default();
     let file = common::FileLog::for_binary("tray", None, level);
     let _guard = common::init_logging(level, Some(file));
+
+    if !host::available() {
+        tracing::warn!("no system tray host on this desktop; exiting");
+        return ExitCode::SUCCESS;
+    }
 
     let Some(_lock) = lock::acquire() else {
         tracing::info!("another tray is already running; exiting");
