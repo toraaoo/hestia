@@ -23,6 +23,10 @@ import {
 } from '@/components/ui/dialog';
 import { ProvisionProgressView } from '@/features/shared/entry/components';
 import {
+  symbolBytes,
+  symbolOption,
+} from '@/features/shared/entry/components/icon-editor/catalog';
+import {
   createWizardDefaults,
   createWizardSchema,
   detailsStepSchema,
@@ -34,6 +38,7 @@ import { memGb } from '@/lib/format';
 import { toastWarnings } from '@/lib/warnings';
 import { m } from '@/paraglide/messages.js';
 import { configQueries, launcherDefaults } from '@/queries/config';
+import { iconMutations } from '@/queries/icons';
 import { instanceMutations, instanceQueries } from '@/queries/instance';
 import { useJobDisplay, useJobMutation } from '@/queries/jobs';
 import { serverMutations, serverQueries } from '@/queries/server';
@@ -93,11 +98,25 @@ export function CreateEntryDialog({
 
   const createServer = useJobMutation(serverMutations.create());
   const createInstance = useMutation(instanceMutations.create());
+  const generateIcon = useMutation(iconMutations.generate());
   const creating = createServer.isPending || createInstance.isPending;
   const progress = createServer.progress;
   const job = createServer.job;
 
   useJobDisplay(job, open && creating);
+
+  const applyIcon = (
+    entryId: string,
+    icon: WizardValues['details']['icon'],
+  ) => {
+    const symbol = symbolOption(icon.symbol);
+    if (!symbol) return;
+    symbolBytes(symbol.asset)
+      .then((bytes) =>
+        generateIcon.mutate({ entryId, config: icon, symbolBytes: bytes }),
+      )
+      .catch(() => undefined);
+  };
 
   const form = useAppForm({
     defaultValues: createWizardDefaults('', defaultMemoryGb),
@@ -118,11 +137,13 @@ export function CreateEntryDialog({
           );
           toast.success(m['app.toast.created']({ name: created.server.name }));
           toastWarnings(created.warnings);
+          applyIcon(created.id, value.details.icon);
         } else {
           const instance = await createInstance.mutateAsync(
             instanceParams(value, memoryEntries),
           );
           toast.success(m['app.toast.created']({ name: instance.name }));
+          applyIcon(instance.id, value.details.icon);
         }
         onOpenChange(false);
       } catch {

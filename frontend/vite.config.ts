@@ -72,12 +72,25 @@ const config = defineConfig({
     },
   },
 
-  // `@/*` and `#/*` map to `src/*` (mirrors tsconfig paths + components.json).
+  // `@/*` and `#/*` map to `src/*`; `@/assets/*` reaches the project-root
+  // drawable set instead (kept outside src so Vite fingerprints the sprites as
+  // bundled assets). Prefix order matters — the assets entry must win first.
+  // Mirrors the tsconfig paths.
   resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '#': fileURLToPath(new URL('./src', import.meta.url)),
-    },
+    alias: [
+      {
+        find: '@/assets',
+        replacement: fileURLToPath(new URL('./assets', import.meta.url)),
+      },
+      {
+        find: '@/',
+        replacement: fileURLToPath(new URL('./src/', import.meta.url)),
+      },
+      {
+        find: '#/',
+        replacement: fileURLToPath(new URL('./src/', import.meta.url)),
+      },
+    ],
   },
 
   test: {

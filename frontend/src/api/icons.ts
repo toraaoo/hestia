@@ -12,6 +12,24 @@ export interface IconEntry {
   mtime: number;
 }
 
+/**
+ * The generated-icon background, tagged by type both sides of the socket
+ * agree on. Colors are `#rrggbb` literals the shell parses.
+ */
+export type IconBackground =
+  | { type: 'color'; value: string }
+  | {
+      type: 'linear-top-down-gradient';
+      top_color: string;
+      bottom_color: string;
+    };
+
+/** The sidecar config that produced a generated icon. */
+export interface IconConfig {
+  background: IconBackground;
+  symbol: string;
+}
+
 export function list(): Promise<Record<string, IconEntry>> {
   return invokeCommand('icons_list');
 }
@@ -23,6 +41,20 @@ export function set(entryId: string, sourcePath: string): Promise<IconEntry> {
 
 export function remove(entryId: string): Promise<void> {
   return invokeCommand('icon_remove', { entryId });
+}
+
+/** Bake `config` over `symbolBytes` into a generated icon for the entry. */
+export function generate(
+  entryId: string,
+  config: IconConfig,
+  symbolBytes: number[],
+): Promise<IconEntry> {
+  return invokeCommand('icon_generate', { entryId, config, symbolBytes });
+}
+
+/** The stored generation config, or null when the icon was picked instead. */
+export function config(entryId: string): Promise<IconConfig | null> {
+  return invokeCommand('icon_config', { entryId });
 }
 
 /** The webview-loadable URL for a stored icon. */

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { randomIconConfig } from '@/features/shared/entry/components/icon-editor/catalog';
 import {
   detailsStepSchema,
   flavorStepSchema,
@@ -15,6 +16,7 @@ const details = (over: Record<string, unknown> = {}) => ({
   port: '',
   hardcore: false,
   onlineMode: true,
+  icon: randomIconConfig(),
   eula: true,
   ...over,
 });

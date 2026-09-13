@@ -47,6 +47,7 @@ export const keys = {
   icons: {
     all: ['icons'] as const,
     list: () => [...keys.icons.all, 'list'] as const,
+    config: (id: string) => [...keys.icons.all, 'config', id] as const,
   },
   cache: {
     all: ['cache'] as const,
