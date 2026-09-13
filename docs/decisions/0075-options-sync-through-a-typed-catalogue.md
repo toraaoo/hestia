@@ -32,12 +32,17 @@ only instances that already have that key — an absent one means the mod is not
 installed there, and inventing the line would be writing another mod's
 configuration.
 
+**A catalogue entry carries whether it shares by default.** Most settings are a
+preference the player holds once — brightness, chat, sound, keybinds — and a few
+describe the machine they are sitting at, where sharing is defensible but wrong
+as a default: render distance, and anything else a weaker GPU has to be allowed
+to disagree about. An unknown key defaults to shared, because a mod's setting is
+a preference until proven otherwise, and the user turns any of it off per key or
+per instance.
+
 **Rejected:** a table of every `options.txt` key for every version. It is the
 thorough answer and it is a maintenance subscription — every release, for every
-key, forever. Only a setting that actually changed spelling or encoding earns an
-entry here; everything else is a direct key that needs no translation, and the
-cost of a missing entry is a setting that stops being shared rather than one that
-corrupts. **Also rejected:** curating which settings sync by default. Hestia
-shares every key except the ones that must never travel, and the user pins what
-they want kept local — a default set is a second thing to maintain and disagree
-with.
+key, forever. Only a setting that actually changed spelling or encoding earns a
+versioned entry; everything else is a direct key that needs no translation, and
+the cost of a missing entry is a setting that stops being shared rather than one
+that corrupts.

@@ -15,10 +15,16 @@ enable, disable and removal by identity. **A version change never propagates**:
 one instance updating a pack is not a statement about the others, which may be on
 a game version that release does not support.
 
-**Compatibility is a gate, not a failure.** A pack reaches only the instances
-whose game version it supports, and for a resource pack the loader it needs. An
-instance that does not qualify is skipped silently — it is not an error, and it
-must not be reported as one every launch.
+**Compatibility is the pack's own declaration, and it is a gate rather than a
+failure.** A resource pack states the `pack_format` it was built for in its
+`pack.mcmeta`, and the client states the format it reads in its own
+`version.json`; the pack reaches an instance only when those agree. That is a
+stronger test than the version list the platform publishes, which describes the
+release rather than the archive, and it works for a pack installed from a file
+that has no platform metadata at all. The platform's game versions and loaders
+still decide *which* release to install. An instance that does not qualify is
+skipped silently — it is not an error, and it must not be reported as one every
+launch.
 
 **A pack the instance did not choose does not travel.** Content carrying a
 modpack origin belongs to that pack's configuration, not to the player's
@@ -36,7 +42,10 @@ A datapack loads from inside a world, so syncing one cannot mean writing into
 every save an instance holds — a world is the player's, and a pack appearing in
 one they did not ask for is a change to how that world runs. The unit shares the
 library and applies it when a world is created or when the user says so, never
-retroactively.
+retroactively. This is the narrow reading of a feature Modrinth ships switched
+off for the same reason: their schema carries data packs and the capability
+refuses them, because propagating into existing worlds is the only behaviour that
+would make the toggle mean anything, and it is the one that cannot be undone.
 
 **Rejected:** copying pack files between instances directly. It would duplicate
 the pool, lose provenance, and leave the copies unupdatable — the content pool
