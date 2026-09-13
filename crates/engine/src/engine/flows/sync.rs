@@ -1,53 +1,35 @@
-//! The sync flows that compose the `sync` subsystem with the instance store:
-//! the reconcile pass a launch runs, the one its exit replays, per-instance
-//! link status, and the adopt migration.
+//! The sync flows: the reconcile a launch runs, the one its exit replays,
+//! turning a unit on from a named instance, and the per-instance overrides.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 
-use anyhow::{Context, Result};
-use proto::sync::InstanceSyncStatus;
+use anyhow::{bail, Context, Result};
+use proto::sync::{
+    InstanceSyncStatus, SyncConfig, SyncOption, SyncOverrides, SyncSource, SyncUnit,
+};
 use proto::warning::WarningInfo;
 
-use crate::content::modpack;
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
 use crate::sync::{Pass, Scope};
 
 impl Engine {
-    /// Whether instances share their targets at all (`sync.enabled`).
-    pub fn sync_enabled(&self) -> bool {
-        self.config.settings().sync.enabled
+    pub fn sync_config(&self) -> SyncConfig {
+        self.sync.config()
     }
 
-    /// The reconcile an instance would run, or `None` when it shares nothing —
-    /// sharing switched off launcher-wide, or this instance opted out.
-    ///
-    /// `profile_store` is a captured profile's own store, which scopes the
-    /// settings-class targets to it. Without one, an entry running a **modpack**
-    /// keeps its config tree: the pack ships it, so hestia does not fold it into
-    /// what every other instance reads. That is the automatic pass only — a
-    /// `sync adopt` the user asks for still opts the folder in, and the link it
-    /// leaves is reconciled from then on.
     pub(crate) fn instance_pass(
         &self,
         record: &InstanceRecord,
-        entry_dir: &Path,
         data_dir: &Path,
         profile_store: Option<&Path>,
-    ) -> Option<Pass> {
-        if !self.shares_settings(record) {
-            return None;
-        }
+    ) -> Pass {
         let scope = match profile_store {
             Some(store) => Scope::Profile(store.to_path_buf()),
-            None if modpack::load(entry_dir).is_some() => Scope::Local,
             None => Scope::Shared,
         };
-        Some(pass(record, data_dir, scope))
-    }
-
-    fn shares_settings(&self, record: &InstanceRecord) -> bool {
-        self.sync_enabled() && record.shares_settings()
+        pass(record, data_dir, scope)
     }
 
     /// Reconcile for a launching session and record what it reconciled, so the
@@ -58,12 +40,9 @@ impl Engine {
         warnings
     }
 
-    /// Reconcile once more for a session that has exited, so what the player
-    /// changed in game reaches the store now rather than at their next launch.
-    ///
     /// Skipped while the instance's other sessions run: they hold the same
-    /// files open, and a pass that copied over a live game's `options.txt`
-    /// would lose whatever it writes at its own exit.
+    /// files open, and copying over a live game's `options.txt` would lose
+    /// whatever it writes at its own exit.
     pub fn finish_instance_sync(&self, session: &str) {
         let Some(pass) = self.sync.recall(session) else {
             return;
@@ -82,88 +61,156 @@ impl Engine {
         }
     }
 
-    /// Link a brand-new instance's folder targets, so nothing can fill them
-    /// before the first launch — a modpack install writes its `overrides/`
-    /// straight into the game directory. The settings folders are deliberately
-    /// left for the launch: whether a pack owns them is not knowable yet.
-    /// Best-effort, like every reconcile; nothing here fails a create.
-    pub(crate) fn link_new_instance(&self, record: &InstanceRecord, data_dir: &Path) {
-        if !self.shares_settings(record) {
-            return;
-        }
-        for warning in self.sync.apply(&pass(record, data_dir, Scope::Local)) {
-            tracing::debug!(instance = %record.name, warning = %warning, "sync at create");
-        }
-    }
-
-    /// Every instance's per-folder-target link state, and whether it shares at
-    /// all — an opted-out instance reports no targets, since none of them
-    /// describe it.
-    pub fn sync_status(&self) -> Vec<InstanceSyncStatus> {
+    /// Which instances could start a unit's shared copy.
+    pub fn sync_sources(&self, unit: SyncUnit) -> Vec<SyncSource> {
         self.instances
             .list()
             .into_iter()
-            .map(|record| InstanceSyncStatus {
-                enabled: record.shares_settings(),
-                targets: match record.shares_settings() {
-                    true => self.sync.status(&self.instances.data_dir(&record)),
-                    false => Vec::new(),
-                },
-                id: record.id,
-                name: record.name,
+            .map(|record| {
+                let (present, modified_unix) = self
+                    .sync
+                    .source_state(unit, &self.instances.data_dir(&record));
+                SyncSource {
+                    id: record.id,
+                    name: record.name,
+                    present,
+                    modified_unix,
+                }
             })
             .collect()
     }
 
-    /// Put one instance in or out of shared settings. Leaving hands it its own
-    /// copy of every folder it shared; rejoining folds it back in with the
-    /// store winning whatever the two both have. What was duplicated or
-    /// discarded rides back as warnings. The caller guarantees it is stopped.
-    pub fn set_instance_sharing(
+    /// Seed a unit from one instance and turn it on. Every other instance's
+    /// agreement is recorded as its current content, so its first pass settles
+    /// the shared copy's way rather than racing it.
+    pub fn enable_sync_unit(&self, unit: SyncUnit, source: &str) -> Result<SyncConfig> {
+        let records = self.instances.list();
+        let source = match source.trim() {
+            "" => self.only_candidate(unit, &records)?,
+            reference => Some(
+                self.instances
+                    .get(reference)
+                    .with_context(|| format!("unknown instance: {reference}"))?,
+            ),
+        };
+
+        let seeded_from = match &source {
+            Some(record) => {
+                self.sync.seed(unit, &self.instances.data_dir(record))?;
+                record.name.clone()
+            }
+            None => String::new(),
+        };
+        for record in &records {
+            self.sync
+                .defer(unit, &record.id, &self.instances.data_dir(record))?;
+        }
+        tracing::info!(%unit, source = %seeded_from, "sync unit enabled");
+        self.sync.enable(unit, &seeded_from)
+    }
+
+    fn only_candidate(
+        &self,
+        unit: SyncUnit,
+        records: &[InstanceRecord],
+    ) -> Result<Option<InstanceRecord>> {
+        let mut candidates: Vec<&InstanceRecord> = records
+            .iter()
+            .filter(|record| {
+                self.sync
+                    .source_state(unit, &self.instances.data_dir(record))
+                    .0
+            })
+            .collect();
+        if candidates.len() > 1 {
+            bail!(proto::error::ErrorInfo::SyncSourceRequired {
+                unit,
+                candidates: candidates.iter().map(|r| r.name.clone()).collect(),
+            });
+        }
+        Ok(candidates.pop().cloned())
+    }
+
+    pub fn disable_sync_unit(&self, unit: SyncUnit) -> Result<SyncConfig> {
+        tracing::info!(%unit, "sync unit disabled");
+        self.sync.disable(unit)
+    }
+
+    pub fn set_sync_unsynced(&self, keys: BTreeSet<String>) -> Result<SyncConfig> {
+        self.sync.set_unsynced(keys)
+    }
+
+    pub fn sync_options(&self) -> Vec<SyncOption> {
+        self.sync.options()
+    }
+
+    pub fn set_sync_option(&self, key: &str, value: &str) -> Result<Vec<SyncOption>> {
+        if !self.sync.enabled(SyncUnit::Options) {
+            bail!(proto::error::ErrorInfo::SyncUnitDisabled {
+                unit: SyncUnit::Options
+            });
+        }
+        self.sync.set_option(key, value)?;
+        Ok(self.sync.options())
+    }
+
+    pub fn sync_status(&self) -> Vec<InstanceSyncStatus> {
+        self.instances
+            .list()
+            .into_iter()
+            .map(|record| self.instance_sync_status(&record))
+            .collect()
+    }
+
+    pub fn set_instance_sync_unit(
         &self,
         reference: &str,
-        on: bool,
-    ) -> Result<(bool, Vec<WarningInfo>)> {
-        let record = self
-            .instances
-            .get(reference)
-            .with_context(|| format!("unknown instance: {reference}"))?;
-        if record.shares_settings() == on {
-            return Ok((on, Vec::new()));
-        }
-        let warnings = if self.sync_enabled() {
-            let data_dir = self.instances.data_dir(&record);
-            let pass = pass(&record, &data_dir, self.settings_scope(&record));
-            match on {
-                true => self.sync.attach(&pass)?,
-                false => self.sync.detach(&pass)?,
+        unit: SyncUnit,
+        shared: Option<bool>,
+    ) -> Result<InstanceSyncStatus> {
+        self.update_overrides(reference, |overrides| match shared {
+            Some(true) | None => {
+                overrides.excluded.remove(&unit);
             }
-        } else {
-            Vec::new()
-        };
-        self.instances.set_sharing(&record.id, on)?;
-        tracing::info!(instance = %record.name, sharing = on, "instance sharing changed");
-        Ok((on, warnings))
+            Some(false) => {
+                overrides.excluded.insert(unit);
+            }
+        })
     }
 
-    /// Which store the settings-class targets belong to outside a launch, where
-    /// no profile is in play.
-    fn settings_scope(&self, record: &InstanceRecord) -> Scope {
-        match modpack::load(&self.instances.instance_dir(record)).is_some() {
-            true => Scope::Local,
-            false => Scope::Shared,
-        }
+    pub fn set_instance_sync_keys(
+        &self,
+        reference: &str,
+        unsynced: BTreeSet<String>,
+    ) -> Result<InstanceSyncStatus> {
+        self.update_overrides(reference, |overrides| overrides.unsynced = unsynced.clone())
     }
 
-    /// Adopt a stopped instance's existing folder contents into the shared
-    /// store (all folder targets when `targets` is empty). All-or-nothing per
-    /// target; a store collision refuses that target with the names.
-    pub fn adopt_instance_sync(&self, reference: &str, targets: &[String]) -> Result<Vec<String>> {
+    fn update_overrides(
+        &self,
+        reference: &str,
+        mutate: impl FnOnce(&mut SyncOverrides),
+    ) -> Result<InstanceSyncStatus> {
         let record = self
             .instances
             .get(reference)
             .with_context(|| format!("unknown instance: {reference}"))?;
-        self.sync.adopt(&self.instances.data_dir(&record), targets)
+        let mut overrides = record.sharing.clone();
+        mutate(&mut overrides);
+        let record = self.instances.set_overrides(&record.id, overrides)?;
+        tracing::info!(instance = %record.name, "instance sync overrides changed");
+        Ok(self.instance_sync_status(&record))
+    }
+
+    fn instance_sync_status(&self, record: &InstanceRecord) -> InstanceSyncStatus {
+        let data_dir = self.instances.data_dir(record);
+        let pass = pass(record, &data_dir, Scope::Shared);
+        InstanceSyncStatus {
+            id: record.id.clone(),
+            name: record.name.clone(),
+            units: self.sync.status(&pass),
+            unsynced: record.sharing.unsynced.clone(),
+        }
     }
 }
 
@@ -174,5 +221,6 @@ fn pass(record: &InstanceRecord, data_dir: &Path, scope: Scope) -> Pass {
         game_version: record.profile.game_version.clone(),
         data_dir: data_dir.to_path_buf(),
         scope,
+        overrides: record.sharing.clone(),
     }
 }

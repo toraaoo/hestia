@@ -288,28 +288,6 @@ impl fmt::Display for Task {
     }
 }
 
-/// Why a path was rejected as a sync target.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-#[serde(rename_all = "snake_case")]
-pub enum SyncReason {
-    CopiedTarget,
-    NotFolderTarget,
-    ManagedDir,
-    UnsafePath,
-}
-
-impl fmt::Display for SyncReason {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            SyncReason::CopiedTarget => "share it as a folder instead",
-            SyncReason::NotFolderTarget => "it is not a folder sync target",
-            SyncReason::ManagedDir => "it is a launcher-managed directory",
-            SyncReason::UnsafePath => "it is not a safe relative path",
-        })
-    }
-}
-
 /// The one daemon error type — every failure the socket surfaces. The `kind`
 /// tag is the wire discriminant; front-ends switch on it exhaustively.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -553,12 +531,17 @@ pub enum ErrorInfo {
     },
 
     // --- sync ---
-    SyncTargetInvalid {
-        path: String,
-        reason: SyncReason,
+    /// Turning a unit on has to start the shared copy from *someone's*, and
+    /// more than one instance holds that file. Letting the launcher pick is how
+    /// settings go missing quietly, so the choice is refused back to the caller
+    /// with the instances it could have meant.
+    SyncSourceRequired {
+        unit: crate::sync::SyncUnit,
+        candidates: Vec<String>,
     },
-    SyncLinkConflict {
-        path: String,
+    /// An edit to a shared copy nobody reads: the unit is off in the catalogue.
+    SyncUnitDisabled {
+        unit: crate::sync::SyncUnit,
     },
 
     // --- protocol ---
@@ -808,11 +791,13 @@ impl fmt::Display for ErrorInfo {
                 "'{title}' cannot be downloaded through the {source} API — \
                  get the file from its project page and import it"
             ),
-            SyncTargetInvalid { path, reason } => {
-                write!(f, "'{path}' cannot be a sync target: {reason}")
-            }
-            SyncLinkConflict { path } => {
-                write!(f, "'{path}' already has contents — adopt it first")
+            SyncSourceRequired { unit, candidates } => write!(
+                f,
+                "name the instance to start {unit} from: {}",
+                candidates.join(", ")
+            ),
+            SyncUnitDisabled { unit } => {
+                write!(f, "{unit} is not shared between your instances")
             }
             UnknownChannel { channel } => write!(f, "unknown channel: {channel}"),
             MalformedRequest { detail } => write!(f, "malformed request: {detail}"),

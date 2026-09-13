@@ -193,7 +193,6 @@ impl Engine {
         let mut warnings = landed.warnings;
         warnings.extend(quarantined_under(mark, &entry_dir));
 
-        self.link_new_instance(&record, &data_dir);
         Ok(ImportOutcome {
             format,
             record,
@@ -234,7 +233,7 @@ impl Engine {
                     last_played_unix: None,
                     playtime_seconds: 0,
                     jvm,
-                    sync: None,
+                    sharing: Default::default(),
                     profile,
                 }
             }

@@ -1,148 +1,263 @@
-//! `hestia sync …` — the settings/configs shared across instances. File
-//! targets are copied newest-wins; folder targets are linked into the shared
-//! store, so every instance opens the same physical folders (worlds included).
+//! `hestia sync …` — the settings shared across instances.
 
 use anyhow::Result;
-use clap::Subcommand;
-use client::proto::sync::{InstanceSyncStatus, LinkState, SyncTargets};
+use clap::{Subcommand, ValueEnum};
+use client::proto::sync::{InstanceSyncStatus, SyncConfig, SyncUnit, UnitState};
+use client::Client;
 
 use crate::ui::{self, View};
 
 #[derive(Subcommand)]
 pub enum SyncCmd {
-    /// The shared store, its targets, and each instance's link state
+    /// What is shared, and where each instance stands
     #[command(alias = "list", alias = "ls")]
     Status,
-    /// Share a file (or a whole folder with `--folder`)
-    Add {
-        /// Game-relative path, e.g. `options.txt` or `config`
-        path: String,
-        /// Treat the path as a folder (linked into the shared store)
+    /// Start sharing one thing, seeded from one instance's copy
+    On {
+        /// What to share
+        unit: Unit,
+        /// The instance whose copy the shared one starts from
         #[arg(long)]
-        folder: bool,
+        from: Option<String>,
     },
-    /// Stop sharing a target
-    #[command(alias = "rm")]
-    Remove {
-        /// The file or folder path to remove
-        path: String,
+    /// Stop sharing one thing; every instance keeps the copy it has
+    Off {
+        /// What to stop sharing
+        unit: Unit,
     },
+    /// The shared game options
+    Options {
+        #[command(subcommand)]
+        cmd: OptionsCmd,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum OptionsCmd {
+    /// Every shared setting and its value
+    #[command(alias = "ls")]
+    List,
+    /// Change a shared setting
+    Set { key: String, value: String },
+    /// Stop sharing one setting; each instance keeps its own
+    Local { key: String },
+    /// Share one setting again
+    Share { key: String },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+pub enum Unit {
+    Options,
+    Servers,
+    Commands,
+    Hotbars,
+}
+
+impl Unit {
+    pub(crate) fn proto(self) -> SyncUnit {
+        match self {
+            Unit::Options => SyncUnit::Options,
+            Unit::Servers => SyncUnit::Servers,
+            Unit::Commands => SyncUnit::Commands,
+            Unit::Hotbars => SyncUnit::Hotbars,
+        }
+    }
 }
 
 pub async fn run(cmd: SyncCmd) -> Result<()> {
+    let client = super::connect().await?;
     match cmd {
-        SyncCmd::Status => status().await,
-        SyncCmd::Add { path, folder } => add(path, folder).await,
-        SyncCmd::Remove { path } => remove(path).await,
+        SyncCmd::Status => status(&client).await,
+        SyncCmd::On { unit, from } => enable(&client, unit.proto(), from).await,
+        SyncCmd::Off { unit } => disable(&client, unit.proto()).await,
+        SyncCmd::Options { cmd } => options(&client, cmd).await,
     }
 }
 
-async fn status() -> Result<()> {
-    let client = super::connect().await?;
+pub fn unit_name(unit: SyncUnit) -> &'static str {
+    match unit {
+        SyncUnit::Options => "options",
+        SyncUnit::Servers => "servers",
+        SyncUnit::Commands => "commands",
+        SyncUnit::Hotbars => "hotbars",
+    }
+}
+
+pub fn state_label(state: UnitState) -> &'static str {
+    match state {
+        UnitState::Synced => "synced",
+        UnitState::Pending => "shares at next launch",
+        UnitState::Overridden => "keeps its own",
+        UnitState::Off => "not shared",
+        UnitState::EraBound => "too old to share",
+    }
+}
+
+async fn status(client: &Client) -> Result<()> {
     let config = client.sync().get().await?;
-    ui::show(View::detail([
-        (
-            "sharing",
-            match config.enabled {
-                true => "on".to_string(),
-                false => "off (config set sync.enabled true)".to_string(),
-            },
-        ),
-        ("shared store", config.shared_dir.display().to_string()),
-    ]))?;
-    if !config.enabled {
+    ui::show(View::detail([(
+        "shared store",
+        config.shared_dir.display().to_string(),
+    )]))?;
+    render_units(&config)?;
+    if config.units.iter().all(|unit| !unit.enabled) {
         return ui::show(View::note(
-            "instances keep their own settings while sharing is off",
+            "nothing is shared yet — `hestia sync on options` starts with your game settings",
         ));
     }
-    render_targets(&config.targets)?;
-    render_status(client.sync().status().await?)
+    if !config.unsynced.is_empty() {
+        ui::show(View::note(format!(
+            "settings kept per-instance: {}",
+            config
+                .unsynced
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        )))?;
+    }
+    render_instances(client.sync().status().await?)
 }
 
-fn render_targets(targets: &SyncTargets) -> Result<()> {
-    if targets.files.is_empty() && targets.folders.is_empty() {
-        return ui::show(View::note("no sync targets"));
-    }
-    let mut rows: Vec<Vec<String>> = Vec::new();
-    for path in &targets.folders {
-        rows.push(vec!["folder (linked)".to_string(), path.clone()]);
-    }
-    for path in &targets.files {
-        rows.push(vec!["file (copied)".to_string(), path.clone()]);
-    }
-    ui::show(View::table("Sync targets", ["CLASS", "PATH"], rows))
+fn render_units(config: &SyncConfig) -> Result<()> {
+    let rows = config
+        .units
+        .iter()
+        .map(|unit| {
+            vec![
+                unit_name(unit.unit).to_string(),
+                match unit.enabled {
+                    true => "shared".to_string(),
+                    false => "not shared".to_string(),
+                },
+                unit.seeded_from.clone(),
+            ]
+        })
+        .collect();
+    ui::show(View::table(
+        "Shared",
+        ["WHAT", "SHARING", "STARTED FROM"],
+        rows,
+    ))
 }
 
-fn render_status(instances: Vec<InstanceSyncStatus>) -> Result<()> {
+fn render_instances(instances: Vec<InstanceSyncStatus>) -> Result<()> {
     if instances.is_empty() {
         return Ok(());
     }
-    let mut blocked = Vec::new();
     let mut rows: Vec<Vec<String>> = Vec::new();
     for instance in instances {
-        if !instance.enabled {
-            rows.push(vec![
-                instance.name,
-                "—".to_string(),
-                "opted out (instance <name> sync on)".to_string(),
-            ]);
-            continue;
-        }
-        for target in instance.targets {
-            if target.state == LinkState::CannotLink {
-                blocked.push((instance.name.clone(), target.target.clone()));
-            }
+        for unit in instance.units.iter().filter(|u| u.state != UnitState::Off) {
             rows.push(vec![
                 instance.name.clone(),
-                target.target,
-                state_label(target.state).to_string(),
+                unit_name(unit.unit).to_string(),
+                state_label(unit.state).to_string(),
             ]);
         }
     }
+    if rows.is_empty() {
+        return Ok(());
+    }
     ui::show(View::table(
-        "Link state",
-        ["INSTANCE", "TARGET", "STATE"],
+        "Instances",
+        ["INSTANCE", "WHAT", "STATE"],
         rows,
-    ))?;
-    for (name, target) in blocked {
-        ui::show(View::note(format!(
-            "'{name}' keeps its own '{target}': files of the same name are already shared — \
-             rename or delete the clashing ones to share it"
-        )))?;
-    }
-    Ok(())
+    ))
 }
 
-fn state_label(state: LinkState) -> &'static str {
-    match state {
-        LinkState::Linked => "linked",
-        LinkState::Pending => "shares at next launch",
-        LinkState::CannotLink => "clashes with the store",
-    }
-}
-
-async fn add(path: String, folder: bool) -> Result<()> {
-    let client = super::connect().await?;
-    let mut targets = client.sync().get().await?.targets;
-    let added = if folder {
-        targets.folders.insert(path.clone())
-    } else {
-        targets.files.insert(path.clone())
+/// The shared copy has to start as someone's, so a source is picked before the
+/// call rather than letting the first launch decide.
+async fn enable(client: &Client, unit: SyncUnit, from: Option<String>) -> Result<()> {
+    let source = match from {
+        Some(name) => name,
+        None => pick_source(client, unit).await?,
     };
-    if !added {
-        return ui::show(View::note(format!("instances already share '{path}'")));
-    }
-    client.sync().set(targets).await?;
-    ui::show(View::line(format!("instances now share '{path}'")))
+    let config = client.sync().enable(unit, &source).await?;
+    let seeded = config
+        .units
+        .iter()
+        .find(|entry| entry.unit == unit)
+        .map(|entry| entry.seeded_from.clone())
+        .unwrap_or_default();
+    ui::show(View::line(match seeded.is_empty() {
+        true => format!("your instances now share {unit}"),
+        false => format!("your instances now share {unit}, starting from '{seeded}'"),
+    }))
 }
 
-async fn remove(path: String) -> Result<()> {
-    let client = super::connect().await?;
-    let mut targets = client.sync().get().await?.targets;
-    let removed = targets.files.remove(&path) || targets.folders.remove(&path);
-    if !removed {
-        return ui::show(View::note(format!("instances do not share '{path}'")));
+async fn pick_source(client: &Client, unit: SyncUnit) -> Result<String> {
+    let candidates: Vec<_> = client
+        .sync()
+        .sources(unit)
+        .await?
+        .into_iter()
+        .filter(|source| source.present)
+        .collect();
+    if candidates.len() < 2 {
+        return Ok(String::new());
     }
-    client.sync().set(targets).await?;
-    ui::show(View::line(format!("instances no longer share '{path}'")))
+    let names: Vec<String> = candidates.iter().map(|s| s.name.clone()).collect();
+    let chosen = ui::select(&format!("Start {unit} from which instance?"), &names)?;
+    Ok(names[chosen].clone())
+}
+
+async fn disable(client: &Client, unit: SyncUnit) -> Result<()> {
+    client.sync().disable(unit).await?;
+    ui::show(View::line(format!(
+        "{unit} is no longer shared; every instance keeps the copy it has"
+    )))
+}
+
+async fn options(client: &Client, cmd: OptionsCmd) -> Result<()> {
+    match cmd {
+        OptionsCmd::List => list_options(client).await,
+        OptionsCmd::Set { key, value } => {
+            client.sync().set_option(&key, &value).await?;
+            ui::show(View::line(format!("shared '{key}' is now {value}")))
+        }
+        OptionsCmd::Local { key } => set_shared(client, &key, false).await,
+        OptionsCmd::Share { key } => set_shared(client, &key, true).await,
+    }
+}
+
+async fn list_options(client: &Client) -> Result<()> {
+    let options = client.sync().options().await?;
+    if options.is_empty() {
+        return ui::show(View::note(
+            "no shared settings yet — they arrive the first time an instance launches",
+        ));
+    }
+    let rows = options
+        .into_iter()
+        .map(|option| {
+            vec![
+                option.key,
+                option.value,
+                match option.synced {
+                    true => "shared".to_string(),
+                    false => "per-instance".to_string(),
+                },
+            ]
+        })
+        .collect();
+    ui::show(View::table("Shared options", ["KEY", "VALUE", ""], rows))
+}
+
+async fn set_shared(client: &Client, key: &str, shared: bool) -> Result<()> {
+    let mut unsynced = client.sync().get().await?.unsynced;
+    let changed = match shared {
+        true => unsynced.remove(key),
+        false => unsynced.insert(key.to_string()),
+    };
+    if !changed {
+        return ui::show(View::note(match shared {
+            true => format!("'{key}' is already shared"),
+            false => format!("'{key}' is already per-instance"),
+        }));
+    }
+    client.sync().set_unsynced(unsynced).await?;
+    ui::show(View::line(match shared {
+        true => format!("'{key}' is shared between your instances again"),
+        false => format!("'{key}' is each instance's own from now on"),
+    }))
 }

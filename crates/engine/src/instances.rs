@@ -12,6 +12,7 @@ use std::sync::Mutex;
 
 use anyhow::{bail, Context, Result};
 use proto::minecraft::InstanceProfile;
+use proto::sync::SyncOverrides;
 use serde::{Deserialize, Serialize};
 
 use crate::minecraft::launch::{JavaSettings, JVM_ARGS_KEY, MEMORY_KEY};
@@ -35,20 +36,10 @@ pub struct InstanceRecord {
     /// Per-entry JVM tuning (memory, extra flags) injected at each launch.
     #[serde(default)]
     pub jvm: JavaSettings,
-    /// Whether this instance takes part in shared settings; unset follows the
-    /// launcher-wide `sync.enabled`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sync: Option<bool>,
+    /// What this instance does differently from the sync catalogue.
+    #[serde(default, skip_serializing_if = "SyncOverrides::is_empty")]
+    pub sharing: SyncOverrides,
     pub profile: InstanceProfile,
-}
-
-impl InstanceRecord {
-    /// Whether the instance reconciles against the shared store at all. An
-    /// instance that opted out is left alone entirely — no copy, no link, and
-    /// no unlinking of what it already shares.
-    pub fn shares_settings(&self) -> bool {
-        self.sync.unwrap_or(true)
-    }
 }
 
 impl Document for InstanceRecord {
@@ -110,7 +101,7 @@ impl Instances {
                 last_played_unix: None,
                 playtime_seconds: 0,
                 jvm: JavaSettings::default(),
-                sync: None,
+                sharing: SyncOverrides::default(),
                 profile,
             },
         )
@@ -216,15 +207,13 @@ impl Instances {
         Ok(record.jvm.entries())
     }
 
-    /// Record whether this instance takes part in shared settings. The file
-    /// work that a change implies is the sync flow's — this only persists the
-    /// answer.
-    pub fn set_sharing(&self, id: &str, on: bool) -> Result<()> {
+    pub fn set_overrides(&self, id: &str, overrides: SyncOverrides) -> Result<InstanceRecord> {
         let mut record = self
             .get(id)
             .with_context(|| format!("unknown instance: {id}"))?;
-        record.sync = Some(on);
-        registry::write_record(&self.instance_dir(&record), &record)
+        record.sharing = overrides;
+        registry::write_record(&self.instance_dir(&record), &record)?;
+        Ok(record)
     }
 
     /// Rename an instance: rewrite the display name and move its directory to
@@ -290,19 +279,17 @@ pub(crate) fn save_worlds(data_dir: &Path) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use proto::sync::SyncUnit;
+
     use super::*;
 
-    /// An instance shares unless it says otherwise — including one recorded
-    /// before the field existed, which has no `sync` at all.
     #[test]
-    fn sharing_is_on_until_opted_out() {
+    fn an_instance_follows_the_catalogue_until_it_excludes_a_unit() {
         let mut record = InstanceRecord::default();
-        assert!(record.shares_settings());
+        assert!(record.sharing.shares(SyncUnit::Options));
 
-        record.sync = Some(false);
-        assert!(!record.shares_settings());
-
-        record.sync = None;
-        assert!(record.shares_settings(), "clearing returns to the default");
+        record.sharing.excluded.insert(SyncUnit::Options);
+        assert!(!record.sharing.shares(SyncUnit::Options));
+        assert!(record.sharing.shares(SyncUnit::Servers));
     }
 }

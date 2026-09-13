@@ -1,40 +1,62 @@
-//! Shared settings/configs: the set of game-relative files (copied) and
-//! folders (linked) propagated across instances. Apply runs inside the
-//! instance launch flow; these channels read and edit the target set, report
-//! each instance's per-target link state, and run the adopt migration.
+//! The `sync.*` channels: the catalogue, what can seed it, the shared options,
+//! and each instance's standing. The reconcile itself runs in the launch flow.
 
 use proto::sync::{
-    SyncAdopt, SyncAdoptResult, SyncConfig, SyncGet, SyncSet, SyncSetParams, SyncShare,
-    SyncShareResult, SyncStatus, SyncStatusResult,
+    InstanceSyncKeys, InstanceSyncKeysParams, InstanceSyncUnit, InstanceSyncUnitParams,
+    SyncDisable, SyncDisableParams, SyncEnable, SyncEnableParams, SyncGet, SyncKeys,
+    SyncKeysParams, SyncOptionSet, SyncOptionSetParams, SyncOptionsGet, SyncOptionsResult,
+    SyncSources, SyncSourcesParams, SyncSourcesResult, SyncStatus, SyncStatusResult,
 };
 use proto::Empty;
 
 use super::guards::{instance_for, Intent};
 use crate::runtime::Channels;
 
-fn config(engine: &engine::Engine) -> SyncConfig {
-    SyncConfig {
-        enabled: engine.sync_enabled(),
-        shared_dir: engine.sync().dir(),
-        targets: engine.sync().targets(),
-    }
-}
-
 pub(super) fn register(on: &mut Channels<'_>) {
-    on.handle::<SyncGet, _, _>(|_: Empty, ctx| async move { Ok(config(ctx.runtime.engine())) });
+    on.handle::<SyncGet, _, _>(
+        |_: Empty, ctx| async move { Ok(ctx.runtime.engine().sync_config()) },
+    );
 
-    on.handle::<SyncSet, _, _>(|p: SyncSetParams, ctx| async move {
-        let engine = ctx.runtime.engine();
-        let targets = engine
-            .sync()
-            .set_targets(p.targets)
+    on.handle::<SyncSources, _, _>(|p: SyncSourcesParams, ctx| async move {
+        Ok(SyncSourcesResult {
+            sources: ctx.runtime.engine().sync_sources(p.unit),
+        })
+    });
+
+    on.handle::<SyncEnable, _, _>(|p: SyncEnableParams, ctx| async move {
+        ctx.runtime
+            .engine()
+            .enable_sync_unit(p.unit, &p.source)
+            .map_err(crate::runtime::engine_error)
+    });
+
+    on.handle::<SyncDisable, _, _>(|p: SyncDisableParams, ctx| async move {
+        ctx.runtime
+            .engine()
+            .disable_sync_unit(p.unit)
+            .map_err(crate::runtime::engine_error)
+    });
+
+    on.handle::<SyncKeys, _, _>(|p: SyncKeysParams, ctx| async move {
+        ctx.runtime
+            .engine()
+            .set_sync_unsynced(p.unsynced)
+            .map_err(crate::runtime::engine_error)
+    });
+
+    on.handle::<SyncOptionsGet, _, _>(|_: Empty, ctx| async move {
+        Ok(SyncOptionsResult {
+            options: ctx.runtime.engine().sync_options(),
+        })
+    });
+
+    on.handle::<SyncOptionSet, _, _>(|p: SyncOptionSetParams, ctx| async move {
+        let options = ctx
+            .runtime
+            .engine()
+            .set_sync_option(&p.key, &p.value)
             .map_err(crate::runtime::engine_error)?;
-        tracing::info!(
-            files = targets.files.len(),
-            folders = targets.folders.len(),
-            "sync targets updated"
-        );
-        Ok(config(engine))
+        Ok(SyncOptionsResult { options })
     });
 
     on.handle::<SyncStatus, _, _>(|_: Empty, ctx| async move {
@@ -43,28 +65,19 @@ pub(super) fn register(on: &mut Channels<'_>) {
         })
     });
 
-    on.handle::<SyncAdopt, _, _>(|p, ctx| async move {
+    on.handle::<InstanceSyncUnit, _, _>(|p: InstanceSyncUnitParams, ctx| async move {
         let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
-        let adopted = ctx
-            .runtime
+        ctx.runtime
             .engine()
-            .adopt_instance_sync(&record.id, &p.targets)
-            .map_err(crate::runtime::engine_error)?;
-        tracing::info!(
-            instance = %record.id,
-            targets = adopted.len(),
-            "sync folders adopted into the shared store"
-        );
-        Ok(SyncAdoptResult { adopted })
+            .set_instance_sync_unit(&record.id, p.unit, p.shared)
+            .map_err(crate::runtime::engine_error)
     });
 
-    on.handle::<SyncShare, _, _>(|p, ctx| async move {
+    on.handle::<InstanceSyncKeys, _, _>(|p: InstanceSyncKeysParams, ctx| async move {
         let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
-        let (enabled, warnings) = ctx
-            .runtime
+        ctx.runtime
             .engine()
-            .set_instance_sharing(&record.id, p.enabled)
-            .map_err(crate::runtime::engine_error)?;
-        Ok(SyncShareResult { enabled, warnings })
+            .set_instance_sync_keys(&record.id, p.unsynced)
+            .map_err(crate::runtime::engine_error)
     });
 }

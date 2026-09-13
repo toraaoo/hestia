@@ -1,106 +1,35 @@
-//! Shared settings/configs, propagated across instances through a persistent
-//! `<data_home>/shared/` store. Two target classes, following Pandora's split:
-//!
-//! - **Files are copied** ([`files`]): each instance keeps its own physical copy
-//!   under `data/`, reconciled against a per-instance baseline. File symlinks
-//!   would need elevation on Windows.
-//! - **Folders are linked** ([`folders`]): a symlink on POSIX, a junction on
-//!   Windows, so folder content — worlds above all — is stored once and shared
-//!   live between instances.
-//!
-//! A [`Pass`] is one reconcile: which instance, where its game directory is, and
-//! which store its settings-class targets belong to. A launch runs one and
-//! remembers it; the same pass runs again when that session exits, so what the
-//! player changed in game reaches the store then rather than at their next
-//! launch.
-//!
-//! Sharing is switchable launcher-wide (`sync.enabled`) and per instance
-//! ([`Sync::attach`] / [`Sync::detach`]): off, no pass runs at all. Links
-//! already made are left alone — hestia never breaks one behind the user's
-//! back.
-//!
-//! Sync is **instance-only**: a client-side quality-of-life feature. A server's
-//! configuration is per-server infrastructure (`server.config.*`,
-//! `server.properties`) and is never shared — concurrent live servers must not
-//! share writable config.
-//!
-//! The launcher-managed content directories (`mods/`, `resourcepacks/`,
-//! `shaderpacks/`) are off-limits as targets: the content system owns them and
-//! per-instance selection is impossible over a shared directory. `saves/` is a
-//! valid — and default — *linked* target, but stays invalid as a copied one.
+//! Shared settings across instances: a catalogue of units, the shared copy of
+//! each under `<data_home>/shared/`, and the reconcile a launch runs.
 
-mod files;
-mod folders;
-pub(crate) mod link;
+mod catalogue;
+mod history;
+mod options;
+mod reconcile;
+mod servers;
+mod state;
 
-use std::collections::HashMap;
-use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::collections::{BTreeSet, HashMap};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::UNIX_EPOCH;
 
-use anyhow::{bail, Context, Result};
-use proto::sync::{SyncTargets, TargetLinkState};
+use anyhow::{Context, Result};
+use proto::sync::{SyncConfig, SyncOption, SyncOverrides, SyncUnit, UnitState, UnitStatus};
 use proto::warning::WarningInfo;
 
-use folders::Linked;
+use state::Catalogue;
 
-const TARGETS_FILE: &str = "targets.json";
-const OPTIONS_TXT: &str = "options.txt";
-
-/// Where a store keeps, per instance, the content each copied target last
-/// agreed on.
+/// Agreements live inside the store they describe, so a captured profile
+/// carries its own and `release` takes them with it.
 const BASELINES: &str = ".baselines";
 
-/// First-path-component names no target may ever claim: the launcher-managed
-/// content dirs (owned by the content system), the backups dir, and the store's
-/// own bookkeeping.
-const RESERVED_ROOTS: &[&str] = &["mods", "resourcepacks", "shaderpacks", "backups", BASELINES];
-
-/// The settings-class targets a captured profile scopes to its own store.
-/// Worlds and screenshots stay on the global store: capture exists to fork
-/// *settings*, not game data.
-const CAPTURE_FILES: &[&str] = &[OPTIONS_TXT];
-const CAPTURE_FOLDERS: &[&str] = &["config"];
-
-/// 1.13 renamed every `options.txt` keybind from an LWJGL key code to a
-/// `key.keyboard.*` name, and is the oldest world format a current client opens
-/// without converting.
-pub const SHARED_FORMATS_SINCE: (u64, u64, u64) = (1, 13, 0);
-
-/// The targets whose on-disk format is bound to the game's era.
-const ERA_BOUND: &[&str] = &[OPTIONS_TXT, "saves"];
-
-/// An id that is not a release triple answers yes: nearly all of them are
-/// modern snapshots.
-pub fn shares_era_bound(game_version: &str) -> bool {
-    crate::version::parse(game_version).is_none_or(|v| v >= SHARED_FORMATS_SINCE)
-}
-
-/// Where an instance's settings-class targets reconcile for one pass.
 #[derive(Clone, Default, PartialEq, Eq)]
 pub enum Scope {
-    /// The global shared store — the ordinary instance.
     #[default]
     Shared,
-    /// A captured profile's own store.
     Profile(PathBuf),
-    /// The instance owns them: a modpack ships its config tree, so hestia does
-    /// not link or adopt one behind the user's back. An `adopt` the user asks
-    /// for still opts in, and the link it leaves is honoured from then on.
-    Local,
 }
 
-impl Scope {
-    /// Whether this target is one the instance keeps to itself unless the user
-    /// has already opted in by adopting it.
-    fn owns_locally(&self, target: &str) -> bool {
-        matches!(self, Scope::Local) && CAPTURE_FOLDERS.contains(&target)
-    }
-}
-
-/// One reconcile of one instance. The id keys its baselines and the name is
-/// what a warning calls it, so both travel together — a rename must not read as
-/// a different instance to the store.
 #[derive(Clone)]
 pub struct Pass {
     pub id: String,
@@ -108,19 +37,11 @@ pub struct Pass {
     pub game_version: String,
     pub data_dir: PathBuf,
     pub scope: Scope,
-}
-
-impl Pass {
-    fn may_share(&self, raw: &str) -> bool {
-        !ERA_BOUND.contains(&raw) || shares_era_bound(&self.game_version)
-    }
+    pub overrides: SyncOverrides,
 }
 
 pub struct Sync {
     dir: Mutex<PathBuf>,
-    /// What each live session reconciles against, so its exit pass uses the
-    /// scope it launched under rather than whichever is active by then. A daemon
-    /// restart drops these; the next launch reconciles as it always would.
     sessions: Mutex<HashMap<String, Pass>>,
 }
 
@@ -136,200 +57,191 @@ impl Sync {
         *self.dir.lock().unwrap() = dir;
     }
 
-    /// The shared store root (`<data_home>/shared`).
     pub fn dir(&self) -> PathBuf {
         self.dir.lock().unwrap().clone()
     }
 
-    /// The current target set — the persisted file, or the built-in defaults
-    /// when none has been written yet.
-    pub fn targets(&self) -> SyncTargets {
-        let path = self.dir().join(TARGETS_FILE);
-        fs::read_to_string(&path)
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_else(default_targets)
-    }
-
-    /// Validate and persist a new target set. Each path must be relative,
-    /// free of `..` escapes, and outside the launcher-managed directories;
-    /// `saves` is additionally rejected as a *file* (copied) target.
-    pub fn set_targets(&self, targets: SyncTargets) -> Result<SyncTargets> {
-        for path in &targets.files {
-            validate_target(path)?;
-            if first_component(path).as_deref() == Some("saves") {
-                bail!(proto::error::ErrorInfo::SyncTargetInvalid {
-                    path: path.to_string(),
-                    reason: proto::error::SyncReason::CopiedTarget
-                });
-            }
-        }
-        for path in &targets.folders {
-            validate_target(path)?;
-        }
-        let dir = self.dir();
-        fs::create_dir_all(&dir).with_context(|| format!("cannot create {}", dir.display()))?;
-        let text = serde_json::to_string_pretty(&targets).expect("SyncTargets serializes");
-        fs::write(dir.join(TARGETS_FILE), format!("{text}\n"))?;
-        Ok(targets)
-    }
-
-    /// Reconcile an instance's `data/` with the store: settle the file targets
-    /// against their baselines, then ensure each folder target is a link.
-    ///
-    /// Best-effort per target — refusing to launch over a leftover folder would
-    /// be worse than launching unshared. Every skip is **returned** as a
-    /// warning: the user configured that target expecting it to be shared, and
-    /// would otherwise play against the wrong data with no sign of it.
-    pub fn apply(&self, pass: &Pass) -> Vec<WarningInfo> {
-        let targets = self.targets();
+    pub fn config(&self) -> SyncConfig {
         let shared = self.dir();
-        fs::create_dir_all(&shared).ok();
-        let mut warnings = Vec::new();
+        Catalogue::load(&shared).to_config(&shared)
+    }
 
-        for raw in &targets.files {
-            let Some(rel) = safe_rel(raw) else { continue };
-            if !pass.may_share(raw) {
-                warnings.push(era_warning(pass, raw));
-                continue;
-            }
-            let store = scope_root(&shared, &pass.scope, raw, CAPTURE_FILES);
-            let baseline = baseline_path(&store, &pass.id, &rel);
-            let store = store.join(&rel);
-            let at = pass.data_dir.join(&rel);
-            let result = if rel.as_os_str() == OPTIONS_TXT {
-                files::merge_options(&baseline, &store, &at)
-            } else {
-                files::reconcile(&baseline, &store, &at)
-            };
-            if let Err(e) = result {
-                tracing::warn!(target = %rel.display(), error = %e, "config sync skipped a file");
-                warnings.push(WarningInfo::SyncTargetSkipped {
-                    target: raw.clone(),
-                    detail: format!("{e:#}"),
-                });
-            }
+    pub fn enabled(&self, unit: SyncUnit) -> bool {
+        Catalogue::load(&self.dir()).enabled(unit)
+    }
+
+    pub fn enable(&self, unit: SyncUnit, seeded_from: &str) -> Result<SyncConfig> {
+        let shared = self.dir();
+        let mut catalogue = Catalogue::load(&shared);
+        catalogue.enable(unit, seeded_from);
+        catalogue.save(&shared)?;
+        Ok(catalogue.to_config(&shared))
+    }
+
+    pub fn disable(&self, unit: SyncUnit) -> Result<SyncConfig> {
+        let shared = self.dir();
+        let mut catalogue = Catalogue::load(&shared);
+        catalogue.disable(unit);
+        catalogue.save(&shared)?;
+        Ok(catalogue.to_config(&shared))
+    }
+
+    pub fn set_unsynced(&self, keys: BTreeSet<String>) -> Result<SyncConfig> {
+        let shared = self.dir();
+        let mut catalogue = Catalogue::load(&shared);
+        catalogue.set_unsynced(keys);
+        catalogue.save(&shared)?;
+        Ok(catalogue.to_config(&shared))
+    }
+
+    pub fn seed(&self, unit: SyncUnit, from: &Path) -> Result<()> {
+        let shared = self.dir();
+        std::fs::create_dir_all(&shared)
+            .with_context(|| format!("cannot create {}", shared.display()))?;
+        let file = catalogue::file(unit);
+        let source = from.join(file);
+        if source.is_file() {
+            reconcile::copy_file(&source, &shared.join(file))?;
         }
+        Ok(())
+    }
 
-        for raw in &targets.folders {
-            let Some(rel) = safe_rel(raw) else { continue };
-            if !pass.may_share(raw) {
-                // A link made before this instance was known to be era-bound is
-                // live and unsafe, so it is taken back to the instance's own
-                // copy rather than left pointing at the store the warning says
-                // it does not share.
-                let store = scope_root(&shared, &pass.scope, raw, CAPTURE_FOLDERS).join(&rel);
-                let at = pass.data_dir.join(&rel);
-                match folders::materialize(&store, &at, &rel) {
-                    Ok(Some(bytes)) => warnings.push(WarningInfo::SyncTargetDuplicated {
-                        target: raw.clone(),
-                        bytes,
-                    }),
-                    Ok(None) => {}
-                    Err(e) => warnings.push(WarningInfo::SyncTargetSkipped {
-                        target: raw.clone(),
-                        detail: format!("{e:#}"),
-                    }),
-                }
-                warnings.push(era_warning(pass, raw));
+    pub fn defer(&self, unit: SyncUnit, id: &str, data_dir: &Path) -> Result<()> {
+        let file = catalogue::file(unit);
+        reconcile::defer_to_store(
+            &self.dir().join(BASELINES).join(id).join(file),
+            &data_dir.join(file),
+        )
+    }
+
+    pub fn source_state(&self, unit: SyncUnit, data_dir: &Path) -> (bool, Option<i64>) {
+        let path = data_dir.join(catalogue::file(unit));
+        let modified = reconcile::mtime(&path)
+            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+            .map(|since| since.as_secs() as i64);
+        (path.is_file(), modified)
+    }
+
+    /// Best-effort per unit: refusing to launch over one unreadable file would
+    /// be worse than launching unshared, so a skip is returned rather than
+    /// raised.
+    pub fn apply(&self, pass: &Pass) -> Vec<WarningInfo> {
+        let shared = self.dir();
+        let catalogue = Catalogue::load(&shared);
+        let mut warnings = Vec::new();
+        for &unit in catalogue::ALL {
+            if !catalogue.enabled(unit) || !pass.overrides.shares(unit) {
                 continue;
             }
-            let store = scope_root(&shared, &pass.scope, raw, CAPTURE_FOLDERS);
-            let at = pass.data_dir.join(&rel);
-            if pass.scope.owns_locally(raw) && !folders::links_into_a_store(&at, &rel) {
-                tracing::debug!(target = %rel.display(), "leaving a pack-owned folder local");
-                continue;
-            }
-            match folders::ensure_link(&store.join(&rel), &at, &rel) {
-                Ok(Linked::Yes) => {}
-                Ok(Linked::No(reason)) => warnings.push(WarningInfo::SyncTargetNotShared {
+            if catalogue::era_bound(unit) && !catalogue::shares_era_bound(&pass.game_version) {
+                tracing::info!(instance = %pass.name, version = %pass.game_version, %unit, "sync skipped an era-bound unit");
+                warnings.push(WarningInfo::SyncUnitEraBound {
                     instance: pass.name.clone(),
-                    target: raw.clone(),
-                    reason,
-                }),
-                Err(e) => {
-                    tracing::warn!(
-                        target = %rel.display(),
-                        error = format!("{e:#}"),
-                        "cannot link a sync folder"
-                    );
-                    warnings.push(WarningInfo::SyncTargetSkipped {
-                        target: raw.clone(),
-                        detail: format!("{e:#}"),
-                    });
-                }
+                    unit,
+                });
+                continue;
+            }
+            if let Err(e) = self.settle(unit, pass, &shared, &catalogue) {
+                let detail = format!("{e:#}");
+                tracing::warn!(%unit, error = %detail, "sync skipped a unit");
+                warnings.push(WarningInfo::SyncUnitSkipped { unit, detail });
             }
         }
         warnings
     }
 
-    /// Take an instance out of sharing: every folder it shares becomes its own
-    /// copy of the store's content and its agreements are dropped. Nothing is
-    /// deleted — it plays what it played before, and the two copies diverge
-    /// from here.
-    pub fn detach(&self, pass: &Pass) -> Result<Vec<WarningInfo>> {
-        let targets = self.targets();
-        let shared = self.dir();
-        let mut warnings = Vec::new();
-        for raw in &targets.folders {
-            let Some(rel) = safe_rel(raw) else { continue };
-            let store = scope_root(&shared, &pass.scope, raw, CAPTURE_FOLDERS).join(&rel);
-            let at = pass.data_dir.join(&rel);
-            if let Some(bytes) = folders::materialize(&store, &at, &rel)
-                .with_context(|| format!("cannot copy '{raw}' out of the store"))?
-            {
-                tracing::info!(instance = %pass.name, target = %raw, bytes, "copied out of the store");
-                warnings.push(WarningInfo::SyncTargetDuplicated {
-                    target: raw.clone(),
-                    bytes,
-                });
-            }
+    fn settle(
+        &self,
+        unit: SyncUnit,
+        pass: &Pass,
+        shared: &Path,
+        catalogue: &Catalogue,
+    ) -> Result<()> {
+        let store = self.store_root(unit, pass, shared);
+        let baselines = store.join(BASELINES).join(&pass.id);
+        std::fs::create_dir_all(&baselines)
+            .with_context(|| format!("cannot create {}", baselines.display()))?;
+        let file = catalogue::file(unit);
+        match unit {
+            SyncUnit::Options => options::merge(
+                &baselines.join(file),
+                &store.join(file),
+                &pass.data_dir.join(file),
+                &excluded_keys(catalogue, pass),
+            ),
+            SyncUnit::Servers => servers::merge(&baselines, &store, &pass.data_dir),
+            SyncUnit::Commands => history::merge(
+                &baselines.join(file),
+                &store.join(file),
+                &pass.data_dir.join(file),
+            ),
+            SyncUnit::Hotbars => reconcile::whole(
+                &baselines.join(file),
+                &store.join(file),
+                &pass.data_dir.join(file),
+            ),
         }
-        self.forget(&pass.id);
-        Ok(warnings)
     }
 
-    /// Bring an instance back into sharing. The store is the authority for
-    /// anything the two both have, since the others are already playing it: a
-    /// clashing folder entry keeps the store's copy and a clashing setting takes
-    /// the store's value. What only this instance has is carried in.
-    pub fn attach(&self, pass: &Pass) -> Result<Vec<WarningInfo>> {
-        let targets = self.targets();
+    pub fn status(&self, pass: &Pass) -> Vec<UnitStatus> {
         let shared = self.dir();
-        let mut warnings = Vec::new();
-        for raw in &targets.files {
-            let Some(rel) = safe_rel(raw) else { continue };
-            let store = scope_root(&shared, &pass.scope, raw, CAPTURE_FILES);
-            files::defer_to_store(
-                &baseline_path(&store, &pass.id, &rel),
-                &pass.data_dir.join(&rel),
-            )
-            .with_context(|| format!("cannot record the agreement for '{raw}'"))?;
-        }
-        for raw in &targets.folders {
-            let Some(rel) = safe_rel(raw) else { continue };
-            let store = scope_root(&shared, &pass.scope, raw, CAPTURE_FOLDERS).join(&rel);
-            let at = pass.data_dir.join(&rel);
-            let replaced = folders::adopt(&store, &at, &rel, folders::OnCollision::KeepStore)
-                .with_context(|| format!("cannot share '{raw}'"))?;
-            if !replaced.is_empty() {
-                tracing::info!(
-                    instance = %pass.name,
-                    target = %raw,
-                    replaced = replaced.join(", "),
-                    "the store's copies won a clash"
-                );
-                warnings.push(WarningInfo::SyncEntriesReplaced {
-                    target: raw.clone(),
-                    entries: replaced,
-                });
-            }
-        }
-        warnings.extend(self.apply(pass));
-        Ok(warnings)
+        let catalogue = Catalogue::load(&shared);
+        catalogue::ALL
+            .iter()
+            .map(|&unit| UnitStatus {
+                unit,
+                state: self.state(unit, pass, &shared, &catalogue),
+            })
+            .collect()
     }
 
-    /// Record what a starting session reconciled, keyed by its process id.
+    fn state(
+        &self,
+        unit: SyncUnit,
+        pass: &Pass,
+        shared: &Path,
+        catalogue: &Catalogue,
+    ) -> UnitState {
+        if !catalogue.enabled(unit) {
+            return UnitState::Off;
+        }
+        if !pass.overrides.shares(unit) {
+            return UnitState::Overridden;
+        }
+        if catalogue::era_bound(unit) && !catalogue::shares_era_bound(&pass.game_version) {
+            return UnitState::EraBound;
+        }
+        let agreed = self
+            .store_root(unit, pass, shared)
+            .join(BASELINES)
+            .join(&pass.id)
+            .join(catalogue::file(unit));
+        match agreed.exists() {
+            true => UnitState::Synced,
+            false => UnitState::Pending,
+        }
+    }
+
+    pub fn options(&self) -> Vec<SyncOption> {
+        let shared = self.dir();
+        let catalogue = Catalogue::load(&shared);
+        options::read(&shared.join(catalogue::file(SyncUnit::Options)))
+            .into_iter()
+            .map(|(key, value)| SyncOption {
+                synced: !catalogue.unsynced().contains(&key),
+                key,
+                value,
+            })
+            .collect()
+    }
+
+    pub fn set_option(&self, key: &str, value: &str) -> Result<()> {
+        let path = self.dir().join(catalogue::file(SyncUnit::Options));
+        let mut values = options::read(&path);
+        values.insert(key.to_string(), value.to_string());
+        options::write(&path, &values)
+    }
+
     pub fn remember(&self, session: &str, pass: Pass) {
         self.sessions
             .lock()
@@ -337,212 +249,70 @@ impl Sync {
             .insert(session.to_string(), pass);
     }
 
-    /// Take back what a finished session reconciled, if it recorded anything.
     pub fn recall(&self, session: &str) -> Option<Pass> {
         self.sessions.lock().unwrap().remove(session)
     }
 
-    /// Drop an instance's baselines from the global store. A profile's store
-    /// lives under the instance and goes with it.
     pub fn forget(&self, id: &str) {
         let dir = self.dir().join(BASELINES).join(id);
         if dir.exists() {
-            if let Err(e) = fs::remove_dir_all(&dir) {
+            if let Err(e) = std::fs::remove_dir_all(&dir) {
                 tracing::warn!(instance = id, error = %e, "cannot drop the sync baselines");
             }
         }
     }
 
-    /// Seed a profile's captured store from the global one: the settings-class
-    /// file and folder targets are copied as they currently stand. From then on
-    /// launches under the profile reconcile against the captured store, and
-    /// divergence is by design.
     pub fn capture(&self, profile_store: &Path) -> Result<()> {
-        let targets = self.targets();
         let shared = self.dir();
-        fs::create_dir_all(profile_store)
+        std::fs::create_dir_all(profile_store)
             .with_context(|| format!("cannot create {}", profile_store.display()))?;
-        for raw in &targets.files {
-            let Some(rel) = safe_rel(raw) else { continue };
-            if !CAPTURE_FILES.contains(&raw.as_str()) {
-                continue;
-            }
-            let source = shared.join(&rel);
+        for &unit in catalogue::ALL
+            .iter()
+            .filter(|unit| catalogue::captured(**unit))
+        {
+            let file = catalogue::file(unit);
+            let source = shared.join(file);
             if source.is_file() {
-                files::copy_file(&source, &profile_store.join(&rel))?;
-            }
-        }
-        for raw in &targets.folders {
-            let Some(rel) = safe_rel(raw) else { continue };
-            if !CAPTURE_FOLDERS.contains(&raw.as_str()) {
-                continue;
-            }
-            let source = shared.join(&rel);
-            let dest = profile_store.join(&rel);
-            if source.is_dir() && link::read_target(&source).is_none() {
-                folders::copy_tree(&source, &dest)?;
-            } else {
-                fs::create_dir_all(&dest)
-                    .with_context(|| format!("cannot create {}", dest.display()))?;
+                reconcile::copy_file(&source, &profile_store.join(file))?;
             }
         }
         Ok(())
     }
 
-    /// Delete a profile's captured store; the profile inherits the global
-    /// store again (the stale link in `data/` is relinked at the next apply).
     pub fn release(&self, profile_store: &Path) -> Result<()> {
         if profile_store.symlink_metadata().is_ok() {
-            fs::remove_dir_all(profile_store)
+            std::fs::remove_dir_all(profile_store)
                 .with_context(|| format!("cannot remove {}", profile_store.display()))?;
         }
         Ok(())
     }
 
-    /// Each folder target's link state for one instance's `data/`.
-    pub fn status(&self, data_dir: &Path) -> Vec<TargetLinkState> {
-        let targets = self.targets();
-        let shared = self.dir();
-        targets
-            .folders
-            .iter()
-            .filter_map(|raw| {
-                let rel = safe_rel(raw)?;
-                Some(TargetLinkState {
-                    target: raw.clone(),
-                    state: folders::state(&shared.join(&rel), &data_dir.join(&rel), &rel),
-                })
-            })
-            .collect()
-    }
-
-    /// Move the entries of an instance's real folder targets into the store
-    /// and link the emptied folders. All-or-nothing per target: any name that
-    /// already exists in the store refuses that whole target, naming the
-    /// collisions — nothing is ever merged or overwritten. Returns each
-    /// target that is linked after the call.
-    pub fn adopt(&self, data_dir: &Path, requested: &[String]) -> Result<Vec<String>> {
-        let targets = self.targets();
-        let all: Vec<String> = if requested.is_empty() {
-            targets.folders.iter().cloned().collect()
-        } else {
-            for name in requested {
-                if !targets.folders.contains(name) {
-                    bail!(proto::error::ErrorInfo::SyncTargetInvalid {
-                        path: name.to_string(),
-                        reason: proto::error::SyncReason::NotFolderTarget
-                    });
-                }
-            }
-            requested.to_vec()
-        };
-
-        let shared = self.dir();
-        let mut adopted = Vec::new();
-        for raw in all {
-            let Some(rel) = safe_rel(&raw) else { continue };
-            let store = shared.join(&rel);
-            let at = data_dir.join(&rel);
-            folders::adopt(&store, &at, &rel, folders::OnCollision::Refuse)
-                .with_context(|| format!("cannot adopt '{raw}'"))?;
-            adopted.push(raw);
-        }
-        Ok(adopted)
-    }
-}
-
-/// The built-in targets. Copied files: `options.txt` (keybinds/video,
-/// key-merged) and `servers.dat` (the multiplayer list). Linked folders:
-/// `saves` (the shared worlds), mod `config/`, and `screenshots`.
-fn default_targets() -> SyncTargets {
-    SyncTargets {
-        files: [OPTIONS_TXT.to_string(), "servers.dat".to_string()]
-            .into_iter()
-            .collect(),
-        folders: [
-            "saves".to_string(),
-            "config".to_string(),
-            "screenshots".to_string(),
-        ]
-        .into_iter()
-        .collect(),
-    }
-}
-
-/// The store root a target reconciles against: the profile's captured store
-/// for settings-class targets when one is in scope, the global store otherwise.
-fn scope_root(shared: &Path, scope: &Scope, raw: &str, scoped: &[&str]) -> PathBuf {
-    match scope {
-        Scope::Profile(store) if scoped.contains(&raw) => store.clone(),
-        _ => shared.to_path_buf(),
-    }
-}
-
-/// A baseline lives in the store it describes an agreement with, so a profile's
-/// captured store carries its own and `release` takes them with it.
-fn era_warning(pass: &Pass, target: &str) -> WarningInfo {
-    tracing::info!(
-        instance = %pass.name,
-        version = %pass.game_version,
-        target,
-        "sync skipped an era-bound target"
-    );
-    WarningInfo::SyncTargetNotShared {
-        instance: pass.name.clone(),
-        target: target.to_string(),
-        reason: proto::warning::NotSharedReason::GameEra,
-    }
-}
-
-fn baseline_path(store: &Path, instance: &str, rel: &Path) -> PathBuf {
-    store.join(BASELINES).join(instance).join(rel)
-}
-
-/// Reject an absolute path, a `..` escape, an empty path, or one rooted at a
-/// launcher-managed directory.
-fn validate_target(path: &str) -> Result<()> {
-    let first =
-        first_component(path).with_context(|| format!("'{path}' is not a safe relative path"))?;
-    if RESERVED_ROOTS.contains(&first.as_str()) {
-        bail!(proto::error::ErrorInfo::SyncTargetInvalid {
-            path: path.to_string(),
-            reason: proto::error::SyncReason::ManagedDir
-        });
-    }
-    Ok(())
-}
-
-fn first_component(path: &str) -> Option<String> {
-    safe_rel(path)?.components().find_map(|c| match c {
-        Component::Normal(s) => Some(s.to_string_lossy().into_owned()),
-        _ => None,
-    })
-}
-
-/// Normalise a target string to a relative path, rejecting absolute paths and any
-/// component that escapes the root (`..`, a root/prefix).
-fn safe_rel(path: &str) -> Option<PathBuf> {
-    let candidate = Path::new(path);
-    let mut normalized = PathBuf::new();
-    for component in candidate.components() {
-        match component {
-            Component::Normal(part) => normalized.push(part),
-            Component::CurDir => {}
-            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
+    fn store_root(&self, unit: SyncUnit, pass: &Pass, shared: &Path) -> PathBuf {
+        match &pass.scope {
+            Scope::Profile(store) if catalogue::captured(unit) => store.clone(),
+            _ => shared.to_path_buf(),
         }
     }
-    if normalized.as_os_str().is_empty() {
-        return None;
-    }
-    Some(normalized)
+}
+
+fn excluded_keys(catalogue: &Catalogue, pass: &Pass) -> BTreeSet<String> {
+    catalogue
+        .unsynced()
+        .iter()
+        .cloned()
+        .chain(pass.overrides.unsynced.iter().cloned())
+        .chain(
+            catalogue::ALWAYS_LOCAL_KEYS
+                .iter()
+                .map(|key| key.to_string()),
+        )
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::time::{Duration, SystemTime};
-
-    use proto::sync::LinkState;
-    use proto::warning::NotSharedReason;
 
     use super::*;
 
@@ -553,6 +323,14 @@ mod tests {
             .expect("temp dir")
     }
 
+    fn sharing(shared: &Path) -> Sync {
+        let sync = Sync::new(shared.to_path_buf());
+        for &unit in catalogue::ALL {
+            sync.enable(unit, "test").unwrap();
+        }
+        sync
+    }
+
     fn pass(name: &str, data_dir: &Path) -> Pass {
         Pass {
             id: name.to_string(),
@@ -560,20 +338,7 @@ mod tests {
             game_version: "1.21.4".to_string(),
             data_dir: data_dir.to_path_buf(),
             scope: Scope::Shared,
-        }
-    }
-
-    fn legacy_pass(name: &str, data_dir: &Path) -> Pass {
-        Pass {
-            game_version: "1.12.2".to_string(),
-            ..pass(name, data_dir)
-        }
-    }
-
-    fn scoped(name: &str, data_dir: &Path, scope: Scope) -> Pass {
-        Pass {
-            scope,
-            ..pass(name, data_dir)
+            overrides: SyncOverrides::default(),
         }
     }
 
@@ -594,152 +359,56 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_managed_dirs_and_escapes() {
-        assert!(validate_target("mods/sodium.jar").is_err());
-        assert!(validate_target("resourcepacks/x").is_err());
-        assert!(validate_target(".baselines/cozy").is_err());
-        assert!(validate_target("../secret").is_err());
-        assert!(validate_target("/etc/passwd").is_err());
-        assert!(validate_target("").is_err());
-        assert!(validate_target("options.txt").is_ok());
-        assert!(validate_target("config/mod.toml").is_ok());
-        assert!(validate_target("saves").is_ok());
-    }
-
-    #[test]
-    fn saves_is_a_folder_target_only() {
-        let base = temp_dir("savesclass");
-        let sync = Sync::new(base.path().join("shared"));
-
-        let mut targets = SyncTargets::default();
-        targets.folders.insert("saves".to_string());
-        assert!(sync.set_targets(targets).is_ok());
-
-        let mut targets = SyncTargets::default();
-        targets.files.insert("saves".to_string());
-        assert!(sync.set_targets(targets).is_err());
-    }
-
-    #[test]
-    fn a_legacy_instance_shares_neither_options_nor_saves() {
-        let base = temp_dir("era");
+    fn a_unit_is_off_until_it_is_enabled() {
+        let base = temp_dir("off");
         let shared = base.path().join("shared");
         let data = base.path().join("data");
         fs::create_dir_all(&shared).unwrap();
         fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
-
-        let warnings = Sync::new(shared.clone()).apply(&legacy_pass("old", &data));
-
-        assert!(
-            !data.join("options.txt").exists(),
-            "a pre-1.13 client cannot read the store's keybinds"
-        );
-        assert!(!data.join("saves").exists());
-        let era: Vec<&str> = warnings
-            .iter()
-            .filter_map(|w| match w {
-                WarningInfo::SyncTargetNotShared {
-                    target,
-                    reason: proto::warning::NotSharedReason::GameEra,
-                    ..
-                } => Some(target.as_str()),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(era.len(), 2, "both era-bound targets are reported: {era:?}");
-    }
-
-    #[test]
-    fn a_legacy_launch_takes_back_a_link_made_before_the_gate() {
-        let base = temp_dir("era-unlink");
-        let shared = base.path().join("shared");
-        let data = base.path().join("data");
-        fs::create_dir_all(&data).unwrap();
-        fs::create_dir_all(shared.join("saves").join("World")).unwrap();
-        fs::write(shared.join("saves").join("World").join("level.dat"), "w").unwrap();
 
         let sync = Sync::new(shared.clone());
-        sync.apply(&pass("modern", &data));
-        assert!(
-            folders::links_into_a_store(&data.join("saves"), Path::new("saves")),
-            "a modern instance links as before"
-        );
+        sync.apply(&pass("test", &data));
+        assert!(!data.join("options.txt").exists());
 
-        let warnings = sync.apply(&legacy_pass("modern", &data));
-
-        assert!(
-            !folders::links_into_a_store(&data.join("saves"), Path::new("saves")),
-            "the link is taken back once the instance is era-bound"
-        );
-        assert!(data.join("saves").join("World").join("level.dat").is_file());
-        assert!(warnings
-            .iter()
-            .any(|w| matches!(w, WarningInfo::SyncTargetDuplicated { .. })));
+        sync.enable(SyncUnit::Options, "other").unwrap();
+        sync.apply(&pass("test", &data));
+        assert!(fs::read_to_string(data.join("options.txt"))
+            .unwrap()
+            .contains("guiScale:3"));
     }
 
     #[test]
-    fn a_legacy_instance_still_shares_the_era_agnostic_targets() {
-        let base = temp_dir("era-keeps");
-        let shared = base.path().join("shared");
-        let data = base.path().join("data");
-        fs::create_dir_all(&shared).unwrap();
-        fs::write(shared.join("servers.dat"), b"\x0a\x00\x00").unwrap();
-
-        Sync::new(shared).apply(&legacy_pass("old", &data));
-
-        assert!(data.join("servers.dat").exists());
-        assert!(data.join("screenshots").exists());
-    }
-
-    #[test]
-    fn the_era_boundary_is_the_1_13_format_break() {
-        assert!(!shares_era_bound("1.6.4"));
-        assert!(!shares_era_bound("1.12.2"));
-        assert!(shares_era_bound("1.13"));
-        assert!(shares_era_bound("1.21.4"));
-        assert!(
-            shares_era_bound("23w14a"),
-            "an unparseable id is treated as modern"
-        );
-    }
-
-    #[test]
-    fn seeds_a_new_instance_from_the_store() {
+    fn seeding_starts_the_shared_copy_from_one_instance() {
         let base = temp_dir("seed");
         let shared = base.path().join("shared");
-        let data = base.path().join("data");
-        fs::create_dir_all(&shared).unwrap();
-        fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
+        let source = base.path().join("source");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("options.txt"), "fov:90\n").unwrap();
 
-        Sync::new(shared).apply(&pass("test", &data));
+        Sync::new(shared.clone())
+            .seed(SyncUnit::Options, &source)
+            .unwrap();
 
-        let seeded = fs::read_to_string(data.join("options.txt")).unwrap();
-        assert!(seeded.contains("guiScale:3"));
+        assert!(fs::read_to_string(shared.join("options.txt"))
+            .unwrap()
+            .contains("fov:90"));
     }
 
     #[test]
-    fn pack_selection_stays_entry_local() {
-        let base = temp_dir("packs");
+    fn deferring_lets_the_shared_copy_win() {
+        let base = temp_dir("defer");
         let shared = base.path().join("shared");
         let data = base.path().join("data");
-        fs::create_dir_all(&data).unwrap();
-        fs::write(
-            data.join("options.txt"),
-            "guiScale:2\nresourcePacks:[\"cozy\"]\n",
-        )
-        .unwrap();
+        write_at(&shared.join("options.txt"), "guiScale:1\n", 300);
+        write_at(&data.join("options.txt"), "guiScale:4\n", 100);
 
-        Sync::new(shared.clone()).apply(&pass("test", &data));
+        let sync = sharing(&shared);
+        sync.defer(SyncUnit::Options, "test", &data).unwrap();
+        sync.apply(&pass("test", &data));
 
-        let stored = fs::read_to_string(shared.join("options.txt")).unwrap();
-        assert!(stored.contains("guiScale:2"));
-        assert!(
-            !stored.contains("resourcePacks"),
-            "pack selection must not propagate to the shared store"
-        );
-        // The entry keeps its own pack selection.
-        let local = fs::read_to_string(data.join("options.txt")).unwrap();
-        assert!(local.contains("resourcePacks"));
+        assert!(fs::read_to_string(data.join("options.txt"))
+            .unwrap()
+            .contains("guiScale:1"));
     }
 
     /// The drift the baseline exists to stop: an instance that changed nothing
@@ -750,43 +419,7 @@ mod tests {
         let shared = base.path().join("shared");
         let a = base.path().join("a");
         let b = base.path().join("b");
-        let sync = Sync::new(shared.clone());
-
-        write_at(&shared.join("servers.dat"), "one", 300);
-        sync.apply(&pass("a", &a));
-        sync.apply(&pass("b", &b));
-        assert_eq!(fs::read_to_string(a.join("servers.dat")).unwrap(), "one");
-
-        // b adds a server in game; a then launches, having changed nothing.
-        write_at(&b.join("servers.dat"), "one+two", 100);
-        sync.apply(&pass("a", &a));
-
-        // b's edit survives its own next pass, and reaches the store.
-        sync.apply(&pass("b", &b));
-        assert_eq!(
-            fs::read_to_string(b.join("servers.dat")).unwrap(),
-            "one+two"
-        );
-        assert_eq!(
-            fs::read_to_string(shared.join("servers.dat")).unwrap(),
-            "one+two"
-        );
-
-        // And a picks it up at its next launch.
-        sync.apply(&pass("a", &a));
-        assert_eq!(
-            fs::read_to_string(a.join("servers.dat")).unwrap(),
-            "one+two"
-        );
-    }
-
-    #[test]
-    fn an_idle_instance_cannot_revert_an_options_change() {
-        let base = temp_dir("optdrift");
-        let shared = base.path().join("shared");
-        let a = base.path().join("a");
-        let b = base.path().join("b");
-        let sync = Sync::new(shared.clone());
+        let sync = sharing(&shared);
 
         write_at(&shared.join("options.txt"), "guiScale:1\n", 300);
         sync.apply(&pass("a", &a));
@@ -795,24 +428,20 @@ mod tests {
         write_at(&b.join("options.txt"), "guiScale:4\n", 100);
         sync.apply(&pass("a", &a));
         sync.apply(&pass("b", &b));
+        sync.apply(&pass("a", &a));
 
-        assert!(fs::read_to_string(b.join("options.txt"))
-            .unwrap()
-            .contains("guiScale:4"));
-        assert!(fs::read_to_string(shared.join("options.txt"))
+        assert!(fs::read_to_string(a.join("options.txt"))
             .unwrap()
             .contains("guiScale:4"));
     }
 
-    /// Two instances editing different settings both survive — the reason
-    /// `options.txt` is merged by key rather than copied whole.
     #[test]
     fn two_instances_changing_different_keys_both_survive() {
-        let base = temp_dir("optkeys");
+        let base = temp_dir("keys");
         let shared = base.path().join("shared");
         let a = base.path().join("a");
         let b = base.path().join("b");
-        let sync = Sync::new(shared.clone());
+        let sync = sharing(&shared);
 
         write_at(&shared.join("options.txt"), "guiScale:1\nfov:70\n", 300);
         sync.apply(&pass("a", &a));
@@ -833,33 +462,158 @@ mod tests {
     }
 
     #[test]
+    fn a_key_one_instance_pins_stays_out_of_its_copy_only() {
+        let base = temp_dir("pin");
+        let shared = base.path().join("shared");
+        let a = base.path().join("a");
+        let b = base.path().join("b");
+        let sync = sharing(&shared);
+
+        write_at(&shared.join("options.txt"), "guiScale:1\n", 300);
+        write_at(&a.join("options.txt"), "guiScale:4\n", 100);
+
+        let mut pinned = pass("a", &a);
+        pinned.overrides.unsynced.insert("guiScale".to_string());
+        sync.apply(&pinned);
+        sync.apply(&pass("b", &b));
+
+        assert!(fs::read_to_string(a.join("options.txt"))
+            .unwrap()
+            .contains("guiScale:4"));
+        assert!(
+            fs::read_to_string(shared.join("options.txt"))
+                .unwrap()
+                .contains("guiScale:1"),
+            "pinning on one instance must not strip the key for the others"
+        );
+        assert!(fs::read_to_string(b.join("options.txt"))
+            .unwrap()
+            .contains("guiScale:1"));
+    }
+
+    #[test]
+    fn pack_selection_stays_instance_local() {
+        let base = temp_dir("packs");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        fs::create_dir_all(&data).unwrap();
+        fs::write(
+            data.join("options.txt"),
+            "guiScale:2\nresourcePacks:[\"cozy\"]\n",
+        )
+        .unwrap();
+
+        sharing(&shared).apply(&pass("test", &data));
+
+        let stored = fs::read_to_string(shared.join("options.txt")).unwrap();
+        assert!(stored.contains("guiScale:2"));
+        assert!(!stored.contains("resourcePacks"));
+        assert!(fs::read_to_string(data.join("options.txt"))
+            .unwrap()
+            .contains("resourcePacks"));
+    }
+
+    #[test]
+    fn an_instance_that_excludes_a_unit_keeps_its_own() {
+        let base = temp_dir("excluded");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        write_at(&shared.join("options.txt"), "guiScale:1\n", 300);
+        write_at(&data.join("options.txt"), "guiScale:4\n", 100);
+
+        let sync = sharing(&shared);
+        let mut opted_out = pass("test", &data);
+        opted_out.overrides.excluded.insert(SyncUnit::Options);
+        sync.apply(&opted_out);
+
+        assert!(fs::read_to_string(data.join("options.txt"))
+            .unwrap()
+            .contains("guiScale:4"));
+        assert_eq!(
+            sync.status(&opted_out)
+                .iter()
+                .find(|status| status.unit == SyncUnit::Options)
+                .map(|status| status.state),
+            Some(UnitState::Overridden)
+        );
+    }
+
+    #[test]
+    fn the_command_history_is_a_union_of_both_sides() {
+        let base = temp_dir("history");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        write_at(
+            &shared.join("command_history.txt"),
+            "/gamemode creative\n",
+            300,
+        );
+        write_at(&data.join("command_history.txt"), "/time set day\n", 100);
+
+        sharing(&shared).apply(&pass("test", &data));
+
+        let merged = fs::read_to_string(data.join("command_history.txt")).unwrap();
+        assert!(merged.contains("/gamemode creative"));
+        assert!(merged.contains("/time set day"));
+    }
+
+    #[test]
     fn a_missing_file_is_restored_rather_than_deleted_from_the_store() {
         let base = temp_dir("nodelete");
         let shared = base.path().join("shared");
         let data = base.path().join("data");
-        let sync = Sync::new(shared.clone());
+        let sync = sharing(&shared);
 
-        write_at(&shared.join("servers.dat"), "one", 300);
+        write_at(&shared.join("hotbar.nbt"), "one", 300);
         sync.apply(&pass("test", &data));
-        fs::remove_file(data.join("servers.dat")).unwrap();
+        fs::remove_file(data.join("hotbar.nbt")).unwrap();
         sync.apply(&pass("test", &data));
 
         assert_eq!(
-            fs::read_to_string(shared.join("servers.dat")).unwrap(),
+            fs::read_to_string(shared.join("hotbar.nbt")).unwrap(),
             "one"
         );
-        assert_eq!(fs::read_to_string(data.join("servers.dat")).unwrap(), "one");
+        assert_eq!(fs::read_to_string(data.join("hotbar.nbt")).unwrap(), "one");
     }
 
     #[test]
-    fn forget_drops_only_that_instances_baselines() {
+    fn a_legacy_instance_shares_everything_but_the_options() {
+        let base = temp_dir("era");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        fs::create_dir_all(&shared).unwrap();
+        fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
+        fs::write(shared.join("hotbar.nbt"), "bar").unwrap();
+
+        let legacy = Pass {
+            game_version: "1.12.2".to_string(),
+            ..pass("old", &data)
+        };
+        let warnings = sharing(&shared).apply(&legacy);
+
+        assert!(!data.join("options.txt").exists());
+        assert!(data.join("hotbar.nbt").exists());
+        assert!(warnings
+            .iter()
+            .any(|warning| matches!(warning, WarningInfo::SyncUnitEraBound { .. })));
+    }
+
+    #[test]
+    fn the_era_boundary_is_the_1_13_format_break() {
+        assert!(!catalogue::shares_era_bound("1.12.2"));
+        assert!(catalogue::shares_era_bound("1.13"));
+        assert!(catalogue::shares_era_bound("23w14a"));
+    }
+
+    #[test]
+    fn forget_drops_only_that_instances_agreements() {
         let base = temp_dir("forget");
         let shared = base.path().join("shared");
         let a = base.path().join("a");
         let b = base.path().join("b");
-        let sync = Sync::new(shared.clone());
+        let sync = sharing(&shared);
 
-        write_at(&shared.join("servers.dat"), "one", 300);
+        write_at(&shared.join("options.txt"), "guiScale:1\n", 300);
         sync.apply(&pass("a", &a));
         sync.apply(&pass("b", &b));
         assert!(shared.join(BASELINES).join("a").exists());
@@ -879,15 +633,17 @@ mod tests {
             .join("instance")
             .join("profiles")
             .join("showcase");
-        let sync = Sync::new(shared.clone());
+        let sync = sharing(&shared);
         sync.capture(&store).unwrap();
 
-        let launched = scoped("test", &data, Scope::Profile(store.clone()));
+        let launched = Pass {
+            scope: Scope::Profile(store.clone()),
+            ..pass("test", &data)
+        };
         sync.apply(&launched);
         sync.remember("instance-test-1", launched);
 
-        // The game wrote settings during the session; the exit pass must file
-        // them under the captured store, not whichever is active now.
+        fs::create_dir_all(&data).unwrap();
         fs::write(data.join("options.txt"), "guiScale:5\n").unwrap();
         let recalled = sync.recall("instance-test-1").expect("recorded at launch");
         sync.apply(&recalled);
@@ -900,378 +656,21 @@ mod tests {
     }
 
     #[test]
-    fn leaving_sharing_copies_the_shared_folders_out() {
-        let base = temp_dir("detach");
+    fn editing_the_shared_options_reaches_the_next_launch() {
+        let base = temp_dir("edit");
         let shared = base.path().join("shared");
         let data = base.path().join("data");
-        let sync = Sync::new(shared.clone());
-        let pass = pass("test", &data);
+        let sync = sharing(&shared);
 
-        sync.apply(&pass);
-        fs::create_dir_all(shared.join("saves").join("world")).unwrap();
-        fs::write(shared.join("saves").join("world").join("level.dat"), "w").unwrap();
-
-        let warnings = sync.detach(&pass).unwrap();
-
-        assert!(
-            link::read_target(&data.join("saves")).is_none(),
-            "no longer a link"
-        );
-        assert_eq!(
-            fs::read_to_string(data.join("saves").join("world").join("level.dat")).unwrap(),
-            "w",
-            "it plays what it played before"
-        );
-        assert!(
-            shared.join("saves").join("world").is_dir(),
-            "the store is untouched"
-        );
-        assert!(warnings.iter().any(
-            |w| matches!(w, WarningInfo::SyncTargetDuplicated { target, .. } if target == "saves")
-        ));
-
-        // What it does from here is its own.
-        fs::write(data.join("saves").join("world").join("level.dat"), "mine").unwrap();
-        assert_eq!(
-            fs::read_to_string(shared.join("saves").join("world").join("level.dat")).unwrap(),
-            "w"
-        );
-        assert!(!shared.join(BASELINES).join("test").exists());
-    }
-
-    #[test]
-    fn rejoining_lets_the_store_win_a_clash() {
-        let base = temp_dir("attach");
-        let shared = base.path().join("shared");
-        let data = base.path().join("data");
-        fs::create_dir_all(shared.join("saves").join("world")).unwrap();
-        fs::write(shared.join("saves").join("world").join("level.dat"), "ours").unwrap();
-        write_at(&shared.join("servers.dat"), "shared", 300);
-        fs::create_dir_all(data.join("saves").join("world")).unwrap();
-        fs::write(data.join("saves").join("world").join("level.dat"), "mine").unwrap();
-        fs::create_dir_all(data.join("saves").join("solo")).unwrap();
-        write_at(&data.join("servers.dat"), "mine", 100);
-
-        let sync = Sync::new(shared.clone());
-        let pass = pass("test", &data);
-        let warnings = sync.attach(&pass).unwrap();
-
-        assert!(link::is_linked_to(
-            &shared.join("saves"),
-            &data.join("saves")
-        ));
-        assert_eq!(
-            fs::read_to_string(shared.join("saves").join("world").join("level.dat")).unwrap(),
-            "ours",
-            "the store's copy survives the clash"
-        );
-        assert!(
-            shared.join("saves").join("solo").is_dir(),
-            "what only this instance had comes with it"
-        );
-        assert!(warnings.iter().any(|w| matches!(
-            w,
-            WarningInfo::SyncEntriesReplaced { entries, .. } if entries == &vec!["world".to_string()]
-        )));
-        // And the store wins a copied file too, newer though the instance's is.
-        assert_eq!(
-            fs::read_to_string(data.join("servers.dat")).unwrap(),
-            "shared"
-        );
-    }
-
-    #[test]
-    fn apply_links_missing_and_empty_folders() {
-        let base = temp_dir("linkfresh");
-        let shared = base.path().join("shared");
-        let data = base.path().join("data");
-        fs::create_dir_all(data.join("config")).unwrap();
-
-        Sync::new(shared.clone()).apply(&pass("test", &data));
-
-        assert!(link::is_linked_to(
-            &shared.join("saves"),
-            &data.join("saves")
-        ));
-        assert!(link::is_linked_to(
-            &shared.join("config"),
-            &data.join("config")
-        ));
-
-        // A world created through one instance's link is visible in another's.
-        fs::create_dir_all(data.join("saves").join("world")).unwrap();
-        let data2 = base.path().join("data2");
-        fs::create_dir_all(&data2).unwrap();
-        Sync::new(shared.clone()).apply(&pass("other", &data2));
-        assert!(data2.join("saves").join("world").is_dir());
-    }
-
-    #[test]
-    fn apply_adopts_a_folder_the_store_cannot_clash_with() {
-        let base = temp_dir("adopt-apply");
-        let shared = base.path().join("shared");
-        let data = base.path().join("data");
-        fs::create_dir_all(data.join("saves").join("old-world")).unwrap();
-        fs::write(data.join("saves").join("old-world").join("level.dat"), "x").unwrap();
-
-        let sync = Sync::new(shared.clone());
-        let warnings = sync.apply(&pass("test", &data));
-
-        assert!(
-            warnings.is_empty(),
-            "the user did nothing to be warned about"
-        );
-        assert!(link::is_linked_to(
-            &shared.join("saves"),
-            &data.join("saves")
-        ));
-        assert_eq!(
-            fs::read_to_string(shared.join("saves").join("old-world").join("level.dat")).unwrap(),
-            "x",
-            "the world moved into the store"
-        );
-        // And still opens where the game looks for it.
-        assert!(data
-            .join("saves")
-            .join("old-world")
-            .join("level.dat")
-            .exists());
-    }
-
-    #[test]
-    fn apply_leaves_a_folder_that_would_overwrite_the_store() {
-        let base = temp_dir("guard");
-        let shared = base.path().join("shared");
-        fs::create_dir_all(shared.join("saves").join("old-world")).unwrap();
-        fs::write(
-            shared.join("saves").join("old-world").join("level.dat"),
-            "store",
-        )
-        .unwrap();
-        let data = base.path().join("data");
-        fs::create_dir_all(data.join("saves").join("old-world")).unwrap();
-        fs::write(
-            data.join("saves").join("old-world").join("level.dat"),
-            "mine",
-        )
-        .unwrap();
-
-        let sync = Sync::new(shared.clone());
-        let warnings = sync.apply(&pass("test", &data));
-
-        assert!(link::read_target(&data.join("saves")).is_none());
-        assert_eq!(
-            fs::read_to_string(data.join("saves").join("old-world").join("level.dat")).unwrap(),
-            "mine"
-        );
-        assert_eq!(
-            fs::read_to_string(shared.join("saves").join("old-world").join("level.dat")).unwrap(),
-            "store"
-        );
-        assert!(warnings.iter().any(|w| matches!(
-            w,
-            WarningInfo::SyncTargetNotShared {
-                reason: NotSharedReason::Collides,
-                ..
-            }
-        )));
-        let states = sync.status(&data);
-        let saves = states.iter().find(|t| t.target == "saves").unwrap();
-        assert_eq!(saves.state, LinkState::CannotLink);
-    }
-
-    #[test]
-    fn a_pack_owned_config_stays_local_until_adopted() {
-        let base = temp_dir("packlocal");
-        let shared = base.path().join("shared");
-        let data = base.path().join("data");
-        fs::create_dir_all(data.join("config")).unwrap();
-        fs::write(data.join("config").join("pack.toml"), "x=1").unwrap();
-
-        let sync = Sync::new(shared.clone());
-        let warnings = sync.apply(&scoped("test", &data, Scope::Local));
-
-        assert!(link::read_target(&data.join("config")).is_none());
-        assert!(warnings.is_empty(), "keeping it local is not a degradation");
-        // Worlds are not settings — they share as usual.
-        assert!(link::is_linked_to(
-            &shared.join("saves"),
-            &data.join("saves")
-        ));
-
-        // Adopting is the opt-in, and the link is honoured from then on.
-        sync.adopt(&data, &["config".to_string()]).unwrap();
-        sync.apply(&scoped("test", &data, Scope::Local));
-        assert!(link::is_linked_to(
-            &shared.join("config"),
-            &data.join("config")
-        ));
-        assert!(shared.join("config").join("pack.toml").is_file());
-    }
-
-    #[test]
-    fn apply_relinks_a_stale_store_link() {
-        let base = temp_dir("stale");
-        let old_shared = base.path().join("old-home").join("shared");
-        fs::create_dir_all(old_shared.join("saves")).unwrap();
-        let data = base.path().join("data");
-        fs::create_dir_all(&data).unwrap();
-        link::link_dir(&old_shared.join("saves"), &data.join("saves")).unwrap();
-
-        let shared = base.path().join("new-home").join("shared");
-        Sync::new(shared.clone()).apply(&pass("test", &data));
-
-        assert!(link::is_linked_to(
-            &shared.join("saves"),
-            &data.join("saves")
-        ));
-    }
-
-    #[test]
-    fn apply_leaves_a_foreign_link_alone() {
-        let base = temp_dir("foreign");
-        let shared = base.path().join("shared");
-        let elsewhere = base.path().join("elsewhere");
-        fs::create_dir_all(&elsewhere).unwrap();
-        let data = base.path().join("data");
-        fs::create_dir_all(&data).unwrap();
-        link::link_dir(&elsewhere, &data.join("saves")).unwrap();
-
-        Sync::new(shared.clone()).apply(&pass("test", &data));
-
-        assert_eq!(link::read_target(&data.join("saves")), Some(elsewhere));
-    }
-
-    #[test]
-    fn adopt_moves_entries_and_links() {
-        let base = temp_dir("adopt");
-        let shared = base.path().join("shared");
-        let data = base.path().join("data");
-        fs::create_dir_all(data.join("saves").join("world-a")).unwrap();
-        fs::write(data.join("saves").join("world-a").join("level.dat"), "a").unwrap();
-        fs::create_dir_all(data.join("saves").join("world-b")).unwrap();
-
-        let sync = Sync::new(shared.clone());
-        let adopted = sync.adopt(&data, &["saves".to_string()]).unwrap();
-
-        assert_eq!(adopted, vec!["saves".to_string()]);
-        assert!(link::is_linked_to(
-            &shared.join("saves"),
-            &data.join("saves")
-        ));
-        assert!(shared
-            .join("saves")
-            .join("world-a")
-            .join("level.dat")
-            .exists());
-        assert!(shared.join("saves").join("world-b").is_dir());
-        // Both worlds open through the link.
-        assert!(data
-            .join("saves")
-            .join("world-a")
-            .join("level.dat")
-            .exists());
-    }
-
-    #[test]
-    fn adopt_refuses_the_whole_target_on_collision() {
-        let base = temp_dir("collide");
-        let shared = base.path().join("shared");
-        fs::create_dir_all(shared.join("saves").join("world")).unwrap();
-        fs::write(
-            shared.join("saves").join("world").join("level.dat"),
-            "store",
-        )
-        .unwrap();
-        let data = base.path().join("data");
-        fs::create_dir_all(data.join("saves").join("world")).unwrap();
-        fs::write(data.join("saves").join("world").join("level.dat"), "mine").unwrap();
-        fs::create_dir_all(data.join("saves").join("other")).unwrap();
-
-        let sync = Sync::new(shared.clone());
-        let err = sync.adopt(&data, &["saves".to_string()]).unwrap_err();
-        assert!(format!("{err:#}").contains("world"));
-
-        // Nothing moved — not even the non-colliding entry.
-        assert!(data.join("saves").join("other").is_dir());
-        assert!(link::read_target(&data.join("saves")).is_none());
-        assert_eq!(
-            fs::read_to_string(shared.join("saves").join("world").join("level.dat")).unwrap(),
-            "store"
-        );
-    }
-
-    #[test]
-    fn capture_seeds_the_profile_store_from_the_global_one() {
-        let base = temp_dir("capture");
-        let shared = base.path().join("shared");
-        fs::create_dir_all(shared.join("config")).unwrap();
-        fs::write(shared.join("config").join("mod.toml"), "x=1").unwrap();
-        fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
-
-        let store = base
-            .path()
-            .join("instance")
-            .join("profiles")
-            .join("showcase");
-        Sync::new(shared.clone()).capture(&store).unwrap();
-
-        assert_eq!(
-            fs::read_to_string(store.join("config").join("mod.toml")).unwrap(),
-            "x=1"
-        );
-        assert!(store.join("options.txt").is_file());
-    }
-
-    #[test]
-    fn apply_scopes_settings_targets_to_the_profile_store() {
-        let base = temp_dir("scoped");
-        let shared = base.path().join("shared");
-        fs::create_dir_all(&shared).unwrap();
-        let store = base
-            .path()
-            .join("instance")
-            .join("profiles")
-            .join("showcase");
-        let data = base.path().join("data");
-        fs::create_dir_all(&data).unwrap();
-
-        let sync = Sync::new(shared.clone());
-        sync.capture(&store).unwrap();
-        sync.apply(&scoped("test", &data, Scope::Profile(store.clone())));
-
-        // config links into the captured store; saves stays on the global one.
-        assert!(link::is_linked_to(
-            &store.join("config"),
-            &data.join("config")
-        ));
-        assert!(link::is_linked_to(
-            &shared.join("saves"),
-            &data.join("saves")
-        ));
-
-        // An in-game settings change lands in the captured store, not the
-        // global one (the link writes through).
-        fs::write(data.join("config").join("mod.toml"), "render=far").unwrap();
-        assert!(store.join("config").join("mod.toml").is_file());
-        assert!(!shared.join("config").join("mod.toml").exists());
-
-        // options.txt reconciles against the captured store.
-        fs::write(data.join("options.txt"), "guiScale:2\n").unwrap();
-        sync.apply(&scoped("test", &data, Scope::Profile(store.clone())));
-        assert!(fs::read_to_string(store.join("options.txt"))
-            .unwrap()
-            .contains("guiScale:2"));
-        assert!(!shared.join("options.txt").exists());
-
-        // Release, and the next un-profiled apply relinks the global store —
-        // the stale captured-store link counts as a hestia store target.
-        sync.release(&store).unwrap();
-        assert!(!store.exists());
+        sync.set_option("renderDistance", "16").unwrap();
         sync.apply(&pass("test", &data));
-        assert!(link::is_linked_to(
-            &shared.join("config"),
-            &data.join("config")
-        ));
+
+        assert!(fs::read_to_string(data.join("options.txt"))
+            .unwrap()
+            .contains("renderDistance:16"));
+        assert!(sync
+            .options()
+            .iter()
+            .any(|option| option.key == "renderDistance" && option.synced));
     }
 }

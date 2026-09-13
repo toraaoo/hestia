@@ -151,17 +151,13 @@ impl Engine {
             return Err(e);
         }
 
-        // Re-read before linking: the config entries above may have opted this
-        // instance out of sharing, and the create-time record predates them.
+        // Re-read: the config entries above rewrote the record the create left.
         let record = self
             .instances
             .get(&record.id)
             .with_context(|| format!("instance '{}' vanished after create", record.id))?;
-        let data_dir = self.instances.data_dir(&record);
-        if let Err(e) = std::fs::create_dir_all(&data_dir) {
+        if let Err(e) = std::fs::create_dir_all(self.instances.data_dir(&record)) {
             tracing::warn!(id = %record.id, error = %e, "cannot create the game directory");
-        } else {
-            self.link_new_instance(&record, &data_dir);
         }
         Ok(record)
     }
@@ -270,17 +266,15 @@ impl Engine {
         std::fs::create_dir_all(&game_dir)
             .with_context(|| format!("cannot create {}", game_dir.display()))?;
         if reconcile {
-            // A captured profile scopes the settings-class sync targets to its
-            // own store; an uncaptured one inherits the global store.
+            // A captured profile scopes the settings units to its own store; an
+            // uncaptured one inherits the global store.
             let store = launch_profile
                 .as_ref()
                 .filter(|p| p.captured)
                 .map(|p| profiles::store_dir(&entry_dir, &p.name));
-            if let Some(pass) = self.instance_pass(&record, &entry_dir, &game_dir, store.as_deref())
-            {
-                let session = proto::naming::instance_session_id(&record.id, session_seq);
-                warnings.extend(self.begin_instance_sync(&session, pass));
-            }
+            let pass = self.instance_pass(&record, &game_dir, store.as_deref());
+            let session = proto::naming::instance_session_id(&record.id, session_seq);
+            warnings.extend(self.begin_instance_sync(&session, pass));
             let selection: Option<std::collections::HashSet<String>> =
                 launch_profile.map(|p| p.members.into_iter().collect());
             let worlds = crate::instances::save_worlds(&game_dir);

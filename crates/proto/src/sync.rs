@@ -1,13 +1,12 @@
-//! Shared settings/configs: the set of game-relative settings targets
-//! propagated across instances through the launcher's `shared/` store. `files`
-//! are copied (newest-wins, `options.txt` key-merged); `folders` are **linked**
-//! (a symlink on POSIX, a junction on Windows) into the store, so folder
-//! content — worlds above all — is stored once and shared live. See the
-//! engine's `sync` subsystem.
+//! Shared settings across instances: a closed catalogue of the files Minecraft
+//! writes that are worth keeping the same everywhere. Each unit is turned on by
+//! itself, seeded from an instance the user names, and each instance may keep
+//! any unit — or any individual option key — to itself.
 //!
-//! Sync is **instance-only**: it is a client-side quality-of-life feature. A
-//! server's configuration is per-server infrastructure, managed through its own
-//! `server.config.*` keys and `server.properties`, never a cross-entry store.
+//! Everything here is copied and merged, never linked.
+//!
+//! Sync is instance-only: a server's configuration is per-server
+//! infrastructure, managed through `server.config.*` and `server.properties`.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -16,29 +15,82 @@ use serde::{Deserialize, Serialize};
 
 use crate::contract::{Contract, Empty};
 
-/// The game-relative paths shared across instances: individual `files`
-/// (copied newest-wins, `options.txt` key-merged) and whole `folders` (linked
-/// into the shared store — every instance opens the same physical directory).
-#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
-#[serde(default, rename_all = "camelCase")]
-pub struct SyncTargets {
-    pub files: BTreeSet<String>,
-    pub folders: BTreeSet<String>,
+#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "snake_case")]
+pub enum SyncUnit {
+    /// `options.txt`, merged key by key.
+    #[default]
+    Options,
+    /// `servers.dat`, merged entry by entry.
+    Servers,
+    /// `command_history.txt`, merged as a union.
+    Commands,
+    /// `hotbar.nbt`, whole-file.
+    Hotbars,
 }
 
-/// The sync store location plus the current targets. `enabled` is the
-/// `sync.enabled` setting read back: an empty reconcile means something
-/// different when sharing is switched off than when nothing is targeted, and a
-/// front-end cannot tell those apart from the targets alone. It is *set*
-/// through `config.set`, like every other launcher-wide setting.
+impl SyncUnit {
+    /// The subject of every warning and status line about the unit, so the
+    /// wording exists once.
+    pub fn label(self) -> &'static str {
+        match self {
+            SyncUnit::Options => "the game options",
+            SyncUnit::Servers => "the multiplayer list",
+            SyncUnit::Commands => "the command history",
+            SyncUnit::Hotbars => "the creative hotbars",
+        }
+    }
+}
+
+impl std::fmt::Display for SyncUnit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncUnitConfig {
+    pub unit: SyncUnit,
+    pub enabled: bool,
+    /// The instance the shared copy was seeded from; empty when it started from
+    /// nothing.
+    pub seeded_from: String,
+}
+
+/// The catalogue and where the shared copies live. A unit is off until it is
+/// enabled with a source, so there is no launcher-wide switch.
+///
+/// `unsynced` is the `options.txt` keys no instance shares. It sits beside the
+/// units because only the options unit has keys.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SyncConfig {
-    pub enabled: bool,
     pub shared_dir: PathBuf,
-    pub targets: SyncTargets,
+    pub units: Vec<SyncUnitConfig>,
+    pub unsynced: BTreeSet<String>,
+}
+
+/// What one instance does differently from the catalogue.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncOverrides {
+    pub excluded: BTreeSet<SyncUnit>,
+    pub unsynced: BTreeSet<String>,
+}
+
+impl SyncOverrides {
+    pub fn is_empty(&self) -> bool {
+        self.excluded.is_empty() && self.unsynced.is_empty()
+    }
+
+    pub fn shares(&self, unit: SyncUnit) -> bool {
+        !self.excluded.contains(&unit)
+    }
 }
 
 pub struct SyncGet;
@@ -48,56 +100,158 @@ impl Contract for SyncGet {
     type Result = SyncConfig;
 }
 
-/// Replace the target set wholesale. The daemon validates each path
-/// (relative, no `..` escape, not a launcher-managed directory) before persisting.
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
-pub struct SyncSetParams {
-    pub targets: SyncTargets,
+pub struct SyncSource {
+    pub id: String,
+    pub name: String,
+    /// Whether the instance holds the unit's file at all.
+    pub present: bool,
+    pub modified_unix: Option<i64>,
 }
 
-pub struct SyncSet;
-impl Contract for SyncSet {
-    const CHANNEL: &'static str = "sync.set";
-    type Params = SyncSetParams;
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncSourcesParams {
+    pub unit: SyncUnit,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncSourcesResult {
+    pub sources: Vec<SyncSource>,
+}
+
+/// What a front-end fills its source picker from, before enabling a unit.
+pub struct SyncSources;
+impl Contract for SyncSources {
+    const CHANNEL: &'static str = "sync.sources";
+    type Params = SyncSourcesParams;
+    type Result = SyncSourcesResult;
+}
+
+/// Turn a unit on, seeded from one instance's copy. `source` may be empty only
+/// when at most one instance holds the file.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncEnableParams {
+    pub unit: SyncUnit,
+    /// Instance name or id.
+    pub source: String,
+}
+
+pub struct SyncEnable;
+impl Contract for SyncEnable {
+    const CHANNEL: &'static str = "sync.enable";
+    type Params = SyncEnableParams;
     type Result = SyncConfig;
 }
 
-/// One folder target's link state on one instance.
-#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-#[serde(rename_all = "snake_case")]
-pub enum LinkState {
-    /// Linked into the shared store.
-    Linked,
-    /// Missing, empty, or a stale hestia-store link — the next launch links it.
-    #[default]
-    Pending,
-    /// A non-empty real directory (or a foreign link) that will never be
-    /// linked automatically; `instance <name> sync adopt` is the fix.
-    CannotLink,
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncDisableParams {
+    pub unit: SyncUnit,
+}
+
+/// Every instance keeps the copy it has; nothing is moved or deleted.
+pub struct SyncDisable;
+impl Contract for SyncDisable {
+    const CHANNEL: &'static str = "sync.disable";
+    type Params = SyncDisableParams;
+    type Result = SyncConfig;
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
-pub struct TargetLinkState {
-    pub target: String,
-    pub state: LinkState,
+pub struct SyncKeysParams {
+    pub unsynced: BTreeSet<String>,
 }
 
-/// One instance's per-folder-target link states. An instance that opted out
-/// (`instance config set sync off`) reports `enabled: false` and no targets:
-/// none of them describe it, and its folders are left exactly as they are.
+pub struct SyncKeys;
+impl Contract for SyncKeys {
+    const CHANNEL: &'static str = "sync.options.keys";
+    type Params = SyncKeysParams;
+    type Result = SyncConfig;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncOption {
+    pub key: String,
+    pub value: String,
+    /// False when the key is pinned local launcher-wide.
+    pub synced: bool,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncOptionsResult {
+    pub options: Vec<SyncOption>,
+}
+
+pub struct SyncOptionsGet;
+impl Contract for SyncOptionsGet {
+    const CHANNEL: &'static str = "sync.options.get";
+    type Params = Empty;
+    type Result = SyncOptionsResult;
+}
+
+/// Edits the shared copy; it reaches each instance at its next launch.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncOptionSetParams {
+    pub key: String,
+    pub value: String,
+}
+
+pub struct SyncOptionSet;
+impl Contract for SyncOptionSet {
+    const CHANNEL: &'static str = "sync.options.set";
+    type Params = SyncOptionSetParams;
+    type Result = SyncOptionsResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "snake_case")]
+pub enum UnitState {
+    Synced,
+    /// Shared, but the two copies have not met yet.
+    #[default]
+    Pending,
+    /// The instance keeps its own copy.
+    Overridden,
+    /// Off in the catalogue.
+    Off,
+    /// A pre-1.13 client cannot read the shared copy, nor it theirs.
+    EraBound,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct UnitStatus {
+    pub unit: SyncUnit,
+    pub state: UnitState,
+}
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceSyncStatus {
     pub id: String,
     pub name: String,
-    pub enabled: bool,
-    pub targets: Vec<TargetLinkState>,
+    pub units: Vec<UnitStatus>,
+    pub unsynced: BTreeSet<String>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -114,61 +268,37 @@ impl Contract for SyncStatus {
     type Result = SyncStatusResult;
 }
 
-/// Adopt an instance's existing folder contents into the shared store: move
-/// the entries under each named target (all folder targets when empty) and
-/// link the emptied folder. All-or-nothing per target — a name collision with
-/// the store refuses that whole target.
+/// `shared` unset follows the catalogue, which is how a front-end tells "this
+/// instance opted out" from "this unit is off".
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
-pub struct SyncAdoptParams {
+pub struct InstanceSyncUnitParams {
     /// Instance name or id.
     pub instance: String,
-    /// Folder targets to adopt; empty adopts every folder target.
-    pub targets: Vec<String>,
+    pub unit: SyncUnit,
+    pub shared: Option<bool>,
 }
 
-/// What adopt did per target.
+pub struct InstanceSyncUnit;
+impl Contract for InstanceSyncUnit {
+    const CHANNEL: &'static str = "instance.sync.unit";
+    type Params = InstanceSyncUnitParams;
+    type Result = InstanceSyncStatus;
+}
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
 #[serde(default, rename_all = "camelCase")]
-pub struct SyncAdoptResult {
-    /// Targets now linked (adopted by this call or already linked).
-    pub adopted: Vec<String>,
-}
-
-pub struct SyncAdopt;
-impl Contract for SyncAdopt {
-    const CHANNEL: &'static str = "instance.sync.adopt";
-    type Params = SyncAdoptParams;
-    type Result = SyncAdoptResult;
-}
-
-/// Put one instance in or out of shared settings. Not a preference — files move
-/// either way, so the instance must be stopped: leaving copies every folder it
-/// shares out of the store, and rejoining folds it back in with the **store**
-/// winning anything the two both have.
-#[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
-#[serde(default, rename_all = "camelCase")]
-pub struct SyncShareParams {
+pub struct InstanceSyncKeysParams {
     /// Instance name or id.
     pub instance: String,
-    pub enabled: bool,
+    pub unsynced: BTreeSet<String>,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
-#[serde(default, rename_all = "camelCase")]
-pub struct SyncShareResult {
-    pub enabled: bool,
-    /// What was duplicated on the way out, or discarded on the way in.
-    pub warnings: Vec<crate::warning::WarningInfo>,
-}
-
-pub struct SyncShare;
-impl Contract for SyncShare {
-    const CHANNEL: &'static str = "instance.sync.share";
-    type Params = SyncShareParams;
-    type Result = SyncShareResult;
+pub struct InstanceSyncKeys;
+impl Contract for InstanceSyncKeys {
+    const CHANNEL: &'static str = "instance.sync.keys";
+    type Params = InstanceSyncKeysParams;
+    type Result = InstanceSyncStatus;
 }

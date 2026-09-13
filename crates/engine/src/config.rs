@@ -27,8 +27,6 @@ pub struct Settings {
     pub content: ContentSettings,
     /// What an instance is allowed to do beyond the safe default.
     pub instance: InstanceSettings,
-    /// Shared settings/configs across instances.
-    pub sync: SyncSettings,
     /// Corrections applied over a modpack's own declarations.
     pub modpack: ModpackSettings,
     /// What the launcher publishes to a local Discord client.
@@ -115,22 +113,6 @@ impl Default for ModpackSettings {
 #[serde(default, rename_all = "camelCase")]
 pub struct InstanceSettings {
     pub multi_session: bool,
-}
-
-/// Whether instances share their settings targets at all. Sync moves a user's
-/// own files into a common store, so it is switchable: off, a launch reconciles
-/// nothing and every instance keeps what it has — links already made stay, since
-/// hestia never breaks one behind the user's back.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(default, rename_all = "camelCase")]
-pub struct SyncSettings {
-    pub enabled: bool,
-}
-
-impl Default for SyncSettings {
-    fn default() -> Self {
-        SyncSettings { enabled: true }
-    }
 }
 
 /// The launcher-wide JVM defaults, addressed by the kebab-case config keys

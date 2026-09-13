@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use ipc::errors::IpcError;
 
 use crate::session::Session;
@@ -13,15 +15,71 @@ impl Sync<'_> {
             .await
     }
 
-    pub async fn set(
+    pub async fn sources(
         &self,
-        targets: proto::sync::SyncTargets,
-    ) -> Result<proto::sync::SyncConfig, IpcError> {
-        let params = proto::sync::SyncSetParams { targets };
-        self.session.call::<proto::sync::SyncSet>(&params).await
+        unit: proto::sync::SyncUnit,
+    ) -> Result<Vec<proto::sync::SyncSource>, IpcError> {
+        let params = proto::sync::SyncSourcesParams { unit };
+        Ok(self
+            .session
+            .call::<proto::sync::SyncSources>(&params)
+            .await?
+            .sources)
     }
 
-    /// Every instance's per-folder-target link state.
+    /// `source` may be empty only when at most one instance holds the file.
+    pub async fn enable(
+        &self,
+        unit: proto::sync::SyncUnit,
+        source: &str,
+    ) -> Result<proto::sync::SyncConfig, IpcError> {
+        let params = proto::sync::SyncEnableParams {
+            unit,
+            source: source.to_string(),
+        };
+        self.session.call::<proto::sync::SyncEnable>(&params).await
+    }
+
+    pub async fn disable(
+        &self,
+        unit: proto::sync::SyncUnit,
+    ) -> Result<proto::sync::SyncConfig, IpcError> {
+        let params = proto::sync::SyncDisableParams { unit };
+        self.session.call::<proto::sync::SyncDisable>(&params).await
+    }
+
+    pub async fn set_unsynced(
+        &self,
+        unsynced: BTreeSet<String>,
+    ) -> Result<proto::sync::SyncConfig, IpcError> {
+        let params = proto::sync::SyncKeysParams { unsynced };
+        self.session.call::<proto::sync::SyncKeys>(&params).await
+    }
+
+    pub async fn options(&self) -> Result<Vec<proto::sync::SyncOption>, IpcError> {
+        Ok(self
+            .session
+            .call::<proto::sync::SyncOptionsGet>(&proto::Empty {})
+            .await?
+            .options)
+    }
+
+    pub async fn set_option(
+        &self,
+        key: &str,
+        value: &str,
+    ) -> Result<Vec<proto::sync::SyncOption>, IpcError> {
+        let params = proto::sync::SyncOptionSetParams {
+            key: key.to_string(),
+            value: value.to_string(),
+        };
+        Ok(self
+            .session
+            .call::<proto::sync::SyncOptionSet>(&params)
+            .await?
+            .options)
+    }
+
     pub async fn status(&self) -> Result<Vec<proto::sync::InstanceSyncStatus>, IpcError> {
         Ok(self
             .session
@@ -30,37 +88,34 @@ impl Sync<'_> {
             .instances)
     }
 
-    /// Adopt a stopped instance's folder contents into the shared store
-    /// (every folder target when `targets` is empty). Returns the targets
-    /// linked after the call.
-    pub async fn adopt(
+    /// `shared` unset returns the instance to following the catalogue.
+    pub async fn set_instance_unit(
         &self,
         instance: &str,
-        targets: Vec<String>,
-    ) -> Result<Vec<String>, IpcError> {
-        let params = proto::sync::SyncAdoptParams {
+        unit: proto::sync::SyncUnit,
+        shared: Option<bool>,
+    ) -> Result<proto::sync::InstanceSyncStatus, IpcError> {
+        let params = proto::sync::InstanceSyncUnitParams {
             instance: instance.to_string(),
-            targets,
+            unit,
+            shared,
         };
-        Ok(self
-            .session
-            .call::<proto::sync::SyncAdopt>(&params)
-            .await?
-            .adopted)
+        self.session
+            .call::<proto::sync::InstanceSyncUnit>(&params)
+            .await
     }
 
-    /// Put a stopped instance in or out of shared settings. Leaving copies the
-    /// folders it shares out of the store; rejoining lets the store win
-    /// whatever the two both have. The warnings say what that cost.
-    pub async fn share(
+    pub async fn set_instance_unsynced(
         &self,
         instance: &str,
-        enabled: bool,
-    ) -> Result<proto::sync::SyncShareResult, IpcError> {
-        let params = proto::sync::SyncShareParams {
+        unsynced: BTreeSet<String>,
+    ) -> Result<proto::sync::InstanceSyncStatus, IpcError> {
+        let params = proto::sync::InstanceSyncKeysParams {
             instance: instance.to_string(),
-            enabled,
+            unsynced,
         };
-        self.session.call::<proto::sync::SyncShare>(&params).await
+        self.session
+            .call::<proto::sync::InstanceSyncKeys>(&params)
+            .await
     }
 }

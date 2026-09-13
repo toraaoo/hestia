@@ -17,35 +17,6 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-/// Why a sync target stayed instance-local instead of reconciling against the
-/// shared store. A folder holding only the instance's own files is adopted
-/// automatically, so a reason here always means sharing would have destroyed
-/// something.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-#[serde(rename_all = "snake_case")]
-pub enum NotSharedReason {
-    /// The store already holds files by the same names, so moving the folder's
-    /// own into it would overwrite them.
-    Collides,
-    /// The folder is a symlink the user made, pointing somewhere that is not a
-    /// hestia store. Only hestia's own links are ever touched.
-    ForeignLink,
-    /// The instance predates 1.13, whose `options.txt` keybinds and world format
-    /// neither era reads from the other. Refused in both directions.
-    GameEra,
-}
-
-impl fmt::Display for NotSharedReason {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            NotSharedReason::Collides => "files of the same name are already shared",
-            NotSharedReason::ForeignLink => "the folder is a link you made",
-            NotSharedReason::GameEra => "this version is too old to share it safely",
-        })
-    }
-}
-
 /// One degraded outcome. The `kind` tag is the wire discriminant; front-ends
 /// switch on it exhaustively.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -55,26 +26,19 @@ pub enum WarningInfo {
     /// The schema-generation run produced nothing, so this server's property
     /// keys cannot be validated — every unmanaged key will be accepted.
     PropertiesSchemaMissing { name: String },
-    /// A shared folder target was left instance-local, so the game runs against
-    /// that instance's own copy rather than the shared store.
-    SyncTargetNotShared {
+    /// A synced unit was left instance-local because this instance predates
+    /// 1.13: the two eras cannot read each other's `options.txt`, in either
+    /// direction, so sharing it would degrade whichever side wrote last.
+    SyncUnitEraBound {
         instance: String,
-        target: String,
-        reason: NotSharedReason,
+        unit: crate::sync::SyncUnit,
     },
-    /// A sync target could not be reconciled at all. `detail` is operational
-    /// English, shown as secondary text.
-    SyncTargetSkipped { target: String, detail: String },
-    /// Leaving sharing gave the instance its own copy of a folder it used to
-    /// share. Nothing was lost, but the data now exists twice and the two
-    /// copies diverge from here.
-    SyncTargetDuplicated { target: String, bytes: u64 },
-    /// Rejoining sharing kept the store's copy of these names and discarded the
-    /// instance's own — the store is what the other instances are already
-    /// playing, so it is the one that survives a clash.
-    SyncEntriesReplaced {
-        target: String,
-        entries: Vec<String>,
+    /// A synced unit could not be reconciled at all, so this launch runs on
+    /// whatever the instance already had. `detail` is operational English,
+    /// shown as secondary text.
+    SyncUnitSkipped {
+        unit: crate::sync::SyncUnit,
+        detail: String,
     },
     /// Game-directory files the pack owns were left as the user edited them, so
     /// this entry is not running the pack's own configuration for them.
@@ -132,36 +96,13 @@ impl WarningInfo {
                 "any key is accepted until it can be derived again, so check spelling yourself; \
                  `hestia server {name} update <version>` re-derives it"
             ),
-            SyncTargetNotShared {
-                target,
-                reason: NotSharedReason::Collides,
-                ..
-            } => format!(
-                "rename or delete the clashing files under `data/{target}`, then launch again to \
-                 share it"
+            SyncUnitEraBound { unit, .. } => format!(
+                "{unit} stays this instance's own — a pre-1.13 version and a current one cannot \
+                 read each other's copy"
             ),
-            SyncTargetNotShared {
-                target,
-                reason: NotSharedReason::GameEra,
-                ..
-            } => format!(
-                "`data/{target}` stays this instance's own — a pre-1.13 instance and a current one \
-                 cannot read each other's copy"
-            ),
-            SyncTargetNotShared { target, .. } => format!(
-                "remove or repoint the link at `data/{target}`, then launch again to share it"
-            ),
-            SyncTargetSkipped { target, .. } => {
-                format!("check permissions on `data/{target}`, then launch again")
+            SyncUnitSkipped { unit, .. } => {
+                format!("check the instance's file permissions, then launch again to share {unit}")
             }
-            SyncTargetDuplicated { target, .. } => format!(
-                "`data/{target}` is this instance's alone now — sharing it again keeps the \
-                 shared copy, not this one"
-            ),
-            SyncEntriesReplaced { target, .. } => format!(
-                "the discarded copies are gone; export an instance before sharing it again if \
-                 `data/{target}` held anything you still want"
-            ),
             ModpackOverridesKept { .. } => {
                 "delete a file under `data/` to take the pack's version of it at the next update"
                     .to_string()
@@ -205,23 +146,13 @@ impl fmt::Display for WarningInfo {
                 f,
                 "'{name}' has no property schema: its server.properties keys cannot be validated"
             ),
-            SyncTargetNotShared { target, reason, .. } => write!(
+            SyncUnitEraBound { instance, unit } => write!(
                 f,
-                "'{target}' is not shared with your other instances: {reason}"
+                "'{instance}' is too old to share {unit} with your other instances"
             ),
-            SyncTargetSkipped { target, detail } => {
-                write!(f, "'{target}' could not be synced: {detail}")
+            SyncUnitSkipped { unit, detail } => {
+                write!(f, "{unit} could not be synced: {detail}")
             }
-            SyncTargetDuplicated { target, bytes } => write!(
-                f,
-                "'{target}' was copied out of the shared store ({bytes} bytes) and is now this \
-                 instance's alone"
-            ),
-            SyncEntriesReplaced { target, entries } => write!(
-                f,
-                "the shared copies of {} replaced this instance's under '{target}'",
-                entries.join(", ")
-            ),
             ModpackOverridesKept { count, .. } => write!(
                 f,
                 "{count} file(s) you had edited were kept instead of the modpack's"
