@@ -18,8 +18,8 @@ job done events (`server.create.done`, `server.update.done`,
 `instance.launch.done`) and on the standing views that stay true afterwards
 (`ServerDetails`, so `server info` keeps saying it long after the create
 scrolled past). `Sync::apply` therefore *returns* its warnings instead of
-logging them, and the empty-or-linked guard reports which arm refused
-(`NotSharedReason`). Every variant carries a `hint()` beside its `Display`
+logging them, naming the unit it left the instance to settle on its own. Every
+variant carries a `hint()` beside its `Display`
 headline: a warning the user cannot act on is noise, so the remediation is part
 of the type rather than something each front-end invents. Front-ends get it for
 free and localize it generically — the CLI prints a `warning:` line plus the
@@ -28,7 +28,7 @@ message keys as a toast on the operation and a standing `WarningNotice` on the
 entry.
 
 The rejected alternatives were raising the log level to WARN (same invisible
-place) and hard-failing the operation (refusing to launch over a leftover
-folder, or refusing to create a server whose schema run timed out — both break a
-recoverable situation). A front-end must not have to *ask* whether the thing it
+place) and hard-failing the operation (refusing to launch over a file sync
+cannot read, or refusing to create a server whose schema run timed out — both
+break a recoverable situation). A front-end must not have to *ask* whether the thing it
 just did worked properly.

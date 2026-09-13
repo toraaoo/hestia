@@ -416,9 +416,13 @@ One shared factory set, bound per entry kind, so servers and instances cannot dr
 | `skinMutations.update()`                      | `skin.update`               | `{ key, label?, variant? }`            |
 | `skinMutations.equip()` / `.reset()` / `.remove()` | `skin.equip\|reset\|remove` | `{ key, account? }` / `{ account? }?` / `key` |
 | `skinMutations.equipCape()` / `.clearCape()`  | `cape.equip\|clear`         | `{ cape, account? }` / `{ account? }?` |
-| `syncQueries.config()` / `.status()`          | `sync.get\|status`          | —                                      |
-| `syncMutations.set()`                         | `sync.set`                  | `SyncTargets`                          |
-| `syncMutations.adopt(id)`                     | `instance.sync.adopt`       | `targets?: string[]`                   |
+| `syncQueries.config()` / `.status()` / `.options()` | `sync.get\|status\|options.get` | —                            |
+| `syncQueries.sources(unit)`                   | `sync.sources`              | —                                      |
+| `syncMutations.enable()` / `.disable()`       | `sync.enable\|disable`      | `{ unit, source? }` / `SyncUnit`       |
+| `syncMutations.setUnsynced()`                 | `sync.options.keys`         | `string[]`                             |
+| `syncMutations.setOption()`                   | `sync.options.set`          | `{ key, value }`                       |
+| `syncMutations.setInstanceUnit(id)`           | `instance.sync.unit`        | `{ unit, shared }`                     |
+| `syncMutations.setInstanceUnsynced(id)`       | `instance.sync.keys`        | `string[]`                             |
 | `updateQueries.check()`                       | `update_check` (shell)      | —                                      |
 | `updateMutations.install()`                   | `update_install` (shell)    | —                                      |
 | `iconQueries.list()`                          | `icons_list` (shell)        | —                                      |

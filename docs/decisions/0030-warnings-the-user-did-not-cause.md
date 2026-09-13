@@ -3,37 +3,32 @@
 *Applies to: [The socket boundary](../architecture/wire.md)*
 
 The [structured-warning rule](0029-degraded-outcomes-ride-on-the-result.md)
-earned its keep and then over-fired: the two warnings a normal user actually met
-were both about hestia's own limitations. Every NeoForge create said its
-property schema could not be derived (structural — see the NeoForge note), and
-an instance whose `data/config` had contents — which a modpack's `overrides/`
-puts there before the first launch ever runs — said `config` was not shared,
-pointing at an `adopt` chore hestia could perfectly well do itself. Neither
-followed from anything the user did, and the second's "remediation" was work the
-daemon was declining to do.
+earns its keep only for outcomes the user can act on. A warning that follows
+from hestia's own limitations is noise twice over: it names no action, and the
+remediation it points at is work the daemon is declining to do. A NeoForge
+create that cannot derive its property schema, or a launch that reports leaving
+alone a directory it could perfectly well have moved itself, are both of that
+kind.
 
-So the fix in both cases was to **remove the degradation**, not to soften the
-text. The schema run stopped using an argument file it could not resolve; the
-folder guard was narrowed from "never touch a non-empty directory" to "never
-overwrite" — a folder holding only the instance's own files is adopted at the
-launch that would have warned, silently, because moving files into the store is
-exactly what making it a target asked for and nothing can be lost. What survives
-is a warning about a **name clash** (`NotSharedReason::Collides`), which the
-user must resolve because either copy could be the one they want, and a foreign
-link, which is theirs to repoint.
+The answer to one is to **remove the degradation**, not to soften the text. The
+schema run resolves its own arguments rather than reporting that it could not.
+Sync shares a closed catalogue of files whose format it can merge, so an
+ordinary launch has nothing to decline: there is no directory to claim and no
+link to refuse, and two instances editing different settings both keep their
+change.
 
-Two rules keep the automatic pass honest. **A modpack owns its config tree**: a
-pack ships `config/` as part of what it is, so folding it into the store every
-other instance reads would push one pack's settings onto all of them —
-`Settings::Local` leaves those folders alone, with no warning, since it is a
-deliberate outcome rather than a degraded one. It is the automatic pass only: an
-`adopt` the user asks for still opts the folder in, and the link it leaves is
-reconciled from then on, so a pack *can* share if that is what the user wants.
-And **hestia never breaks a link it did not just make** — a folder already
-sharing keeps sharing, whatever else changes.
+What stays a warning is what only the user can settle. Sync reports a unit it
+could not read at all, because that instance then runs on its own copy and the
+player would otherwise never know. It reports a pre-1.13 instance holding back
+its options, because 1.13 renamed every keybind and neither era can read the
+other's file in either direction — no launcher can fix that, and the player has
+to know which copy they are playing.
 
-Sharing is now switchable outright (`sync.enabled`, in the config store):
-moving a user's files into a common store is a policy
-some people simply do not want, and the honest answer to that is a switch, not a
-warning they cannot turn off. Off, no pass runs — and existing links are left
-exactly where they are.
+Sharing is switchable per unit and per instance for the same reason: keeping a
+user's files the same across instances is a policy some people do not want, and
+the honest answer to that is a switch, not a warning they cannot turn off. Off,
+no pass runs and every instance keeps exactly what it has.
+
+The test for a new warning is therefore to name the action it asks for. When
+the answer is "something hestia could do itself", it is a missing feature
+wearing a warning's clothes, and the fix belongs in the code it reports on.

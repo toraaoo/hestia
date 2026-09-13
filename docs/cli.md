@@ -511,7 +511,6 @@ hestia config set home <dir>     # persist the data dir (empty reverts to defaul
 hestia config get autostart      # true if the daemon starts at login
 hestia config set autostart true # register the daemon to start at login
 hestia config set instance.multi-session true # allow an instance to run several sessions
-hestia config set sync.enabled false          # stop sharing settings across instances
 hestia config set discord.enabled false       # stop publishing Discord presence
 hestia config set content.curseforge-key <key> # unlock the CurseForge source
 hestia config set network.offline true        # stop reaching the network at all

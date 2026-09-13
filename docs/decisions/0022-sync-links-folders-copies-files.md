@@ -10,12 +10,12 @@ makes the second instance to write lose its change, so it does not belong in the
 catalogue — which is why an arbitrary user-supplied path is not a sync target.
 
 Every unit is copied into the instance and merged back out. Nothing is linked.
-A link would exist only to share a directory too large to duplicate — a worlds
-store — and it costs an empty-or-linked guard, a per-target state for a folder
-that already holds files, a migration to move them, and a rule that every walk
-of an instance's `data/` must treat a link as a boundary. Worlds stay with the
-instance that plays them, and none of that machinery is needed to share a few
-kilobytes of settings.
+A link earns its keep only for a directory too large to duplicate — a worlds
+store — and it charges for that: a guard deciding when a directory may become a
+link, a state for one that already holds files, a migration to move them in, and
+a rule that every walk of an instance's `data/` treats a link as a boundary.
+Worlds stay with the instance that plays them, and none of that is needed to
+share a few kilobytes of settings.
 
 What a unit shares is not all-or-nothing. The options merge resolves per key, so
 a key can be pinned local launcher-wide or on a single instance; a pinned key is
