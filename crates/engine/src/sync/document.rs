@@ -1,27 +1,20 @@
-//! `options.txt` as the game wrote it.
-//!
-//! The file is not ours: mods add keys to it, the player hand-edits it, and the
-//! game rewrites it whole at every exit. A merge that re-rendered it from a map
-//! of the pairs it understood would drop every comment and blank line, reorder
-//! the rest and normalise the line endings — a change to the file on every pass
-//! whether or not a value moved. So a document keeps the lines it read, and a
-//! merge rewrites only the values it settles.
+//! `options.txt` as the game wrote it. Mods add keys to the file and players
+//! hand-edit it, so re-rendering it from a map of the pairs we understood would
+//! drop comments, reorder keys and restamp the file on every pass. A document
+//! keeps the lines it read and rewrites only the values a merge settles.
 
 use std::path::Path;
 
 use anyhow::{bail, Result};
 
-/// Beyond these the file is not the game's own any more, and a merge would be
-/// working on something it cannot describe. The caps are the same order as
-/// Minecraft's own file, which runs to a few hundred short lines.
+/// Past these the file is not the game's own any more.
 const MAX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_LINES: usize = 16_384;
 
 #[derive(Clone, Default)]
 pub struct Document {
     lines: Vec<Line>,
-    /// What an appended line ends with: whatever the file already uses, so a
-    /// CRLF file stays a CRLF file.
+    /// A CRLF file stays a CRLF file.
     ending: String,
 }
 
@@ -33,9 +26,8 @@ struct Line {
 }
 
 impl Document {
-    /// `None` when there is no file. An unreadable one is an error rather than
-    /// an empty document: the caller would otherwise settle against nothing and
-    /// write the shared copy over a file it merely failed to decode.
+    /// An unreadable file is an error, not an empty document: settling against
+    /// nothing writes the shared copy over a file we merely failed to decode.
     pub fn read(path: &Path) -> Result<Option<Document>> {
         let bytes = match std::fs::read(path) {
             Ok(bytes) => bytes,
@@ -90,8 +82,6 @@ impl Document {
             .filter_map(|line| line.pair.as_ref().map(|(key, _)| key.as_str()))
     }
 
-    /// Rewrites the line the key is already on, so its place in the file and
-    /// everything around it survive; a key the file does not have is appended.
     pub fn set(&mut self, key: &str, value: &str) {
         if let Some(line) = self
             .lines
@@ -140,8 +130,7 @@ fn split_line(text: &str) -> (&str, &str, &str) {
     }
 }
 
-/// The game writes `key:value` with no spacing and no comments. A line that is
-/// not that shape belongs to whatever wrote it, and is carried through as text.
+/// The game writes `key:value`; any other line belongs to whoever wrote it.
 fn pair(line: &str) -> Option<(String, String)> {
     if line.starts_with('#') {
         return None;

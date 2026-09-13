@@ -1,5 +1,5 @@
-//! The closed set of syncable units, the file each one is, and what a unit
-//! needs from the game version it is asked to share with.
+//! The closed set of syncable units, the file each one is, and the version
+//! each needs.
 
 use proto::sync::SyncUnit;
 
@@ -19,16 +19,13 @@ pub fn file(unit: SyncUnit) -> &'static str {
     }
 }
 
-/// The version each unit's file first exists in, or first exists in a spelling
-/// the other instances can read. Below it the file is either absent (the game
-/// never writes one) or written in a form the modern one corrupts, and sharing
-/// it degrades whichever side wrote last.
+/// The version each unit's file first appears in, in a spelling the others can
+/// read:
 ///
-/// - `options.txt`: 1.13 renamed every keybind from an LWJGL key code to a
-///   `key.keyboard.*` name. An old client drops the binds it cannot parse and
-///   writes its own spelling back, so the gate holds in both directions.
-/// - `hotbar.nbt`: creative hotbar saving arrived in 1.12.
-/// - `command_history.txt`: the game only started writing one in 1.20.2.
+/// - `options.txt`: 1.13 renamed every keybind from an LWJGL code to a
+///   `key.keyboard.*` name, and an old client drops what it cannot parse.
+/// - `hotbar.nbt`: creative hotbars arrived in 1.12.
+/// - `command_history.txt`: first written in 1.20.2.
 fn requires(unit: SyncUnit) -> Option<(u64, u64, u64)> {
     match unit {
         SyncUnit::Options => Some((1, 13, 0)),
@@ -38,7 +35,6 @@ fn requires(unit: SyncUnit) -> Option<(u64, u64, u64)> {
     }
 }
 
-/// What a front-end tells the user a skipped unit is waiting for.
 pub fn requirement(unit: SyncUnit) -> String {
     match requires(unit) {
         Some((major, minor, 0)) => format!("{major}.{minor}"),
@@ -59,16 +55,13 @@ pub fn captured(unit: SyncUnit) -> bool {
     matches!(unit, SyncUnit::Options)
 }
 
-/// `options.txt` keys that must never travel between instances, whatever the
-/// catalogue says. Sharing one is not a preference the user can hold — it
-/// either describes the file, the machine, or a moment, and copying it makes
-/// the receiving instance wrong rather than merely different.
+/// Keys that must never travel, whatever the catalogue says: each describes the
+/// file, the machine or a moment, so a copy makes the receiver wrong.
 pub const NEVER_SHARED_KEYS: &[&str] = &[
-    // The data version of the file itself. Copying another instance's tells
-    // this client the file came from a different game version, and it migrates
-    // keybinds and settings it never needed to touch.
+    // The file's own data version: a copy makes the client migrate settings it
+    // never needed to touch.
     "version",
-    // Name packs and worlds the receiving instance does not have.
+    // Name packs the receiving instance does not have.
     "resourcePacks",
     "incompatibleResourcePacks",
     "lastServer",
@@ -77,8 +70,7 @@ pub const NEVER_SHARED_KEYS: &[&str] = &[
     "fullscreenResolution",
     "overrideWidth",
     "overrideHeight",
-    // First-run and one-off prompt state: copying it re-arms or suppresses a
-    // prompt on an instance that never saw it.
+    // First-run prompts: a copy re-arms one on an instance that never saw it.
     "startedCleanly",
     "tutorialStep",
     "joinedFirstServer",
@@ -87,8 +79,8 @@ pub const NEVER_SHARED_KEYS: &[&str] = &[
     "skipRealms32bitWarning",
     "skipFriendsListPromo",
     "hideBundleTutorial",
-    // Account-scoped, and the launcher owns it.
+    // Account-scoped; the launcher owns it.
     "skin",
-    // A pre-1.8 world default that has nothing to do with the client.
+    // A pre-1.8 world default, not a client setting.
     "difficulty",
 ];
