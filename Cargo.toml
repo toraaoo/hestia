@@ -36,6 +36,7 @@ tray-icon = { version = "0.24.1", default-features = false, features = ["gtk"] }
 tao = "0.35.3"
 ksni = { version = "0.3.6", features = ["blocking"] }
 png = "0.18.1"
+image = { version = "0.25.8", default-features = false, features = ["png"] }
 sha1 = "0.11"
 sha2 = "0.11"
 tar = "0.4.46"
