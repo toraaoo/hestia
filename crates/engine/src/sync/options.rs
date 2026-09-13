@@ -1,77 +1,78 @@
-//! `options.txt`, merged key by key.
+//! `options.txt`, merged key by key over the file the game wrote.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use anyhow::Result;
 
+use super::document::Document;
 use super::reconcile;
 
-/// An excluded key is carried through untouched on both sides, so pinning one
-/// on a single instance never strips it from the others.
+/// An excluded key is left exactly where each side has it: the merge never
+/// reads or writes one, so pinning a key on a single instance cannot strip it
+/// from the others, and a key that must never travel simply never does.
 pub fn merge(
     baseline: &Path,
     store: &Path,
     data: &Path,
     excluded: &BTreeSet<String>,
 ) -> Result<()> {
-    let stored = read(store);
-    let local = read(data);
-    if stored.is_empty() && local.is_empty() {
+    let stored = Document::read(store)?;
+    let local = Document::read(data)?;
+    if stored.is_none() && local.is_none() {
         return Ok(());
     }
-    let base = read(baseline);
+    let mut stored = stored.unwrap_or_default();
+    let mut local = local.unwrap_or_default();
+    let base = Document::read(baseline).ok().flatten().unwrap_or_default();
     let data_newer = reconcile::newer(data, store);
 
-    let shared: BTreeMap<String, String> = stored
+    let shared: BTreeSet<String> = stored
         .keys()
         .chain(local.keys())
         .filter(|key| !excluded.contains(*key))
-        .collect::<BTreeSet<&String>>()
-        .into_iter()
-        .filter_map(|key| {
-            let value = reconcile::one(base.get(key), stored.get(key), local.get(key), data_newer)?;
-            Some((key.clone(), value.clone()))
-        })
+        .map(str::to_string)
         .collect();
 
-    let mut for_data = shared.clone();
-    let mut for_store = shared;
-    for key in excluded {
-        if let Some(value) = local.get(key) {
-            for_data.insert(key.clone(), value.clone());
-        }
-        if let Some(value) = stored.get(key) {
-            for_store.insert(key.clone(), value.clone());
-        }
+    for key in shared {
+        let settled = reconcile::one(
+            base.get(&key).map(str::to_string).as_ref(),
+            stored.get(&key).map(str::to_string).as_ref(),
+            local.get(&key).map(str::to_string).as_ref(),
+            data_newer,
+        )
+        .cloned();
+        let Some(value) = settled else {
+            continue;
+        };
+        stored.set(&key, &value);
+        local.set(&key, &value);
     }
 
-    write(data, &for_data)?;
-    write(store, &for_store)?;
-    reconcile::write_if_changed(baseline, render(&for_store).as_bytes())
+    reconcile::write_if_changed(data, local.render().as_bytes())?;
+    reconcile::write_if_changed(store, stored.render().as_bytes())?;
+    reconcile::write_if_changed(baseline, stored.render().as_bytes())
 }
 
+/// The shared copy's values, for the front-ends that list and edit them.
 pub fn read(path: &Path) -> BTreeMap<String, String> {
-    let Ok(text) = std::fs::read_to_string(path) else {
+    let Ok(Some(document)) = Document::read(path) else {
         return BTreeMap::new();
     };
-    text.lines()
-        .filter_map(|line| line.trim().split_once(':'))
-        .map(|(key, value)| (key.to_string(), value.to_string()))
+    document
+        .keys()
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .filter_map(|key| {
+            let value = document.get(&key)?.to_string();
+            Some((key, value))
+        })
         .collect()
 }
 
-pub fn write(path: &Path, values: &BTreeMap<String, String>) -> Result<()> {
-    reconcile::write_if_changed(path, render(values).as_bytes())
-}
-
-fn render(values: &BTreeMap<String, String>) -> String {
-    let mut text = String::new();
-    for (key, value) in values {
-        text.push_str(key);
-        text.push(':');
-        text.push_str(value);
-        text.push('\n');
-    }
-    text
+pub fn set(path: &Path, key: &str, value: &str) -> Result<()> {
+    let mut document = Document::read(path)?.unwrap_or_default();
+    document.set(key, value);
+    reconcile::write_if_changed(path, document.render().as_bytes())
 }

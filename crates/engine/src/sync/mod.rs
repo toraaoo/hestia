@@ -2,6 +2,7 @@
 //! each under `<data_home>/shared/`, and the reconcile a launch runs.
 
 mod catalogue;
+mod document;
 mod history;
 mod options;
 mod reconcile;
@@ -237,9 +238,7 @@ impl Sync {
 
     pub fn set_option(&self, key: &str, value: &str) -> Result<()> {
         let path = self.dir().join(catalogue::file(SyncUnit::Options));
-        let mut values = options::read(&path);
-        values.insert(key.to_string(), value.to_string());
-        options::write(&path, &values)
+        options::set(&path, key, value)
     }
 
     pub fn remember(&self, session: &str, pass: Pass) {
@@ -603,6 +602,29 @@ mod tests {
         assert!(!catalogue::shares_era_bound("1.12.2"));
         assert!(catalogue::shares_era_bound("1.13"));
         assert!(catalogue::shares_era_bound("23w14a"));
+    }
+
+    /// The file the game wrote is the file it gets back: a merge that settles
+    /// one value must not reorder, re-space or strip the rest of it.
+    #[test]
+    fn a_merge_leaves_everything_it_did_not_settle_alone() {
+        let base = temp_dir("shape");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        let sync = sharing(&shared);
+
+        write_at(&shared.join("options.txt"), "guiScale:1\n", 300);
+        write_at(
+            &data.join("options.txt"),
+            "# mine\r\nfov:70\r\nguiScale:1\r\n",
+            100,
+        );
+        sync.apply(&pass("test", &data));
+
+        assert_eq!(
+            fs::read_to_string(data.join("options.txt")).unwrap(),
+            "# mine\r\nfov:70\r\nguiScale:1\r\n"
+        );
     }
 
     #[test]
