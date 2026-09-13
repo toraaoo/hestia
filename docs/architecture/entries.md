@@ -286,7 +286,7 @@ their next launch.
 
 Sharing is refused for nothing else: an arbitrary path is not a sync target,
 because the catalogue exists to name files whose format the launcher can merge
-([0022](../decisions/0022-sync-links-folders-copies-files.md)).
+([0022](../decisions/0022-sync-is-a-catalogue-of-merged-files.md)).
 
 **A pre-1.13 instance does not share its options.** 1.13 renamed every keybind
 from an LWJGL key code to a `key.keyboard.*` name, so the two eras cannot read
@@ -362,7 +362,7 @@ refused: the daemon cannot make the write durable, but it can say so
 ## Decisions
 
 - [0021 — The entry root is Hestia's; `data/` is the game's](../decisions/0021-entry-root-versus-data-dir.md)
-- [0022 — Sync is a closed catalogue of merged files](../decisions/0022-sync-links-folders-copies-files.md)
+- [0022 — Sync is a closed catalogue of merged files](../decisions/0022-sync-is-a-catalogue-of-merged-files.md)
 - [0069 — A synced unit reconciles against a baseline, not a clock](../decisions/0069-sync-reconciles-against-a-baseline.md)
 - [0023 — The id is an opaque uuid; the directory is the slug](../decisions/0023-id-is-a-uuid-directory-is-a-slug.md)
 - [0024 — Backups follow docker-mc-backup, minus what the launcher already owns](../decisions/0024-backups-follow-docker-mc-backup.md)

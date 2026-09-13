@@ -67,7 +67,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 ### [Servers & instances](../architecture/entries.md)
 
 - **0021** — [The entry root is hestia's; `data/` is the game's](0021-entry-root-versus-data-dir.md)
-- **0022** — [Sync is a closed catalogue of merged files — no links, no worlds](0022-sync-links-folders-copies-files.md)
+- **0022** — [Sync is a closed catalogue of merged files — no links, no worlds](0022-sync-is-a-catalogue-of-merged-files.md)
 - **0069** — [A synced unit reconciles against a baseline, not a clock](0069-sync-reconciles-against-a-baseline.md)
 - **0023** — [The id is an opaque uuid; the directory is the slug — decoupled](0023-id-is-a-uuid-directory-is-a-slug.md)
 - **0024** — [Backups follow docker-mc-backup, minus what the launcher already owns](0024-backups-follow-docker-mc-backup.md)
