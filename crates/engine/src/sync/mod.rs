@@ -308,7 +308,6 @@ impl Sync {
     }
 }
 
-/// A unit with one form keeps its copy where it always was.
 fn in_era(root: &Path, era: &str) -> PathBuf {
     match era.is_empty() {
         true => root.to_path_buf(),
@@ -648,8 +647,6 @@ mod tests {
             .any(|warning| matches!(warning, WarningInfo::SyncUnitUnsupported { .. })));
     }
 
-    /// 1.20.5 replaced item tags with components. A save from either side of
-    /// that break is not a file the other can read, so the two never meet.
     #[test]
     fn hotbars_are_kept_apart_across_the_item_format_break() {
         let base = temp_dir("eras");
@@ -701,8 +698,6 @@ mod tests {
         assert!(catalogue::supports(SyncUnit::Servers, "1.7.10"));
     }
 
-    /// The file the game wrote is the file it gets back: a merge that settles
-    /// one value must not reorder, re-space or strip the rest of it.
     #[test]
     fn a_merge_leaves_everything_it_did_not_settle_alone() {
         let base = temp_dir("shape");

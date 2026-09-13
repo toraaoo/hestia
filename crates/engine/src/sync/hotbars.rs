@@ -1,6 +1,4 @@
-//! `hotbar.nbt`, merged slot by slot: two instances that saved different
-//! toolbars each kept something, and settling the file whole would discard one
-//! of them. What is not a toolbar is left as each side wrote it.
+//! `hotbar.nbt`, merged slot by slot; what is not a toolbar is left alone.
 
 use std::collections::HashMap;
 use std::path::Path;

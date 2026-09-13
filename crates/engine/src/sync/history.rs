@@ -7,9 +7,7 @@ use anyhow::Result;
 
 use super::reconcile;
 
-/// What the game itself keeps. Without the same ceiling the union grows without
-/// bound and every launch undoes the trim the game just made, writing an
-/// ever-longer file back into every instance.
+/// What the game keeps; without the ceiling every launch undoes its trim.
 const LIMIT: usize = 50;
 
 pub fn merge(baseline: &Path, store: &Path, data: &Path) -> Result<()> {

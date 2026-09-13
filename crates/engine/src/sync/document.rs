@@ -1,7 +1,5 @@
-//! `options.txt` as the game wrote it. Mods add keys to the file and players
-//! hand-edit it, so re-rendering it from a map of the pairs we understood would
-//! drop comments, reorder keys and restamp the file on every pass. A document
-//! keeps the lines it read and rewrites only the values a merge settles.
+//! `options.txt` as the game wrote it: re-rendering from a map would drop
+//! comments, reorder keys and restamp the file on every pass.
 
 use std::path::Path;
 
@@ -26,8 +24,7 @@ struct Line {
 }
 
 impl Document {
-    /// An unreadable file is an error, not an empty document: settling against
-    /// nothing writes the shared copy over a file we merely failed to decode.
+    /// Unreadable is an error: settling against nothing overwrites the file.
     pub fn read(path: &Path) -> Result<Option<Document>> {
         let bytes = match std::fs::read(path) {
             Ok(bytes) => bytes,
@@ -130,7 +127,6 @@ fn split_line(text: &str) -> (&str, &str, &str) {
     }
 }
 
-/// The game writes `key:value`; any other line belongs to whoever wrote it.
 fn pair(line: &str) -> Option<(String, String)> {
     if line.starts_with('#') {
         return None;

@@ -12,6 +12,7 @@
 //! cannot be parsed is reported as an error only to a caller that is writing,
 //! since overwriting a list we failed to understand would discard it.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -40,6 +41,47 @@ struct Entry {
     accept_textures: Option<i8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hidden: Option<i8>,
+}
+
+/// A tag this build does not model must survive the round trip.
+pub type Row = HashMap<String, fastnbt::Value>;
+
+#[derive(Serialize, Deserialize, Default)]
+struct RawList {
+    servers: Vec<Row>,
+}
+
+pub fn read_rows(game_dir: &Path) -> Result<Vec<Row>> {
+    let Some(bytes) = bytes(&path(game_dir))? else {
+        return Ok(Vec::new());
+    };
+    let list: RawList = fastnbt::from_bytes(&bytes)
+        .with_context(|| format!("{} is not a readable server list", path(game_dir).display()))?;
+    Ok(list.servers)
+}
+
+pub fn write_rows(game_dir: &Path, rows: &[Row]) -> Result<()> {
+    let list = RawList {
+        servers: rows.to_vec(),
+    };
+    let bytes = fastnbt::to_bytes(&list).context("cannot encode the server list")?;
+    commit(&path(game_dir), &bytes)
+}
+
+fn bytes(file: &Path) -> Result<Option<Vec<u8>>> {
+    match std::fs::read(file) {
+        Ok(bytes) if bytes.is_empty() => Ok(None),
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e).with_context(|| format!("cannot read {}", file.display())),
+    }
+}
+
+fn commit(file: &Path, bytes: &[u8]) -> Result<()> {
+    let staging = file.with_extension("dat.part");
+    std::fs::write(&staging, bytes)
+        .with_context(|| format!("cannot write {}", staging.display()))?;
+    std::fs::rename(&staging, file).with_context(|| format!("cannot commit {}", file.display()))
 }
 
 pub fn path(game_dir: &Path) -> PathBuf {
@@ -80,20 +122,12 @@ fn parse(file: &Path) -> Result<Vec<ServerEntry>> {
     Ok(list.servers.into_iter().map(into_proto).collect())
 }
 
-/// Write the list back whole, staged through a temp file so a failure leaves
-/// the player's existing list intact.
 pub fn write(game_dir: &Path, servers: &[ServerEntry]) -> Result<()> {
-    let file = path(game_dir);
     let list = ServerList {
         servers: servers.iter().map(from_proto).collect(),
     };
     let bytes = fastnbt::to_bytes(&list).context("cannot encode the server list")?;
-    let staging = file.with_extension("dat.part");
-    std::fs::write(&staging, &bytes)
-        .with_context(|| format!("cannot write {}", staging.display()))?;
-    std::fs::rename(&staging, &file)
-        .with_context(|| format!("cannot commit {}", file.display()))?;
-    Ok(())
+    commit(&path(game_dir), &bytes)
 }
 
 /// Find an entry by name or by address, case-insensitively — the two things a

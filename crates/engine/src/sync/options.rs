@@ -8,9 +8,8 @@ use anyhow::Result;
 use super::document::Document;
 use super::reconcile;
 
-/// An excluded key is left exactly where each side has it: the merge never
-/// reads or writes one, so pinning a key on a single instance cannot strip it
-/// from the others, and a key that must never travel simply never does.
+/// An excluded key is never read or written, so pinning one on a single
+/// instance cannot strip it from the others.
 pub fn merge(
     baseline: &Path,
     store: &Path,
@@ -54,7 +53,6 @@ pub fn merge(
     reconcile::write_if_changed(baseline, stored.render().as_bytes())
 }
 
-/// The shared copy's values, for the front-ends that list and edit them.
 pub fn read(path: &Path) -> BTreeMap<String, String> {
     let Ok(Some(document)) = Document::read(path) else {
         return BTreeMap::new();
