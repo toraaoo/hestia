@@ -36,5 +36,36 @@ pub fn captured(unit: SyncUnit) -> bool {
     matches!(unit, SyncUnit::Options)
 }
 
-/// A shared selection would name packs the receiving instance has not installed.
-pub const ALWAYS_LOCAL_KEYS: &[&str] = &["resourcePacks", "incompatibleResourcePacks"];
+/// `options.txt` keys that must never travel between instances, whatever the
+/// catalogue says. Sharing one is not a preference the user can hold — it
+/// either describes the file, the machine, or a moment, and copying it makes
+/// the receiving instance wrong rather than merely different.
+pub const NEVER_SHARED_KEYS: &[&str] = &[
+    // The data version of the file itself. Copying another instance's tells
+    // this client the file came from a different game version, and it migrates
+    // keybinds and settings it never needed to touch.
+    "version",
+    // Name packs and worlds the receiving instance does not have.
+    "resourcePacks",
+    "incompatibleResourcePacks",
+    "lastServer",
+    // The machine's hardware, not the player's preference.
+    "soundDevice",
+    "fullscreenResolution",
+    "overrideWidth",
+    "overrideHeight",
+    // First-run and one-off prompt state: copying it re-arms or suppresses a
+    // prompt on an instance that never saw it.
+    "startedCleanly",
+    "tutorialStep",
+    "joinedFirstServer",
+    "onboardAccessibility",
+    "showInventoryAchievementHint",
+    "skipRealms32bitWarning",
+    "skipFriendsListPromo",
+    "hideBundleTutorial",
+    // Account-scoped, and the launcher owns it.
+    "skin",
+    // A pre-1.8 world default that has nothing to do with the client.
+    "difficulty",
+];

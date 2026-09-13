@@ -302,7 +302,7 @@ fn excluded_keys(catalogue: &Catalogue, pass: &Pass) -> BTreeSet<String> {
         .cloned()
         .chain(pass.overrides.unsynced.iter().cloned())
         .chain(
-            catalogue::ALWAYS_LOCAL_KEYS
+            catalogue::NEVER_SHARED_KEYS
                 .iter()
                 .map(|key| key.to_string()),
         )
@@ -603,6 +603,27 @@ mod tests {
         assert!(!catalogue::shares_era_bound("1.12.2"));
         assert!(catalogue::shares_era_bound("1.13"));
         assert!(catalogue::shares_era_bound("23w14a"));
+    }
+
+    #[test]
+    fn a_key_that_describes_the_file_or_the_machine_never_travels() {
+        let base = temp_dir("never");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        fs::create_dir_all(&data).unwrap();
+        fs::write(
+            data.join("options.txt"),
+            "guiScale:2\nversion:4325\nlastServer:example.net\noverrideWidth:1920\n",
+        )
+        .unwrap();
+
+        sharing(&shared).apply(&pass("test", &data));
+
+        let stored = fs::read_to_string(shared.join("options.txt")).unwrap();
+        assert!(stored.contains("guiScale:2"));
+        for key in ["version", "lastServer", "overrideWidth"] {
+            assert!(!stored.contains(key), "{key} must not reach the store");
+        }
     }
 
     #[test]
