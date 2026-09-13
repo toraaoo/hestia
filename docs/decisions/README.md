@@ -69,6 +69,8 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0021** — [The entry root is hestia's; `data/` is the game's](0021-entry-root-versus-data-dir.md)
 - **0022** — [Sync is a closed catalogue of merged files — no links, no worlds](0022-sync-is-a-catalogue-of-merged-files.md)
 - **0069** — [A synced unit reconciles against a baseline, not a clock](0069-sync-reconciles-against-a-baseline.md)
+- **0073** — [A unit shares only what its game version writes](0073-a-unit-shares-only-what-its-version-writes.md)
+- **0074** — [The merge writes the game's own file, not its own rendering of it](0074-the-merge-writes-the-games-own-file.md)
 - **0023** — [The id is an opaque uuid; the directory is the slug — decoupled](0023-id-is-a-uuid-directory-is-a-slug.md)
 - **0024** — [Backups follow docker-mc-backup, minus what the launcher already owns](0024-backups-follow-docker-mc-backup.md)
 - **0025** — [A world describes itself; a directory listing does not](0025-a-world-describes-itself.md)

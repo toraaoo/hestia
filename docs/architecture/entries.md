@@ -244,12 +244,12 @@ nothing is linked, and worlds are never shared. Servers are deliberately
 decoupled: a server's shareable state is its own config and `server.properties`,
 never a cross-entry store.
 
-| Unit | File | How two copies settle |
-|---|---|---|
-| `options` | `options.txt` | key by key |
-| `servers` | `servers.dat` | entry by entry, keyed by the row's name |
-| `commands` | `command_history.txt` | a union — an append-only log loses nothing |
-| `hotbars` | `hotbar.nbt` | whole file |
+| Unit | File | How two copies settle | Needs |
+|---|---|---|---|
+| `options` | `options.txt` | key by key, in the file the game wrote | 1.13 |
+| `servers` | `servers.dat` | row by row, paired against the agreement | — |
+| `commands` | `command_history.txt` | a union, capped at the 50 lines the game keeps | 1.20.2 |
+| `hotbars` | `hotbar.nbt` | slot by slot, one store per item-format era | 1.12 |
 
 ```mermaid
 flowchart LR
@@ -280,27 +280,39 @@ shared copy last agreed on: only a side that moved since then wins, and the cloc
 breaks a tie no other way settles
 ([0069](../decisions/0069-sync-reconciles-against-a-baseline.md)). A missing side
 is never an edit, and a key, entry or line only one side knows is carried
-through. The pass runs at every launch and once more when each session **exits**,
-so what the player changed in game reaches the shared copy then rather than at
-their next launch.
+through. The pass runs at every launch and once more when each session
+**exits**, so what the player changed in game reaches the shared copy then
+rather than at their next launch; it also runs over every idle instance when the
+daemon starts and whenever the catalogue changes, so a change reaches an
+instance that is never launched.
+
+The merge writes the file the game would: comments, key order and line endings
+survive, an unreadable file skips the unit instead of being replaced, and a
+`servers.dat` row keeps tags this build does not model
+([0074](../decisions/0074-the-merge-writes-the-games-own-file.md)). Before
+sharing first lands on an instance, its own copy is kept under
+`<store>/.backups/<instance>/`.
 
 Sharing is refused for nothing else: an arbitrary path is not a sync target,
 because the catalogue exists to name files whose format the launcher can merge
 ([0022](../decisions/0022-sync-is-a-catalogue-of-merged-files.md)).
 
-**A pre-1.13 instance does not share its options.** 1.13 renamed every keybind
-from an LWJGL key code to a `key.keyboard.*` name, so the two eras cannot read
-each other's copy in either direction — an old client silently drops the keybinds
-it cannot parse, and writing back degrades every modern instance. The gate is
-bidirectional and applies to `options.txt` alone; the other three units are
-era-agnostic and stay shared.
+**A unit shares only what its version writes.** 1.13 respelled every keybind, so
+a pre-1.13 instance keeps its own `options.txt`; the command history and the
+creative hotbars simply do not exist before 1.20.2 and 1.12. An instance below a
+unit's floor is skipped with a warning naming the version that would share it.
+The 1.20.5 item-format break is not a floor but a split: hotbars are stored per
+era, so each side shares with its own and neither writes a file the other cannot
+read ([0073](../decisions/0073-a-unit-shares-only-what-its-version-writes.md)).
 
 An instance **overrides** the catalogue on two axes, and neither moves a file —
 the next launch simply reconciles differently. It can keep any unit to itself,
 and it can pin individual `options.txt` keys local while sharing the rest. A key
 pinned on one instance is carried through untouched on both sides, so pinning
-never strips it from the others. Pack selection (`resourcePacks`) is always
-local: a shared list would name packs the receiving instance has not installed.
+never strips it from the others. Some keys are never shared at all — the pack
+selection, which would name packs the receiver has not installed, and the keys
+describing the file, the machine or a moment (`version`, `lastServer`, the
+display and audio keys, the first-run prompts).
 
 A `Scope` decides where the settings unit reconciles: the global store or a
 [captured profile's](content.md#content-profiles). A launch records its scope
