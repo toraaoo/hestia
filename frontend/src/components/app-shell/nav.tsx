@@ -3,6 +3,7 @@ import {
   CubeIcon,
   GearSixIcon,
   HardDrivesIcon,
+  ImagesIcon,
   PackageIcon,
   StackIcon,
   StorefrontIcon,
@@ -48,6 +49,12 @@ export const nav: NavItem[] = [
     label: m['app.nav.profiles'],
     icon: StackIcon,
     match: ['/profiles'],
+  },
+  {
+    to: '/screenshots',
+    label: m['app.nav.screenshots'],
+    icon: ImagesIcon,
+    match: ['/screenshots'],
   },
   {
     to: '/skins',

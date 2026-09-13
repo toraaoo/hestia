@@ -101,6 +101,10 @@
         "hint": "Teclas, vídeo e áudio, mesclados configuração a configuração.",
         "label": "Configurações de jogo"
       },
+      "screenshots": {
+        "hint": "Lidas onde foram tiradas; nada é copiado.",
+        "label": "Capturas"
+      },
       "servers": {
         "hint": "Os servidores na lista do jogo.",
         "label": "Lista multijogador"

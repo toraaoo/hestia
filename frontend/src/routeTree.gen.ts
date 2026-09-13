@@ -17,6 +17,7 @@ import { Route as AppInstancesIdRouteImport } from './routes/_app/instances/$id'
 import { Route as AppOfflineIndexRouteImport } from './routes/_app/offline/index'
 import { Route as AppProfilesIndexRouteImport } from './routes/_app/profiles/index'
 import { Route as AppProfilesNameRouteImport } from './routes/_app/profiles/$name'
+import { Route as AppScreenshotsIndexRouteImport } from './routes/_app/screenshots/index'
 import { Route as AppServersIndexRouteImport } from './routes/_app/servers/index'
 import { Route as AppServersIdRouteImport } from './routes/_app/servers/$id'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
@@ -63,6 +64,11 @@ const AppProfilesNameRoute = AppProfilesNameRouteImport.update({
   path: '/profiles/$name',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppScreenshotsIndexRoute = AppScreenshotsIndexRouteImport.update({
+  id: '/screenshots/',
+  path: '/screenshots/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppServersIndexRoute = AppServersIndexRouteImport.update({
   id: '/servers/',
   path: '/servers/',
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/instances/': typeof AppInstancesIndexRoute
   '/offline/': typeof AppOfflineIndexRoute
   '/profiles/': typeof AppProfilesIndexRoute
+  '/screenshots/': typeof AppScreenshotsIndexRoute
   '/servers/': typeof AppServersIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/skins/': typeof AppSkinsIndexRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/instances': typeof AppInstancesIndexRoute
   '/offline': typeof AppOfflineIndexRoute
   '/profiles': typeof AppProfilesIndexRoute
+  '/screenshots': typeof AppScreenshotsIndexRoute
   '/servers': typeof AppServersIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/skins': typeof AppSkinsIndexRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/_app/instances/': typeof AppInstancesIndexRoute
   '/_app/offline/': typeof AppOfflineIndexRoute
   '/_app/profiles/': typeof AppProfilesIndexRoute
+  '/_app/screenshots/': typeof AppScreenshotsIndexRoute
   '/_app/servers/': typeof AppServersIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/skins/': typeof AppSkinsIndexRoute
@@ -152,6 +161,7 @@ export interface FileRouteTypes {
     | '/instances/'
     | '/offline/'
     | '/profiles/'
+    | '/screenshots/'
     | '/servers/'
     | '/settings/'
     | '/skins/'
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/instances'
     | '/offline'
     | '/profiles'
+    | '/screenshots'
     | '/servers'
     | '/settings'
     | '/skins'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/_app/instances/'
     | '/_app/offline/'
     | '/_app/profiles/'
+    | '/_app/screenshots/'
     | '/_app/servers/'
     | '/_app/settings/'
     | '/_app/skins/'
@@ -252,6 +264,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProfilesNameRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/screenshots/': {
+      id: '/_app/screenshots/'
+      path: '/screenshots'
+      fullPath: '/screenshots/'
+      preLoaderRoute: typeof AppScreenshotsIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/servers/': {
       id: '/_app/servers/'
       path: '/servers'
@@ -306,6 +325,7 @@ interface AppRouteRouteChildren {
   AppInstancesIndexRoute: typeof AppInstancesIndexRoute
   AppOfflineIndexRoute: typeof AppOfflineIndexRoute
   AppProfilesIndexRoute: typeof AppProfilesIndexRoute
+  AppScreenshotsIndexRoute: typeof AppScreenshotsIndexRoute
   AppServersIndexRoute: typeof AppServersIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppSkinsIndexRoute: typeof AppSkinsIndexRoute
@@ -322,6 +342,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppInstancesIndexRoute: AppInstancesIndexRoute,
   AppOfflineIndexRoute: AppOfflineIndexRoute,
   AppProfilesIndexRoute: AppProfilesIndexRoute,
+  AppScreenshotsIndexRoute: AppScreenshotsIndexRoute,
   AppServersIndexRoute: AppServersIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppSkinsIndexRoute: AppSkinsIndexRoute,

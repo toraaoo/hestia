@@ -17,6 +17,7 @@ import { channels as modpack } from './modpack';
 import { channels as net } from './net';
 import { channels as process } from './process';
 import { channels as profile } from './profile';
+import { channels as screenshot } from './screenshot';
 import { channels as server } from './server';
 import { channels as skin } from './skin';
 import { channels as sync } from './sync';
@@ -39,6 +40,7 @@ export const channels: Handlers = {
   ...profile,
   ...server,
   ...skin,
+  ...screenshot,
   ...sync,
   ...transfer,
   ...update,

@@ -164,6 +164,11 @@ export const keys = {
     all: ['skins'] as const,
     list: (account: string) => [...keys.skins.all, 'list', account] as const,
   },
+  screenshots: {
+    all: ['screenshots'] as const,
+    list: (instance: string) =>
+      [...keys.screenshots.all, 'list', instance] as const,
+  },
   sync: {
     all: ['sync'] as const,
     config: () => [...keys.sync.all, 'config'] as const,

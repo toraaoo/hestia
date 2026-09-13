@@ -51,6 +51,7 @@ pub enum Unit {
     Servers,
     Commands,
     Hotbars,
+    Screenshots,
 }
 
 impl Unit {
@@ -60,6 +61,7 @@ impl Unit {
             Unit::Servers => SyncUnit::Servers,
             Unit::Commands => SyncUnit::Commands,
             Unit::Hotbars => SyncUnit::Hotbars,
+            Unit::Screenshots => SyncUnit::Screenshots,
         }
     }
 }
@@ -80,6 +82,7 @@ pub fn unit_name(unit: SyncUnit) -> &'static str {
         SyncUnit::Servers => "servers",
         SyncUnit::Commands => "commands",
         SyncUnit::Hotbars => "hotbars",
+        SyncUnit::Screenshots => "screenshots",
     }
 }
 

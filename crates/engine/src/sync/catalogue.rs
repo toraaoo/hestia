@@ -7,14 +7,20 @@ pub const ALL: &[SyncUnit] = &[
     SyncUnit::Servers,
     SyncUnit::Commands,
     SyncUnit::Hotbars,
+    SyncUnit::Screenshots,
 ];
 
-pub fn file(unit: SyncUnit) -> &'static str {
+pub const OPTIONS: &str = "options.txt";
+
+/// `None` for a unit that shares no file: nothing is copied, so there is no
+/// shared copy and no agreement to settle against.
+pub fn file(unit: SyncUnit) -> Option<&'static str> {
     match unit {
-        SyncUnit::Options => "options.txt",
-        SyncUnit::Servers => "servers.dat",
-        SyncUnit::Commands => "command_history.txt",
-        SyncUnit::Hotbars => "hotbar.nbt",
+        SyncUnit::Options => Some(OPTIONS),
+        SyncUnit::Servers => Some("servers.dat"),
+        SyncUnit::Commands => Some("command_history.txt"),
+        SyncUnit::Hotbars => Some("hotbar.nbt"),
+        SyncUnit::Screenshots => None,
     }
 }
 
@@ -25,7 +31,7 @@ fn requires(unit: SyncUnit) -> Option<(u64, u64, u64)> {
         SyncUnit::Options => None,
         SyncUnit::Hotbars => Some((1, 12, 0)),
         SyncUnit::Commands => Some((1, 20, 2)),
-        SyncUnit::Servers => None,
+        SyncUnit::Servers | SyncUnit::Screenshots => None,
     }
 }
 

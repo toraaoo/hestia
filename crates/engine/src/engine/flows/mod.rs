@@ -16,6 +16,7 @@ mod multiplayer;
 
 pub use multiplayer::ServerListWrite;
 mod profiles;
+mod screenshots;
 mod server;
 mod skins;
 mod sync;

@@ -6,6 +6,7 @@ export const SYNC_UNITS: SyncUnit[] = [
   'servers',
   'commands',
   'hotbars',
+  'screenshots',
 ];
 
 export const unitLabel: Record<SyncUnit, () => string> = {
@@ -13,6 +14,7 @@ export const unitLabel: Record<SyncUnit, () => string> = {
   servers: () => m['domain.sync_unit.servers.label'](),
   commands: () => m['domain.sync_unit.commands.label'](),
   hotbars: () => m['domain.sync_unit.hotbars.label'](),
+  screenshots: () => m['domain.sync_unit.screenshots.label'](),
 };
 
 export const unitHint: Record<SyncUnit, () => string> = {
@@ -20,6 +22,7 @@ export const unitHint: Record<SyncUnit, () => string> = {
   servers: () => m['domain.sync_unit.servers.hint'](),
   commands: () => m['domain.sync_unit.commands.hint'](),
   hotbars: () => m['domain.sync_unit.hotbars.hint'](),
+  screenshots: () => m['domain.sync_unit.screenshots.hint'](),
 };
 
 export const stateLabel: Record<UnitState, () => string> = {

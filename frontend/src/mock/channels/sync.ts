@@ -13,7 +13,13 @@ import type {
 import * as entries from '../state/entries';
 import { type Handlers, str, strings } from '../support';
 
-const UNITS: SyncUnit[] = ['options', 'servers', 'commands', 'hotbars'];
+const UNITS: SyncUnit[] = [
+  'options',
+  'servers',
+  'commands',
+  'hotbars',
+  'screenshots',
+];
 
 const enabled = new Map<SyncUnit, string>([['options', 'Cozy']]);
 let unsynced: string[] = [];

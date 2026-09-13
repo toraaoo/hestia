@@ -1,0 +1,14 @@
+{
+  "screenshot": {
+    "delete": {
+      "body": "{file} será excluída da instância que a tirou. Isso não pode ser desfeito.",
+      "title": "Excluir esta captura?"
+    },
+    "empty": "Nenhuma captura ainda",
+    "empty_hint": "Aperte F2 no jogo e elas aparecem aqui.",
+    "off": "As capturas ainda não são compartilhadas",
+    "off_hint": "Ative nas configurações para ver as capturas de cada instância aqui.",
+    "subtitle": "Todas as instâncias que as compartilham, das mais recentes.",
+    "title": "Capturas"
+  }
+}

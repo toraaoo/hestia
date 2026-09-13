@@ -104,10 +104,12 @@ impl Sync {
     }
 
     pub fn seed(&self, unit: SyncUnit, game_version: &str, from: &Path) -> Result<()> {
+        let Some(file) = catalogue::file(unit) else {
+            return Ok(());
+        };
         let store = in_era(&self.dir(), catalogue::era(unit, game_version));
         std::fs::create_dir_all(&store)
             .with_context(|| format!("cannot create {}", store.display()))?;
-        let file = catalogue::file(unit);
         let source = from.join(file);
         if source.is_file() {
             reconcile::copy_file(&source, &store.join(file))?;
@@ -116,7 +118,9 @@ impl Sync {
     }
 
     pub fn back_up(&self, unit: SyncUnit, id: &str, data_dir: &Path) -> Result<()> {
-        let file = catalogue::file(unit);
+        let Some(file) = catalogue::file(unit) else {
+            return Ok(());
+        };
         let source = data_dir.join(file);
         if !source.is_file() {
             return Ok(());
@@ -138,7 +142,9 @@ impl Sync {
         game_version: &str,
         data_dir: &Path,
     ) -> Result<()> {
-        let file = catalogue::file(unit);
+        let Some(file) = catalogue::file(unit) else {
+            return Ok(());
+        };
         let agreed = in_era(
             &self.dir().join(BASELINES).join(id),
             catalogue::era(unit, game_version),
@@ -147,7 +153,10 @@ impl Sync {
     }
 
     pub fn source_state(&self, unit: SyncUnit, data_dir: &Path) -> (bool, Option<i64>) {
-        let path = data_dir.join(catalogue::file(unit));
+        let Some(file) = catalogue::file(unit) else {
+            return (false, None);
+        };
+        let path = data_dir.join(file);
         let modified = reconcile::mtime(&path)
             .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
             .map(|since| since.as_secs() as i64);
@@ -163,6 +172,9 @@ impl Sync {
         let mut warnings = Vec::new();
         for &unit in catalogue::ALL {
             if !catalogue.enabled(unit) || !pass.overrides.shares(unit) {
+                continue;
+            }
+            if catalogue::file(unit).is_none() {
                 continue;
             }
             if !catalogue::supports(unit, &pass.game_version) {
@@ -196,7 +208,9 @@ impl Sync {
         let baselines = in_era(&root.join(BASELINES).join(&pass.id), era);
         std::fs::create_dir_all(&baselines)
             .with_context(|| format!("cannot create {}", baselines.display()))?;
-        let file = catalogue::file(unit);
+        let Some(file) = catalogue::file(unit) else {
+            return Ok(());
+        };
         let agreed = baselines.join(file);
         let interrupted = baselines.join(format!("{file}.pending"));
         if interrupted.exists() {
@@ -223,6 +237,7 @@ impl Sync {
                 &store.join(file),
                 &pass.data_dir.join(file),
             ),
+            SyncUnit::Screenshots => Ok(()),
         };
         if settled.is_ok() {
             let _ = std::fs::remove_file(&interrupted);
@@ -258,6 +273,9 @@ impl Sync {
         if !catalogue::supports(unit, &pass.game_version) {
             return UnitState::Unsupported;
         }
+        let Some(file) = catalogue::file(unit) else {
+            return UnitState::Synced;
+        };
         let agreed = in_era(
             &self
                 .store_root(unit, pass, shared)
@@ -265,7 +283,7 @@ impl Sync {
                 .join(&pass.id),
             catalogue::era(unit, &pass.game_version),
         )
-        .join(catalogue::file(unit));
+        .join(file);
         match agreed.exists() {
             true => UnitState::Synced,
             false => UnitState::Pending,
@@ -275,7 +293,7 @@ impl Sync {
     pub fn options(&self) -> Vec<SyncOption> {
         let shared = self.dir();
         let catalogue = Catalogue::load(&shared);
-        options::read(&shared.join(catalogue::file(SyncUnit::Options)))
+        options::read(&shared.join(catalogue::OPTIONS))
             .into_iter()
             .map(|(key, value)| SyncOption {
                 synced: !catalogue.unsynced().contains(&key),
@@ -286,7 +304,7 @@ impl Sync {
     }
 
     pub fn set_option(&self, key: &str, value: &str) -> Result<()> {
-        let path = self.dir().join(catalogue::file(SyncUnit::Options));
+        let path = self.dir().join(catalogue::OPTIONS);
         options::set(&path, key, value)
     }
 
@@ -318,7 +336,9 @@ impl Sync {
             .iter()
             .filter(|unit| catalogue::captured(**unit))
         {
-            let file = catalogue::file(unit);
+            let Some(file) = catalogue::file(unit) else {
+                continue;
+            };
             let source = shared.join(file);
             if source.is_file() {
                 reconcile::copy_file(&source, &profile_store.join(file))?;

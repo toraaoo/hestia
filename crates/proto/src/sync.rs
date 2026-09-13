@@ -28,6 +28,9 @@ pub enum SyncUnit {
     Commands,
     /// `hotbar.nbt`, whole-file.
     Hotbars,
+    /// The instances' `screenshots/` folders, read as one listing. Nothing is
+    /// copied, so this unit has no shared copy and no agreement.
+    Screenshots,
 }
 
 impl SyncUnit {
@@ -39,6 +42,7 @@ impl SyncUnit {
             SyncUnit::Servers => "the multiplayer list",
             SyncUnit::Commands => "the command history",
             SyncUnit::Hotbars => "the creative hotbars",
+            SyncUnit::Screenshots => "the screenshots",
         }
     }
 }

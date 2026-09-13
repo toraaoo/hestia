@@ -238,8 +238,10 @@ between machines, so it travels as one file you write on purpose.
 
 ## Sync — shared settings across instances
 
-Instances share a closed **catalogue** of four things Minecraft writes, through
-a persistent `<data_home>/shared/` store. Every one is copied and merged —
+Instances share a closed **catalogue**, and each unit names its own mechanism
+([0022](../decisions/0022-sync-is-a-closed-catalogue.md)): four files merged
+through a persistent `<data_home>/shared/` store, and the screenshots, which are
+only ever read where they already are. Every one is copied and merged —
 nothing is linked, and worlds are never shared. Servers are deliberately
 decoupled: a server's shareable state is its own config and `server.properties`,
 never a cross-entry store.
@@ -250,6 +252,7 @@ never a cross-entry store.
 | `servers` | `servers.dat` | row by row, paired against the agreement | — |
 | `commands` | `command_history.txt` | a union, capped at the 50 lines the game keeps | 1.20.2 |
 | `hotbars` | `hotbar.nbt` | slot by slot, one store per item-format era | 1.12 |
+| `screenshots` | `screenshots/` | nothing is copied — the folders are read as one listing | — |
 
 ```mermaid
 flowchart LR

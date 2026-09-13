@@ -455,10 +455,11 @@ hestia cache clear               # evict everything
 
 ## Shared settings
 
-Four things can be kept the same across your instances: your **game settings**, your **multiplayer list**, your
-**command history** and your **creative hotbars**. Each is merged at every launch and again when a session exits, key by
-key for the settings and entry by entry for the server list, so two instances changing different things both survive.
-Worlds are never shared.
+Five things can be kept the same across your instances: your **game settings**, your **multiplayer list**, your
+**command history**, your **creative hotbars** and your **screenshots**. The first four are merged at every launch, when
+a session exits, and over idle instances whenever the catalogue changes — key by key for the settings, row by row for the
+server list, slot by slot for the hotbars — so two instances changing different things both survive. Screenshots are the
+exception: nothing is copied, they are simply read where the game wrote them. Worlds are never shared.
 
 Each one is off until you turn it on, and turning it on asks which instance the shared copy starts from — that choice is
 the point, since letting whichever instance launched first decide is how settings go missing:
@@ -468,6 +469,7 @@ hestia sync status                    # what is shared, and where each instance 
 hestia sync on options --from cozy    # start the shared settings from 'cozy'
 hestia sync on servers                # asks which instance, unless only one has a list
 hestia sync off commands              # stop sharing; every instance keeps what it has
+hestia sync on screenshots            # read every instance's shots as one listing
 ```
 
 The shared game settings can be read and changed without opening the game, and any one of them can be dropped out of
@@ -475,7 +477,7 @@ sharing so every instance keeps its own value for it:
 
 ```bash
 hestia sync options                       # every shared setting and its value
-hestia sync options set renderDistance 16 # applies at each instance's next launch
+hestia sync options set fov 90            # applies at each instance's next launch
 hestia sync options local guiScale        # each instance keeps its own guiScale
 hestia sync options share guiScale        # …and back
 ```
@@ -491,8 +493,18 @@ hestia instance modded sync local fov    # keep one setting to this instance
 hestia instance modded sync share fov    # …and back
 ```
 
-A pre-1.13 instance does not share its settings in either direction: 1.13 renamed every keybind, and the two eras cannot
-read each other's file. `sync status` says so on that instance's row; the other three stay shared.
+Settings cross every version: a keybind saved as a number before 1.13 and one saved as a name after it are the same
+setting, and a value is written in each instance's own spelling. The distances and driver-level toggles start out pinned
+local, since a weaker machine has to be free to disagree. A unit whose file the version never wrote is skipped instead —
+the command history needs 1.20.2, the hotbars 1.12 — and `sync status` says so on that instance's row.
+
+Screenshots are listed and deleted where they lie:
+
+```bash
+hestia screenshot list                   # every instance that shares them, newest first
+hestia screenshot list --instance modded # one instance, shared or not
+hestia screenshot rm modded 2026-09-01_18.42.10.png
+```
 
 Sync is **instance-only**: a server's configuration is per-server infrastructure, managed through
 `server <name> config …` and

@@ -208,6 +208,11 @@ enum Command {
         #[command(subcommand)]
         cmd: commands::config::ConfigCmd,
     },
+    /// Screenshots across your instances
+    Screenshot {
+        #[command(subcommand)]
+        cmd: commands::screenshot::ScreenshotCmd,
+    },
     /// Settings/configs shared across instances
     Sync {
         #[command(subcommand)]
@@ -385,6 +390,7 @@ async fn run_command(command: Command) -> anyhow::Result<()> {
         Command::Sources => commands::content::run_sources().await,
         Command::Cache { cmd } => commands::cache::run(cmd).await,
         Command::Config { cmd } => commands::config::run(cmd).await,
+        Command::Screenshot { cmd } => commands::screenshot::run(cmd).await,
         Command::Sync { cmd } => commands::sync::run(cmd).await,
         Command::Update { yes } => commands::update::run(yes).await,
         // Handled by `dispatch`: these answer with their own exit status.

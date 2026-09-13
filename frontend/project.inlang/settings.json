@@ -1,7 +1,10 @@
 {
   "$schema": "https://inlang.com/schema/project-settings",
   "baseLocale": "en",
-  "locales": ["en", "pt-BR"],
+  "locales": [
+    "en",
+    "pt-BR"
+  ],
   "modules": [
     "https://cdn.jsdelivr.net/npm/@inlang/plugin-message-format@4/dist/index.js",
     "https://cdn.jsdelivr.net/npm/@inlang/plugin-m-function-matcher@2/dist/index.js"
@@ -16,6 +19,7 @@
       "./messages/{locale}/instance.json",
       "./messages/{locale}/content.json",
       "./messages/{locale}/profile.json",
+      "./messages/{locale}/screenshot.json",
       "./messages/{locale}/skin.json",
       "./messages/{locale}/settings.json",
       "./messages/{locale}/onboarding.json",

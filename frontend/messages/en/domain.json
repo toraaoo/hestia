@@ -101,6 +101,10 @@
         "hint": "Keybinds, video and audio, merged setting by setting.",
         "label": "Game settings"
       },
+      "screenshots": {
+        "hint": "Read where they were taken; nothing is copied.",
+        "label": "Screenshots"
+      },
       "servers": {
         "hint": "The servers in the in-game list.",
         "label": "Multiplayer list"

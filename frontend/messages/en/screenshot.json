@@ -1,0 +1,14 @@
+{
+  "screenshot": {
+    "delete": {
+      "body": "{file} is deleted from the instance that took it. This cannot be undone.",
+      "title": "Delete this screenshot?"
+    },
+    "empty": "No screenshots yet",
+    "empty_hint": "Press F2 in game and they show up here.",
+    "off": "Screenshots aren't shared yet",
+    "off_hint": "Turn them on in settings to see every instance's shots here.",
+    "subtitle": "Every instance that shares them, newest first.",
+    "title": "Screenshots"
+  }
+}
