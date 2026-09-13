@@ -5,8 +5,7 @@
 //! Wayland bar, or GNOME with the AppIndicator extension. Speaking the
 //! protocol directly is what Chromium does, and it is why an Electron app has
 //! a tray on a desktop that ships no indicator library: the requirement is a
-//! session bus and a host, never a package on the user's machine
-//! ([0072](../../../docs/decisions/0072-the-tray-speaks-the-tray-protocol.md)).
+//! session bus and a host, never a package on the user's machine.
 
 use std::process::ExitCode;
 use std::sync::mpsc::{self, Sender};

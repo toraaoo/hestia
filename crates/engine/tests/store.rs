@@ -370,8 +370,7 @@ fn instance_update_swaps_profile_and_keeps_settings() {
 }
 
 /// A server's own settings outlive a version change. The profile is the only
-/// thing an update resolves upstream, so it must be the only thing it writes —
-/// see [decision 0068](../../../docs/decisions/0068-a-record-is-mutated-not-rebuilt.md).
+/// thing an update resolves upstream, so it must be the only thing it writes.
 #[tokio::test]
 async fn server_update_swaps_profile_and_keeps_settings() {
     let dir = temp_dir("server-update");

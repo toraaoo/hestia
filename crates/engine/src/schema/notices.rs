@@ -3,11 +3,10 @@
 //!
 //! A quarantine is not the outcome of the operation that happened to trigger it
 //! — a `server.list` does not *cause* one — so it cannot ride out on that
-//! result the way an ordinary degraded outcome does
-//! ([0029](../../../../docs/decisions/0029-degraded-outcomes-ride-on-the-result.md)).
-//! What it does instead is disappear: the entry whose record was set aside stops
-//! being listed, silently, which is the exact failure that decision exists to
-//! prevent.
+//! result the way an ordinary degraded outcome does. What it does instead is
+//! disappear: the entry whose record was set aside stops being listed,
+//! silently, which is the exact failure a warning riding on the result exists
+//! to prevent.
 //!
 //! So quarantines accumulate here, in one append-only sink per process, and are
 //! read back through the surfaces where the user is already looking: the daemon

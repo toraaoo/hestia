@@ -3,7 +3,6 @@
 //! ship snake_case keys the camelCase frontend won't read. Enums are exempt —
 //! their variant *values* stay snake/lowercase, which the frontend's
 //! string-literal types depend on — and unit/marker structs have no fields.
-//! See docs/contributing.md.
 
 use std::fs;
 use std::path::Path;
