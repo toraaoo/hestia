@@ -7,47 +7,6 @@ use std::time::SystemTime;
 
 use anyhow::{Context, Result};
 
-enum Settle {
-    Pull,
-    Push,
-}
-
-pub fn whole(baseline: &Path, store: &Path, data: &Path) -> Result<()> {
-    let stored = read(store);
-    let local = read(data);
-    if stored.is_none() && local.is_none() {
-        return Ok(());
-    }
-    if stored == local {
-        return write_if_changed(baseline, local.as_deref().unwrap_or_default());
-    }
-
-    let settle = if local.is_none() {
-        Settle::Pull
-    } else if stored.is_none() {
-        Settle::Push
-    } else {
-        let base = read(baseline);
-        match (base != stored, base != local) {
-            (true, false) => Settle::Pull,
-            (false, true) => Settle::Push,
-            _ if newer(data, store) => Settle::Push,
-            _ => Settle::Pull,
-        }
-    };
-    let agreed = match settle {
-        Settle::Pull => {
-            copy_file(store, data)?;
-            stored
-        }
-        Settle::Push => {
-            copy_file(data, store)?;
-            local
-        }
-    };
-    write_if_changed(baseline, agreed.as_deref().unwrap_or_default())
-}
-
 pub fn one<'a, T: PartialEq>(
     base: Option<&T>,
     stored: Option<&'a T>,

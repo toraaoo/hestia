@@ -4,6 +4,7 @@
 mod catalogue;
 mod document;
 mod history;
+mod hotbars;
 mod options;
 mod reconcile;
 mod servers;
@@ -95,24 +96,31 @@ impl Sync {
         Ok(catalogue.to_config(&shared))
     }
 
-    pub fn seed(&self, unit: SyncUnit, from: &Path) -> Result<()> {
-        let shared = self.dir();
-        std::fs::create_dir_all(&shared)
-            .with_context(|| format!("cannot create {}", shared.display()))?;
+    pub fn seed(&self, unit: SyncUnit, game_version: &str, from: &Path) -> Result<()> {
+        let store = in_era(&self.dir(), catalogue::era(unit, game_version));
+        std::fs::create_dir_all(&store)
+            .with_context(|| format!("cannot create {}", store.display()))?;
         let file = catalogue::file(unit);
         let source = from.join(file);
         if source.is_file() {
-            reconcile::copy_file(&source, &shared.join(file))?;
+            reconcile::copy_file(&source, &store.join(file))?;
         }
         Ok(())
     }
 
-    pub fn defer(&self, unit: SyncUnit, id: &str, data_dir: &Path) -> Result<()> {
+    pub fn defer(
+        &self,
+        unit: SyncUnit,
+        id: &str,
+        game_version: &str,
+        data_dir: &Path,
+    ) -> Result<()> {
         let file = catalogue::file(unit);
-        reconcile::defer_to_store(
-            &self.dir().join(BASELINES).join(id).join(file),
-            &data_dir.join(file),
-        )
+        let agreed = in_era(
+            &self.dir().join(BASELINES).join(id),
+            catalogue::era(unit, game_version),
+        );
+        reconcile::defer_to_store(&agreed.join(file), &data_dir.join(file))
     }
 
     pub fn source_state(&self, unit: SyncUnit, data_dir: &Path) -> (bool, Option<i64>) {
@@ -159,8 +167,10 @@ impl Sync {
         shared: &Path,
         catalogue: &Catalogue,
     ) -> Result<()> {
-        let store = self.store_root(unit, pass, shared);
-        let baselines = store.join(BASELINES).join(&pass.id);
+        let root = self.store_root(unit, pass, shared);
+        let era = catalogue::era(unit, &pass.game_version);
+        let store = in_era(&root, era);
+        let baselines = in_era(&root.join(BASELINES).join(&pass.id), era);
         std::fs::create_dir_all(&baselines)
             .with_context(|| format!("cannot create {}", baselines.display()))?;
         let file = catalogue::file(unit);
@@ -177,7 +187,7 @@ impl Sync {
                 &store.join(file),
                 &pass.data_dir.join(file),
             ),
-            SyncUnit::Hotbars => reconcile::whole(
+            SyncUnit::Hotbars => hotbars::merge(
                 &baselines.join(file),
                 &store.join(file),
                 &pass.data_dir.join(file),
@@ -213,11 +223,14 @@ impl Sync {
         if !catalogue::supports(unit, &pass.game_version) {
             return UnitState::Unsupported;
         }
-        let agreed = self
-            .store_root(unit, pass, shared)
-            .join(BASELINES)
-            .join(&pass.id)
-            .join(catalogue::file(unit));
+        let agreed = in_era(
+            &self
+                .store_root(unit, pass, shared)
+                .join(BASELINES)
+                .join(&pass.id),
+            catalogue::era(unit, &pass.game_version),
+        )
+        .join(catalogue::file(unit));
         match agreed.exists() {
             true => UnitState::Synced,
             false => UnitState::Pending,
@@ -295,6 +308,14 @@ impl Sync {
     }
 }
 
+/// A unit with one form keeps its copy where it always was.
+fn in_era(root: &Path, era: &str) -> PathBuf {
+    match era.is_empty() {
+        true => root.to_path_buf(),
+        false => root.join(era),
+    }
+}
+
 fn excluded_keys(catalogue: &Catalogue, pass: &Pass) -> BTreeSet<String> {
     catalogue
         .unsynced()
@@ -345,6 +366,10 @@ mod tests {
     /// Stamped a known distance in the past, so a pass that stamps `now` where
     /// it should have stamped nothing is unambiguous.
     fn write_at(path: &Path, contents: &str, seconds_ago: u64) {
+        write_bytes_at(path, contents.as_bytes(), seconds_ago)
+    }
+
+    fn write_bytes_at(path: &Path, contents: &[u8], seconds_ago: u64) {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).unwrap();
         }
@@ -356,6 +381,24 @@ mod tests {
             .unwrap()
             .set_modified(when)
             .unwrap();
+    }
+
+    fn hotbar_holding(id: &str) -> Vec<u8> {
+        let mut stack = HashMap::new();
+        stack.insert("id".to_string(), fastnbt::Value::String(id.to_string()));
+        let mut root: HashMap<String, fastnbt::Value> = HashMap::new();
+        root.insert(
+            "0".to_string(),
+            fastnbt::Value::List(vec![fastnbt::Value::Compound(stack)]),
+        );
+        fastnbt::to_bytes(&root).unwrap()
+    }
+
+    fn holds(path: &Path, id: &str) -> bool {
+        let Ok(bytes) = fs::read(path) else {
+            return false;
+        };
+        String::from_utf8_lossy(&bytes).contains(id)
     }
 
     #[test]
@@ -386,7 +429,7 @@ mod tests {
         fs::write(source.join("options.txt"), "fov:90\n").unwrap();
 
         Sync::new(shared.clone())
-            .seed(SyncUnit::Options, &source)
+            .seed(SyncUnit::Options, "1.21.4", &source)
             .unwrap();
 
         assert!(fs::read_to_string(shared.join("options.txt"))
@@ -403,7 +446,8 @@ mod tests {
         write_at(&data.join("options.txt"), "guiScale:4\n", 100);
 
         let sync = sharing(&shared);
-        sync.defer(SyncUnit::Options, "test", &data).unwrap();
+        sync.defer(SyncUnit::Options, "test", "1.21.4", &data)
+            .unwrap();
         sync.apply(&pass("test", &data));
 
         assert!(fs::read_to_string(data.join("options.txt"))
@@ -564,16 +608,17 @@ mod tests {
         let data = base.path().join("data");
         let sync = sharing(&shared);
 
-        write_at(&shared.join("hotbar.nbt"), "one", 300);
+        let saved = hotbar_holding("minecraft:stone");
+        write_bytes_at(&shared.join("components").join("hotbar.nbt"), &saved, 300);
         sync.apply(&pass("test", &data));
         fs::remove_file(data.join("hotbar.nbt")).unwrap();
         sync.apply(&pass("test", &data));
 
-        assert_eq!(
-            fs::read_to_string(shared.join("hotbar.nbt")).unwrap(),
-            "one"
-        );
-        assert_eq!(fs::read_to_string(data.join("hotbar.nbt")).unwrap(), "one");
+        assert!(holds(
+            &shared.join("components").join("hotbar.nbt"),
+            "minecraft:stone"
+        ));
+        assert!(holds(&data.join("hotbar.nbt"), "minecraft:stone"));
     }
 
     #[test]
@@ -583,7 +628,12 @@ mod tests {
         let data = base.path().join("data");
         fs::create_dir_all(&shared).unwrap();
         fs::write(shared.join("options.txt"), "guiScale:3\n").unwrap();
-        fs::write(shared.join("hotbar.nbt"), "bar").unwrap();
+        fs::create_dir_all(shared.join("legacy")).unwrap();
+        fs::write(
+            shared.join("legacy").join("hotbar.nbt"),
+            hotbar_holding("minecraft:stone"),
+        )
+        .unwrap();
 
         let legacy = Pass {
             game_version: "1.12.2".to_string(),
@@ -596,6 +646,47 @@ mod tests {
         assert!(warnings
             .iter()
             .any(|warning| matches!(warning, WarningInfo::SyncUnitUnsupported { .. })));
+    }
+
+    /// 1.20.5 replaced item tags with components. A save from either side of
+    /// that break is not a file the other can read, so the two never meet.
+    #[test]
+    fn hotbars_are_kept_apart_across_the_item_format_break() {
+        let base = temp_dir("eras");
+        let shared = base.path().join("shared");
+        let modern_dir = base.path().join("modern");
+        let old_dir = base.path().join("old");
+        let sync = sharing(&shared);
+
+        let modern = pass("modern", &modern_dir);
+        let old = Pass {
+            game_version: "1.20.4".to_string(),
+            ..pass("old", &old_dir)
+        };
+        write_bytes_at(
+            &modern_dir.join("hotbar.nbt"),
+            &hotbar_holding("minecraft:stone"),
+            200,
+        );
+        write_bytes_at(
+            &old_dir.join("hotbar.nbt"),
+            &hotbar_holding("minecraft:torch"),
+            100,
+        );
+        sync.apply(&modern);
+        sync.apply(&old);
+        sync.apply(&modern);
+
+        assert!(holds(
+            &shared.join("components").join("hotbar.nbt"),
+            "minecraft:stone"
+        ));
+        assert!(holds(
+            &shared.join("legacy").join("hotbar.nbt"),
+            "minecraft:torch"
+        ));
+        assert!(!holds(&modern_dir.join("hotbar.nbt"), "minecraft:torch"));
+        assert!(!holds(&old_dir.join("hotbar.nbt"), "minecraft:stone"));
     }
 
     #[test]

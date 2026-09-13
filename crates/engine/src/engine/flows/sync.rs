@@ -96,14 +96,22 @@ impl Engine {
 
         let seeded_from = match &source {
             Some(record) => {
-                self.sync.seed(unit, &self.instances.data_dir(record))?;
+                self.sync.seed(
+                    unit,
+                    &record.profile.game_version,
+                    &self.instances.data_dir(record),
+                )?;
                 record.name.clone()
             }
             None => String::new(),
         };
         for record in &records {
-            self.sync
-                .defer(unit, &record.id, &self.instances.data_dir(record))?;
+            self.sync.defer(
+                unit,
+                &record.id,
+                &record.profile.game_version,
+                &self.instances.data_dir(record),
+            )?;
         }
         tracing::info!(%unit, source = %seeded_from, "sync unit enabled");
         self.sync.enable(unit, &seeded_from)

@@ -51,6 +51,21 @@ pub fn supports(unit: SyncUnit, game_version: &str) -> bool {
     crate::version::parse(game_version).is_none_or(|version| version >= floor)
 }
 
+/// 1.20.5 replaced an item's tags with components: a hotbar from either side
+/// of it is not a file the other can read, so each era keeps its own copy.
+const COMPONENT_ITEMS_SINCE: (u64, u64, u64) = (1, 20, 5);
+
+/// Empty for a unit that has only ever had one form.
+pub fn era(unit: SyncUnit, game_version: &str) -> &'static str {
+    if unit != SyncUnit::Hotbars {
+        return "";
+    }
+    match crate::version::parse(game_version) {
+        Some(version) if version < COMPONENT_ITEMS_SINCE => "legacy",
+        _ => "components",
+    }
+}
+
 pub fn captured(unit: SyncUnit) -> bool {
     matches!(unit, SyncUnit::Options)
 }
