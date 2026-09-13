@@ -40,6 +40,11 @@ to disagree about. An unknown key defaults to shared, because a mod's setting is
 a preference until proven otherwise, and the user turns any of it off per key or
 per instance.
 
+The keycode table and the list of keys the game itself writes are ported from
+Modrinth's launcher (GPL-3.0-only), as the skin preview already is, and so is
+the set of settings that do not share by default — the distances and the
+driver-level toggles a weaker machine has to be free to disagree about.
+
 **Rejected:** a table of every `options.txt` key for every version. It is the
 thorough answer and it is a maintenance subscription — every release, for every
 key, forever. Only a setting that actually changed spelling or encoding earns a

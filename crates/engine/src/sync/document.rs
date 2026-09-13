@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 const MAX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_LINES: usize = 16_384;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Document {
     lines: Vec<Line>,
     ending: String,
@@ -19,6 +19,15 @@ struct Line {
     text: String,
     ending: String,
     pair: Option<(String, String)>,
+}
+
+impl Default for Document {
+    fn default() -> Self {
+        Document {
+            lines: Vec::new(),
+            ending: "\n".to_string(),
+        }
+    }
 }
 
 impl Document {

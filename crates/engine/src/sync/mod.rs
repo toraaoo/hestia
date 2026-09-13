@@ -78,6 +78,11 @@ impl Sync {
         let shared = self.dir();
         let mut catalogue = Catalogue::load(&shared);
         catalogue.enable(unit, seeded_from);
+        if unit == SyncUnit::Options {
+            let mut pinned = catalogue.unsynced().clone();
+            pinned.extend(options::LOCAL_BY_DEFAULT.iter().map(|key| key.to_string()));
+            catalogue.set_unsynced(pinned);
+        }
         catalogue.save(&shared)?;
         Ok(catalogue.to_config(&shared))
     }
@@ -205,6 +210,7 @@ impl Sync {
                 &store.join(file),
                 &pass.data_dir.join(file),
                 &excluded_keys(catalogue, pass),
+                &pass.game_version,
             ),
             SyncUnit::Servers => servers::merge(&baselines, &store, &pass.data_dir),
             SyncUnit::Commands => history::merge(
@@ -587,6 +593,25 @@ mod tests {
     }
 
     #[test]
+    fn what_a_machine_may_disagree_about_starts_pinned() {
+        let base = temp_dir("defaults");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        write_at(
+            &shared.join("options.txt"),
+            "renderDistance:32\nfov:90\n",
+            300,
+        );
+
+        let sync = sharing(&shared);
+        sync.apply(&pass("test", &data));
+
+        let local = fs::read_to_string(data.join("options.txt")).unwrap();
+        assert!(local.contains("fov:90"));
+        assert!(!local.contains("renderDistance"));
+    }
+
+    #[test]
     fn a_key_one_instance_pins_stays_out_of_its_copy_only() {
         let base = temp_dir("pin");
         let shared = base.path().join("shared");
@@ -703,7 +728,7 @@ mod tests {
     }
 
     #[test]
-    fn a_legacy_instance_shares_everything_but_the_options() {
+    fn a_legacy_instance_shares_what_its_version_can_hold() {
         let base = temp_dir("era");
         let shared = base.path().join("shared");
         let data = base.path().join("data");
@@ -722,7 +747,9 @@ mod tests {
         };
         let warnings = sharing(&shared).apply(&legacy);
 
-        assert!(!data.join("options.txt").exists());
+        assert!(fs::read_to_string(data.join("options.txt"))
+            .unwrap()
+            .contains("guiScale:3"));
         assert!(data.join("hotbar.nbt").exists());
         assert!(warnings
             .iter()
@@ -770,9 +797,8 @@ mod tests {
 
     #[test]
     fn a_unit_is_gated_by_the_version_that_first_writes_its_file() {
-        assert!(!catalogue::supports(SyncUnit::Options, "1.12.2"));
-        assert!(catalogue::supports(SyncUnit::Options, "1.13"));
-        assert!(catalogue::supports(SyncUnit::Options, "23w14a"));
+        assert!(catalogue::supports(SyncUnit::Options, "1.12.2"));
+        assert!(catalogue::supports(SyncUnit::Commands, "23w14a"));
         assert!(!catalogue::supports(SyncUnit::Commands, "1.20.1"));
         assert!(catalogue::supports(SyncUnit::Commands, "1.20.2"));
         assert!(!catalogue::supports(SyncUnit::Hotbars, "1.11.2"));
@@ -879,15 +905,15 @@ mod tests {
         let data = base.path().join("data");
         let sync = sharing(&shared);
 
-        sync.set_option("renderDistance", "16").unwrap();
+        sync.set_option("fov", "90").unwrap();
         sync.apply(&pass("test", &data));
 
         assert!(fs::read_to_string(data.join("options.txt"))
             .unwrap()
-            .contains("renderDistance:16"));
+            .contains("fov:90"));
         assert!(sync
             .options()
             .iter()
-            .any(|option| option.key == "renderDistance" && option.synced));
+            .any(|option| option.key == "fov" && option.synced));
     }
 }

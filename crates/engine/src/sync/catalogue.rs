@@ -18,11 +18,11 @@ pub fn file(unit: SyncUnit) -> &'static str {
     }
 }
 
-/// 1.13 respelled every keybind, and an old client drops what it cannot parse;
-/// hotbars and the command history simply do not exist before their version.
+/// Hotbars and the command history do not exist before their version; the
+/// options catalogue translates every spelling, so options have no floor.
 fn requires(unit: SyncUnit) -> Option<(u64, u64, u64)> {
     match unit {
-        SyncUnit::Options => Some((1, 13, 0)),
+        SyncUnit::Options => None,
         SyncUnit::Hotbars => Some((1, 12, 0)),
         SyncUnit::Commands => Some((1, 20, 2)),
         SyncUnit::Servers => None,
