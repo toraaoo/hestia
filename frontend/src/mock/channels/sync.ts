@@ -19,6 +19,8 @@ const UNITS: SyncUnit[] = [
   'commands',
   'hotbars',
   'screenshots',
+  'resource_packs',
+  'data_packs',
 ];
 
 const enabled = new Map<SyncUnit, string>([['options', 'Cozy']]);

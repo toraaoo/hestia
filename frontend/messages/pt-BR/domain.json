@@ -93,6 +93,10 @@
         "hint": "Os comandos digitados no chat.",
         "label": "Histórico de comandos"
       },
+      "data_packs": {
+        "hint": "Compartilhados como biblioteca; o mundo é seu para adicioná-los.",
+        "label": "Data packs"
+      },
       "hotbars": {
         "hint": "As barras salvas no modo criativo.",
         "label": "Barras do criativo"
@@ -100,6 +104,10 @@
       "options": {
         "hint": "Teclas, vídeo e áudio, mesclados configuração a configuração.",
         "label": "Configurações de jogo"
+      },
+      "resource_packs": {
+        "hint": "Instalados em cada instância compatível.",
+        "label": "Pacotes de recursos"
       },
       "screenshots": {
         "hint": "Lidas onde foram tiradas; nada é copiado.",

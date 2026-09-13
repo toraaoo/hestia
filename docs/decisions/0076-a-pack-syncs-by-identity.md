@@ -15,27 +15,28 @@ enable, disable and removal by identity. **A version change never propagates**:
 one instance updating a pack is not a statement about the others, which may be on
 a game version that release does not support.
 
-**Compatibility is the pack's own declaration, and it is a gate rather than a
-failure.** A resource pack states the `pack_format` it was built for in its
-`pack.mcmeta`, and the client states the format it reads in its own
-`version.json`; the pack reaches an instance only when those agree. That is a
-stronger test than the version list the platform publishes, which describes the
-release rather than the archive, and it works for a pack installed from a file
-that has no platform metadata at all. The platform's game versions and loaders
-still decide *which* release to install. An instance that does not qualify is
-skipped silently — it is not an error, and it must not be reported as one every
-launch.
+**Compatibility is a gate, not a failure.** A pack reaches an instance by being
+installed the ordinary way, so the pool's own resolution decides it: the newest
+release of that project whose game versions and loaders match the instance. An
+instance nothing resolves for is skipped silently — it is not an error, and it
+must not be reported as one every launch. The stronger test is the pack's own
+`pack_format` in its `pack.mcmeta` against the format the client reads, which is
+what a pack installed from a file — with no platform metadata at all — has to be
+judged by; that check belongs with the selection, where a pack that resolves but
+cannot load must still be kept out of the load order.
 
 **A pack the instance did not choose does not travel.** Content carrying a
 modpack origin belongs to that pack's configuration, not to the player's
 library, so it is never lifted into the shared selection — the same rule that
 keeps a modpack's `options.txt` from redefining everyone's settings.
 
-Load order and enablement live in `options.txt`'s `resourcePacks` key, which is
-never shared as a raw string: it names files by path, and a path means nothing on
-an instance that does not hold that pack. The pack unit reconciles that
-selection **per pack**, mapping each shared pack to the path it has locally, and
-leaves entries for packs only that instance has exactly where they are.
+Load order lives in `options.txt`'s `resourcePacks` key, which is never shared as
+a raw string: it names files by path, and a path means nothing on an instance
+that does not hold that pack. Enablement travels as part of a pack's identity —
+disabling one disables it everywhere — while the order each instance loads them
+in stays that instance's, until the selection is reconciled per pack the way the
+key would have to be: each shared pack mapped to the path it has locally, with
+entries for packs only that instance holds left where they are.
 
 **Datapacks keep the world as their record** ([0016](0016-datapacks-are-world-of-record.md)).
 A datapack loads from inside a world, so syncing one cannot mean writing into

@@ -1,0 +1,134 @@
+//! The shared pack library, reconciled into one instance through the pool.
+
+use anyhow::Result;
+use proto::content::{ContentAddItem, ContentAddSpec, ContentKind, InstalledContent};
+use proto::sync::SyncUnit;
+use proto::warning::WarningInfo;
+
+use crate::cancel::{Cancel, Job};
+use crate::engine::Engine;
+use crate::instances::InstanceRecord;
+use crate::sync::packs::{self, Action, Pack};
+
+use super::content::EntryRef;
+
+const UNITS: &[(SyncUnit, ContentKind)] = &[
+    (SyncUnit::ResourcePacks, ContentKind::ResourcePack),
+    (SyncUnit::DataPacks, ContentKind::DataPack),
+];
+
+impl Engine {
+    pub async fn reconcile_packs(&self, record: &InstanceRecord) -> Vec<WarningInfo> {
+        let mut warnings = Vec::new();
+        for &(unit, kind) in UNITS {
+            if !self.sync.enabled(unit) || !record.sharing.shares(unit) {
+                continue;
+            }
+            if let Err(e) = self.settle_packs(record, kind).await {
+                let detail = format!("{e:#}");
+                tracing::warn!(instance = %record.name, %unit, error = %detail, "pack sync skipped");
+                warnings.push(WarningInfo::SyncUnitSkipped { unit, detail });
+            }
+        }
+        warnings
+    }
+
+    pub async fn reconcile_idle_packs(&self) {
+        for record in self.instances.list() {
+            if self.running_sessions(&record.id) > 0 {
+                continue;
+            }
+            self.reconcile_packs(&record).await;
+        }
+    }
+
+    async fn settle_packs(&self, record: &InstanceRecord, kind: ContentKind) -> Result<()> {
+        let installed = self.entry_content(EntryRef::Instance(&record.id), kind)?.0;
+        let mine: Vec<Pack> = installed
+            .iter()
+            .filter(is_the_players)
+            .map(as_pack)
+            .collect();
+        let mut library = self.sync.library();
+        let agreed = self.sync.agreed_packs(&record.id, kind);
+        let (shared, actions) = packs::settle(&library.of(kind), &agreed, &mine);
+
+        for action in actions {
+            self.act_on_pack(record, kind, action).await?;
+        }
+        library.replace(kind, shared.clone());
+        self.sync.save_library(&library)?;
+        self.sync.agree_packs(&record.id, kind, &shared)
+    }
+
+    async fn act_on_pack(
+        &self,
+        record: &InstanceRecord,
+        kind: ContentKind,
+        action: Action,
+    ) -> Result<()> {
+        let entry = EntryRef::Instance(&record.id);
+        match action {
+            // A data pack loads from inside a world, and which worlds is the
+            // player's to say, so the library travels but an install does not.
+            Action::Install(_) if kind == ContentKind::DataPack => Ok(()),
+            Action::Install(pack) => {
+                let spec = ContentAddSpec {
+                    kind,
+                    source: pack.source.clone(),
+                    items: vec![ContentAddItem {
+                        project: pack.project.clone(),
+                        source: pack.source.clone(),
+                        ..ContentAddItem::default()
+                    }],
+                    worlds: Vec::new(),
+                };
+                let cancel = Cancel::new();
+                let quiet = |_: &proto::minecraft::ProvisionProgress| {};
+                let job = Job::new(&quiet, &cancel);
+                let (_, failed) = self.add_entry_content(entry, &spec, &job).await?;
+                if let Some(failure) = failed.first() {
+                    tracing::info!(
+                        instance = %record.name,
+                        pack = %pack.title,
+                        reason = %failure.error,
+                        "pack does not fit this instance"
+                    );
+                }
+                Ok(())
+            }
+            Action::Remove(pack) => {
+                self.remove_entry_content(entry, kind, &[selector(&pack)], &[])?;
+                Ok(())
+            }
+            Action::Enable(pack, enabled) => {
+                self.enable_entry_content(entry, kind, &selector(&pack), enabled, &[])?;
+                Ok(())
+            }
+        }
+    }
+}
+
+/// Content a modpack or a profile supplied belongs to that thing, not to the
+/// player's library.
+fn is_the_players(item: &&InstalledContent) -> bool {
+    item.origin.is_empty()
+}
+
+fn as_pack(item: &InstalledContent) -> Pack {
+    Pack {
+        kind: item.kind,
+        source: item.source.clone(),
+        project: item.project_id.clone(),
+        title: item.title.clone(),
+        filename: item.filename.clone(),
+        enabled: item.enabled,
+    }
+}
+
+fn selector(pack: &Pack) -> String {
+    match pack.project.is_empty() {
+        true => pack.filename.clone(),
+        false => pack.project.clone(),
+    }
+}

@@ -93,6 +93,10 @@
         "hint": "The commands typed into chat.",
         "label": "Command history"
       },
+      "data_packs": {
+        "hint": "Shared as a library; a world is yours to add them to.",
+        "label": "Data packs"
+      },
       "hotbars": {
         "hint": "The hotbars saved in creative mode.",
         "label": "Creative hotbars"
@@ -100,6 +104,10 @@
       "options": {
         "hint": "Keybinds, video and audio, merged setting by setting.",
         "label": "Game settings"
+      },
+      "resource_packs": {
+        "hint": "Installed into every instance a pack fits.",
+        "label": "Resource packs"
       },
       "screenshots": {
         "hint": "Read where they were taken; nothing is copied.",

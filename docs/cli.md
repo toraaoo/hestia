@@ -470,6 +470,7 @@ hestia sync on options --from cozy    # start the shared settings from 'cozy'
 hestia sync on servers                # asks which instance, unless only one has a list
 hestia sync off commands              # stop sharing; every instance keeps what it has
 hestia sync on screenshots            # read every instance's shots as one listing
+hestia sync on resourcepacks          # install your packs into every instance they fit
 ```
 
 The shared game settings can be read and changed without opening the game, and any one of them can be dropped out of

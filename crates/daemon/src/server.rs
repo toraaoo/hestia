@@ -36,6 +36,7 @@ pub async fn run_daemon(log_path: std::path::PathBuf) -> i32 {
     // before anything else writes.
     runtime.engine().recover();
     runtime.engine().reconcile_idle();
+    runtime.engine().reconcile_idle_packs().await;
     crate::runtime::spawn_backup_scheduler(runtime.clone());
     crate::runtime::spawn_metrics_sampler(runtime.clone());
     crate::runtime::spawn_network_watcher(runtime.clone());

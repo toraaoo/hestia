@@ -17,7 +17,8 @@ use proto::content::{
     ContentAddSpec, ContentFailure, ContentKind, InstalledContent, UntrackedFile,
 };
 
-use self::entry::{Entry, EntryContent, EntryRef, EntrySide};
+pub(in crate::engine) use self::entry::EntryRef;
+use self::entry::{Entry, EntryContent, EntrySide};
 use self::manage::{list_content, remove_content, set_enabled};
 use super::phase_progress;
 use crate::content::{install, profiles};

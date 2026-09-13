@@ -6,6 +6,7 @@ mod document;
 mod history;
 mod hotbars;
 mod options;
+pub mod packs;
 mod reconcile;
 mod servers;
 mod state;
@@ -152,6 +153,35 @@ impl Sync {
         reconcile::defer_to_store(&agreed.join(file), &data_dir.join(file))
     }
 
+    pub fn agreed_packs(&self, id: &str, kind: proto::content::ContentKind) -> Vec<packs::Pack> {
+        packs::Library::load(&self.dir().join(BASELINES).join(id)).of(kind)
+    }
+
+    pub fn agree_packs(
+        &self,
+        id: &str,
+        kind: proto::content::ContentKind,
+        agreed: &[packs::Pack],
+    ) -> Result<()> {
+        let dir = self.dir().join(BASELINES).join(id);
+        std::fs::create_dir_all(&dir)
+            .with_context(|| format!("cannot create {}", dir.display()))?;
+        let mut library = packs::Library::load(&dir);
+        library.replace(kind, agreed.to_vec());
+        library.save(&dir)
+    }
+
+    pub fn library(&self) -> packs::Library {
+        packs::Library::load(&self.dir())
+    }
+
+    pub fn save_library(&self, library: &packs::Library) -> Result<()> {
+        let shared = self.dir();
+        std::fs::create_dir_all(&shared)
+            .with_context(|| format!("cannot create {}", shared.display()))?;
+        library.save(&shared)
+    }
+
     pub fn source_state(&self, unit: SyncUnit, data_dir: &Path) -> (bool, Option<i64>) {
         let Some(file) = catalogue::file(unit) else {
             return (false, None);
@@ -237,7 +267,7 @@ impl Sync {
                 &store.join(file),
                 &pass.data_dir.join(file),
             ),
-            SyncUnit::Screenshots => Ok(()),
+            SyncUnit::Screenshots | SyncUnit::ResourcePacks | SyncUnit::DataPacks => Ok(()),
         };
         if settled.is_ok() {
             let _ = std::fs::remove_file(&interrupted);

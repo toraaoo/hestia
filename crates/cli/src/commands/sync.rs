@@ -52,6 +52,8 @@ pub enum Unit {
     Commands,
     Hotbars,
     Screenshots,
+    ResourcePacks,
+    DataPacks,
 }
 
 impl Unit {
@@ -62,6 +64,8 @@ impl Unit {
             Unit::Commands => SyncUnit::Commands,
             Unit::Hotbars => SyncUnit::Hotbars,
             Unit::Screenshots => SyncUnit::Screenshots,
+            Unit::ResourcePacks => SyncUnit::ResourcePacks,
+            Unit::DataPacks => SyncUnit::DataPacks,
         }
     }
 }
@@ -83,6 +87,8 @@ pub fn unit_name(unit: SyncUnit) -> &'static str {
         SyncUnit::Commands => "commands",
         SyncUnit::Hotbars => "hotbars",
         SyncUnit::Screenshots => "screenshots",
+        SyncUnit::ResourcePacks => "resourcepacks",
+        SyncUnit::DataPacks => "datapacks",
     }
 }
 

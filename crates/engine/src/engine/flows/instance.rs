@@ -275,6 +275,7 @@ impl Engine {
             let pass = self.instance_pass(&record, &game_dir, store.as_deref());
             let session = proto::naming::instance_session_id(&record.id, session_seq);
             warnings.extend(self.begin_instance_sync(&session, pass));
+            warnings.extend(self.reconcile_packs(&record).await);
             let selection: Option<std::collections::HashSet<String>> =
                 launch_profile.map(|p| p.members.into_iter().collect());
             let worlds = crate::instances::save_worlds(&game_dir);
