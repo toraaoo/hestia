@@ -43,6 +43,7 @@ export function EntryRunControl({
   name,
   sessions,
   size = 'default',
+  iconOnly = false,
   busy = false,
   launching = false,
   onNewSession,
@@ -52,6 +53,8 @@ export function EntryRunControl({
   /** The live sessions, oldest first. */
   sessions: ProcessInfo[];
   size?: Size;
+  /** Compact square buttons with no labels — the library card's hover action. */
+  iconOnly?: boolean;
   busy?: boolean;
   launching?: boolean;
   onNewSession: () => void;
@@ -69,8 +72,9 @@ export function EntryRunControl({
       <div className="flex items-center">
         <Button
           variant="outline"
-          size={size}
-          data-icon="inline-start"
+          size={iconOnly ? 'icon-sm' : size}
+          aria-label={m['app.action.stop']()}
+          title={m['app.action.stop']()}
           disabled={busy}
           className={cn(menu && 'border-r-0')}
           onClick={(event) => {
@@ -80,7 +84,7 @@ export function EntryRunControl({
           }}
         >
           <PowerIcon weight="bold" />
-          {m['app.action.stop']()}
+          {!iconOnly && m['app.action.stop']()}
         </Button>
         {menu && (
           <DropdownMenu>
@@ -88,7 +92,7 @@ export function EntryRunControl({
               render={
                 <Button
                   variant="outline"
-                  size={CARET_SIZE[size]}
+                  size={iconOnly ? 'icon-sm' : CARET_SIZE[size]}
                   aria-label={m['entry.session.menu']()}
                   title={m['entry.session.menu']()}
                   disabled={busy}

@@ -11,9 +11,9 @@ export function EntryGridSkeleton({
   return (
     <CardGridSkeleton
       header={header}
-      grid="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
+      grid="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(10rem,1fr))]"
       count={count}
-      card="h-40"
+      card="aspect-[2/3]"
     />
   );
 }

@@ -1,6 +1,6 @@
 import { PlayIcon, PowerIcon, PushPinIcon } from '@phosphor-icons/react';
 import { createLink } from '@tanstack/react-router';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 
 import type { ProcessInfo } from '@/api';
 import { entryIcon } from '@/components/icons';
@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
-import { duration, layoutMorph, listItem } from '@/lib/motion';
+import { Thumbnail } from '@/components/ui/thumbnail';
+import { layoutMorph, listItem } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { usePinned } from '@/queries/pinned';
@@ -118,9 +119,12 @@ function PinToggle({
 function ActionButton({
   entry,
   size = 'sm',
+  square = false,
 }: {
   entry: EntryCardModel;
   size?: 'sm' | 'xs';
+  /** Grid cards: a bare square icon, no label. */
+  square?: boolean;
 }) {
   if (entry.running && entry.onNewSession) {
     return (
@@ -128,6 +132,7 @@ function ActionButton({
         name={entry.name}
         sessions={entry.sessions ?? []}
         size={size}
+        iconOnly={square}
         busy={entry.stopping}
         launching={entry.launching}
         onNewSession={entry.onNewSession}
@@ -141,16 +146,17 @@ function ActionButton({
         trigger={
           <Button
             variant="outline"
-            size={size}
-            data-icon="inline-start"
+            size={square ? 'icon' : size}
             disabled={entry.busy}
+            aria-label={m['app.action.stop']()}
+            title={m['app.action.stop']()}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
             }}
           >
             <PowerIcon weight="bold" />
-            {m['app.action.stop']()}
+            {!square && m['app.action.stop']()}
           </Button>
         }
         title={m['entry.stop.title']({ name: entry.name })}
@@ -166,9 +172,18 @@ function ActionButton({
   }
   return (
     <Button
-      size={size}
+      size={square ? 'icon-lg' : size}
       disabled={!entry.ready || entry.busy}
-      data-icon="inline-start"
+      aria-label={
+        entry.kind === 'server'
+          ? m['app.action.start']()
+          : m['app.action.play']()
+      }
+      title={
+        entry.kind === 'server'
+          ? m['app.action.start']()
+          : m['app.action.play']()
+      }
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -177,22 +192,13 @@ function ActionButton({
       className="bg-ember text-ember-foreground hover:bg-ember/90"
     >
       {entry.busy ? <Spinner /> : <PlayIcon weight="fill" />}
-      {entry.kind === 'server'
-        ? m['app.action.start']()
-        : m['app.action.play']()}
+      {!square &&
+        (entry.kind === 'server'
+          ? m['app.action.start']()
+          : m['app.action.play']())}
     </Button>
   );
 }
-
-const iconTransition = {
-  layout: layoutMorph,
-  opacity: { duration: duration.fast },
-};
-const metaTransition = {
-  layout: layoutMorph,
-  opacity: { duration: duration.fast },
-  height: { duration: duration.fast },
-};
 
 export function EntryTile({
   entry,
@@ -223,44 +229,17 @@ export function EntryTile({
       <motion.div
         layout
         transition={layoutMorph}
-        className={cn(
-          'relative grid shrink-0 place-items-center overflow-hidden',
-          grid
-            ? 'h-24 w-full border-b border-border bg-muted/40'
-            : 'size-9 bg-muted ring-1 ring-border',
-        )}
+        className={cn('shrink-0', grid && 'w-full border-b border-border')}
       >
-        <AnimatePresence mode="wait" initial={false}>
-          {entry.iconUrl ? (
-            <motion.img
-              key="img"
-              layout
-              src={entry.iconUrl}
-              alt=""
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={iconTransition}
-              className="size-full object-cover"
-            />
-          ) : (
-            <motion.div
-              key="icon"
-              layout
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={iconTransition}
-            >
-              <Icon
-                className={cn(
-                  'text-muted-foreground',
-                  grid ? 'size-9 opacity-40' : 'size-4.5',
-                )}
-              />
-            </motion.div>
+        <Thumbnail
+          src={entry.iconUrl}
+          icon={Icon}
+          size={grid ? 'full' : 'lg'}
+          className={cn(
+            grid &&
+              'bg-muted/40 ring-0 transition-[filter] group-hover:brightness-90',
           )}
-        </AnimatePresence>
+        />
       </motion.div>
 
       {/* Text block: position-only. Glyphs must never be scaled, and this
@@ -268,34 +247,14 @@ export function EntryTile({
       <motion.div
         layout="position"
         transition={layoutMorph}
-        className={cn('min-w-0', grid ? 'w-full space-y-2 p-3' : 'flex-1')}
+        className={cn('min-w-0', grid ? 'w-full p-3 pt-2.5' : 'flex-1')}
       >
-        <span className="block truncate text-sm font-medium">{entry.name}</span>
-
-        <AnimatePresence initial={false}>
-          {grid && (
-            <motion.div
-              key="meta"
-              layout="position"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={metaTransition}
-              className="flex items-center gap-1.5 overflow-hidden"
-            >
-              <Badge variant="secondary" className="uppercase">
-                {entry.flavor}
-              </Badge>
-              <Badge variant="outline" className="font-mono">
-                {entry.version}
-              </Badge>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <span className="block truncate font-mono text-[11px] text-muted-foreground">
+        <span className="block truncate text-sm font-semibold">
+          {entry.name}
+        </span>
+        <span className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">
           {grid
-            ? entry.subtitle
+            ? `${entry.flavor} · ${entry.version}`
             : `${entry.flavor} · ${entry.version} · ${entry.subtitle}`}
         </span>
       </motion.div>
@@ -323,10 +282,17 @@ export function EntryTile({
         transition={layoutMorph}
         className={cn(
           grid &&
-            'absolute top-15 right-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-aria-expanded:opacity-100',
+            'pointer-events-none absolute inset-x-0 top-0 aspect-square opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 has-aria-expanded:opacity-100',
         )}
       >
-        <ActionButton entry={entry} />
+        <div
+          className={cn(
+            '[&>*]:pointer-events-auto',
+            grid && 'absolute right-3 bottom-3 grid',
+          )}
+        >
+          <ActionButton entry={entry} square={grid} />
+        </div>
       </motion.div>
     </MotionLink>
   );

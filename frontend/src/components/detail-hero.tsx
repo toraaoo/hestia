@@ -3,6 +3,8 @@ import { CaretRightIcon } from '@phosphor-icons/react';
 import { Link, type LinkProps } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
+import { Thumbnail } from '@/components/ui/thumbnail';
+
 /** Breadcrumb + banner hero: parent link, big icon, name, badges, actions. */
 export function DetailHero({
   parentLabel,
@@ -45,18 +47,13 @@ export function DetailHero({
       </div>
 
       <div className="flex items-end gap-4 bg-muted/25 px-5 pt-8 pb-5">
-        <span className="group relative grid size-16 shrink-0 place-items-center overflow-hidden bg-muted text-muted-foreground ring-1 ring-border">
-          {iconUrl ? (
-            <img src={iconUrl} alt="" className="size-full object-cover" />
-          ) : (
-            <Icon className="size-8" />
-          )}
+        <Thumbnail src={iconUrl} icon={Icon} size="2xl" className="group">
           {iconAction && (
             <span className="absolute right-1 bottom-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
               {iconAction}
             </span>
           )}
-        </span>
+        </Thumbnail>
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-heading text-xl font-semibold">
             {name}

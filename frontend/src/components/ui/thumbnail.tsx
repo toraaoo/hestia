@@ -1,5 +1,5 @@
 import type { Icon } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -9,47 +9,72 @@ const sizes = {
   md: { box: 'size-8', glyph: 'size-4.5' },
   lg: { box: 'size-9', glyph: 'size-5' },
   xl: { box: 'size-12', glyph: 'size-6' },
+  '2xl': { box: 'size-16', glyph: 'size-8' },
+  full: { box: 'aspect-square w-full', glyph: 'size-1/3' },
 } as const;
 
-/** The square image-or-glyph tile a list row or card leads with. */
+/** Below this an icon is pixel art, and smoothing it only smears it. */
+const PIXEL_ART_WIDTH = 32;
+
+/**
+ * The square image-or-glyph tile a list row, card or hero leads with.
+ *
+ * The box is 1:1 at every size and the image is *contained*, never cropped —
+ * a picked icon of any aspect sits whole on the tile rather than losing its
+ * edges to a centre crop.
+ */
 export function Thumbnail({
   src,
   icon: Glyph,
   size = 'sm',
   className,
+  children,
 }: {
   /** A URL or data URI; the glyph stands in when it is absent or fails. */
   src?: string;
   icon: Icon;
   size?: keyof typeof sizes;
   className?: string;
+  /** Overlays positioned against the tile — a hover action, a menu. */
+  children?: ReactNode;
 }) {
-  // By source, not a flag: a tile whose image changes underneath it must get
-  // a fresh attempt.
+  // Keyed by source, not a flag: a tile whose image changes underneath it must
+  // get a fresh attempt, and must not carry the old one's rendering.
   const [broken, setBroken] = useState<string | null>(null);
+  const [pixelArt, setPixelArt] = useState<string | null>(null);
   const { box, glyph } = sizes[size];
 
-  if (!src || broken === src) {
-    return (
-      <span
-        className={cn(
-          'grid shrink-0 place-items-center bg-muted text-muted-foreground ring-1 ring-border',
-          box,
-          className,
-        )}
-      >
-        <Glyph className={glyph} />
-      </span>
-    );
-  }
-
   return (
-    <img
-      src={src}
-      alt=""
-      onError={() => setBroken(src)}
-      className={cn('shrink-0 object-cover ring-1 ring-border', box, className)}
-    />
+    <span
+      className={cn(
+        'relative grid shrink-0 place-items-center overflow-hidden bg-muted text-muted-foreground ring-1 ring-border',
+        box,
+        className,
+      )}
+    >
+      {!src || broken === src ? (
+        <Glyph className={glyph} />
+      ) : (
+        <img
+          src={src}
+          alt=""
+          onError={() => setBroken(src)}
+          onLoad={(e) =>
+            setPixelArt(
+              e.currentTarget.naturalWidth > 0 &&
+                e.currentTarget.naturalWidth < PIXEL_ART_WIDTH
+                ? src
+                : null,
+            )
+          }
+          className={cn(
+            'size-full object-contain',
+            pixelArt === src && '[image-rendering:pixelated]',
+          )}
+        />
+      )}
+      {children}
+    </span>
   );
 }
 

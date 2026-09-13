@@ -181,7 +181,7 @@ export function EntryCollection({
       className={cn(
         view === 'list'
           ? 'divide-y divide-border border border-border'
-          : 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
+          : 'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(10rem,1fr))]',
       )}
     >
       <AnimatePresence initial={false}>

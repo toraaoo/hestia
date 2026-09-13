@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusDot } from '@/components/ui/status-dot';
+import { Thumbnail } from '@/components/ui/thumbnail';
 import { useLaunchDialog } from '@/features/instances/dialogs';
 import { anchor } from '@/features/onboarding';
 import { EntryRunControl } from '@/features/shared/entry/components';
@@ -59,17 +60,7 @@ export function PlayBar() {
               disabled={list.length === 0}
               className="-ml-2 flex h-14 w-72 items-center gap-3 px-2 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset aria-expanded:bg-muted disabled:opacity-50"
             >
-              <span className="grid size-11 shrink-0 place-items-center overflow-hidden bg-muted text-muted-foreground ring-1 ring-border">
-                {sel?.iconUrl ? (
-                  <img
-                    src={sel.iconUrl}
-                    alt=""
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <Icon className="size-6" />
-                )}
-              </span>
+              <Thumbnail src={sel?.iconUrl} icon={Icon} size="xl" />
               <span className="min-w-0 flex-1 leading-tight">
                 <span className="block text-[11px] tracking-wide text-muted-foreground uppercase">
                   {m['app.playbar.quick_play']()}
