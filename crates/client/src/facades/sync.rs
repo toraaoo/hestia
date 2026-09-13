@@ -80,6 +80,39 @@ impl Sync<'_> {
             .options)
     }
 
+    pub async fn packs(&self) -> Result<Vec<proto::sync::SharedPack>, IpcError> {
+        Ok(self
+            .session
+            .call::<proto::sync::SyncPacks>(&proto::Empty {})
+            .await?
+            .packs)
+    }
+
+    pub async fn set_pack(
+        &self,
+        pack: &str,
+        enabled: bool,
+    ) -> Result<Vec<proto::sync::SharedPack>, IpcError> {
+        Ok(self
+            .session
+            .call::<proto::sync::SyncPackSet>(&proto::sync::SyncPackSetParams {
+                pack: pack.to_string(),
+                enabled,
+            })
+            .await?
+            .packs)
+    }
+
+    pub async fn remove_pack(&self, pack: &str) -> Result<Vec<proto::sync::SharedPack>, IpcError> {
+        Ok(self
+            .session
+            .call::<proto::sync::SyncPackRemove>(&proto::sync::SyncPackRemoveParams {
+                pack: pack.to_string(),
+            })
+            .await?
+            .packs)
+    }
+
     pub async fn status(&self) -> Result<Vec<proto::sync::InstanceSyncStatus>, IpcError> {
         Ok(self
             .session

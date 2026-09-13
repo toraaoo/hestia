@@ -105,6 +105,86 @@ impl SyncOverrides {
     }
 }
 
+/// One pack the instances share: an identity, never a file and never a version.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SharedPack {
+    pub kind: crate::content::ContentKind,
+    pub source: String,
+    /// The project this is an install of; empty for a pack that came from a
+    /// file, which is then known by its filename alone.
+    pub project: String,
+    pub title: String,
+    pub filename: String,
+    pub enabled: bool,
+}
+
+impl SharedPack {
+    pub fn identity(&self) -> String {
+        match self.project.is_empty() {
+            true => format!("{}:file:{}", self.kind, self.filename),
+            false => format!("{}:{}:{}", self.kind, self.source, self.project),
+        }
+    }
+
+    /// Whether the pack answers to what a person typed: its project, its file
+    /// or its title.
+    pub fn answers_to(&self, reference: &str) -> bool {
+        let reference = reference.trim();
+        [&self.project, &self.filename, &self.title]
+            .iter()
+            .any(|field| !field.is_empty() && field.eq_ignore_ascii_case(reference))
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncPacksResult {
+    pub packs: Vec<SharedPack>,
+}
+
+pub struct SyncPacks;
+impl Contract for SyncPacks {
+    const CHANNEL: &'static str = "sync.packs.get";
+    type Params = Empty;
+    type Result = SyncPacksResult;
+}
+
+/// Reaches each instance at its next pass; nothing is moved here.
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncPackSetParams {
+    /// Project, filename or title.
+    pub pack: String,
+    pub enabled: bool,
+}
+
+pub struct SyncPackSet;
+impl Contract for SyncPackSet {
+    const CHANNEL: &'static str = "sync.packs.set";
+    type Params = SyncPackSetParams;
+    type Result = SyncPacksResult;
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields))]
+#[serde(default, rename_all = "camelCase")]
+pub struct SyncPackRemoveParams {
+    pub pack: String,
+}
+
+/// Drops it from the library; every instance that has it loses it at its next
+/// pass, and one that had already removed it stays as it is.
+pub struct SyncPackRemove;
+impl Contract for SyncPackRemove {
+    const CHANNEL: &'static str = "sync.packs.remove";
+    type Params = SyncPackRemoveParams;
+    type Result = SyncPacksResult;
+}
+
 pub struct SyncGet;
 impl Contract for SyncGet {
     const CHANNEL: &'static str = "sync.get";

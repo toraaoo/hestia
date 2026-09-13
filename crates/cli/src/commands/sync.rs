@@ -30,6 +30,25 @@ pub enum SyncCmd {
         #[command(subcommand)]
         cmd: OptionsCmd,
     },
+    /// The shared pack library
+    Packs {
+        #[command(subcommand)]
+        cmd: PacksCmd,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PacksCmd {
+    /// Every pack the instances share
+    #[command(alias = "ls")]
+    List,
+    /// Load a pack in every instance that has it
+    Enable { pack: String },
+    /// Keep a pack installed but unloaded everywhere
+    Disable { pack: String },
+    /// Drop a pack from the library; every instance loses it at its next pass
+    #[command(alias = "rm")]
+    Remove { pack: String },
 }
 
 #[derive(Subcommand)]
@@ -77,7 +96,58 @@ pub async fn run(cmd: SyncCmd) -> Result<()> {
         SyncCmd::On { unit, from } => enable(&client, unit.proto(), from).await,
         SyncCmd::Off { unit } => disable(&client, unit.proto()).await,
         SyncCmd::Options { cmd } => options(&client, cmd).await,
+        SyncCmd::Packs { cmd } => packs(&client, cmd).await,
     }
+}
+
+async fn packs(client: &Client, cmd: PacksCmd) -> Result<()> {
+    match cmd {
+        PacksCmd::List => list_packs(client).await,
+        PacksCmd::Enable { pack } => {
+            client.sync().set_pack(&pack, true).await?;
+            ui::show(View::line(format!("'{pack}' loads in every instance")))
+        }
+        PacksCmd::Disable { pack } => {
+            client.sync().set_pack(&pack, false).await?;
+            ui::show(View::line(format!(
+                "'{pack}' stays installed but unloaded everywhere"
+            )))
+        }
+        PacksCmd::Remove { pack } => {
+            client.sync().remove_pack(&pack).await?;
+            ui::show(View::line(format!(
+                "'{pack}' is no longer shared; instances lose it at their next pass"
+            )))
+        }
+    }
+}
+
+async fn list_packs(client: &Client) -> Result<()> {
+    let packs = client.sync().packs().await?;
+    if packs.is_empty() {
+        return ui::show(View::note(
+            "no packs shared yet — `hestia sync on resourcepacks` starts from an instance",
+        ));
+    }
+    let rows = packs
+        .into_iter()
+        .map(|pack| {
+            vec![
+                pack.title,
+                pack.kind.to_string(),
+                pack.source,
+                match pack.enabled {
+                    true => "loaded".to_string(),
+                    false => "not loaded".to_string(),
+                },
+            ]
+        })
+        .collect();
+    ui::show(View::table(
+        "Shared packs",
+        ["PACK", "KIND", "FROM", ""],
+        rows,
+    ))
 }
 
 pub fn unit_name(unit: SyncUnit) -> &'static str {

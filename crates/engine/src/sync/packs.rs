@@ -5,33 +5,12 @@ use std::path::Path;
 
 use anyhow::Result;
 use proto::content::ContentKind;
+pub use proto::sync::SharedPack as Pack;
 use serde::{Deserialize, Serialize};
 
 use crate::schema::{self, Document};
 
 const FILE: &str = "packs.json";
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct Pack {
-    pub kind: ContentKind,
-    pub source: String,
-    /// The project this is an install of; empty for a pack that came from a
-    /// file, which is then known by its filename alone.
-    pub project: String,
-    pub title: String,
-    pub filename: String,
-    pub enabled: bool,
-}
-
-impl Pack {
-    pub fn identity(&self) -> String {
-        match self.project.is_empty() {
-            true => format!("{}:file:{}", self.kind, self.filename),
-            false => format!("{}:{}:{}", self.kind, self.source, self.project),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(default, rename_all = "camelCase")]

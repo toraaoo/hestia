@@ -107,6 +107,7 @@ impl Engine {
                     &record.profile.game_version,
                     &self.instances.data_dir(record),
                 )?;
+                self.seed_packs(unit, record)?;
                 record.name.clone()
             }
             None => String::new(),

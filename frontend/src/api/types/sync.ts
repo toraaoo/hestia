@@ -2,6 +2,7 @@
 export type { InstanceSyncKeysParams } from "./generated/InstanceSyncKeysParams";
 export type { InstanceSyncStatus } from "./generated/InstanceSyncStatus";
 export type { InstanceSyncUnitParams } from "./generated/InstanceSyncUnitParams";
+export type { SharedPack } from "./generated/SharedPack";
 export type { SyncConfig } from "./generated/SyncConfig";
 export type { SyncDisableParams } from "./generated/SyncDisableParams";
 export type { SyncEnableParams } from "./generated/SyncEnableParams";
@@ -10,6 +11,9 @@ export type { SyncOption } from "./generated/SyncOption";
 export type { SyncOptionSetParams } from "./generated/SyncOptionSetParams";
 export type { SyncOptionsResult } from "./generated/SyncOptionsResult";
 export type { SyncOverrides } from "./generated/SyncOverrides";
+export type { SyncPackRemoveParams } from "./generated/SyncPackRemoveParams";
+export type { SyncPackSetParams } from "./generated/SyncPackSetParams";
+export type { SyncPacksResult } from "./generated/SyncPacksResult";
 export type { SyncSource } from "./generated/SyncSource";
 export type { SyncSourcesParams } from "./generated/SyncSourcesParams";
 export type { SyncSourcesResult } from "./generated/SyncSourcesResult";

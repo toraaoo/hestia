@@ -1,6 +1,6 @@
 //! The shared pack library, reconciled into one instance through the pool.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use proto::content::{ContentAddItem, ContentAddSpec, ContentKind, InstalledContent};
 use proto::sync::SyncUnit;
 use proto::warning::WarningInfo;
@@ -16,6 +16,13 @@ const UNITS: &[(SyncUnit, ContentKind)] = &[
     (SyncUnit::ResourcePacks, ContentKind::ResourcePack),
     (SyncUnit::DataPacks, ContentKind::DataPack),
 ];
+
+fn kind_of(unit: SyncUnit) -> Option<ContentKind> {
+    UNITS
+        .iter()
+        .find(|(candidate, _)| *candidate == unit)
+        .map(|(_, kind)| *kind)
+}
 
 impl Engine {
     pub async fn reconcile_packs(&self, record: &InstanceRecord) -> Vec<WarningInfo> {
@@ -40,6 +47,55 @@ impl Engine {
             }
             self.reconcile_packs(&record).await;
         }
+    }
+
+    /// The named instance's packs become the library, so enabling the unit
+    /// starts from someone rather than from whoever reconciles first.
+    pub fn seed_packs(&self, unit: SyncUnit, record: &InstanceRecord) -> Result<()> {
+        let Some(kind) = kind_of(unit) else {
+            return Ok(());
+        };
+        let installed = self.entry_content(EntryRef::Instance(&record.id), kind)?.0;
+        let mut library = self.sync.library();
+        library.replace(
+            kind,
+            installed
+                .iter()
+                .filter(is_the_players)
+                .map(as_pack)
+                .collect(),
+        );
+        self.sync.save_library(&library)
+    }
+
+    pub fn shared_packs(&self) -> Vec<Pack> {
+        self.sync.library().packs
+    }
+
+    pub fn set_shared_pack(&self, reference: &str, enabled: bool) -> Result<Vec<Pack>> {
+        self.change_library(reference, |packs, at| packs[at].enabled = enabled)
+    }
+
+    pub fn remove_shared_pack(&self, reference: &str) -> Result<Vec<Pack>> {
+        self.change_library(reference, |packs, at| {
+            packs.remove(at);
+        })
+    }
+
+    fn change_library(
+        &self,
+        reference: &str,
+        change: impl FnOnce(&mut Vec<Pack>, usize),
+    ) -> Result<Vec<Pack>> {
+        let mut library = self.sync.library();
+        let at = library
+            .packs
+            .iter()
+            .position(|pack| pack.answers_to(reference))
+            .with_context(|| format!("no shared pack '{reference}'"))?;
+        change(&mut library.packs, at);
+        self.sync.save_library(&library)?;
+        Ok(library.packs)
     }
 
     async fn settle_packs(&self, record: &InstanceRecord, kind: ContentKind) -> Result<()> {

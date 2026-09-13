@@ -5,7 +5,9 @@ use proto::sync::{
     InstanceSyncKeys, InstanceSyncKeysParams, InstanceSyncUnit, InstanceSyncUnitParams,
     SyncDisable, SyncDisableParams, SyncEnable, SyncEnableParams, SyncGet, SyncKeys,
     SyncKeysParams, SyncOptionSet, SyncOptionSetParams, SyncOptionsGet, SyncOptionsResult,
-    SyncSources, SyncSourcesParams, SyncSourcesResult, SyncStatus, SyncStatusResult,
+    SyncPackRemove, SyncPackRemoveParams, SyncPackSet, SyncPackSetParams, SyncPacks,
+    SyncPacksResult, SyncSources, SyncSourcesParams, SyncSourcesResult, SyncStatus,
+    SyncStatusResult,
 };
 use proto::Empty;
 
@@ -42,6 +44,30 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .engine()
             .set_sync_unsynced(p.unsynced)
             .map_err(crate::runtime::engine_error)
+    });
+
+    on.handle::<SyncPacks, _, _>(|_: Empty, ctx| async move {
+        Ok(SyncPacksResult {
+            packs: ctx.runtime.engine().shared_packs(),
+        })
+    });
+
+    on.handle::<SyncPackSet, _, _>(|p: SyncPackSetParams, ctx| async move {
+        let packs = ctx
+            .runtime
+            .engine()
+            .set_shared_pack(&p.pack, p.enabled)
+            .map_err(crate::runtime::engine_error)?;
+        Ok(SyncPacksResult { packs })
+    });
+
+    on.handle::<SyncPackRemove, _, _>(|p: SyncPackRemoveParams, ctx| async move {
+        let packs = ctx
+            .runtime
+            .engine()
+            .remove_shared_pack(&p.pack)
+            .map_err(crate::runtime::engine_error)?;
+        Ok(SyncPacksResult { packs })
     });
 
     on.handle::<SyncOptionsGet, _, _>(|_: Empty, ctx| async move {

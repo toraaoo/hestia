@@ -499,6 +499,15 @@ setting, and a value is written in each instance's own spelling. The distances a
 local, since a weaker machine has to be free to disagree. A unit whose file the version never wrote is skipped instead —
 the command history needs 1.20.2, the hotbars 1.12 — and `sync status` says so on that instance's row.
 
+The shared pack library is a list of identities, never files or versions — a pack is installed into every instance it
+fits, and loses its place everywhere at once:
+
+```bash
+hestia sync packs                      # every pack the instances share
+hestia sync packs disable cozy         # installed everywhere, loaded nowhere
+hestia sync packs rm cozy              # instances lose it at their next pass
+```
+
 Screenshots are listed and deleted where they lie:
 
 ```bash
