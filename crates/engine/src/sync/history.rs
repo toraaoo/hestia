@@ -7,7 +7,6 @@ use anyhow::Result;
 
 use super::reconcile;
 
-/// What the game keeps; without the ceiling every launch undoes its trim.
 const LIMIT: usize = 50;
 
 pub fn merge(baseline: &Path, store: &Path, data: &Path) -> Result<()> {

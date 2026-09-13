@@ -43,7 +43,6 @@ struct Entry {
     hidden: Option<i8>,
 }
 
-/// A tag this build does not model must survive the round trip.
 pub type Row = HashMap<String, fastnbt::Value>;
 
 #[derive(Serialize, Deserialize, Default)]

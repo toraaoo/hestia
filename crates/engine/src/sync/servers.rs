@@ -1,8 +1,5 @@
-//! `servers.dat`, merged row by row against the rows last written here.
-//!
-//! Paths are the directory holding the file, which is what `minecraft::servers`
-//! takes. A row carries no id, so identity is recovered from the agreement: a
-//! row whose address still matches is the same row renamed, not a new one.
+//! `servers.dat`, merged row by row. A row carries no id, so identity comes
+//! from the agreement: a row whose address still matches is the same row.
 
 use std::path::Path;
 
@@ -62,7 +59,6 @@ pub fn merge(baseline_dir: &Path, store_dir: &Path, data_dir: &Path) -> Result<(
     Ok(())
 }
 
-/// A row only one side still has is a removal when the other left it alone.
 fn settle(base: &Row, stored: Option<&Row>, local: Option<&Row>, data_newer: bool) -> Option<Row> {
     match (stored, local) {
         (Some(s), Some(l)) if s == l => Some(s.clone()),
@@ -77,8 +73,6 @@ fn settle(base: &Row, stored: Option<&Row>, local: Option<&Row>, data_newer: boo
     }
 }
 
-/// Each row's place in the agreement: identical content first, then the same
-/// address, then the same name, nearest position winning a tie.
 fn paired(rows: &[Row], base: &[Row]) -> Vec<Option<usize>> {
     let same: [fn(&Row, &Row) -> bool; 3] = [
         |row, candidate| row == candidate,
@@ -123,7 +117,6 @@ fn invert(pairs: &[Option<usize>], len: usize) -> Vec<Option<usize>> {
     inverted
 }
 
-/// This side's own order, with each agreed row replaced by what it settled to.
 fn rebuild(
     rows: &[Row],
     pairs: &[Option<usize>],
@@ -140,8 +133,6 @@ fn rebuild(
         .collect()
 }
 
-/// Rows the other side has gained since the agreement. Direct-connect scratch
-/// is the game's, not a list the player curated, so it never travels.
 fn added<'a>(rows: &'a [Row], pairs: &'a [Option<usize>]) -> impl Iterator<Item = Row> + 'a {
     rows.iter()
         .enumerate()
@@ -149,8 +140,6 @@ fn added<'a>(rows: &'a [Row], pairs: &'a [Option<usize>]) -> impl Iterator<Item 
         .map(|(_, row)| row.clone())
 }
 
-/// The first time two sides meet there is no agreement to pair against, so both
-/// arrive holding the same rows; the one already placed wins its slot.
 fn dedupe(rows: impl Iterator<Item = Row>) -> Vec<Row> {
     let mut placed: Vec<String> = Vec::new();
     let mut kept = Vec::new();

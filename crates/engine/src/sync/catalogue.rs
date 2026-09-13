@@ -64,18 +64,14 @@ pub fn captured(unit: SyncUnit) -> bool {
 
 /// Keys that describe the file, the machine or a moment, so a copy is wrong.
 pub const NEVER_SHARED_KEYS: &[&str] = &[
-    // A copy makes the client migrate settings it never needed to touch.
     "version",
-    // Name packs the receiver does not have.
     "resourcePacks",
     "incompatibleResourcePacks",
     "lastServer",
-    // Hardware, not preference.
     "soundDevice",
     "fullscreenResolution",
     "overrideWidth",
     "overrideHeight",
-    // First-run prompts the receiver never saw.
     "startedCleanly",
     "tutorialStep",
     "joinedFirstServer",
@@ -84,8 +80,6 @@ pub const NEVER_SHARED_KEYS: &[&str] = &[
     "skipRealms32bitWarning",
     "skipFriendsListPromo",
     "hideBundleTutorial",
-    // The launcher owns it.
     "skin",
-    // A pre-1.8 world default.
     "difficulty",
 ];

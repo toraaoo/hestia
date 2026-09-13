@@ -8,8 +8,6 @@ use anyhow::Result;
 use super::document::Document;
 use super::reconcile;
 
-/// An excluded key is never read or written, so pinning one on a single
-/// instance cannot strip it from the others.
 pub fn merge(
     baseline: &Path,
     store: &Path,

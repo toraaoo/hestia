@@ -1,18 +1,16 @@
-//! `options.txt` as the game wrote it: re-rendering from a map would drop
-//! comments, reorder keys and restamp the file on every pass.
+//! `options.txt` as the game wrote it: re-rendering would drop its comments,
+//! reorder its keys and restamp the file on every pass.
 
 use std::path::Path;
 
 use anyhow::{bail, Result};
 
-/// Past these the file is not the game's own any more.
 const MAX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_LINES: usize = 16_384;
 
 #[derive(Clone, Default)]
 pub struct Document {
     lines: Vec<Line>,
-    /// A CRLF file stays a CRLF file.
     ending: String,
 }
 
@@ -24,7 +22,6 @@ struct Line {
 }
 
 impl Document {
-    /// Unreadable is an error: settling against nothing overwrites the file.
     pub fn read(path: &Path) -> Result<Option<Document>> {
         let bytes = match std::fs::read(path) {
             Ok(bytes) => bytes,
