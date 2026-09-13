@@ -155,7 +155,7 @@ real directory.
 ├── instances/<id>/      one directory per instance ──
 ├── skins/               the skin library
 ├── profiles/            global content profiles
-├── shared/              the linked/copied instance store (sync)
+├── shared/              the shared settings store (sync)
 ├── java/                installed Java runtimes
 ├── meta/                materialised game files — regenerable
 │   ├── versions/ libraries/ assets/ natives/
@@ -200,7 +200,7 @@ version updates both ways · server backups, on demand and
 scheduled · content install and management from Modrinth, CurseForge, a URL or a
 local file · modpacks into a new or existing entry · per-instance content
 profiles and global profiles · instance import and export (hestia, `.mrpack`,
-Prism/MultiMC) · shared instance settings and worlds (`sync`) · self-update and
+Prism/MultiMC) · shared instance settings (`sync`) · self-update and
 the announcement feed · network reachability as a first-class state, with
 offline launch and cached version catalogues · the legacy client era, both its
 unpacked natives and its named asset tree · the CLI over all of it · the desktop
@@ -265,7 +265,7 @@ their unpacked natives and their pre-hash asset layout.
 |---|---|
 | `crates/proto/tests/` | `wire` and `golden` — the envelope and contract encodings, so a wire change is caught |
 | `crates/engine/tests/` | `store` (config/cache/java/server/instance persistence), `auth_oracle` (the sign-in state machine), `process` (tree termination), `flows` (provisioning and content install against fixture providers, over `Engine::over`) |
-| `crates/engine/src/**` | unit tests beside the code: archive detection and round trips, the Prism component mapping, the export ignore rules, launch-plan assembly (including the quick-play target and its version gate), document schema stamping, migration and quarantine, the `servers.dat` round trip, server-address parsing, the Log4Shell-safe session config, sync reconciliation and folder linking, Modrinth and CurseForge mapping, pack-format detection and `.mrpack`/URL parsing, version picking, per-flavor accepted kinds, JVM-args precedence, PaperMC and SpigotMC catalogue parsing |
+| `crates/engine/src/**` | unit tests beside the code: archive detection and round trips, the Prism component mapping, the export ignore rules, launch-plan assembly (including the quick-play target and its version gate), document schema stamping, migration and quarantine, the `servers.dat` round trip, server-address parsing, the Log4Shell-safe session config, sync reconciliation and its per-key merge, Modrinth and CurseForge mapping, pack-format detection and `.mrpack`/URL parsing, version picking, per-flavor accepted kinds, JVM-args precedence, PaperMC and SpigotMC catalogue parsing |
 | `crates/client/tests/` | the SDK against a scripted daemon over an in-memory duplex: contract marshalling, typed failures, timeouts, a version mismatch, and every way a job settles |
 | `crates/daemon/tests/e2e.rs` | a client-to-daemon round trip over a real socket |
 | `frontend/tests/` | the message catalogue (locale coverage, placeholder parity, no dead or missing keys), the export dialog's tree/exclusion conversions, and the quick-play version gate |

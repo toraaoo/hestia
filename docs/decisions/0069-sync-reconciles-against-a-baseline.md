@@ -1,8 +1,8 @@
-# A copied sync target reconciles against a baseline, not a clock
+# A synced unit reconciles against a baseline, not a clock
 
 *Applies to: [Servers & instances](../architecture/entries.md)*
 
-Copied targets (`options.txt`, `servers.dat`) reconciled **newest-wins**: the
+Synced files (`options.txt`, `servers.dat`) reconciled **newest-wins**: the
 side with the later mtime was taken as the edited one. But an mtime is stamped
 by the *copy*, not by the edit behind it — `fs::copy` sets the destination to
 `now`, and the `options.txt` merge rewrote both sides on every pass whether or
@@ -32,16 +32,13 @@ knows is carried through untouched — instances on different game versions have
 different option sets, and treating the absence as a removal would let an old
 client strip keys a new one added.
 
-The same baseline is what makes leaving and rejoining sharing expressible. An
-instance opting out has its shared folders copied out of the store and its
-baselines dropped; opting back in records its *current* content as the
-baseline first, so every disagreement reads as the store's change and settles
-the store's way — the other instances are already playing the store's copy, so
-it is the one that survives a clash. That is destructive in a way the automatic
-pass never is, which is why it is an explicit operation
-(`instance.sync.share`, confirmed in both front-ends) rather than a config key,
-and why what it discarded or duplicated comes back as warnings
-([0029](0029-degraded-outcomes-ride-on-the-result.md)).
+The same baseline is what makes **turning a unit on** expressible. The shared
+copy is seeded from one named instance, and every instance's *current* content is
+then recorded as its baseline — so every disagreement reads as the shared copy's
+change and settles that way, which is what the user asked for by naming the
+source. Nothing is deleted to achieve it: an instance that disagrees is simply
+brought to the shared copy at its next launch, and a unit it overrides is left
+alone entirely.
 
 **Rejected:** hashing content into a sidecar index instead of storing it — the
 files are a few KB, and keeping the bytes means the three-way merge has the base

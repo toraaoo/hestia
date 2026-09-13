@@ -227,11 +227,11 @@ runs against the same single `data/`. The reserved name `none` overrides an
 active profile for one launch ([0017](../decisions/0017-content-profile-is-a-selection.md)).
 
 **Settings capture** is opt-in per profile. An uncaptured profile inherits the
-global `shared/` store; `capture` snapshots the settings-class sync targets into
-`<instance>/profiles/<name>/`, whose existence *is* the captured flag. Under
-linked sync the `config` folder repoints its link into the profile store, while
-`options.txt` keeps its per-scope copy-reconcile. `saves` and `screenshots`
-always stay global — capture forks *settings*, not game data
+global `shared/` store; `capture` snapshots the game options into
+`<instance>/profiles/<name>/`, whose existence *is* the captured flag, and
+launches under that profile reconcile against it — baselines included. The other
+sync units stay global: capture forks *settings*, not the multiplayer list or
+what was typed into chat
 ([0019](../decisions/0019-profile-settings-capture.md)).
 
 ### Global profiles

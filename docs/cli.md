@@ -453,62 +453,50 @@ hestia cache list                # cached blobs
 hestia cache clear               # evict everything
 ```
 
-## Shared settings/configs
+## Shared settings
 
-Settings, configs — and worlds — are shared across your instances automatically. **File** targets (`options.txt`,
-key-merged with pack selection kept per-instance; `servers.dat`) are copied: each instance keeps its own copy,
-reconciled newest-wins at every launch. **Folder** targets (`saves`, `config`, `screenshots`) are **linked** into the
-shared store (a symlink on Linux/macOS, a junction on Windows): every instance opens the same physical folders, so a
-world exists once and appears everywhere instantly. It works out of the box — no setup.
+Four things can be kept the same across your instances: your **game settings**, your **multiplayer list**, your
+**command history** and your **creative hotbars**. Each is merged at every launch and again when a session exits, key by
+key for the settings and entry by entry for the server list, so two instances changing different things both survive.
+Worlds are never shared.
 
-A folder that already holds an instance's own files is **adopted**: its contents move into the store and the folder
-becomes a link, at the launch that would otherwise have left it unshared. Nothing is ever merged or overwritten, so the
-one thing that stops it is a name the store already has (two instances with a world called `New World`) — `sync status`
-shows that folder as *clashes with the store*, and it stays local until you rename or delete the clashing files. Adopt
-on demand is the same migration:
+Each one is off until you turn it on, and turning it on asks which instance the shared copy starts from — that choice is
+the point, since letting whichever instance launched first decide is how settings go missing:
 
 ```bash
-hestia sync status               # sharing on/off, store path, targets, link state
-
-hestia instance modded sync adopt        # move existing folders into the store
-hestia instance modded sync adopt saves  # …or just one target
-hestia instance modded sync off          # leave sharing: its folders are copied out
-hestia instance modded sync on           # rejoin: the shared copies win any clash
+hestia sync status                    # what is shared, and where each instance stands
+hestia sync on options --from cozy    # start the shared settings from 'cozy'
+hestia sync on servers                # asks which instance, unless only one has a list
+hestia sync off commands              # stop sharing; every instance keeps what it has
 ```
 
-An instance running a **modpack** keeps its own `config/`: the pack ships that tree, so it is not folded into what every
-other instance reads. Adopt it explicitly if you want it shared anyway — the link is honoured from then on.
-
-Sharing can be switched off entirely; folders already linked stay linked.
+The shared game settings can be read and changed without opening the game, and any one of them can be dropped out of
+sharing so every instance keeps its own value for it:
 
 ```bash
-hestia config set sync.enabled false    # every instance keeps its own settings
-hestia config get sync.enabled
+hestia sync options                       # every shared setting and its value
+hestia sync options set renderDistance 16 # applies at each instance's next launch
+hestia sync options local guiScale        # each instance keeps its own guiScale
+hestia sync options share guiScale        # …and back
 ```
 
-One instance can leave on its own. That one is not a setting but a move: `sync off` copies every folder it shares out of
-the store, so it plays exactly what it played before while the two copies drift apart from then on, and `sync on` folds
-it back in with the **shared** copy winning anything both have — its own clashing worlds are deleted. Both need the
-instance stopped and both confirm first (`-y` skips the prompt), and both report what it cost.
+One instance can differ from the rest without leaving: it can keep a whole unit to itself, or pin individual settings
+local while sharing everything else. Nothing here moves a file — the next launch simply reconciles differently.
+
+```bash
+hestia instance modded sync            # where this instance stands
+hestia instance modded sync off options  # it keeps its own settings
+hestia instance modded sync on options   # …and back
+hestia instance modded sync local fov    # keep one setting to this instance
+hestia instance modded sync share fov    # …and back
+```
+
+A pre-1.13 instance does not share its settings in either direction: 1.13 renamed every keybind, and the two eras cannot
+read each other's file. `sync status` says so on that instance's row; the other three stay shared.
 
 Sync is **instance-only**: a server's configuration is per-server infrastructure, managed through
 `server <name> config …` and
 `server.properties`, and is never shared.
-
-```bash
-hestia sync add screenshots --folder   # share a folder (linked)
-hestia sync add optionsof.txt          # share a file (copied)
-hestia sync remove servers.dat         # keep each instance's list local
-```
-
-Paths are **game-relative** (relative to `data/`). `..` escapes and the launcher-managed content directories (`mods`,
-`resourcepacks`, `shaderpacks`)
-are rejected — the content system already shares content. `saves` can only be shared as a folder (linked), never copied.
-
-Two things to know about shared worlds: opening the same world from two instances at once is only guarded by Minecraft's
-own `session.lock`, and instances on different versions or loaders writing one world can corrupt it. Instance data is
-kept by exporting it (`hestia instance <name> export`) rather than by a backup schedule — a shared world lives in the
-store, so an export of any instance that links it carries a copy.
 
 ## Configuration
 

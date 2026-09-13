@@ -1,40 +1,40 @@
-# Sync links folders and copies files — Pandora's split, adopted
+# Sync is a closed catalogue of merged files — no links, no worlds
 
 *Applies to: [Servers & instances](../architecture/entries.md)*
 
-Sync was originally all-copy ("copied, not symlinked"): each instance kept its
-own physical copy of every target, reconciled newest-wins at launch. That call
-was revisited for one reason — worlds. Copying `saves/` across instances would
-duplicate gigabytes per instance and still leave each copy divergent; linking
-stores a world **once** and shares it instantly. So folder targets (`saves`,
-`config`, `screenshots`) are now **links** into the flat `shared/` store (a
-symlink on POSIX, a junction on Windows — junctions need no privileges), while
-file targets (`options.txt` key-merged, `servers.dat`) keep the copy-reconcile:
-file symlinks need elevation or developer mode on Windows, and merge semantics
-need a real copy anyway. The original decision's three objections each found a
-narrower home instead of blocking linking wholesale: concurrent live servers →
-servers are decoupled from sync entirely (a server's shareable state is its own
-`server.config.*` and `server.properties`, never a cross-entry store); content
-ownership → the managed content dirs are still rejected as targets (per-instance
-selection is impossible over a shared dir); backups archiving through links →
-instance backups no longer exist. The safety story was Pandora's
-**empty-or-linked guard**: a folder became a link only when missing, empty, or
-already linked into a hestia store — a non-empty real directory was never
-touched, only surfaced as `cannot_link` until an explicit `sync adopt` moved its
-entries into the store (all-or-nothing per target, refused on any name
-collision). That guard is now **narrowed to the collision it was really about**
-— see [Warnings the user did not
-cause](0030-warnings-the-user-did-not-cause.md): a folder holding only the
-instance's own files is adopted automatically, since moving it can destroy
-nothing, and only a name the store already has stops it. Only links pointing
-into a hestia store (`…/shared/<target>`) are ever touched, so a user's own
-symlinks survive; a stale store link after a data-home move is relinked at the
-next launch. Pack selection (`options.txt`'s `resourcePacks`) stays entry-local
-— merged like Pandora's, but never pushed to the store. **Accepted risks,
-documented not guarded:** two instances (or sessions) opening one shared world
-are arbitrated only by Minecraft's own `session.lock`, and instances of
-different versions/loaders writing one world can corrupt it — plus, until
-import/export lands, instance data (the shared worlds store included) has no
-backup story at all. Any code that walks or deletes an instance's `data/` must
-treat a link as a boundary, never a directory to descend into —
-`remove_dir_all`'s link-preserving behavior is pinned by a test.
+Sync shares a **closed catalogue** of four units: the game options, the
+multiplayer list, the command history and the creative hotbars. Each names one
+file whose format the launcher understands well enough to **merge** two edits
+of, and that is what decides membership. A file that can only be copied whole
+makes the second instance to write lose its change, so it does not belong in the
+catalogue — which is why an arbitrary user-supplied path is not a sync target.
+
+Every unit is copied into the instance and merged back out. Nothing is linked.
+A link would exist only to share a directory too large to duplicate — a worlds
+store — and it costs an empty-or-linked guard, a per-target state for a folder
+that already holds files, a migration to move them, and a rule that every walk
+of an instance's `data/` must treat a link as a boundary. Worlds stay with the
+instance that plays them, and none of that machinery is needed to share a few
+kilobytes of settings.
+
+What a unit shares is not all-or-nothing. The options merge resolves per key, so
+a key can be pinned local launcher-wide or on a single instance; a pinned key is
+carried through untouched on both sides, because pinning on one instance must
+not change what the others read. `servers.dat` merges per entry for the same
+reason, keyed by the row's own name so that editing an address reads as an edit
+rather than as a delete plus an add.
+
+A unit is **off until it is enabled with a named source**. The shared copy has to
+start as someone's, and a launcher that picks for itself defines everyone's
+settings from whichever instance happens to launch first. Enabling seeds from one
+named instance and records every instance's current content as its baseline, so
+the first pass settles the shared copy's way. With several candidates and no
+source named, the daemon refuses and hands back the candidates.
+
+**Rejected:** folder targets for `config/` and `screenshots/`. A directory tree
+has no merge — it needs per-file baselines and deletion semantics for the two
+targets that least repay them, and a modpack's config tree belongs to the
+instance anyway. **Also rejected:** an arbitrary-path escape hatch beside the
+catalogue. It can only work by whole-file copy, which is the lost-edit behaviour
+the catalogue exists to avoid, and it invites paths (`mods/`, `saves/`) that must
+never be shared.

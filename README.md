@@ -96,8 +96,8 @@ BuildTools (needs `git`) — so a first create on those takes a few minutes. Cur
 (`hestia config set content.curseforge-key`); the source isn't offered until one resolves.
 
 A few more things it does: several concurrent sessions of one instance, starting straight into a world or onto a server,
-in-place version changes both ways (downgrades warn, and a server is backed up first), settings and worlds shared across
-instances, a system tray, and self-update.
+in-place version changes both ways (downgrades warn, and a server is backed up first), game settings and multiplayer
+lists shared across instances, a system tray, and self-update.
 
 Old versions are covered too: a pre-1.19 client's LWJGL natives are unpacked from their classifier jars, and an asset
 index that predates the hashed store is mirrored to the named tree those clients read.

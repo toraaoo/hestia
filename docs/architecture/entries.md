@@ -238,91 +238,74 @@ between machines, so it travels as one file you write on purpose.
 
 ## Sync — shared settings across instances
 
-Instances share settings, configs and worlds through a persistent
-`<data_home>/shared/` store. Servers are deliberately decoupled from it: a
-server's shareable state is its own config and `server.properties`, never a
-cross-entry store.
+Instances share a closed **catalogue** of four things Minecraft writes, through
+a persistent `<data_home>/shared/` store. Every one is copied and merged —
+nothing is linked, and worlds are never shared. Servers are deliberately
+decoupled: a server's shareable state is its own config and `server.properties`,
+never a cross-entry store.
 
-Two target classes, treated differently on purpose:
+| Unit | File | How two copies settle |
+|---|---|---|
+| `options` | `options.txt` | key by key |
+| `servers` | `servers.dat` | entry by entry, keyed by the row's name |
+| `commands` | `command_history.txt` | a union — an append-only log loses nothing |
+| `hotbars` | `hotbar.nbt` | whole file |
 
 ```mermaid
 flowchart LR
     subgraph store["&lt;data_home&gt;/shared/"]
-        SAVES["saves/"]
-        CONFIG["config/"]
-        SHOTS["screenshots/"]
         OPTS["options.txt"]
         SDAT["servers.dat"]
+        BASE[".baselines/&lt;instance&gt;/"]
     end
-    subgraph i1["instance A/data/"]
-        A1["saves →"]
-        A2["options.txt"]
-    end
-    subgraph i2["instance B/data/"]
-        B1["saves →"]
-        B2["options.txt"]
-    end
-    A1 -.->|symlink / junction| SAVES
-    B1 -.->|symlink / junction| SAVES
-    OPTS -->|key-merged copy| A2
-    OPTS -->|key-merged copy| B2
+    A["instance A/data/"]
+    B["instance B/data/"]
+    OPTS <-->|"merge per key"| A
+    OPTS <-->|"merge per key"| B
+    SDAT <-->|"merge per entry"| A
+    SDAT <-->|"merge per entry"| B
+    BASE -.->|"what each side last agreed on"| OPTS
 ```
 
-- **Folders are linked** (`saves`, `config`, `screenshots`) — a symlink on POSIX,
-  a junction on Windows. A world is stored **once** and shared live, rather than
-  duplicating gigabytes per instance.
-- **Files are copied** (`options.txt` key-merged, `servers.dat` whole) — file
-  symlinks need elevation on Windows, and merge semantics need a real copy. Each
-  instance's copy reconciles against a **baseline**, the content it and the store
-  last agreed on: only a side that moved since then wins, and the clock breaks a
-  tie no other way settles
-  ([0069](../decisions/0069-sync-reconciles-against-a-baseline.md)).
+A unit is **off until it is turned on with a source**. The shared copy has to
+start as *someone's*, and letting whichever instance launched first decide is how
+settings go missing quietly — so `sync.enable` names the instance to seed from,
+and every other instance's baseline is recorded as its own current content, so
+its first pass settles the shared copy's way rather than racing it. Where more
+than one instance holds the file and none was named, the daemon refuses with the
+candidates rather than picking.
 
-`apply` runs at every launch, once more when each session **exits** — so what
-the player changed in game reaches the store then rather than at their next
-launch — and once at create, before anything can fill a folder. A folder holding only the instance's own files is **adopted** into the
-store automatically, since moving it can destroy nothing; only a name the store
-already has stops it, and that is what you get warned about. Hestia never breaks
-a link it did not make, and only ever touches links pointing into its own store
-([0022](../decisions/0022-sync-links-folders-copies-files.md),
-[0030](../decisions/0030-warnings-the-user-did-not-cause.md)).
+Each instance's copy reconciles against a **baseline**, the content it and the
+shared copy last agreed on: only a side that moved since then wins, and the clock
+breaks a tie no other way settles
+([0069](../decisions/0069-sync-reconciles-against-a-baseline.md)). A missing side
+is never an edit, and a key, entry or line only one side knows is carried
+through. The pass runs at every launch and once more when each session **exits**,
+so what the player changed in game reaches the shared copy then rather than at
+their next launch.
 
-**A pre-1.13 instance shares neither `options.txt` nor `saves`.** 1.13 renamed
-every keybind from an LWJGL key code to a `key.keyboard.*` name and moved the
-world format on, so the two eras cannot read each other's copy in either
-direction — an old client silently drops the keybinds it cannot parse, and
-writing back degrades every modern instance in the store. The gate is
-bidirectional and applies to those two targets only; `servers.dat`, `config/`
-and `screenshots/` are era-agnostic and stay shared. A link made before an
-instance was known to be era-bound is taken back to that instance's own copy at
-the next launch — the one case where hestia undoes a link it made, because
-leaving it live would contradict the warning it reports beside it.
+Sharing is refused for nothing else: an arbitrary path is not a sync target,
+because the catalogue exists to name files whose format the launcher can merge
+([0022](../decisions/0022-sync-links-folders-copies-files.md)).
 
-A `Scope` decides where settings-class targets reconcile: the global store, a
-[captured profile's](content.md#content-profiles), or nowhere — a modpack owns
-its own config tree. A launch records its scope against the session id, so the
-exit pass uses the profile it launched under rather than whichever is active by
-then.
+**A pre-1.13 instance does not share its options.** 1.13 renamed every keybind
+from an LWJGL key code to a `key.keyboard.*` name, so the two eras cannot read
+each other's copy in either direction — an old client silently drops the keybinds
+it cannot parse, and writing back degrades every modern instance. The gate is
+bidirectional and applies to `options.txt` alone; the other three units are
+era-agnostic and stay shared.
 
-Sharing is switchable wholesale with `sync.enabled`, and **per instance**
-(`instance.sync.share`); off either way, no pass runs and existing links are
-left where they are. The per-instance switch is a transition, not a preference:
-leaving copies every folder that instance shares out of the store, so it keeps
-playing the same worlds while the two copies diverge; rejoining folds it back in
-with the **store** winning anything the two both have, since the other instances
-are already playing that copy. Both directions need the instance stopped, both
-confirm first, and what was duplicated or discarded comes back as a warning.
-The switch is per instance, so it lives on that instance's own settings — the
-launcher-wide page owns only `sync.enabled` and the target set.
+An instance **overrides** the catalogue on two axes, and neither moves a file —
+the next launch simply reconciles differently. It can keep any unit to itself,
+and it can pin individual `options.txt` keys local while sharing the rest. A key
+pinned on one instance is carried through untouched on both sides, so pinning
+never strips it from the others. Pack selection (`resourcePacks`) is always
+local: a shared list would name packs the receiving instance has not installed.
 
-The managed content directories are rejected as sync targets at the edge:
-per-instance content selection is impossible over a shared directory.
-
-> **Accepted risks, documented rather than guarded.** Two instances opening one
-> shared world are arbitrated only by Minecraft's own `session.lock`, and
-> instances of different versions or loaders writing one world can corrupt it.
-> Any code that walks or deletes an instance's `data/` must treat a link as a
-> boundary, never a directory to descend into — pinned by a test.
+A `Scope` decides where the settings unit reconciles: the global store or a
+[captured profile's](content.md#content-profiles). A launch records its scope
+against the session id, so the exit pass uses the profile it launched under
+rather than whichever is active by then.
 
 ## Worlds
 
@@ -379,7 +362,8 @@ refused: the daemon cannot make the write durable, but it can say so
 ## Decisions
 
 - [0021 — The entry root is Hestia's; `data/` is the game's](../decisions/0021-entry-root-versus-data-dir.md)
-- [0022 — Sync links folders and copies files](../decisions/0022-sync-links-folders-copies-files.md)
+- [0022 — Sync is a closed catalogue of merged files](../decisions/0022-sync-links-folders-copies-files.md)
+- [0069 — A synced unit reconciles against a baseline, not a clock](../decisions/0069-sync-reconciles-against-a-baseline.md)
 - [0023 — The id is an opaque uuid; the directory is the slug](../decisions/0023-id-is-a-uuid-directory-is-a-slug.md)
 - [0024 — Backups follow docker-mc-backup, minus what the launcher already owns](../decisions/0024-backups-follow-docker-mc-backup.md)
 - [0025 — A world describes itself; a directory listing does not](../decisions/0025-a-world-describes-itself.md)
