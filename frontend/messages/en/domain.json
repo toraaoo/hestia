@@ -82,9 +82,29 @@
       "writing_pack_files": "Writing pack files"
     },
     "sync_state": {
-      "cannot_link": "clashes with the store",
-      "linked": "linked",
-      "pending": "shares at next launch"
+      "era_bound": "too old to share",
+      "off": "not shared",
+      "overridden": "keeps its own",
+      "pending": "shares at next launch",
+      "synced": "synced"
+    },
+    "sync_unit": {
+      "commands": {
+        "hint": "The commands typed into chat.",
+        "label": "Command history"
+      },
+      "hotbars": {
+        "hint": "The hotbars saved in creative mode.",
+        "label": "Creative hotbars"
+      },
+      "options": {
+        "hint": "Keybinds, video and audio, merged setting by setting.",
+        "label": "Game settings"
+      },
+      "servers": {
+        "hint": "The servers in the in-game list.",
+        "label": "Multiplayer list"
+      }
     },
     "update_channel": {
       "beta": "Beta",

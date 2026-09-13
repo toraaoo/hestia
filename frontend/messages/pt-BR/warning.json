@@ -11,12 +11,8 @@
       "properties_schema_missing": "Qualquer chave é aceita até que ele possa ser derivado novamente, então confira a grafia você mesmo. Atualizar o servidor o deriva de novo.",
       "server_list_in_use": "Feche o jogo e faça a mudança de novo, ou adicione o servidor pela tela multijogador do jogo.",
       "session_not_verified": "O modo um jogador funciona normalmente; inicie novamente quando estiver online para jogar multijogador.",
-      "sync_entries_replaced": "As cópias descartadas foram perdidas — exporte uma instância antes de voltar a compartilhá-la se ela tiver algo que você ainda queira.",
-      "sync_target_duplicated": "Compartilhar '{target}' novamente mantém a cópia compartilhada, não esta.",
-      "sync_target_not_shared": "Renomeie ou apague os arquivos em conflito na pasta da instância e inicie novamente para compartilhá-la.",
-      "sync_target_not_shared.foreign_link": "Remova ou aponte o link na pasta da instância para outro lugar e inicie novamente para compartilhá-la.",
-      "sync_target_not_shared.game_era": "Esta instância mantém seus próprios controles e mundos. Uma versão anterior à 1.13 e uma atual não conseguem ler a cópia uma da outra.",
-      "sync_target_skipped": "Verifique as permissões da pasta e inicie novamente."
+      "sync_unit_era_bound": "Esta instância mantém a própria cópia. Uma versão anterior à 1.13 e uma atual não conseguem ler a cópia uma da outra.",
+      "sync_unit_skipped": "Verifique as permissões dos arquivos da instância e inicie novamente."
     },
     "kind": {
       "document_quarantined": "{document} não pôde ser lido e foi posto de lado: {detail}",
@@ -28,15 +24,14 @@
       "properties_schema_missing": "'{name}' não tem esquema de propriedades, então suas chaves de server.properties não podem ser verificadas.",
       "server_list_in_use": "“{instance}” tem {sessions} sessão(ões) aberta(s), então o jogo em execução vai sobrescrever esta mudança na lista multijogador ao sair.",
       "session_not_verified": "Não foi possível acessar a Microsoft para renovar {account}, então esta sessão usa o login armazenado.",
-      "sync_entries_replaced": "As cópias compartilhadas de {entries} substituíram as desta instância em '{target}'",
-      "sync_target_duplicated": "'{target}' foi copiado para fora do armazenamento compartilhado e agora pertence só a esta instância",
-      "sync_target_not_shared": "'{target}' não está compartilhado com suas outras instâncias: {reason}.",
-      "sync_target_skipped": "'{target}' não pôde ser sincronizado: {detail}"
+      "sync_unit_era_bound": "“{instance}” é antiga demais para compartilhar {unit} com suas outras instâncias.",
+      "sync_unit_skipped": "{unit} não pôde ser sincronizado: {detail}"
     },
     "token": {
-      "collides": "arquivos com o mesmo nome já são compartilhados",
-      "foreign_link": "a pasta é um vínculo criado por você",
-      "game_era": "esta versão é antiga demais para compartilhá-la com segurança"
+      "commands": "o histórico de comandos",
+      "hotbars": "as barras do criativo",
+      "options": "as configurações de jogo",
+      "servers": "a lista multijogador"
     }
   }
 }

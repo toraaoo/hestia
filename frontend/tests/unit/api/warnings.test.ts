@@ -15,13 +15,13 @@ describe('warningMessage', () => {
   it('labels a token field through the warning vocabulary', () => {
     const rendered = warningMessage(
       info({
-        kind: 'sync_target_not_shared',
-        reason: 'collides',
-        target: 'saves',
+        kind: 'sync_unit_skipped',
+        unit: 'options',
+        detail: 'permission denied',
       }),
     );
-    expect(rendered).toContain('files of the same name are already shared');
-    expect(rendered).not.toContain('collides');
+    expect(rendered).toContain('the game settings');
+    expect(rendered).not.toContain('options');
   });
 
   it('is empty for a kind the catalogue does not know', () => {

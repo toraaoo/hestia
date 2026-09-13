@@ -82,9 +82,29 @@
       "writing_pack_files": "Gravando arquivos do pacote"
     },
     "sync_state": {
-      "cannot_link": "conflita com o armazenamento",
-      "linked": "vinculada",
-      "pending": "compartilha no próximo início"
+      "era_bound": "antiga demais para compartilhar",
+      "off": "não compartilhado",
+      "overridden": "mantém o próprio",
+      "pending": "compartilha no próximo início",
+      "synced": "sincronizado"
+    },
+    "sync_unit": {
+      "commands": {
+        "hint": "Os comandos digitados no chat.",
+        "label": "Histórico de comandos"
+      },
+      "hotbars": {
+        "hint": "As barras salvas no modo criativo.",
+        "label": "Barras do criativo"
+      },
+      "options": {
+        "hint": "Teclas, vídeo e áudio, mesclados configuração a configuração.",
+        "label": "Configurações de jogo"
+      },
+      "servers": {
+        "hint": "Os servidores na lista do jogo.",
+        "label": "Lista multijogador"
+      }
     },
     "update_channel": {
       "beta": "Beta",

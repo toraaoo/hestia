@@ -39,6 +39,7 @@ const TOKEN_FIELDS = new Set([
   'actual',
   'expected',
   'requested',
+  'unit',
 ]);
 
 function token(value: unknown): string {

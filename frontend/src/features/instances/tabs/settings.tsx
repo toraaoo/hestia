@@ -42,13 +42,7 @@ export function InstanceSettingsTab({
       remove={remove}
       update={update}
       versionsQuery={instanceQueries.versions(instance.flavor)}
-      extraFields={
-        <InstanceSyncField
-          id={instance.id}
-          name={instance.name}
-          running={running}
-        />
-      }
+      extraFields={<InstanceSyncField id={instance.id} />}
     />
   );
 }

@@ -7,6 +7,5 @@ export type { Nameable } from "./generated/Nameable";
 export type { ProfileScope } from "./generated/ProfileScope";
 export type { Reason } from "./generated/Reason";
 export type { Service } from "./generated/Service";
-export type { SyncReason } from "./generated/SyncReason";
 export type { Task } from "./generated/Task";
 export type { Unsupported } from "./generated/Unsupported";

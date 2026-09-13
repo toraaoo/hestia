@@ -168,6 +168,8 @@ export const keys = {
     all: ['sync'] as const,
     config: () => [...keys.sync.all, 'config'] as const,
     status: () => [...keys.sync.all, 'status'] as const,
+    options: () => [...keys.sync.all, 'options'] as const,
+    sources: (unit: string) => [...keys.sync.all, 'sources', unit] as const,
   },
   update: {
     all: ['update'] as const,

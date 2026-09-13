@@ -1,184 +1,287 @@
+import { revalidateLogic } from '@tanstack/react-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { z } from 'zod';
 
-import type { SyncTargets } from '@/api';
+import type { SyncUnit } from '@/api';
+import { useAppForm } from '@/components/form';
 import { Bone } from '@/components/skeleton';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Switch } from '@/components/ui/switch';
-import {
-  AddRow,
-  Setting,
-  SwitchRow,
-  ValueRow,
-} from '@/features/settings/components';
+import { Setting } from '@/features/settings/components';
+import { SYNC_UNITS, unitHint, unitLabel } from '@/lib/sync';
 import { m } from '@/paraglide/messages.js';
 import { syncMutations, syncQueries } from '@/queries/sync';
 
-interface Known {
-  name: string;
-  description: () => string;
-}
-
 /**
- * What Minecraft writes into an instance — offered rather than remembered. The
- * launcher-managed content directories are deliberately absent: the daemon
- * refuses them as targets, so offering one is offering an error.
+ * What the instances share. Turning one on has to start the shared copy from
+ * someone's, so it asks which instance rather than letting the first launch
+ * decide.
  */
-const KNOWN_FILES: Known[] = [
-  { name: 'options.txt', description: m['settings.sync.target.options_txt'] },
-  { name: 'servers.dat', description: m['settings.sync.target.servers_dat'] },
-];
-
-const KNOWN_FOLDERS: Known[] = [
-  { name: 'saves', description: m['settings.sync.target.saves'] },
-  { name: 'config', description: m['settings.sync.target.config'] },
-  { name: 'screenshots', description: m['settings.sync.target.screenshots'] },
-];
-
-/**
- * The launcher-wide sync settings: whether instances share at all and which
- * targets they share. Where one instance stands — and whether it takes part —
- * belongs to that instance's own settings, not here.
- */
-export function SyncSettings({
-  onCommit,
-}: {
-  onCommit: (key: string, value: unknown) => void;
-}) {
+export function SyncSettings() {
   const config = useQuery(syncQueries.config());
-  const setTargets = useMutation(syncMutations.set());
+  const disable = useMutation(syncMutations.disable());
+  const [picking, setPicking] = useState<SyncUnit | null>(null);
 
-  const targets = config.data?.targets ?? { files: [], folders: [] };
-  const enabled = config.data?.enabled ?? true;
+  if (config.isPending) return <Bone className="h-40" />;
 
-  const change = (next: SyncTargets) => setTargets.mutate(next);
+  const units = config.data?.units ?? [];
+  const optionsShared = units.some(
+    (unit) => unit.unit === 'options' && unit.enabled,
+  );
 
   return (
     <>
-      <Setting id="sync-enabled">
-        <SwitchRow
-          id="sync-enabled"
-          label={m['settings.sync.enabled_label']()}
-          description={m['settings.sync.enabled_description']()}
-          checked={enabled}
-          disabled={config.isPending}
-          onChange={(checked) => onCommit('sync.enabled', checked)}
-        />
+      <Setting id="sync-units">
+        <div className="divide-y divide-border border border-border">
+          {SYNC_UNITS.map((unit) => {
+            const entry = units.find((candidate) => candidate.unit === unit);
+            return (
+              <label
+                key={unit}
+                htmlFor={`sync-${unit}`}
+                className="flex cursor-pointer items-center gap-3 px-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs">{unitLabel[unit]()}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {entry?.enabled && entry.seededFrom
+                      ? m['settings.sync.seeded_from']({
+                          instance: entry.seededFrom,
+                        })
+                      : unitHint[unit]()}
+                  </div>
+                </div>
+                <Switch
+                  id={`sync-${unit}`}
+                  size="sm"
+                  checked={entry?.enabled ?? false}
+                  disabled={disable.isPending}
+                  onCheckedChange={(checked) =>
+                    checked === true ? setPicking(unit) : disable.mutate(unit)
+                  }
+                />
+              </label>
+            );
+          })}
+        </div>
       </Setting>
 
-      {enabled && (
-        <Setting id="sync-targets">
-          {config.isPending ? (
-            <div className="flex flex-col gap-2">
-              <Bone className="h-28" />
-              <Bone className="h-28" />
-            </div>
-          ) : (
-            <div className="flex flex-col gap-5">
-              <TargetGroup
-                label={m['settings.sync.files']()}
-                hint={m['settings.sync.files_hint']()}
-                placeholder={m['settings.sync.add_file_placeholder']()}
-                known={KNOWN_FILES}
-                values={targets.files}
-                pending={setTargets.isPending}
-                onChange={(files) => change({ ...targets, files })}
-              />
-              <TargetGroup
-                label={m['settings.sync.folders']()}
-                hint={m['settings.sync.folders_hint']()}
-                placeholder={m['settings.sync.add_folder_placeholder']()}
-                known={KNOWN_FOLDERS}
-                values={targets.folders}
-                pending={setTargets.isPending}
-                onChange={(folders) => change({ ...targets, folders })}
-              />
-            </div>
-          )}
-        </Setting>
-      )}
+      {optionsShared && <SharedOptions />}
+
+      <SourcePicker unit={picking} onClose={() => setPicking(null)} />
     </>
   );
 }
 
-/**
- * One side of the target set: the targets Minecraft is known to write, each a
- * switch, and whatever else the set holds as rows under them.
- */
-function TargetGroup({
-  label,
-  hint,
-  placeholder,
-  known,
-  values,
-  pending,
-  onChange,
+function SourcePicker({
+  unit,
+  onClose,
 }: {
-  label: string;
-  hint: string;
-  placeholder: string;
-  known: Known[];
-  values: string[];
-  pending: boolean;
-  onChange: (values: string[]) => void;
+  unit: SyncUnit | null;
+  onClose: () => void;
 }) {
-  const names = new Set(known.map((entry) => entry.name));
-  const custom = values.filter((value) => !names.has(value));
+  const sources = useQuery({
+    ...syncQueries.sources(unit ?? 'options'),
+    enabled: unit !== null,
+  });
+  const enable = useMutation(syncMutations.enable());
+
+  const candidates = (sources.data ?? []).filter((source) => source.present);
+
+  const form = useAppForm({
+    defaultValues: { source: '' },
+    validationLogic: revalidateLogic(),
+    validators: {
+      onDynamic: z.object({
+        source: z.string().min(1, m['settings.sync.source.required']()),
+      }),
+    },
+    onSubmit: async ({ value, formApi }) => {
+      if (unit === null) return;
+      await enable.mutateAsync({ unit, source: value.source });
+      formApi.reset();
+      onClose();
+    },
+  });
+
+  const startEmpty = async () => {
+    if (unit === null) return;
+    await enable.mutateAsync({ unit, source: '' });
+    onClose();
+  };
 
   return (
-    <Field>
-      <FieldLabel>{label}</FieldLabel>
-      <FieldDescription>{hint}</FieldDescription>
-      <div className="divide-y divide-border border border-border">
-        {known.map((entry) => (
-          <label
-            key={entry.name}
-            htmlFor={`sync-${entry.name}`}
-            className="flex cursor-pointer items-center gap-3 px-3 py-2"
+    <Dialog open={unit !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{m['settings.sync.source.title']()}</DialogTitle>
+          <DialogDescription>
+            {m['settings.sync.source.description']()}
+          </DialogDescription>
+        </DialogHeader>
+
+        {sources.isPending ? (
+          <Bone className="h-24" />
+        ) : candidates.length === 0 ? (
+          <div className="flex flex-col gap-3">
+            <FieldDescription>
+              {m['settings.sync.source.none']()}
+            </FieldDescription>
+            <DialogFooter>
+              <Button onClick={startEmpty} disabled={enable.isPending}>
+                {m['settings.sync.source.empty_action']()}
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              form.handleSubmit();
+            }}
           >
-            <div className="min-w-0 flex-1">
-              <div className="font-mono text-xs">{entry.name}</div>
-              <div className="text-[11px] text-muted-foreground">
-                {entry.description()}
+            <form.AppField name="source">
+              {(field) => (
+                <field.SelectField
+                  label={m['settings.sync.source.label']()}
+                  placeholder={m['settings.sync.source.placeholder']()}
+                  options={candidates.map((source) => ({
+                    value: source.name,
+                    label: source.name,
+                  }))}
+                />
+              )}
+            </form.AppField>
+            <DialogFooter className="mt-4">
+              <form.AppForm>
+                <form.SubmitButton>
+                  {m['settings.sync.source.action']()}
+                </form.SubmitButton>
+              </form.AppForm>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** The shared `options.txt`, key by key — the only way to read those values
+ * without opening the game. */
+function SharedOptions() {
+  const config = useQuery(syncQueries.config());
+  const options = useQuery(syncQueries.options());
+  const setOption = useMutation(syncMutations.setOption());
+  const setUnsynced = useMutation(syncMutations.setUnsynced());
+
+  const unsynced = config.data?.unsynced ?? [];
+
+  const form = useAppForm({
+    defaultValues: { key: '', value: '' },
+    validationLogic: revalidateLogic(),
+    validators: {
+      onDynamic: z.object({
+        key: z.string().min(1, m['settings.sync.options.key_required']()),
+        value: z.string(),
+      }),
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await setOption.mutateAsync(value);
+      formApi.reset();
+    },
+  });
+
+  const share = (key: string, shared: boolean) =>
+    setUnsynced.mutate(
+      shared ? unsynced.filter((other) => other !== key) : [...unsynced, key],
+    );
+
+  return (
+    <Setting id="sync-options">
+      <Field>
+        <FieldLabel>{m['settings.sync.options.label']()}</FieldLabel>
+        <FieldDescription>{m['settings.sync.options.hint']()}</FieldDescription>
+
+        {options.isPending ? (
+          <Bone className="h-24" />
+        ) : options.data?.length === 0 ? (
+          <FieldDescription>
+            {m['settings.sync.options.empty']()}
+          </FieldDescription>
+        ) : (
+          <div className="divide-y divide-border border border-border">
+            {options.data?.map((option) => (
+              <div
+                key={option.key}
+                className="flex items-center gap-3 px-3 py-1.5 text-xs"
+              >
+                <span className="min-w-0 flex-1 truncate font-mono">
+                  {option.key}
+                </span>
+                <span className="truncate font-mono text-muted-foreground">
+                  {option.value}
+                </span>
+                <Switch
+                  size="sm"
+                  aria-label={m['settings.sync.options.share_key']({
+                    key: option.key,
+                  })}
+                  checked={option.synced}
+                  disabled={setUnsynced.isPending}
+                  onCheckedChange={(checked) =>
+                    share(option.key, checked === true)
+                  }
+                />
               </div>
-            </div>
-            <Switch
-              id={`sync-${entry.name}`}
-              size="sm"
-              checked={values.includes(entry.name)}
-              disabled={pending}
-              onCheckedChange={(checked) =>
-                onChange(
-                  checked === true
-                    ? [...values, entry.name]
-                    : values.filter((v) => v !== entry.name),
-                )
-              }
-            />
-          </label>
-        ))}
+            ))}
+          </div>
+        )}
 
-        {custom.map((value) => (
-          <ValueRow
-            key={value}
-            value={value}
-            badge={
-              <Badge variant="outline">{m['settings.sync.custom']()}</Badge>
-            }
-            pending={pending}
-            onRemove={() => onChange(values.filter((v) => v !== value))}
-          />
-        ))}
-
-        <AddRow
-          placeholder={placeholder}
-          label={m['settings.sync.add_custom']()}
-          pending={pending}
-          onAdd={(value) => {
-            if (!values.includes(value)) onChange([...values, value]);
+        <form
+          className="flex items-end gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            form.handleSubmit();
           }}
-        />
-      </div>
-    </Field>
+        >
+          <form.AppField name="key">
+            {(field) => (
+              <field.TextField
+                label={m['settings.sync.options.key_label']()}
+                placeholder="guiScale"
+                className="flex-1"
+                inputClassName="font-mono"
+              />
+            )}
+          </form.AppField>
+          <form.AppField name="value">
+            {(field) => (
+              <field.TextField
+                label={m['settings.sync.options.value_label']()}
+                className="flex-1"
+                inputClassName="font-mono"
+              />
+            )}
+          </form.AppField>
+          <form.AppForm>
+            <form.SubmitButton>
+              {m['settings.sync.options.action']()}
+            </form.SubmitButton>
+          </form.AppForm>
+        </form>
+      </Field>
+    </Setting>
   );
 }

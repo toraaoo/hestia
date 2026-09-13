@@ -32,7 +32,7 @@ export function InstancesTab() {
         legend={m['settings.sync.section']()}
         description={m['settings.sync.description']()}
       >
-        <SyncSettings onCommit={commit} />
+        <SyncSettings />
       </SettingsSection>
     </>
   );

@@ -80,24 +80,28 @@
     },
     "subtitle": "Launcher, runtimes e daemon",
     "sync": {
-      "add_custom": "Adicionar",
-      "add_file_placeholder": "options.txt",
-      "add_folder_placeholder": "saves",
-      "custom": "Personalizado",
-      "description": "Arquivos são copiados e mesclados a cada inicialização; pastas são vinculadas a um armazenamento compartilhado.",
-      "enabled_description": "Desligado, cada instância mantém suas próprias configurações e mundos. Pastas já compartilhadas continuam assim.",
-      "enabled_label": "Compartilhar configurações entre instâncias",
-      "files": "Arquivos copiados",
-      "files_hint": "Copiados para cada instância ao iniciar e de volta ao sair — o mais novo vence, e o options.txt é mesclado chave a chave.",
-      "folders": "Pastas vinculadas",
-      "folders_hint": "Vinculadas a um único armazenamento compartilhado, então toda instância vê a mesma pasta.",
+      "description": "Cada um é mesclado a cada inicialização, então duas instâncias que mudam coisas diferentes sobrevivem.",
+      "options": {
+        "action": "Definir",
+        "empty": "Nenhuma configuração compartilhada ainda — elas chegam na primeira vez que uma instância iniciar.",
+        "hint": "As configurações de jogo compartilhadas, uma a uma. Desligue uma e cada instância mantém o próprio valor dela.",
+        "key_label": "Configuração",
+        "key_required": "Informe a configuração a alterar.",
+        "label": "Configurações de jogo compartilhadas",
+        "share_key": "Compartilhar {key}",
+        "value_label": "Valor"
+      },
       "section": "Compartilhado entre instâncias",
-      "target": {
-        "config": "Configuração de mods",
-        "options_txt": "Teclas, vídeo e áudio",
-        "saves": "Mundos",
-        "screenshots": "Capturas de tela",
-        "servers_dat": "A lista de servidores multijogador"
+      "seeded_from": "Começou a partir de {instance}",
+      "source": {
+        "action": "Começar a compartilhar",
+        "description": "A cópia compartilhada começa como a de uma instância. As outras a recebem na próxima inicialização.",
+        "empty_action": "Começar vazio",
+        "label": "Instância",
+        "none": "Nenhuma instância tem esse arquivo ainda, então a cópia compartilhada começa vazia e se preenche na primeira inicialização.",
+        "placeholder": "Escolha uma instância",
+        "required": "Escolha uma instância para começar.",
+        "title": "Qual instância começa?"
       }
     },
     "tabs": {

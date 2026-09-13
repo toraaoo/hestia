@@ -16,7 +16,6 @@ const settings: Tree = {
   content: { 'curseforge-key': '' },
   discord: { enabled: true },
   instance: { 'multi-session': false },
-  sync: { enabled: true },
   modpack: {
     'default-excludes': true,
     'exclude-files': '',

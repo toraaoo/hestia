@@ -1,54 +1,75 @@
 /**
- * The `sync.*` channels — the shared settings/config target set
- * (instance-only): files copied, folders linked into the shared store.
+ * The `sync.*` channels — the catalogue of shared settings, what can seed it,
+ * the shared game options, and each instance's standing.
  */
 import { call } from './core/ipc';
 import type {
   InstanceSyncStatus,
   SyncConfig,
-  SyncShareResult,
-  SyncTargets,
+  SyncOption,
+  SyncSource,
+  SyncUnit,
 } from './types/sync';
 
 export function get(): Promise<SyncConfig> {
   return call('sync.get');
 }
 
-/** Replace the target set wholesale; the daemon validates each path. */
-export function set(targets: SyncTargets): Promise<SyncConfig> {
-  return call('sync.set', { targets });
+/** Which instances could start a unit's shared copy. */
+export async function sources(unit: SyncUnit): Promise<SyncSource[]> {
+  const result = await call<{ sources: SyncSource[] }>('sync.sources', {
+    unit,
+  });
+  return result.sources;
 }
 
-/** Every instance's per-folder-target link state. */
+/** `source` may be empty only when at most one instance holds the file. */
+export function enable(unit: SyncUnit, source = ''): Promise<SyncConfig> {
+  return call('sync.enable', { unit, source });
+}
+
+export function disable(unit: SyncUnit): Promise<SyncConfig> {
+  return call('sync.disable', { unit });
+}
+
+/** The `options.txt` keys no instance shares. */
+export function setUnsynced(unsynced: string[]): Promise<SyncConfig> {
+  return call('sync.options.keys', { unsynced });
+}
+
+export async function options(): Promise<SyncOption[]> {
+  const result = await call<{ options: SyncOption[] }>('sync.options.get');
+  return result.options;
+}
+
+export async function setOption(
+  key: string,
+  value: string,
+): Promise<SyncOption[]> {
+  const result = await call<{ options: SyncOption[] }>('sync.options.set', {
+    key,
+    value,
+  });
+  return result.options;
+}
+
 export async function status(): Promise<InstanceSyncStatus[]> {
   const result = await call<{ instances: InstanceSyncStatus[] }>('sync.status');
   return result.instances;
 }
 
-/**
- * Adopt a stopped instance's folder contents into the shared store (every
- * folder target when `targets` is empty). Returns the targets linked after
- * the call; a store collision refuses that target with the names.
- */
-export async function adopt(
+/** `shared` null returns the instance to following the catalogue. */
+export function setInstanceUnit(
   instance: string,
-  targets: string[] = [],
-): Promise<string[]> {
-  const result = await call<{ adopted: string[] }>('instance.sync.adopt', {
-    instance,
-    targets,
-  });
-  return result.adopted;
+  unit: SyncUnit,
+  shared: boolean | null,
+): Promise<InstanceSyncStatus> {
+  return call('instance.sync.unit', { instance, unit, shared });
 }
 
-/**
- * Put a stopped instance in or out of shared settings. Leaving copies every
- * folder it shares out of the store; rejoining folds it back in with the store
- * winning anything the two both have. The warnings say what that cost.
- */
-export function share(
+export function setInstanceUnsynced(
   instance: string,
-  enabled: boolean,
-): Promise<SyncShareResult> {
-  return call('instance.sync.share', { instance, enabled });
+  unsynced: string[],
+): Promise<InstanceSyncStatus> {
+  return call('instance.sync.keys', { instance, unsynced });
 }

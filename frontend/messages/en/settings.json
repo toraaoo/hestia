@@ -80,24 +80,28 @@
     },
     "subtitle": "Launcher, runtimes and daemon",
     "sync": {
-      "add_custom": "Add",
-      "add_file_placeholder": "options.txt",
-      "add_folder_placeholder": "saves",
-      "custom": "Custom",
-      "description": "Files are copied and merged at each launch; folders are linked into one shared store.",
-      "enabled_description": "Off, every instance keeps its own settings, configs and worlds. Folders already shared stay shared.",
-      "enabled_label": "Share settings between instances",
-      "files": "Copied files",
-      "files_hint": "Copied into each instance at launch and back out after — the newest wins, and options.txt merges key by key.",
-      "folders": "Linked folders",
-      "folders_hint": "Linked into one shared store, so every instance sees the same folder.",
+      "description": "Each one is merged at every launch, so two instances changing different things both survive.",
+      "options": {
+        "action": "Set",
+        "empty": "No shared settings yet — they arrive the first time an instance launches.",
+        "hint": "The shared game settings, one by one. Turn one off and every instance keeps its own value for it.",
+        "key_label": "Setting",
+        "key_required": "Name the setting to change.",
+        "label": "Shared game settings",
+        "share_key": "Share {key}",
+        "value_label": "Value"
+      },
       "section": "Shared between instances",
-      "target": {
-        "config": "Mod configuration",
-        "options_txt": "Keybinds, video and audio settings",
-        "saves": "Worlds",
-        "screenshots": "Screenshots",
-        "servers_dat": "The multiplayer server list"
+      "seeded_from": "Started from {instance}",
+      "source": {
+        "action": "Start sharing",
+        "description": "The shared copy starts as one instance's. The others take it at their next launch.",
+        "empty_action": "Start empty",
+        "label": "Instance",
+        "none": "No instance has this file yet, so the shared copy starts empty and fills at the first launch.",
+        "placeholder": "Pick an instance",
+        "required": "Pick an instance to start from.",
+        "title": "Which instance starts it?"
       }
     },
     "tabs": {
