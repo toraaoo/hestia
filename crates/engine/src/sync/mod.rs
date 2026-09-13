@@ -25,6 +25,8 @@ use state::Catalogue;
 /// carries its own and `release` takes them with it.
 const BASELINES: &str = ".baselines";
 
+const BACKUPS: &str = ".backups";
+
 #[derive(Clone, Default, PartialEq, Eq)]
 pub enum Scope {
     #[default]
@@ -106,6 +108,22 @@ impl Sync {
             reconcile::copy_file(&source, &store.join(file))?;
         }
         Ok(())
+    }
+
+    pub fn back_up(&self, unit: SyncUnit, id: &str, data_dir: &Path) -> Result<()> {
+        let file = catalogue::file(unit);
+        let source = data_dir.join(file);
+        if !source.is_file() {
+            return Ok(());
+        }
+        let stamp = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let kept = self.dir().join(BACKUPS).join(id).join(stamp.to_string());
+        std::fs::create_dir_all(&kept)
+            .with_context(|| format!("cannot create {}", kept.display()))?;
+        reconcile::copy_file(&source, &kept.join(file))
     }
 
     pub fn defer(
@@ -434,6 +452,32 @@ mod tests {
         assert!(fs::read_to_string(shared.join("options.txt"))
             .unwrap()
             .contains("fov:90"));
+    }
+
+    #[test]
+    fn what_the_shared_copy_lands_on_is_kept_first() {
+        let base = temp_dir("backup");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        write_at(&data.join("options.txt"), "guiScale:4\n", 100);
+
+        let sync = sharing(&shared);
+        sync.back_up(SyncUnit::Options, "test", &data).unwrap();
+
+        let kept = walk(&shared.join(BACKUPS).join("test"));
+        assert_eq!(kept.len(), 1);
+        assert!(fs::read_to_string(&kept[0]).unwrap().contains("guiScale:4"));
+    }
+
+    fn walk(dir: &Path) -> Vec<PathBuf> {
+        let mut found = Vec::new();
+        for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
+            match entry.path().is_dir() {
+                true => found.extend(walk(&entry.path())),
+                false => found.push(entry.path()),
+            }
+        }
+        found
     }
 
     #[test]

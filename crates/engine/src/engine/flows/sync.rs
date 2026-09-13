@@ -106,6 +106,8 @@ impl Engine {
             None => String::new(),
         };
         for record in &records {
+            self.sync
+                .back_up(unit, &record.id, &self.instances.data_dir(record))?;
             self.sync.defer(
                 unit,
                 &record.id,
