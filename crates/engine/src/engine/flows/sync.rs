@@ -10,6 +10,7 @@ use proto::sync::{
 };
 use proto::warning::WarningInfo;
 
+use crate::content::profiles;
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
 use crate::sync::{Pass, Scope};
@@ -58,6 +59,27 @@ impl Engine {
         }
         for warning in self.sync.apply(&pass) {
             tracing::debug!(instance = %pass.name, warning = %warning, "sync at exit");
+        }
+    }
+
+    /// Every instance that is not running takes the shared copy now, so a
+    /// change reaches an instance that is never launched.
+    pub fn reconcile_idle(&self) {
+        for record in self.instances.list() {
+            if self.running_sessions(&record.id) > 0 {
+                continue;
+            }
+            let entry_dir = self.instances.instance_dir(&record);
+            let store = profiles::resolve(&entry_dir, "")
+                .ok()
+                .flatten()
+                .filter(|profile| profile.captured)
+                .map(|profile| profiles::store_dir(&entry_dir, &profile.name));
+            let data_dir = self.instances.data_dir(&record);
+            let pass = self.instance_pass(&record, &data_dir, store.as_deref());
+            for warning in self.sync.apply(&pass) {
+                tracing::debug!(instance = %record.name, warning = %warning, "idle sync");
+            }
         }
     }
 
@@ -116,7 +138,9 @@ impl Engine {
             )?;
         }
         tracing::info!(%unit, source = %seeded_from, "sync unit enabled");
-        self.sync.enable(unit, &seeded_from)
+        let config = self.sync.enable(unit, &seeded_from)?;
+        self.reconcile_idle();
+        Ok(config)
     }
 
     fn only_candidate(
@@ -147,7 +171,9 @@ impl Engine {
     }
 
     pub fn set_sync_unsynced(&self, keys: BTreeSet<String>) -> Result<SyncConfig> {
-        self.sync.set_unsynced(keys)
+        let config = self.sync.set_unsynced(keys)?;
+        self.reconcile_idle();
+        Ok(config)
     }
 
     pub fn sync_options(&self) -> Vec<SyncOption> {
@@ -161,6 +187,7 @@ impl Engine {
             });
         }
         self.sync.set_option(key, value)?;
+        self.reconcile_idle();
         Ok(self.sync.options())
     }
 
@@ -209,6 +236,11 @@ impl Engine {
         mutate(&mut overrides);
         let record = self.instances.set_overrides(&record.id, overrides)?;
         tracing::info!(instance = %record.name, "instance sync overrides changed");
+        if self.running_sessions(&record.id) == 0 {
+            let data_dir = self.instances.data_dir(&record);
+            let pass = self.instance_pass(&record, &data_dir, None);
+            self.sync.apply(&pass);
+        }
         Ok(self.instance_sync_status(&record))
     }
 
