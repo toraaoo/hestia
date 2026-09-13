@@ -36,8 +36,6 @@ it migrate them. And an instance's own copy is kept under `<store>/.backups/`
 before sharing first lands on it, because the first pass overwrites in place and
 nothing else held that file.
 
-**Rejected:** a typed catalogue of every known setting, with per-version key
-mappings and canonical values. It is the only way to share a setting across a
-rename (`fancyGraphics` → `graphicsMode` → `graphicsPreset`), but it is a table
-that must be revisited every game release, and the failure mode without it is a
-key that stops being shared rather than one that corrupts.
+Writing the game's own file is about the bytes around a value, not the value
+itself: which settings exist and how each is spelled per version is the
+catalogue's problem ([0075](0075-options-sync-through-a-typed-catalogue.md)).
