@@ -67,7 +67,7 @@ the alternative you rejected — that is usually the part nobody can recover lat
 ### [Servers & instances](../architecture/entries.md)
 
 - **0021** — [The entry root is hestia's; `data/` is the game's](0021-entry-root-versus-data-dir.md)
-- **0022** — [Sync is a closed catalogue of merged files — no links, no worlds](0022-sync-is-a-catalogue-of-merged-files.md)
+- **0022** — [Sync is a closed catalogue, and each unit names its own mechanism](0022-sync-is-a-closed-catalogue.md)
 - **0069** — [A synced unit reconciles against a baseline, not a clock](0069-sync-reconciles-against-a-baseline.md)
 - **0073** — [A unit shares only what its game version writes](0073-a-unit-shares-only-what-its-version-writes.md)
 - **0074** — [The merge writes the game's own file, not its own rendering of it](0074-the-merge-writes-the-games-own-file.md)
