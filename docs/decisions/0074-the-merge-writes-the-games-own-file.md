@@ -1,6 +1,6 @@
 # The merge writes the game's own file, not its own rendering of it
 
-*Applies to: [Servers & instances](../architecture/entries.md)*
+*Applies to: [Instances](../architecture/entries.md#sync--shared-settings-across-instances)*
 
 The `options.txt` merge parsed the file into a map and rendered the map back.
 Everything the map could not hold was lost on the first pass: comments, blank

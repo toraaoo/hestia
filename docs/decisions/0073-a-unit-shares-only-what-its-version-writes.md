@@ -1,6 +1,6 @@
 # A unit shares only what its game version writes
 
-*Applies to: [Servers & instances](../architecture/entries.md)*
+*Applies to: [Instances](../architecture/entries.md#sync--shared-settings-across-instances)*
 
 Only `options.txt` was gated on a game version — a pre-1.13 instance kept its
 own, because 1.13 respelled every keybind. The other three units were treated as
