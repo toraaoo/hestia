@@ -1,79 +1,30 @@
-import {
-  ImageIcon,
-  PencilSimpleIcon,
-  SparkleIcon,
-  TrashIcon,
-} from '@phosphor-icons/react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+/**
+ * The hero-icon overlay button: opens the shared icon editor directly, where
+ * a custom image, the generated pickers, and reset all live.
+ */
+import { PencilSimpleIcon } from '@phosphor-icons/react';
 import { useState } from 'react';
 
-import { dialog } from '@/api';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { m } from '@/paraglide/messages.js';
-import { iconMutations, iconQueries } from '@/queries/icons';
 import { IconEditorDialog } from './icon-editor/editor-dialog';
 
-/**
- * The hero-icon overlay menu: pick a custom image for the entry, compose a
- * generated one, or reset to the kind glyph. Desktop-local (the shell's
- * `icons_*` commands).
- */
 export function EntryIconMenu({ id }: { id: string }) {
-  const icons = useQuery(iconQueries.list());
-  const config = useQuery(iconQueries.config(id));
-  const set = useMutation(iconMutations.set());
-  const remove = useMutation(iconMutations.remove());
-  const hasIcon = !!icons.data?.[id];
   const [editorOpen, setEditorOpen] = useState(false);
-
-  const change = async () => {
-    const path = await dialog.pickImage();
-    if (!path) return;
-    set.mutate({ entryId: id, sourcePath: path });
-  };
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <button
-              type="button"
-              aria-label={m['entry.icon.change']()}
-              className="grid size-5 place-items-center bg-background/80 text-muted-foreground ring-1 ring-border backdrop-blur-xs outline-none hover:text-foreground focus-visible:ring-ring"
-            >
-              <PencilSimpleIcon className="size-3" />
-            </button>
-          }
-        />
-        <DropdownMenuContent align="start" className="w-48">
-          <DropdownMenuItem onClick={() => setEditorOpen(true)}>
-            <SparkleIcon />
-            {m['entry.icon.customize']()}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={change} disabled={set.isPending}>
-            <ImageIcon />
-            {m['entry.icon.change']()}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={!hasIcon || remove.isPending}
-            onClick={() => remove.mutate(id)}
-          >
-            <TrashIcon />
-            {m['entry.icon.reset']()}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <button
+        type="button"
+        aria-label={m['entry.icon.customize']()}
+        onClick={() => setEditorOpen(true)}
+        className="grid size-5 place-items-center bg-background/80 text-muted-foreground ring-1 ring-border backdrop-blur-xs outline-none hover:text-foreground focus-visible:ring-ring"
+      >
+        <PencilSimpleIcon className="size-3" />
+      </button>
       <IconEditorDialog
         open={editorOpen}
         onOpenChange={setEditorOpen}
         entryId={id}
-        initial={config.data}
       />
     </>
   );

@@ -40,12 +40,18 @@
       "snapshot": "snapshot"
     },
     "icon": {
-      "change": "Alterar ícone",
       "customize": "Personalizar ícone",
       "reset": "Restaurar ícone",
       "editor": {
         "background": "Fundo",
+        "categories": {
+          "loader": "Carregadores",
+          "modded": "Moddados",
+          "vanilla": "Vanilla"
+        },
         "description": "Combine elementos para criar um ícone personalizado.",
+        "image": "Imagem personalizada",
+        "pick_image": "Escolher imagem…",
         "randomize": "Sortear",
         "save": "Salvar ícone",
         "symbol": "Símbolo",

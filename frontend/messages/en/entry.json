@@ -40,12 +40,18 @@
       "snapshot": "snapshot"
     },
     "icon": {
-      "change": "Change icon",
       "customize": "Customize icon",
       "reset": "Reset icon",
       "editor": {
         "background": "Background",
+        "categories": {
+          "loader": "Loaders",
+          "modded": "Modded",
+          "vanilla": "Vanilla"
+        },
         "description": "Mix and match elements to create a custom icon.",
+        "image": "Custom image",
+        "pick_image": "Choose image…",
         "randomize": "Randomize",
         "save": "Save icon",
         "symbol": "Symbol",

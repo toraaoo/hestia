@@ -49,7 +49,7 @@ export function DetailHero({
       <div className="flex items-end gap-4 bg-muted/25 px-5 pt-8 pb-5">
         <Thumbnail src={iconUrl} icon={Icon} size="2xl" className="group">
           {iconAction && (
-            <span className="absolute right-1 bottom-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <span className="absolute right-1 bottom-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100">
               {iconAction}
             </span>
           )}
