@@ -192,7 +192,14 @@ impl Sync {
         std::fs::create_dir_all(&baselines)
             .with_context(|| format!("cannot create {}", baselines.display()))?;
         let file = catalogue::file(unit);
-        match unit {
+        let agreed = baselines.join(file);
+        let interrupted = baselines.join(format!("{file}.pending"));
+        if interrupted.exists() {
+            reconcile::defer_to_store(&agreed, &pass.data_dir.join(file))?;
+        }
+        std::fs::write(&interrupted, [])
+            .with_context(|| format!("cannot write {}", interrupted.display()))?;
+        let settled = match unit {
             SyncUnit::Options => options::merge(
                 &baselines.join(file),
                 &store.join(file),
@@ -210,7 +217,11 @@ impl Sync {
                 &store.join(file),
                 &pass.data_dir.join(file),
             ),
+        };
+        if settled.is_ok() {
+            let _ = std::fs::remove_file(&interrupted);
         }
+        settled
     }
 
     pub fn status(&self, pass: &Pass) -> Vec<UnitStatus> {
@@ -478,6 +489,33 @@ mod tests {
             }
         }
         found
+    }
+
+    #[test]
+    fn a_pass_that_died_mid_write_settles_the_shared_copys_way() {
+        let base = temp_dir("interrupted");
+        let shared = base.path().join("shared");
+        let data = base.path().join("data");
+        let sync = sharing(&shared);
+
+        write_at(&shared.join("options.txt"), "guiScale:1\n", 300);
+        sync.apply(&pass("test", &data));
+
+        write_at(&shared.join("options.txt"), "guiScale:2\n", 200);
+        write_at(&data.join("options.txt"), "guiScale:9\n", 100);
+        fs::write(
+            shared
+                .join(BASELINES)
+                .join("test")
+                .join("options.txt.pending"),
+            [],
+        )
+        .unwrap();
+        sync.apply(&pass("test", &data));
+
+        assert!(fs::read_to_string(data.join("options.txt"))
+            .unwrap()
+            .contains("guiScale:2"));
     }
 
     #[test]
