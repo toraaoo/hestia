@@ -2,13 +2,7 @@ import { m } from '@/paraglide/messages.js';
 
 import type { TourAnchor } from './anchor';
 
-export type TourId =
-  | 'shell'
-  | 'browse'
-  | 'instance'
-  | 'server'
-  | 'profiles'
-  | 'skins';
+export type TourId = 'shell' | 'browse' | 'instance' | 'server' | 'skins';
 
 export interface TourStep {
   anchor?: TourAnchor;
@@ -70,11 +64,6 @@ export const tours: Record<TourId, readonly TourStep[]> = {
       body: m['onboarding.tour.instance.content.body'],
     },
     {
-      anchor: 'instance-profiles',
-      title: m['onboarding.tour.instance.profiles.title'],
-      body: m['onboarding.tour.instance.profiles.body'],
-    },
-    {
       anchor: 'instance-worlds',
       title: m['onboarding.tour.instance.worlds.title'],
       body: m['onboarding.tour.instance.worlds.body'],
@@ -101,18 +90,6 @@ export const tours: Record<TourId, readonly TourStep[]> = {
       anchor: 'server-backups',
       title: m['onboarding.tour.server.backups.title'],
       body: m['onboarding.tour.server.backups.body'],
-    },
-  ],
-
-  profiles: [
-    {
-      title: m['onboarding.tour.profiles.what.title'],
-      body: m['onboarding.tour.profiles.what.body'],
-    },
-    {
-      anchor: 'page-actions',
-      title: m['onboarding.tour.profiles.create.title'],
-      body: m['onboarding.tour.profiles.create.body'],
     },
   ],
 

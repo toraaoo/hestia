@@ -8,7 +8,7 @@ them cross the socket.
 
 A stored account is also a proof of ownership, which is why the whole
 `instance.*` surface is refused until one exists — enforced once, at the router
-([0033](../decisions/0033-instance-surface-gated-on-an-account.md)).
+([0030](../decisions/0030-instance-surface-gated-on-an-account.md)).
 
 ## Sign-in
 
@@ -105,12 +105,12 @@ Two deliberate departures from the launcher this design otherwise follows:
   reconciliation dance nobody needs.
 
 Changes apply immediately — the daemon is resident, so there is no app-close edge
-to flush ([0020](../decisions/0020-skins-follow-modrinth-minus-couplings.md)).
+to flush ([0017](../decisions/0017-skins-follow-modrinth-minus-couplings.md)).
 
 **Skins are a desktop surface only.** Picking a skin is visual, so the CLI
 deliberately grows no command for it — one of the documented exceptions to
-[every capability getting a verb](../decisions/0044-every-capability-gets-a-verb.md).
+[every capability getting a verb](../decisions/0041-every-capability-gets-a-verb.md).
 
 ## Decisions
 
-- [0020 — Skins follow Modrinth's shape, minus its couplings](../decisions/0020-skins-follow-modrinth-minus-couplings.md)
+- [0017 — Skins follow Modrinth's shape, minus its couplings](../decisions/0017-skins-follow-modrinth-minus-couplings.md)

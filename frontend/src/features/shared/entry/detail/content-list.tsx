@@ -5,7 +5,6 @@ import {
   PackageIcon,
   ProhibitIcon,
   PuzzlePieceIcon,
-  StackIcon,
   SwapIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
@@ -102,8 +101,7 @@ export function ContentListResult({
 
 /**
  * Where a row came from, when it was not installed by hand. The tag names a
- * profile by name but a modpack by project id, so the pack the entry runs
- * supplies the readable name.
+ * modpack by project id, so the pack the entry runs supplies the readable name.
  */
 function OriginBadge({
   origin,
@@ -112,26 +110,20 @@ function OriginBadge({
   origin: string;
   packName: string;
 }) {
-  const parsed = parseOrigin(origin);
-  if (!parsed) return null;
+  if (!parseOrigin(origin)) return null;
 
-  const pack = parsed.scope === 'modpack';
-  const Icon = pack ? PackageIcon : StackIcon;
-  const name = pack ? packName : parsed.key;
   return (
     <Badge
       variant="secondary"
       className="shrink-0 text-muted-foreground"
       title={
-        name
-          ? pack
-            ? m['content.modpack.origin_badge']({ name })
-            : m['profile.origin_badge']({ name })
+        packName
+          ? m['content.modpack.origin_badge']({ name: packName })
           : undefined
       }
     >
-      <Icon />
-      {name || m['content.modpack.title']()}
+      <PackageIcon />
+      {packName || m['content.modpack.title']()}
     </Badge>
   );
 }

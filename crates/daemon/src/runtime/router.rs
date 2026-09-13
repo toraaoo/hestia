@@ -149,7 +149,6 @@ mod tests {
             "instance.list",
             "instance.content.add",
             "instance.modpack.install",
-            "instance.profile.apply",
             "sync.set",
             "instance.sync.adopt",
         ] {
@@ -165,7 +164,6 @@ mod tests {
             "server.content.add",
             "server.modpack.install",
             "content.search",
-            "profile.list",
             "java.install",
         ] {
             assert!(!requires_account(channel), "{channel} should be open");

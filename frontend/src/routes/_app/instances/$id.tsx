@@ -9,7 +9,6 @@ import { ensureSignedIn } from '@/queries';
 
 const tabs: Record<Exclude<InstanceTab, 'overview'>, true> = {
   content: true,
-  profiles: true,
   worlds: true,
   servers: true,
   logs: true,

@@ -23,7 +23,7 @@ flowchart TD
 Each front-end declares what it means by an ambiguous action rather than
 inheriting a wire default: the CLI asks before stopping a daemon with workloads
 running, while the tray and desktop leave workloads running, because a menu item
-cannot ask ([0039](../decisions/0039-stopping-the-daemon-has-three-meanings.md)).
+cannot ask ([0036](../decisions/0036-stopping-the-daemon-has-three-meanings.md)).
 
 ---
 
@@ -65,17 +65,16 @@ Two cross-cutting shortcuts sit on top, earned by how often they are used:
   which kind an entry is, nor that `server start` and `instance launch` differ.
 
 Everything scriptable still has an explicit noun-first form
-([0043](../decisions/0043-entry-first-cli-grammar.md)).
+([0040](../decisions/0040-entry-first-cli-grammar.md)).
 
 Anything a `create` needs but wasn't given is asked for interactively — on a
 terminal the picker *is* the browser; piped invocations error naming the flag to
 pass, so scripts stay explicit.
 
 **Every daemon capability gets a scriptable verb, or a written reason it has
-none.** Skins and content profiles are the documented exceptions — both are
-visual surfaces. A channel with no CLI verb is fine when the architecture says
-why, and a bug when it does not
-([0044](../decisions/0044-every-capability-gets-a-verb.md)).
+none.** Skins are the documented exception — a visual surface. A channel with no
+CLI verb is fine when the architecture says why, and a bug when it does not
+([0041](../decisions/0041-every-capability-gets-a-verb.md)).
 
 ## Connection and flags
 
@@ -88,7 +87,7 @@ daemon; `start()`, behind `daemon start`, is the one that spawns it.
 
 `-vv` buys **wire visibility** rather than more volume — every frame with its
 channel, correlation id, size and round-trip time. Payloads are never logged
-([0045](../decisions/0045-vv-buys-wire-visibility.md)).
+([0042](../decisions/0042-vv-buys-wire-visibility.md)).
 
 ## Exit codes
 
@@ -105,7 +104,7 @@ A state query answers through its exit code, in systemd's vocabulary
 Only the verbs that *assert* one subject's running-ness produce 3 — `daemon
 status`, `server <name> status`. Verbs that merely describe stay 0, because
 "inactive" is not a claim they make
-([0046](../decisions/0046-state-queries-answer-through-exit-codes.md)).
+([0043](../decisions/0043-state-queries-answer-through-exit-codes.md)).
 
 ## Presentation
 
@@ -129,7 +128,7 @@ Interactive surfaces run as **fullscreen sessions** on a small framework:
 Anything that takes keys owns the whole alternate screen for as long as it runs.
 Progress with **no** interaction is the deliberate exception — one stderr line
 rewritten in place, since flashing the alternate screen for a spinner you cannot
-act on is hostile ([0047](../decisions/0047-fullscreen-interaction-inline-progress.md)).
+act on is hostile ([0044](../decisions/0044-fullscreen-interaction-inline-progress.md)).
 
 Piped or redirected, every surface degrades to plain text and widgets degrade to
 arguments, so output stays scriptable.
@@ -160,22 +159,22 @@ Mirroring ~120 channels as individual Tauri commands would add a third naming
 seam that can drift from both sides while adding no safety — `invoke()` results
 are untyped JSON regardless, and the daemon already validates every payload
 through the wire contract. So the typed layer lives once, in TypeScript
-([0049](../decisions/0049-desktop-bridge-is-one-generic-command.md)).
+([0046](../decisions/0046-desktop-bridge-is-one-generic-command.md)).
 
 A watcher task notices a lost daemon between calls, emits `hestia:connection`
 transitions, and passively reconnects. **Reconnection never spawns** — a daemon
 stopped during the session was stopped on purpose. While the connection is down
 the bridge answers `connection_lost` from held state rather than attempting the
 socket, so a burst of reads costs one socket attempt per watch interval
-([0053](../decisions/0053-offline-is-one-state.md)).
+([0050](../decisions/0050-offline-is-one-state.md)).
 
 Everything else in `commands/` is there because it **cannot** be a daemon call —
 each needs something only the shell process has:
 
 | Command | Why it is not generic |
 |---|---|
-| `account_login_sisu` (`auth.rs`) | Microsoft sign-in opens in a native webview window and completes by reading that window's URL on redirect. A cross-origin webview's location is readable only from Rust ([0051](../decisions/0051-sisu-sign-in-is-a-shell-command.md)) |
-| `prefs_list\|set\|remove` (`prefs.rs`) | UI state is the front-end's concern, so it never crosses the socket — written directly to `<data_home>/prefs.json`, resolving the same data home the engine uses ([0052](../decisions/0052-desktop-prefs-live-in-the-data-home.md)) |
+| `account_login_sisu` (`auth.rs`) | Microsoft sign-in opens in a native webview window and completes by reading that window's URL on redirect. A cross-origin webview's location is readable only from Rust ([0048](../decisions/0048-sisu-sign-in-is-a-shell-command.md)) |
+| `prefs_list\|set\|remove` (`prefs.rs`) | UI state is the front-end's concern, so it never crosses the socket — written directly to `<data_home>/prefs.json`, resolving the same data home the engine uses ([0049](../decisions/0049-desktop-prefs-live-in-the-data-home.md)) |
 | `icons_list`, `icon_set\|remove` (`icons.rs`) | a picked image is copied to `<data_home>/icons/<entry-id>.<ext>` so it survives the original moving. The webview loads them over the asset protocol, whose scope is widened to that directory per call, since the data home can move at runtime |
 | `crash_list\|read\|clear`, `crash_report`, `log_write` (`diagnostics.rs`) | a webview error kills the UI without touching the Rust stack, so the shell records it into the same crash directory the daemon writes to. `log_write` routes console logging into the process `tracing` subscriber under the `ui` target |
 | `start_daemon` (`bridge.rs`) | the `Client::start()` spawn path behind the offline overlay's start button |
@@ -226,7 +225,7 @@ live events (`useServerLogs`, `useProcessMetrics`).
 [hooks.md](../hooks.md) is the usage guide for this layer.
 
 **`features/` and `routes/`** — pages for the library, servers, instances,
-content browse, profiles, skins and settings, over a shared app shell with
+content browse, skins and settings, over a shared app shell with
 an offline overlay, a first-run sign-in prompt and route guards for the
 account-gated instance surface.
 
@@ -256,10 +255,9 @@ Rules that keep it from drifting:
   `features/shared/*` may not import `features/<feature>/*`. `shared/entry` is
   what a server and an instance both are (cards, the create wizard, the detail
   sections, the settings tab); `shared/content` is the content vocabulary the
-  browse pages, the entry content tabs and the profile pages all resolve against.
-  Everything else is one-directional — `library → instances`,
-  `instances → content · profiles`, `servers → content` — so the feature graph
-  is acyclic.
+  browse pages and the entry content tabs resolve against. Everything else is
+  one-directional — `library → instances`, `instances → content`,
+  `servers → content` — so the feature graph is acyclic.
 
 ## Two kinds of offline
 
@@ -269,7 +267,7 @@ avoid.
 
 A lost **daemon** covers the window (`OfflineOverlay`): nothing works without it,
 so every page would otherwise render its own empty state
-([0053](../decisions/0053-offline-is-one-state.md)).
+([0050](../decisions/0050-offline-is-one-state.md)).
 
 A lost **connection** must not block anything — instances still launch, servers
 still run, installed content is still there. So it gets its own light in the
@@ -282,7 +280,7 @@ upstream says so itself:
 | Content browse, project detail, the install picker, the version dialog | `OfflineState` — the whole surface, since there is nothing local to show |
 | Skin library | `OfflineState` when nothing is cached; Mojang owns the profile |
 | Version pickers in the create wizard | `StaleNotice` — the list answers from the cached catalogue |
-| Java runtimes, update check, entry content updates, profile members, sign-in | `OfflineNotice` and a disabled action — the content is local, only the download is not |
+| Java runtimes, update check, entry content updates, sign-in | `OfflineNotice` and a disabled action — the content is local, only the download is not |
 | `/offline` | the dedicated page: which state, what still works, what does not, and a retry |
 
 The `offline` error code is silenced in the query toast path for the same reason
@@ -340,7 +338,7 @@ locale must cover the base locale exactly and interpolate the same
 `{placeholders}`, every referenced key must exist, and every defined key must
 have a call site. Dynamically reached tables must be declared in
 `DYNAMIC_PREFIXES` — an undeclared table is exactly what makes dead keys
-unprovable ([0050](../decisions/0050-messages-organised-by-render-surface.md)).
+unprovable ([0047](../decisions/0047-messages-organised-by-render-surface.md)).
 
 ---
 
@@ -364,7 +362,7 @@ socket. Left-click launches the desktop shell.
 exactly when the tray is most useful — the greyed status plus a start action — so
 only its own Quit removes it. A duplicate spawn after a daemon restart is
 absorbed by an exclusive lock keyed by endpoint, so a dev daemon's tray and the
-session's tray coexist ([0054](../decisions/0054-the-daemon-spawns-the-tray.md)).
+session's tray coexist ([0051](../decisions/0051-the-daemon-spawns-the-tray.md)).
 
 **The tray speaks the tray protocol, and asks nothing of the machine.** On Linux
 the status area is a D-Bus protocol, `org.kde.StatusNotifierItem`, and the tray
@@ -374,7 +372,7 @@ per daemon start. The requirement is now a session bus and a desktop that hosts
 a tray, never a package on the user's machine, which is why the icon appears
 wherever an Electron app's does — Plasma and SteamOS, XFCE, Cinnamon, LXQt, a
 Wayland bar, GNOME with the AppIndicator extension
-([0072](../decisions/0072-the-tray-speaks-the-tray-protocol.md)).
+([0068](../decisions/0068-the-tray-speaks-the-tray-protocol.md)).
 
 **A session with no host yet is not a failure.** The item stays published and
 registers the moment a watcher appears, so a bar that restarts or an extension
@@ -384,21 +382,21 @@ Single-instance is enforced deliberately in each front-end: the tray by that
 runtime lock, the desktop by `tauri-plugin-single-instance`, which focuses the
 existing window rather than opening another. They must not share a GApplication
 id, or on Linux each would block the other
-([0055](../decisions/0055-tray-and-desktop-app-ids.md)).
+([0052](../decisions/0052-tray-and-desktop-app-ids.md)).
 
 ## Decisions
 
-- [0043 — Entry-first, with verb-first shortcuts for the hot path](../decisions/0043-entry-first-cli-grammar.md)
-- [0044 — Every daemon capability gets a scriptable verb, or a written reason](../decisions/0044-every-capability-gets-a-verb.md)
-- [0045 — `-vv` buys wire visibility, not more volume](../decisions/0045-vv-buys-wire-visibility.md)
-- [0046 — A state query answers through its exit code](../decisions/0046-state-queries-answer-through-exit-codes.md)
-- [0047 — Interaction is fullscreen; bare progress is one line](../decisions/0047-fullscreen-interaction-inline-progress.md)
-- [0049 — The desktop bridge is one generic command](../decisions/0049-desktop-bridge-is-one-generic-command.md)
-- [0050 — Messages are organised by render surface](../decisions/0050-messages-organised-by-render-surface.md)
-- [0051 — Sign-in is the one bespoke shell command](../decisions/0051-sisu-sign-in-is-a-shell-command.md)
-- [0052 — Front-end preferences are desktop-local](../decisions/0052-desktop-prefs-live-in-the-data-home.md)
-- [0053 — Offline is one state, not a failure per read](../decisions/0053-offline-is-one-state.md)
-- [0071 — Reachability is observed from real traffic, and offline is a state the whole system reads](../decisions/0071-reachability-is-observed-not-asked.md)
-- [0054 — The daemon spawns the tray; the tray outlives the daemon](../decisions/0054-the-daemon-spawns-the-tray.md)
-- [0055 — The tray and desktop must not share a GApplication id](../decisions/0055-tray-and-desktop-app-ids.md)
-- [0072 — The tray speaks the tray protocol, not a library that might be installed](../decisions/0072-the-tray-speaks-the-tray-protocol.md)
+- [0040 — Entry-first, with verb-first shortcuts for the hot path](../decisions/0040-entry-first-cli-grammar.md)
+- [0041 — Every daemon capability gets a scriptable verb, or a written reason](../decisions/0041-every-capability-gets-a-verb.md)
+- [0042 — `-vv` buys wire visibility, not more volume](../decisions/0042-vv-buys-wire-visibility.md)
+- [0043 — A state query answers through its exit code](../decisions/0043-state-queries-answer-through-exit-codes.md)
+- [0044 — Interaction is fullscreen; bare progress is one line](../decisions/0044-fullscreen-interaction-inline-progress.md)
+- [0046 — The desktop bridge is one generic command](../decisions/0046-desktop-bridge-is-one-generic-command.md)
+- [0047 — Messages are organised by render surface](../decisions/0047-messages-organised-by-render-surface.md)
+- [0048 — Sign-in is the one bespoke shell command](../decisions/0048-sisu-sign-in-is-a-shell-command.md)
+- [0049 — Front-end preferences are desktop-local](../decisions/0049-desktop-prefs-live-in-the-data-home.md)
+- [0050 — Offline is one state, not a failure per read](../decisions/0050-offline-is-one-state.md)
+- [0067 — Reachability is observed from real traffic, and offline is a state the whole system reads](../decisions/0067-reachability-is-observed-not-asked.md)
+- [0051 — The daemon spawns the tray; the tray outlives the daemon](../decisions/0051-the-daemon-spawns-the-tray.md)
+- [0052 — The tray and desktop must not share a GApplication id](../decisions/0052-tray-and-desktop-app-ids.md)
+- [0068 — The tray speaks the tray protocol, not a library that might be installed](../decisions/0068-the-tray-speaks-the-tray-protocol.md)

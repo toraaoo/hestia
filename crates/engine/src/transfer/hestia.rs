@@ -1,7 +1,7 @@
 //! hestia's own archive format — the full-fidelity one.
 //!
-//! It is the entry directory itself: the content pool, the profiles, the
-//! modpack record, the game directory, everything but what regenerates. The
+//! It is the entry directory itself: the content pool, the modpack record, the
+//! game directory, everything but what regenerates. The
 //! record travels beside them in `hestia.instance.json`, which is both the
 //! manifest and the marker — and carries a **resolved** profile, so importing
 //! one needs no network and cannot be broken by a version falling out of a

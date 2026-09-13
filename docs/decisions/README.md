@@ -6,9 +6,9 @@ was made — what changed, what it replaced, and what was rejected. The
 describe *why it is that*.
 
 Each entry is one decision, numbered in the order it was written down, and links
-back to the subsystem page it explains. Numbers are permanent: a superseded
-decision is rewritten in place rather than renumbered, so an inbound link never
-rots.
+back to the subsystem page it explains. The numbering stays contiguous: a
+superseded decision is rewritten in place, and one whose feature is removed is
+deleted with the rest renumbered behind it, so the list never has holes in it.
 
 **Adding one:** when you make a call that a future reader would otherwise have to
 reverse-engineer, add a file here (`NNNN-kebab-title.md`, next number free), open
@@ -20,40 +20,40 @@ the alternative you rejected — that is usually the part nobody can recover lat
 ### [The socket boundary](../architecture/wire.md)
 
 - **0001** — [The envelope seam fails closed, so no decode site can forget the version check](0001-envelope-fails-closed.md)
-- **0029** — [A degraded outcome rides on the result, never only in the log](0029-degraded-outcomes-ride-on-the-result.md)
-- **0030** — [A warning the user did not cause is a bug in the launcher, not a notice](0030-warnings-the-user-did-not-cause.md)
-- **0031** — [Everything serialized is camelCase, except the `config.*` key vocabulary and upstream DTOs](0031-camelcase-except-the-config-vocabulary.md)
-- **0035** — [A job is cancelled by asking, at safe checkpoints — never by disconnecting](0035-jobs-are-cancelled-by-asking.md)
-- **0048** — [One event-callback slot per client `Session`](0048-one-event-callback-per-session.md)
-- **0067** — [An endpoint is scoped exactly as the data home behind it](0067-an-endpoint-is-scoped-like-its-data-home.md)
+- **0026** — [A degraded outcome rides on the result, never only in the log](0026-degraded-outcomes-ride-on-the-result.md)
+- **0027** — [A warning the user did not cause is a bug in the launcher, not a notice](0027-warnings-the-user-did-not-cause.md)
+- **0028** — [Everything serialized is camelCase, except the `config.*` key vocabulary and upstream DTOs](0028-camelcase-except-the-config-vocabulary.md)
+- **0032** — [A job is cancelled by asking, at safe checkpoints — never by disconnecting](0032-jobs-are-cancelled-by-asking.md)
+- **0045** — [One event-callback slot per client `Session`](0045-one-event-callback-per-session.md)
+- **0063** — [An endpoint is scoped exactly as the data home behind it](0063-an-endpoint-is-scoped-like-its-data-home.md)
 
 ### [Cross-cutting foundations](../architecture/common.md)
 
 - **0002** — [Two log files, because one file cannot be both readable and complete](0002-two-log-files.md)
 - **0003** — [A crash must survive the process that had no console](0003-crash-reports-survive-the-process.md)
-- **0057** — [Materialised game files live under one `meta/` root](0057-meta-root-for-materialised-files.md)
+- **0054** — [Materialised game files live under one `meta/` root](0054-meta-root-for-materialised-files.md)
 
 ### [The engine](../architecture/engine.md)
 
-- **0027** — [A temp artifact is only valid while its job holds the claim — so a restart invalidates every one](0027-temp-artifacts-are-reclaimed-at-startup.md)
-- **0036** — [Supervision is engine state, and one stop reaches the whole tree](0036-supervision-is-engine-state.md)
-- **0037** — [Workloads outlive the daemon by design](0037-workloads-outlive-the-daemon.md)
-- **0038** — [A finished process is labelled, not merely unrecorded](0038-a-finished-process-is-tombstoned.md)
-- **0040** — [Following logs is scoped to the entry, not to one run of it](0040-following-logs-is-entry-scoped.md)
-- **0064** — [A managed document carries its own schema version, and an unreadable one is set aside](0064-a-managed-document-carries-its-schema-version.md)
-- **0066** — [The daemon owns self-update; the shell asks like everything else](0066-the-daemon-owns-self-update.md)
-- **0070** — [A channel picks the feed, not an entry inside one](0070-a-channel-picks-the-feed-not-the-entry.md)
-- **0071** — [Reachability is observed from real traffic, and offline is a state the whole system reads](0071-reachability-is-observed-not-asked.md)
-- **0072** — [The tray speaks the tray protocol, not a library that might be installed](0072-the-tray-speaks-the-tray-protocol.md)
+- **0024** — [A temp artifact is only valid while its job holds the claim — so a restart invalidates every one](0024-temp-artifacts-are-reclaimed-at-startup.md)
+- **0033** — [Supervision is engine state, and one stop reaches the whole tree](0033-supervision-is-engine-state.md)
+- **0034** — [Workloads outlive the daemon by design](0034-workloads-outlive-the-daemon.md)
+- **0035** — [A finished process is labelled, not merely unrecorded](0035-a-finished-process-is-tombstoned.md)
+- **0037** — [Following logs is scoped to the entry, not to one run of it](0037-following-logs-is-entry-scoped.md)
+- **0060** — [A managed document carries its own schema version, and an unreadable one is set aside](0060-a-managed-document-carries-its-schema-version.md)
+- **0062** — [The daemon owns self-update; the shell asks like everything else](0062-the-daemon-owns-self-update.md)
+- **0066** — [A channel picks the feed, not an entry inside one](0066-a-channel-picks-the-feed-not-the-entry.md)
+- **0067** — [Reachability is observed from real traffic, and offline is a state the whole system reads](0067-reachability-is-observed-not-asked.md)
+- **0068** — [The tray speaks the tray protocol, not a library that might be installed](0068-the-tray-speaks-the-tray-protocol.md)
 
 ### [The daemon](../architecture/daemon.md)
 
-- **0032** — [No Service-class-per-prefix — but one registrar function per domain](0032-one-registrar-per-domain.md)
-- **0033** — [Instances are gated on a signed-in account, in the router](0033-instance-surface-gated-on-an-account.md)
-- **0034** — [An aggregation point is a directory, not a file](0034-an-aggregation-point-is-a-directory.md)
-- **0039** — [Stopping the daemon has three meanings; the front-end picks one, the wire carries two](0039-stopping-the-daemon-has-three-meanings.md)
-- **0065** — [A job family declares what differs; the runner owns the rest](0065-a-job-declares-what-differs.md)
-- **0063** — [Discord presence belongs to the daemon, and is a loop rather than a hook](0063-discord-presence-is-a-daemon-loop.md)
+- **0029** — [No Service-class-per-prefix — but one registrar function per domain](0029-one-registrar-per-domain.md)
+- **0030** — [Instances are gated on a signed-in account, in the router](0030-instance-surface-gated-on-an-account.md)
+- **0031** — [An aggregation point is a directory, not a file](0031-an-aggregation-point-is-a-directory.md)
+- **0036** — [Stopping the daemon has three meanings; the front-end picks one, the wire carries two](0036-stopping-the-daemon-has-three-meanings.md)
+- **0061** — [A job family declares what differs; the runner owns the rest](0061-a-job-declares-what-differs.md)
+- **0059** — [Discord presence belongs to the daemon, and is a loop rather than a hook](0059-discord-presence-is-a-daemon-loop.md)
 
 ### [Minecraft providers](../architecture/minecraft.md)
 
@@ -66,24 +66,24 @@ the alternative you rejected — that is usually the part nobody can recover lat
 
 ### [Servers & instances](../architecture/entries.md)
 
-- **0021** — [The entry root is hestia's; `data/` is the game's](0021-entry-root-versus-data-dir.md)
-- **0022** — [Sync is a closed catalogue, and each unit names its own mechanism](0022-sync-is-a-closed-catalogue.md)
-- **0069** — [A synced unit reconciles against a baseline, not a clock](0069-sync-reconciles-against-a-baseline.md)
-- **0073** — [A unit shares only what its game version writes](0073-a-unit-shares-only-what-its-version-writes.md)
-- **0074** — [The merge writes the game's own file, not its own rendering of it](0074-the-merge-writes-the-games-own-file.md)
-- **0075** — [Options sync through a typed catalogue, not raw key-value pairs](0075-options-sync-through-a-typed-catalogue.md)
-- **0076** — [A pack syncs by identity, not by file — and only where it fits](0076-a-pack-syncs-by-identity.md)
-- **0077** — [Screenshots aggregate rather than sync — nothing is copied](0077-screenshots-aggregate-rather-than-sync.md)
-- **0023** — [The id is an opaque uuid; the directory is the slug — decoupled](0023-id-is-a-uuid-directory-is-a-slug.md)
-- **0024** — [Backups follow docker-mc-backup, minus what the launcher already owns](0024-backups-follow-docker-mc-backup.md)
-- **0025** — [A world describes itself; a directory listing does not](0025-a-world-describes-itself.md)
-- **0026** — [An unfinished record says which kind of unfinished, so recovery can act on it](0026-server-phase-over-a-ready-bool.md)
-- **0028** — [The properties schema is generated, not maintained — and it is not the file](0028-properties-schema-is-generated.md)
-- **0041** — [An instance runs many sessions; a server runs one](0041-an-instance-runs-many-sessions.md)
-- **0042** — [Per-session logs come from a generated Log4j2 config, not a captured pipe](0042-per-session-log4j-config.md)
-- **0056** — [Server provisioning is front-loaded by design](0056-server-provisioning-is-front-loaded.md)
-- **0059** — [The server console is RCON, not a stdin pipe](0059-the-console-is-rcon-not-a-pipe.md)
-- **0062** — [Joining directly is a launch parameter, not a second launch path](0062-joining-directly-is-a-launch-parameter.md)
+- **0018** — [The entry root is hestia's; `data/` is the game's](0018-entry-root-versus-data-dir.md)
+- **0019** — [Sync is a closed catalogue, and each unit names its own mechanism](0019-sync-is-a-closed-catalogue.md)
+- **0065** — [A synced unit reconciles against a baseline, not a clock](0065-sync-reconciles-against-a-baseline.md)
+- **0069** — [A unit shares only what its game version writes](0069-a-unit-shares-only-what-its-version-writes.md)
+- **0070** — [The merge writes the game's own file, not its own rendering of it](0070-the-merge-writes-the-games-own-file.md)
+- **0071** — [Options sync through a typed catalogue, not raw key-value pairs](0071-options-sync-through-a-typed-catalogue.md)
+- **0072** — [A pack syncs by identity, not by file — and only where it fits](0072-a-pack-syncs-by-identity.md)
+- **0073** — [Screenshots aggregate rather than sync — nothing is copied](0073-screenshots-aggregate-rather-than-sync.md)
+- **0020** — [The id is an opaque uuid; the directory is the slug — decoupled](0020-id-is-a-uuid-directory-is-a-slug.md)
+- **0021** — [Backups follow docker-mc-backup, minus what the launcher already owns](0021-backups-follow-docker-mc-backup.md)
+- **0022** — [A world describes itself; a directory listing does not](0022-a-world-describes-itself.md)
+- **0023** — [An unfinished record says which kind of unfinished, so recovery can act on it](0023-server-phase-over-a-ready-bool.md)
+- **0025** — [The properties schema is generated, not maintained — and it is not the file](0025-properties-schema-is-generated.md)
+- **0038** — [An instance runs many sessions; a server runs one](0038-an-instance-runs-many-sessions.md)
+- **0039** — [Per-session logs come from a generated Log4j2 config, not a captured pipe](0039-per-session-log4j-config.md)
+- **0053** — [Server provisioning is front-loaded by design](0053-server-provisioning-is-front-loaded.md)
+- **0055** — [The server console is RCON, not a stdin pipe](0055-the-console-is-rcon-not-a-pipe.md)
+- **0058** — [Joining directly is a launch parameter, not a second launch path](0058-joining-directly-is-a-launch-parameter.md)
 
 ### [Content & modpacks](../architecture/content.md)
 
@@ -94,31 +94,28 @@ the alternative you rejected — that is usually the part nobody can recover lat
 - **0014** — [Enable/disable, update-check, and pin extend the same model](0014-enable-update-check-and-pin.md)
 - **0015** — [A local-file import is inspected, not trusted](0015-local-imports-are-inspected.md)
 - **0016** — [Datapacks are world-of-record, not managed-dir-of-record](0016-datapacks-are-world-of-record.md)
-- **0017** — [A content profile is a selection, not a copy](0017-content-profile-is-a-selection.md)
-- **0018** — [A global profile stores project references, never jars](0018-global-profile-stores-references.md)
-- **0019** — [Settings capture is opt-in per profile, and scopes only settings](0019-profile-settings-capture.md)
-- **0068** — [A record of the user's is mutated, never rebuilt](0068-a-record-is-mutated-not-rebuilt.md)
+- **0064** — [A record of the user's is mutated, never rebuilt](0064-a-record-is-mutated-not-rebuilt.md)
 
 ### [Accounts & skins](../architecture/accounts.md)
 
-- **0020** — [Skins follow Modrinth's shape, minus its couplings — and skip the CLI](0020-skins-follow-modrinth-minus-couplings.md)
+- **0017** — [Skins follow Modrinth's shape, minus its couplings — and skip the CLI](0017-skins-follow-modrinth-minus-couplings.md)
 
 ### [Import & export](../architecture/transfer.md)
 
-- **0061** — [An archive format is a module, not a branch — and the launcher matches on the recipe](0061-an-archive-format-is-a-module.md)
+- **0057** — [An archive format is a module, not a branch — and the launcher matches on the recipe](0057-an-archive-format-is-a-module.md)
 
 ### [Front-ends](../architecture/frontends.md)
 
-- **0043** — [Entry-first, with verb-first shortcuts for the hot path](0043-entry-first-cli-grammar.md)
-- **0044** — [Every daemon capability gets a scriptable verb, or a written reason it has none](0044-every-capability-gets-a-verb.md)
-- **0045** — [`-vv` buys wire visibility, not more volume](0045-vv-buys-wire-visibility.md)
-- **0046** — [A state query answers through its exit code, not only its stdout](0046-state-queries-answer-through-exit-codes.md)
-- **0047** — [Interaction is fullscreen; bare progress is one line](0047-fullscreen-interaction-inline-progress.md)
-- **0049** — [The desktop bridge is one generic command, not a facade mirror](0049-desktop-bridge-is-one-generic-command.md)
-- **0050** — [Messages are organised on one axis — where the string is rendered — and split one file per root](0050-messages-organised-by-render-surface.md)
-- **0051** — [Sign-in is the one bespoke shell command — it must be](0051-sisu-sign-in-is-a-shell-command.md)
-- **0052** — [Front-end preferences are desktop-local, in the data home — not the daemon](0052-desktop-prefs-live-in-the-data-home.md)
-- **0053** — [Offline is one state, not a failure per read — and the shell brings its own daemon up](0053-offline-is-one-state.md)
-- **0054** — [The daemon spawns the tray; the tray outlives the daemon](0054-the-daemon-spawns-the-tray.md)
-- **0055** — [The tray and desktop must not share a GApplication id](0055-tray-and-desktop-app-ids.md)
-- **0060** — [Job progress paints once per frame, because the store re-renders synchronously](0060-job-progress-paints-once-per-frame.md)
+- **0040** — [Entry-first, with verb-first shortcuts for the hot path](0040-entry-first-cli-grammar.md)
+- **0041** — [Every daemon capability gets a scriptable verb, or a written reason it has none](0041-every-capability-gets-a-verb.md)
+- **0042** — [`-vv` buys wire visibility, not more volume](0042-vv-buys-wire-visibility.md)
+- **0043** — [A state query answers through its exit code, not only its stdout](0043-state-queries-answer-through-exit-codes.md)
+- **0044** — [Interaction is fullscreen; bare progress is one line](0044-fullscreen-interaction-inline-progress.md)
+- **0046** — [The desktop bridge is one generic command, not a facade mirror](0046-desktop-bridge-is-one-generic-command.md)
+- **0047** — [Messages are organised on one axis — where the string is rendered — and split one file per root](0047-messages-organised-by-render-surface.md)
+- **0048** — [Sign-in is the one bespoke shell command — it must be](0048-sisu-sign-in-is-a-shell-command.md)
+- **0049** — [Front-end preferences are desktop-local, in the data home — not the daemon](0049-desktop-prefs-live-in-the-data-home.md)
+- **0050** — [Offline is one state, not a failure per read — and the shell brings its own daemon up](0050-offline-is-one-state.md)
+- **0051** — [The daemon spawns the tray; the tray outlives the daemon](0051-the-daemon-spawns-the-tray.md)
+- **0052** — [The tray and desktop must not share a GApplication id](0052-tray-and-desktop-app-ids.md)
+- **0056** — [Job progress paints once per frame, because the store re-renders synchronously](0056-job-progress-paints-once-per-frame.md)

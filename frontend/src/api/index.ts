@@ -53,7 +53,6 @@ export * as modpack from './modpack';
 export * as net from './net';
 export * as prefs from './prefs';
 export * as process from './process';
-export * as profile from './profile';
 export * as screenshot from './screenshot';
 export * as server from './server';
 export * as skins from './skins';

@@ -50,7 +50,7 @@ nothing.
 
 One module per domain: `app`, `health`, `daemon`, `config`, `cache`, `download`,
 `java`, `accounts`, `skins`, `process`, `server`, `instance`, `backup`,
-`content`, `modpack`, `profile`, `sync`, `update`, `job`, `events`.
+`content`, `modpack`, `sync`, `update`, `job`, `events`.
 Three are shared vocabularies rather than domains of their own:
 
 - **`minecraft`** — what the `server` and `instance` domains have in common:
@@ -73,7 +73,7 @@ key conversion. Enum variant *values* stay `snake_case`/`lowercase`, because the
 frontend's string-literal union types depend on them. `tests/casing.rs` fails
 the build if a new serialized struct omits the attribute. The one deliberate
 exception is the `config.*` key vocabulary, which stays kebab-case
-([0031](../decisions/0031-camelcase-except-the-config-vocabulary.md)).
+([0028](../decisions/0028-camelcase-except-the-config-vocabulary.md)).
 
 Adding a channel is a struct plus an `impl Contract` — see
 [contributing.md](../contributing.md).
@@ -86,7 +86,7 @@ Carries bytes and nothing domain-specific.
 |---|---|
 | `transport.rs` | the platform socket (Unix domain socket / Windows named pipe), `bind`/`connect`, a length-framed `FrameReader`/`FrameWriter`, and `Peer` — the connection's verified identity (`uid` and `authorized()` on POSIX via peer credentials) |
 | `protocol.rs` | the JSON envelope, encoded and decoded in exactly one place. Request `{v, channel, payload, id?}`, response `{v, ok, payload \| error, id?}`, event `{event, payload}` |
-| `endpoint.rs` | where the socket lives — `$XDG_RUNTIME_DIR/hestia/hestiad.sock`, else `/tmp/hestia-<uid>/…`; a named pipe on Windows. A build carrying its own data home takes a name scoped to it (`common::paths::install_scope`), so a portable copy never meets an installed daemon on one socket ([0067](../decisions/0067-an-endpoint-is-scoped-like-its-data-home.md)). `HESTIA_SOCK` overrides it so tests and side-by-side daemons never collide |
+| `endpoint.rs` | where the socket lives — `$XDG_RUNTIME_DIR/hestia/hestiad.sock`, else `/tmp/hestia-<uid>/…`; a named pipe on Windows. A build carrying its own data home takes a name scoped to it (`common::paths::install_scope`), so a portable copy never meets an installed daemon on one socket ([0063](../decisions/0063-an-endpoint-is-scoped-like-its-data-home.md)). `HESTIA_SOCK` overrides it so tests and side-by-side daemons never collide |
 | `errors.rs` | the error-code vocabulary (`BAD_REQUEST`, `NOT_FOUND`, `UNKNOWN_CHANNEL`, `HANDLER_ERROR`, `VERSION_MISMATCH`, `UNAUTHORIZED`, …) and the client-facing `IpcError` |
 
 The **runtime directory** holding the ephemeral socket is deliberately distinct
@@ -134,12 +134,12 @@ Session also carries the **wire trace** — a `trace!` per frame sent and
 received with its channel, correlation id, byte size and round-trip time, plus
 connection transitions. That is what the CLI's `-vv` buys, for every front-end
 that links `client`. Payloads are never logged
-([0045](../decisions/0045-vv-buys-wire-visibility.md)).
+([0042](../decisions/0042-vv-buys-wire-visibility.md)).
 
 > **One event-callback slot per session.** `run_job` and `subscribe` both claim
 > it, so a driver must serialize event-driven calls — plain request/response
 > calls may interleave freely, but one job runs at a time
-> ([0048](../decisions/0048-one-event-callback-per-session.md)).
+> ([0045](../decisions/0045-one-event-callback-per-session.md)).
 
 ## Jobs, events and cancellation
 
@@ -165,12 +165,12 @@ done topic. Cancellation is an **explicit act** — one `job.cancel { id }`
 channel — and inside the engine it is cooperative and checkpointed, never a
 kill: stopping at a checkpoint leaves exactly what a network failure at the same
 point would have left, so the existing failure paths do the cleanup. A cancelled
-job is not an error ([0035](../decisions/0035-jobs-are-cancelled-by-asking.md)).
+job is not an error ([0032](../decisions/0032-jobs-are-cancelled-by-asking.md)).
 
 A client subscribes with `events.subscribe`, filtered by id. The filter also
 covers *session keys beneath* an entry key, which is what lets one subscription
 follow an instance across launches
-([0040](../decisions/0040-following-logs-is-entry-scoped.md)).
+([0037](../decisions/0037-following-logs-is-entry-scoped.md)).
 
 ## Failures and warnings
 
@@ -190,21 +190,21 @@ Two structured vocabularies, same discipline:
 than with its text, so it has its own `ipc::errors` code — and pinned offline
 (`OfflineMode`) is a separate variant, because the remedy is a setting to turn
 off rather than a connection to wait for
-([0071](../decisions/0071-reachability-is-observed-not-asked.md)).
+([0067](../decisions/0067-reachability-is-observed-not-asked.md)).
 
 Every warning variant carries a `hint()` beside its `Display` headline: a
 warning you cannot act on is noise, so the remediation is part of the type
 rather than something each front-end invents. And a warning about something the
 *launcher* did wrong is a bug to fix, not text to soften
-([0029](../decisions/0029-degraded-outcomes-ride-on-the-result.md),
-[0030](../decisions/0030-warnings-the-user-did-not-cause.md)).
+([0026](../decisions/0026-degraded-outcomes-ride-on-the-result.md),
+[0027](../decisions/0027-warnings-the-user-did-not-cause.md)).
 
 ## Decisions
 
 - [0001 — The envelope seam fails closed](../decisions/0001-envelope-fails-closed.md)
-- [0029 — A degraded outcome rides on the result](../decisions/0029-degraded-outcomes-ride-on-the-result.md)
-- [0030 — A warning the user did not cause is a bug](../decisions/0030-warnings-the-user-did-not-cause.md)
-- [0071 — Reachability is observed from real traffic, and offline is a state the whole system reads](../decisions/0071-reachability-is-observed-not-asked.md)
-- [0031 — camelCase everywhere, except the `config.*` vocabulary](../decisions/0031-camelcase-except-the-config-vocabulary.md)
-- [0035 — A job is cancelled by asking](../decisions/0035-jobs-are-cancelled-by-asking.md)
-- [0048 — One event-callback slot per session](../decisions/0048-one-event-callback-per-session.md)
+- [0026 — A degraded outcome rides on the result](../decisions/0026-degraded-outcomes-ride-on-the-result.md)
+- [0027 — A warning the user did not cause is a bug](../decisions/0027-warnings-the-user-did-not-cause.md)
+- [0067 — Reachability is observed from real traffic, and offline is a state the whole system reads](../decisions/0067-reachability-is-observed-not-asked.md)
+- [0028 — camelCase everywhere, except the `config.*` vocabulary](../decisions/0028-camelcase-except-the-config-vocabulary.md)
+- [0032 — A job is cancelled by asking](../decisions/0032-jobs-are-cancelled-by-asking.md)
+- [0045 — One event-callback slot per session](../decisions/0045-one-event-callback-per-session.md)

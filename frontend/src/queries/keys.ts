@@ -138,12 +138,6 @@ export const keys = {
     modpack: (id: string) => [...keys.instances.detail(id), 'modpack'] as const,
     exportContents: (id: string) =>
       [...keys.instances.detail(id), 'export-contents'] as const,
-    profiles: (id: string) =>
-      [...keys.instances.detail(id), 'profiles'] as const,
-  },
-  profiles: {
-    all: ['profiles'] as const,
-    list: () => [...keys.profiles.all, 'list'] as const,
   },
   content: {
     all: ['content'] as const,

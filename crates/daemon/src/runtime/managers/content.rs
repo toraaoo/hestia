@@ -31,11 +31,6 @@ pub enum ContentJob {
         item: String,
         version: String,
     },
-    /// Apply a global profile's references into an instance's pool.
-    ProfileApply {
-        instance_id: String,
-        profile: String,
-    },
 }
 
 /// Which entry a job is for, owned — the job outlives the request that asked
@@ -85,7 +80,6 @@ impl ContentJob {
             ContentJob::Add { entry, .. }
             | ContentJob::Update { entry, .. }
             | ContentJob::SetVersion { entry, .. } => entry.key(),
-            ContentJob::ProfileApply { instance_id, .. } => instance_process_id(instance_id),
         }
     }
 
@@ -103,7 +97,6 @@ impl ContentJob {
                 EntryKind::Server => "server-content-set-version",
                 EntryKind::Instance => "instance-content-set-version",
             },
-            ContentJob::ProfileApply { .. } => "profile-apply",
         }
     }
 
@@ -131,14 +124,6 @@ impl ContentJob {
                 .set_entry_content_version(entry.as_ref(), kind, &item, &version, on_progress)
                 .await
                 .map(|items| (items, Vec::new())),
-            ContentJob::ProfileApply {
-                instance_id,
-                profile,
-            } => {
-                engine
-                    .apply_global_profile(&instance_id, &profile, on_progress)
-                    .await
-            }
         }
     }
 }

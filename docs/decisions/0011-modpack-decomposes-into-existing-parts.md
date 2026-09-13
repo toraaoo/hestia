@@ -12,8 +12,8 @@ into things this codebase already has:
   path);
 - its **index files under a flat managed load dir** become ordinary pool items
   tagged `modpack:<project>`, so the launch-time mirror, the backup heal,
-  `content list`, per-item enable and per-item update all work on them unchanged
-  — the same origin-tag mechanism global profiles already use;
+  `content list`, per-item enable and per-item update all work on them
+  unchanged;
 - **everything else it ships** — its `overrides/`, plus any index file outside a
   managed dir — is written straight into `data/` and recorded in `modpack.json`.
 

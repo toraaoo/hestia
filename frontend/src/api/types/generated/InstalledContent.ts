@@ -19,8 +19,8 @@ iconUrl: string, installedUnix: number,
  */
 worlds: Array<string>, 
 /**
- * Who put the item in the pool: empty = user-installed; a global profile
- * apply tags its installs `profile:<name>`.
+ * Who put the item in the pool: empty = user-installed; a modpack tags
+ * its installs `modpack:<project>`.
  */
 origin: string, 
 /**

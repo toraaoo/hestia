@@ -61,7 +61,7 @@ paste a project link and it resolves.
   <img src="assets/screenshots/browse.png" alt="Browsing mods, packs and shaders" width="820">
 </p>
 
-**Keep it.** Everything installed lands in one pool you can update in place and slice into named profiles.
+**Keep it.** Everything installed lands in one pool you can update, pin, enable and remove in place.
 
 <p align="center">
   <img src="assets/screenshots/content.png" alt="An instance's installed content" width="820">

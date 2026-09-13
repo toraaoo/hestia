@@ -325,8 +325,8 @@ pub struct InstalledContent {
     /// managed file is mirrored into, empty meaning every world the entry has.
     /// Always empty for the other kinds, which mirror into one flat dir.
     pub worlds: Vec<String>,
-    /// Who put the item in the pool: empty = user-installed; a global profile
-    /// apply tags its installs `profile:<name>`.
+    /// Who put the item in the pool: empty = user-installed; a modpack tags
+    /// its installs `modpack:<project>`.
     pub origin: String,
     /// Whether the launch-time mirror places this item in the game's load dirs.
     /// A disabled item keeps its managed copy and provenance, and is not loaded.

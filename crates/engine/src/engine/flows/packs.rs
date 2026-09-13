@@ -109,8 +109,7 @@ impl Engine {
     }
 }
 
-/// Content a modpack or a profile supplied belongs to that thing, not to the
-/// player's library.
+/// Content a modpack supplied belongs to the pack, not to the player's library.
 fn is_the_players(item: &&InstalledContent) -> bool {
     item.origin.is_empty()
 }

@@ -113,10 +113,7 @@ export function ContentStep({
             }
           />
 
-          {/* A global profile stores project references, never files. */}
-          {target.type !== 'profile' && (
-            <FileImportButton onFiles={onAddFiles} />
-          )}
+          <FileImportButton onFiles={onAddFiles} />
         </>
       }
     >

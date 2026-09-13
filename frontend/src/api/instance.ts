@@ -20,11 +20,9 @@ import type {
   InstanceInfo,
   InstanceLaunchDoneEvent,
   InstanceLaunchParams,
-  InstanceProfileListResult,
   InstanceServerEditParams,
   InstanceServersWriteResult,
   InstanceUpdateParams,
-  Profile,
   ServerEntry,
   WorldInfo,
 } from './types/instance';
@@ -214,98 +212,6 @@ export const config = {
       { instance },
     );
     return result.entries;
-  },
-};
-
-/**
- * Per-instance content profiles: named selections over the installed pool,
- * enforced by the launch-time mirror reconcile. CRUD applies at the next
- * launch, so it is safe while the instance runs.
- */
-export const profiles = {
-  list(instance: string): Promise<InstanceProfileListResult> {
-    return call('instance.profile.list', { instance });
-  },
-
-  /** Seeded with every selectable pool item unless `seedFromPool` is false. */
-  create(
-    instance: string,
-    name: string,
-    seedFromPool = true,
-  ): Promise<Profile> {
-    return call('instance.profile.create', {
-      instance,
-      name,
-      seedFromPool,
-    });
-  },
-
-  /** Removing the active profile clears the active selection. */
-  async remove(instance: string, name: string): Promise<void> {
-    await call('instance.profile.remove', { instance, name });
-  },
-
-  rename(instance: string, name: string, newName: string): Promise<Profile> {
-    return call('instance.profile.rename', {
-      instance,
-      name,
-      newName,
-    });
-  },
-
-  /** Sets the active profile; an empty `name` clears it. */
-  async use(instance: string, name: string): Promise<void> {
-    await call('instance.profile.use', { instance, name });
-  },
-
-  /**
-   * Add/remove members by pool reference (project id, slug, filename, or
-   * title); a reference that matches nothing — or only a datapack — errors.
-   */
-  edit(
-    instance: string,
-    name: string,
-    add: string[] = [],
-    remove: string[] = [],
-  ): Promise<Profile> {
-    return call('instance.profile.edit', { instance, name, add, remove });
-  },
-
-  /**
-   * Capture the profile's own settings store (snapshotted from the global
-   * one); launches under it then sync settings against the captured store.
-   * The instance must be stopped.
-   */
-  async capture(instance: string, name: string): Promise<void> {
-    await call('instance.profile.capture', { instance, name });
-  },
-
-  /**
-   * Delete the profile's captured store; it inherits the global store again.
-   * The instance must be stopped.
-   */
-  async release(instance: string, name: string): Promise<void> {
-    await call('instance.profile.release', { instance, name });
-  },
-
-  /**
-   * Apply a **global** profile into the instance's pool — a content job:
-   * references not already present install at their newest compatible
-   * version, tagged `profile:<name>`; incompatible ones come back as
-   * failures. Applying never removes de-listed content. Refused on a running
-   * or busy instance.
-   */
-  apply(
-    instance: string,
-    profile: string,
-    job: JobRun,
-  ): Promise<ContentDoneEvent> {
-    return runJob<ContentDoneEvent>({
-      ...job,
-      topics: { done: 'content.done', error: 'content.error' },
-      start: () =>
-        call('instance.profile.apply', { instance, profile, id: job.id }),
-    });
   },
 };
 

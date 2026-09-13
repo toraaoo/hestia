@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils';
 
 /**
  * A selectable row shared by every modal that picks content or targets — the
- * install wizard's pick steps, a profile's member selection, the apply
- * picker. Works single- or multi-select: the caller owns the selection and
+ * install wizard's pick steps. Works single- or multi-select: the caller owns
+ * the selection and
  * `onSelect` fires on every click (toggle it for multi-select). A selected row
  * highlights whole and carries a trailing check.
  */

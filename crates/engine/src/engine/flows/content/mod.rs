@@ -21,7 +21,7 @@ pub(in crate::engine) use self::entry::EntryRef;
 use self::entry::{Entry, EntryContent, EntrySide};
 use self::manage::{list_content, remove_content, set_enabled};
 use super::phase_progress;
-use crate::content::{install, profiles};
+use crate::content::install;
 use crate::engine::Engine;
 use crate::minecraft::materialize::OnProgress;
 
@@ -84,16 +84,6 @@ impl Engine {
             );
         }
         let removed = remove_content(&ctx, kind, items, worlds)?;
-        // Content profiles are an instance concern, so only that side has
-        // selections to prune.
-        if ctx.side == EntrySide::Client {
-            let gone: Vec<String> = removed
-                .iter()
-                .filter(|i| profiles::selectable(i.kind))
-                .map(|i| i.filename.clone())
-                .collect();
-            profiles::prune(&ctx.entry_dir, &gone)?;
-        }
         Ok(removed.len())
     }
 
@@ -132,8 +122,7 @@ impl Engine {
     }
 
     /// The version-change path shared by update (empty pin) and set-version
-    /// (explicit pin): apply the change, then follow each item's filename move
-    /// in every content profile.
+    /// (explicit pin).
     async fn change_version(
         &self,
         entry: EntryRef<'_>,
@@ -143,21 +132,8 @@ impl Engine {
         on_progress: OnProgress<'_>,
     ) -> Result<Vec<InstalledContent>> {
         let (_, ctx) = self.content_ctx(entry)?;
-        let before = install::load(&ctx.entry_dir);
-        let updated = self
-            .update_content(&ctx, kind, items, pin, on_progress)
-            .await?;
-        if ctx.side == EntrySide::Client {
-            for new_item in &updated {
-                let old = before
-                    .iter()
-                    .find(|i| i.kind == new_item.kind && i.project_id == new_item.project_id);
-                if let Some(old) = old {
-                    profiles::remap(&ctx.entry_dir, &old.filename, &new_item.filename)?;
-                }
-            }
-        }
-        Ok(updated)
+        self.update_content(&ctx, kind, items, pin, on_progress)
+            .await
     }
 
     /// Enable or disable installed items matching `item`; a non-empty `worlds`
@@ -271,7 +247,7 @@ pub(in crate::engine::flows) fn resolve_all(
 fn origin_owner(origin: &str) -> String {
     match origin.split_once(':') {
         Some(("modpack", name)) => format!("modpack '{name}'"),
-        Some((_, name)) => format!("global profile '{name}'"),
+        Some((scope, name)) => format!("{scope} '{name}'"),
         None => format!("'{origin}'"),
     }
 }
@@ -282,7 +258,7 @@ mod tests {
 
     #[test]
     fn a_refusal_names_whatever_owns_the_item() {
-        assert_eq!(origin_owner("profile:starter"), "global profile 'starter'");
         assert_eq!(origin_owner("modpack:1KVo5zza"), "modpack '1KVo5zza'");
+        assert_eq!(origin_owner("hand-placed"), "'hand-placed'");
     }
 }

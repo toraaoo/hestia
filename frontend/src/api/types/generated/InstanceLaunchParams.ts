@@ -16,12 +16,6 @@ id: string,
  */
 newSession: boolean, 
 /**
- * A profile override for this launch only: empty uses the active profile,
- * the literal `none` launches with no profile. `none` (and empty) are
- * therefore reserved as profile names.
- */
-profile: string, 
-/**
  * Skip the menus and join a world or a server on start. Absent launches to
  * the title screen; the game only understands this from 1.20 on, so an
  * older instance refuses rather than silently ignoring it.

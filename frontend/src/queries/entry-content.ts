@@ -1,9 +1,9 @@
 /**
  * The per-entry content mutations, shared by servers and instances. The five
  * operations (`add`/`remove`/`update`/`enable`/`setVersion`) are identical
- * across both kinds bar the entry tag, the api namespace, the key prefixes,
- * and instance's extra `profiles` invalidation — so they live once here and
- * each domain file calls `entryContentFactories` with its own config.
+ * across both kinds bar the entry tag, the api namespace and the key prefixes —
+ * so they live once here and each domain file calls `entryContentFactories`
+ * with its own config.
  */
 import type { QueryKey } from '@tanstack/react-query';
 import type {
@@ -58,8 +58,6 @@ export interface EntryContentConfig {
   contentKey: (id: string) => QueryKey;
   /** The entry's footprint key (`keys.<kind>.info`). */
   infoKey: (id: string) => QueryKey;
-  /** Extra prefixes to sweep — instances add their `profiles(id)`. */
-  extraInvalidate?: (id: string) => QueryKey[];
 }
 
 /** The `content.*` mutation factories for one entry kind. */
@@ -67,7 +65,6 @@ export function entryContentFactories(cfg: EntryContentConfig) {
   const invalidates = (id: string): QueryKey[] => [
     cfg.contentKey(id),
     cfg.infoKey(id),
-    ...(cfg.extraInvalidate?.(id) ?? []),
   ];
   return {
     /** Refused on a running or busy entry. */

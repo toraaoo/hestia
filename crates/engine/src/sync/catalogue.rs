@@ -69,10 +69,6 @@ pub fn era(unit: SyncUnit, game_version: &str) -> &'static str {
     }
 }
 
-pub fn captured(unit: SyncUnit) -> bool {
-    matches!(unit, SyncUnit::Options)
-}
-
 /// Keys that describe the file, the machine or a moment, so a copy is wrong.
 pub const NEVER_SHARED_KEYS: &[&str] = &[
     "version",

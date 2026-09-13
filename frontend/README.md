@@ -41,9 +41,9 @@ Every multi-file directory carries an `index.ts` and is imported by directory,
 never by file (`@/features/skins/components`); siblings import each other
 relatively. Vocabulary two features share lives in `features/shared/`, which is
 a leaf — `shared/entry` is what a server and an instance both are, and
-`shared/content` is what the browse pages, the entry content tabs and the
-profiles resolve content kinds against. Nothing under `shared/` may import a
-feature, so the feature graph stays acyclic.
+`shared/content` is what the browse pages and the entry content tabs resolve
+content kinds against. Nothing under `shared/` may import a feature, so the
+feature graph stays acyclic.
 
 ## Working on it
 

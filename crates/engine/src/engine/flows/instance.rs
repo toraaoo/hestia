@@ -10,7 +10,7 @@ use proto::minecraft::{ConfigEntry, ProvisionPhase};
 use proto::warning::WarningInfo;
 
 use super::{effective_name, guard_downgrade, meta_dir};
-use crate::content::{install, profiles};
+use crate::content::install;
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
 use crate::minecraft::launch::{self, InstancePaths, LaunchAccount, LaunchPlan};
@@ -177,7 +177,6 @@ impl Engine {
             instance: reference,
             account,
             session_seq,
-            profile,
             reconcile,
             quick_play,
             offline,
@@ -194,11 +193,6 @@ impl Engine {
                 target,
             )?;
         }
-        let launch_profile = if reconcile {
-            profiles::resolve(&entry_dir, profile)?
-        } else {
-            None
-        };
         let (account, mut warnings) = self.launch_account(account, offline).await?;
 
         let java = self
@@ -266,20 +260,12 @@ impl Engine {
         std::fs::create_dir_all(&game_dir)
             .with_context(|| format!("cannot create {}", game_dir.display()))?;
         if reconcile {
-            // A captured profile scopes the settings units to its own store; an
-            // uncaptured one inherits the global store.
-            let store = launch_profile
-                .as_ref()
-                .filter(|p| p.captured)
-                .map(|p| profiles::store_dir(&entry_dir, &p.name));
-            let pass = self.instance_pass(&record, &game_dir, store.as_deref());
+            let pass = self.instance_pass(&record, &game_dir);
             let session = proto::naming::instance_session_id(&record.id, session_seq);
             warnings.extend(self.begin_instance_sync(&session, pass));
             warnings.extend(self.reconcile_packs(&record).await);
-            let selection: Option<std::collections::HashSet<String>> =
-                launch_profile.map(|p| p.members.into_iter().collect());
             let worlds = crate::instances::save_worlds(&game_dir);
-            install::sync(&entry_dir, &game_dir, selection.as_ref(), &worlds)?;
+            install::sync(&entry_dir, &game_dir, &worlds)?;
         }
         // After the sync pass: a legacy index mirrors into the game directory,
         // which that pass reconciles.
@@ -381,18 +367,14 @@ impl Engine {
     }
 }
 
-/// One launch's inputs: which instance, as whom, under which profile, and what
-/// it joins on start. A struct rather than a parameter list — the two `&str`s
-/// that mean entirely different things sit next to each other, and a caller
-/// naming them cannot swap them by accident.
+/// One launch's inputs: which instance, as whom, and what it joins on start. A
+/// struct rather than a parameter list — a caller naming its fields cannot swap
+/// two arguments that mean entirely different things.
 pub struct LaunchRequest<'a> {
     pub instance: &'a str,
     /// Account name or uuid; empty picks the sole signed-in one.
     pub account: &'a str,
     pub session_seq: u32,
-    /// A profile override for this launch: empty is the active profile, the
-    /// literal `none` is no profile.
-    pub profile: &'a str,
     /// Off skips the sync/mirror pass entirely — other sessions are already
     /// running, so the mirror is in use (jars are open, locked on Windows).
     pub reconcile: bool,

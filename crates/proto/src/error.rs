@@ -39,8 +39,6 @@ impl fmt::Display for EntryKind {
 pub enum Nameable {
     Server,
     Instance,
-    Profile,
-    GlobalProfile,
 }
 
 impl fmt::Display for Nameable {
@@ -48,26 +46,6 @@ impl fmt::Display for Nameable {
         f.write_str(match self {
             Nameable::Server => "server",
             Nameable::Instance => "instance",
-            Nameable::Profile => "profile",
-            Nameable::GlobalProfile => "global profile",
-        })
-    }
-}
-
-/// Which profile namespace a lookup missed.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
-#[serde(rename_all = "snake_case")]
-pub enum ProfileScope {
-    Instance,
-    Global,
-}
-
-impl fmt::Display for ProfileScope {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            ProfileScope::Instance => "instance",
-            ProfileScope::Global => "global",
         })
     }
 }
@@ -315,9 +293,6 @@ pub enum ErrorInfo {
     Busy {
         detail: String,
     },
-    ReservedName {
-        name: String,
-    },
     UnsupportedOperation {
         reason: Unsupported,
     },
@@ -362,10 +337,6 @@ pub enum ErrorInfo {
     },
     ContentNotFound {
         reference: String,
-    },
-    ProfileNotFound {
-        scope: ProfileScope,
-        name: String,
     },
     SkinNotFound {
         key: String,
@@ -438,12 +409,6 @@ pub enum ErrorInfo {
         name: String,
     },
     NoGamePort {
-        name: String,
-    },
-    ProfileAlreadyCaptured {
-        name: String,
-    },
-    ProfileNotCaptured {
         name: String,
     },
 
@@ -613,7 +578,6 @@ impl ErrorInfo {
             | ProcessNotFound { .. }
             | BackupNotFound { .. }
             | ContentNotFound { .. }
-            | ProfileNotFound { .. }
             | SkinNotFound { .. }
             | WorldNotFound { .. }
             | ServerListEntryNotFound { .. }
@@ -658,7 +622,6 @@ impl fmt::Display for ErrorInfo {
             NothingToDo { what } => write!(f, "nothing to {what}"),
             EulaRequired => write!(f, "accept the EULA to create a server"),
             Busy { detail } => write!(f, "{detail}"),
-            ReservedName { name } => write!(f, "'{name}' is a reserved name"),
             UnsupportedOperation { reason } => write!(f, "{reason}"),
             ContentKindRejected {
                 entry,
@@ -698,7 +661,6 @@ impl fmt::Display for ErrorInfo {
             ContentNotFound { reference } => {
                 write!(f, "no installed content matches '{reference}'")
             }
-            ProfileNotFound { scope, name } => write!(f, "no {scope} profile named '{name}'"),
             SkinNotFound { key } => write!(f, "no skin matches '{key}'"),
             WorldNotFound { world } => write!(f, "no world '{world}' in this instance"),
             ServerListEntryNotFound { reference } => write!(
@@ -728,10 +690,6 @@ impl fmt::Display for ErrorInfo {
             }
             NoConsole { name } => write!(f, "{name} has no console yet — restart it"),
             NoGamePort { name } => write!(f, "{name} has no game port allocated"),
-            ProfileAlreadyCaptured { name } => {
-                write!(f, "profile '{name}' already captured its settings")
-            }
-            ProfileNotCaptured { name } => write!(f, "profile '{name}' has no captured settings"),
             SignInRequired => write!(f, "sign in with a Microsoft account first"),
             SessionExpired { reference } => {
                 write!(f, "your sign-in for '{reference}' expired — sign in again")

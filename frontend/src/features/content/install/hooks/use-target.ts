@@ -11,7 +11,3 @@ export const TargetCtx = createContext<Target | null>(null);
 export function useTarget(): Target | null {
   return useContext(TargetCtx);
 }
-
-export function useIsProfileTarget(): boolean {
-  return useTarget()?.type === 'profile';
-}

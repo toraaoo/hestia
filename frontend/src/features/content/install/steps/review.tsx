@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { contentQueries } from '@/queries/content';
 
-import { useIsProfileTarget, useTarget } from '../hooks';
+import { useTarget } from '../hooks';
 import type { PickedFile } from '../lib';
 
 export function ReviewStep({
@@ -192,18 +192,15 @@ function ReviewItemRow({
   onRemove: () => void;
 }) {
   const target = useTarget();
-  const isProfile = useIsProfileTarget();
   const versions = useQuery({
     ...contentQueries.versions({
       source: project.source,
       project: projectRef(project),
       loader:
-        !isProfile && project.kind === 'mod'
-          ? (target?.flavor ?? undefined)
-          : undefined,
-      gameVersion: !isProfile ? target?.gameVersion || undefined : undefined,
+        project.kind === 'mod' ? (target?.flavor ?? undefined) : undefined,
+      gameVersion: target?.gameVersion || undefined,
     }),
-    enabled: !isProfile && projectRef(project).length > 0,
+    enabled: projectRef(project).length > 0,
   });
   const list = versions.data ?? [];
   const resolved = list.find((v) => v.id === versionId) ?? list[0];
@@ -222,23 +219,17 @@ function ReviewItemRow({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <SourceBadge source={project.source} />
-        {!isProfile && (
-          <>
-            {resolved && !versionId && (
-              <Badge variant="secondary" className="shrink-0">
-                {m['app.label.latest']()}
-              </Badge>
-            )}
-            {resolved && (
-              <VersionCombobox
-                versions={list}
-                value={resolved}
-                onChange={(v) =>
-                  onVersion(v && v.id !== list[0]?.id ? v.id : '')
-                }
-              />
-            )}
-          </>
+        {resolved && !versionId && (
+          <Badge variant="secondary" className="shrink-0">
+            {m['app.label.latest']()}
+          </Badge>
+        )}
+        {resolved && (
+          <VersionCombobox
+            versions={list}
+            value={resolved}
+            onChange={(v) => onVersion(v && v.id !== list[0]?.id ? v.id : '')}
+          />
         )}
         <RemoveButton onClick={onRemove} />
       </div>

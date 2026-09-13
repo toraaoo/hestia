@@ -8,17 +8,15 @@ import type {
   InstanceDetails,
   InstanceInfo,
   InstanceProfile,
-  Profile,
   ServerEntry,
 } from '@/api/types';
 
 import { jobIdOf, startJob } from '../job';
 import * as catalog from '../state/catalog';
-import * as content from '../state/content';
 import * as entries from '../state/entries';
 import * as processes from '../state/processes';
 import * as worlds from '../state/worlds';
-import { bool, fail, type Handlers, now, ok, str, strings } from '../support';
+import { bool, type Handlers, now, ok, str } from '../support';
 import { resolve as resolveAccount } from './account';
 import { configChannels, contentChannels } from './entry';
 
@@ -36,25 +34,6 @@ const withSessions = (instance: InstanceInfo): InstanceInfo => ({
 
 const instanceId = (payload: Record<string, unknown>): string =>
   entries.findInstance(str(payload, 'instance')).id;
-
-/** Per-instance content profiles: named selections over the installed pool. */
-const profiles = new Map<string, { active: string; profiles: Profile[] }>();
-
-const profilesOf = (id: string) => {
-  const existing = profiles.get(id);
-  if (existing) return existing;
-  const fresh = { active: '', profiles: [] as Profile[] };
-  profiles.set(id, fresh);
-  return fresh;
-};
-
-function findProfile(id: string, name: string): Profile {
-  const found = profilesOf(id).profiles.find(
-    (profile) => profile.name === name,
-  );
-  if (!found) fail('not_found', `no such profile: ${name}`);
-  return found;
-}
 
 export const channels: Handlers = {
   'instance.list': () => ({
@@ -202,80 +181,6 @@ export const channels: Handlers = {
     const session =
       str(p, 'session') || processes.sessionsOf(id).at(-1)?.id || '';
     return { lines: processes.logs(session, p.tail as number | undefined) };
-  },
-
-  'instance.profile.list': (p) => profilesOf(instanceId(p)),
-
-  'instance.profile.create': (p) => {
-    const id = instanceId(p);
-    const profile: Profile = {
-      name: str(p, 'name'),
-      members: bool(p, 'seedFromPool', true)
-        ? content.poolOf(id).map((item) => item.filename)
-        : [],
-      captured: false,
-    };
-    profilesOf(id).profiles.push(profile);
-    return profile;
-  },
-
-  'instance.profile.remove': (p) => {
-    const id = instanceId(p);
-    const store = profilesOf(id);
-    const name = str(p, 'name');
-    store.profiles = store.profiles.filter((profile) => profile.name !== name);
-    if (store.active === name) store.active = '';
-    return ok();
-  },
-
-  'instance.profile.rename': (p) => {
-    const profile = findProfile(instanceId(p), str(p, 'name'));
-    profile.name = str(p, 'newName');
-    return profile;
-  },
-
-  'instance.profile.use': (p) => {
-    profilesOf(instanceId(p)).active = str(p, 'name');
-    return ok();
-  },
-
-  'instance.profile.edit': (p) => {
-    const profile = findProfile(instanceId(p), str(p, 'name'));
-    const removed = new Set(strings(p, 'remove'));
-    profile.members = [
-      ...profile.members.filter((member) => !removed.has(member)),
-      ...strings(p, 'add'),
-    ];
-    return profile;
-  },
-
-  'instance.profile.capture': (p) => {
-    findProfile(instanceId(p), str(p, 'name')).captured = true;
-    return ok();
-  },
-
-  'instance.profile.release': (p) => {
-    findProfile(instanceId(p), str(p, 'name')).captured = false;
-    return ok();
-  },
-
-  // Applying a *global* profile is a content job: its references install into
-  // the pool tagged `profile:<name>`, and nothing is ever removed by it.
-  'instance.profile.apply': (p) => {
-    const id = instanceId(p);
-    const name = str(p, 'profile');
-    return startJob({
-      id: jobIdOf(p, 'profile-apply'),
-      family: 'content',
-      steps: [
-        { phase: 'resolving', detail: name },
-        { phase: 'content', detail: 'installing' },
-      ],
-      done: () => ({
-        items: content.install(id, 'mod', ['lithium'], `profile:${name}`),
-        failures: [],
-      }),
-    });
   },
 
   ...configChannels('instance', instanceId),

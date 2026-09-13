@@ -105,15 +105,15 @@ names. No I/O — which is what makes it unit-testable, and it is unit-tested.
 **`rcon`** is a minimal RCON client — connect, authenticate, one command per
 call. It is the server console's transport, chosen because it is
 re-establishable state that survives a daemon restart, where a stdin pipe is not
-([0059](../decisions/0059-the-console-is-rcon-not-a-pipe.md)).
+([0055](../decisions/0055-the-console-is-rcon-not-a-pipe.md)).
 
 **`world.rs`** reads a save's own `level.dat` (gzipped NBT, via `fastnbt`) so a
 world can describe itself rather than being reduced to a folder name
-([0025](../decisions/0025-a-world-describes-itself.md)).
+([0022](../decisions/0022-a-world-describes-itself.md)).
 
 **`log4j.rs`** generates the per-session logging config each instance launch runs
 under — Log4Shell-safe by construction
-([0042](../decisions/0042-per-session-log4j-config.md)).
+([0039](../decisions/0039-per-session-log4j-config.md)).
 
 ## Flavors that build their own jar
 

@@ -99,7 +99,6 @@ cozy.hestia (a zip)
 ├── content.json            the pool index — provenance survives the trip
 ├── modpack.json            the pack the instance runs, when it runs one
 ├── mods/ resourcepacks/ shaderpacks/ datapacks/
-├── profiles/               captured content profiles
 └── data/                   the game directory: config, options.txt, saves
 ```
 
@@ -168,7 +167,7 @@ already up — and opens the import dialog on it.
 
 ## Related decisions
 
-- [0061 — An archive format is a module, not a branch](../decisions/0061-an-archive-format-is-a-module.md)
+- [0057 — An archive format is a module, not a branch](../decisions/0057-an-archive-format-is-a-module.md)
 - [0013 — The managed dir is the record](../decisions/0013-managed-dir-of-record.md)
 - [0011 — A modpack decomposes into existing parts](../decisions/0011-modpack-decomposes-into-existing-parts.md)
-- [0024 — Backups follow docker-mc-backup](../decisions/0024-backups-follow-docker-mc-backup.md)
+- [0021 — Backups follow docker-mc-backup](../decisions/0021-backups-follow-docker-mc-backup.md)

@@ -69,7 +69,6 @@ async fn launch_once(client: &Client, options: &Launch<'_>) -> Result<InstanceLa
                     instance: options.reference,
                     account: options.account,
                     new_session: options.new_session,
-                    profile: "",
                     quick_play: options.quick_play.clone(),
                     offline: options.offline,
                 },

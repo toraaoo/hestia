@@ -46,7 +46,6 @@ impl InstanceLaunchManager {
         let LaunchOrder {
             instance_id,
             account,
-            profile,
             reconcile,
             quick_play,
             offline,
@@ -89,7 +88,6 @@ impl InstanceLaunchManager {
                         instance: &instance_id,
                         account: &account,
                         session_seq: seq,
-                        profile: &profile,
                         reconcile,
                         quick_play,
                         offline,
@@ -178,8 +176,6 @@ pub struct LaunchOrder {
     pub instance_id: String,
     /// Account name or uuid; empty picks the sole signed-in one.
     pub account: String,
-    /// Content-profile override for this launch (`none` = no profile).
-    pub profile: String,
     /// Off skips the sync/mirror pass — other sessions have the mirror in use.
     pub reconcile: bool,
     /// Join a world or server on start instead of the title screen.

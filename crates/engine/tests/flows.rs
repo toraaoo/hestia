@@ -412,7 +412,6 @@ fn launch<'a>(instance: &'a str, quick_play: Option<QuickPlay>) -> LaunchRequest
         instance,
         account: "",
         session_seq: 1,
-        profile: "",
         reconcile: true,
         quick_play,
         offline: false,

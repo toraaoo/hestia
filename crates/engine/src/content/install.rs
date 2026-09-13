@@ -19,7 +19,6 @@ use proto::download::HashAlgorithm;
 use serde::{Deserialize, Serialize};
 
 use crate::checksum::Hasher;
-use crate::content::profiles;
 use crate::registry;
 use crate::schema::Document;
 
@@ -187,28 +186,16 @@ pub(crate) fn mirror(source: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Reconcile the `data/` mirror with the index. With no `selection`, heal only:
-/// re-mirror every enabled indexed file whose `data/` copy is missing. With a
-/// selection (a profile's member filenames), members are mirrored and tracked
-/// non-members have their `data/` copy removed (the managed copy stays) —
-/// untracked files are never touched. A disabled item is treated like a
-/// non-member: kept out of `data/` regardless of selection, so this pass is the
-/// single enforcement point for the enabled flag. A datapack mirrors into each
-/// of `worlds` it targets (profiles never select one, since a world is shared
-/// across them) and is dropped from the worlds it no longer targets.
-pub(crate) fn sync(
-    entry_dir: &Path,
-    data_dir: &Path,
-    selection: Option<&HashSet<String>>,
-    worlds: &[String],
-) -> Result<()> {
+/// Reconcile the `data/` mirror with the index: re-mirror every enabled indexed
+/// file whose `data/` copy is missing, and keep a disabled one out of `data/` —
+/// this pass is the single enforcement point for the enabled flag. Untracked
+/// files are never touched. A datapack mirrors into each of `worlds` it targets
+/// and is dropped from the worlds it no longer targets.
+pub(crate) fn sync(entry_dir: &Path, data_dir: &Path, worlds: &[String]) -> Result<()> {
     let mut healed = 0u32;
     let mut removed = 0u32;
     for item in load(entry_dir) {
-        let excluded = !item.enabled
-            || (profiles::selectable(item.kind)
-                && selection.is_some_and(|members| !members.contains(&item.filename)));
-        let (mirrored, dropped) = place(entry_dir, data_dir, &item, worlds, excluded)?;
+        let (mirrored, dropped) = place(entry_dir, data_dir, &item, worlds, !item.enabled)?;
         healed += mirrored;
         removed += dropped;
     }
@@ -531,7 +518,7 @@ mod tests {
     }
 
     #[test]
-    fn sync_without_selection_heals_all_tracked_items() {
+    fn sync_heals_every_tracked_item() {
         let (_dir, entry, data) = temp_entry("healall");
         let items = vec![
             tracked(ContentKind::Mod, "sodium.jar"),
@@ -543,56 +530,14 @@ mod tests {
         save(&entry, items.clone()).unwrap();
         std::fs::remove_file(data.join("mods/sodium.jar")).unwrap();
 
-        sync(&entry, &data, None, &[]).unwrap();
+        sync(&entry, &data, &[]).unwrap();
 
         assert!(data.join("mods/sodium.jar").is_file());
         assert!(data.join("resourcepacks/cozy.zip").is_file());
     }
 
     #[test]
-    fn sync_with_selection_mirrors_members_and_removes_non_members() {
-        let (_dir, entry, data) = temp_entry("selection");
-        let items = vec![
-            tracked(ContentKind::Mod, "sodium.jar"),
-            tracked(ContentKind::Mod, "lithium.jar"),
-            tracked(ContentKind::ResourcePack, "cozy.zip"),
-        ];
-        for item in &items {
-            install_tracked(&entry, &data, item);
-        }
-        save(&entry, items).unwrap();
-        std::fs::remove_file(data.join("mods/sodium.jar")).unwrap();
-        std::fs::write(data.join("mods").join("hand-dropped.jar"), "mine").unwrap();
-
-        let members: HashSet<String> = ["sodium.jar".to_string()].into_iter().collect();
-        sync(&entry, &data, Some(&members), &[]).unwrap();
-
-        assert!(data.join("mods/sodium.jar").is_file(), "member mirrored");
-        assert!(
-            !data.join("mods/lithium.jar").exists(),
-            "non-member removed"
-        );
-        assert!(
-            !data.join("resourcepacks/cozy.zip").exists(),
-            "non-member resourcepack removed"
-        );
-        assert!(
-            data.join("mods/hand-dropped.jar").is_file(),
-            "untracked file untouched"
-        );
-        assert!(
-            entry.join("mods/lithium.jar").is_file(),
-            "managed copy stays"
-        );
-
-        // Clearing the selection mirrors everything back.
-        sync(&entry, &data, None, &[]).unwrap();
-        assert!(data.join("mods/lithium.jar").is_file());
-        assert!(data.join("resourcepacks/cozy.zip").is_file());
-    }
-
-    #[test]
-    fn datapacks_mirror_into_every_world_and_ignore_profile_selection() {
+    fn datapacks_mirror_into_every_world_they_target() {
         let (_dir, entry, data) = temp_entry("datapack");
         let mut pack = tracked(ContentKind::DataPack, "terralith.zip");
         pack.worlds = Vec::new();
@@ -600,13 +545,12 @@ mod tests {
         save(&entry, vec![pack.clone()]).unwrap();
         let worlds = vec!["saves/one".to_string(), "saves/two".to_string()];
 
-        let empty: HashSet<String> = HashSet::new();
-        sync(&entry, &data, Some(&empty), &worlds).unwrap();
+        sync(&entry, &data, &worlds).unwrap();
 
         for world in &worlds {
             assert!(
                 datapack_path(&data, world, &pack.filename).is_file(),
-                "mirrored into {world} despite the profile selection"
+                "not mirrored into {world}"
             );
         }
     }
@@ -626,7 +570,7 @@ mod tests {
         .unwrap();
         save(&entry, vec![pack.clone()]).unwrap();
 
-        sync(&entry, &data, None, &worlds).unwrap();
+        sync(&entry, &data, &worlds).unwrap();
 
         assert!(datapack_path(&data, "saves/one", &pack.filename).is_file());
         assert!(!datapack_path(&data, "saves/two", &pack.filename).exists());
@@ -640,7 +584,7 @@ mod tests {
         mod_item.enabled = false;
         save(&entry, vec![mod_item]).unwrap();
 
-        sync(&entry, &data, None, &[]).unwrap();
+        sync(&entry, &data, &[]).unwrap();
 
         assert!(
             !data.join("mods/sodium.jar").exists(),
@@ -661,7 +605,7 @@ mod tests {
         let worlds = vec!["saves/one".to_string(), "saves/two".to_string()];
         save(&entry, vec![pack.clone()]).unwrap();
 
-        sync(&entry, &data, None, &worlds).unwrap();
+        sync(&entry, &data, &worlds).unwrap();
 
         assert!(datapack_path(&data, "saves/one", &pack.filename).is_file());
         assert!(!datapack_path(&data, "saves/two", &pack.filename).exists());

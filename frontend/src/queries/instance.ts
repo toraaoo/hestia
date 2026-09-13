@@ -9,14 +9,12 @@
 import { queryOptions, useQuery } from '@tanstack/react-query';
 import type {
   ConfigEntry,
-  ContentDoneEvent,
   ContentKind,
   InstanceCreateParams,
   InstanceInfo,
   InstanceLaunchDoneEvent,
   InstanceServersWriteResult,
   InstanceUpdateParams,
-  Profile,
   QuickPlay,
   ResolveParams,
 } from '../api';
@@ -131,12 +129,6 @@ export const instanceQueries = {
       // A network resolve per item — refetch only when explicitly asked.
       staleTime: Number.POSITIVE_INFINITY,
       enabled: false,
-    }),
-  /** The active profile name and every content profile of the instance. */
-  profiles: (id: string) =>
-    queryOptions({
-      queryKey: keys.instances.profiles(id),
-      queryFn: () => api.profiles.list(id),
     }),
 };
 
@@ -257,89 +249,12 @@ export const instanceMutations = {
       mutationFn: ({ key, value }) => api.config.set(id, key, value),
       invalidates: () => [keys.instances.config(id)],
     }),
-  profiles: {
-    /** Seeded with every selectable pool item unless `seedFromPool` is false. */
-    create: (id: string) =>
-      mutation<Profile, { name: string; seedFromPool?: boolean }>({
-        mutationKey: [...keys.instances.profiles(id), 'create'],
-        mutationFn: ({ name, seedFromPool }) =>
-          api.profiles.create(id, name, seedFromPool),
-        invalidates: () => [keys.instances.profiles(id)],
-      }),
-    /** Removing the active profile clears the active selection. */
-    remove: (id: string) =>
-      mutation<void, string>({
-        mutationKey: [...keys.instances.profiles(id), 'remove'],
-        mutationFn: (name) => api.profiles.remove(id, name),
-        invalidates: () => [keys.instances.profiles(id)],
-      }),
-    rename: (id: string) =>
-      mutation<Profile, { name: string; newName: string }>({
-        mutationKey: [...keys.instances.profiles(id), 'rename'],
-        mutationFn: ({ name, newName }) =>
-          api.profiles.rename(id, name, newName),
-        invalidates: () => [keys.instances.profiles(id)],
-      }),
-    /** Sets the active profile (empty clears it); applied at the next launch. */
-    use: (id: string) =>
-      mutation<void, string>({
-        mutationKey: [...keys.instances.profiles(id), 'use'],
-        mutationFn: (name) => api.profiles.use(id, name),
-        invalidates: () => [keys.instances.profiles(id)],
-      }),
-    /** Add/remove members by pool reference. */
-    edit: (id: string) =>
-      mutation<Profile, { name: string; add?: string[]; remove?: string[] }>({
-        mutationKey: [...keys.instances.profiles(id), 'edit'],
-        mutationFn: ({ name, add, remove }) =>
-          api.profiles.edit(id, name, add, remove),
-        invalidates: () => [keys.instances.profiles(id)],
-      }),
-    /** Capture the profile's settings store; the instance must be stopped. */
-    capture: (id: string) =>
-      mutation<void, string>({
-        mutationKey: [...keys.instances.profiles(id), 'capture'],
-        mutationFn: (name) => api.profiles.capture(id, name),
-        invalidates: () => [keys.instances.profiles(id)],
-      }),
-    /** Release the captured store; the instance must be stopped. */
-    release: (id: string) =>
-      mutation<void, string>({
-        mutationKey: [...keys.instances.profiles(id), 'release'],
-        mutationFn: (name) => api.profiles.release(id, name),
-        invalidates: () => [keys.instances.profiles(id)],
-      }),
-    /**
-     * Apply a global profile into the pool — a content job; installs are
-     * tagged with the profile and never removed by a later apply.
-     */
-    apply: (id: string) =>
-      jobMutation<ContentDoneEvent, string>({
-        mutationKey: [...keys.instances.content(id), 'profile-apply'],
-        meta: (profile) => ({
-          kind: 'profile.apply',
-          label: `apply ${profile}`,
-          entry: { kind: 'instance', id },
-        }),
-        run: (profile, job) => api.profiles.apply(id, profile, job),
-        invalidates: () => [
-          keys.instances.content(id),
-          keys.instances.profiles(id),
-          keys.instances.info(id),
-        ],
-      }),
-  },
-  /**
-   * Instances take mods, resourcepacks, shaders, and datapacks. A
-   * remove/update/pin can drop or remap a member's filename in every profile,
-   * so the instance also sweeps its `profiles(id)` key.
-   */
+  /** Instances take mods, resourcepacks, shaders, and datapacks. */
   content: entryContentFactories({
     kind: 'instance',
     api: api.content,
     contentKey: keys.instances.content,
     infoKey: keys.instances.info,
-    extraInvalidate: (id) => [keys.instances.profiles(id)],
   }),
 };
 

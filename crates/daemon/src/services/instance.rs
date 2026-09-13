@@ -2,18 +2,16 @@
 //! launch over the supervisor, and the per-instance JVM settings. Backups live
 //! in `backup`, content installs in `content`.
 
-use proto::error::{EntryKind, ErrorInfo, Field, ProfileScope};
+use proto::error::{EntryKind, ErrorInfo, Field};
 use proto::instance::{
     AddressPing, InstanceConfigGet, InstanceConfigGetResult, InstanceConfigList,
     InstanceConfigListResult, InstanceConfigSet, InstanceCreate, InstanceCreateResult,
     InstanceFlavors, InstanceInfoQuery, InstanceLaunch, InstanceLaunchResult, InstanceList,
-    InstanceListResult, InstanceLoaders, InstanceLogs, InstanceProfileCapture,
-    InstanceProfileCreate, InstanceProfileEdit, InstanceProfileList, InstanceProfileListResult,
-    InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename, InstanceProfileUse,
-    InstanceRemove, InstanceRename, InstanceResolve, InstanceServerEdit, InstanceServerRemove,
-    InstanceServers, InstanceServersArrange, InstanceServersResult, InstanceServersWriteResult,
-    InstanceStop, InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds,
-    InstanceWorldsResult, ServerEntry,
+    InstanceListResult, InstanceLoaders, InstanceLogs, InstanceRemove, InstanceRename,
+    InstanceResolve, InstanceServerEdit, InstanceServerRemove, InstanceServers,
+    InstanceServersArrange, InstanceServersResult, InstanceServersWriteResult, InstanceStop,
+    InstanceUpdate, InstanceUpdateResult, InstanceVersions, InstanceWorlds, InstanceWorldsResult,
+    ServerEntry,
 };
 use proto::minecraft::{ConfigEntry, FlavorsResult, LoadersResult, VersionsResult};
 use proto::process::ProcessLogsResult;
@@ -260,27 +258,9 @@ pub(super) fn register(on: &mut Channels<'_>) {
                 });
             }
         }
-        // A concurrent session runs against the mirror the live sessions use
-        // (the reconcile is skipped), so a profile override that differs from
-        // the active one cannot be honoured.
-        if running && !p.profile.is_empty() {
-            let (active, _) = ctx
-                .runtime
-                .engine()
-                .instance_profiles(&record.id)
-                .map_err(crate::runtime::engine_error)?;
-            let requested = if p.profile == "none" { "" } else { &p.profile };
-            if !requested.eq_ignore_ascii_case(&active) {
-                return Err(ErrorInfo::EntryRunning {
-                    entry: EntryKind::Instance,
-                    name: record.name.clone(),
-                });
-            }
-        }
         match ctx.runtime.instance_launches().start(LaunchOrder {
             instance_id: record.id,
             account: p.account,
-            profile: p.profile,
             reconcile: !running,
             quick_play: p.quick_play,
             offline: p.offline,
@@ -377,97 +357,5 @@ pub(super) fn register(on: &mut Channels<'_>) {
             .map(|(key, value)| ConfigEntry { key, value })
             .collect();
         Ok(InstanceConfigListResult { entries })
-    });
-
-    // Profile CRUD is metadata-safe while the instance runs (a change applies
-    // at the next launch); only seeding reads the pool, so only create guards
-    // against an in-flight content job.
-    on.handle::<InstanceProfileList, _, _>(|p, ctx| async move {
-        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
-        let (active, profiles) = ctx
-            .runtime
-            .engine()
-            .instance_profiles(&record.id)
-            .map_err(crate::runtime::engine_error)?;
-        Ok(InstanceProfileListResult { active, profiles })
-    });
-
-    on.handle::<InstanceProfileCreate, _, _>(|p, ctx| async move {
-        // Seeding copies the pool, so it waits on whatever is writing it; a
-        // metadata-only create waits on nothing.
-        let intent = match p.seed_from_pool {
-            true => Intent::Backup,
-            false => Intent::Read,
-        };
-        let record = instance_for(&ctx, &p.instance, intent)?;
-        let profile = ctx
-            .runtime
-            .engine()
-            .create_instance_profile(&record.id, &p.name, p.seed_from_pool)
-            .map_err(crate::runtime::engine_error)?;
-        tracing::info!(instance = %record.id, profile = %profile.name, "profile created");
-        Ok(profile)
-    });
-
-    on.handle::<InstanceProfileRemove, _, _>(|p, ctx| async move {
-        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
-        ctx.runtime
-            .engine()
-            .remove_instance_profile(&record.id, &p.name)
-            .map_err(|_| ErrorInfo::ProfileNotFound {
-                scope: ProfileScope::Instance,
-                name: p.name.clone(),
-            })?;
-        tracing::info!(instance = %record.id, profile = %p.name, "profile removed");
-        Ok(Empty {})
-    });
-
-    on.handle::<InstanceProfileRename, _, _>(|p, ctx| async move {
-        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
-        ctx.runtime
-            .engine()
-            .rename_instance_profile(&record.id, &p.name, &p.new_name)
-            .map_err(crate::runtime::engine_error)
-    });
-
-    on.handle::<InstanceProfileUse, _, _>(|p, ctx| async move {
-        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
-        ctx.runtime
-            .engine()
-            .use_instance_profile(&record.id, &p.name)
-            .map_err(crate::runtime::engine_error)?;
-        tracing::info!(instance = %record.id, profile = %p.name, "active profile changed");
-        Ok(Empty {})
-    });
-
-    on.handle::<InstanceProfileEdit, _, _>(|p, ctx| async move {
-        let record = instance_for(&ctx, &p.instance, Intent::Read)?;
-        ctx.runtime
-            .engine()
-            .edit_instance_profile(&record.id, &p.name, &p.add, &p.remove)
-            .map_err(crate::runtime::engine_error)
-    });
-
-    // Capture/release move real settings trees (and a released store may be
-    // what a live session's `config` link writes through), so both require a
-    // stopped instance — unlike the metadata-only CRUD above.
-    on.handle::<InstanceProfileCapture, _, _>(|p, ctx| async move {
-        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
-        ctx.runtime
-            .engine()
-            .capture_instance_profile(&record.id, &p.name)
-            .map_err(crate::runtime::engine_error)?;
-        tracing::info!(instance = %record.id, profile = %p.name, "profile settings captured");
-        Ok(Empty {})
-    });
-
-    on.handle::<InstanceProfileRelease, _, _>(|p, ctx| async move {
-        let record = instance_for(&ctx, &p.instance, Intent::Mutate)?;
-        ctx.runtime
-            .engine()
-            .release_instance_profile(&record.id, &p.name)
-            .map_err(crate::runtime::engine_error)?;
-        tracing::info!(instance = %record.id, profile = %p.name, "profile settings released");
-        Ok(Empty {})
     });
 }

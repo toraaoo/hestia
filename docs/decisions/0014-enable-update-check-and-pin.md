@@ -5,9 +5,9 @@
 Beyond add/list/remove/update, an installed item carries an `enabled` flag
 (`content.json`, defaulting true so old records decode enabled) toggled by
 `server|instance.content.enable`. Disabling is enforced at the *single* point
-the flag needs: the launch-time mirror `sync` treats a disabled item like a
-profile non-member — kept out of `data/` — so a disabled mod is never loaded and
-a backup restore can't resurrect it; the toggle also applies the filesystem
+the flag needs: the launch-time mirror `sync` keeps a disabled item out of
+`data/`, so a disabled mod is never loaded and a backup restore can't resurrect
+it; the toggle also applies the filesystem
 change immediately (the entry is stopped) so the state is visible before the
 next start. A datapack has no mirror, so it disables by the standard `.disabled`
 rename inside its world (Minecraft ignores the suffix), which the world backup

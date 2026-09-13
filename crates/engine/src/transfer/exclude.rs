@@ -138,7 +138,7 @@ mod tests {
             "content.json",
             "modpack.json",
             "mods/sodium.jar",
-            "profiles/vanilla/options.txt",
+            "data/servers.dat",
             "data/options.txt",
             "data/config/sodium.json",
             "data/saves/world/level.dat",

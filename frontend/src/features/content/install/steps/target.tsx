@@ -54,11 +54,7 @@ export function TargetStep({
               key={t.id}
               icon={entryIcon(t.type)}
               title={t.name}
-              subtitle={
-                t.type === 'profile'
-                  ? entryTypeLabel(t.type)
-                  : `${entryTypeLabel(t.type)} · ${t.flavor} · ${t.gameVersion}`
-              }
+              subtitle={`${entryTypeLabel(t.type)} · ${t.flavor} · ${t.gameVersion}`}
               badge={t.running ? m['content.stop_to_install']() : undefined}
               disabled={t.running}
               selected={selectedId === t.id}

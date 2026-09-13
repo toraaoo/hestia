@@ -166,7 +166,7 @@ mod tests {
             },
             Holding {
                 worlds: vec!["saves/hardcore".to_string()],
-                origin: "profile:kitchen-sink".to_string(),
+                origin: "modpack:kitchen-sink".to_string(),
                 enabled: false,
                 disabled_worlds: vec!["saves/hardcore".to_string()],
             },

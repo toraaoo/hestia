@@ -10,31 +10,21 @@ use proto::sync::{
 };
 use proto::warning::WarningInfo;
 
-use crate::content::profiles;
 use crate::engine::Engine;
 use crate::instances::InstanceRecord;
-use crate::sync::{Pass, Scope};
+use crate::sync::Pass;
 
 impl Engine {
     pub fn sync_config(&self) -> SyncConfig {
         self.sync.config()
     }
 
-    pub(crate) fn instance_pass(
-        &self,
-        record: &InstanceRecord,
-        data_dir: &Path,
-        profile_store: Option<&Path>,
-    ) -> Pass {
-        let scope = match profile_store {
-            Some(store) => Scope::Profile(store.to_path_buf()),
-            None => Scope::Shared,
-        };
-        pass(record, data_dir, scope)
+    pub(crate) fn instance_pass(&self, record: &InstanceRecord, data_dir: &Path) -> Pass {
+        pass(record, data_dir)
     }
 
     /// Reconcile for a launching session and record what it reconciled, so the
-    /// pass that runs when the session exits uses the same scope.
+    /// pass that runs when the session exits reconciles the same way.
     pub(crate) fn begin_instance_sync(&self, session: &str, pass: Pass) -> Vec<WarningInfo> {
         let warnings = self.sync.apply(&pass);
         self.sync.remember(session, pass);
@@ -69,14 +59,8 @@ impl Engine {
             if self.running_sessions(&record.id) > 0 {
                 continue;
             }
-            let entry_dir = self.instances.instance_dir(&record);
-            let store = profiles::resolve(&entry_dir, "")
-                .ok()
-                .flatten()
-                .filter(|profile| profile.captured)
-                .map(|profile| profiles::store_dir(&entry_dir, &profile.name));
             let data_dir = self.instances.data_dir(&record);
-            let pass = self.instance_pass(&record, &data_dir, store.as_deref());
+            let pass = self.instance_pass(&record, &data_dir);
             for warning in self.sync.apply(&pass) {
                 tracing::debug!(instance = %record.name, warning = %warning, "idle sync");
             }
@@ -238,7 +222,7 @@ impl Engine {
         tracing::info!(instance = %record.name, "instance sync overrides changed");
         if self.running_sessions(&record.id) == 0 {
             let data_dir = self.instances.data_dir(&record);
-            let pass = self.instance_pass(&record, &data_dir, None);
+            let pass = self.instance_pass(&record, &data_dir);
             self.sync.apply(&pass);
         }
         Ok(self.instance_sync_status(&record))
@@ -246,7 +230,7 @@ impl Engine {
 
     fn instance_sync_status(&self, record: &InstanceRecord) -> InstanceSyncStatus {
         let data_dir = self.instances.data_dir(record);
-        let pass = pass(record, &data_dir, Scope::Shared);
+        let pass = pass(record, &data_dir);
         InstanceSyncStatus {
             id: record.id.clone(),
             name: record.name.clone(),
@@ -256,13 +240,12 @@ impl Engine {
     }
 }
 
-fn pass(record: &InstanceRecord, data_dir: &Path, scope: Scope) -> Pass {
+fn pass(record: &InstanceRecord, data_dir: &Path) -> Pass {
     Pass {
         id: record.id.clone(),
         name: record.name.clone(),
         game_version: record.profile.game_version.clone(),
         data_dir: data_dir.to_path_buf(),
-        scope,
         overrides: record.sharing.clone(),
     }
 }

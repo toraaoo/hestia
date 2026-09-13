@@ -55,7 +55,7 @@ them:
   logic except over the wire. `cargo tree -i engine` shows exactly one consumer.
 - **Workloads outlive the launcher.** A running server or game session is not a
   child the daemon kills on exit. Stopping one is always something you asked
-  for — see [0037](decisions/0037-workloads-outlive-the-daemon.md).
+  for — see [0034](decisions/0034-workloads-outlive-the-daemon.md).
 
 | Front-end | Binary | Stack | What it is for |
 |---|---|---|---|
@@ -98,7 +98,7 @@ flowchart TD
   verbatim by both sides. **`ipc`** is the *how* — framing, the envelope, where
   the socket lives. Neither knows anything launcher-specific; `ipc` reads
   `common` only to scope the endpoint to the running install
-  ([0067](decisions/0067-an-endpoint-is-scoped-like-its-data-home.md)).
+  ([0063](decisions/0063-an-endpoint-is-scoped-like-its-data-home.md)).
 - **`client`** re-exports `proto`, so a front-end takes one dependency and gets
   both the SDK and the domain types.
 - **`engine`** never links `ipc` or `client`. It does not know a socket exists —
@@ -154,7 +154,6 @@ real directory.
 ├── servers/<id>/        one directory per server   ── yours
 ├── instances/<id>/      one directory per instance ──
 ├── skins/               the skin library
-├── profiles/            global content profiles
 ├── shared/              the shared settings store (sync)
 ├── java/                installed Java runtimes
 ├── meta/                materialised game files — regenerable
@@ -166,7 +165,7 @@ real directory.
 ```
 
 Everything under `meta/` and `cache/` is derived and re-downloadable — one
-obvious unit to reclaim ([0057](decisions/0057-meta-root-for-materialised-files.md)).
+obvious unit to reclaim ([0054](decisions/0054-meta-root-for-materialised-files.md)).
 
 ## Subsystem pages
 
@@ -178,7 +177,7 @@ obvious unit to reclaim ([0057](decisions/0057-meta-root-for-materialised-files.
 | [The daemon](architecture/daemon.md) | the serve loop, router, runtime, job managers, service registrars, autostart |
 | [Minecraft providers](architecture/minecraft.md) | flavors, version catalogues, profile resolution, materialize, launch plans, RCON |
 | [Servers & instances](architecture/entries.md) | entry stores, directory layout, provisioning, ports, backups, sync, worlds |
-| [Content & modpacks](architecture/content.md) | content sources, the managed-dir install model, datapacks, content profiles, modpacks |
+| [Content & modpacks](architecture/content.md) | content sources, the managed-dir install model, datapacks, modpacks |
 | [Import & export](architecture/transfer.md) | archive formats, detection, what an archive carries, importing another launcher's instance |
 | [Accounts & skins](architecture/accounts.md) | Microsoft sign-in, token rotation, the skin library |
 | [Front-ends](architecture/frontends.md) | CLI grammar and presentation, the desktop bridge and query layer, the tray |
@@ -198,9 +197,9 @@ server management with an RCON console · instance management with concurrent
 sessions · joining a world or a listed server straight from a launch · in-place
 version updates both ways · server backups, on demand and
 scheduled · content install and management from Modrinth, CurseForge, a URL or a
-local file · modpacks into a new or existing entry · per-instance content
-profiles and global profiles · instance import and export (hestia, `.mrpack`,
-Prism/MultiMC) · shared instance settings (`sync`) · self-update and
+local file · modpacks into a new or existing entry · instance import and export
+(hestia, `.mrpack`, Prism/MultiMC) · shared instance settings (`sync`) ·
+self-update and
 the announcement feed · network reachability as a first-class state, with
 offline launch and cached version catalogues · the legacy client era, both its
 unpacked natives and its named asset tree · the CLI over all of it · the desktop
@@ -211,27 +210,27 @@ their unpacked natives and their pre-hash asset layout.
 
 ## Conventions that hold everywhere
 
-- **The disk is the registry.** Java runtimes, backups, servers, instances,
-  global profiles and finished processes are all discovered by scanning a
-  directory, not by consulting a separate index that can disagree with it.
+- **The disk is the registry.** Java runtimes, backups, servers, instances and
+  finished processes are all discovered by scanning a directory, not by
+  consulting a separate index that can disagree with it.
 - **Write through a temp, rename to commit.** Downloads, backups, installs and
   every persisted record stage to `.part`/`.staging` and rename on success, so a
   failure leaves nothing half-written — and a restart reclaims anything abandoned
-  ([0027](decisions/0027-temp-artifacts-are-reclaimed-at-startup.md)).
+  ([0024](decisions/0024-temp-artifacts-are-reclaimed-at-startup.md)).
 - **A document says which schema it is.** Everything of the user's on disk carries
   a `schemaVersion` and migrates forward as it is read; one this build cannot read
   is set aside, never overwritten
-  ([0064](decisions/0064-a-managed-document-carries-its-schema-version.md)).
+  ([0060](decisions/0060-a-managed-document-carries-its-schema-version.md)).
 - **Validate at the edge.** Payloads decode through the contract; the config
   schema rejects unknown keys; paths from a client are checked for escape.
 - **Wire-in is one line, in one place** — but that place is a module *directory*,
   never a growing file
-  ([0034](decisions/0034-an-aggregation-point-is-a-directory.md)).
+  ([0031](decisions/0031-an-aggregation-point-is-a-directory.md)).
 - **Errors are typed.** `thiserror` enums in libraries, mapped to an
   `ipc::errors` code at the service boundary; `anyhow` at binary edges and for
   multi-step engine operations. A degraded-but-successful outcome rides on the
   result as a structured warning, never only in the log
-  ([0029](decisions/0029-degraded-outcomes-ride-on-the-result.md)).
+  ([0026](decisions/0026-degraded-outcomes-ride-on-the-result.md)).
 - **Never log tokens or secrets.** Access tokens and RCON passwords never reach a
   log line, including the `-vv` wire trace, which reports frame sizes rather than
   contents. A launch must put the account's token in the game's argv, so that one

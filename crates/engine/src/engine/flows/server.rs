@@ -181,7 +181,6 @@ impl Engine {
         install::sync(
             &self.servers.server_dir(&record),
             &data_dir,
-            None,
             &[crate::servers::level_name(&data_dir)],
         )?;
         let java = self.installed_java(record.profile.java_major)?;

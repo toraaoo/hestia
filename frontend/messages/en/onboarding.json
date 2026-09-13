@@ -45,26 +45,12 @@
           "body": "Launch straight into the game, into a world, or onto a server. Several sessions of one instance can run at once.",
           "title": "Play it"
         },
-        "profiles": {
-          "body": "Slice the installed pool into named sets and switch between them without reinstalling anything.",
-          "title": "Profiles"
-        },
         "worlds": {
           "body": "Your saves, with the option to share them across instances rather than copying them around.",
           "title": "Worlds"
         }
       },
       "next": "Next",
-      "profiles": {
-        "create": {
-          "body": "Build one here, then apply it to any instance that matches its game version.",
-          "title": "Make one"
-        },
-        "what": {
-          "body": "A global profile is a named set of mods, shaders and resource packs you can apply to any instance — one place to keep the loadout you always use.",
-          "title": "Loadouts you reuse"
-        }
-      },
       "progress": "Step {current} of {total}",
       "replay": "Show the tour for this page",
       "server": {
@@ -99,7 +85,7 @@
           "title": "Running in the background"
         },
         "nav": {
-          "body": "Library holds what you have. Browse finds content. Instances, Servers, Profiles and Skins each get a page of their own.",
+          "body": "Library holds what you have. Browse finds content. Instances, Servers and Skins each get a page of their own.",
           "title": "Finding your way"
         },
         "play": {

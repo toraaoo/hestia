@@ -22,18 +22,9 @@ use proto::warning::WarningInfo;
 
 use state::Catalogue;
 
-/// Agreements live inside the store they describe, so a captured profile
-/// carries its own and `release` takes them with it.
 const BASELINES: &str = ".baselines";
 
 const BACKUPS: &str = ".backups";
-
-#[derive(Clone, Default, PartialEq, Eq)]
-pub enum Scope {
-    #[default]
-    Shared,
-    Profile(PathBuf),
-}
 
 #[derive(Clone)]
 pub struct Pass {
@@ -41,7 +32,6 @@ pub struct Pass {
     pub name: String,
     pub game_version: String,
     pub data_dir: PathBuf,
-    pub scope: Scope,
     pub overrides: SyncOverrides,
 }
 
@@ -232,10 +222,9 @@ impl Sync {
         shared: &Path,
         catalogue: &Catalogue,
     ) -> Result<()> {
-        let root = self.store_root(unit, pass, shared);
         let era = catalogue::era(unit, &pass.game_version);
-        let store = in_era(&root, era);
-        let baselines = in_era(&root.join(BASELINES).join(&pass.id), era);
+        let store = in_era(shared, era);
+        let baselines = in_era(&shared.join(BASELINES).join(&pass.id), era);
         std::fs::create_dir_all(&baselines)
             .with_context(|| format!("cannot create {}", baselines.display()))?;
         let Some(file) = catalogue::file(unit) else {
@@ -307,10 +296,7 @@ impl Sync {
             return UnitState::Synced;
         };
         let agreed = in_era(
-            &self
-                .store_root(unit, pass, shared)
-                .join(BASELINES)
-                .join(&pass.id),
+            &shared.join(BASELINES).join(&pass.id),
             catalogue::era(unit, &pass.game_version),
         )
         .join(file);
@@ -355,40 +341,6 @@ impl Sync {
             if let Err(e) = std::fs::remove_dir_all(&dir) {
                 tracing::warn!(instance = id, error = %e, "cannot drop the sync baselines");
             }
-        }
-    }
-
-    pub fn capture(&self, profile_store: &Path) -> Result<()> {
-        let shared = self.dir();
-        std::fs::create_dir_all(profile_store)
-            .with_context(|| format!("cannot create {}", profile_store.display()))?;
-        for &unit in catalogue::ALL
-            .iter()
-            .filter(|unit| catalogue::captured(**unit))
-        {
-            let Some(file) = catalogue::file(unit) else {
-                continue;
-            };
-            let source = shared.join(file);
-            if source.is_file() {
-                reconcile::copy_file(&source, &profile_store.join(file))?;
-            }
-        }
-        Ok(())
-    }
-
-    pub fn release(&self, profile_store: &Path) -> Result<()> {
-        if profile_store.symlink_metadata().is_ok() {
-            std::fs::remove_dir_all(profile_store)
-                .with_context(|| format!("cannot remove {}", profile_store.display()))?;
-        }
-        Ok(())
-    }
-
-    fn store_root(&self, unit: SyncUnit, pass: &Pass, shared: &Path) -> PathBuf {
-        match &pass.scope {
-            Scope::Profile(store) if catalogue::captured(unit) => store.clone(),
-            _ => shared.to_path_buf(),
         }
     }
 }
@@ -442,7 +394,6 @@ mod tests {
             name: name.to_string(),
             game_version: "1.21.4".to_string(),
             data_dir: data_dir.to_path_buf(),
-            scope: Scope::Shared,
             overrides: SyncOverrides::default(),
         }
     }
@@ -914,38 +865,6 @@ mod tests {
         sync.forget("a");
         assert!(!shared.join(BASELINES).join("a").exists());
         assert!(shared.join(BASELINES).join("b").exists());
-    }
-
-    #[test]
-    fn a_session_replays_the_scope_it_launched_under() {
-        let base = temp_dir("session");
-        let shared = base.path().join("shared");
-        let data = base.path().join("data");
-        let store = base
-            .path()
-            .join("instance")
-            .join("profiles")
-            .join("showcase");
-        let sync = sharing(&shared);
-        sync.capture(&store).unwrap();
-
-        let launched = Pass {
-            scope: Scope::Profile(store.clone()),
-            ..pass("test", &data)
-        };
-        sync.apply(&launched);
-        sync.remember("instance-test-1", launched);
-
-        fs::create_dir_all(&data).unwrap();
-        fs::write(data.join("options.txt"), "guiScale:5\n").unwrap();
-        let recalled = sync.recall("instance-test-1").expect("recorded at launch");
-        sync.apply(&recalled);
-
-        assert!(fs::read_to_string(store.join("options.txt"))
-            .unwrap()
-            .contains("guiScale:5"));
-        assert!(!shared.join("options.txt").exists());
-        assert!(sync.recall("instance-test-1").is_none());
     }
 
     #[test]

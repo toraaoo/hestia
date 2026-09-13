@@ -123,8 +123,8 @@ export function ContentSection({
   };
 
   // Read off the job store rather than these mutations: a content job started
-  // from another surface (a browse install, a profile apply) holds the same
-  // per-entry lock, and it outlives the component that fired it.
+  // from another surface (a browse install) holds the same per-entry lock, and
+  // it outlives the component that fired it.
   const jobs = useEntryJobs(entry.kind, id);
 
   const context: ContentContext = {

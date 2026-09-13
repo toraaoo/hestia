@@ -12,7 +12,6 @@ pub(crate) mod install;
 pub(crate) mod modpack;
 mod modrinth;
 pub(crate) mod pack;
-pub(crate) mod profiles;
 pub(crate) mod provider;
 pub(crate) mod record;
 
@@ -33,7 +32,6 @@ pub(crate) use provider::UrlRef;
 /// another build, rather than waiting for the first thing that happens to ask.
 pub(crate) fn migrate(entry_dir: &Path) {
     install::load(entry_dir);
-    profiles::migrate(entry_dir);
     modpack::load(entry_dir);
 }
 

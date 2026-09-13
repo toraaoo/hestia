@@ -16,7 +16,7 @@ some upstreams now require.
 
 The tray registers under `TRAY_ID` rather than `ID`, because on Linux both
 front-ends go through `tao` and would otherwise fight over one D-Bus name
-([0055](../decisions/0055-tray-and-desktop-app-ids.md)).
+([0052](../decisions/0052-tray-and-desktop-app-ids.md)).
 
 ## Where your data lives
 
@@ -40,14 +40,14 @@ also provides `config_path`, `log_dir` and `set_persisted_home`.
 
 `install_scope` names that same anchor for anything a *different* install must
 not share — the daemon endpoint above all, which `ipc` scopes with it
-([0067](../decisions/0067-an-endpoint-is-scoped-like-its-data-home.md)). A build
+([0063](../decisions/0063-an-endpoint-is-scoped-like-its-data-home.md)). A build
 using the per-user platform directory answers `None`: it is the session's one
 install, with nothing to tell apart.
 
 The data home's layout is in the [architecture overview](../architecture.md#where-things-live-on-disk).
 Its organising rule: what you would recognise as *yours* sits at the top level,
 and everything the launcher can regenerate sits under `meta/` and `cache/`
-([0057](../decisions/0057-meta-root-for-materialised-files.md)).
+([0054](../decisions/0054-meta-root-for-materialised-files.md)).
 
 Note that the **runtime directory** — where the socket lives — is deliberately
 somewhere else entirely (see [the socket boundary](wire.md)). One is ephemeral
@@ -109,4 +109,4 @@ so a stored archive sorts identically wherever it is read.
 
 - [0002 — Two log files, because one file cannot be both readable and complete](../decisions/0002-two-log-files.md)
 - [0003 — A crash must survive the process that had no console](../decisions/0003-crash-reports-survive-the-process.md)
-- [0057 — Materialised game files live under one `meta/` root](../decisions/0057-meta-root-for-materialised-files.md)
+- [0054 — Materialised game files live under one `meta/` root](../decisions/0054-meta-root-for-materialised-files.md)

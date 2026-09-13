@@ -18,13 +18,12 @@ use proto::content::{
 };
 use proto::daemon::{DaemonStatusResult, DaemonStopParams};
 use proto::download::DownloadSpec;
-use proto::instance::{InstanceInfo, InstanceLaunchParams, InstanceProfileListResult, ServerEntry};
+use proto::instance::{InstanceInfo, InstanceLaunchParams, ServerEntry};
 use proto::java::{JavaInstallProgress, JavaRuntime};
 use proto::minecraft::ProvisionProgress;
 use proto::process::{
     ProcessExitEvent, ProcessInfo, ProcessMetricsEvent, ProcessOutputEvent, ProcessSpec,
 };
-use proto::profile::GlobalProfile;
 use proto::server::{ServerInfo, ServerPingResult};
 use proto::skins::{Cape, Skin};
 use serde::de::DeserializeOwned;
@@ -111,11 +110,6 @@ golden!(
     "instance_launch_quick_play.json"
 );
 golden!(server_entry, ServerEntry, "server_entry.json");
-golden!(
-    instance_profile_list_result,
-    InstanceProfileListResult,
-    "instance_profile_list_result.json"
-);
 golden!(backup_info, BackupInfo, "backup_info.json");
 golden!(
     provision_progress,
@@ -149,7 +143,6 @@ golden!(
     "content_error_event.json"
 );
 golden!(search_query, SearchQuery, "search_query.json");
-golden!(global_profile, GlobalProfile, "global_profile.json");
 golden!(content_version, ContentVersion, "content_version.json");
 golden!(content_project, ContentProject, "content_project.json");
 golden!(skin, Skin, "skin.json");

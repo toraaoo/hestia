@@ -1,6 +1,4 @@
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
-import { useMutation } from '@tanstack/react-query';
-
 import {
   type ContentKind,
   type ContentProject,
@@ -26,7 +24,6 @@ import { projectKey, projectRef } from '@/features/content/components';
 import { m } from '@/paraglide/messages.js';
 import { instanceMutations } from '@/queries/instance';
 import { useJobDisplay, useJobMutation } from '@/queries/jobs';
-import { profileMutations } from '@/queries/profile';
 import { serverMutations } from '@/queries/server';
 import { TargetCtx, useInstallWizard } from './hooks';
 import { type Target, targetTakesKind, useTargets } from './lib';
@@ -36,9 +33,9 @@ import { TargetStep } from './steps/target';
 import { WorldsStep } from './steps/worlds';
 
 /**
- * The content install modal over the daemon's `content.add` (and, for a global
- * profile, `profile.edit`). It opens either way round: from Browse a `project`
- * is fixed and the user picks a target; from an entry's page the `entry` is
+ * The content install modal over the daemon's `content.add`. It opens either way
+ * round: from Browse a `project` is fixed and the user picks a target; from an
+ * entry's page the `entry` is
  * fixed and the user picks a project. The newest compatible version resolves
  * automatically (changeable in the review), a datapack on an instance chooses
  * its worlds, and the install runs as a job with live progress.
@@ -80,7 +77,6 @@ export function ContentInstallDialog({
 
   const addServer = useJobMutation(serverMutations.content.add(targetId));
   const addInstance = useJobMutation(instanceMutations.content.add(targetId));
-  const editProfile = useMutation(profileMutations.edit());
   useJobDisplay(addServer.job, open);
   useJobDisplay(addInstance.job, open);
 
@@ -96,7 +92,6 @@ export function ContentInstallDialog({
   const filesReady = files.every((f) => f.valid && f.kind !== undefined);
   const needsWorlds =
     selectedKinds.includes('data_pack') && target?.type === 'instance';
-  const isProfile = target?.type === 'profile';
 
   // The toggle clears any pin, so a new one is set after it.
   const toggleProject = (p: ContentProject, versionId?: string) => {
@@ -107,10 +102,9 @@ export function ContentInstallDialog({
   };
 
   const pickStep = mode === 'browse' ? 'target' : 'content';
-  const steps: string[] =
-    needsWorlds && !isProfile
-      ? [pickStep, 'worlds', 'review']
-      : [pickStep, 'review'];
+  const steps: string[] = needsWorlds
+    ? [pickStep, 'worlds', 'review']
+    : [pickStep, 'review'];
   const stepId = steps[Math.min(step, steps.length - 1)];
 
   const Icon =
@@ -151,57 +145,36 @@ export function ContentInstallDialog({
 
   async function install() {
     if (!target) return;
-    // A profile takes only projects; guard the no-op (e.g. only files staged)
-    // so it never closes as if it installed.
-    if (isProfile && picked.length === 0) {
-      dispatch({
-        type: 'installError',
-        message: m['content.profile_no_projects'](),
-      });
-      return;
-    }
     dispatch({ type: 'installStart' });
     try {
-      if (isProfile) {
-        // A profile reference resolves against one source per call, so a
-        // mixed selection is one call per source it came from.
-        for (const source of new Set(picked.map((p) => p.source))) {
-          await editProfile.mutateAsync({
-            name: target.name,
-            source,
-            add: picked.filter((p) => p.source === source).map(projectRef),
-          });
-        }
-      } else {
-        const add = target.type === 'server' ? addServer : addInstance;
-        // The wire spec is per-kind, so a mixed selection installs as one
-        // batch per kind; failures aggregate across batches.
-        const failures: string[] = [];
-        for (const k of selectedKinds) {
-          // Each project names its own source, so one batch may mix platforms.
-          const items = [
-            ...picked
-              .filter((p) => p.kind === k)
-              .map((p) => ({
-                project: projectRef(p),
-                source: p.source,
-                version: versionIds[projectKey(p)] ?? '',
-              })),
-            ...files.filter((f) => f.kind === k).map((f) => ({ path: f.path })),
-          ];
-          const done = await add.mutateAsync({
-            kind: k,
-            items,
-            worlds: k === 'data_pack' && needsWorlds ? worlds : [],
-          });
-          failures.push(
-            ...done.failures.map((f) => errorMessageFromInfo(f.error)),
-          );
-        }
-        if (failures.length > 0) {
-          dispatch({ type: 'installError', message: failures.join('; ') });
-          return;
-        }
+      const add = target.type === 'server' ? addServer : addInstance;
+      // The wire spec is per-kind, so a mixed selection installs as one batch
+      // per kind; failures aggregate across batches.
+      const failures: string[] = [];
+      for (const k of selectedKinds) {
+        // Each project names its own source, so one batch may mix platforms.
+        const items = [
+          ...picked
+            .filter((p) => p.kind === k)
+            .map((p) => ({
+              project: projectRef(p),
+              source: p.source,
+              version: versionIds[projectKey(p)] ?? '',
+            })),
+          ...files.filter((f) => f.kind === k).map((f) => ({ path: f.path })),
+        ];
+        const done = await add.mutateAsync({
+          kind: k,
+          items,
+          worlds: k === 'data_pack' && needsWorlds ? worlds : [],
+        });
+        failures.push(
+          ...done.failures.map((f) => errorMessageFromInfo(f.error)),
+        );
+      }
+      if (failures.length > 0) {
+        dispatch({ type: 'installError', message: failures.join('; ') });
+        return;
       }
       onOpenChange(false);
     } catch (e) {

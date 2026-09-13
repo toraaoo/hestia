@@ -1,8 +1,8 @@
 //! Schema versioning for the documents hestia owns on disk.
 //!
 //! Every user-owned document — the settings, the accounts, an entry's record,
-//! its content index and profiles, the skin library, a global profile — carries
-//! the version of the schema it was written with, in a top-level
+//! its content index, the skin library — carries the version of the schema it
+//! was written with, in a top-level
 //! [`FIELD`]. A build that opens one therefore knows, before it decodes
 //! anything, whether it is looking at a shape it understands, a shape it can
 //! bring forward, or a shape from a build newer than itself.
@@ -29,7 +29,7 @@
 //! discarding does not need a migration path; it needs deleting and
 //! regenerating, which is what already happens when one fails to read. Desktop
 //! preferences are excluded too: they are schema-less by design and the
-//! front-end owns their keys (decision 0052).
+//! front-end owns their keys.
 
 pub mod notices;
 

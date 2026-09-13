@@ -69,7 +69,6 @@
     "none_of_kind": "Nenhum {kind} instalado.",
     "none_selected": "nenhum selecionado",
     "pinned_version": "Versão fixada",
-    "profile_no_projects": "Um perfil aceita projetos, não arquivos.",
     "remove": {
       "description": "{name} será removido. Seus arquivos serão excluídos; a mudança se aplica na próxima inicialização.",
       "from_world_description": "{name} será removido de {world}. Os outros mundos o mantêm; a mudança vale no próximo início.",

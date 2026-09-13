@@ -36,14 +36,13 @@ flowchart TD
         INST["instances"]
         SKIN["skins"]
         SYNC["sync"]
-        PROF["profiles"]
         ACC["accounts"]
     end
 
     E --> plumbing
     E --> domain
 
-    FLOWS["<b>engine/flows/</b><br/>server · instance · backup · content<br/>modpack · profiles · skins · sync"]
+    FLOWS["<b>engine/flows/</b><br/>server · instance · backup · content<br/>modpack · skins · sync"]
     E -.->|"impl Engine blocks<br/>composed over the subsystems"| FLOWS
 ```
 
@@ -55,7 +54,7 @@ Two rules keep this from becoming a god object:
   `engine/flows/<concern>.rs` as its own `impl Engine` block (Rust lets an
   inherent impl span modules in a crate), so callers still write
   `engine.provision_server(…)` while the aggregate stays wiring
-  ([0034](../decisions/0034-an-aggregation-point-is-a-directory.md)).
+  ([0031](../decisions/0031-an-aggregation-point-is-a-directory.md)).
 
 `set_data_home()` re-resolves the directory and `reload()`s every subsystem, so a
 `config set home` takes effect on the running daemon rather than the next start.
@@ -71,8 +70,8 @@ one's.
 | Pass | What it settles |
 |---|---|
 | `ProcessSupervisor::recover()` | re-adopt surviving processes; entomb ones that died while unsupervised |
-| server phase reconcile | discard a record still `Provisioning`; keep and log one mid-`Updating` ([0026](../decisions/0026-server-phase-over-a-ready-bool.md)) |
-| `reclaim_temp()` | delete abandoned `.part`/`.staging` artifacts, logging the bytes reclaimed ([0027](../decisions/0027-temp-artifacts-are-reclaimed-at-startup.md)) |
+| server phase reconcile | discard a record still `Provisioning`; keep and log one mid-`Updating` ([0023](../decisions/0023-server-phase-over-a-ready-bool.md)) |
+| `reclaim_temp()` | delete abandoned `.part`/`.staging` artifacts, logging the bytes reclaimed ([0024](../decisions/0024-temp-artifacts-are-reclaimed-at-startup.md)) |
 
 The reclaim is deliberately **not** recursive: each subsystem knows the one
 directory its artifacts land in, and walking a data home whose asset store is six
@@ -81,10 +80,10 @@ figures of files is not a cost to pay at every start.
 ## Persisted documents — `schema`
 
 Every user-owned file in the data home — the settings, the accounts, an entry's
-record, its content index and profiles, the modpack record, the skin library, a
-global profile — is a `Document`: it carries a top-level `schemaVersion` and is
+record, its content index, the modpack record, the skin library — is a
+`Document`: it carries a top-level `schemaVersion` and is
 read and written through `engine::schema`
-([0064](../decisions/0064-a-managed-document-carries-its-schema-version.md)).
+([0060](../decisions/0060-a-managed-document-carries-its-schema-version.md)).
 
 | Concern | How |
 |---|---|
@@ -126,7 +125,7 @@ Two reserved keys are not stored here at all: `home` routes to the path pointer
 and `autostart` to the platform login registration.
 
 Keys are kebab-case even though the file stores camelCase — a deliberate,
-translated exception ([0031](../decisions/0031-camelcase-except-the-config-vocabulary.md)).
+translated exception ([0028](../decisions/0028-camelcase-except-the-config-vocabulary.md)).
 
 ## The network — `net`
 
@@ -154,7 +153,7 @@ it through. `network.offline` pins it, and nothing is attempted while set.
 The daemon ticks `Network::refresh`, which probes only when the state has gone
 stale: every 10s while offline, so recovery is noticed without the user acting,
 and while online only once traffic has been quiet for a minute
-([0071](../decisions/0071-reachability-is-observed-not-asked.md)).
+([0067](../decisions/0067-reachability-is-observed-not-asked.md)).
 
 **`net::store`** keeps the last good copy of each catalogue response under
 `meta/catalogue/`, keyed by URL. A version list that fails to fetch while
@@ -211,12 +210,12 @@ sessions, NeoForge's processor chain, the `server.properties` schema run, a
 Spigot build. It lives in the engine — not the daemon — because its directory is
 engine-owned like every other registry, and because engine flows that shell out
 must not spawn bare children
-([0036](../decisions/0036-supervision-is-engine-state.md)).
+([0033](../decisions/0033-supervision-is-engine-state.md)).
 
 A supervised process is **decoupled from the daemon's lifetime**: its own process
 group (a job object on Windows), no `kill_on_drop`, no pipes back. The daemon is
 restartable and upgradable under live workloads, and stopping one is always
-something you asked for ([0037](../decisions/0037-workloads-outlive-the-daemon.md)).
+something you asked for ([0034](../decisions/0034-workloads-outlive-the-daemon.md)).
 
 ```mermaid
 stateDiagram-v2
@@ -250,7 +249,7 @@ pre-log4j stderr); `LogSource::Capture` redirects into a supervisor-owned
 `output.log`. Either way `tail.rs` polls the file for `process.output` events and
 `process.logs` reads its tail on demand — so log history survives daemon
 restarts, and following logs is scoped to the *entry* rather than one run of it
-([0040](../decisions/0040-following-logs-is-entry-scoped.md)).
+([0037](../decisions/0037-following-logs-is-entry-scoped.md)).
 
 **Stops are polite and reach the tree.** SIGTERM first (the JVM saves and exits),
 a hard kill only after a grace period — both addressed at the whole process tree,
@@ -261,7 +260,7 @@ replaced by a tombstone (`exit.json`: state, exit code, when it ended, where its
 logs are), so the directory keeps its logs *and* says what it is. The startup
 sweep then deletes only directories with **neither** marker — a true stray — and
 retention prunes the oldest tombstoned ones
-([0038](../decisions/0038-a-finished-process-is-tombstoned.md)).
+([0035](../decisions/0035-a-finished-process-is-tombstoned.md)).
 
 `task.rs` is the provisioning half: `run(Task, Job)` drives a program to
 completion, relays what it narrates as progress, and is cancelled through the
@@ -272,7 +271,7 @@ supervisor.
 `update/` owns the whole path — the check against the published release manifest
 (`latest.json`), the download of the artifact for this platform, its minisign
 verification against `update_pubkeys()`, and running it. No front-end does any of
-it ([0066](../decisions/0066-the-daemon-owns-self-update.md)).
+it ([0062](../decisions/0062-the-daemon-owns-self-update.md)).
 
 | Module | What it is |
 |---|---|
@@ -297,16 +296,16 @@ cannot trigger an update.
 | Module | What it is |
 |---|---|
 | `cancel.rs` | `Cancel`, the cooperative cancellation flag, and `Job`, which carries it beside the progress reporter — a step that reports progress is exactly a step that can stop between reports |
-| `registry.rs` | id allocation (`allocate_id`) and directory naming (`dir_name`) shared by the entry stores ([0023](../decisions/0023-id-is-a-uuid-directory-is-a-slug.md)) |
+| `registry.rs` | id allocation (`allocate_id`) and directory naming (`dir_name`) shared by the entry stores ([0020](../decisions/0020-id-is-a-uuid-directory-is-a-slug.md)) |
 | `usage.rs` | directory footprint, treating a symlink as a boundary so a linked sync folder is not counted into the instance that points at it |
 | `signature.rs` | minisign verification for the updater |
 | `error.rs` | the engine's `thiserror` enums, mapped to `ipc::errors` codes at the daemon's service boundary |
 
 ## Decisions
 
-- [0027 — A temp artifact is only valid while its job holds the claim](../decisions/0027-temp-artifacts-are-reclaimed-at-startup.md)
-- [0036 — Supervision is engine state, and one stop reaches the whole tree](../decisions/0036-supervision-is-engine-state.md)
-- [0037 — Workloads outlive the daemon by design](../decisions/0037-workloads-outlive-the-daemon.md)
-- [0038 — A finished process is labelled, not merely unrecorded](../decisions/0038-a-finished-process-is-tombstoned.md)
-- [0040 — Following logs is scoped to the entry, not to one run of it](../decisions/0040-following-logs-is-entry-scoped.md)
-- [0071 — Reachability is observed from real traffic, and offline is a state the whole system reads](../decisions/0071-reachability-is-observed-not-asked.md)
+- [0024 — A temp artifact is only valid while its job holds the claim](../decisions/0024-temp-artifacts-are-reclaimed-at-startup.md)
+- [0033 — Supervision is engine state, and one stop reaches the whole tree](../decisions/0033-supervision-is-engine-state.md)
+- [0034 — Workloads outlive the daemon by design](../decisions/0034-workloads-outlive-the-daemon.md)
+- [0035 — A finished process is labelled, not merely unrecorded](../decisions/0035-a-finished-process-is-tombstoned.md)
+- [0037 — Following logs is scoped to the entry, not to one run of it](../decisions/0037-following-logs-is-entry-scoped.md)
+- [0067 — Reachability is observed from real traffic, and offline is a state the whole system reads](../decisions/0067-reachability-is-observed-not-asked.md)

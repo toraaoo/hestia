@@ -331,18 +331,12 @@ The only named hooks. Everything else is a factory passed to `useQuery`/`useMuta
 | `.logs(id, opts)`                                    | `instance.logs`                       | —                                              |
 | `.config(id)` / `.configValue(id, key)`              | `instance.config.list\|get`           | —                                              |
 | `.content(id, kind)` / `.contentUpdates(id)`         | `instance.content.list\|check_updates`| —                                              |
-| `.profiles(id)`                                      | `instance.profile.list`               | —                                              |
 | `.create()`                                          | `instance.create`                     | `Partial<InstanceCreateParams>`                |
 | `.update(id)`                                        | `instance.update`                     | `{ version, loaderVersion?, allowDowngrade? }` |
 | `.rename(id)` / `.remove(id)`                        | `instance.rename\|remove`             | `name: string` / —                             |
 | `.launchAny()` *(job)*                               | `instance.launch`                     | `{ id, newSession?, quickPlay? }`              |
 | `.stop(id)` / `.stopAny()`                           | `instance.stop`                       | `{ session? }` / `{ id, session? }`            |
 | `.setConfig(id)`                                     | `instance.config.set`                 | `{ key, value }`                               |
-| `.profiles.create(id)`                               | `instance.profile.create`             | `{ name, seedFromPool? }`                      |
-| `.profiles.remove(id)` / `.rename(id)` / `.use(id)`  | `instance.profile.remove\|rename\|use`| `name` / `{ name, newName }` / `name`          |
-| `.profiles.edit(id)`                                 | `instance.profile.edit`               | `{ name, add?, remove? }`                      |
-| `.profiles.capture(id)` / `.release(id)`             | `instance.profile.capture\|release`   | `name: string`                                 |
-| `.profiles.apply(id)` *(job)*                        | `instance.profile.apply`              | `profile: string`                              |
 | `.content.*`                                         | see **Entry content** below           |                                                |
 
 ### Entry content — `<domain>Mutations.content` (`entry-content.ts`)
@@ -368,15 +362,6 @@ One shared factory set, bound per entry kind, so servers and instances cannot dr
 | `.install(kind)` *(job)*      | `<kind>.modpack.install`  | `ModpackInstallParams`          |
 | `.update(kind, id)` *(job)*   | `<kind>.modpack.update`   | `{ version?, allowDowngrade? }` |
 | `.remove(kind, id)`           | `<kind>.modpack.remove`   | —                               |
-
-### Global profiles — `profileQueries` / `profileMutations`
-
-| Factory      | Channel          | Variables                          |
-|--------------|------------------|------------------------------------|
-| `.list()`    | `profile.list`   | —                                  |
-| `.create()`  | `profile.create` | `name: string`                     |
-| `.remove()`  | `profile.remove` | `name: string`                     |
-| `.edit()`    | `profile.edit`   | `{ name, source?, add?, remove? }` |
 
 ### Content browse — `contentQueries`
 

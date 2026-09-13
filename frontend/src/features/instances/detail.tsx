@@ -36,7 +36,6 @@ import {
   InstanceSettingsTab,
 } from '@/features/instances/tabs';
 import { anchor, TourButton } from '@/features/onboarding';
-import { ProfilesPanel } from '@/features/profiles/components';
 import {
   EntryIconMenu,
   EntryRunControl,
@@ -65,7 +64,6 @@ import { useProcessMetrics } from '@/queries/metrics';
 export type InstanceTab =
   | 'overview'
   | 'content'
-  | 'profiles'
   | 'worlds'
   | 'servers'
   | 'logs'
@@ -124,7 +122,6 @@ function InstanceDetail({
   const info = useQuery(instanceQueries.info(id));
   const config = useQuery(instanceQueries.config(id));
   const worlds = useQuery(instanceQueries.worlds(id));
-  const profiles = useQuery(instanceQueries.profiles(id));
   const [addingContent, setAddingContent] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
@@ -246,10 +243,6 @@ function InstanceDetail({
           <TabsTrigger value="content" {...anchor('instance-content')}>
             {m['app.label.content']()}
             <TabCount n={contentCount} />
-          </TabsTrigger>
-          <TabsTrigger value="profiles" {...anchor('instance-profiles')}>
-            {m['app.nav.profiles']()}
-            <TabCount n={profiles.data?.profiles.length ?? 0} />
           </TabsTrigger>
           <TabsTrigger value="worlds" {...anchor('instance-worlds')}>
             {m['app.label.worlds']()}
@@ -411,10 +404,6 @@ function InstanceDetail({
               </Button>
             }
           />
-        </TabsContent>
-
-        <TabsContent value="profiles" className="flex flex-col p-5">
-          <ProfilesPanel instance={instance} running={running} />
         </TabsContent>
 
         <TabsContent value="worlds" className="flex flex-col p-5">

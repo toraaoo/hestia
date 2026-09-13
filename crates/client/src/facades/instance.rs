@@ -15,15 +15,11 @@ use proto::instance::{
     InstanceConfigSetParams, InstanceCreate, InstanceCreateParams, InstanceDetails,
     InstanceFlavors, InstanceInfo, InstanceInfoQuery, InstanceLaunch, InstanceLaunchDoneEvent,
     InstanceLaunchParams, InstanceList, InstanceLoaders, InstanceLogs, InstanceLogsParams,
-    InstanceProfileCapture, InstanceProfileCreate, InstanceProfileCreateParams,
-    InstanceProfileEdit, InstanceProfileEditParams, InstanceProfileList, InstanceProfileRef,
-    InstanceProfileRelease, InstanceProfileRemove, InstanceProfileRename,
-    InstanceProfileRenameParams, InstanceProfileUse, InstanceRef, InstanceRemove, InstanceRename,
-    InstanceRenameParams, InstanceResolve, InstanceServerEdit, InstanceServerEditParams,
-    InstanceServerRef, InstanceServerRemove, InstanceServers, InstanceServersArrange,
-    InstanceServersArrangeParams, InstanceServersWriteResult, InstanceStop, InstanceStopParams,
-    InstanceUpdate, InstanceUpdateParams, InstanceVersions, InstanceWorlds, Profile, QuickPlay,
-    ServerEntry, WorldInfo,
+    InstanceRef, InstanceRemove, InstanceRename, InstanceRenameParams, InstanceResolve,
+    InstanceServerEdit, InstanceServerEditParams, InstanceServerRef, InstanceServerRemove,
+    InstanceServers, InstanceServersArrange, InstanceServersArrangeParams,
+    InstanceServersWriteResult, InstanceStop, InstanceStopParams, InstanceUpdate,
+    InstanceUpdateParams, InstanceVersions, InstanceWorlds, QuickPlay, ServerEntry, WorldInfo,
 };
 use proto::minecraft::{
     ConfigEntry, Flavor, GameVersion, InstanceProfile, LoadersParams, ProvisionProgress,
@@ -48,9 +44,6 @@ pub struct LaunchOptions<'a> {
     pub account: &'a str,
     /// Launch another session even when one is already running.
     pub new_session: bool,
-    /// Overrides the active content profile for this launch: empty keeps it,
-    /// the literal `none` launches with no profile.
-    pub profile: &'a str,
     /// Join a world or server on start instead of opening to the title screen.
     pub quick_play: Option<QuickPlay>,
     /// Skip Microsoft entirely and run unauthenticated.
@@ -332,7 +325,6 @@ impl Instance<'_> {
             account: options.account.to_string(),
             id: id.clone(),
             new_session: options.new_session,
-            profile: options.profile.to_string(),
             quick_play: options.quick_play,
             offline: options.offline,
         };
@@ -370,123 +362,6 @@ impl Instance<'_> {
         run_content_job(session, &id, on_progress, move || async move {
             session
                 .call::<InstanceContentAdd>(&params)
-                .await
-                .map(|_| ())
-        })
-        .await
-    }
-
-    /// The instance's active profile name (empty = none) and every profile.
-    pub async fn profiles(&self, instance: &str) -> Result<(String, Vec<Profile>), IpcError> {
-        let result = self
-            .session
-            .call::<InstanceProfileList>(&instance_ref(instance))
-            .await?;
-        Ok((result.active, result.profiles))
-    }
-
-    /// Create a profile — seeded from the pool by default, or empty.
-    pub async fn create_profile(
-        &self,
-        instance: &str,
-        name: &str,
-        seed_from_pool: bool,
-    ) -> Result<Profile, IpcError> {
-        let params = InstanceProfileCreateParams {
-            instance: instance.to_string(),
-            name: name.to_string(),
-            seed_from_pool,
-        };
-        self.session.call::<InstanceProfileCreate>(&params).await
-    }
-
-    /// Removing the active profile clears the active selection.
-    pub async fn remove_profile(&self, instance: &str, name: &str) -> Result<(), IpcError> {
-        self.session
-            .call::<InstanceProfileRemove>(&profile_ref(instance, name))
-            .await?;
-        Ok(())
-    }
-
-    pub async fn rename_profile(
-        &self,
-        instance: &str,
-        name: &str,
-        new_name: &str,
-    ) -> Result<Profile, IpcError> {
-        let params = InstanceProfileRenameParams {
-            instance: instance.to_string(),
-            name: name.to_string(),
-            new_name: new_name.to_string(),
-        };
-        self.session.call::<InstanceProfileRename>(&params).await
-    }
-
-    /// Set the active profile (empty clears it); applied at the next launch.
-    pub async fn use_profile(&self, instance: &str, name: &str) -> Result<(), IpcError> {
-        self.session
-            .call::<InstanceProfileUse>(&profile_ref(instance, name))
-            .await?;
-        Ok(())
-    }
-
-    /// Add/remove members by pool reference (project id, slug, filename, or
-    /// title).
-    pub async fn edit_profile(
-        &self,
-        instance: &str,
-        name: &str,
-        add: Vec<String>,
-        remove: Vec<String>,
-    ) -> Result<Profile, IpcError> {
-        let params = InstanceProfileEditParams {
-            instance: instance.to_string(),
-            name: name.to_string(),
-            add,
-            remove,
-        };
-        self.session.call::<InstanceProfileEdit>(&params).await
-    }
-
-    /// Capture the profile's own settings store (snapshotted from the global
-    /// one); launches under it then sync settings against the captured store.
-    /// The instance must be stopped.
-    pub async fn capture_profile(&self, instance: &str, name: &str) -> Result<(), IpcError> {
-        self.session
-            .call::<InstanceProfileCapture>(&profile_ref(instance, name))
-            .await?;
-        Ok(())
-    }
-
-    /// Delete the profile's captured store; it inherits the global store
-    /// again. The instance must be stopped.
-    pub async fn release_profile(&self, instance: &str, name: &str) -> Result<(), IpcError> {
-        self.session
-            .call::<InstanceProfileRelease>(&profile_ref(instance, name))
-            .await?;
-        Ok(())
-    }
-
-    /// Apply a global profile into the instance's pool — a content job:
-    /// references not already present install at their newest compatible
-    /// version, tagged with the profile; incompatible ones come back as
-    /// failures. Applying never removes de-listed content.
-    pub async fn apply_profile(
-        &self,
-        instance: &str,
-        profile: &str,
-        on_progress: impl Fn(&ProvisionProgress) + Send + Sync + 'static,
-    ) -> Result<(Vec<InstalledContent>, Vec<ContentFailure>), IpcError> {
-        let id = job_id("profile-apply");
-        let params = proto::profile::InstanceProfileApplyParams {
-            instance: instance.to_string(),
-            profile: profile.to_string(),
-            id: id.clone(),
-        };
-        let session = self.session;
-        run_content_job(session, &id, on_progress, move || async move {
-            session
-                .call::<proto::profile::InstanceProfileApply>(&params)
                 .await
                 .map(|_| ())
         })
@@ -623,12 +498,5 @@ impl Instance<'_> {
 fn instance_ref(instance: &str) -> InstanceRef {
     InstanceRef {
         instance: instance.to_string(),
-    }
-}
-
-fn profile_ref(instance: &str, name: &str) -> InstanceProfileRef {
-    InstanceProfileRef {
-        instance: instance.to_string(),
-        name: name.to_string(),
     }
 }

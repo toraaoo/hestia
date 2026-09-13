@@ -1,21 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import type {
-  ContentKind,
-  GlobalProfile,
-  InstanceInfo,
-  ServerInfo,
-} from '@/api';
+import type { ContentKind, InstanceInfo, ServerInfo } from '@/api';
 import { m } from '@/paraglide/messages.js';
 import { instanceQueries, useInstances } from '@/queries/instance';
-import { profileQueries } from '@/queries/profile';
 import { serverQueries, useServers } from '@/queries/server';
 
 /** An entry the content can be installed into, drawn from every store. */
 export interface Target {
   id: string;
   name: string;
-  type: 'server' | 'instance' | 'profile';
+  type: 'server' | 'instance';
   flavor: string;
   gameVersion: string;
   running: boolean;
@@ -43,42 +37,13 @@ export const instanceTarget = (i: InstanceInfo): Target => ({
   accepts: i.accepts ?? [],
 });
 
-/**
- * A global profile as an install target: references, never jars — a profile
- * has no version or loader of its own, so anything compatible can join it.
- */
-export const profileTarget = (p: GlobalProfile): Target => ({
-  id: p.name,
-  name: p.name,
-  type: 'profile',
-  flavor: '',
-  gameVersion: '',
-  running: false,
-  accepts: PROFILE_ACCEPTS,
-});
-
-/**
- * A global profile stores project references rather than jars, so it has no
- * flavor to ask the daemon about — its kinds are the ones an instance can
- * later resolve a reference into. Servers and instances carry their own
- * `accepts` instead: what a paper server takes differs from what a fabric one
- * does, and only the daemon's flavor registry knows that.
- */
-export const PROFILE_ACCEPTS: ContentKind[] = [
-  'mod',
-  'resource_pack',
-  'shader',
-];
-
 export const targetTakesKind = (t: Target, kind: ContentKind): boolean =>
   t.accepts.includes(kind);
 
 export const entryTypeLabel = (type: Target['type']): string =>
   type === 'server'
     ? m['domain.entry_type.server']()
-    : type === 'profile'
-      ? m['domain.entry_type.profile']()
-      : m['domain.entry_type.instance']();
+    : m['domain.entry_type.instance']();
 
 /**
  * A local file staged for import, carrying the daemon's inspection. `kind` is
@@ -97,26 +62,22 @@ export interface PickedFile {
 
 export const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
-/** Every entry, from all three stores, merged into a common target shape. */
+/** Every entry, from both stores, merged into a common target shape. */
 export function useTargets(): Target[] {
   const servers = useServers();
   const instances = useInstances();
-  const profiles = useQuery(profileQueries.list());
   return useMemo(
     () => [
       ...(servers.data ?? []).map(serverTarget),
       ...(instances.data ?? []).map(instanceTarget),
-      ...(profiles.data ?? []).map(profileTarget),
     ],
-    [servers.data, instances.data, profiles.data],
+    [servers.data, instances.data],
   );
 }
 
 /**
  * The installed pool of a target, keyed `source:projectId` — the same match the
- * CLI's browse session uses to flag an already-installed hit. Built on the
- * server/instance content-list factories; a profile holds references, not an
- * installable pool, so it reports nothing.
+ * CLI's browse session uses to flag an already-installed hit.
  */
 export function useInstalledRefs(
   target: Target,

@@ -57,7 +57,7 @@ an OS signal (SIGTERM / Ctrl-C).
 
 Once listening, it spawns the tray helper: best-effort, detached, skipped on a
 headless session or under `HESTIA_NO_TRAY=1`
-([0054](../decisions/0054-the-daemon-spawns-the-tray.md)).
+([0051](../decisions/0051-the-daemon-spawns-the-tray.md)).
 
 ## `runtime/` — the long-lived collaborators
 
@@ -80,8 +80,8 @@ Because the channel name and payload shapes come from the contract, a handler
 One rule lives at the router rather than in handlers: the whole `instance.*`
 surface (plus the instance-only `sync.*`) is refused with `unauthorized` until an
 account exists. It is a whole-domain lockdown, and prefixing covers
-`instance.content.*` and `instance.profile.*` without touching their modules
-([0033](../decisions/0033-instance-surface-gated-on-an-account.md)).
+`instance.content.*` and `instance.modpack.*` without touching their modules
+([0030](../decisions/0030-instance-surface-gated-on-an-account.md)).
 
 ### Job managers
 
@@ -97,7 +97,7 @@ none of them implements that: `job.rs`'s `Runner` does. A manager builds a
 hands `Runner::start` a closure taking the engine and a `Reporter`. Claiming,
 spawning, progress coalescing, cancellation, terminal classification and logging
 are the runner's, so they cannot drift per family
-([0065](../decisions/0065-a-job-declares-what-differs.md)).
+([0061](../decisions/0061-a-job-declares-what-differs.md)).
 
 ```mermaid
 sequenceDiagram
@@ -139,7 +139,7 @@ reading.
 |---|---|---|
 | `scheduler.rs` | every minute | archive each **running** server whose `backup-interval` has elapsed since its newest backup, then prune `scheduled` archives beyond `backup-retention`. A stopped server's world cannot change, so it is never re-archived |
 | `metrics.rs` | every 2 s | sample CPU and memory for supervised processes, normalising CPU by logical core count so a multi-threaded JVM reports a share of the machine rather than 800% |
-| `presence.rs` | every 5 s, on its own thread | publish Discord Rich Presence — the newest running session, else idle — sending only when the card changed. Gated on `discord.enabled` and skipped entirely under `HESTIA_NO_PRESENCE=1`; a missing Discord client is polled for at a sixth of the rate ([0063](../decisions/0063-discord-presence-is-a-daemon-loop.md)) |
+| `presence.rs` | every 5 s, on its own thread | publish Discord Rich Presence — the newest running session, else idle — sending only when the card changed. Gated on `discord.enabled` and skipped entirely under `HESTIA_NO_PRESENCE=1`; a missing Discord client is polled for at a sixth of the rate ([0059](../decisions/0059-discord-presence-is-a-daemon-loop.md)) |
 
 `event_hub.rs` fans events out to subscribed connections, filtered by id, and
 unsubscribes them on disconnect.
@@ -152,11 +152,11 @@ the list of `register()` calls; `services/guards.rs` holds the preconditions the
 registrars share. A handler does not assemble its own: it names what it is about
 to do — `Intent::{Read, Start, Mutate, Backup, Lifecycle}` — and `server_for` /
 `instance_for` resolve the entry and apply the exclusions that intent implies
-for that side ([0032](../decisions/0032-one-registrar-per-domain.md)).
+for that side ([0029](../decisions/0029-one-registrar-per-domain.md)).
 
 There is no `Service` class per prefix — a handler is a closure, and the grouping
 is purely a compile-time one that keeps `make_router()` from becoming a
-1100-line function ([0032](../decisions/0032-one-registrar-per-domain.md)).
+1100-line function ([0029](../decisions/0029-one-registrar-per-domain.md)).
 
 ### The channel surface
 
@@ -171,11 +171,10 @@ is purely a compile-time one that keeps `make_router()` from becoming a
 | `skins` | `skin.list\|add\|update\|equip\|reset\|remove`, `cape.equip\|clear` |
 | `process` | `process.start\|stop\|list\|status\|logs` |
 | `server` | `server.flavors\|loaders\|versions\|resolve`, `server.create\|update\|rename\|list\|status\|info\|remove\|start\|stop\|logs\|command\|ping`, `server.config.get\|set\|list` |
-| `instance` | the `instance.*` counterparts, plus `instance.launch\|stop\|logs`, `instance.worlds`, `instance.profile.*`, `instance.sync.adopt` |
+| `instance` | the `instance.*` counterparts, plus `instance.launch\|stop\|logs`, `instance.worlds`, `instance.sync.adopt` |
 | `backup` | `server.backup.create\|list\|restore\|remove` |
 | `content` | `content.sources\|search\|project\|versions\|inspect\|resolve_url`, `content.modpack.resolve`, and the per-entry `server\|instance.content.add\|list\|remove\|update\|enable\|check_updates\|set_version` |
 | `modpack` | `server\|instance.modpack.install\|update\|status\|remove` |
-| `profile` | `profile.list\|create\|remove\|edit` — the global reference lists |
 | `sync` | `sync.get\|set\|status` |
 | `update` | `update.check\|download` |
 
@@ -202,14 +201,14 @@ define what a bare "stop the launcher" means when a server is running. That thir
 meaning, **ask**, lives in the front-end: the CLI prompts on a terminal and
 refuses when piped; the tray's Quit and the desktop's stop button both leave
 workloads running, because a menu item cannot ask
-([0039](../decisions/0039-stopping-the-daemon-has-three-meanings.md)).
+([0036](../decisions/0036-stopping-the-daemon-has-three-meanings.md)).
 
 On shutdown the daemon calls `stop_all_and_wait()` only when asked to; otherwise
 supervised processes simply carry on without it.
 
 ## Decisions
 
-- [0032 — One registrar function per domain, not a Service class per prefix](../decisions/0032-one-registrar-per-domain.md)
-- [0033 — Instances are gated on a signed-in account, in the router](../decisions/0033-instance-surface-gated-on-an-account.md)
-- [0034 — An aggregation point is a directory, not a file](../decisions/0034-an-aggregation-point-is-a-directory.md)
-- [0039 — Stopping the daemon has three meanings](../decisions/0039-stopping-the-daemon-has-three-meanings.md)
+- [0029 — One registrar function per domain, not a Service class per prefix](../decisions/0029-one-registrar-per-domain.md)
+- [0030 — Instances are gated on a signed-in account, in the router](../decisions/0030-instance-surface-gated-on-an-account.md)
+- [0031 — An aggregation point is a directory, not a file](../decisions/0031-an-aggregation-point-is-a-directory.md)
+- [0036 — Stopping the daemon has three meanings](../decisions/0036-stopping-the-daemon-has-three-meanings.md)

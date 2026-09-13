@@ -3,8 +3,6 @@ export {
   fileName,
   instanceTarget,
   type PickedFile,
-  PROFILE_ACCEPTS,
-  profileTarget,
   serverTarget,
   type Target,
   targetTakesKind,

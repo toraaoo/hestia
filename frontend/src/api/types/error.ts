@@ -4,7 +4,6 @@ export type { ErrorInfo } from "./generated/ErrorInfo";
 export type { Field } from "./generated/Field";
 export type { IoOp } from "./generated/IoOp";
 export type { Nameable } from "./generated/Nameable";
-export type { ProfileScope } from "./generated/ProfileScope";
 export type { Reason } from "./generated/Reason";
 export type { Service } from "./generated/Service";
 export type { Task } from "./generated/Task";

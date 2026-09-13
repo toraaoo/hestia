@@ -92,10 +92,10 @@ What it adds over stock:
 
 The **daemon** owns self-update — `engine/src/update/`, reached over `update.check`,
 `update.download` and `update.apply`. Every front-end is a caller; none reads the manifest, holds a key, or runs an
-installer ([decision 0066](decisions/0066-the-daemon-owns-self-update.md)).
+installer ([decision 0062](decisions/0062-the-daemon-owns-self-update.md)).
 
 It polls the feed API, one manifest per release channel — `…/updates/stable` or `…/updates/beta`, chosen by the
-`update.channel` setting ([decision 0070](decisions/0070-a-channel-picks-the-feed-not-the-entry.md)). On a `v*` tag the
+`update.channel` setting ([decision 0066](decisions/0066-a-channel-picks-the-feed-not-the-entry.md)). On a `v*` tag the
 release workflow's `manifest` job composes `latest.json`, attaches it to the Release as provenance, and **publishes** it
 to the channel the tag names — a prerelease suffix (`v1.3.0-beta.1`) is beta, a plain `v1.3.0` is stable. Nothing reads
 the repository's releases to decide what is current. The full HTTP contract, both directions, is in

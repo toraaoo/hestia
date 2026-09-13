@@ -45,26 +45,12 @@
           "body": "Inicie direto no jogo, em um mundo ou em um servidor. Várias sessões de uma mesma instância podem rodar ao mesmo tempo.",
           "title": "Jogue"
         },
-        "profiles": {
-          "body": "Divida o conjunto instalado em grupos nomeados e alterne entre eles sem reinstalar nada.",
-          "title": "Perfis"
-        },
         "worlds": {
           "body": "Seus mundos salvos, com a opção de compartilhá-los entre instâncias em vez de copiá-los.",
           "title": "Mundos"
         }
       },
       "next": "Avançar",
-      "profiles": {
-        "create": {
-          "body": "Crie um aqui e aplique em qualquer instância compatível com a versão do jogo.",
-          "title": "Crie um"
-        },
-        "what": {
-          "body": "Um perfil global é um conjunto nomeado de mods, shaders e pacotes de recursos que você aplica a qualquer instância — um lugar só para o conjunto que você sempre usa.",
-          "title": "Conjuntos reutilizáveis"
-        }
-      },
       "progress": "Passo {current} de {total}",
       "replay": "Mostrar o tour desta página",
       "server": {
@@ -99,7 +85,7 @@
           "title": "Rodando em segundo plano"
         },
         "nav": {
-          "body": "A Biblioteca guarda o que você tem. Navegar encontra conteúdo. Instâncias, Servidores, Perfis e Skins têm cada um a sua página.",
+          "body": "A Biblioteca guarda o que você tem. Navegar encontra conteúdo. Instâncias, Servidores e Skins têm cada um a sua página.",
           "title": "Se localizando"
         },
         "play": {

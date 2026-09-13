@@ -1,4 +1,4 @@
-export { TargetCtx, useIsProfileTarget, useTarget } from './use-target';
+export { TargetCtx, useTarget } from './use-target';
 export {
   useInstallWizard,
   type WizardAction,

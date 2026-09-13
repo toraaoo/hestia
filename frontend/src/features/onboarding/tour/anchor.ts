@@ -8,7 +8,6 @@ export type TourAnchor =
   | 'library-new'
   | 'entry-run'
   | 'instance-content'
-  | 'instance-profiles'
   | 'instance-worlds'
   | 'server-details'
   | 'server-console'

@@ -20,7 +20,7 @@ export interface EntryTarget {
  * change per entry at a time, so anything started beside one of these is
  * refused as busy rather than queued.
  */
-const CONTENT_JOBS = ['content.add', 'content.update', 'profile.apply'];
+const CONTENT_JOBS = ['content.add', 'content.update'];
 
 /** Whether one of an entry's jobs is a content change still running. */
 export const contentBusy = (jobs: Job[]): boolean =>
@@ -61,19 +61,18 @@ export const rowKey = (i: InstalledContent) => `${i.kind}:${i.filename}`;
 
 /**
  * Who put an item in the pool. The index tags provenance as `<scope>:<key>`,
- * where the key is an identity and not a label — a profile's name, but a
- * modpack's project id — so a reader resolves it before showing it.
+ * where the key is an identity and not a label — a modpack's project id — so a
+ * reader resolves it before showing it.
  */
 export interface ContentOrigin {
-  scope: 'profile' | 'modpack';
+  scope: 'modpack';
   key: string;
 }
 
 export const parseOrigin = (origin: string): ContentOrigin | null => {
   const sep = origin.indexOf(':');
-  const scope = sep < 0 ? '' : origin.slice(0, sep);
-  return scope === 'profile' || scope === 'modpack'
-    ? { scope, key: origin.slice(sep + 1) }
+  return origin.slice(0, sep) === 'modpack'
+    ? { scope: 'modpack', key: origin.slice(sep + 1) }
     : null;
 };
 

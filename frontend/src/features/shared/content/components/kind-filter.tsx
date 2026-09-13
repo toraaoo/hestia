@@ -7,7 +7,7 @@ const ALL = 'all';
 
 /**
  * The content-type dimension shared by every content-shaped list (browse, an
- * entry's content tab, the profile pages, the install picker). `count` adds the
+ * entry's content tab, the install picker). `count` adds the
  * tally each list already knows; `all` is dropped where a kind is always one of
  * them, as in the install picker.
  */

@@ -14,7 +14,6 @@
     },
     "entry_type": {
       "instance": "instância",
-      "profile": "perfil",
       "server": "servidor"
     },
     "export_format": {

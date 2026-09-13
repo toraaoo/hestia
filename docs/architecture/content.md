@@ -13,11 +13,9 @@ flowchart TD
     SRC["<b>sources</b> — content/<br/>search · project · versions · resolve<br/><i>Modrinth today; the trait is the seam</i>"]
     INST["<b>install</b> — content/install/<br/>managed dir + content.json provenance + data/ mirror"]
     PACK["<b>modpacks</b> — content/mrpack · modpack<br/>the archive format, and which files a pack owns"]
-    SEL["<b>selection</b> — per-instance profiles, global profiles<br/>which of the installed pool is active"]
 
     SRC --> INST
     PACK --> INST
-    INST --> SEL
 ```
 
 ## Sources
@@ -153,7 +151,7 @@ over an item the entry is already holding a particular way.
 flow cannot reset a group it does not own: an update is `repin(item, release)`
 and a modpack re-supply is `rehold(item, holding)`. The assembler is exhaustive,
 so a new field on the record does not compile until it has been classified
-([0068](../decisions/0068-a-record-is-mutated-not-rebuilt.md)).
+([0064](../decisions/0064-a-record-is-mutated-not-rebuilt.md)).
 
 This matters beyond bookkeeping: the launch-time mirror reads `enabled` and the
 per-world disables straight off the record, so a group lost in a rebuild does
@@ -204,52 +202,6 @@ worlds and a removal clears every copy unless narrowed. Sync skips datapacks
 entirely, and the client-side support flag is waived for them: a datapack runs on
 a world's server side, including a client's integrated server
 ([0016](../decisions/0016-datapacks-are-world-of-record.md)).
-
-## Content profiles
-
-An instance's installed pool can be sliced into named **profiles**
-(`profiles.json`; absent means no profiles), keyed by filename — the one index
-field always present and unique.
-
-A profile is a **selection, not a copy**. The managed dirs stay the single source
-of truth; activating a profile changes only what the launch-time reconcile
-mirrors into `data/`:
-
-- members are mirrored;
-- tracked non-members have their `data/` copy removed (the managed copy stays);
-- untracked files are never touched;
-- **no profile active mirrors everything** — exactly the pre-profile behaviour,
-  so existing instances need no migration.
-
-Selectable kinds are mods, resourcepacks and shaders. Worlds, `servers.dat` and
-all other game data are shared across profiles *by construction*: every profile
-runs against the same single `data/`. The reserved name `none` overrides an
-active profile for one launch ([0017](../decisions/0017-content-profile-is-a-selection.md)).
-
-**Settings capture** is opt-in per profile. An uncaptured profile inherits the
-global `shared/` store; `capture` snapshots the game options into
-`<instance>/profiles/<name>/`, whose existence *is* the captured flag, and
-launches under that profile reconcile against it — baselines included. The other
-sync units stay global: capture forks *settings*, not the multiplayer list or
-what was typed into chat
-([0019](../decisions/0019-profile-settings-capture.md)).
-
-### Global profiles
-
-A different thing with a similar name: a data-home-level `profiles/<name>.json`
-is a reusable "starter pack" of **project references** — `{source, project_id,
-slug}` — never jars, because jars are version- and loader-specific.
-
-`instance.profile.apply` resolves every reference against the *target* instance's
-game version and loader through the ordinary add-content path. Applied content
-becomes an ordinary pool item with an `origin` tag (`profile:<name>`), so the
-mirror, backup heal, untracked detection and update all work on it unchanged.
-
-Apply is one-shot and additive: a reference already in the pool is skipped, one
-with no compatible version is a per-item failure the batch continues past, and
-de-listed references are never removed. Removing a profile-tagged item locally is
-refused by name — the reference leaves the global profile instead
-([0018](../decisions/0018-global-profile-stores-references.md)).
 
 ## Modpacks
 
@@ -342,6 +294,3 @@ update *does* carry the game version with it — that is what updating a pack me
 - [0014 — Enable/disable, update-check and pin extend the same model](../decisions/0014-enable-update-check-and-pin.md)
 - [0015 — A local-file import is inspected, not trusted](../decisions/0015-local-imports-are-inspected.md)
 - [0016 — Datapacks are world-of-record](../decisions/0016-datapacks-are-world-of-record.md)
-- [0017 — A content profile is a selection, not a copy](../decisions/0017-content-profile-is-a-selection.md)
-- [0018 — A global profile stores project references, never jars](../decisions/0018-global-profile-stores-references.md)
-- [0019 — Settings capture is opt-in per profile](../decisions/0019-profile-settings-capture.md)

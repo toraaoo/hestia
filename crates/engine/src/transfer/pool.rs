@@ -4,8 +4,8 @@
 //! Every launcher that is not hestia keeps its mods where the game loads them
 //! and nowhere else. hestia keeps a managed copy under the entry root and
 //! mirrors it into `data/` at launch ([`crate::content::install`]), because
-//! that is what makes an item listable, selectable into a profile, and able to
-//! survive a restore. So an import from another launcher has one extra step:
+//! that is what makes an item listable and able to survive a restore. So an
+//! import from another launcher has one extra step:
 //! move what arrived into the pool and record it.
 //!
 //! Shared rather than per-format: it is the same step for any archive that

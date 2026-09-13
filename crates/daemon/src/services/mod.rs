@@ -16,7 +16,6 @@ mod lifecycle;
 mod modpack;
 mod net;
 mod process;
-mod profile;
 mod screenshot;
 mod server;
 mod skins;
@@ -45,7 +44,6 @@ pub fn make_router() -> Router {
     backup::register(&mut on);
     content::register(&mut on);
     modpack::register(&mut on);
-    profile::register(&mut on);
     sync::register(&mut on);
     transfer::register(&mut on);
     update::register(&mut on);

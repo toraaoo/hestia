@@ -8,17 +8,14 @@ import {
   PlugIcon,
   PuzzlePieceIcon,
   SparkleIcon,
-  StackIcon,
 } from '@phosphor-icons/react';
 
 import type { ContentKind } from '@/api';
 import { m } from '@/paraglide/messages.js';
 
-/** Icon for a library entry kind — instances, hosted servers, profiles. */
-export function entryIcon(kind: 'instance' | 'server' | 'profile'): Icon {
-  if (kind === 'server') return HardDrivesIcon;
-  if (kind === 'profile') return StackIcon;
-  return CubeIcon;
+/** Icon for a library entry kind — instances and hosted servers. */
+export function entryIcon(kind: 'instance' | 'server'): Icon {
+  return kind === 'server' ? HardDrivesIcon : CubeIcon;
 }
 
 /** Icon for a piece of content, so the type reads at a glance. */

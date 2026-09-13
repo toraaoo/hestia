@@ -14,7 +14,6 @@ server differs from a game client.
 | Console | RCON | none |
 | Backups | archive/restore + schedule | none — [import/export](transfer.md) instead |
 | Shared settings (`sync`) | no, deliberately | yes |
-| Content profiles | no | yes |
 | Ports | claimed and reconciled | n/a |
 | Runs as | itself | the signed-in account |
 
@@ -23,17 +22,16 @@ server differs from a game client.
 The entry root is Hestia's namespace; `data/` is the game's working directory —
 exactly what the game reads and writes, and the launch plan's cwd. Splitting them
 is what lets Hestia keep its own artifacts without mixing them into files the
-game rewrites ([0021](../decisions/0021-entry-root-versus-data-dir.md)).
+game rewrites ([0018](../decisions/0018-entry-root-versus-data-dir.md)).
 
 ```
 servers/<dir>/                    instances/<dir>/
 ├── server.json     record        ├── instance.json    record
 ├── schema.properties            ├── content.json     install index
-├── content.json    install index├── profiles.json    content profiles
-├── modpack.json    if from a pack├── modpack.json
-├── mods/  plugins/ managed      ├── mods/ resourcepacks/ shaderpacks/
-├── backups/                     ├── profiles/<name>/  captured settings
-│                                ├── logs/session-N.log
+├── content.json    install index├── modpack.json     if from a pack
+├── modpack.json    if from a pack├── mods/ resourcepacks/ shaderpacks/
+├── mods/  plugins/ managed      ├── logs/session-N.log
+├── backups/                     │
 └── data/           the game dir  └── data/            the game dir
     server.properties, eula.txt,      saves/, options.txt, config/,
     world/, logs/, libraries/,        screenshots/, logs/,
@@ -53,7 +51,7 @@ like the entry and track its name.
 So they are decoupled: the `id` is a bare UUIDv7 hex string minted at create and
 never used as a path component, while the directory is `slugify(name)`. A rename
 rewrites the name and *moves the directory*, leaving the id — and everything
-keyed by it — untouched ([0023](../decisions/0023-id-is-a-uuid-directory-is-a-slug.md)).
+keyed by it — untouched ([0020](../decisions/0020-id-is-a-uuid-directory-is-a-slug.md)).
 
 You always address an entry by its **name**, never the id. `proto::naming::reference_matches`
 resolves a reference by exact id *or* any spelling that slugs to the display name
@@ -92,7 +90,7 @@ so a process is never running flags nobody can account for.
 
 A server is a long-lived thing, often driven headless — so `create` pays the
 whole cost once, and `start` is an immediate spawn that cannot fail on the
-network ([0056](../decisions/0056-server-provisioning-is-front-loaded.md)).
+network ([0053](../decisions/0053-server-provisioning-is-front-loaded.md)).
 
 ```mermaid
 flowchart TD
@@ -113,7 +111,7 @@ The record is registered **before** provisioning because it is what holds the
 port claim through a long download. A record carries a `ServerPhase` —
 `Provisioning`, `Ready`, `Updating` — rather than a `ready: bool`, so startup
 recovery can tell "nothing here is yours yet" (discard) from "your world is here,
-mid-swap" (keep) ([0026](../decisions/0026-server-phase-over-a-ready-bool.md)).
+mid-swap" (keep) ([0023](../decisions/0023-server-phase-over-a-ready-bool.md)).
 
 ### Ports
 
@@ -145,7 +143,7 @@ knows", the file is "the values this server holds", and vanilla preserves keys i
 does not recognise. Schema generation is best-effort — a failure is a warning,
 not a create failure — and a server with no schema accepts any unmanaged key
 rather than rejecting every one
-([0028](../decisions/0028-properties-schema-is-generated.md)).
+([0025](../decisions/0025-properties-schema-is-generated.md)).
 
 ## Launching an instance
 
@@ -157,7 +155,7 @@ flowchart TD
     ACC --> J["ensure Java runtime"]
     J --> MAT["materialize client jar,<br/>libraries, assets"]
     MAT --> SYNC["sync: reconcile shared<br/>settings and folder links"]
-    SYNC --> MIRROR["content reconcile:<br/>mirror the active profile into data/"]
+    SYNC --> MIRROR["content reconcile:<br/>mirror the installed pool into data/"]
     MIRROR --> LOG["generate the session's Log4j2 config"]
     LOG --> PLAN["assemble LaunchPlan"]
     PLAN --> SPAWN["supervisor spawns<br/>instance-&lt;id&gt;_&lt;seq&gt;"]
@@ -170,12 +168,12 @@ twice**: the `instance.multi-session` setting has to allow concurrency at all
 with `MultiSessionDisabled`, which names a setting rather than a stop. Under the hood
 `instance-<id>` is an *entry key* (the unit for backup/update/content/rename
 guards) and each launch gets a *session key* `instance-<id>_<seq>`. Servers stay
-singular ([0041](../decisions/0041-an-instance-runs-many-sessions.md)).
+singular ([0038](../decisions/0038-an-instance-runs-many-sessions.md)).
 
 Sessions share one `data/`, so each is pointed at its own generated Log4j2 config
 writing `<instance>/logs/session-<seq>.log` rather than all fighting over
 `logs/latest.log`. The generated config is Log4Shell-safe by construction
-([0042](../decisions/0042-per-session-log4j-config.md)).
+([0039](../decisions/0039-per-session-log4j-config.md)).
 
 ## Version updates
 
@@ -197,7 +195,7 @@ Both flows *mutate* the loaded record — they assign `profile` (and, for a serv
 assigned, so a server keeps its JVM tuning, its backup schedule, and the game
 port players connect to across a version change, for no reason other than that
 an update never rebuilds the record
-([0068](../decisions/0068-a-record-is-mutated-not-rebuilt.md)).
+([0064](../decisions/0064-a-record-is-mutated-not-rebuilt.md)).
 
 ## Backups
 
@@ -229,7 +227,7 @@ current data untouched.
 
 Retention prunes only `scheduled` archives, so a deliberate manual or pre-update
 backup is never auto-deleted. One backup *or* restore runs per server at a time
-([0024](../decisions/0024-backups-follow-docker-mc-backup.md)).
+([0021](../decisions/0021-backups-follow-docker-mc-backup.md)).
 
 **Instances have no backups** — [import/export](transfer.md) is what they have
 instead. A server is infrastructure that has to be recoverable in place, so it
@@ -239,7 +237,7 @@ between machines, so it travels as one file you write on purpose.
 ## Sync — shared settings across instances
 
 Instances share a closed **catalogue**, and each unit names its own mechanism
-([0022](../decisions/0022-sync-is-a-closed-catalogue.md)): four files merged
+([0019](../decisions/0019-sync-is-a-closed-catalogue.md)): four files merged
 through a persistent `<data_home>/shared/` store, and the screenshots, which are
 only ever read where they already are. Every one is copied and merged —
 nothing is linked, and worlds are never shared. Servers are deliberately
@@ -283,7 +281,7 @@ candidates rather than picking.
 Each instance's copy reconciles against a **baseline**, the content it and the
 shared copy last agreed on: only a side that moved since then wins, and the clock
 breaks a tie no other way settles
-([0069](../decisions/0069-sync-reconciles-against-a-baseline.md)). A missing side
+([0065](../decisions/0065-sync-reconciles-against-a-baseline.md)). A missing side
 is never an edit, and a key, entry or line only one side knows is carried
 through. The pass runs at every launch and once more when each session
 **exits**, so what the player changed in game reaches the shared copy then
@@ -294,13 +292,13 @@ instance that is never launched.
 The merge writes the file the game would: comments, key order and line endings
 survive, an unreadable file skips the unit instead of being replaced, and a
 `servers.dat` row keeps tags this build does not model
-([0074](../decisions/0074-the-merge-writes-the-games-own-file.md)). Before
+([0070](../decisions/0070-the-merge-writes-the-games-own-file.md)). Before
 sharing first lands on an instance, its own copy is kept under
 `<store>/.backups/<instance>/`.
 
 Sharing is refused for nothing else: an arbitrary path is not a sync target,
 because the catalogue exists to name files whose format the launcher can merge
-([0022](../decisions/0022-sync-is-a-closed-catalogue.md)).
+([0019](../decisions/0019-sync-is-a-closed-catalogue.md)).
 
 **A unit shares only what its version writes.** 1.13 respelled every keybind, so
 a pre-1.13 instance keeps its own `options.txt`; the command history and the
@@ -308,7 +306,7 @@ creative hotbars simply do not exist before 1.20.2 and 1.12. An instance below a
 unit's floor is skipped with a warning naming the version that would share it.
 The 1.20.5 item-format break is not a floor but a split: hotbars are stored per
 era, so each side shares with its own and neither writes a file the other cannot
-read ([0073](../decisions/0073-a-unit-shares-only-what-its-version-writes.md)).
+read ([0069](../decisions/0069-a-unit-shares-only-what-its-version-writes.md)).
 
 An instance **overrides** the catalogue on two axes, and neither moves a file —
 the next launch simply reconciles differently. It can keep any unit to itself,
@@ -318,11 +316,6 @@ never strips it from the others. Some keys are never shared at all — the pack
 selection, which would name packs the receiver has not installed, and the keys
 describing the file, the machine or a moment (`version`, `lastServer`, the
 display and audio keys, the first-run prompts).
-
-A `Scope` decides where the settings unit reconciles: the global store or a
-[captured profile's](content.md#content-profiles). A launch records its scope
-against the session id, so the exit pass uses the profile it launched under
-rather than whichever is active by then.
 
 ## Worlds
 
@@ -335,7 +328,7 @@ addresses a world by folder, because that is what the game reads and what the
 content index keys on. And **every field but the folder is best-effort**: saves
 span more than a decade of formats, and a corrupt or mid-write one still has to
 appear in the listing, so a failure yields the folder alone with `read: false`
-([0025](../decisions/0025-a-world-describes-itself.md)).
+([0022](../decisions/0022-a-world-describes-itself.md)).
 
 ## Joining directly
 
@@ -349,7 +342,7 @@ The target is validated **before** anything is materialised: a game version olde
 than 1.20 has no such arguments and is refused (`QuickPlayUnsupported`), as is a
 world folder that is not there or an address that does not parse. Refusing is the
 point — an ignored argument would drop the player at the title screen and call
-the launch a success ([0062](../decisions/0062-joining-directly-is-a-launch-parameter.md)).
+the launch a success ([0058](../decisions/0058-joining-directly-is-a-launch-parameter.md)).
 
 ## The multiplayer list
 
@@ -374,21 +367,21 @@ That file belongs to the running game, which holds the list in memory and
 rewrites it wholesale when it exits. An edit made underneath a live session is
 therefore made *and* reported as degraded (`ServerListInUse`), rather than
 refused: the daemon cannot make the write durable, but it can say so
-([0029](../decisions/0029-degraded-outcomes-ride-on-the-result.md)).
+([0026](../decisions/0026-degraded-outcomes-ride-on-the-result.md)).
 
 ## Decisions
 
-- [0021 — The entry root is Hestia's; `data/` is the game's](../decisions/0021-entry-root-versus-data-dir.md)
-- [0022 — Sync is a closed catalogue of merged files](../decisions/0022-sync-is-a-closed-catalogue.md)
-- [0069 — A synced unit reconciles against a baseline, not a clock](../decisions/0069-sync-reconciles-against-a-baseline.md)
-- [0023 — The id is an opaque uuid; the directory is the slug](../decisions/0023-id-is-a-uuid-directory-is-a-slug.md)
-- [0024 — Backups follow docker-mc-backup, minus what the launcher already owns](../decisions/0024-backups-follow-docker-mc-backup.md)
-- [0025 — A world describes itself; a directory listing does not](../decisions/0025-a-world-describes-itself.md)
-- [0026 — An unfinished record says which kind of unfinished](../decisions/0026-server-phase-over-a-ready-bool.md)
-- [0028 — The properties schema is generated, not maintained](../decisions/0028-properties-schema-is-generated.md)
-- [0062 — Joining directly is a launch parameter, not a second launch path](../decisions/0062-joining-directly-is-a-launch-parameter.md)
-- [0041 — An instance runs many sessions; a server runs one](../decisions/0041-an-instance-runs-many-sessions.md)
-- [0042 — Per-session logs come from a generated Log4j2 config](../decisions/0042-per-session-log4j-config.md)
-- [0056 — Server provisioning is front-loaded by design](../decisions/0056-server-provisioning-is-front-loaded.md)
-- [0059 — The server console is RCON, not a stdin pipe](../decisions/0059-the-console-is-rcon-not-a-pipe.md)
-- [0068 — A record of the user's is mutated, never rebuilt](../decisions/0068-a-record-is-mutated-not-rebuilt.md)
+- [0018 — The entry root is Hestia's; `data/` is the game's](../decisions/0018-entry-root-versus-data-dir.md)
+- [0019 — Sync is a closed catalogue of merged files](../decisions/0019-sync-is-a-closed-catalogue.md)
+- [0065 — A synced unit reconciles against a baseline, not a clock](../decisions/0065-sync-reconciles-against-a-baseline.md)
+- [0020 — The id is an opaque uuid; the directory is the slug](../decisions/0020-id-is-a-uuid-directory-is-a-slug.md)
+- [0021 — Backups follow docker-mc-backup, minus what the launcher already owns](../decisions/0021-backups-follow-docker-mc-backup.md)
+- [0022 — A world describes itself; a directory listing does not](../decisions/0022-a-world-describes-itself.md)
+- [0023 — An unfinished record says which kind of unfinished](../decisions/0023-server-phase-over-a-ready-bool.md)
+- [0025 — The properties schema is generated, not maintained](../decisions/0025-properties-schema-is-generated.md)
+- [0058 — Joining directly is a launch parameter, not a second launch path](../decisions/0058-joining-directly-is-a-launch-parameter.md)
+- [0038 — An instance runs many sessions; a server runs one](../decisions/0038-an-instance-runs-many-sessions.md)
+- [0039 — Per-session logs come from a generated Log4j2 config](../decisions/0039-per-session-log4j-config.md)
+- [0053 — Server provisioning is front-loaded by design](../decisions/0053-server-provisioning-is-front-loaded.md)
+- [0055 — The server console is RCON, not a stdin pipe](../decisions/0055-the-console-is-rcon-not-a-pipe.md)
+- [0064 — A record of the user's is mutated, never rebuilt](../decisions/0064-a-record-is-mutated-not-rebuilt.md)

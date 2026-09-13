@@ -85,7 +85,7 @@ renamed. **Enums are the exception** — their variant *values* stay
 `rename_all` alone. `tests/casing.rs` enforces the struct rule: a new serialized struct without the attribute fails the
 build. The one deliberate non-camel exception is the `config.*` key vocabulary (`jvm-args`, `backup-interval`, …), which
 stays kebab-case — see
-[decision 0031](decisions/0031-camelcase-except-the-config-vocabulary.md). For a daemon→client push, implement `Topic` instead of
+[decision 0028](decisions/0028-camelcase-except-the-config-vocabulary.md). For a daemon→client push, implement `Topic` instead of
 `Contract` — the type is its own event payload:
 
 ```rust
@@ -168,7 +168,7 @@ function needs no aggregate member at all.
 A subsystem with an **open set of implementations** — a content platform, an
 archive format — gets a trait plus a registry list, so adding one is a module
 beside the others and a line in that list ([0010](decisions/0010-one-content-provider-trait.md),
-[0061](decisions/0061-an-archive-format-is-a-module.md)). Keep what needs the
+[0057](decisions/0057-an-archive-format-is-a-module.md)). Keep what needs the
 aggregate out of the implementations: express it as data the flow matches on,
 and the flow stops growing a branch per implementation.
 
@@ -184,7 +184,7 @@ still write `engine.provision_server(…)`.
 Anything of the user's that the engine writes to the data home is a
 `schema::Document`: it declares its name and its migration chain, and `schema::load`/`save` handle the stamping,
 the temp-file write and the quarantine of a file this build cannot read
-([0064](decisions/0064-a-managed-document-carries-its-schema-version.md)).
+([0060](decisions/0060-a-managed-document-carries-its-schema-version.md)).
 
 ```rust
 impl Document for InstanceRecord {
@@ -193,7 +193,7 @@ impl Document for InstanceRecord {
 ```
 
 For a record living under an entry directory, that is all — `registry::read_record`/`write_record`/`scan` take the file
-name from `NAME`, so there is no second constant to pass. A document with its own path (the settings, a global profile)
+name from `NAME`, so there is no second constant to pass. A document with its own path (the settings, the accounts)
 calls `schema::load`/`save` directly.
 
 **An additive field needs no migration.** `#[serde(default)]` already decodes an older file, which is why most documents
@@ -203,7 +203,7 @@ have an empty chain.
 
 ```rust
 impl Document for Stored {
-    const NAME: &'static str = "a global profile";
+    const NAME: &'static str = "content.json";
     const MIGRATIONS: &'static [Step] = &[lift_bare_array];
 }
 
@@ -220,8 +220,7 @@ A step rewrites the `Value`, never the deserialized type — the struct only des
 decoded would need rewriting every time the struct moved. Steps run in order from whatever version the file declares, and
 the result is written back, so a document migrates once.
 
-Pin the step with a test that writes the old shape and reads the new one (`profiles.rs` and `schema/mod.rs` have the
-pattern). If the document also travels in an archive, check `transfer/hestia.rs` — the manifest carries the instance
+Pin the step with a test that writes the old shape and reads the new one (`schema/mod.rs` has the pattern). If the document also travels in an archive, check `transfer/hestia.rs` — the manifest carries the instance
 record stamped, so an archive migrates through the same chain.
 
 ---
@@ -368,7 +367,7 @@ The desktop's Rust side is a fixed, generic bridge (`crates/desktop/src/bridge.r
 — one `ipc_call` command over the shared client, plus event forwarding); it never grows per feature. A desktop feature
 is TypeScript in `frontend/src/api/` (and, usually, a hook in `frontend/src/queries/`) — the desktop's equivalent of a
 client facade method. See [the desktop front-end](architecture/frontends.md#desktop--hestia-desktop) and
-[decision 0049](decisions/0049-desktop-bridge-is-one-generic-command.md);
+[decision 0046](decisions/0046-desktop-bridge-is-one-generic-command.md);
 [hooks.md](hooks.md) is the usage guide for *consuming* the queries layer (patterns, the job store, the full hook
 inventory).
 
@@ -443,7 +442,7 @@ roots — put the string where it is *rendered*, not where it happens to be defi
 | Root                    | What goes in it                                                                                                                                         |
 |-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `app.*`                 | shell chrome and shared vocabulary — `nav`, `window`, `action`, `label`, `status`, `toast`, `search`, `time`, `jobs`, `validation`, `daemon`            |
-| `<feature>.*`           | one root per `frontend/src/features/` directory — `library`, `entry`, `server`, `instance`, `content`, `profile`, `skin`, `settings`, `account` |
+| `<feature>.*`           | one root per `frontend/src/features/` directory — `library`, `entry`, `server`, `instance`, `content`, `skin`, `settings`, `account` |
 | `domain.*`              | vocabulary mirroring a `proto` enum — content kinds, flavors, gamemodes, difficulties, provision phases, entry types                                    |
 | `error.*` / `warning.*` | the daemon's own `ErrorInfo`/`WarningInfo` vocabulary, keyed by variant (`kind`, `code`, `token`, `hint`)                                               |
 

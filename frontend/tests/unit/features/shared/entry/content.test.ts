@@ -42,7 +42,6 @@ describe('contentBusy', () => {
   it('reads a running content job as busy, whatever started it', () => {
     expect(contentBusy([job('content.update', 'running')])).toBe(true);
     expect(contentBusy([job('content.add', 'running')])).toBe(true);
-    expect(contentBusy([job('profile.apply', 'running')])).toBe(true);
   });
 
   it('ignores a settled one, and jobs that hold no content lock', () => {

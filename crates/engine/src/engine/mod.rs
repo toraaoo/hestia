@@ -25,7 +25,6 @@ use crate::instances::Instances;
 use crate::java::Java;
 use crate::minecraft::Minecraft;
 use crate::process::ProcessSupervisor;
-use crate::profiles::Profiles;
 use crate::servers::Servers;
 use crate::skins::Skins;
 use crate::sync::Sync;
@@ -74,7 +73,6 @@ pub struct Engine {
     instances: Instances,
     skins: Skins,
     sync: Sync,
-    profiles: Profiles,
     update: Update,
     processes: Arc<ProcessSupervisor>,
     // One backup or restore per entry at a time: two archives of the same
@@ -101,7 +99,6 @@ impl Engine {
         let instances = Instances::new(data_home.join("instances"));
         let skins = Skins::new(data_home.join("skins"));
         let sync = Sync::new(data_home.join("shared"));
-        let profiles = Profiles::new(data_home.join("profiles"));
         let settings = config.settings();
         content.configure(&settings.content);
         crate::net::network().set_offline_mode(settings.network.offline);
@@ -120,7 +117,6 @@ impl Engine {
             instances,
             skins,
             sync,
-            profiles,
             update,
             processes,
             backups_active: Mutex::new(HashSet::new()),
@@ -177,7 +173,6 @@ impl Engine {
         self.instances.reload(resolved.join("instances"));
         self.skins.reload(resolved.join("skins"));
         self.sync.reload(resolved.join("shared"));
-        self.profiles.reload(resolved.join("profiles"));
         self.update.reload(resolved.join("updates"));
         self.processes.reload(resolved.join("processes"));
         *self.data_home.lock().unwrap() = resolved.clone();
@@ -253,9 +248,5 @@ impl Engine {
 
     pub fn update(&self) -> &Update {
         &self.update
-    }
-
-    pub fn profiles(&self) -> &Profiles {
-        &self.profiles
     }
 }
