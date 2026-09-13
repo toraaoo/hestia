@@ -27,7 +27,7 @@ export const stateLabel: Record<UnitState, () => string> = {
   pending: () => m['domain.sync_state.pending'](),
   overridden: () => m['domain.sync_state.overridden'](),
   off: () => m['domain.sync_state.off'](),
-  era_bound: () => m['domain.sync_state.era_bound'](),
+  unsupported: () => m['domain.sync_state.unsupported'](),
 };
 
 export const stateTone: Record<UnitState, 'on' | 'off' | 'warn'> = {
@@ -35,5 +35,5 @@ export const stateTone: Record<UnitState, 'on' | 'off' | 'warn'> = {
   pending: 'off',
   overridden: 'off',
   off: 'off',
-  era_bound: 'warn',
+  unsupported: 'warn',
 };

@@ -82,11 +82,11 @@
       "writing_pack_files": "Writing pack files"
     },
     "sync_state": {
-      "era_bound": "too old to share",
       "off": "not shared",
       "overridden": "keeps its own",
       "pending": "shares at next launch",
-      "synced": "synced"
+      "synced": "synced",
+      "unsupported": "version too old to share"
     },
     "sync_unit": {
       "commands": {

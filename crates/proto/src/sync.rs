@@ -232,8 +232,9 @@ pub enum UnitState {
     Overridden,
     /// Off in the catalogue.
     Off,
-    /// A pre-1.13 client cannot read the shared copy, nor it theirs.
-    EraBound,
+    /// The instance's game version is older than the unit's file, or older
+    /// than the spelling the other instances write.
+    Unsupported,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]

@@ -1,4 +1,5 @@
-//! The closed set of syncable units and the file each one is.
+//! The closed set of syncable units, the file each one is, and what a unit
+//! needs from the game version it is asked to share with.
 
 use proto::sync::SyncUnit;
 
@@ -18,18 +19,40 @@ pub fn file(unit: SyncUnit) -> &'static str {
     }
 }
 
-/// 1.13 renamed every `options.txt` keybind from an LWJGL key code to a
-/// `key.keyboard.*` name. An old client drops the binds it cannot parse and
-/// writes its own spelling back, so the gate holds in both directions.
-const SHARED_FORMATS_SINCE: (u64, u64, u64) = (1, 13, 0);
+/// The version each unit's file first exists in, or first exists in a spelling
+/// the other instances can read. Below it the file is either absent (the game
+/// never writes one) or written in a form the modern one corrupts, and sharing
+/// it degrades whichever side wrote last.
+///
+/// - `options.txt`: 1.13 renamed every keybind from an LWJGL key code to a
+///   `key.keyboard.*` name. An old client drops the binds it cannot parse and
+///   writes its own spelling back, so the gate holds in both directions.
+/// - `hotbar.nbt`: creative hotbar saving arrived in 1.12.
+/// - `command_history.txt`: the game only started writing one in 1.20.2.
+fn requires(unit: SyncUnit) -> Option<(u64, u64, u64)> {
+    match unit {
+        SyncUnit::Options => Some((1, 13, 0)),
+        SyncUnit::Hotbars => Some((1, 12, 0)),
+        SyncUnit::Commands => Some((1, 20, 2)),
+        SyncUnit::Servers => None,
+    }
+}
 
-pub fn era_bound(unit: SyncUnit) -> bool {
-    matches!(unit, SyncUnit::Options)
+/// What a front-end tells the user a skipped unit is waiting for.
+pub fn requirement(unit: SyncUnit) -> String {
+    match requires(unit) {
+        Some((major, minor, 0)) => format!("{major}.{minor}"),
+        Some((major, minor, patch)) => format!("{major}.{minor}.{patch}"),
+        None => String::new(),
+    }
 }
 
 /// An id that is not a release triple is a snapshot, which is modern.
-pub fn shares_era_bound(game_version: &str) -> bool {
-    crate::version::parse(game_version).is_none_or(|v| v >= SHARED_FORMATS_SINCE)
+pub fn supports(unit: SyncUnit, game_version: &str) -> bool {
+    let Some(floor) = requires(unit) else {
+        return true;
+    };
+    crate::version::parse(game_version).is_none_or(|version| version >= floor)
 }
 
 pub fn captured(unit: SyncUnit) -> bool {

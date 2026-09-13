@@ -11,8 +11,8 @@
       "properties_schema_missing": "Qualquer chave é aceita até que ele possa ser derivado novamente, então confira a grafia você mesmo. Atualizar o servidor o deriva de novo.",
       "server_list_in_use": "Feche o jogo e faça a mudança de novo, ou adicione o servidor pela tela multijogador do jogo.",
       "session_not_verified": "O modo um jogador funciona normalmente; inicie novamente quando estiver online para jogar multijogador.",
-      "sync_unit_era_bound": "Esta instância mantém a própria cópia. Uma versão anterior à 1.13 e uma atual não conseguem ler a cópia uma da outra.",
-      "sync_unit_skipped": "Verifique as permissões dos arquivos da instância e inicie novamente."
+      "sync_unit_skipped": "Verifique as permissões dos arquivos da instância e inicie novamente.",
+      "sync_unit_unsupported": "Esta instância mantém a própria cópia. Compartilhar {unit} exige o Minecraft {requires} ou mais recente."
     },
     "kind": {
       "document_quarantined": "{document} não pôde ser lido e foi posto de lado: {detail}",
@@ -24,8 +24,8 @@
       "properties_schema_missing": "'{name}' não tem esquema de propriedades, então suas chaves de server.properties não podem ser verificadas.",
       "server_list_in_use": "“{instance}” tem {sessions} sessão(ões) aberta(s), então o jogo em execução vai sobrescrever esta mudança na lista multijogador ao sair.",
       "session_not_verified": "Não foi possível acessar a Microsoft para renovar {account}, então esta sessão usa o login armazenado.",
-      "sync_unit_era_bound": "“{instance}” é antiga demais para compartilhar {unit} com suas outras instâncias.",
-      "sync_unit_skipped": "{unit} não pôde ser sincronizado: {detail}"
+      "sync_unit_skipped": "{unit} não pôde ser sincronizado: {detail}",
+      "sync_unit_unsupported": "“{instance}” não pode compartilhar {unit}: isso exige o Minecraft {requires} ou mais recente."
     },
     "token": {
       "commands": "o histórico de comandos",

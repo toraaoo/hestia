@@ -82,11 +82,11 @@
       "writing_pack_files": "Gravando arquivos do pacote"
     },
     "sync_state": {
-      "era_bound": "antiga demais para compartilhar",
       "off": "não compartilhado",
       "overridden": "mantém o próprio",
       "pending": "compartilha no próximo início",
-      "synced": "sincronizado"
+      "synced": "sincronizado",
+      "unsupported": "versão antiga demais para compartilhar"
     },
     "sync_unit": {
       "commands": {

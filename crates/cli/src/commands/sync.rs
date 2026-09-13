@@ -89,7 +89,7 @@ pub fn state_label(state: UnitState) -> &'static str {
         UnitState::Pending => "shares at next launch",
         UnitState::Overridden => "keeps its own",
         UnitState::Off => "not shared",
-        UnitState::EraBound => "too old to share",
+        UnitState::Unsupported => "version too old to share",
     }
 }
 

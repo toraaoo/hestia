@@ -26,12 +26,14 @@ pub enum WarningInfo {
     /// The schema-generation run produced nothing, so this server's property
     /// keys cannot be validated — every unmanaged key will be accepted.
     PropertiesSchemaMissing { name: String },
-    /// A synced unit was left instance-local because this instance predates
-    /// 1.13: the two eras cannot read each other's `options.txt`, in either
-    /// direction, so sharing it would degrade whichever side wrote last.
-    SyncUnitEraBound {
+    /// A synced unit was left instance-local because this instance's game
+    /// version is older than the unit needs: the file either does not exist at
+    /// that version or is written in a spelling the other instances corrupt.
+    /// `requires` is the version that would share it.
+    SyncUnitUnsupported {
         instance: String,
         unit: crate::sync::SyncUnit,
+        requires: String,
     },
     /// A synced unit could not be reconciled at all, so this launch runs on
     /// whatever the instance already had. `detail` is operational English,
@@ -96,9 +98,8 @@ impl WarningInfo {
                 "any key is accepted until it can be derived again, so check spelling yourself; \
                  `hestia server {name} update <version>` re-derives it"
             ),
-            SyncUnitEraBound { unit, .. } => format!(
-                "{unit} stays this instance's own — a pre-1.13 version and a current one cannot \
-                 read each other's copy"
+            SyncUnitUnsupported { unit, requires, .. } => format!(
+                "{unit} stays this instance's own — sharing it needs Minecraft {requires} or newer"
             ),
             SyncUnitSkipped { unit, .. } => {
                 format!("check the instance's file permissions, then launch again to share {unit}")
@@ -146,9 +147,13 @@ impl fmt::Display for WarningInfo {
                 f,
                 "'{name}' has no property schema: its server.properties keys cannot be validated"
             ),
-            SyncUnitEraBound { instance, unit } => write!(
+            SyncUnitUnsupported {
+                instance,
+                unit,
+                requires,
+            } => write!(
                 f,
-                "'{instance}' is too old to share {unit} with your other instances"
+                "'{instance}' cannot share {unit}: that needs Minecraft {requires} or newer"
             ),
             SyncUnitSkipped { unit, detail } => {
                 write!(f, "{unit} could not be synced: {detail}")

@@ -11,8 +11,8 @@
       "properties_schema_missing": "Any key is accepted until it can be derived again, so check spelling yourself. Updating the server re-derives it.",
       "server_list_in_use": "Close the game and make the change again, or add the server from the in-game multiplayer screen instead.",
       "session_not_verified": "Singleplayer works as usual; launch again once you are back online to play multiplayer.",
-      "sync_unit_era_bound": "This instance keeps its own copy. A pre-1.13 version and a current one cannot read each other's.",
-      "sync_unit_skipped": "Check the instance's file permissions, then launch it again."
+      "sync_unit_skipped": "Check the instance's file permissions, then launch it again.",
+      "sync_unit_unsupported": "This instance keeps its own copy. Sharing {unit} needs Minecraft {requires} or newer."
     },
     "kind": {
       "document_quarantined": "{document} could not be read and was set aside: {detail}",
@@ -24,8 +24,8 @@
       "properties_schema_missing": "'{name}' has no property schema, so its server.properties keys cannot be checked.",
       "server_list_in_use": "“{instance}” has {sessions} session(s) open, so the running game will overwrite this change to the multiplayer list when it exits.",
       "session_not_verified": "Could not reach Microsoft to refresh {account}, so this session runs on the stored sign-in.",
-      "sync_unit_era_bound": "“{instance}” is too old to share {unit} with your other instances.",
-      "sync_unit_skipped": "{unit} could not be synced: {detail}"
+      "sync_unit_skipped": "{unit} could not be synced: {detail}",
+      "sync_unit_unsupported": "“{instance}” cannot share {unit}: that needs Minecraft {requires} or newer."
     },
     "token": {
       "commands": "the command history",

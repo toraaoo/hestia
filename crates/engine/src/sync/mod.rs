@@ -134,11 +134,12 @@ impl Sync {
             if !catalogue.enabled(unit) || !pass.overrides.shares(unit) {
                 continue;
             }
-            if catalogue::era_bound(unit) && !catalogue::shares_era_bound(&pass.game_version) {
-                tracing::info!(instance = %pass.name, version = %pass.game_version, %unit, "sync skipped an era-bound unit");
-                warnings.push(WarningInfo::SyncUnitEraBound {
+            if !catalogue::supports(unit, &pass.game_version) {
+                tracing::info!(instance = %pass.name, version = %pass.game_version, %unit, "sync skipped a unit this version cannot share");
+                warnings.push(WarningInfo::SyncUnitUnsupported {
                     instance: pass.name.clone(),
                     unit,
+                    requires: catalogue::requirement(unit),
                 });
                 continue;
             }
@@ -209,8 +210,8 @@ impl Sync {
         if !pass.overrides.shares(unit) {
             return UnitState::Overridden;
         }
-        if catalogue::era_bound(unit) && !catalogue::shares_era_bound(&pass.game_version) {
-            return UnitState::EraBound;
+        if !catalogue::supports(unit, &pass.game_version) {
+            return UnitState::Unsupported;
         }
         let agreed = self
             .store_root(unit, pass, shared)
@@ -594,14 +595,19 @@ mod tests {
         assert!(data.join("hotbar.nbt").exists());
         assert!(warnings
             .iter()
-            .any(|warning| matches!(warning, WarningInfo::SyncUnitEraBound { .. })));
+            .any(|warning| matches!(warning, WarningInfo::SyncUnitUnsupported { .. })));
     }
 
     #[test]
-    fn the_era_boundary_is_the_1_13_format_break() {
-        assert!(!catalogue::shares_era_bound("1.12.2"));
-        assert!(catalogue::shares_era_bound("1.13"));
-        assert!(catalogue::shares_era_bound("23w14a"));
+    fn a_unit_is_gated_by_the_version_that_first_writes_its_file() {
+        assert!(!catalogue::supports(SyncUnit::Options, "1.12.2"));
+        assert!(catalogue::supports(SyncUnit::Options, "1.13"));
+        assert!(catalogue::supports(SyncUnit::Options, "23w14a"));
+        assert!(!catalogue::supports(SyncUnit::Commands, "1.20.1"));
+        assert!(catalogue::supports(SyncUnit::Commands, "1.20.2"));
+        assert!(!catalogue::supports(SyncUnit::Hotbars, "1.11.2"));
+        assert!(catalogue::supports(SyncUnit::Hotbars, "1.12"));
+        assert!(catalogue::supports(SyncUnit::Servers, "1.7.10"));
     }
 
     /// The file the game wrote is the file it gets back: a merge that settles

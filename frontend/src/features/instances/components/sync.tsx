@@ -79,7 +79,7 @@ export function InstanceSyncField({ id }: { id: string }) {
                 size="sm"
                 aria-label={unitLabel[unit]()}
                 checked={state !== 'overridden'}
-                disabled={setUnit.isPending || state === 'era_bound'}
+                disabled={setUnit.isPending || state === 'unsupported'}
                 onCheckedChange={(checked) =>
                   setUnit.mutate({ unit, shared: checked === true })
                 }
