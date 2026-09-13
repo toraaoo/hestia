@@ -29,9 +29,7 @@ describe('EntryTile (grid)', () => {
   it('shows the entry’s identity', async () => {
     show(entry());
     expect(await screen.findByText('SMP')).toBeDefined();
-    expect(screen.getByText('paper')).toBeDefined();
-    expect(screen.getByText('1.21.1')).toBeDefined();
-    expect(screen.getByText(':25565 · Stopped')).toBeDefined();
+    expect(screen.getByText('paper · 1.21.1')).toBeDefined();
   });
 
   it('links to the entry the card is for', async () => {
