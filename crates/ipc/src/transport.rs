@@ -232,16 +232,30 @@ mod platform {
 #[cfg(windows)]
 mod platform {
     use std::path::Path;
+    use std::time::Duration;
 
     use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeServer, ServerOptions};
 
     use super::{Connection, Peer};
     use crate::errors::IpcError;
 
+    const ERROR_PIPE_BUSY: i32 = 231;
+    const BUSY_RETRIES: u32 = 20;
+    const BUSY_BACKOFF: Duration = Duration::from_millis(25);
+
     pub async fn connect(endpoint: &Path) -> Result<Connection, IpcError> {
         let name = endpoint.to_string_lossy().to_string();
-        let client = ClientOptions::new().open(&name)?;
-        Ok(Connection::from_stream(Box::new(client)))
+        let mut attempt = 0;
+        loop {
+            match ClientOptions::new().open(&name) {
+                Ok(client) => return Ok(Connection::from_stream(Box::new(client))),
+                Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY) && attempt < BUSY_RETRIES => {
+                    attempt += 1;
+                    tokio::time::sleep(BUSY_BACKOFF).await;
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
     }
 
     /// Server side: a fresh pipe instance is created per accepted connection.
@@ -252,20 +266,21 @@ mod platform {
 
     impl Listener {
         pub async fn accept(&self) -> Result<(Connection, Peer), IpcError> {
-            let server = {
-                let mut slot = self.next.lock().unwrap();
-                slot.take()
-                    .ok_or_else(|| IpcError::Malformed("named pipe listener not primed".into()))?
-            };
-            server.connect().await?;
-            // Prime the next instance so a subsequent client can connect.
-            let next = ServerOptions::new().create(&self.name)?;
-            *self.next.lock().unwrap() = Some(next);
+            let server = self.armed()?;
+            let connected = server.connect().await;
+            // Without a listening instance the pipe name vanishes: clients read the daemon as down.
+            *self.next.lock().unwrap() = Some(ServerOptions::new().create(&self.name)?);
+            connected?;
             let peer = Peer {
                 local: true,
                 uid: 0,
             };
             Ok((Connection::from_stream(Box::new(server)), peer))
+        }
+
+        fn armed(&self) -> std::io::Result<NamedPipeServer> {
+            let parked = self.next.lock().unwrap().take();
+            parked.map_or_else(|| ServerOptions::new().create(&self.name), Ok)
         }
     }
 
