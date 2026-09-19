@@ -50,8 +50,7 @@ pub fn sibling_binary(names: &[&str]) -> Option<PathBuf> {
 /// own directory, so every binary of one build agrees on one home.
 #[cfg(any(feature = "portable", debug_assertions))]
 fn contained_data_home() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    Some(layout_root(exe.parent()?).join("data"))
+    Some(install_root()?.join("data"))
 }
 
 /// A short, stable tag for a path. A per-install name must fit inside a unix
@@ -74,7 +73,14 @@ pub fn path_tag(path: &Path) -> String {
 /// where there is nothing to tell apart.
 #[cfg(any(feature = "portable", debug_assertions))]
 pub fn install_scope() -> Option<String> {
-    contained_data_home().map(|dir| path_tag(&dir))
+    install_root().map(|root| scope_of(&root))
+}
+
+/// Canonical: Windows reports the exe path in whatever case and form it was launched by.
+#[cfg(any(feature = "portable", debug_assertions))]
+fn scope_of(root: &Path) -> String {
+    let root = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+    path_tag(&root.join("data"))
 }
 
 #[cfg(not(any(feature = "portable", debug_assertions)))]
@@ -205,7 +211,16 @@ mod tests {
     }
 
     #[test]
-    fn a_contained_build_is_scoped_by_the_data_home_it_resolves() {
-        assert_eq!(install_scope(), Some(path_tag(&anchor_dir())));
+    fn a_contained_build_is_scoped_by_the_root_of_the_data_home_it_resolves() {
+        let root = anchor_dir().parent().unwrap().to_path_buf();
+        assert_eq!(install_scope(), Some(scope_of(&root)));
+    }
+
+    #[test]
+    fn every_spelling_of_one_root_is_one_scope() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir(root.path().join("bin")).unwrap();
+        let detour = root.path().join("bin").join("..");
+        assert_eq!(scope_of(root.path()), scope_of(&detour));
     }
 }
