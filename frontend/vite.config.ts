@@ -75,7 +75,8 @@ const config = defineConfig({
   // `@/*` and `#/*` map to `src/*`; `@/assets/*` reaches the project-root
   // drawable set instead (kept outside src so Vite fingerprints the sprites as
   // bundled assets). Prefix order matters — the assets entry must win first.
-  // Mirrors the tsconfig paths.
+  // A string `find` matches only itself or `find + '/'` in the dev server, so
+  // it never carries its own trailing slash. Mirrors the tsconfig paths.
   resolve: {
     alias: [
       {
@@ -83,12 +84,12 @@ const config = defineConfig({
         replacement: fileURLToPath(new URL('./assets', import.meta.url)),
       },
       {
-        find: '@/',
-        replacement: fileURLToPath(new URL('./src/', import.meta.url)),
+        find: '@',
+        replacement: fileURLToPath(new URL('./src', import.meta.url)),
       },
       {
-        find: '#/',
-        replacement: fileURLToPath(new URL('./src/', import.meta.url)),
+        find: '#',
+        replacement: fileURLToPath(new URL('./src', import.meta.url)),
       },
     ],
   },
