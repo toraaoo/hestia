@@ -117,6 +117,16 @@ mod tests {
         std::fs::write(path, text).unwrap();
     }
 
+    fn backdate(path: &Path) {
+        let when = std::time::SystemTime::now() - std::time::Duration::from_secs(60);
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(when)
+            .unwrap();
+    }
+
     struct Fixture {
         _dir: tempfile::TempDir,
         baseline: std::path::PathBuf,
@@ -174,6 +184,7 @@ mod tests {
     fn a_mods_setting_reaches_only_instances_that_have_it() {
         let f = fixture();
         write(&f.data, "guiScale:1\n");
+        backdate(&f.data);
         write(&f.store, "guiScale:2\nsodium.options:on\n");
         merge(&f.baseline, &f.store, &f.data, &BTreeSet::new(), "1.21.4").unwrap();
 
