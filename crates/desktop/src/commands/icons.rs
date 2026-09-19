@@ -5,6 +5,10 @@
 //! The webview loads them over the asset protocol, whose scope is widened to
 //! the icons directory at each call — the data home can move at runtime.
 //!
+//! An entry created from a modpack inherits the pack's icon: `icon_fetch`
+//! downloads it into the same directory, sniffing the format rather than
+//! trusting the URL or the server's content type.
+//!
 //! Entries can instead wear a *generated* icon: a flat PNG composited here
 //! from a background (solid color or vertical gradient) and a symbol sprite
 //! ship from the frontend, saved as `<entry-id>.png`. The configuration that
@@ -24,6 +28,7 @@ use crate::bridge::CallError;
 
 const MAX_BYTES: u64 = 10 * 1024 * 1024;
 const EXTENSIONS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "gif"];
+const FETCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 
 /// A generated icon's geometry; the sidecar documents the config that made it.
 const GENERATED_ICON_SIZE: u32 = 256;
@@ -119,6 +124,16 @@ fn has_image_extension(path: &Path) -> bool {
         .is_some_and(|e| EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
 }
 
+fn store(app: &AppHandle, entry_id: &str, ext: &str, bytes: &[u8]) -> Result<IconEntry, CallError> {
+    let dir = icons_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| CallError::other(e.to_string()))?;
+    remove_stored(&dir, entry_id);
+    let target = dir.join(format!("{entry_id}.{ext}"));
+    std::fs::write(&target, bytes).map_err(|e| CallError::other(e.to_string()))?;
+    allow_assets(app, &dir);
+    entry_for(&target).ok_or_else(|| CallError::other("cannot read the stored icon"))
+}
+
 fn remove_stored(dir: &Path, id: &str) {
     for (stored_id, path) in stored_icons(dir) {
         if stored_id == id {
@@ -159,15 +174,70 @@ pub fn icon_set(
     if size > MAX_BYTES {
         return Err(CallError::other("image is larger than 10 MB"));
     }
-
-    let dir = icons_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| CallError::other(e.to_string()))?;
-    remove_stored(&dir, &entry_id);
-    let target = dir.join(format!("{entry_id}.{ext}"));
-    std::fs::copy(&source, &target).map_err(|e| CallError::other(e.to_string()))?;
+    let bytes = std::fs::read(&source).map_err(|e| CallError::other(e.to_string()))?;
+    let entry = store(&app, &entry_id, &ext, &bytes)?;
     tracing::info!(entry_id, ext, size, "icon set");
-    allow_assets(&app, &dir);
-    entry_for(&target).ok_or_else(|| CallError::other("cannot read the stored icon"))
+    Ok(entry)
+}
+
+#[tauri::command]
+pub async fn icon_fetch(
+    app: AppHandle,
+    entry_id: String,
+    url: String,
+) -> Result<IconEntry, CallError> {
+    if !valid_id(&entry_id) {
+        return Err(CallError::other("invalid entry id"));
+    }
+    let url = reqwest::Url::parse(&url).map_err(|_| CallError::other("invalid icon url"))?;
+    if url.scheme() != "https" {
+        return Err(CallError::other("icon url must be https"));
+    }
+    let bytes = download_capped(url).await?;
+    let ext = sniff_extension(&bytes)?;
+    let entry = store(&app, &entry_id, ext, &bytes)?;
+    tracing::info!(entry_id, ext, byte_len = bytes.len(), "icon fetched");
+    Ok(entry)
+}
+
+async fn download_capped(url: reqwest::Url) -> Result<Vec<u8>, CallError> {
+    let too_large = || CallError::other("image is larger than 10 MB");
+    let client = reqwest::Client::builder()
+        .user_agent(common::app::user_agent())
+        .timeout(FETCH_TIMEOUT)
+        .build()
+        .map_err(|e| CallError::other(e.to_string()))?;
+    let mut response = client
+        .get(url)
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(|e| CallError::other(e.to_string()))?;
+    if response.content_length().is_some_and(|len| len > MAX_BYTES) {
+        return Err(too_large());
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|e| CallError::other(e.to_string()))?
+    {
+        bytes.extend_from_slice(&chunk);
+        if bytes.len() as u64 > MAX_BYTES {
+            return Err(too_large());
+        }
+    }
+    Ok(bytes)
+}
+
+fn sniff_extension(bytes: &[u8]) -> Result<&'static str, CallError> {
+    match image::guess_format(bytes) {
+        Ok(ImageFormat::Png) => Ok("png"),
+        Ok(ImageFormat::Jpeg) => Ok("jpg"),
+        Ok(ImageFormat::WebP) => Ok("webp"),
+        Ok(ImageFormat::Gif) => Ok("gif"),
+        _ => Err(CallError::other("unsupported image type")),
+    }
 }
 
 #[tauri::command]
@@ -197,20 +267,15 @@ pub async fn icon_generate(
         .await
         .map_err(|_| CallError::other("icon render worker panicked"))??;
 
-    let dir = icons_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| CallError::other(e.to_string()))?;
-    remove_stored(&dir, &entry_id);
-    let target = dir.join(format!("{entry_id}.png"));
-    std::fs::write(&target, &png).map_err(|e| CallError::other(e.to_string()))?;
-    let sidecar = dir.join(format!("{entry_id}.json"));
+    let entry = store(&app, &entry_id, "png", &png)?;
+    let sidecar = icons_dir().join(format!("{entry_id}.json"));
     std::fs::write(
         &sidecar,
         serde_json::to_vec(&config).expect("icon config is serializable"),
     )
     .map_err(|e| CallError::other(e.to_string()))?;
     tracing::info!(entry_id, byte_len = png.len(), "generated icon set");
-    allow_assets(&app, &dir);
-    entry_for(&target).ok_or_else(|| CallError::other("cannot read the stored icon"))
+    Ok(entry)
 }
 
 /// The stored generation config, or `null` when the icon was picked from a
@@ -339,8 +404,8 @@ fn render_generated_icon(
 #[cfg(test)]
 mod tests {
     use super::{
-        render_generated_icon, validate_icon_config, CanvasBackground, IconBackground, IconConfig,
-        GENERATED_ICON_SIZE,
+        render_generated_icon, sniff_extension, validate_icon_config, CanvasBackground,
+        IconBackground, IconConfig, GENERATED_ICON_SIZE,
     };
     use image::{DynamicImage, GenericImageView, ImageFormat, Rgba, RgbaImage};
     use std::io::Cursor;
@@ -429,5 +494,13 @@ mod tests {
             symbol: "dusk-block".to_string(),
         })
         .is_err());
+    }
+
+    #[test]
+    fn fetched_icon_extension_comes_from_the_bytes() {
+        assert_eq!(sniff_extension(&png(Rgba([0, 0, 0, 255]))).unwrap(), "png");
+        assert_eq!(sniff_extension(b"\xff\xd8\xff\xe0").unwrap(), "jpg");
+        assert_eq!(sniff_extension(b"GIF89a").unwrap(), "gif");
+        assert!(sniff_extension(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>").is_err());
     }
 }
