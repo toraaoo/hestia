@@ -1,6 +1,5 @@
 import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldError, FieldLabel } from '@/components/ui/field';
-import { IconDraftControl } from '@/features/shared/entry/components/icon-editor/icon-draft';
+import { FieldError } from '@/components/ui/field';
 import { m } from '@/paraglide/messages.js';
 
 import {
@@ -44,18 +43,6 @@ export function DetailsStep({ form, kind }: { form: WizardForm; kind: Kind }) {
             max={32}
             step={1}
           />
-        )}
-      </form.AppField>
-
-      <form.AppField name="details.icon">
-        {(field: WizardForm) => (
-          <Field>
-            <FieldLabel>{m['entry.create.icon']()}</FieldLabel>
-            <IconDraftControl
-              value={field.state.value}
-              onChange={field.handleChange}
-            />
-          </Field>
         )}
       </form.AppField>
 

@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { ProvisionProgressView } from '@/features/shared/entry/components';
 import {
+  randomIconConfig,
   symbolBytes,
   symbolOption,
 } from '@/features/shared/entry/components/icon-editor/catalog';
@@ -105,10 +106,8 @@ export function CreateEntryDialog({
 
   useJobDisplay(job, open && creating);
 
-  const applyIcon = (
-    entryId: string,
-    icon: WizardValues['details']['icon'],
-  ) => {
+  const applyRandomIcon = (entryId: string) => {
+    const icon = randomIconConfig();
     const symbol = symbolOption(icon.symbol);
     if (!symbol) return;
     symbolBytes(symbol.asset)
@@ -137,13 +136,13 @@ export function CreateEntryDialog({
           );
           toast.success(m['app.toast.created']({ name: created.server.name }));
           toastWarnings(created.warnings);
-          applyIcon(created.id, value.details.icon);
+          applyRandomIcon(created.id);
         } else {
           const instance = await createInstance.mutateAsync(
             instanceParams(value, memoryEntries),
           );
           toast.success(m['app.toast.created']({ name: instance.name }));
-          applyIcon(instance.id, value.details.icon);
+          applyRandomIcon(instance.id);
         }
         onOpenChange(false);
       } catch {

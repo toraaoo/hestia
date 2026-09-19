@@ -17,7 +17,6 @@
         "version": "Choose the Minecraft version."
       },
       "instance_title": "Create instance",
-      "icon": "Icon",
       "name_hint": "Leave blank to use the flavor and version.",
       "no_flavors": "Couldn't load the distributions.",
       "no_versions_match": "No versions match.",

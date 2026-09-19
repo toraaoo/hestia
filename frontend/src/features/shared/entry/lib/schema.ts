@@ -1,6 +1,4 @@
 import { z } from 'zod';
-import type { IconConfig } from '@/api/icons';
-import { randomIconConfig } from '@/features/shared/entry/components/icon-editor/catalog';
 import { m } from '@/paraglide/messages.js';
 
 type Kind = 'server' | 'instance';
@@ -44,7 +42,6 @@ export function detailsStepSchema(kind: Kind) {
       ),
     hardcore: z.boolean(),
     onlineMode: z.boolean(),
-    icon: z.custom<IconConfig>(),
     eula:
       kind === 'server'
         ? z.literal(true, { error: m['app.validation.eula']() })
@@ -80,7 +77,6 @@ export function createWizardDefaults(
       port: '',
       hardcore: false,
       onlineMode: true,
-      icon: randomIconConfig(),
       eula: false,
     },
   };
