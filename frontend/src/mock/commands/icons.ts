@@ -28,6 +28,12 @@ export const commands: Handlers = {
     return entry;
   },
 
+  icon_fetch: (p) => {
+    const entry = { path: str(p, 'url'), mtime: now() };
+    icons.set(str(p, 'entryId'), entry);
+    return entry;
+  },
+
   icon_remove: (p) => {
     icons.delete(str(p, 'entryId'));
     return null;

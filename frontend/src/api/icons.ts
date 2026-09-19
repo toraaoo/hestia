@@ -43,6 +43,10 @@ export function remove(entryId: string): Promise<void> {
   return invokeCommand('icon_remove', { entryId });
 }
 
+export function fetch(entryId: string, url: string): Promise<IconEntry> {
+  return invokeCommand('icon_fetch', { entryId, url });
+}
+
 /** Bake `config` over `symbolBytes` into a generated icon for the entry. */
 export function generate(
   entryId: string,
